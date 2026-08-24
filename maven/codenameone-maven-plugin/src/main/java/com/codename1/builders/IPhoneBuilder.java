@@ -6482,9 +6482,13 @@ public class IPhoneBuilder extends Executor {
         // reference and useless for finding conditionals -- reading candidates out of it made the
         // qualified entries disappear.
         Map<String, String> declared = appExtensionBuildSettings(extensionFolder);
+        // Through the context-taking overload, so the archive's VARIANTS survive. The
+        // five-argument form rebuilds a context out of BUILD_VARIANTS, and a path written
+        // through a variant-qualified helper was then picked by map order rather than by the
+        // variant being resolved -- which could map two variants onto the same plist and hand
+        // the profile target the normal one's identity.
         Map<String, String> settings = context == null ? declared
-                : extensionSettingsWithBuiltIns(extensionFolder, declared, context.configuration,
-                        context.sdk, context.arch);
+                : extensionSettingsWithBuiltIns(extensionFolder, declared, context);
         Map<String, File> out = new LinkedHashMap<String, File>();
         String base = declared.get("INFOPLIST_FILE");
         if (base == null || base.trim().length() == 0) {
@@ -6513,10 +6517,11 @@ public class IPhoneBuilder extends Executor {
                 // still name different files, which is exactly what
                 // $(CONFIGURATION)/Info.plist under [config=Debug] does. Keying by the text threw
                 // the second one away before it was ever resolved.
+                // In the candidate's own context, VARIANTS included -- the same reason the base
+                // resolution above passes the context rather than its three scalars.
                 out.put(key + " = " + value, resolveInfoPlistPath(value, extensionFolder,
                         context == null ? declared
-                                : extensionSettingsWithBuiltIns(extensionFolder, declared,
-                                        own.configuration, own.sdk, own.arch)));
+                                : extensionSettingsWithBuiltIns(extensionFolder, declared, own)));
             }
         }
         return out;
@@ -8094,14 +8099,26 @@ public class IPhoneBuilder extends Executor {
                 ? declared.trim()
                 : appTarget;
         if (chosen != null && chosen.indexOf('$') >= 0) {
+            // $(inherited) on an extension target inherits the PROJECT's deployment target, which
+            // is what appTarget carries. Expanded like any other unknown name it came out empty
+            // and the floor replaced it, so an extension inheriting iOS 16 was written down to 12
+            // or 14 and its code lost the availability the newer APIs need. Substituted first,
+            // and only when this build knows what it inherits.
+            if (appTarget != null && appTarget.trim().length() > 0) {
+                chosen = chosen.replace("$(inherited)", appTarget.trim())
+                        .replace("${inherited}", appTarget.trim());
+                if (chosen.indexOf('$') < 0) {
+                    return isDeploymentTargetBelow(chosen, floor) ? floor
+                            : normalizeVersion(chosen.trim());
+                }
+            }
             // Written through another setting. What it RESOLVES to decides: a reference that lands
             // on a version clearing the floor is kept as written, because Xcode resolves it on the
             // target and that is the archive author's expression to keep.
             String resolved = extensionFolder == null ? "" : resolveSettingsInValue(chosen,
                     context == null
                             ? extensionSettingsWithBuiltIns(extensionFolder, settings)
-                            : extensionSettingsWithBuiltIns(extensionFolder, settings,
-                                    context.configuration, context.sdk, context.arch));
+                            : extensionSettingsWithBuiltIns(extensionFolder, settings, context));
             if (resolved.length() == 0) {
                 // And a reference to a setting nothing defines is not "unknown" -- Xcode expands
                 // it to the empty string, so the extension would declare no minimum at all. The

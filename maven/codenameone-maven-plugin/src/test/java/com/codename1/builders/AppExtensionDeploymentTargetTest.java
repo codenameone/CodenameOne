@@ -1613,4 +1613,33 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(IPhoneBuilder.conditionSpecificity(governingKey)
                 > IPhoneBuilder.conditionSpecificity("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
     }
+
+    @Test
+    public void anInheritedBaseTargetKeepsTheProjectsMinimum() throws Exception {
+        File dist = tmp.newFolder("dist97");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+
+        // $(inherited) on an extension target inherits the PROJECT's deployment target, which is
+        // what the app hint carries. Expanded like any other unknown name it came out empty and
+        // the floor replaced it, so an extension inheriting iOS 16 was written down to 12 and its
+        // code lost the availability the newer APIs need.
+        assertEquals("16.0", IPhoneBuilder.appExtensionDeploymentTarget("$(inherited)",
+                (File) null, "16.0", extension, settings,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings)));
+
+        // And what it inherits is still held to the floor.
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentTarget("$(inherited)",
+                walletEntitlements(extension), "13.0", extension, settings,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings)));
+    }
+
+    private static File walletEntitlements(File extension) throws Exception {
+        File file = new File(extension, "wallet-inherited.entitlements");
+        write(file, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>com.apple.developer.payment-pass-provisioning</key><true/>\n"
+                + "</dict></plist>\n");
+        return file;
+    }
 }
