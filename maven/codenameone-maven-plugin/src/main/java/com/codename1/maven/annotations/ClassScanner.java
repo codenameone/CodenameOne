@@ -43,8 +43,15 @@ import org.objectweb.asm.Opcodes;
 /// Walks a directory of compiled `.class` files and produces the
 /// `AnnotatedClass` index passed to processors.
 ///
-/// Uses ASM's `ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG |
-/// ClassReader.SKIP_FRAMES` flags — we only care about declarations
+/// Uses ASM's `ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES` flags — we only
+/// care about declarations.
+///
+/// NOT `SKIP_DEBUG`, which also suppresses `visitSource` and so the SourceFile
+/// attribute. That attribute is the only reliable link from a compiled class
+/// back to the file that declared it — Kotlin does not require the two to share
+/// a name — and skipping it made every caller of `getSourceFile()` see null and
+/// silently take its "cannot tell" branch. With SKIP_CODE already set there are
+/// no method bodies to walk, so what this costs is parsing one string per class
 /// (annotations, signatures), never method bodies. This keeps scanning fast
 /// even on large projects.
 ///
@@ -118,7 +125,7 @@ public final class ClassScanner {
         try {
             ClassReader reader = new ClassReader(in);
             Collector c = new Collector(source);
-            reader.accept(c, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            reader.accept(c, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES);
             return c.build();
         } catch (IOException e) {
             throw new ProcessingException("Could not read class from " + source + ": " + e.getMessage(), e);

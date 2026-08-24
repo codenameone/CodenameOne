@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -379,6 +380,69 @@ public class BuildHintAnnotationProcessorTest {
                 src, new String[] {"Main", "Wrong"}));
     }
 
+    /// javac names a NAMED local class Main$1Wrong. No source declares that
+    /// spelling, so looking for it finds nothing -- and concluding "orphan" from
+    /// that dropped a live annotated class before the placement check could
+    /// reject it, letting the build succeed with the hints silently discarded.
+    /// Checking for a wholly numeric segment missed $1Wrong exactly.
+    @Test
+    public void anAnnotationOnANamedLocalClassIsStillReported() throws Exception {
+        String source = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "public class MyApp {\n"
+                + "    void go() {\n"
+                + "        @Ios(teamId = \"ABCDE12345\")\n"
+                + "        class Wrong {}\n"
+                + "        new Wrong();\n"
+                + "    }\n"
+                + "}\n";
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource(MAIN, source),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        // The source root has to be real, or the orphan filter is never consulted
+        // and this passes whatever it does.
+        ProcessorContext ctx = run(classes, settings(), MAIN, false, sourceRootWith(source));
+        assertErrorContaining(ctx, "belong on the application's main class");
+    }
+
+    /// The rule the case above rests on, stated directly: javac's own segments
+    /// are unjudgeable, a developer's are not.
+    @Test
+    public void javacsOwnNestedSegmentsAreNotLookedFor() {
+        assertNull(BuildHintAnnotationProcessor.nestedNameOf("com.example.Main$1Wrong"));
+        assertNull(BuildHintAnnotationProcessor.nestedNameOf("com.example.Main$1"));
+        assertNull(BuildHintAnnotationProcessor.nestedNameOf("com.example.Main$A$1B"));
+        assertArrayEquals(new String[] {"Main", "Wrong"},
+                BuildHintAnnotationProcessor.nestedNameOf("com.example.Main$Wrong"));
+        assertNull(BuildHintAnnotationProcessor.nestedNameOf("com.example.Main"));
+    }
+
+    /// A source root holding MyApp.java with the given text.
+    private File sourceRootWith(String source) throws Exception {
+        File root = tmp.newFolder();
+        File dir = new File(root, "com" + File.separator + "example");
+        assertTrue(dir.mkdirs());
+        try (java.io.Writer w = new java.io.OutputStreamWriter(
+                new FileOutputStream(new File(dir, "MyApp.java")), "UTF-8")) {
+            w.write(source);
+        }
+        return root;
+    }
+
+    /// A declaration may put any legal whitespace, or a comment, between the
+    /// keyword and the name. Requiring exactly one space read `class\nWrong` as
+    /// no declaration at all -- so a live type looked stale to the orphan check,
+    /// and the migration goal reported it could not find the main source.
+    @Test
+    public void anyLegalSeparatorBeforeATypeNameIsAccepted() {
+        assertTrue(BuildHintAnnotationProcessor.declaresType("class\nWrong {}", "Wrong"));
+        assertTrue(BuildHintAnnotationProcessor.declaresType("class\tWrong {}", "Wrong"));
+        assertTrue(BuildHintAnnotationProcessor.declaresType("class /* why */ Wrong {}", "Wrong"));
+        assertTrue(BuildHintAnnotationProcessor.declaresType(
+                "public\nfinal\nclass\n   Wrong\n{}", "Wrong"));
+        assertFalse(BuildHintAnnotationProcessor.declaresType("class Wronger {}", "Wrong"));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
@@ -400,10 +464,21 @@ public class BuildHintAnnotationProcessorTest {
 
     private ProcessorContext run(File classes, Properties settings, String mainClass,
                                  boolean expectClean) throws Exception {
+        return run(classes, settings, mainClass, expectClean, null);
+    }
+
+    /// With `sourceRoot` the orphan filter runs for real. Without it the context
+    /// reports no compile source roots, which the filter reads as "not told" and
+    /// keeps every class -- so a test that means to exercise the filter has to
+    /// supply one, or it passes whatever the filter does.
+    private ProcessorContext run(File classes, Properties settings, String mainClass,
+                                 boolean expectClean, File sourceRoot) throws Exception {
         Map<String, AnnotatedClass> index = ClassScanner.scan(classes);
         BuildHintAnnotationProcessor proc = new BuildHintAnnotationProcessor();
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
-                new SystemStreamLog(), tmp.newFolder(), settings, mainClass);
+                new SystemStreamLog(), tmp.newFolder(), settings, mainClass,
+                sourceRoot == null ? null
+                        : java.util.Collections.singletonList(sourceRoot.getAbsolutePath()));
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
             proc.processClass(cls, ctx);

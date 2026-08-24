@@ -363,6 +363,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// wrong-identity bug one level along -- and Main.Wrong not existing is
     /// exactly when its .class is an orphan.
     private static int declarationOf(String code, String simple, int from, int end) {
+        return declarationOf(code, simple, from, end, true);
+    }
+
+    /// As above; `directOnly` restricts the match to brace depth zero within the
+    /// range, which is what nesting identity needs and what a plain "does this
+    /// file declare X" question does not.
+    private static int declarationOf(String code, String simple, int from, int end,
+                                     boolean directOnly) {
         int depth = 0;
         int i = from;
         while (i < end && i < code.length()) {
@@ -377,7 +385,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 i++;
                 continue;
             }
-            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+            if ((directOnly && depth != 0) || !Character.isJavaIdentifierStart(c)
                     || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
                 i++;
                 continue;
@@ -433,7 +441,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// source declares and which cannot carry an annotation in the first place,
     /// so there is nothing to look for and nothing to conclude from not finding
     /// it.
-    private static String[] nestedNameOf(String binaryName) {
+    static String[] nestedNameOf(String binaryName) {
         int dot = binaryName.lastIndexOf('.');
         String simple = dot < 0 ? binaryName : binaryName.substring(dot + 1);
         if (simple.indexOf('$') < 0) {
@@ -441,20 +449,15 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         String[] path = simple.split("\\$");
         for (String segment : path) {
-            if (segment.length() == 0) {
-                return null;
-            }
-            boolean digits = true;
-            for (int i = 0; i < segment.length(); i++) {
-                if (!Character.isDigit(segment.charAt(i))) {
-                    digits = false;
-                    break;
-                }
-            }
-            // An anonymous or synthetic segment. No source declares one and none
-            // can carry a TYPE annotation, so there is nothing to look for and
-            // nothing to conclude from not finding it.
-            if (digits) {
+            // A segment BEGINNING with a digit is javac's, not the developer's:
+            // $1 for an anonymous class and $1Wrong for a named local one. No
+            // source declares either spelling, so looking for it finds nothing --
+            // and concluding "orphan" from that dropped a live annotated local
+            // class before the placement check could reject it, which let the
+            // build succeed with the requested hints silently discarded.
+            //
+            // Checking for wholly-numeric missed $1Wrong exactly.
+            if (segment.length() == 0 || Character.isDigit(segment.charAt(0))) {
                 return null;
             }
         }
@@ -467,25 +470,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// `// class Wrong` left behind by the very edit that deleted the type would
     /// otherwise vouch for its own orphan.
     public static boolean declaresType(String text, String simple) {
-        text = blankNonCode(text);
-        String[] keywords = {"class ", "interface ", "enum ", "object ", "record "};
-        for (String keyword : keywords) {
-            int at = text.indexOf(keyword);
-            while (at >= 0) {
-                int start = at + keyword.length();
-                int end = start;
-                while (end < text.length()
-                        && Character.isJavaIdentifierPart(text.charAt(end))) {
-                    end++;
-                }
-                if (text.substring(start, end).equals(simple)
-                        && (at == 0 || !Character.isJavaIdentifierPart(text.charAt(at - 1)))) {
-                    return true;
-                }
-                at = text.indexOf(keyword, start);
-            }
-        }
-        return false;
+        String code = blankNonCode(text);
+        return declarationOf(code, simple, 0, code.length(), false) >= 0;
     }
 
     /// `text` with every comment and string literal replaced by spaces, so a
