@@ -160,7 +160,7 @@ public class Simulator {
                 files.add(commonClasses.getAbsoluteFile());
             }
             loadSimulatorProperties(cn1Props.getParentFile());
-            publishAnnotationBuildHints(cn1Props.getParentFile());
+            publishAnnotationBuildHints(cn1Props.getParentFile(), classPathStr);
         }
         if (isDebug && usingHotswapAgent) { 
             HotswapProperties hotswapProperties = new HotswapProperties();
@@ -476,14 +476,12 @@ public class Simulator {
      * point in {@code main} the application classes are not on any classloader
      * yet -- the loader is built from {@code files} further down.</p>
      */
-    private static void publishAnnotationBuildHints(File projectDir) {
+    private static void publishAnnotationBuildHints(File projectDir, String classPathStr) {
         if (projectDir == null) {
             return;
         }
-        File f = new File(projectDir, "target" + File.separator + "classes"
-                + File.separator + "META-INF" + File.separator + "codenameone"
-                + File.separator + "build-hints.properties");
-        if (!f.isFile()) {
+        File f = findAnnotationManifest(projectDir, classPathStr);
+        if (f == null) {
             return;
         }
         java.util.Properties p = new java.util.Properties();
@@ -503,7 +501,7 @@ public class Simulator {
                 }
             }
         }
-        File staleAgainst = classNewerThanManifest(projectDir, p, f);
+        File staleAgainst = classNewerThanManifest(p, f);
         if (staleAgainst != null) {
             // Nothing removes target/classes between builds, so a project that ran
             // process-annotations once and then stopped -- goal unbound, skipped,
@@ -543,19 +541,72 @@ public class Simulator {
     }
 
     /**
+     * The emitted build hint manifest, or null when there is none.
+     *
+     * <p>{@code target/classes} is only the default: a module may configure
+     * {@code build/outputDirectory}, and the annotation processor writes where
+     * that says. Hard-coding the conventional path meant the device build applied
+     * the annotated hints and {@code cn1:run} silently ignored them, which is the
+     * asymmetry this whole publishing step exists to remove.</p>
+     *
+     * <p>The configured directory is on the simulator's own classpath, so the
+     * classpath is searched rather than the layout guessed at. The conventional
+     * path is tried first, since it is right for almost every project and costs
+     * one stat.</p>
+     */
+    private static File findAnnotationManifest(File projectDir, String classPathStr) {
+        String resource = "META-INF" + File.separator + "codenameone"
+                + File.separator + "build-hints.properties";
+        File conventional = new File(projectDir, "target" + File.separator + "classes"
+                + File.separator + resource);
+        if (conventional.isFile()) {
+            return conventional;
+        }
+        if (classPathStr == null) {
+            return null;
+        }
+        for (String entry : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (entry.length() == 0) {
+                continue;
+            }
+            File dir = new File(entry);
+            if (!dir.isDirectory()) {
+                // A jar can carry this resource too, but only as a dependency --
+                // and a dependency's hints belong to whoever built it, which the
+                // main-class stamp exists to reject. Directories are this
+                // project's own output.
+                continue;
+            }
+            File candidate = new File(dir, resource);
+            if (candidate.isFile()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
      * The compiled main class when it is newer than the manifest, or null.
      *
      * <p>Null whenever the question cannot be answered -- no main class recorded,
      * no class file for it, no readable timestamps -- so the manifest is taken at
      * face value rather than discarded on a guess.</p>
      */
-    private static File classNewerThanManifest(File projectDir, java.util.Properties manifest,
+    private static File classNewerThanManifest(java.util.Properties manifest,
                                                File manifestFile) {
         String main = manifest.getProperty("cn1.buildHints.mainClass");
         if (main == null || main.trim().length() == 0) {
             return null;
         }
-        File classFile = new File(new File(projectDir, "target" + File.separator + "classes"),
+        // Beside the manifest, whatever directory that turned out to be -- the
+        // two are written by the same build into the same output directory.
+        File classes = manifestFile.getParentFile();          // .../codenameone
+        classes = classes == null ? null : classes.getParentFile();   // .../META-INF
+        classes = classes == null ? null : classes.getParentFile();   // the output dir
+        if (classes == null) {
+            return null;
+        }
+        File classFile = new File(classes,
                 main.trim().replace('.', File.separatorChar) + ".class");
         if (!classFile.isFile()) {
             return null;

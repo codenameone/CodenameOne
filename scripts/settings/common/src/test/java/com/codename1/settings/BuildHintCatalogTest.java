@@ -283,4 +283,43 @@ public class BuildHintCatalogTest {
                 + "@Ios(teamId = \"ABCDE12345\")\n";
         assertNull(CodenameOneSettings.kotlinImportAlias(src, "Ios"));
     }
+
+    /// A commented-out annotation is not an annotation. Reading it as one made
+    /// Settings withhold Add and the editor for a hint the processor never
+    /// emits, which looks like the tool being broken.
+    @Test
+    public void aCommentedOutAnnotationIsNotOwnership() {
+        String src = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "// @Ios(teamId = \"OLD\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Same for a block comment and for an annotation quoted inside a string.
+    @Test
+    public void aBlockCommentOrStringIsNotOwnership() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "/* @Ios(teamId = \"OLD\") */ public class MyApp {}", out);
+        assertNull(out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "String doc = \"@Ios(teamId = x)\";", out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// And the real one is still found when a commented-out copy precedes it.
+    @Test
+    public void aLiveAnnotationAfterACommentedOneIsStillFound() {
+        String src = "// @Ios(teamId = \"OLD\")\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
 }

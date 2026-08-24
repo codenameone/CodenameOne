@@ -2250,13 +2250,19 @@ public class CodenameOneSettings extends Lifecycle {
                   };
             boolean found = false;
             for (int m = 0; m < markers.length && !found; m++) {
-                int at = source.indexOf(markers[m]);
+                // Found by walking the source rather than by indexOf, so a
+                // commented-out annotation or one quoted in a string is not read
+                // as live code. That mattered in the direction nobody would
+                // notice: a `// @Ios(teamId = "old")` left behind made Settings
+                // treat the hint as annotation-owned and withhold Add and the
+                // editor, for a hint the processor never emits.
+                int at = nextMarker(source, markers[m], 0);
                 while (at >= 0) {
                     // "@Ios" must not match "@IosPrivacy": the next character has
                     // to end the name.
                     int after = at + markers[m].length();
                     if (after < source.length() && continuesAName(source.charAt(after))) {
-                        at = source.indexOf(markers[m], after);
+                        at = nextMarker(source, markers[m], after);
                         continue;
                     }
                     int open = source.indexOf('(', at);
@@ -2270,7 +2276,7 @@ public class CodenameOneSettings extends Lifecycle {
                         found = true;
                         break;
                     }
-                    at = source.indexOf(markers[m], after);
+                    at = nextMarker(source, markers[m], after);
                 }
             }
         }
@@ -2341,6 +2347,30 @@ public class CodenameOneSettings extends Lifecycle {
     private static boolean continuesAName(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                 || (c >= '0' && c <= '9') || c == '_' || c == '$';
+    }
+
+    /// The next occurrence of `marker` that is real code, or -1.
+    ///
+    /// Comments and string literals are stepped over with the same scanner the
+    /// argument reader uses, so what counts as code is one answer rather than
+    /// two that can disagree.
+    static int nextMarker(String source, String marker, int from) {
+        int i = from;
+        while (i < source.length()) {
+            char c = source.charAt(i);
+            if (c == '"' || c == '\'' || c == '/') {
+                int skipped = skipNonCode(source, i);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (source.startsWith(marker, i)) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
     }
 
     /// If a string, character literal or comment starts at `i`, the index just

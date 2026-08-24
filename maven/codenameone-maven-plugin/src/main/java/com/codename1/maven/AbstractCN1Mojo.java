@@ -222,6 +222,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
+    /** The session this mojo is running in, for a subclass that has to reproduce it. */
+    protected MavenSession getSession() {
+        return session;
+    }
+
     /**
      * Lets {@code -Dcodename1.arg.x=y} override the settings file.
      *

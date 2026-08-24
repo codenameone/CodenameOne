@@ -346,6 +346,25 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         request.setGoals(Collections.singletonList("process-classes"));
         Properties props = new Properties();
         props.setProperty("skipTests", "true");
+        // Reproduce the invocation the developer actually made. A project that
+        // needs `-Pcustomer` to compile, or `-Dfeature=true` to bind
+        // process-annotations, is a different build without them: the check
+        // would roll back a migration that works, or -- worse -- pass a build
+        // whose processing an outer -D was switching off. The user properties go
+        // in first so skipTests below cannot be silently overridden by one.
+        if (getSession() != null) {
+            Properties user = getSession().getUserProperties();
+            if (user != null) {
+                for (String name : user.stringPropertyNames()) {
+                    props.setProperty(name, user.getProperty(name));
+                }
+            }
+            props.setProperty("skipTests", "true");
+            List<String> profiles = activeProfileIds();
+            if (!profiles.isEmpty()) {
+                request.setProfiles(profiles);
+            }
+        }
         request.setProperties(props);
         request.setBatchMode(true);
         try {
@@ -380,7 +399,31 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return null;
     }
 
-    /** The reactor module whose basedir is {@code dir}, or null when none is. */
+    /**
+     * The profiles this invocation was started with, by id.
+     *
+     * <p>Taken from the request rather than from the resolved project, because
+     * what has to be reproduced is what the developer typed: a profile activated
+     * by a property or a file is activated again on its own terms in the nested
+     * build, while one named with {@code -P} is not unless it is passed on.</p>
+     */
+    private List<String> activeProfileIds() {
+        List<String> out = new ArrayList<String>();
+        if (getSession() == null || getSession().getRequest() == null) {
+            return out;
+        }
+        List<String> active = getSession().getRequest().getActiveProfiles();
+        if (active != null) {
+            for (String id : active) {
+                if (id != null && id.trim().length() > 0) {
+                    out.add(id.trim());
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The reactor module whose basedir is {@code dir}, or null when none is. */    /** The reactor module whose basedir is {@code dir}, or null when none is. */
     private org.apache.maven.project.MavenProject moduleAt(File dir) {
         if (reactorProjects == null || dir == null) {
             return null;
