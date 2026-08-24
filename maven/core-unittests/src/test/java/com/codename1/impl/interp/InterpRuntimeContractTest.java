@@ -177,6 +177,14 @@ class InterpRuntimeContractTest {
         // real `com/example/...` classes as missing source.
         assertEquals("com.example", packageOf(
                 "package com.\nexample;\npublic class A {}\n"));
+        // Java text blocks process backslash escapes, so `\"""` inside
+        // the block is an escaped quote followed by two quotes -- the
+        // block stays open. Treating the three quotes as the closing
+        // delimiter would expose the fake `package` word after the
+        // block and refuse `real/package-info.java` as missing source.
+        assertEquals("real", packageOf(
+                "@Foo(\"\"\"\n" + "text \\\"\"\" package fake \"\"\")\n"
+                + "package real;\n"));
     }
 
     private static String packageOf(String source) throws Exception {

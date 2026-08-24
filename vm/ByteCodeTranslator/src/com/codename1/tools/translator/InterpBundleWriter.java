@@ -511,12 +511,28 @@ public class InterpBundleWriter {
                 // string, or consume the real one that follows. The literal
                 // ends at the next `"""`; nothing inside it has meaning to
                 // the package scanner, but newlines still terminate a Kotlin
-                // package header so they stay in the output.
+                // package header so they stay in the output. Java text
+                // blocks process backslash escapes (`\"` is an escaped
+                // quote, not the start of a closing delimiter, and `\`
+                // followed by a line terminator is a line continuation);
+                // Kotlin raw strings do not process escapes, so this
+                // handling is Java-only.
+                boolean javaEscapes = !kotlinNested;
                 i += 3;
                 while (i + 2 < text.length()
                         && !(text.charAt(i) == '"'
                                 && text.charAt(i + 1) == '"'
                                 && text.charAt(i + 2) == '"')) {
+                    if (javaEscapes && text.charAt(i) == '\\'
+                            && i + 1 < text.length()) {
+                        // Skip the escape and the escaped character. A `\`
+                        // before `"` means the closing check must not fire
+                        // on the next quote; a `\` before `\n` is a line
+                        // continuation whose real newline is inside the
+                        // block and does not reach the outer scanner.
+                        i += 2;
+                        continue;
+                    }
                     if (text.charAt(i) == '\n' || text.charAt(i) == '\r') {
                         out.append(text.charAt(i));
                     }
