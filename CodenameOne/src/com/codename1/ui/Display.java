@@ -3848,11 +3848,19 @@ public final class Display extends CN1Constants {
                 case SHOWN:
                     if (w != null) {
                         w.showNotify();
+                        // A visibility change can change what is blocked: a modal whose
+                        // owner went away stops blocking, and blocks again when the
+                        // owner returns. Only push, pop and dispose re-synced the native
+                        // flags, so the framework and the platform disagreed for as long
+                        // as the window stayed hidden -- the platform kept the main
+                        // surface disabled with no modal on screen to release it.
+                        Display.getInstance().syncNativeModalBlocking();
                     }
                     break;
                 case HIDDEN:
                     if (w != null) {
                         w.hideNotify();
+                        Display.getInstance().syncNativeModalBlocking();
                     }
                     break;
                 case ACTIVATION_FAILED:
@@ -4795,6 +4803,15 @@ public final class Display extends CN1Constants {
                 // and it applies to the owner chain rather than to any modal at all.
                 continue;
             }
+            if (isModalOutOfReach(modal)) {
+                // Hidden along with an owner the application hid. The registration is
+                // kept on purpose -- hideNotify() cannot tell an owner cascade from a
+                // minimize, and a minimized modal is still open and still modal -- but a
+                // modal nobody can see or dismiss must not go on blocking. Left in, the
+                // owner's hide froze the main surface and every unrelated window with no
+                // window on screen to release them, until the owner was shown again.
+                continue;
+            }
             if (blocks(modal, windowId)) {
                 return true;
             }
@@ -4815,6 +4832,34 @@ public final class Display extends CN1Constants {
     }
 
     /// Whether one modal window blocks input to the window with the given id.
+    /// Whether a registered modal is currently unreachable because an owner above it
+    /// is off screen.
+    ///
+    /// Only the owner chain is consulted, never the modal's own visibility: a modal the
+    /// user minimized is still open and still blocks, which is what keeps a minimized
+    /// modal from quietly releasing the application. An owner that is not showing is a
+    /// different situation -- its children went with it and cannot be restored
+    /// independently, so nothing on screen can dismiss them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `modal`: the registered modal window
+    ///
+    /// #### Returns
+    ///
+    /// true when an owner of this modal is not showing
+    private static boolean isModalOutOfReach(Window modal) {
+        TopLevelContainer owner = modal.getOwnerWindow();
+        while (owner instanceof Window) {
+            Window w = (Window) owner;
+            if (!w.isWindowShowing()) {
+                return true;
+            }
+            owner = w.getOwnerWindow();
+        }
+        return false;
+    }
+
     private boolean blocks(Window modal, int windowId) {
         if (modal.getModalityType() == Window.MODALITY_APPLICATION) {
             return true;

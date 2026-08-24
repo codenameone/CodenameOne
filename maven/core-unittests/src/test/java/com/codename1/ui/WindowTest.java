@@ -4273,6 +4273,57 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void hidingAnOwnerReleasesItsModalChildsGripOnTheApplication() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Display d = Display.getInstance();
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(400, 300);
+        owner.show();
+        Window modal = new Window("modal", new BorderLayout());
+        modal.setWindowSize(200, 150);
+        modal.setOwnerWindow(owner);
+        modal.setModalityType(Window.MODALITY_APPLICATION);
+        modal.show();
+        DisplayTest.flushEdt();
+        // An unrelated window, because what an application modal costs when it will not
+        // let go is every other surface, not just the one that opened it.
+        Window bystander = new Window("bystander", new BorderLayout());
+        bystander.setWindowSize(300, 200);
+        bystander.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow bystanderPeer = wm.getLastWindow();
+        try {
+            assertFalse(bystanderPeer.isInputEnabled(),
+                    "an application modal blocks unrelated windows while it is up");
+
+            // The owner is hidden by the application. Every port cascades that to the
+            // children it owns and reports them through windowHideNotify, which is the
+            // minimize path -- so the child keeps its modal registration on purpose.
+            owner.hide();
+            d.windowHideNotify(modal.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertTrue(bystanderPeer.isInputEnabled(),
+                    "with its owner hidden the modal is on nobody's screen, so it must "
+                            + "not go on blocking every other window with nothing "
+                            + "available to dismiss it");
+
+            // And it takes the block back when the owner returns, rather than being
+            // permanently disarmed.
+            owner.show();
+            d.windowShowNotify(modal.getWindowId());
+            DisplayTest.flushEdt();
+            assertFalse(bystanderPeer.isInputEnabled(),
+                    "the modal blocks again once its owner is back on screen");
+        } finally {
+            bystander.dispose();
+            modal.dispose();
+            owner.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
     void centeringFromABackgroundThreadUsesTheSizeItWillActuallyHave() throws Exception {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         final Window w = new Window("centre", new BorderLayout());
