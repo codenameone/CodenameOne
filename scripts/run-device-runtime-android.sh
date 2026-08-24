@@ -88,10 +88,20 @@ if [ "$SKIP_BUILD" = 0 ]; then
     # installed android-37.0 declares AndroidVersion.ApiLevel=37.0 with
     # Platform.Version=17, which AGP rejects. 36 is the newest coherent one
     # here. Drop this once the SDK package is fixed.
+    # BSD (macOS) sed requires an explicit backup suffix argument -- `-i ''`
+    # for none -- while GNU sed (Linux) takes `-i` alone and treats a
+    # separate `''` as an input filename, aborting with "can't read : No
+    # such file or directory" under `set -e`. Detect once, invoke through
+    # the array to survive both shells.
+    if sed --version >/dev/null 2>&1; then
+        SED_INPLACE=(sed -i)
+    else
+        SED_INPLACE=(sed -i '')
+    fi
     API="${CN1_ANDROID_API:-36}"
-    /usr/bin/sed -i '' -e "s/compileSdkVersion 37/compileSdkVersion $API/" \
-                       -e "s/targetSdkVersion 37/targetSdkVersion $API/" \
-                       "$GRADLE_DIR/app/build.gradle"
+    "${SED_INPLACE[@]}" -e "s/compileSdkVersion 37/compileSdkVersion $API/" \
+                        -e "s/targetSdkVersion 37/targetSdkVersion $API/" \
+                        "$GRADLE_DIR/app/build.gradle"
     # One ABI for a sideloadable APK. The runtime carries ML Kit, CameraX and
     # ARCore on purpose -- they are the reason to debug on a device rather than
     # in the simulator -- and ML Kit's bundled models are ~287MB of native
@@ -103,7 +113,7 @@ if [ "$SKIP_BUILD" = 0 ]; then
     # delivers one ABI per device by itself.
     ABI="${CN1_ANDROID_ABI:-arm64-v8a}"
     if ! grep -q abiFilters "$GRADLE_DIR/app/build.gradle"; then
-        /usr/bin/sed -i '' -e "s/    defaultConfig {/    defaultConfig {\
+        "${SED_INPLACE[@]}" -e "s/    defaultConfig {/    defaultConfig {\
         ndk { abiFilters '$ABI' }/" "$GRADLE_DIR/app/build.gradle"
     fi
     # The generated project has no local.properties -- the cloud build server
