@@ -1,0 +1,14 @@
+package android.net;
+public class Uri {
+    public static Uri parse(String s) { return null; }
+    public static String encode(String s) { return s; }
+    public String getPath() { return ""; }
+    public String getHost() { return ""; }
+    public String toString() { return ""; }
+    public static class Builder {
+        public Builder scheme(String s) { return this; }
+        public Builder authority(String a) { return this; }
+        public Builder path(String p) { return this; }
+        public Uri build() { return null; }
+    }
+}

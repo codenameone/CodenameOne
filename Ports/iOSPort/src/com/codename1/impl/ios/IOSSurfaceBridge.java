@@ -87,6 +87,10 @@ final class IOSSurfaceBridge implements SurfaceBridge {
         }
     }
 
+    // The container write and the watch hand-off below are one operation, and they are safe to
+    // write as one because Surfaces serializes publishes of a kind against each other. Nothing
+    // here re-establishes that: interleave two of these and the later write pairs with the
+    // earlier hand-off, leaving the watch on a descriptor the phone has replaced.
     public void publishWidgetTimeline(String kindId, String timelineJson,
             Map<String, byte[]> images) {
         String container = containerPath();
@@ -106,10 +110,156 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             return;
         }
         nativeInstance.surfacesReloadTimelines(kindId);
+        // The STORE's artwork, not the side-map this publish happened to carry. A SurfaceImage
+        // built from a previously registered name references a blob without shipping it, so the
+        // map is empty while the descriptor still names art -- and a watch installed since that
+        // art was first published rendered a gap until something else forced a full re-send. The
+        // container write above has already run, so what is on disk is exactly the referenced
+        // set.
+        mirrorToWatch(kindId, timelineJson, storedImages(container + "/cn1surfaces/" + kindId));
+    }
+
+    /// The image blobs a kind has in its container, keyed by the name its descriptor references.
+    ///
+    /// Read back rather than remembered, because a reload can be far from the publish that
+    /// produced them and the container is where they live in the meantime.
+    private Map<String, byte[]> storedImages(String kindDir) {
+        Map<String, byte[]> out = new java.util.LinkedHashMap<String, byte[]>();
+        try {
+            String[] files = fs.listFiles(kindDir);
+            if (files == null) {
+                return out;
+            }
+            for (String name : files) {
+                if (name == null || !name.endsWith(".png")) {
+                    continue;
+                }
+                // PER FILE. One unreadable blob -- a concurrent publish removing it between the
+                // listing and the read is the ordinary way -- used to abandon the enumeration, so
+                // every image after it was dropped too. The descriptor then went to the watch
+                // with a partial map, and a watch installing it fresh showed gaps for artwork
+                // that was perfectly readable, until some later publish happened to fix it.
+                try {
+                    java.io.InputStream in = fs.openInputStream(kindDir + "/" + name);
+                    try {
+                        byte[] blob = com.codename1.io.Util.readInputStream(in);
+                        out.put(name.substring(0, name.length() - 4), blob);
+                    } finally {
+                        in.close();
+                    }
+                } catch (Throwable oneBlob) {
+                    // A blob that cannot be read is a gap in that image, not in the rest.
+                    Log.e(oneBlob);
+                }
+            }
+        } catch (Throwable t) {
+            // The listing itself failed, which is the only thing left that can reach here.
+            Log.e(t);
+        }
+        return out;
+    }
+
+    /// Forwards a published timeline to the paired watch, when this build has a watch app and
+    /// the kind declares a complication family.
+    ///
+    /// An App Group container is device-local: the watch resolves the same identifier to a
+    /// directory of its own, which nothing on the phone can write. So a phone-side publish is
+    /// invisible to a complication unless the descriptor travels, and this is where it does.
+    ///
+    /// Which kinds are worth sending is decided at build time and read from the app's plist by
+    /// the native, so a publish of a phone-only kind costs one dictionary lookup. The native is
+    /// also a no-op in a build with no watch app, and on the watch itself -- where the app's own
+    /// publish is authoritative and mirroring back would loop.
+    ///
+    /// Best-effort by contract, and deliberately after the local write: this call cannot fail in
+    /// a way that leaves the phone's own widget wrong.
+    private void mirrorToWatch(String kindId, String timelineJson, Map<String, byte[]> images) {
+        String[] names;
+        byte[][] blobs;
+        if (images == null || images.isEmpty()) {
+            names = new String[0];
+            blobs = new byte[0][];
+        } else {
+            names = new String[images.size()];
+            blobs = new byte[images.size()][];
+            int i = 0;
+            for (Map.Entry<String, byte[]> e : images.entrySet()) {
+                names[i] = e.getKey();
+                blobs[i] = e.getValue();
+                i++;
+            }
+        }
+        try {
+            nativeInstance.surfacesMirrorToWatch(kindId, timelineJson, names, blobs);
+        } catch (Throwable t) {
+            // The timeline is already persisted and the phone's widget already reloaded. A watch
+            // that does not hear about it is a degraded surface, not a failed publish.
+            Log.e(t);
+        }
     }
 
     public void reloadWidgets(String kindId) {
         nativeInstance.surfacesReloadTimelines(kindId == null ? "" : kindId);
+        // ...and the paired watch, which surfacesReloadTimelines does not reach: it drives
+        // WidgetCenter, and a complication lives in another bundle on another device with its own
+        // copy of the descriptor. A reload means "draw what you already hold again", and the only
+        // way to ask for that across the pairing is to hand the descriptor over again. No images:
+        // their names are content hashes, so whatever it references is already beside it.
+        String container = containerPath();
+        if (container == null) {
+            return;
+        }
+        if (kindId != null) {
+            remirror(container, kindId);
+            return;
+        }
+        try {
+            String[] kinds = fs.listFiles(container + "/cn1surfaces");
+            if (kinds == null) {
+                return;
+            }
+            for (String kind : kinds) {
+                if (kind == null) {
+                    continue;
+                }
+                // listFiles returns child names; a directory carries a trailing slash on some
+                // ports.
+                String bare = kind.endsWith("/") ? kind.substring(0, kind.length() - 1) : kind;
+                if (bare.length() > 0) {
+                    remirror(container, bare);
+                }
+            }
+        } catch (IOException e) {
+            // Nothing published yet, most likely. A reload-all that cannot enumerate has nothing
+            // to forward.
+            Log.e(e);
+        }
+    }
+
+    /// Sends a kind's stored descriptor to the watch again. Silent when nothing was published:
+    /// there is then nothing for the watch to redraw.
+    private void remirror(String container, String kindId) {
+        try {
+            String path = container + "/cn1surfaces/" + kindId + "/timeline.json";
+            if (!fs.exists(path)) {
+                return;
+            }
+            java.io.InputStream in = fs.openInputStream(path);
+            byte[] json = com.codename1.io.Util.readInputStream(in);
+            in.close();
+            if (json.length > 0) {
+                // With the artwork, not without it. A reload is also how a watch app installed
+                // AFTER the publish gets its first copy of anything, and a descriptor whose
+                // content-hash images have never existed on that device renders as permanent gaps
+                // until the app happens to publish again.
+                mirrorToWatch(kindId, new String(json, "UTF-8"),
+                        storedImages(container + "/cn1surfaces/" + kindId));
+            }
+        } catch (Throwable t) {
+            // A watch that does not hear about a reload keeps showing the same content, which is
+            // what a reload would have redrawn: this is a refresh, not a change.
+            Log.e(t);
+        }
     }
 
     public int getInstalledWidgetCount(String kindId) {

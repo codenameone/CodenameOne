@@ -127,6 +127,23 @@ function events(state) {
 }
 
 {
+  const state = load("accepted");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1, "an accepted project download should be queued once");
+  assert.equal(recorded[0][0], "InitializrProjectDownloaded");
+  assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
+}
+
+{
+  const state = load("declined");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  assert.equal(eventCommands(state).length, 0,
+    "a project download must not be recorded without analytics consent");
+}
+
+{
   const state = load(null);
   state.window.cn1CrispEvents.signingScreenView({ page: "/signing/" });
   assert.equal(eventCommands(state).length, 0, "an event must wait for a consent choice");

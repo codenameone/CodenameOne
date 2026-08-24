@@ -2973,6 +2973,16 @@ bindCiFallback("Log.print", [
   // production browser console, so silence it unless the diagnostic
   // toggle is on. User code that wants noisy logs can either route
   // through Log.e() (always surfaced) or load with ?parparDiag=1.
+  //
+  // NOTE this stub SHADOWS the translated ``Log.print`` rather than
+  // falling back to it (see the ``Log.e`` note below for why
+  // ``bindCiFallback`` is not conditional), so text logged through
+  // ``Log.p`` never reaches the ``Writer`` a ``Log`` subclass returns
+  // from ``createWriter()``, and ``Log.getLog()`` stays empty on this
+  // port. That is deliberate for now: the translated method writes every
+  // line through ``Storage`` and drops the level-0 gate above. ``Log.e``
+  // is the path that has to run the real Java code (issue #5519) and it
+  // does -- ``logThrowable`` opens the writer itself.
   const text = message == null ? "" : jvm.toNativeString(message);
   const lv = level | 0;
   if (lv >= 1 && global.console && typeof global.console.error === "function") {
@@ -2985,22 +2995,25 @@ bindCiFallback("Log.print", [
   return null;
 });
 
-// ``Log.e(Throwable)`` is a *static* method, so the translated bytecode
-// invokes it with a single argument (the throwable). Earlier versions of
-// this fallback declared ``function*(__cn1ThisObject, throwable)`` — that
-// shifted the parameter by one slot, ``throwable`` was always
-// ``undefined``, and ``stringifyThrowable`` printed ``"null"``. Real
-// caught exceptions then surfaced in the browser console as the
-// infamous ``Exception: null`` flood. Keep the signature as ``(throwable)``
-// so the actual class/message/stack survives the round-trip.
-bindCiFallback("Log.e", [
-  "cn1_com_codename1_io_Log_e_java_lang_Throwable"
-], function*(throwable) {
-  if (global.console && typeof global.console.error === "function") {
-    global.console.error("Exception: " + (yield* stringifyThrowable(throwable)));
-  }
-  return null;
-});
+// ``Log.e(Throwable)`` deliberately has NO binding here.
+//
+// ``bindCiFallback`` reads like "use this only when the real method is
+// missing", but it is not conditional: ``bindNative`` stashes the
+// translated body in ``jvm.translatedMethods`` and then overwrites the
+// live binding, so anything bound here REPLACES the Codename One method
+// outright. A stub used to sit on ``Log.e`` and print the throwable to
+// ``console.error``. That meant ``Log.e`` never reached
+// ``Log.logThrowable``, which is the only caller of ``Log.getWriter()``
+// -> ``Log.createWriter()``. Every ``Log`` subclass that captures output
+// through its own writer therefore got a writer that was never created;
+// the app-visible symptom in issue #5519 was a ``NullPointerException``
+// raised the moment such a subclass read its (still null) writer back.
+//
+// Nothing is lost by letting the translated method run: ``logThrowable``
+// prints through ``Log.print`` (bound above) and ``Throwable
+// .printStackTrace()``, both of which reach the browser console, and
+// ``HTML5Implementation.printStackTraceToStream`` now feeds the writer
+// the same trace the console gets.
 
 bindCiFallback("NetworkManager.addErrorListener", [
   "cn1_com_codename1_io_NetworkManager_addErrorListener_com_codename1_ui_events_ActionListener"

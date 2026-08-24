@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,15 +54,30 @@ public class PatchGradleFiles {
         }
 
         boolean modifiedRoot = patchRootBuildGradle(arguments.root);
-        boolean modifiedApp = patchAppBuildGradle(arguments.app, arguments.compileSdk, arguments.targetSdk);
-
         if (modifiedRoot) {
             System.out.println("Patched " + arguments.root);
         }
-        if (modifiedApp) {
-            System.out.println("Patched " + arguments.app);
+        // Every application module, not only app/. A companion Wear build adds wear/, which is a
+        // second application module with its own compileSdkVersion -- left unpinned it takes the
+        // newest platform installed on the runner, and a platform that has dropped an API the
+        // Codename One port still compiles against (FingerprintManager went in API 37) fails only
+        // that module, in a file nobody edited.
+        boolean modifiedAny = modifiedRoot;
+        for (Path module : arguments.apps) {
+            if (!Files.isRegularFile(module)) {
+                System.out.println("Skipping absent module build.gradle " + module);
+                continue;
+            }
+            // The FIRST --app is the module the instrumentation suite runs against; anything
+            // after it is a companion that only needs its SDK levels pinned.
+            boolean instrumented = module.equals(arguments.apps.get(0));
+            if (patchAppBuildGradle(module, arguments.compileSdk, arguments.targetSdk,
+                    instrumented)) {
+                System.out.println("Patched " + module);
+                modifiedAny = true;
+            }
         }
-        if (!modifiedRoot && !modifiedApp) {
+        if (!modifiedAny) {
             System.out.println("Gradle files already normalized");
         }
     }
@@ -93,7 +130,19 @@ public class PatchGradleFiles {
         return changed;
     }
 
-    private static boolean patchAppBuildGradle(Path path, int compileSdk, int targetSdk) throws IOException {
+    /**
+     * Patches one application module.
+     *
+     * <p>{@code instrumented} tells the SDK pins apart from the test harness. Every application
+     * module needs the pins -- an unpinned one takes the newest platform on the runner, which is
+     * how a Wear module ended up compiling against an API that had dropped a class the port
+     * uses. None of the rest belongs anywhere but the module the suite actually runs against: a
+     * companion Wear module has no instrumentation sources, so a runner, test dependencies and a
+     * coverage report task there are configuration for tests that do not exist, and the report
+     * finalizer fails on a module with nothing to report.</p>
+     */
+    private static boolean patchAppBuildGradle(Path path, int compileSdk, int targetSdk,
+            boolean instrumented) throws IOException {
         String content = Files.readString(path, StandardCharsets.UTF_8);
         boolean changed = false;
 
@@ -101,21 +150,23 @@ public class PatchGradleFiles {
         content = r.content();
         changed |= r.changed();
 
-        r = ensureInstrumentationRunner(content);
-        content = r.content();
-        changed |= r.changed();
-
         r = removeLegacyUseLibrary(content);
         content = r.content();
         changed |= r.changed();
 
-        r = ensureTestDependencies(content);
-        content = r.content();
-        changed |= r.changed();
+        if (instrumented) {
+            r = ensureInstrumentationRunner(content);
+            content = r.content();
+            changed |= r.changed();
 
-        r = ensureJacocoConfiguration(content);
-        content = r.content();
-        changed |= r.changed();
+            r = ensureTestDependencies(content);
+            content = r.content();
+            changed |= r.changed();
+
+            r = ensureJacocoConfiguration(content);
+            content = r.content();
+            changed |= r.changed();
+        }
 
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
@@ -357,20 +408,21 @@ afterEvaluate {
 
     private static class Arguments {
         final Path root;
-        final Path app;
+        /** Every application module to pin; --app may be repeated. */
+        final java.util.List<Path> apps;
         final int compileSdk;
         final int targetSdk;
 
-        Arguments(Path root, Path app, int compileSdk, int targetSdk) {
+        Arguments(Path root, java.util.List<Path> apps, int compileSdk, int targetSdk) {
             this.root = root;
-            this.app = app;
+            this.apps = apps;
             this.compileSdk = compileSdk;
             this.targetSdk = targetSdk;
         }
 
         static Arguments parse(String[] args) {
             Path root = null;
-            Path app = null;
+            java.util.List<Path> apps = new java.util.ArrayList<>();
             int compileSdk = 36;
             int targetSdk = 36;
             for (int i = 0; i < args.length; i++) {
@@ -388,7 +440,7 @@ afterEvaluate {
                             System.err.println("Missing value for --app");
                             return null;
                         }
-                        app = Path.of(args[++i]);
+                        apps.add(Path.of(args[++i]));
                     }
                     case "--compile-sdk" -> {
                         if (i + 1 >= args.length) {
@@ -410,11 +462,11 @@ afterEvaluate {
                     }
                 }
             }
-            if (root == null || app == null) {
-                System.err.println("--root and --app are required");
+            if (root == null || apps.isEmpty()) {
+                System.err.println("--root and at least one --app are required");
                 return null;
             }
-            return new Arguments(root, app, compileSdk, targetSdk);
+            return new Arguments(root, apps, compileSdk, targetSdk);
         }
     }
 }

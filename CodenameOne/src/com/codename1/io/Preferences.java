@@ -107,13 +107,21 @@ public final class Preferences {
     ///
     /// - `o`: a String a number or boolean
     private static void set(String pref, Object o) {
-        Object prior = get(pref, null);
-        if (o == null) {
-            get().remove(pref);
-        } else {
-            get().put(pref, o);
+        Object prior;
+        // the change and the save that persists it have to be one step. save()
+        // serializes the map by writing an entry count and then walking it, so a
+        // change landing from another thread in between wrote a file whose count did
+        // not match its contents, and every preference in it read back as garbage.
+        // Listeners fire outside the lock, they are free to call back in here.
+        synchronized (Preferences.class) {
+            prior = get(pref, null);
+            if (o == null) {
+                get().remove(pref);
+            } else {
+                get().put(pref, o);
+            }
+            save();
         }
-        save();
         fireChange(pref, prior, o);
     }
 
@@ -124,18 +132,20 @@ public final class Preferences {
     /// - `values`: The key/value pairs to set in preferences.
     public static void set(Map<String, Object> values) {
         ArrayList<Object[]> changeParams = new ArrayList<Object[]>();
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            String pref = entry.getKey();
-            Object o = entry.getValue();
-            Object prior = get(pref, null);
-            if (o == null) {
-                get().remove(pref);
-            } else {
-                get().put(pref, o);
+        synchronized (Preferences.class) {
+            for (Map.Entry<String, Object> entry : values.entrySet()) {
+                String pref = entry.getKey();
+                Object o = entry.getValue();
+                Object prior = get(pref, null);
+                if (o == null) {
+                    get().remove(pref);
+                } else {
+                    get().put(pref, o);
+                }
+                changeParams.add(new Object[]{pref, prior, o});
             }
-            changeParams.add(new Object[]{pref, prior, o});
+            save();
         }
-        save();
         for (Object[] params : changeParams) {
             fireChange((String) params[0], params[1], params[2]);
         }
@@ -202,9 +212,12 @@ public final class Preferences {
     ///
     /// - `pref`: the preference value
     public static void delete(String pref) {
-        Object prior = get(pref, null);
-        get().remove(pref);
-        save();
+        Object prior;
+        synchronized (Preferences.class) {
+            prior = get(pref, null);
+            get().remove(pref);
+            save();
+        }
         fireChange(pref, prior, null);
     }
 
@@ -212,21 +225,23 @@ public final class Preferences {
     public static void clearAll() {
         // We only need to save prior values for Preferences that actually have listeners.
         Hashtable<String, Object> priorValues = null;
-        if (!listenerMap.isEmpty()) {
+        synchronized (Preferences.class) {
+            if (!listenerMap.isEmpty()) {
 
-            // Save all the Preferences for which there are registered listeners.
-            priorValues = new Hashtable<String, Object>();
-            for (String key : listenerMap.keySet()) {
-                final Object currentValue = get().get(key);
-                // We can't put null values in the hashtable. But we don't need to, because if we could we'd just be calling 
-                // fireChange(Pref, null, null) and fireChange would do nothing.
-                if (currentValue != null) {
-                    priorValues.put(key, currentValue);
+                // Save all the Preferences for which there are registered listeners.
+                priorValues = new Hashtable<String, Object>();
+                for (String key : listenerMap.keySet()) {
+                    final Object currentValue = get().get(key);
+                    // We can't put null values in the hashtable. But we don't need to, because if we could we'd just be calling
+                    // fireChange(Pref, null, null) and fireChange would do nothing.
+                    if (currentValue != null) {
+                        priorValues.put(key, currentValue);
+                    }
                 }
             }
+            get().clear();
+            save();
         }
-        get().clear();
-        save();
         if (priorValues != null) {
             for (String key : listenerMap.keySet()) {
                 fireChange(key, priorValues.get(key), null);

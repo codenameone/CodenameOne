@@ -220,6 +220,17 @@ static void cn1WatchDeliverPhase(int phase) {
 void cn1_watch_runtime_markJavaReady(void) {
     cn1WatchJavaLifecycleReady = YES;
     cn1WatchReplayPendingPhase();
+    // ...and a complication tap that arrived before the VM did. A tap on a terminated watch app
+    // launches it WITH the URL, and SwiftUI delivers onOpenURL as soon as the scene exists --
+    // which is before this. Same readiness, same drain point.
+    extern void cn1_watch_surface_drainPending(void);
+    cn1_watch_surface_drainPending();
+}
+
+/// Whether the Java lifecycle callback has run, for the surface-URL path in IOSNative.m. An int
+/// rather than a BOOL so the declaration at the call site needs no Objective-C types.
+int cn1_watch_runtime_isJavaReady(void) {
+    return cn1WatchJavaLifecycleReady ? 1 : 0;
 }
 
 /// Hands over, in order, every phase the app could not be told about yet.

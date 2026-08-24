@@ -70,6 +70,7 @@ class JavaScriptRuntimeFacadeTest {
     private static final Path BUFFERED_GRAPHICS_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "BufferedGraphics.java");
     private static final Path BOOTSTRAP_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "JavaScriptPortBootstrap.java");
     private static final Path STUB_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "java", "com", "codename1", "impl", "html5", "Stub.java");
+    private static final Path PORT_JS_SOURCE = Paths.get("..", "..", "Ports", "JavaScriptPort", "src", "main", "webapp", "port.js");
 
     @Test
     void extractedFacadeCompilesAndPreservesKeyRuntimeRules() throws Exception {
@@ -1566,5 +1567,38 @@ class JavaScriptRuntimeFacadeTest {
                 "HTML5Implementation.setTransform should not println its inputs on every call");
         assertTrue(!html5Source.contains("CN1JS:HTML5Implementation.scale x="),
                 "HTML5Implementation.scale should not println its inputs on every call");
+    }
+
+    /**
+     * Issue #5519. ``bindCiFallback`` in port.js is not a fallback: bindNative
+     * overwrites the translated method, so binding one of Codename One's own
+     * methods there deletes its Java behaviour. A stub on ``Log.e(Throwable)``
+     * kept ``Log.logThrowable`` from ever running, which meant a ``Log``
+     * subclass's ``createWriter()`` was never called and the app read a null
+     * writer back. Logged output is not the contract here -- calling back into
+     * the app's Log is -- so pin the absence of the binding rather than the
+     * console text, and pin the writer half that has to be fed from the port.
+     *
+     * <p>The behavioural counterpart is LogSubclassCaptureTest in the
+     * hellocodenameone device suite; this one just fails fast and offline.</p>
+     */
+    @Test
+    void javascriptPortRunsTheRealLogEratherThanAConsoleStub() throws Exception {
+        String portJs = new String(Files.readAllBytes(PORT_JS_SOURCE), StandardCharsets.UTF_8);
+        assertFalse(portJs.contains("\"cn1_com_codename1_io_Log_e_java_lang_Throwable\""),
+                "port.js must not bind over Log.e(Throwable): bindNative replaces the translated "
+                        + "method, so Log.logThrowable never runs and a Log subclass's createWriter() "
+                        + "is never called (issue #5519)");
+
+        String html5Source = new String(Files.readAllBytes(HTML5_SOURCE), StandardCharsets.UTF_8);
+        int idx = html5Source.indexOf("public void printStackTraceToStream(Throwable t, Writer o)");
+        assertTrue(idx >= 0,
+                "HTML5Implementation must override printStackTraceToStream; the inherited "
+                        + "implementation is empty, so Log.e writes an entry with no trace in it");
+        String body = html5Source.substring(idx, Math.min(html5Source.length(), idx + 1200));
+        assertTrue(body.contains("t.printStackTrace(out)"),
+                "printStackTraceToStream should render the throwable's own trace");
+        assertTrue(body.contains("o.write(t.toString())"),
+                "printStackTraceToStream should name the class and message the way the other ports do");
     }
 }

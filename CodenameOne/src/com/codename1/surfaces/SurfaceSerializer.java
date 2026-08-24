@@ -359,7 +359,10 @@ public final class SurfaceSerializer {
 
     private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
 
-    private static String fnv1a(byte[] data) {
+    /// Package-visible so `Surfaces.publishRemote` can check that a name a server supplied
+    /// really is the hash of the bytes beside it. One implementation, because two would
+    /// eventually disagree and the disagreement would look like corruption.
+    static String fnv1a(byte[] data) {
         long hash = 0xcbf29ce484222325L;
         for (byte b : data) {
             hash ^= b & 0xff;

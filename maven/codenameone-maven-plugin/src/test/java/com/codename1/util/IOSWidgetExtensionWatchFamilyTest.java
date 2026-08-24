@@ -41,10 +41,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// lock-screen or home-screen widget is a wrong surface in front of the user, not an approximation.
 class IOSWidgetExtensionWatchFamilyTest {
 
-    /// A project declaring only complications is legitimate -- it just has no iOS surface until the
-    /// watchOS extension target exists. The extension must therefore not be generated at all: an
-    /// emitted-but-empty `WidgetBundle` body does not compile, and falling back to the home-screen
-    /// sizes would ship a widget the manifest never asked for.
+    /// A project declaring only complications has no iOS surface: those kinds are hosted by the
+    /// watch flavour of the extension instead. The iOS extension must therefore not be generated
+    /// at all -- an emitted-but-empty `WidgetBundle` body does not compile, and falling back to
+    /// the home-screen sizes would ship a widget the manifest never asked for.
     @Test
     void watchOnlyProjectHasNoIosSurface() {
         IOSWidgetExtensionBuilder b = builderFor("watchCircular", "watchRectangular", "watchInline");

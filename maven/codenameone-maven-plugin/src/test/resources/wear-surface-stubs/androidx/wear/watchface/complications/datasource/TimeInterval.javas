@@ -1,0 +1,4 @@
+package androidx.wear.watchface.complications.datasource;
+public final class TimeInterval {
+    public TimeInterval(java.time.Instant start, java.time.Instant end) { }
+}

@@ -98,6 +98,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<>();
+    private final List<StorageOutput> openStorageWrites = new CopyOnWriteArrayList<>();
+    private boolean storageWriteFailsOnClose;
     private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
     private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
@@ -3101,6 +3103,38 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void deleteStorageFile(String name) {
         storageEntries.remove(name);
+        // a real port publishes an entry by replacing it, so deleting one abandons
+        // any write still open against it rather than being undone by it
+        for (StorageOutput open : openStorageWrites) {
+            open.discard(name);
+        }
+    }
+
+    /**
+     * Models an implementation that only replaces the entry when the write is closed,
+     * so a write given up before then leaves whatever was stored untouched.
+     *
+     * @param name the entry being written
+     * @param writing the stream handed out for the write that failed
+     * @return true, since this double never writes into the entry itself
+     */
+    @Override
+    public boolean abandonStorageWrite(String name, OutputStream writing) {
+        if (writing instanceof StorageOutput) {
+            ((StorageOutput) writing).discard();
+            return true;
+        }
+        return writing == null;
+    }
+
+    /**
+     * Makes storage writes fail at the point an entry would be published, which is
+     * where an implementation that replaces the entry in one step does the writing.
+     *
+     * @param failsOnClose whether closing a storage output stream should fail
+     */
+    public void setStorageWriteFailsOnClose(boolean failsOnClose) {
+        storageWriteFailsOnClose = failsOnClose;
     }
 
     public void putStorageEntry(String name, byte[] data) {
@@ -4359,15 +4393,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private final class StorageOutput extends ByteArrayOutputStream {
         private final String name;
+        private boolean discarded;
 
         StorageOutput(String name) {
             this.name = name;
+            openStorageWrites.add(this);
+        }
+
+        void discard(String entry) {
+            if (name.equals(entry)) {
+                discarded = true;
+            }
+        }
+
+        void discard() {
+            discarded = true;
         }
 
         @Override
         public void close() throws IOException {
             super.close();
-            storageEntries.put(name, toByteArray());
+            openStorageWrites.remove(this);
+            if (storageWriteFailsOnClose) {
+                // an implementation that publishes the entry on close fails here
+                throw new IOException("Could not store " + name);
+            }
+            if (!discarded) {
+                storageEntries.put(name, toByteArray());
+            }
         }
     }
 

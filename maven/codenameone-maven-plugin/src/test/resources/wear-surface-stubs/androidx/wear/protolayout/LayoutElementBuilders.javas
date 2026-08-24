@@ -1,0 +1,100 @@
+package androidx.wear.protolayout;
+public final class LayoutElementBuilders {
+    public static final int CONTENT_SCALE_MODE_FIT = 1;
+    public static final int CONTENT_SCALE_MODE_CROP = 2;
+    public static final int CONTENT_SCALE_MODE_FILL_BOUNDS = 3;
+    public static final int HORIZONTAL_ALIGN_START = 1;
+    public static final int HORIZONTAL_ALIGN_CENTER = 2;
+    public static final int HORIZONTAL_ALIGN_END = 3;
+    public static final int VERTICAL_ALIGN_TOP = 1;
+    public static final int VERTICAL_ALIGN_CENTER = 2;
+    public static final int VERTICAL_ALIGN_BOTTOM = 3;
+    public static final int FONT_WEIGHT_BOLD = 700;
+    public interface LayoutElement { }
+    public static class FontStyle {
+        public static class Builder {
+            public Builder setSize(DimensionBuilders.SpProp s) { return this; }
+            public Builder setWeight(int w) { return this; }
+            public Builder setColor(ColorBuilders.ColorProp c) { return this; }
+            public FontStyle build() { return null; }
+        }
+    }
+    public static class Text implements LayoutElement {
+        public static class Builder {
+            public Builder setText(String t) { return this; }
+            public Builder setFontStyle(FontStyle f) { return this; }
+            public Builder setMaxLines(int m) { return this; }
+            public Builder setModifiers(ModifiersBuilders.Modifiers m) { return this; }
+            public Text build() { return null; }
+        }
+    }
+    public static class Column implements LayoutElement {
+        public static class Builder {
+            public Builder addContent(LayoutElement e) { return this; }
+            public Builder setModifiers(ModifiersBuilders.Modifiers m) { return this; }
+            public Column build() { return null; }
+        }
+    }
+    public static class Row implements LayoutElement {
+        public static class Builder {
+            public Builder addContent(LayoutElement e) { return this; }
+            public Builder setModifiers(ModifiersBuilders.Modifiers m) { return this; }
+            public Row build() { return null; }
+        }
+    }
+    public static class Box implements LayoutElement {
+        public static class Builder {
+            public Builder addContent(LayoutElement e) { return this; }
+            public Builder setWidth(DimensionBuilders.ContainerDimension d) { return this; }
+            public Builder setHeight(DimensionBuilders.ContainerDimension d) { return this; }
+            public Builder setHorizontalAlignment(int a) { return this; }
+            public Builder setVerticalAlignment(int a) { return this; }
+            public Builder setModifiers(ModifiersBuilders.Modifiers m) { return this; }
+            public Box build() { return null; }
+        }
+    }
+    public static class Spacer implements LayoutElement {
+        public static class Builder {
+            public Builder setWidth(DimensionBuilders.SpacerDimension d) { return this; }
+            public Builder setHeight(DimensionBuilders.SpacerDimension d) { return this; }
+            public Spacer build() { return null; }
+        }
+    }
+    public static class ColorFilter {
+        public static class Builder {
+            public Builder setTint(ColorBuilders.ColorProp c) { return this; }
+            public ColorFilter build() { return null; }
+        }
+    }
+    public static class Image implements LayoutElement {
+        public static class Builder {
+            public Builder setColorFilter(ColorFilter f) { return this; }
+            public Builder setContentScaleMode(int m) { return this; }
+            public Builder setResourceId(String id) { return this; }
+            public Builder setWidth(DimensionBuilders.DpProp d) { return this; }
+            public Builder setHeight(DimensionBuilders.DpProp d) { return this; }
+            public Builder setModifiers(ModifiersBuilders.Modifiers m) { return this; }
+            public Image build() { return null; }
+        }
+    }
+    public static class ArcLine {
+        public static class Builder {
+            public Builder setLength(DimensionBuilders.DegreesProp d) { return this; }
+            public Builder setThickness(DimensionBuilders.DpProp d) { return this; }
+            public Builder setColor(ColorBuilders.ColorProp c) { return this; }
+            public ArcLine build() { return null; }
+        }
+    }
+    public static class Arc implements LayoutElement {
+        public static class Builder {
+            public Builder addContent(ArcLine a) { return this; }
+            public Arc build() { return null; }
+        }
+    }
+    public static class Layout {
+        public static class Builder {
+            public Builder setRoot(LayoutElement e) { return this; }
+            public Layout build() { return null; }
+        }
+    }
+}
