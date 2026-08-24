@@ -453,13 +453,7 @@ class PortStatusTest(unittest.TestCase):
 
     @staticmethod
     def rescope(manifest, test_name, ports):
-        for feature in manifest["features"]:
-            feature["tests"] = [
-                {"test": test_name, "ports": ports}
-                if isinstance(entry, dict) and entry.get("test") == test_name
-                else entry
-                for entry in feature["tests"]
-            ]
+        manifest.setdefault("test_scopes", {})[test_name] = ports
 
     def test_coverage_accepts_a_documented_skip(self):
         # The distinction the rule turns on: a port that genuinely cannot do something reports

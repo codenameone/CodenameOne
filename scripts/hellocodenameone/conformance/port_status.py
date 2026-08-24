@@ -87,39 +87,11 @@ def registered_tests() -> list[str]:
     return names
 
 
-def feature_test_entries(feature: dict):
-    """Yield ``(test name, ports or None)`` for one feature.
-
-    A feature lists its tests either as plain names, which every port is expected to
-    run, or as ``{"test": ..., "ports": [...]}`` for a test that only applies to some
-    of them. The scoped form exists for a capability a port does not have -- a
-    windowing system, say. Without it such a test is absent from that port's report
-    forever, which the coverage gate reads as a test the port dropped, and the only
-    way to quiet that is a row of skips on the public table inviting the reader to
-    count a capability the port was never asked for as something it failed to do.
-    """
-    for entry in feature.get("tests", []):
-        if isinstance(entry, str):
-            yield entry, None
-            continue
-        if not isinstance(entry, dict) or not entry.get("test"):
-            raise ContractError(
-                f"Feature {feature.get('id')} has a test entry that is neither a name "
-                f"nor an object with a test: {entry!r}"
-            )
-        ports = entry.get("ports")
-        if not isinstance(ports, list) or not ports:
-            raise ContractError(
-                f"Scoped test {entry['test']} must list the ports it applies to"
-            )
-        yield entry["test"], set(ports)
-
-
 def test_to_feature(manifest: dict) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for feature in manifest.get("features", []):
         feature_id = feature.get("id")
-        for test, _ports in feature_test_entries(feature):
+        for test in feature.get("tests", []):
             if test in mapping:
                 raise ContractError(
                     f"Test {test} is mapped to both {mapping[test]} and {feature_id}"
@@ -129,11 +101,25 @@ def test_to_feature(manifest: dict) -> dict[str, str]:
 
 
 def test_scopes(manifest: dict) -> dict[str, set[str] | None]:
-    """Map every test to the ports it applies to, or None when that is all of them."""
+    """Map every test to the ports it applies to, or None when that is all of them.
+
+    Scopes live in a top-level ``test_scopes`` map rather than inside the feature's
+    test list, so that list stays a plain list of names: the website templates render,
+    count and search it, and giving some entries a different shape broke the site
+    build rather than the contract.
+
+    A scope exists for a capability a port does not have -- a windowing system, say.
+    Without it such a test is absent from that port's report forever, which the
+    coverage gate reads as a test the port dropped, and the only way to quiet that is a
+    row of skips on the public table inviting the reader to count a capability the port
+    was never asked for as something it failed to do.
+    """
     scopes: dict[str, set[str] | None] = {}
+    scoped = manifest.get("test_scopes", {})
     for feature in manifest.get("features", []):
-        for test, ports in feature_test_entries(feature):
-            scopes[test] = ports
+        for test in feature.get("tests", []):
+            ports = scoped.get(test)
+            scopes[test] = None if ports is None else set(ports)
     return scopes
 
 
@@ -179,17 +165,23 @@ def validate(manifest: dict) -> dict:
         problems.append(str(exc))
         mapped = {}
 
-    try:
-        for test, scoped_ports in test_scopes(manifest).items():
-            if scoped_ports is None:
-                continue
-            unknown_ports = sorted(scoped_ports - set(port_ids))
-            if unknown_ports:
-                problems.append(
-                    f"Test {test} is scoped to unknown ports: " + ", ".join(unknown_ports)
-                )
-    except ContractError as exc:
-        problems.append(str(exc))
+    scoped = manifest.get("test_scopes", {})
+    if not isinstance(scoped, dict):
+        problems.append("test_scopes must be a map of test name to port list")
+        scoped = {}
+    for test, scoped_ports in sorted(scoped.items()):
+        if not isinstance(scoped_ports, list) or not scoped_ports:
+            problems.append(f"Scoped test {test} must list the ports it applies to")
+            continue
+        unknown_ports = sorted(set(scoped_ports) - set(port_ids))
+        if unknown_ports:
+            problems.append(
+                f"Test {test} is scoped to unknown ports: " + ", ".join(unknown_ports)
+            )
+        if test not in mapped:
+            # A scope on a name no feature registers is a scope that does nothing, and
+            # the test it was meant for is left unscoped.
+            problems.append(f"test_scopes names {test}, which no feature registers")
 
     registered = registered_tests()
     duplicate_registrations = sorted(

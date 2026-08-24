@@ -773,69 +773,59 @@
       "description": "Opens additional native operating-system windows, each rendering its own component hierarchy, and checks layout, scrolling, graphics, layered overlays, native text editing and modality inside one.",
       "tests": [
         "MultiWindowApiTest",
-        {
-          "test": "WindowLayoutTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        },
-        {
-          "test": "WindowScrollTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        },
-        {
-          "test": "WindowGraphicsTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        },
-        {
-          "test": "WindowEditingTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        },
-        {
-          "test": "WindowOverlayTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        },
-        {
-          "test": "WindowModalTest",
-          "ports": [
-            "linux-x64",
-            "linux-arm64",
-            "windows-x64",
-            "windows-arm64",
-            "mac-native"
-          ]
-        }
+        "WindowLayoutTest",
+        "WindowScrollTest",
+        "WindowGraphicsTest",
+        "WindowEditingTest",
+        "WindowOverlayTest",
+        "WindowModalTest"
       ]
     }
   ],
+  "test_scopes": {
+    "WindowLayoutTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ],
+    "WindowScrollTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ],
+    "WindowGraphicsTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ],
+    "WindowEditingTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ],
+    "WindowOverlayTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ],
+    "WindowModalTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64",
+      "mac-native"
+    ]
+  },
   "screenshot_mappings": [
     {
       "pattern": "kotlin",
