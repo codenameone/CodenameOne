@@ -68,6 +68,10 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// -- the conflict message, the simulator's hint editor -- can name it.
     private static final String ORIGIN_PREFIX = "cn1.buildHints.origin.";
 
+    /// Other names for the same setting, for a consumer that cannot reach the
+    /// catalog to resolve an alias itself.
+    private static final String ALIAS_PREFIX = "cn1.buildHints.alias.";
+
     /// Stamps the emitted file with the main class it came from, so a stale or
     /// foreign copy on the classpath can be recognised rather than merged.
     private static final String MAIN_CLASS_KEY = "cn1.buildHints.mainClass";
@@ -218,16 +222,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         Map<String, Integer> lines = propertyLines(ctx);
         for (Map.Entry<String, String> e : hints.entrySet()) {
-            // An alias and its target name one setting, so declaring the alias
-            // in the file still collides with the annotation.
-            Set<String> names = new LinkedHashSet<String>();
-            names.add(e.getKey());
-            for (BuildHints.Hint h : BuildHints.entries()) {
-                if (e.getKey().equals(h.aliasOf()) || e.getKey().equals(
-                        BuildHints.canonicalName(h.name()))) {
-                    names.add(h.name());
-                }
-            }
+            Set<String> names = spellingsOf(e.getKey());
             for (String name : names) {
                 String key = BuildHints.ARG_PREFIX + name;
                 if (settings.getProperty(key) == null) {
@@ -370,7 +365,23 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Not `Properties.store`: it writes a timestamp comment, so the bytes would
     /// differ on every build. That churns the resource in every incremental
     /// build and defeats the staged-jar staleness comparison in `CN1BuildMojo`.
-    /// A stable fingerprint of every build hint annotation on `cls`.
+    /// Every name that denotes the same setting as `hint`, itself included.
+    ///
+    /// An alias and its target are one setting -- the builder reads
+    /// `android.captureRecord` and then lets `and.captureRecord` override it --
+    /// so declaring either in the properties file collides with the annotation.
+    static Set<String> spellingsOf(String hint) {
+        Set<String> names = new LinkedHashSet<String>();
+        names.add(hint);
+        for (BuildHints.Hint h : BuildHints.entries()) {
+            if (hint.equals(h.aliasOf()) || hint.equals(BuildHints.canonicalName(h.name()))) {
+                names.add(h.name());
+            }
+        }
+        return names;
+    }
+
+    /// A stable fingerprint of every build hint annotation on `cls`.    /// A stable fingerprint of every build hint annotation on `cls`.
     ///
     /// Taken over the raw annotation members rather than over the hints they
     /// convert into, so it changes for anything the developer can change: a
@@ -460,6 +471,26 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         for (Map.Entry<String, String> e : origins.entrySet()) {
             sb.append(escape(ORIGIN_PREFIX + e.getKey())).append('=')
               .append(escape(e.getValue())).append('\n');
+        }
+        // The other spellings of each hint, for a consumer that has to collapse
+        // them and cannot reach the catalog -- the simulator, which lives in the
+        // JavaSE port. Written only where there is more than one, so the common
+        // hint costs nothing.
+        for (String hint : hints.keySet()) {
+            Set<String> spellings = spellingsOf(hint);
+            spellings.remove(hint);
+            if (spellings.isEmpty()) {
+                continue;
+            }
+            StringBuilder joined = new StringBuilder();
+            for (String name : spellings) {
+                if (joined.length() > 0) {
+                    joined.append(',');
+                }
+                joined.append(name);
+            }
+            sb.append(escape(ALIAS_PREFIX + hint)).append('=')
+              .append(escape(joined.toString())).append('\n');
         }
         try {
             return sb.toString().getBytes("ISO-8859-1");

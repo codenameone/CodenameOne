@@ -537,9 +537,24 @@ public class Simulator {
                     + "goal regenerates it.");
             return;
         }
+        // A hint declared BOTH ways is a build error, and the native merge says
+        // so. Publishing it here instead would bury it: buildHint() reads the
+        // system property before the settings file, so the line the developer
+        // just added to codenameone_settings.properties would be silently
+        // ignored by the simulator while the device build refused to run at all.
+        // Reachable because editing the properties file does not touch the class,
+        // so the timestamp check above still finds the manifest current.
+        java.util.Properties declared = loadProjectSettings(projectDir);
         int applied = 0;
         for (String key : p.stringPropertyNames()) {
             if (!key.startsWith("codename1.arg.")) {
+                continue;
+            }
+            String conflict = declaredInPropertiesToo(p, declared, key);
+            if (conflict != null) {
+                System.err.println("Warning: " + conflict + " is declared both as an annotation "
+                        + "and in codenameone_settings.properties, so the annotation value was "
+                        + "NOT applied. Delete one of them -- a build will refuse this.");
                 continue;
             }
             if (System.getProperty(key) == null) {
@@ -553,13 +568,40 @@ public class Simulator {
     }
 
     /**
-     * The main class this project is configured to launch, or null.
+     * The properties key that declares the same setting as {@code key} in the
+     * settings file, or null when the file declares none of its spellings.
      *
-     * <p>Read from the settings file rather than from the system properties: the
-     * file is what the annotation processor stamped the manifest against, and a
-     * {@code -D} override is a launch choice rather than a change of identity.</p>
+     * <p>An alias and its target name one setting -- the builder reads
+     * {@code android.captureRecord} and then lets {@code and.captureRecord}
+     * override it -- so either spelling in the file collides. The spellings come
+     * out of the manifest, which the annotation processor writes them into,
+     * because the catalog that knows about aliases is a build-time artifact and
+     * this port cannot reach it.</p>
      */
-    private static String configuredMainClass(File projectDir) {
+    private static String declaredInPropertiesToo(java.util.Properties manifest,
+                                                  java.util.Properties declared, String key) {
+        if (declared == null) {
+            return null;
+        }
+        if (declared.getProperty(key) != null) {
+            return key;
+        }
+        String name = key.substring("codename1.arg.".length());
+        String aliases = manifest.getProperty("cn1.buildHints.alias." + name);
+        if (aliases == null) {
+            return null;
+        }
+        for (String alias : aliases.split(",")) {
+            String other = "codename1.arg." + alias.trim();
+            if (alias.trim().length() > 0 && declared.getProperty(other) != null) {
+                return other;
+            }
+        }
+        return null;
+    }
+
+    /** The project's settings file, or null when it cannot be read. */
+    private static java.util.Properties loadProjectSettings(File projectDir) {
         File settings = new File(projectDir, "codenameone_settings.properties");
         if (!settings.isFile()) {
             return null;
@@ -569,6 +611,7 @@ public class Simulator {
         try {
             in = new FileInputStream(settings);
             p.load(in);
+            return p;
         } catch (IOException ex) {
             return null;
         } finally {
@@ -579,6 +622,21 @@ public class Simulator {
                     // read-only stream; nothing useful to do
                 }
             }
+        }
+    }
+
+    /**
+     * The main class this project is configured to launch, or null.    /**
+     * The main class this project is configured to launch, or null.
+     *
+     * <p>Read from the settings file rather than from the system properties: the
+     * file is what the annotation processor stamped the manifest against, and a
+     * {@code -D} override is a launch choice rather than a change of identity.</p>
+     */
+    private static String configuredMainClass(File projectDir) {
+        java.util.Properties p = loadProjectSettings(projectDir);
+        if (p == null) {
+            return null;
         }
         String main = p.getProperty("codename1.mainName");
         if (main == null || main.trim().length() == 0) {

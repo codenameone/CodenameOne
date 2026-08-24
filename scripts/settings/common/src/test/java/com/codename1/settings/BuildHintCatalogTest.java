@@ -380,4 +380,26 @@ public class BuildHintCatalogTest {
         assertEquals("android.facebook_permissions",
                 com.codename1.build.shared.BuildHints.canonicalName("and.facebook_permissions"));
     }
+
+    /// A Kotlin raw string containing a quote was read as an empty literal
+    /// followed by a new one, and that new one then swallowed the annotation
+    /// after it -- so the hint read as unowned and Add wrote the duplicate.
+    @Test
+    public void aTripleQuotedStringDoesNotSwallowTheAnnotation() {
+        String src = "val doc = \"\"\"quoted \" text\"\"\"\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// And an annotation written INSIDE a raw string is still not ownership.
+    @Test
+    public void anAnnotationInsideATripleQuotedStringIsNotOwnership() {
+        String src = "val doc = \"\"\"@Ios(teamId = \"x\")\"\"\"\nclass MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
 }

@@ -2434,6 +2434,14 @@ public class CodenameOneSettings extends Lifecycle {
     /// past it; otherwise `i`.
     private static int skipNonCode(String s, int i) {
         char c = s.charAt(i);
+        // A Kotlin raw string or a Java text block, which the ordinary rule reads
+        // as an empty string followed by a new one -- and then an embedded quote
+        // inside it opens a literal that swallows the annotation after it. No
+        // escapes apply inside either form; the literal ends at the next """.
+        if (c == '"' && s.startsWith("\"\"\"", i)) {
+            int close = s.indexOf("\"\"\"", i + 3);
+            return close < 0 ? s.length() : close + 3;
+        }
         if (c == '"') {
             for (int j = i + 1; j < s.length(); j++) {
                 if (s.charAt(j) == '\\') {
