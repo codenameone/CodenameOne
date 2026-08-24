@@ -2222,9 +2222,15 @@ public class CodenameOneSettings extends Lifecycle {
         if (projectDir == null || main == null || main.isEmpty()) {
             return null;
         }
+        // Collected first, then examined in two passes. Deciding as we walk made
+        // the answer depend on directory order: the budget could be spent on
+        // unrelated files before reaching the one Kotlin source whose name
+        // differs from its class -- which is the only layout this fallback exists
+        // for, so exactly the case it would drop.
+        java.util.List<String> named = new java.util.ArrayList<>();
+        java.util.List<String> others = new java.util.ArrayList<>();
         java.util.List<String> queue = new java.util.ArrayList<>();
         queue.add(projectDir);
-        int opened = 0;
         for (int i = 0; i < queue.size() && i < 4000; i++) {
             String dir = queue.get(i);
             String[] children;
@@ -2247,23 +2253,35 @@ public class CodenameOneSettings extends Lifecycle {
                     }
                     continue;
                 }
-                boolean kotlin = name.endsWith(".kt");
-                if (!kotlin && !name.endsWith(".java")) {
-                    continue;
+                if (name.equals(main + ".java") || name.equals(main + ".kt")) {
+                    named.add(path);
+                } else if (name.endsWith(".kt")) {
+                    // Only Kotlin: Java requires a public type to be named after
+                    // its file, so a differently named .java cannot declare the
+                    // main class of an application.
+                    others.add(path);
                 }
-                // Cheap filter first: a file declaring the class almost always
-                // carries its name.
-                if (!name.equals(main + (kotlin ? ".kt" : ".java")) && opened > 200) {
-                    continue;
-                }
-                String text = readIfPresent(path);
-                opened++;
-                if (text == null || !declaresClass(text, main, pkg)) {
-                    continue;
-                }
-                lastSourceWasKotlin = kotlin;
-                return text;
             }
+        }
+        String hit = firstDeclaring(named, main, pkg, named.size());
+        return hit != null ? hit : firstDeclaring(others, main, pkg, 400);
+    }
+
+    /// The text of the first of `paths` that declares `main` in `pkg`, opening at
+    /// most `budget` of them.
+    private String firstDeclaring(java.util.List<String> paths, String main, String pkg,
+                                  int budget) {
+        int opened = 0;
+        for (String path : paths) {
+            if (opened++ >= budget) {
+                return null;
+            }
+            String text = readIfPresent(path);
+            if (text == null || !declaresClass(text, main, pkg)) {
+                continue;
+            }
+            lastSourceWasKotlin = path.endsWith(".kt");
+            return text;
         }
         return null;
     }

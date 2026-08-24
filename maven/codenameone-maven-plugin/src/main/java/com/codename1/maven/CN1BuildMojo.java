@@ -2746,7 +2746,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // does not add an execution to a project's POM, so an app that adopts the
         // annotations without binding process-annotations compiles cleanly and
         // ships with every annotated hint missing. Refuse rather than build that.
-        String annotated = classCarryingBuildHintAnnotations(classpathElements);
+        String annotated = classCarryingBuildHintAnnotations(classpathElements, expectedMain);
         if (annotated != null) {
             throw new MojoFailureException(annotated + " carries build hint annotations, but "
                     + (stale == null
@@ -2869,14 +2869,36 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * The first application class found carrying a build hint annotation, or null.
+     * The application class carrying a build hint annotation, or null.
      *
      * <p>Read straight out of the class file's annotation table rather than from
      * source, so it sees exactly what the compiler emitted.</p>
+     *
+     * <p>The MAIN class alone when the project names one. The processor honours
+     * no other class, so no other class is evidence that annotations went
+     * unprocessed &mdash; and scanning them all meant a stale annotated
+     * {@code .class}, left behind by a rename without a clean, failed every build
+     * with "no manifest was produced" for a class the developer had already
+     * deleted. The processor ignores that orphan; so does this. Only when the
+     * project names no main class at all does this fall back to scanning
+     * everything, since then there is nothing more specific to ask about.</p>
      */
-    private String classCarryingBuildHintAnnotations(List<String> classpathElements) {
+    private String classCarryingBuildHintAnnotations(List<String> classpathElements,
+                                                     String expectedMain) {
         java.util.Collection<String> descriptors =
                 com.codename1.build.shared.BuildHintAnnotationBinding.descriptors();
+        if (expectedMain != null) {
+            for (String element : classpathElements) {
+                try {
+                    if (mainClassCarriesAnnotation(new File(element), expectedMain, descriptors)) {
+                        return expectedMain;
+                    }
+                } catch (IOException | RuntimeException ex) {
+                    getLog().debug("cn1: could not read " + expectedMain + " from " + element, ex);
+                }
+            }
+            return null;
+        }
         for (String element : classpathElements) {
             File f = new File(element);
             if (f.isDirectory()) {
@@ -2897,6 +2919,34 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         return null;
+    }
+
+    /** Whether the named class, read from this classpath element, is annotated. */
+    private boolean mainClassCarriesAnnotation(File element, String binaryName,
+                                               java.util.Collection<String> descriptors)
+            throws IOException {
+        String path = binaryName.replace('.', '/') + ".class";
+        if (element.isDirectory()) {
+            File f = new File(element, path.replace('/', File.separatorChar));
+            if (!f.isFile()) {
+                return false;
+            }
+            try (InputStream in = new FileInputStream(f)) {
+                return carriesBuildHintAnnotation(in, descriptors);
+            }
+        }
+        if (element.isFile() && element.getName().endsWith(".jar")) {
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
+                java.util.zip.ZipEntry entry = zip.getEntry(path);
+                if (entry == null) {
+                    return false;
+                }
+                try (InputStream in = zip.getInputStream(entry)) {
+                    return carriesBuildHintAnnotation(in, descriptors);
+                }
+            }
+        }
+        return false;
     }
 
     private String findAnnotatedClassInJar(File jar, java.util.Collection<String> descriptors) {

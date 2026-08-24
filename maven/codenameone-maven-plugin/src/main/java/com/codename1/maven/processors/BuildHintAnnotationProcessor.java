@@ -253,9 +253,20 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return dot < 0 ? "" : binaryName.substring(0, dot);
     }
 
+    /// The OUTERMOST simple name, so a nested type is looked for by the type its
+    /// file actually declares.
+    ///
+    /// A nested class's binary name is Main$Wrong, and no source declares a type
+    /// spelled that way -- searching for it found nothing, the class was read as
+    /// an orphan and dropped, and the placement check that would have said
+    /// "annotations belong on the main class" never ran. The build then succeeded
+    /// with the requested hints silently absent, which is the failure this whole
+    /// feature exists to remove.
     private static String simpleNameOf(String binaryName) {
         int dot = binaryName.lastIndexOf('.');
-        return dot < 0 ? binaryName : binaryName.substring(dot + 1);
+        String simple = dot < 0 ? binaryName : binaryName.substring(dot + 1);
+        int nested = simple.indexOf('$');
+        return nested < 0 ? simple : simple.substring(0, nested);
     }
 
     /// Whether a file called `name` declaring package `pkg` exists under `dir`.

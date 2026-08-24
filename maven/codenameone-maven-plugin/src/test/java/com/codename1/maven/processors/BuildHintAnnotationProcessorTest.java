@@ -294,6 +294,26 @@ public class BuildHintAnnotationProcessorTest {
         assertErrorContaining(ctx, "and.captureRecord");
     }
 
+    /// A nested type's binary name is Main$Wrong and no source declares a type
+    /// spelled that way, so looking for it found nothing and the class was
+    /// dropped as an orphan -- taking the placement error with it and letting the
+    /// build succeed with the requested hints silently absent.
+    @Test
+    public void anAnnotationOnANestedTypeIsStillReported() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource(MAIN,
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.buildhints.*;\n"
+                                + "public class MyApp {\n"
+                                + "    @Ios(teamId = \"ABCDE12345\")\n"
+                                + "    public static class Wrong {}\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        ProcessorContext ctx = run(classes, settings(), MAIN, false);
+        assertErrorContaining(ctx, "belong on the application's main class");
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
