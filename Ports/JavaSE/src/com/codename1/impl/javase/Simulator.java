@@ -490,40 +490,28 @@ public class Simulator {
         if (projectDir == null) {
             return;
         }
-        File f = findAnnotationManifest(projectDir, classPathStr);
-        if (f == null) {
-            return;
-        }
-        java.util.Properties p = new java.util.Properties();
-        FileInputStream in = null;
-        try {
-            in = new FileInputStream(f);
-            p.load(in);
-        } catch (IOException ex) {
-            System.err.println("Warning: could not read " + f + ": " + ex.getMessage());
-            return;
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                    // read-only stream; nothing useful to do
-                }
-            }
-        }
-        String stampedFor = p.getProperty("cn1.buildHints.mainClass");
         String expectedMain = configuredMainClass(projectDir);
+        FoundManifest found = findAnnotationManifest(projectDir, classPathStr, expectedMain);
+        if (found == null) {
+            return;
+        }
+        java.util.Properties p = found.hints;
+        File f = found.file;
+        String stampedFor = p.getProperty("cn1.buildHints.mainClass");
         if (stampedFor != null && expectedMain != null && !stampedFor.equals(expectedMain)) {
             // Somebody else's configuration. codename1.mainName changing without a
             // clean build leaves the old class and its manifest together in the
             // output directory, and the timestamp check finds that pair perfectly
             // consistent -- so without the stamp the simulator runs the previous
             // application's hints. The native merge already refuses this.
-            System.err.println("Warning: " + f + " was generated for " + stampedFor
+            System.err.println("Warning: " + found.where + " was generated for " + stampedFor
                     + ", not " + expectedMain + ", so its build hints were NOT applied.");
             return;
         }
-        File staleAgainst = classNewerThanManifest(p, f);
+        // Only for a manifest on disk. Inside a jar the class and the manifest
+        // were written by the same build into the same archive, so they cannot
+        // disagree and there is nothing to compare.
+        File staleAgainst = f == null ? null : classNewerThanManifest(p, f);
         if (staleAgainst != null) {
             // Nothing removes target/classes between builds, so a project that ran
             // process-annotations once and then stopped -- goal unbound, skipped,
@@ -540,7 +528,7 @@ public class Simulator {
             // the direction that matters -- process-classes always follows compile
             // within a build, so a main class newer than the manifest cannot have
             // produced it.
-            System.err.println("Warning: " + f + " is older than "
+            System.err.println("Warning: " + found.where + " is older than "
                     + staleAgainst.getName() + ", so it was produced by an earlier build "
                     + "and its build hints were NOT applied.");
             System.err.println("         Rebuild the project so the cn1 process-annotations "
@@ -695,9 +683,31 @@ public class Simulator {
      * path is tried first, since it is right for almost every project and costs
      * one stat.</p>
      */
-    private static File findAnnotationManifest(File projectDir, String classPathStr) {
+    /**
+     * A manifest that was found, and where.
+     *
+     * <p>Not a File, because it can live inside a jar: the javase-only nested
+     * build the simulator runs resolves the application's own common module as a
+     * dependency artifact, so its manifest has no path of its own.</p>
+     */
+    private static final class FoundManifest {
+        final java.util.Properties hints;
+        /** The file on disk, or null when it came out of a jar. */
+        final File file;
+        final String where;
+
+        FoundManifest(java.util.Properties hints, File file, String where) {
+            this.hints = hints;
+            this.file = file;
+            this.where = where;
+        }
+    }
+
+    private static FoundManifest findAnnotationManifest(File projectDir, String classPathStr,
+                                                        String expectedMain) {
         String resource = "META-INF" + File.separator + "codenameone"
                 + File.separator + "build-hints.properties";
+        String entryName = "META-INF/codenameone/build-hints.properties";
         // The classpath first, because it is the output the build is ACTUALLY
         // using. Trying the conventional path first looked harmless and is not:
         // a project that moves to a configured output directory without running
@@ -712,16 +722,32 @@ public class Simulator {
                     continue;
                 }
                 File dir = new File(entry);
-                if (!dir.isDirectory()) {
-                    // A jar can carry this resource too, but only as a dependency --
-                    // and a dependency's hints belong to whoever built it, which the
-                    // main-class stamp exists to reject. Directories are this
-                    // project's own output.
+                if (dir.isDirectory()) {
+                    File candidate = new File(dir, resource);
+                    if (candidate.isFile()) {
+                        java.util.Properties loaded = readProperties(candidate);
+                        if (loaded != null) {
+                            return new FoundManifest(loaded, candidate, candidate.toString());
+                        }
+                    }
                     continue;
                 }
-                File candidate = new File(dir, resource);
-                if (candidate.isFile()) {
-                    return candidate;
+                // A jar too. The javase-only nested build the simulator runs
+                // resolves the application's OWN common module as a dependency
+                // artifact, so its manifest has no directory anywhere -- skipping
+                // jars meant desktop.titleBar and nativeTheme were simply absent
+                // under cn1:run while the device build applied them.
+                //
+                // The stamp is what tells that jar from a library's: a jar is
+                // accepted only when it was generated for THIS application's main
+                // class, so a dependency carrying its own manifest is passed over
+                // rather than picked and then rejected.
+                if (dir.isFile() && entry.endsWith(".jar") && expectedMain != null) {
+                    java.util.Properties loaded = readJarEntry(dir, entryName);
+                    if (loaded != null
+                            && expectedMain.equals(loaded.getProperty("cn1.buildHints.mainClass"))) {
+                        return new FoundManifest(loaded, null, entryName + " in " + dir.getName());
+                    }
                 }
             }
         }
@@ -729,7 +755,64 @@ public class Simulator {
         // module's output directory at all still finds a conventional build.
         File conventional = new File(projectDir, "target" + File.separator + "classes"
                 + File.separator + resource);
-        return conventional.isFile() ? conventional : null;
+        if (!conventional.isFile()) {
+            return null;
+        }
+        java.util.Properties loaded = readProperties(conventional);
+        return loaded == null ? null
+                : new FoundManifest(loaded, conventional, conventional.toString());
+    }
+
+    /** Loads a properties file, or null when it cannot be read. */
+    private static java.util.Properties readProperties(File f) {
+        java.util.Properties p = new java.util.Properties();
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            p.load(in);
+            return p;
+        } catch (IOException ex) {
+            System.err.println("Warning: could not read " + f + ": " + ex.getMessage());
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream; nothing useful to do
+                }
+            }
+        }
+    }
+
+    /** Loads one entry of a jar as properties, or null when it is not there. */
+    private static java.util.Properties readJarEntry(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.util.Properties p = new java.util.Properties();
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                p.load(in);
+            } finally {
+                in.close();
+            }
+            return p;
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
     }
 
     /**

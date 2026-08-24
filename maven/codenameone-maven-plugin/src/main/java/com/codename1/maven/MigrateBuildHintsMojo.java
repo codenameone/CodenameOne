@@ -1014,14 +1014,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// `package\ncom.example;` is valid Java, and cutting at the first newline
     /// would have inserted the import into the middle of the statement.
     static int endOfPackageDeclaration(String code, int pkgAt) {
-        int i = pkgAt + "package".length();
-        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
-            i++;
-        }
-        while (i < code.length()
-                && (Character.isJavaIdentifierPart(code.charAt(i)) || code.charAt(i) == '.')) {
-            i++;
-        }
+        // Component by component. `package com.\nexample;` is legal, and a
+        // contiguous scan stops at the newline -- so the import was inserted
+        // before `example;` and the verification build rolled back a correct
+        // migration. Same reader the import anchor uses, so the two cannot
+        // disagree about where a name ends.
+        int i = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameEnd(code, pkgAt + "package".length());
         while (i < code.length() && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
             i++;
         }

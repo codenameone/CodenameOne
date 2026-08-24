@@ -373,4 +373,17 @@ public class MigrateBuildHintsPropertyParsingTest {
                 .blankNonCode(head, false);
         assertEquals(head.indexOf("import c.D"), MigrateBuildHintsMojo.lastImportIndex(code));
     }
+
+    /// `package com.\nexample;` is legal, and a contiguous scan stops at the
+    /// newline -- so the import was inserted before `example;`, producing invalid
+    /// source, and the verification build rolled back a correct migration.
+    @Test
+    public void theAnchorClearsAPackageNameThatSpansLines() {
+        String head = "package com.\nexample;\nclass X {}\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int pkg = MigrateBuildHintsMojo.livePackageIndex(code);
+        assertEquals(head.indexOf("class X"),
+                MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
+    }
 }
