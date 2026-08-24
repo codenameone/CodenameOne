@@ -7470,6 +7470,11 @@ public class IPhoneBuilder extends Executor {
     /// builder set -- to govern.
     ///
     /// @return a note per change, for the log
+    /// The three nulls below are an sdk, a configuration and an arch this caller does not know --
+    /// NOT a null context. They go to ArchiveContext.of, which always returns an object, so
+    /// conditionApplies never dereferences null here and "cannot tell" ends up meaning "every
+    /// condition counts", which is what an unconstrained repair should do. Do not add a
+    /// null-context guard downstream on the strength of this call.
     static List<String> repairQualifiedExtensionSettings(Map<String, String> settings,
             String hostPackage, String floor) {
         return repairQualifiedExtensionSettings(settings, hostPackage, floor, null, null, null);
@@ -8625,9 +8630,14 @@ public class IPhoneBuilder extends Executor {
     /// declares, so the target has to be configured as that or the two disagree.
     static String appExtensionBundleId(File extensionFolder, String defaultBundleId,
             ArchiveContext context, String hostPackage) {
-        String override = appExtensionBuildSetting(extensionFolder, "PRODUCT_BUNDLE_IDENTIFIER");
-        if (override != null) {
-            return override;
+        // The declared identifier that governs THIS context, not only the plain key: an archive
+        // declaring just PRODUCT_BUNDLE_IDENTIFIER[config=Debug] read as declaring nothing, so
+        // the Debug plist's literal was compared against itself and preserved while Xcode builds
+        // that configuration under the qualified setting -- one bundle built, another signed.
+        Map<String, String> declared = appExtensionBuildSettings(extensionFolder);
+        String override = winningSetting(declared, "PRODUCT_BUNDLE_IDENTIFIER", context);
+        if (override != null && override.trim().length() > 0) {
+            return override.trim();
         }
         // The one THIS archive gets, by the same rule Xcode applies to any conditional setting.
         String fromPlist = winningSetting(

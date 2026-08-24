@@ -1673,4 +1673,44 @@ public class AppExtensionDeploymentTargetTest {
                 "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*]",
                 "PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
     }
+
+    @Test
+    public void aQualifiedOnlyTargetIdentifierIsSeen() throws Exception {
+        File dist = tmp.newFolder("dist98");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), plistWithIdentifier("com.example.app.FromPlist"));
+        write(new File(extension, "buildSettings.properties"),
+                "PRODUCT_BUNDLE_IDENTIFIER[config\\=Debug] = com.example.app.FromSettings\n");
+
+        // Reading only the plain key, an archive declaring just the qualified one read as
+        // declaring nothing: the Debug plist's literal was compared against itself and preserved
+        // while Xcode builds that configuration under the qualified setting -- one bundle built,
+        // another signed.
+        assertEquals("com.example.app.FromSettings", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Debug", "arm64", null),
+                "com.example.app"));
+
+        // A configuration the qualifier does not name still gets the plist's own statement.
+        assertEquals("com.example.app.FromPlist", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null),
+                "com.example.app"));
+    }
+
+    @Test
+    public void anUnconstrainedRepairHasAContextAndNotANull() {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]", "10.0");
+
+        // The three-argument form passes an unknown sdk/configuration/arch, NOT a null context:
+        // ArchiveContext.of always returns an object, so conditionApplies never dereferences
+        // null and "cannot tell" means "every condition counts".
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "14.0");
+
+        assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
+        assertEquals(notes.toString(), 1, notes.size());
+    }
 }
