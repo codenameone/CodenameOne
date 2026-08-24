@@ -359,4 +359,75 @@ public class AppExtensionInfoPlistPathTest {
                 IPhoneBuilder.contextForCondition("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
                         archive)));
     }
+
+    @Test
+    public void anUnqualifiedPathThatVariesByConfigurationIsEnumerated() throws Exception {
+        File dist = tmp.newFolder("varying-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "Release").mkdirs());
+        assertTrue(new File(extension, "Debug").mkdirs());
+        File release = new File(extension, "Release/Info.plist");
+        File debug = new File(extension, "Debug/Info.plist");
+        write(release, identityPlist("com.example.app.Release"));
+        write(debug, identityPlist("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(CONFIGURATION)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The KEY is unqualified and the VALUE still names a different file per configuration.
+        // Enumerated by key alone, only the archive's own file was ever seen: the Debug plist was
+        // never stamped, and the identifier read out of the Release one was recorded as if it
+        // were universal.
+        assertTrue(plists.toString(), plists.values().contains(release));
+        assertTrue(plists.toString(), plists.values().contains(debug));
+
+        // And each identity stays in its own configuration rather than becoming the base.
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        null), "com.example.app");
+        assertEquals("com.example.app.Debug",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+    }
+
+    @Test
+    public void aPathThroughAConditionalHelperIsEnumeratedToo() throws Exception {
+        File dist = tmp.newFolder("helper-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File release = new File(extension, "release.plist");
+        File debug = new File(extension, "debug.plist");
+        write(release, identityPlist("com.example.app.Release"));
+        write(debug, identityPlist("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "PLIST_PATH = WalletUIExtension/release.plist\n"
+                + "PLIST_PATH[config\\=Debug] = WalletUIExtension/debug.plist\n"
+                + "INFOPLIST_FILE = $(PLIST_PATH)\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The helper is the thing that varies, and helper keys are not plist candidates of their
+        // own -- so the Debug plist was invisible and never stamped.
+        assertTrue(plists.toString(), plists.values().contains(release));
+        assertTrue(plists.toString(), plists.values().contains(debug));
+    }
+
+    @Test
+    public void aPathThatDoesNotVaryAddsNothing() throws Exception {
+        File dist = tmp.newFolder("stable-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), identityPlist("com.example.app.Ext"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(TARGET_NAME:identifier).plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The ordinary case: a reference that means the same thing in every configuration adds no
+        // second candidate, so nothing downstream sees a file twice.
+        assertEquals(plists.toString(), 1, plists.size());
+    }
 }

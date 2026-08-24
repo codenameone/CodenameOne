@@ -6474,6 +6474,59 @@ public class IPhoneBuilder extends Executor {
         return key.indexOf('[') < 0 ? context : contextForCondition(key, context);
     }
 
+    /// The configurations the generated project carries. An extension target is created in both,
+    /// and sources.tar.bz2 lets either be built later.
+    private static final String[] PROJECT_CONFIGURATIONS = {"Debug", "Release"};
+
+    /// Records a candidate per configuration when the path RESOLVES differently in each.
+    ///
+    /// A key says which builds it applies to; it does not say that its value means the same thing
+    /// in all of them. INFOPLIST_FILE = $(CONFIGURATION)/Info.plist is unqualified and still names
+    /// a different file per configuration, and so is INFOPLIST_FILE = $(PLIST_PATH) when
+    /// PLIST_PATH itself is conditional. Enumerated by key alone, only the archive's own file was
+    /// ever seen: the other configuration's plist was never stamped, and the identifier read out
+    /// of the archive's was recorded as if it were universal.
+    ///
+    /// Nothing is added when the path resolves the same everywhere, which is the ordinary case.
+    private static void addConfigurationVariants(Map<String, File> out, String key, String value,
+            File extensionFolder, Map<String, String> declared, ArchiveContext context) {
+        if (context == null || value.indexOf('$') < 0
+                || conditionsOf(key).containsKey("config")) {
+            return;
+        }
+        // From the CANDIDATE's context, not the archive's: a key qualified for some other build
+        // -- [sdk=iphonesimulator*] beside a device archive -- keeps its family here too, so
+        // $(SDK_NAME) stays unexpanded and the path stays unresolvable instead of being answered
+        // with this archive's SDK.
+        ArchiveContext own = contextForCondition(key, context);
+        for (String configuration : PROJECT_CONFIGURATIONS) {
+            if (configuration.equalsIgnoreCase(own.configuration)) {
+                continue;
+            }
+            ArchiveContext other = new ArchiveContext(own.sdk, configuration, own.arch,
+                    own.variants);
+            File resolved = resolveInfoPlistPath(value, extensionFolder,
+                    extensionSettingsWithBuiltIns(extensionFolder, declared, other));
+            File active = out.get(key + " = " + value);
+            if (resolved == null || sameFile(resolved, active)) {
+                continue;
+            }
+            out.put(key + "[config=" + configuration + "] = " + value, resolved);
+        }
+    }
+
+    /// Canonical-path equality, so two ways of writing the same file are one candidate.
+    private static boolean sameFile(File one, File other) {
+        if (one == null || other == null) {
+            return one == other;
+        }
+        try {
+            return one.getCanonicalPath().equals(other.getCanonicalPath());
+        } catch (IOException cannotResolve) {
+            return one.equals(other);
+        }
+    }
+
     /// @param context this archive, so INFOPLIST_FILE = $(CONFIGURATION)/Info.plist resolves to
     /// the plist Xcode actually processes. Without it the path came back unresolvable and the
     /// stamping skipped the file that ships -- the same hole the entitlements path had.
@@ -6499,6 +6552,8 @@ public class IPhoneBuilder extends Executor {
         } else {
             out.put("INFOPLIST_FILE = " + base.trim(),
                     resolveInfoPlistPath(base.trim(), extensionFolder, settings));
+            addConfigurationVariants(out, "INFOPLIST_FILE", base.trim(), extensionFolder, declared,
+                    context);
         }
         for (Map.Entry<String, String> setting : declared.entrySet()) {
             String key = setting.getKey();
@@ -6523,6 +6578,7 @@ public class IPhoneBuilder extends Executor {
                 out.put(key + " = " + value, resolveInfoPlistPath(value, extensionFolder,
                         context == null ? declared
                                 : extensionSettingsWithBuiltIns(extensionFolder, declared, own)));
+                addConfigurationVariants(out, key, value, extensionFolder, declared, context);
             }
         }
         return out;
@@ -7512,6 +7568,10 @@ public class IPhoneBuilder extends Executor {
         // extension of this app had the base value read instead, and the qualified identifier
         // Xcode would have used was dropped for being out of namespace. The generated target then
         // fell back to its base bundle id while the export options still named the custom one.
+        // Per key, below, rather than one map for the pass: a qualified entry can reference a
+        // helper that is qualified too, and one flattening of the archive's context answers with
+        // whichever value the map happened to hand over. This map is the fallback for keys that
+        // constrain nothing.
         Map<String, String> flat = flattenForContext(settings, context);
         for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
                 settings.entrySet())) {
@@ -7528,7 +7588,8 @@ public class IPhoneBuilder extends Executor {
             // with it. An identifier that resolves to nothing is left exactly as written: this
             // build cannot evaluate it, which is not the same as knowing it is wrong. A
             // deployment target is the other way round, for the reason below.
-            String resolved = resolveSettingsInValue(value, flat);
+            String resolved = resolveSettingsInValue(value, key.indexOf('[') < 0 ? flat
+                    : flattenForContext(settings, contextForCondition(key, context)));
             if (resolved.length() == 0) {
                 // Nothing left after expansion. For a deployment target that is not "cannot
                 // tell": Xcode expands the same missing reference to the same nothing, and an
