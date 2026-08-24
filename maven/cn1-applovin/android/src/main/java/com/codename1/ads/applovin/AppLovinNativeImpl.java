@@ -23,10 +23,10 @@
 package com.codename1.ads.applovin;
 
 import android.app.Activity;
+import android.view.View;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
-import com.codename1.ui.PeerComponent;
 
 import com.applovin.mediation.MaxAd;
 import com.applovin.mediation.MaxAdListener;
@@ -183,7 +183,12 @@ public class AppLovinNativeImpl {
         ads.remove(handle);
     }
 
-    public PeerComponent createBanner(final int handle, final String adUnitId, final int sizeType, final int widthDp) {
+    /// Returns the raw Android view rather than a peer component. The
+    /// generated AppLovinNativeStub wraps whatever this method returns in
+    /// PeerComponent.create(), so returning a peer here makes
+    /// AndroidImplementation.createNativePeer reject its own AndroidPeer with
+    /// an IllegalArgumentException the first time a banner is shown.
+    public View createBanner(final int handle, final String adUnitId, final int sizeType, final int widthDp) {
         final Activity activity = AndroidNativeUtil.getActivity();
         if (activity == null) {
             return null;
@@ -196,7 +201,7 @@ public class AppLovinNativeImpl {
                 out[0] = adView;
             }
         });
-        return out[0] == null ? null : PeerComponent.create(out[0]);
+        return out[0];
     }
 
     public void loadBanner(final int handle, final String keywords, final String contentUrl, final boolean nonPersonalized) {

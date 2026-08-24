@@ -1,4 +1,26 @@
 /*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * iOS implementation of the AdMob native bridge, built on the modern Google
  * Mobile Ads (GMA) SDK (GADInterstitialAd / GADRewardedAd /
  * GADRewardedInterstitialAd / GADAppOpenAd / GADBannerView), the User
@@ -9,15 +31,31 @@
  * com.codename1.ads.admob.AdMobCallback.fire(...), keyed by an integer handle,
  * which keeps the native->Java binding surface to one function.
  *
- * This native layer is validated by an on-device iOS build; adjust the GMA
- * symbol names here to the pod version pinned in
- * codenameone_library_required.properties if Google renames an API.
+ * The GMA symbol names here have to match the pod pinned in
+ * codenameone_library_required.properties, and Google does rename and remove
+ * them across major versions. Nothing in an app build catches that before the
+ * customer's Xcode does, so ad-cn1lib-ios-native-check.yml compiles this file
+ * against that pod on every PR that touches it.
  */
 #import "com_codename1_ads_admob_AdMobNativeImpl.h"
 #import <UIKit/UIKit.h>
 #import <GoogleMobileAds/GoogleMobileAds.h>
 #import <UserMessagingPlatform/UserMessagingPlatform.h>
 #import <AppTrackingTransparency/AppTrackingTransparency.h>
+
+// Handing a UIView to Codename One as a native peer is a pointer cast whose
+// spelling depends on the memory model the file is compiled under. There is no
+// BRIDGE_RETAINED anywhere in the port, and a retained cast would be wrong here
+// anyway: NativeIPhoneView retains the peer itself and releases it when the
+// component is collected, while cn1Banners holds the view for as long as the
+// banner exists.
+#ifndef BRIDGE_CAST
+#if __has_feature(objc_arc)
+#define BRIDGE_CAST __bridge
+#else
+#define BRIDGE_CAST
+#endif
+#endif
 
 // Generated entry point for com.codename1.ads.admob.AdMobCallback.fire(int,int,int,String,String,int)
 extern void com_codename1_ads_admob_AdMobCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
@@ -130,6 +168,36 @@ static GADRequest *cn1BuildRequest(NSString *keywords, BOOL nonPersonalized) {
     return request;
 }
 
+// The three state privacy flags AdConfig sends: 1 means yes, 2 means no and
+// anything else leaves the signal unset. tagForChildDirectedTreatment and
+// tagForUnderAgeOfConsent are marked deprecated in favour of
+// ageRestrictedTreatment, which collapses child, teen and unspecified into one
+// enum and therefore cannot express an explicit "no". These two can, and they
+// are what the Android side sends, so the bridge keeps using them.
+static void cn1ApplyPrivacyFlags(GADRequestConfiguration *cfg, int childDirected,
+        int underAge, int maxRating) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    if (childDirected == 1) {
+        cfg.tagForChildDirectedTreatment = @YES;
+    } else if (childDirected == 2) {
+        cfg.tagForChildDirectedTreatment = @NO;
+    }
+    if (underAge == 1) {
+        cfg.tagForUnderAgeOfConsent = @YES;
+    } else if (underAge == 2) {
+        cfg.tagForUnderAgeOfConsent = @NO;
+    }
+#pragma clang diagnostic pop
+    switch (maxRating) {
+        case 1: cfg.maxAdContentRating = GADMaxAdContentRatingGeneral; break;
+        case 2: cfg.maxAdContentRating = GADMaxAdContentRatingParentalGuidance; break;
+        case 3: cfg.maxAdContentRating = GADMaxAdContentRatingTeen; break;
+        case 4: cfg.maxAdContentRating = GADMaxAdContentRatingMatureAudience; break;
+        default: break;
+    }
+}
+
 @implementation com_codename1_ads_admob_AdMobNativeImpl
 
 -(void)initialize:(NSString*)param param1:(BOOL)param1 param2:(int)param2 param3:(int)param3 param4:(int)param4 {
@@ -139,16 +207,18 @@ static GADRequest *cn1BuildRequest(NSString *keywords, BOOL nonPersonalized) {
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         GADRequestConfiguration *cfg = GADMobileAds.sharedInstance.requestConfiguration;
-        NSMutableArray *devices = [NSMutableArray array];
-        if (param1) {
-            [devices addObject:GADSimulatorID];
-        }
+        // param1 is AdConfig.testMode, and it deliberately adds nothing to the
+        // list: the SDK counts every simulator as a test device on its own, and
+        // the GADSimulatorID constant that used to say so was removed in SDK 12.
+        // Explicit device ids still arrive through param.
         if (param != nil && param.length > 0) {
+            NSMutableArray *devices = [NSMutableArray array];
             [devices addObjectsFromArray:[param componentsSeparatedByString:@","]];
+            if (devices.count > 0) {
+                cfg.testDeviceIdentifiers = devices;
+            }
         }
-        if (devices.count > 0) {
-            cfg.testDeviceIdentifiers = devices;
-        }
+        cn1ApplyPrivacyFlags(cfg, param2, param3, param4);
         [[GADMobileAds sharedInstance] startWithCompletionHandler:nil];
     });
 }
@@ -281,7 +351,7 @@ static GADRequest *cn1BuildRequest(NSString *keywords, BOOL nonPersonalized) {
         cn1Banners[@(param)] = holder;
     });
     // Hand the UIView to Codename One as a native peer.
-    return (BRIDGE_RETAINED void*)bannerView;
+    return (BRIDGE_CAST void*)bannerView;
 }
 
 -(void)loadBanner:(int)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(BOOL)param3 {

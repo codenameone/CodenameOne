@@ -25,17 +25,18 @@ package com.codename1.impl.android;
 import android.app.Activity;
 
 /**
- * Compile-only stand-in for the Android port's class of the same name, used by
- * nothing but this module's Ads SDK API check. Never packaged.
+ * Compile-only stand-in for the Android port's class of the same name, shared by
+ * every cn1lib API check: cn1-admob's Maven-driven one and
+ * scripts/check-cn1lib-android-api.py, which covers all of them. Never packaged.
  *
- * <p>The check exists to catch cn1-admob drifting off the Google Ads SDK it
- * pins, and it must run everywhere -- including a fresh release checkout, where
+ * <p>The checks exist to catch a cn1lib drifting off the SDK it pins, and they
+ * must run everywhere -- including a fresh release checkout, where
  * {@code codenameone-android} is built from an empty source directory because
  * the {@code compile-android} profile activates on a {@code cn1.binaries}
  * directory that the {@code download} profile only creates in {@code initialize},
  * after Maven has already evaluated the model. Depending on the real port would
  * make this check fail the release build for a reason that has nothing to do
- * with AdMob.
+ * with the library under test.
  *
  * <p>The signature below is checked against
  * {@code Ports/Android/src/com/codename1/impl/android/AndroidNativeUtil.java}

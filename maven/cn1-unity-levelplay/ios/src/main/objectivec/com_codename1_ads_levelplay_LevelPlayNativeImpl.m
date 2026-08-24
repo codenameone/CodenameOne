@@ -1,15 +1,60 @@
 /*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * iOS implementation of the Unity LevelPlay (ironSource) native bridge. Shipped
- * as source and compiled by the Codename One iOS build; validated on device.
+ * as source and compiled by the Codename One iOS build, and by
+ * ad-cn1lib-ios-native-check.yml against the pod pinned in
+ * codenameone_library_required.properties.
+ *
+ * Written against the unified LevelPlay API (LPMInterstitialAd / LPMRewardedAd
+ * / LPMBannerAdView), where every ad is an object bound to one ad unit. The
+ * singleton ironSource entry points this bridge used to call are gone from the
+ * SDK, and they forced callbacks through a "currently active handle" field that
+ * lost events whenever two ads of the same format were in flight; one ad object
+ * per handle removes that.
+ *
  * Events are reported back to Java through the single static fan-in method
  * com.codename1.ads.levelplay.LevelPlayCallback.fire(...), keyed by an integer
- * handle. LevelPlay interstitial/rewarded placements are singletons, so the
- * active full screen handle is routed to the singleton delegate callbacks.
+ * handle.
  */
 #import "com_codename1_ads_levelplay_LevelPlayNativeImpl.h"
 #import <UIKit/UIKit.h>
 #import <IronSource/IronSource.h>
 #import <AppTrackingTransparency/AppTrackingTransparency.h>
+
+// Handing a UIView to Codename One as a native peer is a pointer cast whose
+// spelling depends on the memory model the file is compiled under. There is no
+// BRIDGE_RETAINED anywhere in the port, and a retained cast would be wrong here
+// anyway: NativeIPhoneView retains the peer itself and releases it when the
+// component is collected, while the banner dictionary holds the view for as
+// long as the banner exists.
+#ifndef BRIDGE_CAST
+#if __has_feature(objc_arc)
+#define BRIDGE_CAST __bridge
+#else
+#define BRIDGE_CAST
+#endif
+#endif
 
 extern void com_codename1_ads_levelplay_LevelPlayCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_INT handle, JAVA_INT event, JAVA_INT code,
@@ -28,11 +73,8 @@ extern void com_codename1_ads_levelplay_LevelPlayCallback_fire___int_int_int_jav
 #define CN1_FORMAT_INTERSTITIAL 1
 #define CN1_FORMAT_REWARDED 2
 
-static int cn1ActiveInterstitial = -1;
-static int cn1ActiveRewarded = -1;
-static int cn1CurrentBannerHandle = -1;
-static NSMutableDictionary *cn1Formats;     // handle -> format
-static NSMutableDictionary *cn1BannerViews; // handle -> wrapper UIView
+static NSMutableDictionary *cn1FullScreen; // handle -> CN1LPFullScreen
+static NSMutableDictionary *cn1Banners;    // handle -> CN1LPBanner
 
 static void cn1Fire(int handle, int event, int code, NSString *message, NSString *rewardType, int rewardAmount) {
     if (handle < 0) { return; }
@@ -51,61 +93,113 @@ static NSString *cn1AppKey() {
     return k == nil ? @"" : k;
 }
 
-// Singleton delegate bridging IronSource interstitial + rewarded + banner.
-@interface CN1LevelPlayDelegate : NSObject <ISInterstitialDelegate, ISRewardedVideoDelegate, ISBannerDelegate>
+// One delegate per full screen handle. LPM ads hold their delegate weakly, so
+// the holder below owns both the ad and its delegate.
+@interface CN1LPFullScreenDelegate : NSObject <LPMInterstitialAdDelegate, LPMRewardedAdDelegate>
+@property (nonatomic) int handle;
 @end
 
-@implementation CN1LevelPlayDelegate
-// Interstitial
-- (void)interstitialDidLoad { cn1Fire(cn1ActiveInterstitial, CN1_AD_LOADED, 0, nil, nil, 0); }
-- (void)interstitialDidFailToLoadWithError:(NSError *)error { cn1Fire(cn1ActiveInterstitial, CN1_AD_FAILED, (int)error.code, error.localizedDescription, nil, 0); }
-- (void)interstitialDidOpen { cn1Fire(cn1ActiveInterstitial, CN1_AD_SHOWN, 0, nil, nil, 0); cn1Fire(cn1ActiveInterstitial, CN1_AD_IMPRESSION, 0, nil, nil, 0); }
-- (void)interstitialDidShow {}
-- (void)interstitialDidFailToShowWithError:(NSError *)error { cn1Fire(cn1ActiveInterstitial, CN1_AD_SHOW_FAILED, (int)error.code, error.localizedDescription, nil, 0); }
-- (void)didClickInterstitial { cn1Fire(cn1ActiveInterstitial, CN1_AD_CLICKED, 0, nil, nil, 0); }
-- (void)interstitialDidClose { cn1Fire(cn1ActiveInterstitial, CN1_AD_DISMISSED, 0, nil, nil, 0); }
-// Rewarded
-- (void)rewardedVideoHasChangedAvailability:(BOOL)available { if (available) cn1Fire(cn1ActiveRewarded, CN1_AD_LOADED, 0, nil, nil, 0); }
-- (void)rewardedVideoDidOpen { cn1Fire(cn1ActiveRewarded, CN1_AD_SHOWN, 0, nil, nil, 0); cn1Fire(cn1ActiveRewarded, CN1_AD_IMPRESSION, 0, nil, nil, 0); }
-- (void)rewardedVideoDidFailToShowWithError:(NSError *)error { cn1Fire(cn1ActiveRewarded, CN1_AD_SHOW_FAILED, (int)error.code, error.localizedDescription, nil, 0); }
-- (void)didClickRewardedVideo:(ISPlacementInfo *)placementInfo { cn1Fire(cn1ActiveRewarded, CN1_AD_CLICKED, 0, nil, nil, 0); }
-- (void)didReceiveRewardForPlacement:(ISPlacementInfo *)placementInfo { cn1Fire(cn1ActiveRewarded, CN1_AD_REWARD, 0, nil, placementInfo.rewardName, placementInfo.rewardAmount.intValue); }
-- (void)rewardedVideoDidClose { cn1Fire(cn1ActiveRewarded, CN1_AD_DISMISSED, 0, nil, nil, 0); }
-- (void)rewardedVideoDidStart {}
-- (void)rewardedVideoDidEnd {}
-// Banner: the loaded ISBannerView is inserted into the wrapper handed to CN1.
-- (void)bannerDidLoad:(ISBannerView *)bannerView {
-    UIView *wrapper = cn1BannerViews[@(cn1CurrentBannerHandle)];
-    if (wrapper != nil) {
-        bannerView.frame = wrapper.bounds;
-        bannerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [wrapper addSubview:bannerView];
-    }
-    cn1Fire(cn1CurrentBannerHandle, CN1_AD_LOADED, 0, nil, nil, 0);
-    cn1Fire(cn1CurrentBannerHandle, CN1_AD_IMPRESSION, 0, nil, nil, 0);
+@implementation CN1LPFullScreenDelegate
+- (void)didLoadAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_LOADED, 0, nil, nil, 0);
 }
-- (void)bannerDidFailToLoadWithError:(NSError *)error { cn1Fire(cn1CurrentBannerHandle, CN1_AD_FAILED, (int)error.code, error.localizedDescription, nil, 0); }
-- (void)didClickBanner { cn1Fire(cn1CurrentBannerHandle, CN1_AD_CLICKED, 0, nil, nil, 0); }
-- (void)bannerWillPresentScreen {}
-- (void)bannerDidDismissScreen {}
-- (void)bannerWillLeaveApplication {}
+- (void)didFailToLoadAdWithAdUnitId:(NSString *)adUnitId error:(NSError *)error {
+    cn1Fire(self.handle, CN1_AD_FAILED, (int)error.code, error.localizedDescription, nil, 0);
+}
+- (void)didDisplayAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_SHOWN, 0, nil, nil, 0);
+    cn1Fire(self.handle, CN1_AD_IMPRESSION, 0, nil, nil, 0);
+}
+- (void)didFailToDisplayAdWithAdInfo:(LPMAdInfo *)adInfo error:(NSError *)error {
+    cn1Fire(self.handle, CN1_AD_SHOW_FAILED, (int)error.code, error.localizedDescription, nil, 0);
+}
+- (void)didClickAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_CLICKED, 0, nil, nil, 0);
+}
+- (void)didCloseAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_DISMISSED, 0, nil, nil, 0);
+}
+- (void)didRewardAdWithAdInfo:(LPMAdInfo *)adInfo reward:(LPMReward *)reward {
+    cn1Fire(self.handle, CN1_AD_REWARD, 0, nil, reward.name, (int)reward.amount);
+}
 @end
 
-static CN1LevelPlayDelegate *cn1Delegate;
+@interface CN1LPBannerDelegate : NSObject <LPMBannerAdViewDelegate>
+@property (nonatomic) int handle;
+@end
+
+@implementation CN1LPBannerDelegate
+- (void)didLoadAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_LOADED, 0, nil, nil, 0);
+    cn1Fire(self.handle, CN1_AD_IMPRESSION, 0, nil, nil, 0);
+}
+- (void)didFailToLoadAdWithAdUnitId:(NSString *)adUnitId error:(NSError *)error {
+    cn1Fire(self.handle, CN1_AD_FAILED, (int)error.code, error.localizedDescription, nil, 0);
+}
+- (void)didClickAdWithAdInfo:(LPMAdInfo *)adInfo {
+    cn1Fire(self.handle, CN1_AD_CLICKED, 0, nil, nil, 0);
+}
+@end
+
+@interface CN1LPFullScreen : NSObject
+@property (nonatomic) int format;
+@property (nonatomic, strong) LPMInterstitialAd *interstitial;
+@property (nonatomic, strong) LPMRewardedAd *rewarded;
+@property (nonatomic, strong) CN1LPFullScreenDelegate *delegate;
+@end
+
+@implementation CN1LPFullScreen
+@end
+
+@interface CN1LPBanner : NSObject
+@property (nonatomic, strong) LPMBannerAdView *view;
+@property (nonatomic, strong) CN1LPBannerDelegate *delegate;
+@end
+
+@implementation CN1LPBanner
+@end
+
+// sizeType matches the SIZE_* constants in com.codename1.ads.BannerAd.
+static LPMAdSize *cn1BannerSize(int sizeType, int widthDp) {
+    switch (sizeType) {
+        case 1: return [LPMAdSize bannerSize];
+        case 2: return [LPMAdSize largeSize];
+        case 3: return [LPMAdSize mediumRectangleSize];
+        case 4: return [LPMAdSize leaderBoardSize];
+        default: {
+            CGFloat width = widthDp > 0 ? widthDp : [UIScreen mainScreen].bounds.size.width;
+            LPMAdSize *adaptive = [LPMAdSize createAdaptiveAdSizeWithWidth:width];
+            // The adaptive factory returns nil when no adaptive size fits the
+            // width it was given.
+            return adaptive == nil ? [LPMAdSize bannerSize] : adaptive;
+        }
+    }
+}
 
 @implementation com_codename1_ads_levelplay_LevelPlayNativeImpl
 
 -(void)initialize:(NSString*)param param1:(BOOL)param1 param2:(int)param2 param3:(int)param3 param4:(int)param4 {
-    if (cn1Formats == nil) {
-        cn1Formats = [[NSMutableDictionary alloc] init];
-        cn1BannerViews = [[NSMutableDictionary alloc] init];
-        cn1Delegate = [[CN1LevelPlayDelegate alloc] init];
+    if (cn1FullScreen == nil) {
+        cn1FullScreen = [[NSMutableDictionary alloc] init];
+        cn1Banners = [[NSMutableDictionary alloc] init];
     }
     dispatch_async(dispatch_get_main_queue(), ^{
-        [IronSource setInterstitialDelegate:cn1Delegate];
-        [IronSource setRewardedVideoDelegate:cn1Delegate];
-        [IronSource setBannerDelegate:cn1Delegate];
-        [IronSource initWithAppKey:cn1AppKey()];
+        // LevelPlay has no test device list: test ads are switched on per ad
+        // unit in the dashboard, so param and param1 (AdConfig's testDeviceIds
+        // and testMode) have no counterpart on this platform.
+        if (param2 == 1) {
+            [LPMPrivacySettings setCOPPA:YES];
+        } else if (param2 == 2) {
+            [LPMPrivacySettings setCOPPA:NO];
+        }
+        LPMInitRequest *request = [[[LPMInitRequestBuilder alloc]
+                initWithAppKey:cn1AppKey()] build];
+        [LevelPlay initWithRequest:request
+                        completion:^(LPMConfiguration *config, NSError *error) {
+            if (error != nil) {
+                cn1Fire(0, CN1_AD_FAILED, (int)error.code, error.localizedDescription, nil, 0);
+            }
+        }];
     });
 }
 
@@ -113,49 +207,56 @@ static CN1LevelPlayDelegate *cn1Delegate;
     if (param1 != CN1_FORMAT_INTERSTITIAL && param1 != CN1_FORMAT_REWARDED) {
         return NO; // LevelPlay has no dedicated app-open / rewarded-interstitial
     }
-    cn1Formats[@(param)] = @(param1);
+    CN1LPFullScreen *fs = [[CN1LPFullScreen alloc] init];
+    fs.format = param1;
+    fs.delegate = [[CN1LPFullScreenDelegate alloc] init];
+    fs.delegate.handle = param;
+    if (param1 == CN1_FORMAT_REWARDED) {
+        fs.rewarded = [[LPMRewardedAd alloc] initWithAdUnitId:param2];
+        [fs.rewarded setDelegate:fs.delegate];
+    } else {
+        fs.interstitial = [[LPMInterstitialAd alloc] initWithAdUnitId:param2];
+        [fs.interstitial setDelegate:fs.delegate];
+    }
+    cn1FullScreen[@(param)] = fs;
     return YES;
 }
 
 -(void)setServerSideVerification:(int)param param1:(NSString*)param1 param2:(NSString*)param2 {
-    if (param1 != nil) { [IronSource setUserId:param1]; }
+    if (param1 != nil) { [LevelPlay setDynamicUserId:param1]; }
 }
 
 -(void)loadFullScreen:(int)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(BOOL)param3 {
-    NSNumber *fmt = cn1Formats[@(param)];
-    if (fmt == nil) { return; }
+    CN1LPFullScreen *fs = cn1FullScreen[@(param)];
+    if (fs == nil) { return; }
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (fmt.intValue == CN1_FORMAT_INTERSTITIAL) {
-            cn1ActiveInterstitial = param;
-            [IronSource loadInterstitial];
+        if (fs.rewarded != nil) {
+            [fs.rewarded loadAd];
         } else {
-            cn1ActiveRewarded = param;
-            if ([IronSource hasRewardedVideo]) { cn1Fire(param, CN1_AD_LOADED, 0, nil, nil, 0); }
+            [fs.interstitial loadAd];
         }
     });
 }
 
 -(BOOL)isFullScreenLoaded:(int)param {
-    NSNumber *fmt = cn1Formats[@(param)];
-    if (fmt == nil) { return NO; }
-    if (fmt.intValue == CN1_FORMAT_INTERSTITIAL) { return [IronSource hasInterstitial]; }
-    return [IronSource hasRewardedVideo];
+    CN1LPFullScreen *fs = cn1FullScreen[@(param)];
+    if (fs == nil) { return NO; }
+    if (fs.rewarded != nil) { return [fs.rewarded isAdReady]; }
+    return [fs.interstitial isAdReady];
 }
 
 -(void)showFullScreen:(int)param {
-    NSNumber *fmt = cn1Formats[@(param)];
-    if (fmt == nil) {
+    CN1LPFullScreen *fs = cn1FullScreen[@(param)];
+    if (fs == nil) {
         cn1Fire(param, CN1_AD_SHOW_FAILED, 100, @"No ad loaded", nil, 0);
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         UIViewController *root = cn1RootController();
-        if (fmt.intValue == CN1_FORMAT_INTERSTITIAL) {
-            cn1ActiveInterstitial = param;
-            [IronSource showInterstitialWithViewController:root];
+        if (fs.rewarded != nil) {
+            [fs.rewarded showAdWithViewController:root placementName:nil];
         } else {
-            cn1ActiveRewarded = param;
-            [IronSource showRewardedVideoWithViewController:root];
+            [fs.interstitial showAdWithViewController:root placementName:nil];
         }
     });
 }
@@ -163,29 +264,41 @@ static CN1LevelPlayDelegate *cn1Delegate;
 -(void)setAppOpenAutoShow:(int)param param1:(BOOL)param1 {}
 
 -(void)disposeFullScreen:(int)param {
-    [cn1Formats removeObjectForKey:@(param)];
+    [cn1FullScreen removeObjectForKey:@(param)];
 }
 
 -(void*)createBanner:(int)param param1:(NSString*)param1 param2:(int)param2 param3:(int)param3 {
-    __block UIView *wrapper = nil;
+    __block LPMBannerAdView *bannerView = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        // The ISBannerView arrives asynchronously via the delegate, so hand
-        // Codename One a wrapper view and add the banner to it on load.
-        wrapper = [[UIView alloc] initWithFrame:CGRectZero];
-        cn1BannerViews[@(param)] = wrapper;
+        LPMBannerAdViewConfig *config = [[[[LPMBannerAdViewConfigBuilder alloc] init]
+                setWithAdSize:cn1BannerSize(param2, param3)] build];
+        bannerView = [[LPMBannerAdView alloc] initWithAdUnitId:param1 config:config];
+        CN1LPBanner *holder = [[CN1LPBanner alloc] init];
+        holder.view = bannerView;
+        holder.delegate = [[CN1LPBannerDelegate alloc] init];
+        holder.delegate.handle = param;
+        [bannerView setDelegate:holder.delegate];
+        cn1Banners[@(param)] = holder;
     });
-    return (BRIDGE_RETAINED void*)wrapper;
+    // LPMBannerAdView is a UIView, so it is the peer itself.
+    return (BRIDGE_CAST void*)bannerView;
 }
 
 -(void)loadBanner:(int)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(BOOL)param3 {
+    CN1LPBanner *holder = cn1Banners[@(param)];
+    if (holder == nil) { return; }
     dispatch_async(dispatch_get_main_queue(), ^{
-        cn1CurrentBannerHandle = param;
-        [IronSource loadBannerWithViewController:cn1RootController() size:ISBannerSize_BANNER];
+        [holder.view loadAdWithViewController:cn1RootController()];
     });
 }
 
 -(void)disposeBanner:(int)param {
-    [cn1BannerViews removeObjectForKey:@(param)];
+    CN1LPBanner *holder = cn1Banners[@(param)];
+    if (holder == nil) { return; }
+    [cn1Banners removeObjectForKey:@(param)];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [holder.view destroy];
+    });
 }
 
 -(void)requestConsent:(BOOL)param {

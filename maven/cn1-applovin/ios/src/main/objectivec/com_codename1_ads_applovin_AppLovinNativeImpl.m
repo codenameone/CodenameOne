@@ -1,7 +1,30 @@
 /*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * iOS implementation of the AppLovin MAX native bridge (MAInterstitialAd /
  * MARewardedAd / MAAppOpenAd / MAAdView). Shipped as source and compiled by the
- * Codename One iOS build; validated on device. Every event is reported back to
+ * Codename One iOS build, and compiled against the pinned AppLovinSDK pod by
+ * .github/workflows/ad-cn1lib-ios-native-check.yml. Every event is reported back to
  * Java through the single static fan-in method
  * com.codename1.ads.applovin.AppLovinCallback.fire(...), keyed by an integer
  * handle.
@@ -10,6 +33,20 @@
 #import <UIKit/UIKit.h>
 #import <AppLovinSDK/AppLovinSDK.h>
 #import <AppTrackingTransparency/AppTrackingTransparency.h>
+
+// Handing a UIView to Codename One as a native peer is a pointer cast whose
+// spelling depends on the memory model the file is compiled under. There is no
+// BRIDGE_RETAINED anywhere in the port, and a retained cast would be wrong here
+// anyway: NativeIPhoneView retains the peer itself and releases it when the
+// component is collected, while the banner dictionary holds the view for as
+// long as the banner exists.
+#ifndef BRIDGE_CAST
+#if __has_feature(objc_arc)
+#define BRIDGE_CAST __bridge
+#else
+#define BRIDGE_CAST
+#endif
+#endif
 
 extern void com_codename1_ads_applovin_AppLovinCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_INT handle, JAVA_INT event, JAVA_INT code,
@@ -105,8 +142,25 @@ static NSMutableDictionary *cn1Banners;
         cn1Banners = [[NSMutableDictionary alloc] init];
     }
     dispatch_async(dispatch_get_main_queue(), ^{
-        [ALSdk shared].mediationProvider = @"max";
-        [[ALSdk shared] initializeSdkWithCompletionHandler:^(ALSdkConfiguration *configuration) {}];
+        // MAX SDK 13 replaced the implicit "read the key out of Info.plist and
+        // initialize" call with an explicit configuration object, so the key
+        // the app injected through ios.plistInject is read here.
+        NSString *sdkKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"AppLovinSdkKey"];
+        if (sdkKey == nil) {
+            sdkKey = @"";
+        }
+        NSArray<NSString *> *testDevices = (param != nil && param.length > 0)
+                ? [param componentsSeparatedByString:@","] : @[];
+        ALSdkInitializationConfiguration *config =
+                [ALSdkInitializationConfiguration configurationWithSdkKey:sdkKey
+                        builderBlock:^(ALSdkInitializationConfigurationBuilder *builder) {
+            builder.mediationProvider = ALMediationProviderMAX;
+            if (testDevices.count > 0) {
+                builder.testDeviceAdvertisingIdentifiers = testDevices;
+            }
+        }];
+        [[ALSdk shared] initializeWithConfiguration:config
+                completionHandler:^(ALSdkConfiguration *configuration) {}];
     });
 }
 
@@ -193,7 +247,7 @@ static NSMutableDictionary *cn1Banners;
         bannerView.delegate = holder.delegate;
         cn1Banners[@(param)] = holder;
     });
-    return (BRIDGE_RETAINED void*)bannerView;
+    return (BRIDGE_CAST void*)bannerView;
 }
 
 -(void)loadBanner:(int)param param1:(NSString*)param1 param2:(NSString*)param2 param3:(BOOL)param3 {
