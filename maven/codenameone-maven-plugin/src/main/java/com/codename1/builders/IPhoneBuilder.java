@@ -5059,6 +5059,13 @@ public class IPhoneBuilder extends Executor {
                             // Xcode does. An explicit PRODUCT_BUNDLE_IDENTIFIER in
                             // buildSettings.properties is merged over all of this further down
                             // and still outranks it.
+                            // Captured BEFORE anything is stamped, and it has to stay that way:
+                            // two settings can name the same physical plist -- the base one and a
+                            // qualified one -- and stamping the qualified context rewrites that
+                            // shared file's literal to $(PRODUCT_BUNDLE_IDENTIFIER). Read
+                            // afterwards, the base literal is gone and the base configuration
+                            // falls back to the derived folder identifier while preflight has
+                            // already used the original.
                             Map<String, String> plistIdentifiers = appExtensionPlistIdentifiers(
                                     appExtension, plistContext, request.getPackageName());
                             String basePlistId =
@@ -5141,6 +5148,26 @@ public class IPhoneBuilder extends Executor {
                                 for (String note
                                         : dropBlankBundleIdentifiers(archiveOwnSettings)) {
                                     debug("The " + extensionName + " app extension: " + note + ".");
+                                }
+                                // Narrowed, not taken as given: an exported folder carries the
+                                // universal "1,2" from the project it came from, and copying that
+                                // over the host-derived value put an iPhone-only app back to
+                                // embedding an extension that claims iPad.
+                                String hostFamily = embeddedExtensionDeviceFamily(
+                                        request.getArg("ios.project_type", "ios"));
+                                for (String key : new ArrayList<String>(archiveOwnSettings.keySet())) {
+                                    if ("TARGETED_DEVICE_FAMILY".equals(key)
+                                            || isQualified(key, "TARGETED_DEVICE_FAMILY")) {
+                                        String narrowed = narrowDeviceFamily(
+                                                archiveOwnSettings.get(key), hostFamily);
+                                        if (!narrowed.equals(archiveOwnSettings.get(key))) {
+                                            debug("The " + extensionName + " app extension asks for "
+                                                    + key + " = " + archiveOwnSettings.get(key)
+                                                    + ", which this app does not support; narrowed to "
+                                                    + narrowed + ".");
+                                        }
+                                        archiveOwnSettings.put(key, narrowed);
+                                    }
                                 }
                                 buildSettingsMap.putAll(archiveOwnSettings);
                                 buildSettingsProps.delete();
@@ -6560,9 +6587,19 @@ public class IPhoneBuilder extends Executor {
         // they agree on cannot be embedded in this app.
         String target = archiveSettings == null ? null
                 : archiveSettings.get("PRODUCT_BUNDLE_IDENTIFIER");
-        if (target != null && target.trim().length() > 0 && target.indexOf('$') < 0) {
-            return resolved.equals(target.trim());
+        // Resolved, because the target is as entitled to be written through another setting as
+        // the plist is: PRODUCT_BUNDLE_IDENTIFIER = $(EXTENSION_ID) is what the preflight above
+        // exists to handle. Skipping the comparison on the strength of a '$' kept a literal that
+        // disagrees with what the target actually resolves to, and the .appex was then built as
+        // one identifier and signed as the other.
+        String resolvedTarget = target == null ? null
+                : resolveSettingsFully(target.trim(), archiveSettings);
+        if (resolvedTarget != null && resolvedTarget.trim().length() > 0) {
+            return resolved.equals(resolvedTarget.trim());
         }
+        // A target this build cannot resolve is not something to judge a plist against: the
+        // namespace is all that can be checked, and preflight refuses an unresolvable identifier
+        // on its own terms.
         return true;
     }
 
@@ -8081,6 +8118,42 @@ public class IPhoneBuilder extends Executor {
             // A path this process cannot even canonicalize is not one to write to.
             return false;
         }
+    }
+
+    /// The archive's TARGETED_DEVICE_FAMILY, narrowed to what the host app actually supports.
+    ///
+    /// An exported extension folder usually carries the universal "1,2" from the project it came
+    /// from, and those settings are copied onto the target verbatim -- so the host-derived default
+    /// computed for an iPhone-only app was set and then immediately overwritten, and the extension
+    /// went back to claiming iPad support its container does not have. That is refused at upload.
+    ///
+    /// Narrower than the host is left alone: a widget deliberately limited to iPhone inside a
+    /// universal app is the author's call. Only the families the host does not have are dropped,
+    /// and an archive that shares none of them falls back to the host's rather than to nothing.
+    static String narrowDeviceFamily(String declared, String hostFamily) {
+        if (declared == null || declared.trim().length() == 0) {
+            return hostFamily;
+        }
+        if (hostFamily == null || hostFamily.trim().length() == 0) {
+            return declared;
+        }
+        List<String> allowed = new ArrayList<String>();
+        for (String family : hostFamily.split(",")) {
+            if (family.trim().length() > 0) {
+                allowed.add(family.trim());
+            }
+        }
+        StringBuilder kept = new StringBuilder();
+        for (String family : declared.split(",")) {
+            String one = family.trim();
+            if (one.length() > 0 && allowed.contains(one)) {
+                if (kept.length() > 0) {
+                    kept.append(",");
+                }
+                kept.append(one);
+            }
+        }
+        return kept.length() == 0 ? hostFamily : kept.toString();
     }
 
     /// The device families an extension embedded in THIS app may declare.

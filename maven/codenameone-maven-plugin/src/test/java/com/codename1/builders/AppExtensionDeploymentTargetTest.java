@@ -1295,4 +1295,48 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Debug", IPhoneBuilder.winningSetting(identifiers,
                 "PRODUCT_BUNDLE_IDENTIFIER", debugArchive));
     }
+
+    @Test
+    public void anExportedDeviceFamilyIsNarrowedToTheHosts() {
+        // An exported folder carries the universal pair from the project it came from, and those
+        // settings are copied onto the target verbatim -- so the host-derived value was set and
+        // then immediately overwritten, and an iPhone-only app went back to embedding an
+        // extension claiming iPad support. Refused at upload.
+        assertEquals("1", IPhoneBuilder.narrowDeviceFamily("1,2", "1"));
+        assertEquals("2", IPhoneBuilder.narrowDeviceFamily("1,2", "2"));
+        assertEquals("1,2", IPhoneBuilder.narrowDeviceFamily("1,2", "1,2"));
+
+        // Narrower than the host stays: a widget limited to iPhone inside a universal app is the
+        // author's call.
+        assertEquals("1", IPhoneBuilder.narrowDeviceFamily("1", "1,2"));
+
+        // Sharing none of them falls back to the host's rather than to nothing, since an empty
+        // TARGETED_DEVICE_FAMILY is not a device family.
+        assertEquals("1", IPhoneBuilder.narrowDeviceFamily("2", "1"));
+        assertEquals("1", IPhoneBuilder.narrowDeviceFamily("", "1"));
+        assertEquals("1,2", IPhoneBuilder.narrowDeviceFamily("1,2", null));
+    }
+
+    @Test
+    public void aReferencedTargetIdentifierIsResolvedBeforeComparing() {
+        String plist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n"
+                + "<dict>\n\t<key>CFBundleIdentifier</key>\n"
+                + "\t<string>com.example.app.Custom</string>\n</dict>\n</plist>\n";
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.FromSettings");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        // The target is as entitled to be written through another setting as the plist is.
+        // Skipping the comparison on the strength of a '$' kept a literal that disagrees with
+        // what the target resolves to, so the .appex was built as one identifier and signed as
+        // the other.
+        assertFalse(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
+
+        settings.put("EXTENSION_ID", "com.example.app.Custom");
+        assertTrue(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
+
+        // A target this build cannot resolve is not something to judge a plist against.
+        settings.remove("EXTENSION_ID");
+        assertTrue(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
+    }
 }

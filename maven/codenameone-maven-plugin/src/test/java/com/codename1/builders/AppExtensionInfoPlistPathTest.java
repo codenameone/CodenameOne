@@ -293,4 +293,39 @@ public class AppExtensionInfoPlistPathTest {
                 + "\t<key>CFBundleVersion</key>\n\t<string>5.4</string>\n"
                 + "</dict>\n</plist>\n";
     }
+
+    @Test
+    public void aSharedPlistKeepsItsBaseIdentityForDiscovery() throws Exception {
+        File dist = tmp.newFolder("shared-id");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File shared = new File(extension, "Info.plist");
+        write(shared, identityPlist("com.example.app.Base"));
+        // The base setting and a qualified one naming the SAME file, with the qualified
+        // configuration carrying its own explicit identifier.
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/Info.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/Info.plist\n"
+                + "PRODUCT_BUNDLE_IDENTIFIER[config\\=Debug] = com.example.app.Debug\n");
+
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+        // Read BEFORE stamping, which is the point: stamping the Debug context rewrites the
+        // shared file's literal to $(PRODUCT_BUNDLE_IDENTIFIER), and judging each candidate in
+        // its own context cannot help once another context has rewritten the file they share.
+        java.util.Map<String, String> before = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, archive, "com.example.app");
+        assertEquals("com.example.app.Base", before.get("PRODUCT_BUNDLE_IDENTIFIER"));
+
+        BuildRequest request = new BuildRequest();
+        request.setMainClass("MyApp");
+        request.setPackageName("com.example.app");
+        request.setVersion("5.4");
+        new IPhoneBuilder().stampAppExtensionInfoPlist(extension, request, archive);
+
+        // Afterwards the literal may well be a reference -- which is exactly why the builder
+        // captures the identities first rather than reading them back here.
+        String text = new String(Files.readAllBytes(shared.toPath()), "UTF-8");
+        assertTrue(text, text.contains("<key>CFBundleIdentifier</key>"));
+    }
 }
