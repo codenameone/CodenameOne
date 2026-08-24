@@ -1078,11 +1078,17 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
 
     /// Back up over the modifiers preceding the keyword at `at`, so the
     /// annotations land above `public final class` rather than inside it.
+    ///
+    /// Across any whitespace, newlines included. `public\nclass Main` is legal,
+    /// and stopping at the line break left `public` in the head -- so the
+    /// generated import was written after it, which is not valid Java, and the
+    /// verification build rolled back a migration that was otherwise correct.
+    /// Comments are already spaces here, since this runs on blanked code.
     private static int startOfModifiers(String code, int at) {
         int start = at;
         while (true) {
             int i = start - 1;
-            while (i >= 0 && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
+            while (i >= 0 && Character.isWhitespace(code.charAt(i))) {
                 i--;
             }
             if (i < 0) {

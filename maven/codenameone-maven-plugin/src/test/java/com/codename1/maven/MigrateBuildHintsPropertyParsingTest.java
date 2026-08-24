@@ -305,4 +305,25 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(head.indexOf("class X"),
                 MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
     }
+
+    /// `public\nclass Main` is legal. Stopping at the line break left `public` in
+    /// the head, so the generated import was written after it -- not valid Java,
+    /// and the verification build rolled the migration back.
+    @Test
+    public void modifiersOnEarlierLinesArePartOfTheDeclaration() {
+        String src = "public\nfinal\nclass MyApp {\n}\n";
+        assertEquals(0, MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
+
+        String annotated = "@Deprecated\npublic\nclass MyApp {\n}\n";
+        assertEquals(annotated.indexOf("public"),
+                MigrateBuildHintsMojo.classDeclarationIndex(annotated, false, "MyApp"));
+    }
+
+    /// ...and the walk still stops at a word that is not a modifier.
+    @Test
+    public void aNonModifierWordStopsTheWalk() {
+        String src = "interface Other {}\npublic class MyApp {}\n";
+        assertEquals(src.indexOf("public class"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
+    }
 }
