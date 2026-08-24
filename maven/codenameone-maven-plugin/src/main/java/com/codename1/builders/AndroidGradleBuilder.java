@@ -3211,6 +3211,24 @@ public class AndroidGradleBuilder extends Executor {
                     + " added for you.", new RuntimeException());
             return false;
         }
+
+        // And AndroidX, because the modular artifact's transitive closure is
+        // AndroidX the whole way down. The preflight that catches this for
+        // every other feature reads the CATALOG's gradle dependencies, and
+        // the transport has none -- its artifact is turned on through the
+        // Play-services flag above so it keeps the version this build's own
+        // table resolved. So the check that would have caught it cannot see
+        // it, and AGP rejected the generated project instead, well after the
+        // build had committed to it and with a message that names androidx
+        // rather than anything the developer wrote.
+        if (usesNearbyTransport && !useAndroidX) {
+            error("Error: com.codename1.nearby.transport needs"
+                    + " play-services-nearby, whose transitive dependencies"
+                    + " are AndroidX, and this build set"
+                    + " android.useAndroidX=false. Remove that hint or set"
+                    + " it to true.", new RuntimeException());
+            return false;
+        }
         playServicesPlus = !request.getArg("android.playService.plus", "false" ).equals("false");
         playServicesAuth = !request.getArg("android.playService.auth", (Boolean.valueOf(playFlag) || googleServicesJson.exists()) ? "true" : "false").equals("false");
         playServicesBase = !request.getArg("android.playService.base", playFlag).equals("false");

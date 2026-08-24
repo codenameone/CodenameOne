@@ -85,4 +85,23 @@ public class NearbyPresenceScanTest {
                 "companion use must be set for any CompanionDevices call,"
                 + " not only for the observing one");
     }
+
+    /**
+     * The transport refuses a build that turned AndroidX off.
+     *
+     * <p>play-services-nearby is AndroidX all the way down its transitive
+     * closure, and the preflight that catches this for every other feature
+     * reads the catalog's gradle dependencies -- which the transport does
+     * not use, because its artifact is selected through the builder's own
+     * Play-services table. So nothing would have caught it, and AGP
+     * rejected the generated project long after the build committed to
+     * it.</p>
+     */
+    @Test
+    public void theTransportRequiresAndroidX() throws Exception {
+        String src = scanner();
+        assertTrue(src.contains("usesNearbyTransport && !useAndroidX"),
+                "the transport has to refuse android.useAndroidX=false"
+                + " itself; the catalog preflight cannot see it");
+    }
 }
