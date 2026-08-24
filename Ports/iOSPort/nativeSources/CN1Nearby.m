@@ -501,6 +501,14 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 @property (nonatomic, retain) NSString *discoverServiceId;
 /// Peer id to the unfolded service id the peer was seen on.
 @property (nonatomic, retain) NSMutableDictionary *serviceIdByPeer;
+/// The service each CONNECTION was negotiated through.
+///
+/// Separate from serviceIdByPeer, which is what discovery saw. One map could
+/// not be both: browsing A while advertising B, a peer that connects through
+/// B and is then found or lost by the browser had its entry rewritten to A,
+/// so every payload and disconnection on that live B connection was labelled
+/// with a service it had nothing to do with.
+@property (nonatomic, retain) NSMutableDictionary *connectionServiceByPeer;
 /// The topology each half was started with.
 ///
 /// MultipeerConnectivity enforces no topology of its own -- it will happily
@@ -720,6 +728,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     [_discoverServiceType release];
     [_discoverServiceId release];
     [_serviceIdByPeer release];
+    [_connectionServiceByPeer release];
     [super dealloc];
 }
 
@@ -873,8 +882,23 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 /// Drops every unanswered invitation.
 - (void)forgetInvitations {
+    NSArray *pending;
     @synchronized (self) {
+        pending = [[[self.invitations allValues] copy] autorelease];
         [self.invitations removeAllObjects];
+    }
+    // REJECTED, not just dropped. The handler is the only thing that tells
+    // the initiator its invitation was answered, so releasing it unanswered
+    // left that peer's requestConnection waiting on MultipeerConnectivity's
+    // own timeout instead of hearing immediately that it was refused --
+    // which is what stopping the transport means for an invitation nobody
+    // is going to look at.
+    //
+    // Answered outside the lock: the handler runs framework code, and
+    // holding the transport's monitor across it invites a deadlock against
+    // the delegate queue.
+    for (id handler in pending) {
+        ((void (^)(BOOL, MCSession *))handler)(NO, nil);
     }
 }
 
@@ -1181,6 +1205,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     @synchronized (self) {
         [self.peersById removeObjectForKey:pid];
         [self.serviceIdByPeer removeObjectForKey:pid];
+        [self.connectionServiceByPeer removeObjectForKey:pid];
         [self.lostWhileConnected removeObject:pid];
     }
 }
@@ -1190,6 +1215,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     @synchronized (self) {
         [self.peersById removeAllObjects];
         [self.serviceIdByPeer removeAllObjects];
+        [self.connectionServiceByPeer removeAllObjects];
         [self.everConnected removeAllObjects];
         [self.inviting removeAllObjects];
         [self.lostWhileConnected removeAllObjects];
@@ -1232,15 +1258,38 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     }
 }
 
-/// Encodes a peer first seen on a known service, remembering which one.
+/// Encodes a peer DISCOVERY saw, remembering the service it was seen on.
+///
+/// Always answers with that service, so a found and its matching lost name
+/// the same one even where a connection through another service came and
+/// went in between.
 - (NSString *)encodePeer:(MCPeerID *)peer service:(NSString *)serviceId {
     NSString *pid = cn1nbIdForPeer(peer);
-    if (serviceId != nil) {
-        @synchronized (self) {
+    NSString *service;
+    @synchronized (self) {
+        if (serviceId != nil) {
             [self.serviceIdByPeer setObject:serviceId forKey:pid];
         }
+        [self.peersById setObject:peer forKey:pid];
+        service = [self.serviceIdByPeer objectForKey:pid];
+        if (service == nil) {
+            service = self.discoverServiceId;
+        }
     }
-    return [self encodePeer:peer];
+    return cn1nbJoin([NSArray arrayWithObjects:pid,
+            peer.displayName == nil ? @"" : peer.displayName,
+            service == nil ? @"" : service, nil]);
+}
+
+/// Records the service a CONNECTION with this peer was negotiated through.
+- (void)noteConnectionService:(NSString *)serviceId
+                      forPeer:(NSString *)pid {
+    if (serviceId == nil || pid == nil) {
+        return;
+    }
+    @synchronized (self) {
+        [self.connectionServiceByPeer setObject:serviceId forKey:pid];
+    }
 }
 
 - (NSString *)encodePeer:(MCPeerID *)peer {
@@ -1253,7 +1302,13 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     // state change, an arriving payload -- was found by the browser or came
     // in through the advertiser earlier, and that is when the mapping was
     // recorded.
-        service = [self.serviceIdByPeer objectForKey:pid];
+        // The connection's own service wins where there is one: that is
+        // what this peer is connected THROUGH, whatever the browser has
+        // seen it under since.
+        service = [self.connectionServiceByPeer objectForKey:pid];
+        if (service == nil) {
+            service = [self.serviceIdByPeer objectForKey:pid];
+        }
         if (service == nil) {
             service = self.discoverServiceId != nil ? self.discoverServiceId
                     : self.advertiseServiceId;
@@ -1553,8 +1608,10 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             return;
         }
         NSString *pid = cn1nbIdForPeer(peerID);
-        NSString *encoded = [self encodePeer:peerID
-                                     service:self.advertiseServiceId];
+        // The ADVERTISED service, recorded as this connection's, not as
+        // something discovery saw: the peer answered this advertisement.
+        [self noteConnectionService:self.advertiseServiceId forPeer:pid];
+        NSString *encoded = [self encodePeer:peerID];
         // Copied because the block outlives this call: it is answered when
         // the app calls accept or reject, which is at least an EDT hop away.
         [self rememberInvitation:[[invitationHandler copy] autorelease]
@@ -1775,6 +1832,8 @@ static CN1NearbyTransport *cn1nbTransportInit(NSString *serviceId,
         cn1nbTransport.awaitingAck = [NSMutableDictionary dictionary];
         cn1nbTransport.sessionsById = [NSMutableDictionary dictionary];
         cn1nbTransport.serviceIdByPeer = [NSMutableDictionary dictionary];
+        cn1nbTransport.connectionServiceByPeer =
+                [NSMutableDictionary dictionary];
     }
     if (serviceId != nil) {
         // Assigned on EVERY call, and only to the half this call is for.
@@ -2907,6 +2966,11 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
                     @"the endpoint was lost while renaming this device");
             return;
         }
+        // Connecting OUT, so this connection belongs to whatever discovery
+        // found the peer under -- recorded as the connection's service, so a
+        // later sighting under another one cannot relabel it.
+        [cn1nbTransport noteConnectionService:cn1nbTransport.discoverServiceId
+                                      forPeer:pid];
         // Reserved BEFORE the invitation goes out, so a second
         // requestConnection made while this one is still unanswered sees the
         // slot taken.
