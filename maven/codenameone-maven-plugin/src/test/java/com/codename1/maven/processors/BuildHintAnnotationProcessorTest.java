@@ -582,6 +582,36 @@ public class BuildHintAnnotationProcessorTest {
                 false));
     }
 
+    /// Kotlin lets a declaration escape its name in backticks, and the binary
+    /// name is plainly the text between them. Reading it with the identifier
+    /// rule recorded an empty name, so a LIVE annotated type looked undeclared,
+    /// was dropped as an orphan before placement validation, and its misplaced
+    /// hints went unreported on a green build.
+    @Test
+    public void aKotlinEscapedNameIsTheTextBetweenTheBackticks() {
+        assertTrue(BuildHintAnnotationProcessor.declaresType(
+                "package com.example\nclass `when` {\n}\n", "when", true));
+
+        // A quote is a legal character in an escaped name, and the name is not a
+        // literal -- treating it as one blanked the rest of the file.
+        String quoted = "package com.example\nclass `say\"hi` { }\nclass Real { }\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(quoted, "Real", true));
+        assertTrue(BuildHintAnnotationProcessor.declaresType(quoted, "say\"hi", true));
+
+        // Functions are escaped at least as often, and a local class takes the
+        // enclosing function's name as a segment of its own binary name.
+        String fn = "package com.example\n"
+                + "class Main {\n"
+                + "    fun `does the thing`() {\n"
+                + "        class Wrong\n"
+                + "    }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                fn, new String[] {"Main", "does the thing", "Wrong"}, true));
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                fn, new String[] {"Main", "does the thing", "Gone"}, true));
+    }
+
     /// Kotlin's UNNAMED companion object is `Companion` in the binary name and
     /// is spelled `companion object` in the source, so nothing there is called
     /// Companion. Treating that as inconclusive accepted the whole path without

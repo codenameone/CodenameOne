@@ -2477,7 +2477,7 @@ public class CodenameOneSettings extends Lifecycle {
         int i = 0;
         while (i < text.length()) {
             char c = text.charAt(i);
-            if (c == '"' || c == '\'' || c == '/') {
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
                 int skipped = skipNonCode(text, i, kotlin);
                 if (skipped > i) {
                     i = skipped;
@@ -2510,11 +2510,24 @@ public class CodenameOneSettings extends Lifecycle {
                 // stopping at a newline read the declaration as unnamed.
                 int n = nextLiveChar(text, wordEnd, kotlin);
                 if (n >= 0) {
+                    // Kotlin lets the name be ESCAPED in backticks, and the
+                    // binary name -- which is what codename1.mainName holds --
+                    // is the text between them. Reading it with the identifier
+                    // rule recorded an empty name, so the real main source was
+                    // rejected, nothing knew which hints an annotation already
+                    // owns, and Settings offered Add for one of them.
                     int end = n;
-                    while (end < text.length() && continuesAName(text.charAt(end))) {
-                        end++;
+                    String declared;
+                    if (kotlin && text.charAt(n) == '`') {
+                        int close = text.indexOf('`', n + 1);
+                        declared = close < 0 ? null : text.substring(n + 1, close);
+                    } else {
+                        while (end < text.length() && continuesAName(text.charAt(end))) {
+                            end++;
+                        }
+                        declared = text.substring(n, end);
                     }
-                    if (text.substring(n, end).equals(main)) {
+                    if (main.equals(declared)) {
                         return true;
                     }
                 }
@@ -2876,7 +2889,7 @@ public class CodenameOneSettings extends Lifecycle {
         int i = from;
         while (i < source.length()) {
             char c = source.charAt(i);
-            if (c == '"' || c == '\'' || c == '/') {
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
                 int skipped = skipNonCode(source, i, kotlin);
                 if (skipped > i) {
                     i = skipped;
@@ -2967,6 +2980,18 @@ public class CodenameOneSettings extends Lifecycle {
                 }
             }
             return s.length();
+        }
+        // A Kotlin escaped identifier -- `class `when``. It is code, not a
+        // literal, but it is stepped over whole because a quote inside it
+        // (`say"hi` is a legal name) would otherwise open a literal that
+        // swallows every annotation after it, leaving an owned hint editable in
+        // Settings and letting the user add the duplicate that fails the build.
+        if (kotlin && c == '`') {
+            int close = s.indexOf('`', i + 1);
+            int nl = s.indexOf('\n', i + 1);
+            if (close >= 0 && (nl < 0 || close < nl)) {
+                return close + 1;
+            }
         }
         if (c == '/' && i + 1 < s.length()) {
             char n = s.charAt(i + 1);

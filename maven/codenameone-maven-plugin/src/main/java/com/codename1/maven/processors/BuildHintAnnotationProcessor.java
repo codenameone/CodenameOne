@@ -449,17 +449,40 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 while (n < end && Character.isWhitespace(code.charAt(n))) {
                     n++;
                 }
-                int stop = n;
-                while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
-                    stop++;
-                }
-                if (code.substring(n, stop).equals(simple)) {
+                if (simple.equals(simpleNameAt(code, n, end))) {
                     return i;
                 }
             }
             i = wordEnd;
         }
         return -1;
+    }
+
+    /// The declared simple name at `n`, or null when the source runs out.
+    ///
+    /// Kotlin lets a declaration ESCAPE its name in backticks -- `class `when``
+    /// compiles to a class whose binary name is plainly `when`. Reading it with
+    /// the identifier rule stopped at the backtick and recorded an empty name,
+    /// so the class looked undeclared: the orphan filter then classified a live
+    /// annotated type as stale and dropped it before placement validation, and
+    /// the misplaced hints went unreported on a green build.
+    ///
+    /// A backtick cannot appear in Java source at all outside a comment or a
+    /// literal, both of which are already blanked, so this needs no language
+    /// flag.
+    private static String simpleNameAt(String code, int n, int end) {
+        if (n < end && n < code.length() && code.charAt(n) == '`') {
+            int close = code.indexOf('`', n + 1);
+            if (close < 0 || close >= end) {
+                return null;
+            }
+            return code.substring(n + 1, close);
+        }
+        int stop = n;
+        while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
+            stop++;
+        }
+        return code.substring(n, stop);
     }
 
     private static boolean isTypeKeyword(String word) {
@@ -559,11 +582,10 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 while (n < end && Character.isWhitespace(code.charAt(n))) {
                     n++;
                 }
-                int stop = n;
-                while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
-                    stop++;
-                }
-                if (code.substring(n, stop).equals(simple)) {
+                // Backticks here too: Kotlin test code habitually names a
+                // function `does the thing`, and a local class inside it takes
+                // that name as a segment of its binary name.
+                if (simple.equals(simpleNameAt(code, n, end))) {
                     return i;
                 }
             }
@@ -739,6 +761,17 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                     }
                     i++;
                 }
+            } else if (kotlin && c == '`') {
+                // A Kotlin escaped identifier. It is CODE, so it is left alone
+                // rather than blanked -- the declared name has to stay readable
+                // -- but it is stepped over whole, because the quote in
+                // `class `say"hi`` would otherwise open a literal that swallows
+                // the rest of the file.
+                int j = i + 1;
+                while (j < out.length && out[j] != '`' && out[j] != '\n') {
+                    j++;
+                }
+                i = j < out.length && out[j] == '`' ? j + 1 : i + 1;
             } else if (c == '\'') {
                 // A char literal. '{' is legal and would otherwise be counted as
                 // syntax, so the nesting scan loses its place and reads a live

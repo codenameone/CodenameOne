@@ -865,4 +865,23 @@ public class BuildHintCatalogTest {
         // Java does not nest, so the same text really does end at the inner `*/`.
         assertFalse(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example", false));
     }
+
+    /// A Kotlin main class may escape its name in backticks, and
+    /// `codename1.mainName` holds the name between them. Reading it with the
+    /// identifier rule recorded an empty name, so the real main source was
+    /// rejected, nothing knew which hints an annotation already owns, and
+    /// Settings offered Add for one of them -- the duplicate declaration that
+    /// fails the next build.
+    @Test
+    public void aKotlinEscapedMainNameIsRecognised() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass `when` {\n}\n", "when", "com.example"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nclass `when` {\n}\n", "Other", "com.example"));
+
+        // A quote inside an escaped name is legal, and is not the start of a
+        // literal: reading it as one blanked the declaration that followed.
+        String quoted = "package com.example\nclass `say\"hi` { }\nclass MyApp { }\n";
+        assertTrue(CodenameOneSettings.declaresClass(quoted, "MyApp", "com.example"));
+    }
 }
