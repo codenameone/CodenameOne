@@ -863,26 +863,26 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String head = text.substring(0, declaration);
         String tail = text.substring(declaration);
 
-        int lastImport = head.lastIndexOf("\nimport ");
+        String blankedHead = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, kotlin);
+        int lastImport = blankedHead.lastIndexOf("\nimport ");
         if (lastImport >= 0) {
             int eol = head.indexOf('\n', lastImport + 1);
             head = head.substring(0, eol + 1) + importLine + "\n" + head.substring(eol + 1);
         } else {
-            // No existing import. Anchor on the package declaration, and when the
-            // class is in the default package anchor on the class declaration
-            // instead: indexOf("package ") returns -1 there, and the old
-            // arithmetic then put the import at the first newline in the file,
-            // which is inside the copyright comment. The result compiled to
-            // nothing useful while the properties entries had already been
-            // deleted.
-            int pkg = head.indexOf("package ");
-            // Before any annotation the class already carries. classDeclarationIndex
-            // points at the modifiers, so `head` ends with an existing
-            // @SuppressWarnings -- and anchoring on head.length() put the import
-            // between that annotation and the class, which is not valid in either
-            // language. The verification build then failed and rolled a correct
-            // migration back.
-            int anchor = pkg >= 0 ? head.indexOf('\n', pkg) + 1
+            // No existing import. Anchor after the package declaration, and when
+            // the class is in the default package anchor above any annotation it
+            // already carries: indexOf returns -1 there, and the old arithmetic
+            // then put the import at the first newline in the file, which is
+            // inside the copyright comment.
+            //
+            // The package is found in CODE. A header sentence mentioning the word
+            // -- "// The package layout is documented here" -- was selected by a
+            // raw search, and the import went in before the real declaration or
+            // inside the comment itself, so the verification build failed and
+            // rolled back a migration that was otherwise correct.
+            int pkg = livePackageIndex(blankedHead);
+            int anchor = pkg >= 0 ? endOfPackageDeclaration(blankedHead, pkg)
                     : startOfLeadingAnnotations(head, kotlin);
             head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
@@ -901,6 +901,53 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * the type named by {@code codename1.mainName} is preferred over whatever
      * happens to appear first.</p>
      */
+    /// The offset of the `package` keyword in already-blanked code, or -1.
+    static int livePackageIndex(String code) {
+        int i = 0;
+        while (i < code.length()) {
+            char c = code.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            if ("package".equals(code.substring(i, wordEnd))) {
+                return i;
+            }
+            i = wordEnd;
+        }
+        return -1;
+    }
+
+    /// The index just past the whole package declaration beginning at `pkgAt`.
+    ///
+    /// Past the NAME and its optional semicolon, not merely to the next newline:
+    /// `package\ncom.example;` is valid Java, and cutting at the first newline
+    /// would have inserted the import into the middle of the statement.
+    static int endOfPackageDeclaration(String code, int pkgAt) {
+        int i = pkgAt + "package".length();
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        while (i < code.length()
+                && (Character.isJavaIdentifierPart(code.charAt(i)) || code.charAt(i) == '.')) {
+            i++;
+        }
+        while (i < code.length() && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
+            i++;
+        }
+        if (i < code.length() && code.charAt(i) == ';') {
+            i++;
+        }
+        int eol = code.indexOf('\n', i);
+        return eol < 0 ? code.length() : eol + 1;
+    }
+
     /// The index in `head` where the run of annotations immediately preceding the
     /// declaration begins, or `head.length()` when there is none.
     ///

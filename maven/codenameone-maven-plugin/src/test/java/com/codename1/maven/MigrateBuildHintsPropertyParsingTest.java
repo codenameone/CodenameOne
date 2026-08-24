@@ -268,4 +268,41 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertTrue(com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .declaresNestedPath(topLevel, new String[] {"MyApp"}, true));
     }
+
+    /// The word "package" in a header sentence is not the package declaration. A
+    /// raw search selected it and the import went in before the real statement,
+    /// or inside the comment, so the verification build failed and rolled back an
+    /// otherwise correct migration.
+    @Test
+    public void theWordPackageInACommentIsNotTheDeclaration() {
+        String head = "// The package layout is documented here\npackage com.example;\n\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        assertEquals(head.indexOf("package com.example"),
+                MigrateBuildHintsMojo.livePackageIndex(code));
+    }
+
+    /// The anchor is past the whole declaration, not at the first newline:
+    /// `package\ncom.example;` is valid Java and cutting there would put the
+    /// import inside the statement.
+    @Test
+    public void theAnchorClearsAMultiLinePackageDeclaration() {
+        String head = "package\ncom.example;\nclass X {}\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int pkg = MigrateBuildHintsMojo.livePackageIndex(code);
+        assertEquals(head.indexOf("class X"),
+                MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
+    }
+
+    /// Kotlin has no semicolon; the declaration ends with the name.
+    @Test
+    public void aKotlinPackageDeclarationEndsAtItsName() {
+        String head = "package com.example\nclass X\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, true);
+        int pkg = MigrateBuildHintsMojo.livePackageIndex(code);
+        assertEquals(head.indexOf("class X"),
+                MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
+    }
 }
