@@ -101,6 +101,15 @@ public final class BuildHintCodeGenerator {
      *             file receives the developer guide's table
      */
     public static void main(String[] args) throws IOException {
+        // The developer guide's table is not checked in: it is rendered from the
+        // catalog every time the guide is built, so it cannot drift and there is
+        // nothing for a hand edit to survive in. This mode writes that one file
+        // and nothing else, so a documentation build does not also rewrite source
+        // trees it has no business touching.
+        if (args.length == 2 && "--table-only".equals(args[0])) {
+            write(new File(args[1]), asciidocTable());
+            return;
+        }
         if (args.length < 2) {
             System.err.println("usage: BuildHintCodeGenerator <annotation-src-root> "
                     + "<catalog-src-root> [output...]");

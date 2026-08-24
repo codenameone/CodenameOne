@@ -141,3 +141,9 @@ scripts/fidelity-app/common/src/main/resources/*ThemeDev.res
 # build time (common/pom.xml copy-native-themes); never commit the duplicate.
 scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res
 scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res
+
+# Rendered from maven/build-hint-catalog by scripts/gen-build-hint-table.sh every
+# time the developer guide is built. Not checked in: a generated file living in
+# git invites a hand edit that the next regeneration silently discards, and needs
+# a drift gate to notice. Generating it on the fly removes both.
+docs/developer-guide/_generated-build-hints.adoc

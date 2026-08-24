@@ -216,6 +216,14 @@ jobs:
         run: |
           gem install --no-document asciidoctor asciidoctor-pdf rouge
 
+      # The build hint table is rendered from maven/build-hint-catalog rather than
+      # checked in, so every step below that reads the guide -- the lint, the HTML
+      # and PDF build, Vale -- needs it on disk first. Generating it here is also
+      # what makes it impossible for the table to disagree with the catalog: there
+      # is no committed copy for an edit to survive in.
+      - name: Render the build hint table
+        run: scripts/gen-build-hint-table.sh
+
       - name: Run Asciidoctor lint
         run: |
           set -euo pipefail

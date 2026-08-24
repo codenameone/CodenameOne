@@ -39,10 +39,13 @@ java -cp "$CLASSES" com.codename1.build.shared.BuildHintCodeGenerator \
      "$ANN_ROOT" "$CATALOG_SRC" "$JAVASE_SRC" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then
+  # The developer guide's table is deliberately absent: it is not checked in, so
+  # there is nothing for it to drift FROM. scripts/gen-build-hint-table.sh
+  # renders it during the doc build instead, and this script still writes it for
+  # a local asciidoctor run -- gitignored, so that copy is never reviewed.
   targets=("CodenameOne/src/com/codename1/annotations/buildhints"
            "maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
-           "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java"
-           "docs/developer-guide/_generated-build-hints.adoc")
+           "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
     echo "::error::Generated build hint annotations are out of date." >&2

@@ -229,7 +229,10 @@ everything else is generated from it:
 
 - the `com.codename1.annotations.buildhints` annotations in `CodenameOne/src`
 - `BuildHintAnnotationBinding`, which the annotation processor reads back
-- the developer guide's build hint table (`docs/developer-guide/_generated-build-hints.adoc`)
+- the developer guide's build hint table, rendered by
+  `scripts/gen-build-hint-table.sh` every time the guide is built and **not**
+  checked in (both renderers -- `developer-guide-docs.yml` and
+  `scripts/website/build.sh` -- call it first)
 - the simulator's Build Hint editor schema (`BuildHintCatalogDefaults`)
 - the agent reference's annotation table (`skill/references/build-hints.md`)
 
