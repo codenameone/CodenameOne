@@ -3863,7 +3863,6 @@ public abstract class CodenameOneImplementation {
     /// true if the drag should propagate into Codename One
     protected boolean hasWindowDragStarted(final int windowId, final int slot,
             final int x, final int y) {
-        Display d = Display.getInstance();
         int surfaceWidth = com.codename1.ui.Desktop.getInstance().windowWidth(windowId);
         int surfaceHeight = com.codename1.ui.Desktop.getInstance().windowHeight(windowId);
         if (surfaceWidth <= 0 || surfaceHeight <= 0) {

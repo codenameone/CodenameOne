@@ -1507,27 +1507,6 @@ public final class Display extends CN1Constants {
         time = System.currentTimeMillis() - currentTime;
     }
 
-    /// Resolves the top level a repeat or long press should be delivered to, or null
-    /// when it must not receive one.
-    ///
-    /// These timers are armed when the press is accepted and fire from the paint loop,
-    /// which calls keyRepeated, longKeyPress and longPointerPress directly rather than
-    /// through the packed queue -- so they never meet the modality filter. A handler
-    /// that opens a modal window from the very press still being held would otherwise
-    /// go on receiving repeats and a long press behind that modal, which is the one
-    /// case where the press was legitimately accepted and the block arrived afterwards.
-    /// The same reasoning covers a window hidden while its press is held.
-    private Container repeatTarget(int windowId, Form current) {
-        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
-            return null;
-        }
-        if (windowId == 0) {
-            return current;
-        }
-        Window w = Desktop.getInstance().windowById(windowId);
-        return w != null && w.isWindowShowing() ? w : null;
-    }
-
     boolean hasNoSerialCallsPending() {
         return pendingSerialCalls.isEmpty();
     }
@@ -2924,10 +2903,6 @@ public final class Display extends CN1Constants {
     /// `#longPressWindows`.
     private static final int MAIN_LONG_PRESS_ID = -1;
 
-    private static int longPressKey(int windowId) {
-        return windowId == 0 ? MAIN_LONG_PRESS_ID : windowId;
-    }
-
     /// Arms key repeat and the long-key-press timer for one window.
     private void chargeKeyRepeat(int windowId, int keyCode, boolean armed, long now,
             long firstRepeatAt) {
@@ -3036,16 +3011,6 @@ public final class Display extends CN1Constants {
         setSelectionPressed(windowId, false, 0, 0);
     }
 
-    /// Whether the given window has a press down that has not been released or
-    /// dragged. Never allocates a slot -- this is a query.
-    private boolean isSelectionPressed(int windowId) {
-        if (windowId == 0) {
-            return pointerPressedAndNotReleasedOrDragged;
-        }
-        Window w = Desktop.getInstance().windowById(windowId);
-        return w != null && w.hasSelectionPressed();
-    }
-
     /// Whether any window has a press down. What the component-less
     /// shouldRenderSelection() answers, since it has nothing to resolve a window from.
     private boolean anySelectionPressed() {
@@ -3069,16 +3034,6 @@ public final class Display extends CN1Constants {
         for (int iter = 0; iter < open.length; iter++) {
             open[iter].setSelectionPressed(false, 0, 0);
         }
-    }
-
-    /// Where the press that is still down in this window went down.
-    private int selectionX(int windowId) {
-        return pointerX;
-    }
-
-    /// Where the press that is still down in this window went down.
-    private int selectionY(int windowId) {
-        return pointerY;
     }
 
     /// Records that a drag happened in one window.
