@@ -5047,6 +5047,21 @@ public class IPhoneBuilder extends Executor {
                                     plistContext, request.getPackageName());
                             buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null
                                     ? declaredId : request.getPackageName() + "." + extensionName);
+                            // And each configuration's own, where the archive's plists differ:
+                            // the value above is what THIS archive is built and signed as, but
+                            // the generated project keeps every configuration, and a Debug build
+                            // off the exported sources processes the Debug plist. Writing only
+                            // the archive's answer left that configuration naming a bundle its
+                            // plist does not.
+                            for (Map.Entry<String, String> perConfiguration
+                                    : appExtensionPlistIdentifiers(appExtension, plistContext,
+                                            request.getPackageName()).entrySet()) {
+                                if (!"PRODUCT_BUNDLE_IDENTIFIER".equals(
+                                        perConfiguration.getKey())) {
+                                    buildSettingsMap.put(perConfiguration.getKey(),
+                                            perConfiguration.getValue());
+                                }
+                            }
                             // The identifier THIS archive gets: a qualified setting overrides the
                             // plain one, so a stale base beside a right device value is not a
                             // reason to refuse a build Xcode would have got right.
@@ -5107,10 +5122,18 @@ public class IPhoneBuilder extends Executor {
                                 // whitespace, so the identifier that was checked and the
                                 // identifier that was written into the target were not the same
                                 // string.
-                                buildSettingsMap.putAll(appExtensionBuildSettings(appExtension));
-                                for (String note : dropBlankBundleIdentifiers(buildSettingsMap)) {
+                                // Filtered BEFORE the merge, not after. Dropping afterwards
+                                // removed the key the blank had just overwritten -- the good
+                                // identifier put on this map above -- and left the target with no
+                                // identifier at all, which is the failure the filtering exists to
+                                // prevent.
+                                Map<String, String> archiveOwnSettings =
+                                        appExtensionBuildSettings(appExtension);
+                                for (String note
+                                        : dropBlankBundleIdentifiers(archiveOwnSettings)) {
                                     debug("The " + extensionName + " app extension: " + note + ".");
                                 }
+                                buildSettingsMap.putAll(archiveOwnSettings);
                                 buildSettingsProps.delete();
                             }
 
@@ -5130,9 +5153,13 @@ public class IPhoneBuilder extends Executor {
                             // settings as well: BUILD_VARIANTS among them.
                             ArchiveContext buildContext = ArchiveContext.of(archiveSdk,
                                     archiveConfiguration, archiveArch, buildSettingsMap);
-                            File signingEntitlements = appExtensionSigningEntitlements(appExtension,
-                                    buildSettingsMap, extEntitlementsFile, buildContext.sdk,
-                                    buildContext.configuration, buildContext.arch);
+                            // Every variant's, not one of them: see
+                            // appExtensionSigningEntitlementsPerVariant. The target has a single
+                            // deployment target per configuration, so the strictest of these
+                            // decides it.
+                            List<File> signingEntitlements =
+                                    appExtensionSigningEntitlementsPerVariant(appExtension,
+                                            buildSettingsMap, extEntitlementsFile, buildContext);
                             // The BASE setting is copied into every Xcode configuration, so
                             // writing the archive's answer there hands Debug a minimum belonging
                             // to Release; it gets the base value, clamped on its own. The
@@ -6500,7 +6527,26 @@ public class IPhoneBuilder extends Executor {
             // settings above because the caller puts the target's own identifier in them.
             return false;
         }
-        return resolved.startsWith(hostBundleId + ".");
+        if (!resolved.startsWith(hostBundleId + ".")) {
+            return false;
+        }
+        // And equal to what the TARGET is configured with, when the caller knows it. Being under
+        // the host is necessary and not sufficient: an archive naming itself
+        // com.example.app.Custom in the plist while buildSettings.properties configures the
+        // target as com.example.app.FromSettings is in namespace either way, and keeping the
+        // literal builds a bundle declaring one identifier and signs it for the other. The
+        // target's is the one every profile and export entry was chosen for, so a literal that
+        // disagrees with it is replaced.
+        //
+        // Both conditions, in this order. Comparing with the target ALONE accepted a plist whose
+        // reference resolves to an out-of-namespace target -- agreement is not enough when what
+        // they agree on cannot be embedded in this app.
+        String target = archiveSettings == null ? null
+                : archiveSettings.get("PRODUCT_BUNDLE_IDENTIFIER");
+        if (target != null && target.trim().length() > 0 && target.indexOf('$') < 0) {
+            return resolved.equals(target.trim());
+        }
+        return true;
     }
 
     /**
@@ -7156,7 +7202,48 @@ public class IPhoneBuilder extends Executor {
 
     static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
             File byName, String sdk, String configuration, String arch) {
-        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", sdk, configuration, arch);
+        return appExtensionSigningEntitlements(extensionFolder, settings, byName,
+                ArchiveContext.of(sdk, configuration, arch, settings));
+    }
+
+    /// Every entitlements file this archive signs with: ONE PER BUILD VARIANT it produces.
+    ///
+    /// BUILD_VARIANTS = "normal profile" makes Xcode build both, and each is signed by whichever
+    /// CODE_SIGN_ENTITLEMENTS applies to it -- so [variant=normal] and [variant=profile] are both
+    /// applicable settings, equally specific, and picking one shared winner picked whichever the
+    /// map happened to hand over first. When the other one is the file granting
+    /// payment-pass-provisioning, the floor came out 12.0 for a build Apple requires 14 of.
+    ///
+    /// The target carries one deployment target per configuration and cannot vary it by variant,
+    /// so the floor has to be the strictest of these -- which is what
+    /// {@link #appExtensionDeploymentFloor(List)} does with the list.
+    static List<File> appExtensionSigningEntitlementsPerVariant(File extensionFolder,
+            Map<String, String> settings, File byName, ArchiveContext context) {
+        List<File> out = new ArrayList<File>();
+        List<String> variants = context == null || context.variants == null
+                || context.variants.isEmpty()
+                        ? java.util.Collections.singletonList("normal") : context.variants;
+        for (String variant : variants) {
+            ArchiveContext perVariant = new ArchiveContext(
+                    context == null ? null : context.sdk,
+                    context == null ? null : context.configuration,
+                    context == null ? null : context.arch,
+                    java.util.Collections.singletonList(variant));
+            File signed = appExtensionSigningEntitlements(extensionFolder, settings, byName,
+                    perVariant);
+            if (signed != null && !out.contains(signed)) {
+                out.add(signed);
+            }
+        }
+        return out;
+    }
+
+    static File appExtensionSigningEntitlements(File extensionFolder, Map<String, String> settings,
+            File byName, ArchiveContext context) {
+        String winner = winningSetting(settings, "CODE_SIGN_ENTITLEMENTS", context);
+        String sdk = context == null ? null : context.sdk;
+        String configuration = context == null ? null : context.configuration;
+        String arch = context == null ? null : context.arch;
         if (winner == null) {
             return byName;
         }
@@ -7997,40 +8084,40 @@ public class IPhoneBuilder extends Executor {
         return "iphone".equalsIgnoreCase(projectType) ? "1" : "2";
     }
 
-    /// The identifier this extension's own Info.plist states outright, when it states one.
+    /// Every identifier the archive's own Info.plists state, keyed by the
+    /// PRODUCT_BUNDLE_IDENTIFIER setting that expresses it.
     ///
     /// Two different things decide two different identifiers and nothing reconciles them: the
     /// target's PRODUCT_BUNDLE_IDENTIFIER chooses the profile that signs the .appex and keys the
     /// export options, while a LITERAL in the plist is what the built bundle declares -- Xcode
     /// copies it through untouched. An archive whose plist says com.example.app.Custom and whose
-    /// target was given the derived com.example.app.<folder> is therefore signed for one bundle
-    /// and built as another, which codesign refuses and App Store validation refuses after it.
+    /// target was given the derived com.example.app.&lt;folder&gt; is therefore signed for one
+    /// bundle and built as another, which codesign refuses and App Store validation refuses after
+    /// it.
     ///
-    /// The archive's own statement wins, because it is the identifier the customer's profile was
-    /// issued for. An explicit PRODUCT_BUNDLE_IDENTIFIER in buildSettings.properties still
-    /// outranks it: that one is about the target, which is the thing being configured.
+    /// Keyed rather than reduced to one value, because the plists are per-configuration and so
+    /// are the identifiers in them: an archive with INFOPLIST_FILE[config=Debug] beside the base
+    /// setting states one identity for Debug and another for Release, and answering with a single
+    /// unqualified value wrote the Release archive's identifier into the Debug configuration too
+    /// -- where a later Debug build off these sources processes a plist still declaring the other
+    /// one, which is the same mismatch one configuration along. Each stays where it belongs, and
+    /// {@link #winningSetting} picks the one THIS archive gets by the same rule Xcode uses.
     ///
-    /// @return the literal, or null when the plist states none, states a reference (which
-    /// resolves against the target and so already agrees with it), or states one outside the
-    /// host's namespace -- that case is refused elsewhere rather than adopted here
-    static String appExtensionPlistIdentifier(File extensionFolder, ArchiveContext context,
-            String hostPackage) {
+    /// A reference is not recorded: it resolves against the target and so already agrees with it.
+    /// Nor is an identifier outside the host's namespace, which is refused elsewhere with a
+    /// message that says why -- adopting it here would move that refusal onto the target and lose
+    /// the explanation. Nor is a padded one, which is not the identifier it reads as.
+    static Map<String, String> appExtensionPlistIdentifiers(File extensionFolder,
+            ArchiveContext context, String hostPackage) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
         if (extensionFolder == null || hostPackage == null || hostPackage.length() == 0) {
-            return null;
+            return out;
         }
-        String found = null;
+        Map<String, Long> specificities = new LinkedHashMap<String, Long>();
         for (Map.Entry<String, File> candidate
                 : appExtensionInfoPlists(extensionFolder, context).entrySet()) {
             File file = candidate.getValue();
             if (file == null || !file.isFile()) {
-                continue;
-            }
-            // Only the plists THIS archive builds with. A [config=Debug] candidate states the
-            // Debug target's identity, and adopting it would name the device archive after a
-            // build it is not. An applicable qualifier narrows nothing, so its context and the
-            // archive's are the same object's worth of values.
-            ArchiveContext candidateContext = infoPlistCandidateContext(candidate.getKey(), context);
-            if (context != null && !String.valueOf(context).equals(String.valueOf(candidateContext))) {
                 continue;
             }
             String declared = plistRootString(readPlistTextQuietly(file), "CFBundleIdentifier");
@@ -8039,11 +8126,40 @@ public class IPhoneBuilder extends Executor {
                     || !declared.startsWith(hostPackage + ".")) {
                 continue;
             }
-            // Later candidates are the qualified ones, and a qualifier that applies to this
-            // archive overrides the base setting for it.
-            found = declared;
+            String qualifier = conditionOf(candidate.getKey());
+            String key = "PRODUCT_BUNDLE_IDENTIFIER" + qualifier;
+            // Two candidates land on the same setting key only when one of them is the default
+            // Info.plist, which appExtensionInfoPlists does not emit alongside an explicit base
+            // setting -- so this comparison is a guard, not the fix. The fix is that each
+            // identifier is recorded under the setting that states it: [sdk=iphoneos*] and
+            // [sdk=iphoneos14.4] are different keys, both kept, and winningSetting chooses
+            // between them by specificity the way Xcode does. Reducing them to one answer here
+            // was what made the result depend on the order Properties happened to iterate in.
+            long specificity = qualifier.length() == 0 ? 0
+                    : conditionSpecificity(stripValueFromCandidateKey(candidate.getKey()));
+            Long previous = specificities.get(key);
+            if (previous == null || specificity >= previous.longValue()) {
+                specificities.put(key, Long.valueOf(specificity));
+                out.put(key, declared);
+            }
         }
-        return found;
+        return out;
+    }
+
+    /// The bracketed condition of a plist candidate's key, or "" when it has none.
+    private static String conditionOf(String candidateKey) {
+        String key = stripValueFromCandidateKey(candidateKey);
+        int open = key.indexOf('[');
+        return open < 0 ? "" : key.substring(open);
+    }
+
+    /// A candidate label without the " = value" these labels carry for the log.
+    private static String stripValueFromCandidateKey(String candidateKey) {
+        if (candidateKey == null) {
+            return "";
+        }
+        int separator = candidateKey.indexOf(" = ");
+        return separator < 0 ? candidateKey : candidateKey.substring(0, separator);
     }
 
     /// The plist's text, or "" when it cannot be read as one. The callers here are asking what an
@@ -8132,7 +8248,10 @@ public class IPhoneBuilder extends Executor {
         if (override != null) {
             return override;
         }
-        String fromPlist = appExtensionPlistIdentifier(extensionFolder, context, hostPackage);
+        // The one THIS archive gets, by the same rule Xcode applies to any conditional setting.
+        String fromPlist = winningSetting(
+                appExtensionPlistIdentifiers(extensionFolder, context, hostPackage),
+                "PRODUCT_BUNDLE_IDENTIFIER", context);
         return fromPlist != null ? fromPlist : defaultBundleId;
     }
 

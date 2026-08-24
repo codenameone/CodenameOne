@@ -1079,8 +1079,9 @@ public class AppExtensionDeploymentTargetTest {
         // Xcode copies a literal through untouched, so the .appex declares com.example.app.Custom
         // while the target was configured as com.example.app.WalletUIExtension: signed for one
         // bundle, built as another, which codesign refuses.
-        assertEquals("com.example.app.Custom", IPhoneBuilder.appExtensionPlistIdentifier(
-                extension, context, "com.example.app"));
+        assertEquals("com.example.app.Custom",
+                IPhoneBuilder.appExtensionPlistIdentifiers(extension, context, "com.example.app")
+                        .get("PRODUCT_BUNDLE_IDENTIFIER"));
         assertEquals("com.example.app.Custom", IPhoneBuilder.appExtensionBundleId(extension,
                 "com.example.app.WalletUIExtension", context, "com.example.app"));
     }
@@ -1115,21 +1116,23 @@ public class AppExtensionDeploymentTargetTest {
                 plistWithIdentifier("$(PRODUCT_BUNDLE_IDENTIFIER)"));
         // A reference resolves against the target, so it already agrees with whatever the target
         // is: adopting it would make the target name itself.
-        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(referenced, context,
-                "com.example.app"));
+        assertTrue(IPhoneBuilder.appExtensionPlistIdentifiers(referenced, context,
+                "com.example.app").isEmpty());
 
         File foreign = new File(dist, "ForeignExtension");
         assertTrue(foreign.mkdirs());
         write(new File(foreign, "Info.plist"), plistWithIdentifier("com.other.app.Ext"));
         // Out of namespace is refused elsewhere, with a message that says why. Adopting it here
         // would move that refusal onto the target and lose the explanation.
-        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(foreign, context, "com.example.app"));
+        assertTrue(IPhoneBuilder.appExtensionPlistIdentifiers(foreign, context,
+                "com.example.app").isEmpty());
 
         File padded = new File(dist, "PaddedExtension");
         assertTrue(padded.mkdirs());
         write(new File(padded, "Info.plist"), plistWithIdentifier(" com.example.app.Ext "));
         // Padding is not the identifier it reads as, and it is not one to copy onto a target.
-        assertNull(IPhoneBuilder.appExtensionPlistIdentifier(padded, context, "com.example.app"));
+        assertTrue(IPhoneBuilder.appExtensionPlistIdentifiers(padded, context,
+                "com.example.app").isEmpty());
     }
 
     private static String plistWithIdentifier(String identifier) {
@@ -1138,5 +1141,125 @@ public class AppExtensionDeploymentTargetTest {
                 + "\t<key>NSExtension</key>\n\t<dict>\n"
                 + "\t\t<key>CFBundleIdentifier</key>\n\t\t<string>com.nested.not.this</string>\n"
                 + "\t</dict>\n</dict>\n</plist>\n";
+    }
+
+    @Test
+    public void aBlankIdentifierLeavesTheGoodOneStanding() throws Exception {
+        // The order the builder uses: the derived identifier goes on the map first, then the
+        // archive's own settings are merged over it.
+        java.util.Map<String, String> target = new java.util.LinkedHashMap<String, String>();
+        target.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.WalletUIExtension");
+
+        java.util.Map<String, String> archiveOwn = new java.util.LinkedHashMap<String, String>();
+        archiveOwn.put("PRODUCT_BUNDLE_IDENTIFIER", "");
+        IPhoneBuilder.dropBlankBundleIdentifiers(archiveOwn);
+        target.putAll(archiveOwn);
+
+        // Filtering AFTER the merge removed the key the blank had just overwritten and left the
+        // target with no identifier at all -- the very failure the filtering exists to prevent.
+        assertEquals("com.example.app.WalletUIExtension",
+                target.get("PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
+    @Test
+    public void theMostSpecificPlistIdentifierWins() throws Exception {
+        File dist = tmp.newFolder("dist70");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "wild.plist"), plistWithIdentifier("com.example.app.Wild"));
+        write(new File(extension, "exact.plist"), plistWithIdentifier("com.example.app.Exact"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE[sdk\\=iphoneos*] = WalletUIExtension/wild.plist\n"
+                + "INFOPLIST_FILE[sdk\\=iphoneos14.4] = WalletUIExtension/exact.plist\n");
+
+        IPhoneBuilder.ArchiveContext context = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, context, "com.example.app");
+
+        // Both apply to this archive, and reducing them to ONE answer made it depend on the order
+        // Properties happened to hand them over. Each is recorded under the setting that states
+        // it, so nothing is lost and nothing is arbitrary...
+        assertEquals("com.example.app.Wild",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+        assertEquals("com.example.app.Exact",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]"));
+
+        // ...and the one this archive is built with is chosen by specificity, which is Xcode's
+        // rule, rather than by iteration order.
+        assertEquals("com.example.app.Exact", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension", context, "com.example.app"));
+    }
+
+    @Test
+    public void aConfigurationsPlistIdentifierStaysInItsConfiguration() throws Exception {
+        File dist = tmp.newFolder("dist71");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), plistWithIdentifier("com.example.app.Base"));
+        write(new File(extension, "debug.plist"), plistWithIdentifier("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/Info.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/debug.plist\n");
+
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        null), "com.example.app");
+
+        // Answering with one unqualified value wrote the Release archive's identifier into the
+        // Debug configuration too, where a later Debug build off these sources processes a plist
+        // still declaring the other one -- the same mismatch, one configuration along.
+        assertEquals("com.example.app.Base", identifiers.get("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals("com.example.app.Debug",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+    }
+
+    @Test
+    public void everyVariantsEntitlementsDecideTheFloor() throws Exception {
+        File dist = tmp.newFolder("dist72");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "plain.entitlements"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>keychain-access-groups</key><array/>\n</dict></plist>\n");
+        write(new File(extension, "wallet.entitlements"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>com.apple.developer.payment-pass-provisioning</key><true/>\n"
+                + "</dict></plist>\n");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "normal profile");
+        settings.put("CODE_SIGN_ENTITLEMENTS[variant=normal]",
+                "WalletUIExtension/plain.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS[variant=profile]",
+                "WalletUIExtension/wallet.entitlements");
+
+        java.util.List<File> perVariant =
+                IPhoneBuilder.appExtensionSigningEntitlementsPerVariant(extension, settings, null,
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                                settings));
+
+        // Both settings apply and are equally specific, so one shared winner was whichever the
+        // map handed over first: with the plain file winning, the profile variant is signed for
+        // payment-pass provisioning and clamped to 12.0 for a build Apple requires 14 of. The
+        // target carries one deployment target per configuration, so the strictest decides.
+        assertEquals(perVariant.toString(), 2, perVariant.size());
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(perVariant));
+    }
+
+    @Test
+    public void aPlistLiteralThatDisagreesWithTheTargetIsReplaced() throws Exception {
+        String plist = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n"
+                + "<dict>\n\t<key>CFBundleIdentifier</key>\n"
+                + "\t<string>com.example.app.Custom</string>\n</dict>\n</plist>\n";
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.FromSettings");
+
+        // Both are under the host, so a namespace check alone kept the literal: the bundle is
+        // then built declaring Custom and signed as FromSettings, which codesign refuses.
+        assertFalse(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
+
+        // Agreement is what makes it safe, not the namespace.
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Custom");
+        assertTrue(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
     }
 }
