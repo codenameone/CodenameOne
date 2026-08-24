@@ -2742,6 +2742,18 @@
 |_(none)_
 |Boolean true/false defaults to false. Generates an Apple Wallet issuer provisioning extension (the "From apps on your iPhone" flow in the Wallet app) and embeds it in the build. Requires `ios.wallet.appGroup` and `ios.wallet.issuerEndpoint`. See the Apple Wallet Extension chapter.
 
+|ios.wallet.generateRequestInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected at the generate-request marker of the non-UI Wallet extension.
+
+|ios.wallet.generateResponseInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected at the generate-response marker of the non-UI Wallet extension.
+
 |ios.wallet.includeUI
 |boolean
 |`false`
@@ -2760,11 +2772,59 @@
 |_(none)_
 |
 
+|ios.wallet.nonuiImportsInject
+|string
+|_(none)_
+|_(none)_
+|Extra `import` lines for the non-UI Wallet extension.
+
+|ios.wallet.passEntriesInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected where the non-UI Wallet extension lists its pass entries.
+
+|ios.wallet.remotePassEntriesInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected where the non-UI Wallet extension lists its remote pass entries.
+
+|ios.wallet.statusInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected at the status marker of the non-UI Wallet extension.
+
+|ios.wallet.uiAuthRequestInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected at the auth-request marker of the UI Wallet extension.
+
+|ios.wallet.uiAuthResponseInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected at the auth-response marker of the UI Wallet extension.
+
 |ios.wallet.uiExtensionName
 |string
 |`WalletUIExtension`
 |_(none)_
 |
+
+|ios.wallet.uiImportsInject
+|string
+|_(none)_
+|_(none)_
+|Extra `import` lines for the UI Wallet extension.
+
+|ios.wallet.uiViewDidLoadInject
+|string
+|_(none)_
+|_(none)_
+|Swift injected into `viewDidLoad` of the UI Wallet extension.
 
 |ios.xcode_version
 |string

@@ -156,9 +156,13 @@ for dirpath, _, files in os.walk(SRC):
                 # Fully resolved -- an ordinary hint read that merely spelled its
                 # name with a constant.
                 hits[resolved].append(("<expr>", rel, line))
-            elif '"' in expr:
-                # The name is being BUILT here, so no literal anywhere names it and
-                # the literal pass cannot see it. Worth reporting.
+            elif '"' in expr or '[' in expr:
+                # The name is BUILT here, or read out of a table -- either way no
+                # literal at a getArg call names it, so the literal pass cannot
+                # see it. IPhoneBuilder's WALLET_INJECTION_HINTS is the second
+                # kind: ten real hints living in a String[][] and reaching getArg
+                # as hintAndMarker[0], invisible to every literal search until
+                # subscripts were reported too.
                 computed.append({"expr": " ".join(expr.split()),
                                  "file": rel, "line": line})
             # Anything else is a forwarding helper -- getArg(key, ...) inside a

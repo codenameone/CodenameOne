@@ -1207,6 +1207,76 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
+        h.add(new Hint("ios.wallet.generateRequestInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected at the generate-request marker of the non-UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.generateResponseInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected at the generate-response marker of the non-UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.nonuiImportsInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Extra `import` lines for the non-UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.passEntriesInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected where the non-UI Wallet extension lists its pass entries."));
+
+        h.add(new Hint("ios.wallet.remotePassEntriesInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected where the non-UI Wallet extension lists its remote pass entries."));
+
+        h.add(new Hint("ios.wallet.statusInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected at the status marker of the non-UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.uiAuthRequestInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected at the auth-request marker of the UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.uiAuthResponseInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected at the auth-response marker of the UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.uiImportsInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Extra `import` lines for the UI Wallet extension."));
+
+        h.add(new Hint("ios.wallet.uiViewDidLoadInject")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Swift injected into `viewDidLoad` of the UI Wallet extension."));
+
         h.add(new Hint("ios.zbar_flash")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)

@@ -150,7 +150,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 skipped.add(name + " (kept by configuration)");
                 continue;
             }
-            BuildHints.Hint hint = BuildHints.byName(name);
+            // Through the alias, not at it. byName("cn1.androidTheme") returns the
+            // alias entry, whose own isAnnotated() is false even though the
+            // setting it names has an annotation -- so the legacy spellings, which
+            // are exactly the ones an existing project is most likely to be
+            // carrying, were reported as having no annotation and left behind.
+            BuildHints.Hint hint = BuildHints.resolve(BuildHints.byName(name));
             if (hint == null || !hint.isAnnotated()) {
                 skipped.add(name + " (no annotation for this hint yet)");
                 continue;

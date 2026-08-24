@@ -131,6 +131,21 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (!carriesAny) {
             return;
         }
+        // An output directory keeps class files whose source is gone. Rename the
+        // main class, update codename1.mainName and skip the clean, and the old
+        // annotated .class is still sitting there -- so every incremental build
+        // failed with a placement error naming a class the developer had already
+        // deleted, and the orphan's hints were merged in besides.
+        //
+        // Only a class that is NOT the main one is dropped this way. The main
+        // class is processed whatever its source layout, because failing to find
+        // its source would otherwise mean silently applying none of its hints,
+        // which is worse than any placement message.
+        if (!isMainClass(cls, ctx) && !hasBackingSource(cls, ctx)) {
+            ctx.getLog().debug("cn1: ignoring " + cls.getBinaryName()
+                    + " -- annotated, but no source for it; stale output from an earlier build");
+            return;
+        }
         annotated.add(cls);
 
         for (Map.Entry<String, AnnotationValues> e : cls.getClassAnnotations().entrySet()) {
@@ -189,7 +204,50 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 + annotated.get(0).getBinaryName());
     }
 
-    /// Build hints configure the application, so they belong on the class the
+    private static boolean isMainClass(AnnotatedClass cls, ProcessorContext ctx) {
+        String main = ctx.getMainClassBinaryName();
+        return main != null && main.equals(cls.getBinaryName());
+    }
+
+    /// Whether a source file for `cls` still exists under the project.
+    ///
+    /// Answered "yes" whenever the question cannot actually be put: no project
+    /// directory, or no source tree under it to search. Absence of a source tree
+    /// is not evidence that a class is orphaned -- it means this is a layout the
+    /// lookup does not know, and dropping annotations on that basis would apply
+    /// none of a project's hints while reporting nothing.
+    private static boolean hasBackingSource(AnnotatedClass cls, ProcessorContext ctx) {
+        File dir = ctx.getProjectDir();
+        if (dir == null) {
+            return true;
+        }
+        // The outermost class owns the file: Outer$Inner lives in Outer.java.
+        String binary = cls.getBinaryName();
+        int nested = binary.indexOf('$');
+        if (nested >= 0) {
+            binary = binary.substring(0, nested);
+        }
+        String rel = binary.replace('.', File.separatorChar);
+        String[] roots = {"src" + File.separator + "main" + File.separator + "java",
+                          "src" + File.separator + "main" + File.separator + "kotlin",
+                          "src"};
+        String[] extensions = {".java", ".kt"};
+        boolean sawARoot = false;
+        for (String root : roots) {
+            if (!new File(dir, root).isDirectory()) {
+                continue;
+            }
+            sawARoot = true;
+            for (String ext : extensions) {
+                if (new File(dir, root + File.separator + rel + ext).isFile()) {
+                    return true;
+                }
+            }
+        }
+        return !sawARoot;
+    }
+
+    /// Build hints configure the application, so they belong on the class the    /// Build hints configure the application, so they belong on the class the
     /// project already names as its entry point.
     ///
     /// Accepting them anywhere would mean two classes could set the same hint
