@@ -995,4 +995,36 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(twoImportAliases, owned, true);
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
+
+    /// A `typealias` is a top-level declaration, not a file-scoped one, so it
+    /// may be written in another file and used on the main class. Looking only
+    /// at the main source read the hint as unowned, and Add wrote the duplicate
+    /// the next build refuses.
+    @Test
+    public void aTypeAliasFromAnotherFileStillOwnsTheHint() {
+        String main = "package com.example\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String sibling = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(sibling));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Without the sibling there is nothing to resolve the name to.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true, null);
+        assertNull(owned.get("ios.teamId"));
+
+        // An IMPORT alias is file-scoped, so another file's does not apply.
+        String importAliasElsewhere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as AppIos\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(importAliasElsewhere));
+        assertNull(owned.get("ios.teamId"));
+    }
 }

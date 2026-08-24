@@ -1171,6 +1171,21 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
     }
 
+    /// One thing this deliberately does NOT do: translate Java's unicode
+    /// escapes. `public cl\\u0061ss Main` is a legal spelling of the keyword
+    /// (written with two backslashes here because javac would translate a real
+    /// one even inside this comment), and
+    /// the processor-side reader decodes it -- so the source lookup accepts a
+    /// file this locator then cannot find a declaration in, and the goal refuses
+    /// with "Could not find the class declaration".
+    ///
+    /// That is the outcome we want from it. Every index here is written back
+    /// into the file as it is on disk, so decoding would need an offset map
+    /// threaded through the import scan, the package scan, the annotation walk
+    /// and the insertion itself -- and the failure being avoided is a refusal
+    /// that names what it could not do and changes nothing, on a spelling no
+    /// project writes. A migration that guessed an offset wrong would corrupt
+    /// the source instead. Refusing is the safe half of the trade.
     static int classDeclarationIndex(String text, boolean kotlin, String simpleName) {
         // Top level means brace depth zero, not column zero. Anchoring the
         // pattern to the start of a line refused `  public class MyApp`, which

@@ -2316,7 +2316,8 @@ public class CodenameOneSettings extends Lifecycle {
                 if (text == null || !declaresClass(text, main, pkg, ext.equals(".kt"))) {
                     continue;
                 }
-                collectAnnotationOwnedHints(text, out, ext.equals(".kt"));
+                collectAnnotationOwnedHints(text, out, ext.equals(".kt"),
+                        ext.equals(".kt") ? otherKotlinSources(binding.projectDir(), path) : null);
                 return out;
             }
         }
@@ -2328,7 +2329,9 @@ public class CodenameOneSettings extends Lifecycle {
         // properly before giving up.
         String found = findMainClassSource(binding.projectDir(), main, pkg);
         if (found != null) {
-            collectAnnotationOwnedHints(found, out, lastSourceWasKotlin);
+            collectAnnotationOwnedHints(found, out, lastSourceWasKotlin,
+                    lastSourceWasKotlin
+                            ? otherKotlinSources(binding.projectDir(), lastSourcePath) : null);
             return out;
         }
         // Genuinely no source. Distinct from "found and declares nothing", and
@@ -2339,6 +2342,60 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// Set by findMainClassSource, since it decides the language by what it finds.
     private boolean lastSourceWasKotlin;
+
+    /// The path findMainClassSource read, so it can be left out of the sweep for
+    /// declarations made elsewhere.
+    private String lastSourcePath;
+
+    /// The text of every OTHER Kotlin source in the project, bounded.
+    ///
+    /// Only for declarations that are not file-scoped -- a `typealias` naming one
+    /// of our annotations. Bounded in files read and in directories walked,
+    /// because this runs when the tool opens a project and a source tree is not
+    /// a search index; a project past the bound simply keeps the previous
+    /// behaviour for an alias declared in a file nobody reached.
+    private java.util.List<String> otherKotlinSources(String projectDir, String exclude) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (projectDir == null) {
+            return out;
+        }
+        java.util.List<String> queue = new java.util.ArrayList<>();
+        queue.add(projectDir);
+        for (int i = 0; i < queue.size() && i < 4000 && out.size() < 200; i++) {
+            String dir = queue.get(i);
+            String[] children;
+            try {
+                children = FileSystemStorage.getInstance().listFiles(ProjectIO.fsUrl(dir));
+            } catch (Exception ex) {
+                continue;
+            }
+            if (children == null) {
+                continue;
+            }
+            for (String child : children) {
+                String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
+                String path = dir + "/" + name;
+                if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
+                    // Same rule as the main-class search: an output directory
+                    // holds copies, unless `build` is a package name under src/.
+                    boolean output = ("target".equals(name) || "build".equals(name))
+                            && !insideSourceTree(dir);
+                    if (!output && !name.startsWith(".")) {
+                        queue.add(path);
+                    }
+                    continue;
+                }
+                if (!name.endsWith(".kt") || path.equals(exclude) || out.size() >= 200) {
+                    continue;
+                }
+                String text = readIfPresent(path);
+                if (text != null) {
+                    out.add(text);
+                }
+            }
+        }
+        return out;
+    }
 
     /// The text of the file declaring `main` in `pkg`, found by searching, or null.
     ///
@@ -2426,6 +2483,7 @@ public class CodenameOneSettings extends Lifecycle {
                 continue;
             }
             lastSourceWasKotlin = path.endsWith(".kt");
+            lastSourcePath = path;
             return text;
         }
         return null;
@@ -2828,6 +2886,20 @@ public class CodenameOneSettings extends Lifecycle {
 
     static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
                                             boolean kotlin) {
+        collectAnnotationOwnedHints(source, out, kotlin, null);
+    }
+
+    /// As above, also resolving `typealias` declarations made in OTHER files.
+    ///
+    /// A typealias is a top-level declaration, not a file-scoped one: a project
+    /// may declare `typealias AppIos = Ios` in one file and write `@AppIos(...)`
+    /// on the main class in another. Looking only at the main source read the
+    /// hint as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. An import alias is NOT collected this way -- that one applies
+    /// only to the file that writes it.
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
+                                            boolean kotlin,
+                                            java.util.List<String> otherSources) {
         for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
             if (!h.isAnnotated()) {
                 continue;
@@ -2843,6 +2915,11 @@ public class CodenameOneSettings extends Lifecycle {
             // compiled annotation is still ours, so missing it left the hint
             // editable and Add wrote the duplicate the next build refuses.
             aliases.addAll(kotlinTypeAliases(source, simple, kotlin));
+            if (otherSources != null) {
+                for (String other : otherSources) {
+                    aliases.addAll(kotlinTypeAliases(other, simple, kotlin));
+                }
+            }
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as
