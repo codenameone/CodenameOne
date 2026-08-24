@@ -298,16 +298,22 @@ public class InterpBundleWriter {
                 }
                 String token = code.substring(start, i);
                 if ("package".equals(token)) {
-                    // Terminated by `;` (Java) or end-of-line (Kotlin, whose
-                    // package declaration has no semicolon). Falling back to
-                    // the next `;` in the file would land inside the class
-                    // body for a Kotlin source, so the key would be a garbled
-                    // "com.example fun ..." and the reader would look up a
-                    // key nobody wrote.
+                    // Java terminates the declaration at `;`, so a package
+                    // legally wraps across lines (`package com.\nexample;`);
+                    // stopping at `\n` there would cut the name to `com.`
+                    // and the source would be keyed at the wrong path.
+                    // Kotlin has no semicolon and its declaration ends at
+                    // the first line break -- falling back to the next `;`
+                    // in the file would land inside the class body and
+                    // the key would be a garbled `com.example fun ...`
+                    // that nobody wrote.
                     int end = i;
                     while (end < code.length()) {
                         char t = code.charAt(end);
-                        if (t == ';' || t == '\n' || t == '\r' || t == '{') {
+                        if (t == ';' || t == '{') {
+                            break;
+                        }
+                        if (!java && (t == '\n' || t == '\r')) {
                             break;
                         }
                         end++;

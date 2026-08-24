@@ -97,22 +97,22 @@ class InterpRuntimeContractTest {
         // used to skip through the class body and return a garbled key that
         // the reader looked up against nothing.
         assertEquals("com.example",
-                packageOf("package com.example\n\nclass A { fun f() {} }\n"));
+                packageOfKotlin("package com.example\n\nclass A { fun f() {} }\n"));
         assertEquals("com.example",
-                packageOf("/* license */\npackage com.example\n\nfun main() {}\n"));
+                packageOfKotlin("/* license */\npackage com.example\n\nfun main() {}\n"));
         // A Kotlin source may escape reserved-word segments with backticks --
         // `package com.`is`.foo` -- but kotlinc's SourceFile attribute names
         // the file at `com/is/Foo.kt`. Storing it under the raw path with
         // backticks left the reader looking for a source the writer did not
         // key, and the entire push was refused as missing source.
         assertEquals("com.is.foo",
-                packageOf("package com.`is`.foo\n\nfun main() {}\n"));
+                packageOfKotlin("package com.`is`.foo\n\nfun main() {}\n"));
         // Whitespace *inside* backticks is part of the escaped segment;
         // kotlinc keeps it, so the writer has to as well. Stripping every
         // space folded `com.`foo bar`.baz` to `com.foobar.baz` and the
         // reader then asked for a key nobody had written.
         assertEquals("com.foo bar.baz",
-                packageOf("package com.`foo bar`.baz\n\nfun main() {}\n"));
+                packageOfKotlin("package com.`foo bar`.baz\n\nfun main() {}\n"));
         // A `package-info.java` may carry an annotation whose argument is a
         // class literal (`@Foo(String.class) package p;`). The `class` in
         // `String.class` is not a type declaration -- the preceding dot
@@ -123,7 +123,7 @@ class InterpRuntimeContractTest {
                 "@p.A(String.class)\npackage p;\n"));
         // Kotlin spells the class literal with `::class`. Same problem, same
         // fix: the `class` after `::` is the literal, not a declaration.
-        assertEquals("p", packageOf(
+        assertEquals("p", packageOfKotlin(
                 "@file:A(String::class)\npackage p\n\nfun main() {}\n"));
         // Kotlin's `"""..."""` raw strings (and Java text blocks) contain
         // lone `"` characters. Treating each quote as its own delimiter
@@ -131,7 +131,7 @@ class InterpRuntimeContractTest {
         // source at the wrong key; the whole push was then refused as
         // missing source. The scanner has to recognise the triple-quote as
         // one token.
-        assertEquals("real.p", packageOf(
+        assertEquals("real.p", packageOfKotlin(
                 "@file:Tag(\"\"\"x\" package fake \"\"\")\npackage real.p\n\nfun main() {}\n"));
         // A `package-info.java` annotation whose argument is an array
         // initializer -- `@p.A({String.class}) package p;` -- contains a
@@ -147,7 +147,7 @@ class InterpRuntimeContractTest {
         // it as such returned garbled text from the annotation line as
         // the package and refused the real `package real.pkg` on the
         // next line as source-less.
-        assertEquals("real.pkg", packageOf(
+        assertEquals("real.pkg", packageOfKotlin(
                 "@file:com.foo.`package`.Ann\npackage real.pkg\n\nfun main() {}\n"));
         // Java's backslash-u preprocessing runs before tokenisation and
         // would decode an escape spelled 005c u 0022 (a quote) into a bare
@@ -171,6 +171,12 @@ class InterpRuntimeContractTest {
         // name (`fooclassTest`).
         assertEquals("foo", packageOfKotlin(
                 "package foo /*\n comment */ class Test\n"));
+        // A Java package declaration terminates at `;`, so a line break
+        // inside the name is legal (`package com.\nexample;`). Stopping
+        // at the newline would key the source at `com/` and refuse the
+        // real `com/example/...` classes as missing source.
+        assertEquals("com.example", packageOf(
+                "package com.\nexample;\npublic class A {}\n"));
     }
 
     private static String packageOf(String source) throws Exception {
