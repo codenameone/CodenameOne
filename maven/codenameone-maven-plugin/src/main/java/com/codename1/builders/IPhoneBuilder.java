@@ -5093,16 +5093,17 @@ public class IPhoneBuilder extends Executor {
                                                 plistContext));
                                 String governing = governingKey == null ? null
                                         : declaredSettings.get(governingKey);
-                                // And only where that override actually reaches. An explicit
-                                // [sdk=iphoneos14.4] identifier beside a plist named
-                                // [sdk=iphoneos*] governs THIS archive and nothing else, so
-                                // suppressing the plist entry outright left every other device SDK
-                                // with neither -- falling back to the generated base while its own
-                                // plist declares something else. The plist entry is kept whenever the
-                                // override is the narrower of the two.
+                                // And only where that override actually COVERS the plist entry.
+                                // Specificity settles which of two settings wins where both apply; it
+                                // says nothing about whether one reaches everywhere the other does.
+                                // An explicit [sdk=iphoneos*] beside a plist named [config=Release]
+                                // is orthogonal to it -- neither contains the other -- and
+                                // suppressing on the strength of this archive being in both left a
+                                // simulator Release with no identifier of its own while Xcode
+                                // processes the Release plist's literal.
                                 if (governing != null && governing.trim().length() > 0
-                                        && conditionSpecificity(governingKey)
-                                                <= conditionSpecificity(perConfiguration.getKey())) {
+                                        && conditionCovers(governingKey,
+                                                perConfiguration.getKey())) {
                                     continue;
                                 }
                                 buildSettingsMap.put(perConfiguration.getKey(),
@@ -8287,6 +8288,47 @@ public class IPhoneBuilder extends Executor {
             }
         }
         return any;
+    }
+
+    /// Whether {@code governingKey}'s condition reaches every build {@code candidateKey}'s does.
+    ///
+    /// Not the same question as which is more specific. Specificity orders two settings where
+    /// both apply; coverage asks whether one is redundant beside the other. [sdk=iphoneos*] and
+    /// [config=Release] are orthogonal -- a device Release satisfies both, and neither contains
+    /// the other -- so an explicit identifier qualified by one must not silence a plist
+    /// identifier qualified by the other: the builds in the difference get neither.
+    ///
+    /// An unqualified governing key covers everything, which is what makes an archive's plain
+    /// PRODUCT_BUNDLE_IDENTIFIER the last word on the target.
+    static boolean conditionCovers(String governingKey, String candidateKey) {
+        Map<String, String> governing = conditionsOf(governingKey);
+        Map<String, String> candidate = conditionsOf(candidateKey);
+        for (Map.Entry<String, String> constraint : governing.entrySet()) {
+            String narrower = candidate.get(constraint.getKey());
+            // A dimension the governing key constrains and the candidate does not is exactly the
+            // orthogonal case: the candidate also describes builds outside it.
+            if (narrower == null || !matchesCondition(constraint.getValue(), narrower)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The bracketed conditions of a settings key, as name to value.
+    private static Map<String, String> conditionsOf(String key) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        int open = key == null ? -1 : key.indexOf('[');
+        if (open < 0) {
+            return out;
+        }
+        for (String condition : key.substring(open).split("[\\[\\],]")) {
+            int equals = condition.indexOf('=');
+            if (equals > 0) {
+                out.put(condition.substring(0, equals).trim(),
+                        condition.substring(equals + 1).trim());
+            }
+        }
+        return out;
     }
 
     /// Whether two TARGETED_DEVICE_FAMILY values name the same families.

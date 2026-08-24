@@ -1642,4 +1642,35 @@ public class AppExtensionDeploymentTargetTest {
                 + "</dict></plist>\n");
         return file;
     }
+
+    @Test
+    public void coverageIsNotSpecificity() {
+        // Orthogonal: a device Release satisfies both, and neither contains the other. Suppressing
+        // the plist entry on the strength of this archive being in both left a simulator Release
+        // with no identifier of its own while Xcode processes the Release plist's literal.
+        assertFalse(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]",
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Release]"));
+        assertFalse(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[config=Release]",
+                "PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+
+        // A wildcard covers an exact value in the same dimension, but not the other way round.
+        assertTrue(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]",
+                "PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]"));
+        assertFalse(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]",
+                "PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+
+        // Unqualified covers everything, which is what makes an archive's plain setting the last
+        // word on the target.
+        assertTrue(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER",
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // The same condition covers itself; more dimensions on the candidate is still covered.
+        assertTrue(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+        assertTrue(IPhoneBuilder.conditionCovers("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*]"));
+        assertFalse(IPhoneBuilder.conditionCovers(
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*]",
+                "PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+    }
 }
