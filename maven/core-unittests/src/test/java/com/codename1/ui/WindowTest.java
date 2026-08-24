@@ -2493,6 +2493,76 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void reShowingAHiddenWindowHasNotPaintedItsNewContentYet() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("re-shown", new BorderLayout());
+        Label l = new Label("before");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.markPainted();
+        assertTrue(w.hasPaintedOnce(), "it painted while it was up");
+
+        w.hide();
+        DisplayTest.flushEdt();
+        // Free to change while nothing was painting it, which is the whole point:
+        // whatever the surface still holds is a picture of the old content.
+        l.setText("after");
+        w.show();
+        DisplayTest.flushEdt();
+
+        assertFalse(w.hasPaintedOnce(),
+                "a window brought back has not painted its current content yet; saying "
+                        + "otherwise lets a waiter capture the raster from before the hide");
+        w.markPainted();
+        assertTrue(w.hasPaintedOnce(), "and it counts again once it really has painted");
+        w.dispose();
+    }
+
+    @FormTest
+    void anInterruptedModalWaitKeepsBlockingUntilTheWindowGoesAway() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("modal", new BorderLayout());
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        DisplayTest.flushEdt();
+        assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                "an application modal blocks the main form while it is up");
+
+        // showModal() from another thread: the window is already showing, so the show
+        // it performs is a no-op and the thread goes straight into the wait, which
+        // invokeAndBlock runs inline off the event dispatch thread. Interrupting it
+        // there is the case under test.
+        final Thread waiter = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        });
+        waiter.start();
+        for (int iter = 0; iter < 100 && waiter.isAlive(); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+            // Repeated rather than once: an interrupt that lands before the wait starts
+            // is consumed by whatever was running, and the flag has to be set again for
+            // the wait itself to see it. Harmless once the thread is gone.
+            waiter.interrupt();
+        }
+        waiter.join(2000);
+        assertFalse(waiter.isAlive(),
+                "an interrupted showModal() has to return rather than park for good");
+
+        assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                "the window is still on screen and still modal, so it must go on "
+                        + "blocking; dropping its blocker here leaves a modal window "
+                        + "visible with input reaching the windows behind it");
+
+        w.dispose();
+        DisplayTest.flushEdt();
+        assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                "and the blocker goes when the window really does");
+    }
+
+    @FormTest
     void aResizeDropsPaintWorkQueuedAgainstTheOldSize() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("resizes", new BorderLayout());

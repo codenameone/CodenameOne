@@ -1839,7 +1839,19 @@ public class Window extends Container implements TopLevelContainer {
         }
         revalidateWithAnimationSafety();
         initFocused();
+        // Whether this is bringing a hidden window back, which decides whether what it
+        // painted before still stands for what it shows now.
+        boolean wasHidden = !nativeVisible;
         nativeVisible = true;
+        if (wasHidden) {
+            // Its surface was dropped when it went away, and its components were free
+            // to change while nothing was painting it. The repaint below fills it in
+            // again, but until that runs the raster is the one from before the hide --
+            // so anything waiting on hasPaintedOnce() has to wait for the new content
+            // rather than capture the old. The resize and surface-reopen paths reset
+            // this for the same reason.
+            paintedOnce = false;
+        }
         // A window being shown is by definition no longer minimized. Only hide() and
         // showNotify() cleared this before, so restoring an iconified window through
         // show() left it marked iconified while it was on screen.
@@ -1921,7 +1933,17 @@ public class Window extends Container implements TopLevelContainer {
                 }
             });
         } finally {
-            releaseModal();
+            // Only when the wait ended because the window did. The loop above also
+            // breaks on an interrupt, and the window is still on screen then -- so
+            // releasing here left a modal window visible with input flowing to the
+            // windows behind it, which is the one thing a modal must not do.
+            //
+            // Nothing leaks by keeping it: the blocker belongs to the window, and
+            // hide(), dispose(), activationFailed() and setModalityType() all release
+            // it when the window is really finished with.
+            if (isModalFinished()) {
+                releaseModal();
+            }
         }
     }
 
