@@ -431,6 +431,24 @@ public class AndroidUwbRanging implements NearbyBridge {
             session.startRequest.set(requestId);
             Disposable started = UwbClientSessionScopeRx
                     .rangingResultsObservable(session.scope, params)
+                    // The grace period starts HERE, where the radio is
+                    // actually asked -- not on the calling thread.
+                    //
+                    // subscribeOn defers the subscription to an io thread, so
+                    // a saturated or delayed scheduler let the timer answer
+                    // "ranging started" before rangingResultsObservable had
+                    // asked for anything at all; the error that followed
+                    // arrived as an invalidation, after the caller had been
+                    // told its start succeeded. Placed UPSTREAM of
+                    // subscribeOn deliberately: that is what puts this
+                    // callback on the thread the subscription happens on.
+                    .doOnSubscribe(
+                            new io.reactivex.rxjava3.functions.Consumer<
+                                    Disposable>() {
+                                public void accept(Disposable d) {
+                                    scheduleStartGrace(session);
+                                }
+                            })
                     .subscribeOn(Schedulers.io())
                     .subscribe(new io.reactivex.rxjava3.functions.Consumer<
                             RangingResult>() {
@@ -489,7 +507,6 @@ public class AndroidUwbRanging implements NearbyBridge {
                         "the session was stopped before ranging started");
                 return;
             }
-            scheduleStartGrace(session);
         } catch (Throwable t) {
             session.startRequest.set(0);
             fail(requestId, NearbyError.SESSION_FAILED, message(t));
