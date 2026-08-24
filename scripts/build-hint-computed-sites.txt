@@ -9,14 +9,20 @@
 # every expansion must be catalogued or match a dynamic pattern. A new computed
 # site therefore forces a catalog decision instead of disappearing.
 #
-# Format: <file>:<line>|<expansion>[,<expansion>...]
+# Format: <file>|<expression>|<expansion>[,<expansion>...]
+#
+# Keyed by the expression, not just the file: a builder that already appears here
+# would otherwise absorb a SECOND computed hint for free -- adding
+# `platform + ".maps.apiKey"` beside the provider one kept the gate green while
+# the new hint had no catalog row. The line number is deliberately not part of
+# the key, so moving code does not churn this file.
 #
 # Only sites whose expression contains a string literal are reported. A helper
 # that forwards a variable -- getArg(key, ...) inside a wrapper -- gets its
 # literal from its caller, which the ordinary literal pass already mines.
 
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MapsProviderInjector.java|android.maps.provider,ios.maps.provider
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/NativeVerifyOption.java|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MacNativeBuilder.java|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|ios.entitlements.com.apple.developer.healthkit.access
-maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/WatchNativeBuilder.java|ios.entitlements.com.apple.developer.healthkit.access
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MapsProviderInjector.java|platform + ".maps.provider"|android.maps.provider,ios.maps.provider
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/NativeVerifyOption.java|platformPrefix + "." + HINT|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MacNativeBuilder.java|"macNative.provisioningProfile." + (isAppStore ? "appStore" : "developerID")|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + suffix|ios.entitlements.com.apple.developer.healthkit.access
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/WatchNativeBuilder.java|"ios.entitlements.com.apple.developer.healthkit." + canonicalKey|ios.entitlements.com.apple.developer.healthkit.access

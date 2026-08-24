@@ -557,32 +557,38 @@ public class Simulator {
     private static File findAnnotationManifest(File projectDir, String classPathStr) {
         String resource = "META-INF" + File.separator + "codenameone"
                 + File.separator + "build-hints.properties";
+        // The classpath first, because it is the output the build is ACTUALLY
+        // using. Trying the conventional path first looked harmless and is not:
+        // a project that moves to a configured output directory without running
+        // clean leaves the old target/classes in place, complete with its old
+        // manifest and the old class beside it, so the staleness check compares
+        // two obsolete files against each other, finds them consistent, and
+        // publishes last week's hints while the real ones sit on the classpath.
+        if (classPathStr != null) {
+            for (String entry
+                    : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                if (entry.length() == 0) {
+                    continue;
+                }
+                File dir = new File(entry);
+                if (!dir.isDirectory()) {
+                    // A jar can carry this resource too, but only as a dependency --
+                    // and a dependency's hints belong to whoever built it, which the
+                    // main-class stamp exists to reject. Directories are this
+                    // project's own output.
+                    continue;
+                }
+                File candidate = new File(dir, resource);
+                if (candidate.isFile()) {
+                    return candidate;
+                }
+            }
+        }
+        // Only when the classpath carries none: a launch that did not pass the
+        // module's output directory at all still finds a conventional build.
         File conventional = new File(projectDir, "target" + File.separator + "classes"
                 + File.separator + resource);
-        if (conventional.isFile()) {
-            return conventional;
-        }
-        if (classPathStr == null) {
-            return null;
-        }
-        for (String entry : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
-            if (entry.length() == 0) {
-                continue;
-            }
-            File dir = new File(entry);
-            if (!dir.isDirectory()) {
-                // A jar can carry this resource too, but only as a dependency --
-                // and a dependency's hints belong to whoever built it, which the
-                // main-class stamp exists to reject. Directories are this
-                // project's own output.
-                continue;
-            }
-            File candidate = new File(dir, resource);
-            if (candidate.isFile()) {
-                return candidate;
-            }
-        }
-        return null;
+        return conventional.isFile() ? conventional : null;
     }
 
     /**

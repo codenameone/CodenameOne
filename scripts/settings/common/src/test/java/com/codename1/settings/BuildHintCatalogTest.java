@@ -322,4 +322,27 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(src, out);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
+
+    /// A commented-out earlier alias must not win over the live import. It did,
+    /// and then the live `@BuildIos` was never looked for at all -- the very bug
+    /// the alias support exists to prevent.
+    @Test
+    public void aCommentedOutAliasDoesNotShadowTheLiveOne() {
+        String src = "// import com.codename1.annotations.buildhints.Ios as Old\n"
+                + "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(src, "Ios"));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The package named somewhere that is not an import is not an alias.
+    @Test
+    public void aMentionThatIsNotAnImportIsNotAnAlias() {
+        assertNull(CodenameOneSettings.kotlinImportAlias(
+                "val doc = com.codename1.annotations.buildhints.Ios as Whatever", "Ios"));
+    }
 }

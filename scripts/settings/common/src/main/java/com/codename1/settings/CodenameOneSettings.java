@@ -2196,9 +2196,18 @@ public class CodenameOneSettings extends Lifecycle {
     /// itself created.
     static String kotlinImportAlias(String source, String simple) {
         String needle = "com.codename1.annotations.buildhints." + simple;
-        int at = source.indexOf(needle);
+        // Same comment-aware walk the marker search uses, and the occurrence has
+        // to be a live `import` directive. A commented-out earlier alias --
+        // `// import ...Ios as Old` above the real `import ...Ios as BuildIos` --
+        // otherwise won, the live `@BuildIos` was never looked for, and the hint
+        // read as unowned again: the exact bug the alias support was added for.
+        int at = nextMarker(source, needle, 0);
         while (at >= 0) {
             int after = at + needle.length();
+            if (!precededByImport(source, at)) {
+                at = nextMarker(source, needle, after);
+                continue;
+            }
             if (after >= source.length() || !continuesAName(source.charAt(after))) {
                 int i = after;
                 while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
@@ -2221,9 +2230,28 @@ public class CodenameOneSettings extends Lifecycle {
                     }
                 }
             }
-            at = source.indexOf(needle, after);
+            at = nextMarker(source, needle, after);
         }
         return null;
+    }
+
+    /// Whether the token at `at` is the target of an `import` on the same line.
+    ///
+    /// Without this a mention of the package in code or in a doc string would be
+    /// read as an import directive.
+    private static boolean precededByImport(String source, int at) {
+        int i = at - 1;
+        while (i >= 0 && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
+            i--;
+        }
+        if (i < 5) {
+            return false;
+        }
+        if (!source.regionMatches(i - 5, "import", 0, 6)) {
+            return false;
+        }
+        int before = i - 6;
+        return before < 0 || !continuesAName(source.charAt(before));
     }
 
     /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.

@@ -159,22 +159,32 @@ def main():
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                where, _, expansions = line.partition("|")
-                declared[where] = [e for e in expansions.split(",") if e]
+                # Split from both ends: the expression sits in the middle and may
+                # itself contain a pipe, while the file and the expansion list
+                # cannot.
+                path, _, rest = line.partition("|")
+                expr, _, expansions = rest.rpartition("|")
+                declared[(path, " ".join(expr.split()))] = [
+                    e for e in expansions.split(",") if e]
 
     computed_bad = []
-    for expr, path, line_no in miner.hits_computed():
-        if path not in declared:
+    mined = miner.hits_computed()
+    for expr, path, line_no in mined:
+        key = (path, " ".join(expr.split()))
+        if key not in declared:
+            # Keyed by the expression as well as the file, so a builder already
+            # listed cannot absorb a second computed hint for free.
             computed_bad.append(
                 f"{path}:{line_no}  builds a hint name from `{expr}` and is not listed")
             continue
-        for name in declared[path]:
+        for name in declared[key]:
             if name in known or any(fnmatch.fnmatch(name, p) for p in patterns):
                 continue
             computed_bad.append(
                 f"{path}:{line_no}  expands to {name}, which the catalog does not describe")
-    for path in sorted(set(declared) - {p for _, p, _ in miner.hits_computed()}):
-        computed_bad.append(f"{path}  is listed but no longer builds a hint name")
+    mined_keys = {(path, " ".join(expr.split())) for expr, path, _ in mined}
+    for path, expr in sorted(set(declared) - mined_keys):
+        computed_bad.append(f"{path}  is listed for `{expr}`, which no longer builds a hint name")
     if computed_bad:
         print("check-build-hint-catalog: computed hint names are unaccounted for:",
               file=sys.stderr)
