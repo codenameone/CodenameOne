@@ -437,6 +437,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         int depth = 0;
         int i = from;
         while (i < end && i < code.length()) {
+            int escaped = escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (c == '{') {
                 depth++;
@@ -470,6 +475,24 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             i = wordEnd;
         }
         return -1;
+    }
+
+    /// The index just past a Kotlin escaped identifier at `i`, or -1 when there
+    /// is not one there.
+    ///
+    /// [#blankNonCode] leaves these as the code they are, because a declared
+    /// name has to stay readable -- so every scanner looking for a KEYWORD has
+    /// to step over them itself. `fun `import`() {}` declares a function called
+    /// import, not an import directive, and reading it as one put the generated
+    /// import after a top-level declaration where Kotlin does not allow it.
+    /// Stepping over the run also keeps the brace count honest, since `{` is a
+    /// legal character inside one.
+    public static int escapedIdentifierEnd(String code, int i) {
+        if (i < 0 || i >= code.length() || code.charAt(i) != '`') {
+            return -1;
+        }
+        int close = code.indexOf('`', i + 1);
+        return close < 0 ? -1 : close + 1;
     }
 
     /// The declared simple name at `n`, or null when the source runs out.
@@ -514,6 +537,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         int depth = 0;
         int i = from;
         while (i < end && i < code.length()) {
+            int escaped = escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (c == '{') {
                 depth++;
@@ -570,6 +598,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         int depth = 0;
         int i = from;
         while (i < end && i < code.length()) {
+            int escaped = escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (c == '{') {
                 depth++;

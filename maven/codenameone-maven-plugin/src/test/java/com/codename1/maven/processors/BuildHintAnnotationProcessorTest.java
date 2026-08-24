@@ -619,6 +619,18 @@ public class BuildHintAnnotationProcessorTest {
         return hex.toString();
     }
 
+    /// An escaped identifier may contain anything, spaces and keywords
+    /// included, and it is left as the code it is -- so a declaration scanner
+    /// has to step over it rather than read what is inside. `val `class Main``
+    /// declares a property, and reading it as a declaration of Main made a class
+    /// that belongs elsewhere look like it belonged here.
+    @Test
+    public void anEscapedIdentifierIsNotADeclaration() {
+        String kt = "package com.example\nval `class Main` = 1\nclass Other\n";
+        assertFalse(BuildHintAnnotationProcessor.declaresType(kt, "Main", true));
+        assertTrue(BuildHintAnnotationProcessor.declaresType(kt, "Other", true));
+    }
+
     /// A qualified name may escape a COMPONENT: `package com.`when`` is legal
     /// Kotlin and the compiled class belongs to `com.when`. Stopping at the
     /// backtick recorded `com.`, so a live annotated class looked like it

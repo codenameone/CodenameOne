@@ -964,6 +964,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     private static int importKeywordAt(String code, int from) {
         int i = from;
         while (i < code.length()) {
+            // A Kotlin escaped identifier is code, not a keyword: `fun
+            // `import`() {}` declares a function called import.
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (!Character.isJavaIdentifierStart(c)
                     || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
@@ -1022,6 +1030,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     static int livePackageIndex(String code) {
         int i = 0;
         while (i < code.length()) {
+            // A Kotlin escaped identifier is code, not a keyword: `fun
+            // `import`() {}` declares a function called import.
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (!Character.isJavaIdentifierStart(c)
                     || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
@@ -1127,6 +1143,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         int depth = 0;
         int i = 0;
         while (i < code.length()) {
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (c == '{') {
                 depth++;

@@ -371,6 +371,29 @@ public class MigrateBuildHintsPropertyParsingTest {
                 MigrateBuildHintsMojo.classDeclarationIndex(src, true, "Other"));
     }
 
+    /// `blankNonCode` leaves an escaped identifier as the code it is, so a
+    /// scanner looking for a KEYWORD has to step over it. `fun `import`() {}`
+    /// declares a function called import, and reading it as an import directive
+    /// put the generated import after a top-level declaration -- where Kotlin
+    /// does not allow one, so verification failed and rolled back a valid
+    /// migration.
+    @Test
+    public void anEscapedIdentifierIsNotAKeyword() {
+        String kt = "package com.example\n\nfun `import`() {}\n\nclass MyApp\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(kt, true);
+        assertEquals(-1, MigrateBuildHintsMojo.lastImportIndex(code));
+        assertFalse(MigrateBuildHintsMojo.importsBuildHints(code));
+        assertEquals(0, MigrateBuildHintsMojo.livePackageIndex(code));
+
+        // ...and the package keyword the same way. A file with no package
+        // declaration at all has none, whatever a function is called.
+        String noPackage = "fun `package`() {}\n\nclass MyApp\n";
+        assertEquals(-1, MigrateBuildHintsMojo.livePackageIndex(
+                com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .blankNonCode(noPackage, true)));
+    }
+
     /// The build hints PACKAGE, not any name that starts with its letters. An
     /// unrelated `com.codename1.annotations.buildhintsExtra.Widget` read as
     /// "already imported" and aborted a migration with nothing to conflict with.
