@@ -617,7 +617,12 @@ static gboolean cn1DesktopOnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointe
             }
         }
         if (pe->angle_delta != 0.0) {
-            double rad = pe->angle_delta * G_PI / 180.0;
+            /* Radians already. GdkEventTouchpadPinch.angle_delta is documented as
+             * "the angle change in radians", and the Java side reads the packed value
+             * as radians too -- converting it as though it were degrees divided every
+             * rotation by 57.3, so a gesture the user could plainly feel barely moved
+             * anything on screen. */
+            double rad = pe->angle_delta;
             cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_ROTATE, x, y,
                     (int) (rad * CN1_GESTURE_FIXED + (rad >= 0 ? 0.5 : -0.5)));
         }

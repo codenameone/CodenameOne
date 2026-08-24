@@ -580,8 +580,8 @@ static gboolean cn1OnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
 
 /* Touchpad pinch / rotate (GDK_TOUCHPAD_PINCH, libinput). scale is cumulative
  * relative to the gesture's BEGIN, so we forward the incremental multiplier;
- * angle_delta is already a per-event delta in degrees, forwarded as incremental
- * radians. These map to Display.fireMagnifyGesture / fireRotationGesture, the
+ * angle_delta is a per-event delta already in radians, which is what the Java side
+ * reads it as. These map to Display.fireMagnifyGesture / fireRotationGesture, the
  * same hooks the macOS trackpad drives. Delivered through the generic "event"
  * signal, so we return FALSE for anything else to leave other handlers intact. */
 static double cn1PinchLastScale = 1.0;
@@ -606,7 +606,12 @@ static gboolean cn1OnGenericEvent(GtkWidget* widget, GdkEvent* e, gpointer data)
             }
         }
         if (pe->angle_delta != 0.0) {
-            double rad = pe->angle_delta * G_PI / 180.0;
+            /* Radians already. GdkEventTouchpadPinch.angle_delta is documented as
+             * "the angle change in radians", and the Java side reads the packed value
+             * as radians too -- converting it as though it were degrees divided every
+             * rotation by 57.3, so a gesture the user could plainly feel barely moved
+             * anything on screen. */
+            double rad = pe->angle_delta;
             cn1LinuxPushEvent(CN1_EVENT_ROTATE, x, y,
                     (int) (rad * CN1_GESTURE_FIXED + (rad >= 0 ? 0.5 : -0.5)));
         }
