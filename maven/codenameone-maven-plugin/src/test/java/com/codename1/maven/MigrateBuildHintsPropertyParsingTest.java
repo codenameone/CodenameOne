@@ -169,4 +169,35 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
         assertNull(mojo.toSourceLiteral(ios, "nonsense", false));
     }
+
+    /// A value that is not already canonical is refused, not normalised.
+    /// AndroidGradleBuilder compares android.hideStatusBar with .equals("true"),
+    /// so `TRUE` is false today and migrating it to `true` would flip the app's
+    /// behaviour while reporting a successful migration.
+    @Test
+    public void aNonCanonicalScalarIsRefused() {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        com.codename1.build.shared.BuildHints.Hint bool =
+                com.codename1.build.shared.BuildHints.byName("android.hideStatusBar");
+        assertEquals("true", mojo.toSourceLiteral(bool, "true", false));
+        assertNull(mojo.toSourceLiteral(bool, "TRUE", false));
+        assertNull(mojo.toSourceLiteral(bool, "True", false));
+        assertNull(mojo.toSourceLiteral(bool, "true ", false));
+
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
+        assertNull(mojo.toSourceLiteral(ios, "MODERN", false));
+    }
+
+    /// An int that does not round-trip would be rewritten too.
+    @Test
+    public void anIntThatDoesNotRoundTripIsRefused() {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        com.codename1.build.shared.BuildHints.Hint i =
+                com.codename1.build.shared.BuildHints.byName("android.min_sdk_version");
+        assertEquals("24", mojo.toSourceLiteral(i, "24", false));
+        assertNull(mojo.toSourceLiteral(i, "024", false));
+        assertNull(mojo.toSourceLiteral(i, "+24", false));
+    }
 }

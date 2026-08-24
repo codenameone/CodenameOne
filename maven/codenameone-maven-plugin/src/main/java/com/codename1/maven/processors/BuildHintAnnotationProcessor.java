@@ -234,7 +234,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         String pkg = packageOf(cls.getBinaryName());
         String simpleName = simpleNameOf(cls.getBinaryName());
-        String nestedName = nestedNameOf(cls.getBinaryName());
+        String[] nestedName = nestedNameOf(cls.getBinaryName());
         boolean sawARoot = false;
         for (String root : roots) {
             File dir = new File(root);
@@ -282,7 +282,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// because Kotlin does not require the two to agree. Depth-limited: this runs
     /// per annotated class and a source tree is not a search index.
     private static boolean declaresPackage(File dir, String name, String pkg, String simple,
-                                           String nested, int depth) {
+                                           String[] nested, int depth) {
         if (depth > 24) {
             return false;
         }
@@ -310,7 +310,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// class that used to be in it -- keeping a stale annotation owner and
     /// failing the placement check on every incremental build, which is the very
     /// thing this guard was added to stop.
-    private static boolean matches(File f, String pkg, String simple, String nested) {
+    private static boolean matches(File f, String pkg, String simple, String[] nested) {
         String text = readHead(f);
         if (text == null) {
             // Unreadable: answer yes, as everywhere else here, because the only
@@ -320,12 +320,111 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (!pkg.equals(declaredPackageIn(text)) || !declaresType(text, simple)) {
             return false;
         }
-        // The nested type has to be there too. Reducing Main$Wrong to Main so the
-        // file can be found let the LIVE outer class vouch for a nested type that
-        // had been deleted, and the orphan then failed the placement check on
-        // every incremental build -- swapping one silent failure for a loud
-        // permanent one.
-        return nested == null || declaresType(text, nested);
+        // The whole nesting PATH has to be there, in order. Checking only the
+        // innermost name let an unrelated Main.B.Wrong vouch for a deleted
+        // Main.A.Wrong, so the orphan stayed and failed the placement check on
+        // every incremental build. Checking only the outer class was the same bug
+        // one level out.
+        return nested == null || declaresNestedPath(text, nested);
+    }
+
+    /// Whether `text` declares the chain `path` -- {"Main", "A", "Wrong"} -- each
+    /// inside the body of the one before it.
+    ///
+    /// Braces are counted on the blanked text, where every comment and string
+    /// literal is already spaces, so a brace inside either cannot throw the
+    /// nesting off.
+    static boolean declaresNestedPath(String text, String[] path) {
+        String code = blankNonCode(text);
+        int from = 0;
+        int end = code.length();
+        for (String segment : path) {
+            int at = declarationOf(code, segment, from, end);
+            if (at < 0) {
+                return false;
+            }
+            int open = code.indexOf('{', at);
+            if (open < 0 || open >= end) {
+                // A body-less declaration -- Kotlin's `class Foo` -- can only be
+                // the last segment, and if it is not, nothing is nested in it.
+                return segment.equals(path[path.length - 1]);
+            }
+            from = open + 1;
+            end = matchingBrace(code, open);
+        }
+        return true;
+    }
+
+    /// The offset of a `class`/`interface`/`enum`/`object`/`record` declaration of
+    /// `simple` declared DIRECTLY between `from` and `end`, or -1.
+    ///
+    /// Directly: at brace depth zero within that range. A match at any depth
+    /// would let Main.B.Wrong answer for Main.Wrong, which is the same
+    /// wrong-identity bug one level along -- and Main.Wrong not existing is
+    /// exactly when its .class is an orphan.
+    private static int declarationOf(String code, String simple, int from, int end) {
+        int depth = 0;
+        int i = from;
+        while (i < end && i < code.length()) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length() && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = code.substring(i, wordEnd);
+            if (isTypeKeyword(word)) {
+                int n = wordEnd;
+                while (n < end && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int stop = n;
+                while (stop < end && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                    stop++;
+                }
+                if (code.substring(n, stop).equals(simple)) {
+                    return i;
+                }
+            }
+            i = wordEnd;
+        }
+        return -1;
+    }
+
+    private static boolean isTypeKeyword(String word) {
+        return "class".equals(word) || "interface".equals(word) || "enum".equals(word)
+                || "object".equals(word) || "record".equals(word);
+    }
+
+    /// The index just past the brace closing the one at `open`.
+    private static int matchingBrace(String code, int open) {
+        int depth = 0;
+        for (int i = open; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
+        }
+        return code.length();
     }
 
     /// The innermost named segment of a nested binary name, or null.
@@ -334,18 +433,32 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// source declares and which cannot carry an annotation in the first place,
     /// so there is nothing to look for and nothing to conclude from not finding
     /// it.
-    private static String nestedNameOf(String binaryName) {
-        int nested = binaryName.lastIndexOf('$');
-        if (nested < 0 || nested + 1 >= binaryName.length()) {
+    private static String[] nestedNameOf(String binaryName) {
+        int dot = binaryName.lastIndexOf('.');
+        String simple = dot < 0 ? binaryName : binaryName.substring(dot + 1);
+        if (simple.indexOf('$') < 0) {
             return null;
         }
-        String tail = binaryName.substring(nested + 1);
-        for (int i = 0; i < tail.length(); i++) {
-            if (!Character.isDigit(tail.charAt(i))) {
-                return tail;
+        String[] path = simple.split("\\$");
+        for (String segment : path) {
+            if (segment.length() == 0) {
+                return null;
+            }
+            boolean digits = true;
+            for (int i = 0; i < segment.length(); i++) {
+                if (!Character.isDigit(segment.charAt(i))) {
+                    digits = false;
+                    break;
+                }
+            }
+            // An anonymous or synthetic segment. No source declares one and none
+            // can carry a TYPE annotation, so there is nothing to look for and
+            // nothing to conclude from not finding it.
+            if (digits) {
+                return null;
             }
         }
-        return null;
+        return path;
     }
 
     /// Whether `text` declares a type called `simple`.

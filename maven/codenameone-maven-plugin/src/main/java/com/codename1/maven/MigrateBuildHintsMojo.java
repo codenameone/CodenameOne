@@ -564,6 +564,19 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return false;
     }
 
+    /// Whether `value` is spelled exactly as the domain declares it, alias or not.
+    ///
+    /// canonicalValue ignores case because a reader might; the migration cannot
+    /// afford to, because a reader might not.
+    private static boolean exactlySpelled(BuildHints.Hint hint, String value) {
+        for (String allowed : hint.values()) {
+            if (allowed.equals(value)) {
+                return true;
+            }
+        }
+        return hint.valueAliases().containsKey(value);
+    }
+
     /**
      * Renders a value as the Java literal for its attribute.
      *
@@ -591,23 +604,40 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String v = value;
         switch (hint.type()) {
             case BOOLEAN:
-                if ("true".equalsIgnoreCase(v.trim())) return "true";
-                if ("false".equalsIgnoreCase(v.trim())) return "false";
+                // Exactly, not ignoring case. AndroidGradleBuilder compares
+                // android.hideStatusBar with .equals("true"), so `=TRUE` is false
+                // today, while other hints are read with equalsIgnoreCase. Which
+                // applies is per hint and this cannot know, so a value that is not
+                // already canonical is refused rather than normalised into one
+                // that may mean the opposite.
+                if ("true".equals(v)) return "true";
+                if ("false".equals(v)) return "false";
                 return null;
             case INT:
                 try {
-                    return String.valueOf(Integer.parseInt(v.trim()));
+                    // Round-tripped for the same reason: 007 and +5 parse, and a
+                    // builder comparing the raw string would not see the 7 or 5
+                    // this would otherwise write.
+                    String canonical = String.valueOf(Integer.parseInt(v));
+                    return canonical.equals(v) ? canonical : null;
                 } catch (NumberFormatException ex) {
                     return null;
                 }
             case ENUM: {
-                // Canonicalised, so a documented spelling that is not its own
-                // constant migrates to the constant it means -- ios.themeMode=flat
-                // becomes IosThemeMode.IOS7 -- rather than being refused as
-                // outside the domain, which is what an existing project setting a
-                // legacy spelling would have hit.
-                String canonical = hint.canonicalValue(v.trim());
-                return canonical == null ? null : hint.enumName() + "." + enumConstant(canonical);
+                // A documented spelling that is not its own constant migrates to
+                // the constant it means -- ios.themeMode=flat becomes
+                // IosThemeMode.IOS7 -- rather than being refused as outside the
+                // domain, which is what an existing project setting a legacy
+                // spelling would have hit.
+                //
+                // Case-sensitively, though: installNativeTheme compares with
+                // .equals, so `MODERN` is not `modern` to the runtime and
+                // migrating it would change the theme rather than preserve it.
+                String canonical = hint.canonicalValue(v);
+                if (canonical == null || !exactlySpelled(hint, v)) {
+                    return null;
+                }
+                return hint.enumName() + "." + enumConstant(canonical);
             }
             case STRING_LIST: {
                 String sep = hint.separator();

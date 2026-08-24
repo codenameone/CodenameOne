@@ -349,6 +349,36 @@ public class BuildHintAnnotationProcessorTest {
         assertEquals(2, blanked.split("\n", -1).length - 1);
     }
 
+    /// The whole nesting path, in order. Checking only the innermost name let an
+    /// unrelated Main.B.Wrong vouch for a deleted Main.A.Wrong; checking only the
+    /// outer class was the same bug one level out.
+    @Test
+    public void aNestedPathMustNestTheSameWay() {
+        String src = "package com.example;\n"
+                + "public class Main {\n"
+                + "    static class A { }\n"
+                + "    static class B { static class Wrong { } }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                src, new String[] {"Main", "B", "Wrong"}));
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                src, new String[] {"Main", "A", "Wrong"}));
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                src, new String[] {"Main", "Wrong"}));
+    }
+
+    /// Braces inside comments and strings must not move the nesting.
+    @Test
+    public void bracesInCommentsAndStringsDoNotBreakNesting() {
+        String src = "class Main {\n"
+                + "    // }\n"
+                + "    String s = \"}\";\n"
+                + "    static class Wrong { }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                src, new String[] {"Main", "Wrong"}));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

@@ -600,4 +600,18 @@ public class BuildHintCatalogTest {
         assertFalse(CodenameOneSettings.declaresClass(
                 "// package com.example\nclass MyApp\n", "MyApp", "com.example", true));
     }
+
+    /// `class\nMain` and `class /* why */ Main` are both legal. Stopping at a
+    /// space read the declaration as unnamed, so the file did not declare the
+    /// main class and ownership came back empty.
+    @Test
+    public void anyLegalSeparatorBeforeTheNameIsAccepted() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass\nMyApp\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass /* why */ MyApp\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class\t MyApp {}\n", "MyApp",
+                "com.example", false));
+    }
 }

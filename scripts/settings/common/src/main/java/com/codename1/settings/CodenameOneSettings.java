@@ -2336,10 +2336,14 @@ public class CodenameOneSettings extends Lifecycle {
                 boolean wholeWord = (at == 0 || !continuesAName(text.charAt(at - 1)))
                         && start < text.length() && !continuesAName(text.charAt(start));
                 if (wholeWord) {
-                    int i = start;
-                    while (i < text.length()
-                            && (text.charAt(i) == ' ' || text.charAt(i) == '\t')) {
-                        i++;
+                    // Every legal separator, not just a space: `class\nMain` and
+                    // `class /* why */ Main` are both valid Java and Kotlin, and
+                    // stopping at a newline read the declaration as unnamed --
+                    // so the file did not declare the main class, ownership read
+                    // as empty, and Add wrote the duplicate.
+                    int i = nextLiveChar(text, start, kotlin);
+                    if (i < 0) {
+                        break;
                     }
                     int end = i;
                     while (end < text.length() && continuesAName(text.charAt(end))) {
