@@ -226,10 +226,30 @@ public class IPhoneBuilder extends Executor {
     /// - `name`: the define to enable
     private void enableNearbyDefine(File buildinRes, String name)
             throws BuildException {
+        File header = new File(buildinRes, "CodenameOne_GLViewController.h");
         try {
-            replaceInFile(new File(buildinRes,
-                    "CodenameOne_GLViewController.h"),
-                    "//#define " + name, "#define " + name);
+            // Checked, because replaceInFile is a String.replace and a
+            // marker that is not there is a silent no-op. A port override or
+            // an older staged header without this line let the build finish
+            // with the native compiled out -- so the app shipped, the API
+            // reported the feature unsupported, and nothing anywhere said
+            // why. The whole point of enabling the define is that the
+            // scanner found the usage.
+            String before = readFileToString(header);
+            if (before.indexOf("//#define " + name) < 0) {
+                if (before.indexOf("#define " + name) >= 0) {
+                    // Already enabled, which is the same outcome.
+                    return;
+                }
+                throw new BuildException("This app uses"
+                        + " com.codename1.nearby, which needs " + name
+                        + " enabled in CodenameOne_GLViewController.h, and"
+                        + " the staged header does not carry that marker."
+                        + " The iOS port in use is older than the nearby"
+                        + " support or has been overridden; build against a"
+                        + " port that has it.");
+            }
+            replaceInFile(header, "//#define " + name, "#define " + name);
         } catch (IOException ex) {
             throw new BuildException("Failed to enable " + name, ex);
         }

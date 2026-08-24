@@ -260,8 +260,12 @@ class TvNativeBuilder {
         // not one, and gets neither key.
         java.util.List<String> bonjour = tvBonjourServices(request);
         if (!bonjour.isEmpty()) {
-            String why = request.getArg("ios.NSLocalNetworkUsageDescription",
-                    null);
+            // The EFFECTIVE value, the same one IPhoneBuilder validates:
+            // ios.plistInject wins over the hint, so an app that declared a
+            // perfectly good disclosure there left the hint blank and the
+            // tvOS plist -- reading the hint -- omitted the key entirely.
+            String why = IPhoneBuilder.effectivePurposeString(request,
+                    "ios.NSLocalNetworkUsageDescription");
             if (why != null && why.trim().length() > 0) {
                 plistString(sb, "NSLocalNetworkUsageDescription",
                         IPhoneBuilder.plistEscape(why));

@@ -267,6 +267,25 @@ public final class CompanionDevices {
         }
     }
 
+    /// Whether any listener is registered to receive presence right now.
+    ///
+    /// For a PORT deciding whether an event needs to outlive the process.
+    /// One that can be delivered now does not: it goes to the listeners and
+    /// is done with. One that arrives with nobody listening is parked here,
+    /// and that in-memory backlog dies with the process -- which is the
+    /// case, and the only case, a durable copy is for.
+    ///
+    /// @hidden not part of the public API; for ports.
+    ///
+    /// #### Returns
+    ///
+    /// true when a presence listener is registered
+    public static boolean hasPresenceListener() {
+        synchronized (LISTENERS) {
+            return !LISTENERS.isEmpty();
+        }
+    }
+
     /// Registers a presence listener. Callbacks arrive on the EDT.
     ///
     /// Register from the app's `init()`: presence is exactly the event that

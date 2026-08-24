@@ -127,13 +127,25 @@ class NearbyPresenceStore {
 
     private static long presenceSequence;
 
-    /// Persists an event and hands it to the in-memory backlog.
+    /// Hands an event to the backlog, persisting it only if nobody is
+    /// listening.
+    ///
+    /// A live app with a listener registered sees the event now and is done
+    /// with it -- persisting it as well meant the NEXT launch replayed a
+    /// sighting the app had already acted on, as though it had happened
+    /// while the app was away. The durable copy exists for the one case the
+    /// in-memory backlog cannot survive: an event delivered into a process
+    /// that has no listener yet and may be reclaimed before it gets one.
     /// Whether the app has explicitly stopped watching this association.
     static boolean isUnobserved(String associationId) {
         return UNOBSERVED.contains(associationId);
     }
 
     static void record(Context ctx, String encoded, boolean present) {
+        if (CompanionDevices.hasPresenceListener()) {
+            CompanionDevices.deliverPresenceChanged(encoded, present);
+            return;
+        }
         String seq;
         synchronized (NearbyPresenceStore.class) {
             // Qualified by pid, so a sequence minted by an earlier process
