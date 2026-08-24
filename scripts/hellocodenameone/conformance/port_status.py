@@ -87,17 +87,62 @@ def registered_tests() -> list[str]:
     return names
 
 
+def feature_test_entries(feature: dict):
+    """Yield ``(test name, ports or None)`` for one feature.
+
+    A feature lists its tests either as plain names, which every port is expected to
+    run, or as ``{"test": ..., "ports": [...]}`` for a test that only applies to some
+    of them. The scoped form exists so that a capability a port does not have -- a
+    windowing system, say -- is absent from that port's report rather than present as
+    a row of skips: the tests genuinely do not apply there, and reporting them as
+    skipped invites the reader to count them as something the port failed to do.
+    """
+    for entry in feature.get("tests", []):
+        if isinstance(entry, str):
+            yield entry, None
+            continue
+        if not isinstance(entry, dict) or not entry.get("test"):
+            raise ContractError(
+                f"Feature {feature.get('id')} has a test entry that is neither a name "
+                f"nor an object with a test: {entry!r}"
+            )
+        ports = entry.get("ports")
+        if not isinstance(ports, list) or not ports:
+            raise ContractError(
+                f"Scoped test {entry['test']} must list the ports it applies to"
+            )
+        yield entry["test"], set(ports)
+
+
 def test_to_feature(manifest: dict) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for feature in manifest.get("features", []):
         feature_id = feature.get("id")
-        for test in feature.get("tests", []):
+        for test, _ports in feature_test_entries(feature):
             if test in mapping:
                 raise ContractError(
                     f"Test {test} is mapped to both {mapping[test]} and {feature_id}"
                 )
             mapping[test] = feature_id
     return mapping
+
+
+def test_scopes(manifest: dict) -> dict[str, set[str] | None]:
+    """Map every test to the ports it applies to, or None when that is all of them."""
+    scopes: dict[str, set[str] | None] = {}
+    for feature in manifest.get("features", []):
+        for test, ports in feature_test_entries(feature):
+            scopes[test] = ports
+    return scopes
+
+
+def tests_for_port(manifest: dict, port_id: str) -> set[str]:
+    """The tests a given port is expected to report on."""
+    return {
+        test
+        for test, ports in test_scopes(manifest).items()
+        if ports is None or port_id in ports
+    }
 
 
 def screenshot_test(manifest: dict, output_name: str) -> str | None:
@@ -132,6 +177,18 @@ def validate(manifest: dict) -> dict:
     except ContractError as exc:
         problems.append(str(exc))
         mapped = {}
+
+    try:
+        for test, scoped_ports in test_scopes(manifest).items():
+            if scoped_ports is None:
+                continue
+            unknown_ports = sorted(scoped_ports - set(port_ids))
+            if unknown_ports:
+                problems.append(
+                    f"Test {test} is scoped to unknown ports: " + ", ".join(unknown_ports)
+                )
+    except ContractError as exc:
+        problems.append(str(exc))
 
     registered = registered_tests()
     duplicate_registrations = sorted(
@@ -205,13 +262,14 @@ def validate(manifest: dict) -> dict:
             if not isinstance(report_tests, dict):
                 problems.append(f"Stored report {report_path} has no test result map")
                 continue
-            unknown_tests = sorted(set(report_tests) - set(mapped))
+            expected_tests = tests_for_port(manifest, port_id)
+            unknown_tests = sorted(set(report_tests) - expected_tests)
             if unknown_tests:
                 problems.append(
                     f"Stored report {report_path} contains unknown tests: "
                     + ", ".join(unknown_tests)
                 )
-            missing_tests = sorted(set(mapped) - set(report_tests))
+            missing_tests = sorted(expected_tests - set(report_tests))
             if missing_tests:
                 problems.append(
                     f"Stored report {report_path} is missing tests: "
@@ -574,7 +632,7 @@ def normalize(
             "compared": False,
             "comparison_passed": False,
         }
-        for test in mapped
+        for test in tests_for_port(manifest, port_id)
     }
     suite_finished = parse_logs(manifest, logs, states)
     performance = parse_performance(
@@ -710,14 +768,16 @@ def publishable_report_problems(
                     f"generated_at {generated_at!r} is in the future"
                 )
 
-    mapped = test_to_feature(manifest)
+    # Scoped to this port: a test that does not apply here is not something the
+    # report predates, it is something the report is right not to carry.
+    expected = tests_for_port(manifest, port_id)
     tests = report.get("tests")
     if not isinstance(tests, dict):
         malformed.append("report has no test result map")
         tests = {}
     else:
-        missing = sorted(set(mapped) - set(tests))
-        unknown = sorted(set(tests) - set(mapped))
+        missing = sorted(expected - set(tests))
+        unknown = sorted(set(tests) - expected)
         if missing:
             drift.append("report predates tests: " + ", ".join(missing))
         if unknown:

@@ -51,7 +51,7 @@
     "fail": 0,
     "not-run": 0,
     "pass": 177,
-    "skip": 10
+    "skip": 4
   },
   "tests": {
     "ARApiTest": {
@@ -789,48 +789,6 @@
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
       "status": "pass"
-    },
-    "WindowEditingTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
-    },
-    "WindowGraphicsTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
-    },
-    "WindowLayoutTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
-    },
-    "WindowModalTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
-    },
-    "WindowOverlayTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
-    },
-    "WindowScrollTest": {
-      "feature": "multi-window",
-      "reasons": [
-        "no-windowing-system"
-      ],
-      "status": "skip"
     }
   }
 }

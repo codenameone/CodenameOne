@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import json
 import tempfile
 import unittest
@@ -395,9 +396,12 @@ class PortStatusTest(unittest.TestCase):
 
     def publishable_report(self, port_id, **overrides):
         mapped = port_status.test_to_feature(self.manifest)
+        # Only the tests this port is expected to report on. A test scoped to other
+        # ports is not something this report is missing, and carrying it here would
+        # make the fixture assert the opposite of the contract.
         tests = {
-            test: {"status": "pass", "feature": feature}
-            for test, feature in mapped.items()
+            test: {"status": "pass", "feature": mapped[test]}
+            for test in port_status.tests_for_port(self.manifest, port_id)
         }
         report = {
             "schema_version": self.manifest["schema_version"],
@@ -798,6 +802,70 @@ class PortStatusTest(unittest.TestCase):
         )
         self.assertTrue(
             any("performance status is" in item for item in malformed), malformed)
+
+    def test_a_scoped_test_is_expected_only_where_it_applies(self):
+        # The windowed baselines are the reason scoping exists: a port with no
+        # windowing system is not asked for them at all, rather than reporting a row
+        # of skips the reader has to be told not to count.
+        desktop = port_status.tests_for_port(self.manifest, "linux-x64")
+        phone = port_status.tests_for_port(self.manifest, "android")
+        self.assertIn("WindowLayoutTest", desktop)
+        self.assertNotIn("WindowLayoutTest", phone)
+        # MultiWindowApiTest is not scoped: it asserts the contract everywhere,
+        # including that the API throws where windows are unsupported.
+        self.assertIn("MultiWindowApiTest", desktop)
+        self.assertIn("MultiWindowApiTest", phone)
+
+    def test_a_report_carrying_a_test_scoped_away_from_it_is_drift(self):
+        report = self.publishable_report("android")
+        report["tests"]["WindowLayoutTest"] = {
+            "status": "pass", "feature": "multi-window"}
+        report["summary"]["pass"] += 1
+        drift, malformed = port_status.publishable_report_problems(
+            self.manifest, "android", report)
+        self.assertEqual([], malformed)
+        self.assertTrue(
+            any("WindowLayoutTest" in item for item in drift), drift)
+
+    def test_a_report_missing_a_test_scoped_to_it_is_still_drift(self):
+        # Scoping must not become a way for a port to quietly stop reporting a test
+        # it is on the hook for.
+        report = self.publishable_report("linux-x64")
+        del report["tests"]["WindowLayoutTest"]
+        report["summary"]["pass"] -= 1
+        drift, malformed = port_status.publishable_report_problems(
+            self.manifest, "linux-x64", report)
+        self.assertEqual([], malformed)
+        self.assertTrue(
+            any("WindowLayoutTest" in item for item in drift), drift)
+
+    def test_a_test_scoped_to_an_unknown_port_is_rejected(self):
+        manifest = copy.deepcopy(self.manifest)
+        for feature in manifest["features"]:
+            if feature["id"] == "multi-window":
+                feature["tests"] = [
+                    {"test": "WindowLayoutTest", "ports": ["linux-x64", "no-such-port"]}
+                    if isinstance(entry, dict) and entry["test"] == "WindowLayoutTest"
+                    else entry
+                    for entry in feature["tests"]
+                ]
+        with self.assertRaises(port_status.ContractError) as caught:
+            port_status.validate(manifest)
+        self.assertIn("no-such-port", str(caught.exception))
+
+    def test_a_scoped_test_must_name_at_least_one_port(self):
+        manifest = copy.deepcopy(self.manifest)
+        for feature in manifest["features"]:
+            if feature["id"] == "multi-window":
+                feature["tests"] = [
+                    {"test": "WindowLayoutTest", "ports": []}
+                    if isinstance(entry, dict) and entry["test"] == "WindowLayoutTest"
+                    else entry
+                    for entry in feature["tests"]
+                ]
+        with self.assertRaises(port_status.ContractError) as caught:
+            port_status.validate(manifest)
+        self.assertIn("WindowLayoutTest", str(caught.exception))
 
     def test_publishable_matches_every_report_the_site_serves(self):
         for port in self.manifest["ports"]:

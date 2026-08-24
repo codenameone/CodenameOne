@@ -133,17 +133,14 @@ public abstract class WindowHostTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
         if (!Desktop.isSupported()) {
-            // Reported as SKIPPED, not as a pass. This platform has no windowing
-            // system and emits no golden, and a pass here would put a tick against
-            // multi-window on the public port status table for a port that cannot
-            // open a window at all.
-            // Named by test class, not by golden name: the skip marker is parsed
-            // with [A-Za-z0-9_]+, which the hyphenated screenshot names would not
-            // match, and an unmatched marker is silently dropped -- leaving the
-            // very pass this is here to avoid.
-            println("CN1SS:INFO:test=" + getClass().getName().substring(
-                    getClass().getName().lastIndexOf('.') + 1)
-                    + " status=SKIPPED reason=no-windowing-system");
+            // Nothing is reported here at all. The windowed baselines are scoped in
+            // port_status.json to the ports that have a windowing system, so this
+            // test is not part of the contract for the port running it now and the
+            // report will not carry a row for it either way. Reporting a skip would
+            // put a row on the public table inviting the reader to count a capability
+            // this port was never asked for as something it failed to do; reporting a
+            // pass would put a tick against multi-window on a port that cannot open a
+            // window at all.
             done();
             return true;
         }
