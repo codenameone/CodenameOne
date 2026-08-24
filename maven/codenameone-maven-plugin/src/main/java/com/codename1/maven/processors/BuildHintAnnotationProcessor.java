@@ -233,6 +233,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             return true;
         }
         String pkg = packageOf(cls.getBinaryName());
+        String simpleName = simpleNameOf(cls.getBinaryName());
         boolean sawARoot = false;
         for (String root : roots) {
             File dir = new File(root);
@@ -240,7 +241,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
-            if (declaresPackage(dir, sourceFile, pkg, 0)) {
+            if (declaresPackage(dir, sourceFile, pkg, simpleName, 0)) {
                 return true;
             }
         }
@@ -250,6 +251,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     private static String packageOf(String binaryName) {
         int dot = binaryName.lastIndexOf('.');
         return dot < 0 ? "" : binaryName.substring(0, dot);
+    }
+
+    private static String simpleNameOf(String binaryName) {
+        int dot = binaryName.lastIndexOf('.');
+        return dot < 0 ? binaryName : binaryName.substring(dot + 1);
     }
 
     /// Whether a file called `name` declaring package `pkg` exists under `dir`.
@@ -263,7 +269,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// The package is read from the file rather than inferred from its directory,
     /// because Kotlin does not require the two to agree. Depth-limited: this runs
     /// per annotated class and a source tree is not a search index.
-    private static boolean declaresPackage(File dir, String name, String pkg, int depth) {
+    private static boolean declaresPackage(File dir, String name, String pkg, String simple,
+                                           int depth) {
         if (depth > 24) {
             return false;
         }
@@ -273,46 +280,73 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for (File f : children) {
             if (f.isFile()) {
-                if (f.getName().equals(name) && pkg.equals(declaredPackage(f))) {
+                if (f.getName().equals(name) && matches(f, pkg, simple)) {
                     return true;
                 }
-            } else if (f.isDirectory() && declaresPackage(f, name, pkg, depth + 1)) {
+            } else if (f.isDirectory() && declaresPackage(f, name, pkg, simple, depth + 1)) {
                 return true;
             }
         }
         return false;
     }
 
-    /// The package a source file declares, or "" for the default package.
+    /// Whether `f` declares type `simple` in package `pkg`.
     ///
-    /// Read from the head of the file only -- a package declaration cannot appear
-    /// after the first type -- and "" on any read failure, which errs towards
-    /// treating the file as a match and so towards keeping a class.
-    private static String declaredPackage(File f) {
+    /// The declaration is checked, not just the file's name and package. Kotlin
+    /// lets a class be renamed without renaming its file, and one file can hold
+    /// several types, so the surviving source would otherwise answer for the
+    /// class that used to be in it -- keeping a stale annotation owner and
+    /// failing the placement check on every incremental build, which is the very
+    /// thing this guard was added to stop.
+    private static boolean matches(File f, String pkg, String simple) {
+        String text = readHead(f);
+        if (text == null) {
+            // Unreadable: answer yes, as everywhere else here, because the only
+            // thing this decides is whether to IGNORE an annotated class.
+            return true;
+        }
+        return pkg.equals(declaredPackageIn(text)) && declaresType(text, simple);
+    }
+
+    /// Whether `text` declares a type called `simple`.
+    static boolean declaresType(String text, String simple) {
+        String[] keywords = {"class ", "interface ", "enum ", "object ", "record "};
+        for (String keyword : keywords) {
+            int at = text.indexOf(keyword);
+            while (at >= 0) {
+                int start = at + keyword.length();
+                int end = start;
+                while (end < text.length()
+                        && Character.isJavaIdentifierPart(text.charAt(end))) {
+                    end++;
+                }
+                if (text.substring(start, end).equals(simple)
+                        && (at == 0 || !Character.isJavaIdentifierPart(text.charAt(at - 1)))) {
+                    return true;
+                }
+                at = text.indexOf(keyword, start);
+            }
+        }
+        return false;
+    }
+
+    /// The first 400 lines of `f`, or null when it cannot be read.
+    ///
+    /// Bounded because this runs per annotated class, and both the package
+    /// statement and the type declarations of interest are at the top.
+    private static String readHead(File f) {
         BufferedReader r = null;
         try {
             r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
             String line;
             int read = 0;
-            while ((line = r.readLine()) != null && read++ < 200) {
-                String t = line.trim();
-                if (!t.startsWith("package")) {
-                    continue;
-                }
-                String rest = t.substring("package".length());
-                if (rest.length() == 0 || Character.isJavaIdentifierPart(rest.charAt(0))) {
-                    continue;
-                }
-                rest = rest.trim();
-                int end = rest.indexOf(';');
-                if (end >= 0) {
-                    rest = rest.substring(0, end);
-                }
-                return rest.trim();
+            while ((line = r.readLine()) != null && read++ < 400) {
+                sb.append(line).append('\n');
             }
-            return "";
+            return sb.toString();
         } catch (IOException ex) {
-            return "";
+            return null;
         } finally {
             if (r != null) {
                 try {
@@ -322,6 +356,27 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 }
             }
         }
+    }
+
+    /// The package `text` declares, or "" for the default package.
+    static String declaredPackageIn(String text) {
+        for (String line : text.split("\n")) {
+            String t = line.trim();
+            if (!t.startsWith("package")) {
+                continue;
+            }
+            String rest = t.substring("package".length());
+            if (rest.length() == 0 || Character.isJavaIdentifierPart(rest.charAt(0))) {
+                continue;
+            }
+            rest = rest.trim();
+            int end = rest.indexOf(';');
+            if (end >= 0) {
+                rest = rest.substring(0, end);
+            }
+            return rest.trim();
+        }
+        return "";
     }
 
     /// Build hints configure the application, so they belong on the class the    /// Build hints configure the application, so they belong on the class the

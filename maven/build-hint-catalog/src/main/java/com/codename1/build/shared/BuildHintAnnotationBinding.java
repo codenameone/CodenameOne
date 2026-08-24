@@ -51,6 +51,8 @@ public final class BuildHintAnnotationBinding {
 
     static {
         DESCRIPTORS.put("IosPrivacy", "Lcom/codename1/annotations/buildhints/IosPrivacy;");
+        HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#bluetoothAlwaysUsageDescription", "ios.NSBluetoothAlwaysUsageDescription");
+        HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#bluetoothPeripheralUsageDescription", "ios.NSBluetoothPeripheralUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#calendarsFullAccessUsageDescription", "ios.NSCalendarsFullAccessUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#calendarsUsageDescription", "ios.NSCalendarsUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#calendarsWriteOnlyAccessUsageDescription", "ios.NSCalendarsWriteOnlyAccessUsageDescription");
@@ -64,6 +66,7 @@ public final class BuildHintAnnotationBinding {
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#microphoneUsageDescription", "ios.NSMicrophoneUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#remindersFullAccessUsageDescription", "ios.NSRemindersFullAccessUsageDescription");
         HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#remindersUsageDescription", "ios.NSRemindersUsageDescription");
+        HINTS.put("Lcom/codename1/annotations/buildhints/IosPrivacy;#speechRecognitionUsageDescription", "ios.NSSpeechRecognitionUsageDescription");
         DESCRIPTORS.put("Ios", "Lcom/codename1/annotations/buildhints/Ios;");
         HINTS.put("Lcom/codename1/annotations/buildhints/Ios;#addLibs", "ios.add_libs");
         HINTS.put("Lcom/codename1/annotations/buildhints/Ios;#applicationQueriesSchemes", "ios.applicationQueriesSchemes");

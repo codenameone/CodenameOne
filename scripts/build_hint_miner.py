@@ -57,6 +57,14 @@ METHOD_DECL = re.compile(
     r'[A-Za-z_][A-Za-z0-9_<>\[\], .?]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*'
     r'(?:throws [A-Za-z0-9_., ]+)?\{')
 
+# A local that is ASSEMBLED from a literal and then passed to an accessor:
+#   String requestKey = "ios." + privacyKey;
+#   request.getArg(requestKey, null)
+# The accessor's argument is a bare variable, so it reads as a forwarder, but the
+# name is built two lines up and no literal ever sits at a getArg call.
+LOCAL_ASSEMBLY = re.compile(
+    r'\b(?:String\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;\n]*"[^;\n]*)\s*;')
+
 FORWARDS = re.compile(r'\b(?:getArg|booleanArg)\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,'
                       r'|(?<![A-Za-z0-9_.])arg\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,')
 
@@ -188,6 +196,13 @@ for dirpath, _, files in os.walk(SRC):
         rel = os.path.relpath(path, ROOT)
         constants = {m.group(1): (read_literal(m.group(0), m.group(0).index('"') + 1)[0] or "")
                      for m in CONST_DECL.finditer(text)}
+        assembled = {}
+        for m in LOCAL_ASSEMBLY.finditer(text):
+            rhs = m.group(2).strip()
+            # Only an assembly, not a plain literal: a plain one is already mined
+            # wherever it reaches an accessor.
+            if '+' in rhs:
+                assembled[m.group(1)] = rhs
         for m in COMPUTED_OPENER.finditer(text):
             open_paren = text.rindex('(', m.start(), m.end())
             expr = first_argument(text, open_paren)
@@ -199,6 +214,10 @@ for dirpath, _, files in os.walk(SRC):
                 # Fully resolved -- an ordinary hint read that merely spelled its
                 # name with a constant.
                 hits[resolved].append(("<expr>", rel, line))
+            elif re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', expr) and expr in assembled:
+                # A bare variable, but one built from a literal in this file.
+                computed.append({"expr": " ".join(assembled[expr].split()),
+                                 "file": rel, "line": line})
             elif '"' in expr or '[' in expr:
                 # The name is BUILT here, or read out of a table -- either way no
                 # literal at a getArg call names it, so the literal pass cannot

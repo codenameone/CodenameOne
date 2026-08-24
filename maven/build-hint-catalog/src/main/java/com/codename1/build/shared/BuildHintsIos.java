@@ -76,11 +76,36 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
 
+        h.add(new Hint("ios.NSBluetoothAlwaysUsageDescription")
+                .annotatedAs(HintGroup.IOS_PRIVACY, "bluetoothAlwaysUsageDescription")
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Why the app uses Bluetooth. Supplied automatically when the app references "
+                        + "`com.codename1.bluetooth`; set it to say something more specific than "
+                        + "the default."));
+
+        h.add(new Hint("ios.NSBluetoothPeripheralUsageDescription")
+                .annotatedAs(HintGroup.IOS_PRIVACY, "bluetoothPeripheralUsageDescription")
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("The pre-iOS 13 spelling of the Bluetooth usage description, supplied and "
+                        + "overridable on the same terms."));
+
         h.add(new Hint("ios.NSCameraUsageDescription")
                 .annotatedAs(HintGroup.IOS_PRIVACY, "cameraUsageDescription")
                 .type(HintType.STRING)
                 .platform("ios")
                 .consumedBy("MacNativeBuilder"));
+
+        h.add(new Hint("ios.NSSpeechRecognitionUsageDescription")
+                .annotatedAs(HintGroup.IOS_PRIVACY, "speechRecognitionUsageDescription")
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("Why the app sends speech for recognition. Supplied automatically when the "
+                        + "app references the speech APIs; set it to say something more specific."));
 
         h.add(new Hint("ios.NSHealthShareUsageDescription")
                 .annotatedAs(HintGroup.IOS_PRIVACY, "healthShareUsageDescription")

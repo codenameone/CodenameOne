@@ -211,6 +211,39 @@ def main():
               file=sys.stderr)
         return 1
 
+    # The plist keys the platform feature catalog injects become ios.<key> build
+    # hints that an app may override. They reach getArg through a locally built
+    # name, so the computed-site accounting covers them -- but that accounting
+    # lists today's expansions, and a NEW entry there would change neither the
+    # expression nor the call count. This reads the other catalog directly, so
+    # adding a plist entry without a build hint row fails here instead.
+    #
+    # A CONCRETE row, not a dynamic pattern. ios.NS*UsageDescription exists so an
+    # app can set an arbitrary Apple key, and it was quietly absorbing these --
+    # which is why the gate reported success while ios.NSBluetoothAlwaysUsage-
+    # Description had no annotation, no doc row and no editor entry. A key WE
+    # inject is a known one, and known keys get described individually.
+    plist_src = os.path.join(
+        ROOT, "maven/platform-feature-catalog/src/main/java/com/codename1/build/shared",
+        "PlatformFeatureCatalog.java")
+    plist_bad = []
+    if os.path.exists(plist_src):
+        with open(plist_src, encoding="utf-8") as fh:
+            for m in re.finditer(r'\.iosPlist\(\s*"([^"\\]+)"', fh.read()):
+                name = "ios." + m.group(1)
+                if name in known:
+                    continue
+                plist_bad.append(name)
+    if plist_bad:
+        print("check-build-hint-catalog: the platform feature catalog injects plist entries the "
+              "build hint catalog does not describe:", file=sys.stderr)
+        for name in sorted(set(plist_bad)):
+            print(f"  {name}  injected by PlatformFeatureCatalog.iosPlist", file=sys.stderr)
+        print("\nAn app can override any of these with a build hint of that name, so each one "
+              "needs a catalog row like the other ios.NS*UsageDescription entries.",
+              file=sys.stderr)
+        return 1
+
     print(f"check-build-hint-catalog: {len(miner.hits)} hints read, all described by the "
           f"catalog; {len(declared)} computed site(s) accounted for"
           + (f" ({len(baseline)} baselined)" if baseline else ""))

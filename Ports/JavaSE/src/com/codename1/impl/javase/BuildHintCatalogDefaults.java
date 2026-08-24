@@ -45,6 +45,16 @@ final class BuildHintCatalogDefaults {
         java.util.Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();
 
         set("{{@IosPrivacy}}.label", "iOS Privacy Strings");
+        if (!handWritten.contains("ios.NSBluetoothAlwaysUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.label", "Bluetooth always usage description");
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.description", "Why the app uses Bluetooth. Supplied automatically when the app references `com.codename1.bluetooth`; set it to say something more specific than the default.");
+        }
+        if (!handWritten.contains("ios.NSBluetoothPeripheralUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.label", "Bluetooth peripheral usage description");
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.description", "The pre-iOS 13 spelling of the Bluetooth usage description, supplied and overridable on the same terms.");
+        }
         if (!handWritten.contains("ios.NSCalendarsFullAccessUsageDescription")) {
         set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.label", "Calendars full access usage description");
         set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.type", "TextField");
@@ -96,6 +106,11 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("ios.NSRemindersUsageDescription")) {
         set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.label", "Reminders usage description");
         set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.type", "TextField");
+        }
+        if (!handWritten.contains("ios.NSSpeechRecognitionUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.label", "Speech recognition usage description");
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.description", "Why the app sends speech for recognition. Supplied automatically when the app references the speech APIs; set it to say something more specific.");
         }
 
         set("{{@Ios}}.label", "iOS");

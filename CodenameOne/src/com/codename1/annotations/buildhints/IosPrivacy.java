@@ -43,6 +43,15 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface IosPrivacy {
 
+    /// Why the app uses Bluetooth. Supplied automatically when the app references
+    /// `com.codename1.bluetooth`; set it to say something more specific than the
+    /// default.
+    String bluetoothAlwaysUsageDescription() default "";
+
+    /// The pre-iOS 13 spelling of the Bluetooth usage description, supplied and
+    /// overridable on the same terms.
+    String bluetoothPeripheralUsageDescription() default "";
+
     /// The text iOS shows when the app first asks for the calendars full access. It
     /// becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`. The
     /// App Store rejects an app that touches this resource without one.
@@ -109,4 +118,8 @@ public @interface IosPrivacy {
     /// `NSRemindersUsageDescription` key in `Info.plist`. The App Store rejects an
     /// app that touches this resource without one.
     String remindersUsageDescription() default "";
+
+    /// Why the app sends speech for recognition. Supplied automatically when the
+    /// app references the speech APIs; set it to say something more specific.
+    String speechRecognitionUsageDescription() default "";
 }
