@@ -768,10 +768,24 @@ public class AndroidNearbyTransport implements NearbyBridge {
             public void onConnectionInitiated(String endpointId,
                     ConnectionInfo info) {
                 endpointNames.put(endpointId, info.getEndpointName());
-                // An endpoint that arrives here without having been
-                // discovered came in through advertising, so that is the
-                // service it belongs to.
-                if (!endpointServices.containsKey(endpointId)) {
+                // Which service this connection belongs to depends on who
+                // started it, and Nearby says which.
+                //
+                // INCOMING means the peer answered THIS advertisement, so
+                // the service is the one this callback was built for, even
+                // when discovery had already seen the same peer under
+                // another. Treating any existing mapping as authoritative
+                // labelled that connection -- and every lifecycle and
+                // payload event on it -- with the service it was discovered
+                // under rather than the one it was negotiated through, which
+                // in an app running two services routes it to the wrong
+                // protocol.
+                //
+                // OUTGOING keeps the mapping discovery recorded, because
+                // this callback carries the discoveryServiceId FIELD, which
+                // may have moved on since the endpoint was found.
+                if (info.isIncomingConnection()
+                        || !endpointServices.containsKey(endpointId)) {
                     endpointServices.put(endpointId, serviceId);
                 }
                 NearbyTransport.deliverConnectionRequested(
@@ -939,30 +953,46 @@ public class AndroidNearbyTransport implements NearbyBridge {
                                 != PayloadTransferUpdate.Status.SUCCESS) {
                     return;
                 }
-                String path = localPathFor(file);
-                if (path == null) {
-                    // A payload whose only accessor cannot be used is worse
-                    // than one that failed: getPath() is all a file Payload
-                    // offers, so delivering it with a null path told the app
-                    // the transfer succeeded and then gave it nothing to
-                    // read. Reported as a failure instead, which is a state
-                    // the API already documents.
-                    NearbyTransport.deliverPayloadProgress(
-                            encode(endpointId, nameOf(endpointId)),
-                            senderIdOf(file), 0, update.getTotalBytes(),
-                            PayloadStatus.FAILURE.ordinal());
-                    return;
-                }
-                // The terminal SUCCESS held back above, now that it is true.
-                NearbyTransport.deliverPayloadProgress(
-                        encode(endpointId, nameOf(endpointId)),
-                        senderIdOf(file), update.getBytesTransferred(),
-                        update.getTotalBytes(),
-                        PayloadStatus.SUCCESS.ordinal());
-                NearbyTransport.deliverPayloadReceived(
-                        encode(endpointId, nameOf(endpointId)),
-                        senderIdOf(file), NearbyBridge.PAYLOAD_FILE, null,
-                        "file://" + path);
+                // On a WORKER thread, because localPathFor copies the whole
+                // file when scoped storage gives only a content URI -- and
+                // Nearby delivers this callback on the main thread. A file
+                // payload is the one meant for large data, so copying it
+                // here froze the UI for as long as the copy took and put a
+                // big enough transfer within reach of an ANR.
+                //
+                // Everything the delivery needs is read out first: this
+                // callback's arguments do not outlive it.
+                final Payload received = file;
+                final String peer = encode(endpointId, nameOf(endpointId));
+                final int senderId = senderIdOf(file);
+                final long moved = update.getBytesTransferred();
+                final long total = update.getTotalBytes();
+                new Thread(new Runnable() {
+                    public void run() {
+                        String path = localPathFor(received);
+                        if (path == null) {
+                            // A payload whose only accessor cannot be used is
+                            // worse than one that failed: getPath() is all a
+                            // file Payload offers, so delivering it with a
+                            // null path told the app the transfer succeeded
+                            // and then gave it nothing to read. Reported as a
+                            // failure instead, which is a state the API
+                            // already documents.
+                            NearbyTransport.deliverPayloadProgress(peer,
+                                    senderId, 0, total,
+                                    PayloadStatus.FAILURE.ordinal());
+                            return;
+                        }
+                        // The terminal SUCCESS held back above, now that it
+                        // is true.
+                        NearbyTransport.deliverPayloadProgress(peer, senderId,
+                                moved, total,
+                                PayloadStatus.SUCCESS.ordinal());
+                        NearbyTransport.deliverPayloadReceived(peer, senderId,
+                                NearbyBridge.PAYLOAD_FILE, null,
+                                "file://" + path);
+                    }
+                }, "CN1 nearby file receive").start();
             }
         };
     }
