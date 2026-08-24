@@ -1375,9 +1375,23 @@ public class AndroidNearbyBackend implements NearbyBridge {
         return address == null ? null : address.toString();
     }
 
+    /// The association's id: the platform's, not its MAC address.
+    ///
+    /// AssociationInfo exists only from API 33, and from there every
+    /// association has an id of its own. The MAC does not: one device can
+    /// hold SEVERAL associations, and giving them all the address they share
+    /// meant getAssociations handed back duplicate ids, the newly created
+    /// association could not be told from the ones already held, and
+    /// disassociate removed whichever of them it met first.
+    ///
+    /// It also makes the API 36 presence calls work at all. They take an
+    /// association id and parse this string to get one, so an id that was a
+    /// MAC address threw every time and the whole path failed silently.
+    ///
+    /// Below 33 the address IS the id -- there is no AssociationInfo to take
+    /// one from -- and that half is unchanged.
     private static String idOf(AssociationInfo info) {
-        String mac = macOf(info);
-        return mac != null ? mac : Integer.toString(info.getId());
+        return Integer.toString(info.getId());
     }
 
     private static String encode(AssociationInfo info, boolean present) {

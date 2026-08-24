@@ -41,6 +41,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TvNativeBuilderNearbyTest {
 
+    /// The builder's own source, for a rule that lives inside a method with
+    /// no seam to call -- the same way the scanner parity tests do it.
+    private static String source() throws Exception {
+        java.io.File f = new java.io.File(
+                "src/main/java/com/codename1/builders/TvNativeBuilder.java");
+        assertTrue(f.exists(), "builder source must be readable: "
+                + f.getAbsolutePath());
+        return new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     private static String optionalFrameworks() throws Exception {
         Field f = TvNativeBuilder.class
                 .getDeclaredField("TV_OPTIONAL_FRAMEWORKS");
@@ -59,5 +70,26 @@ class TvNativeBuilderNearbyTest {
     void theFrameworkTvosShipsIsNotWeakLinked() throws Exception {
         String list = optionalFrameworks();
         assertFalse(list.contains("MultipeerConnectivity.framework"), list);
+    }
+
+    /**
+     * The tvOS plist carries the local-network keys the transport needs.
+     *
+     * <p>MultipeerConnectivity ships on tvOS and is deliberately linked for
+     * this slice, but tvOS 14 gates local-network discovery on the same two
+     * declarations iOS does -- and the tvOS plist is generated separately,
+     * carrying only bundle metadata, capabilities and fonts. So the
+     * framework was there, the native transport was compiled in, and the
+     * target could neither advertise nor browse.</p>
+     */
+    @Test
+    void theTvPlistCarriesTheLocalNetworkKeys() throws Exception {
+        String src = source();
+        assertTrue(src.contains("NSBonjourServices"),
+                "the tvOS plist has to declare the Bonjour services the"
+                + " iOS slice resolved");
+        assertTrue(src.contains("NSLocalNetworkUsageDescription"),
+                "and the usage description, without which tvOS 14 refuses"
+                + " the discovery outright");
     }
 }

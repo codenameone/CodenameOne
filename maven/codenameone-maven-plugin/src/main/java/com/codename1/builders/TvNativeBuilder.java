@@ -245,6 +245,36 @@ class TvNativeBuilder {
             }
             sb.append("    </array>\n");
         }
+        // The local-network keys the nearby transport needs, copied from what
+        // the iOS slice resolved.
+        //
+        // MultipeerConnectivity ships on tvOS and is deliberately linked for
+        // this slice, but tvOS 14 gates local-network discovery on the same
+        // two declarations iOS does -- and this plist is generated
+        // separately, carrying only bundle metadata, capabilities and fonts.
+        // So the framework was there, the native transport was compiled in,
+        // and the target could neither advertise nor browse.
+        //
+        // Keyed off the Bonjour services because that array is written only
+        // for a build that uses the transport; an app that declares none is
+        // not one, and gets neither key.
+        java.util.List<String> bonjour = WatchNativeBuilder
+                .injectedPlistStringArray(request, "NSBonjourServices");
+        if (!bonjour.isEmpty()) {
+            String why = request.getArg("ios.NSLocalNetworkUsageDescription",
+                    null);
+            if (why != null && why.trim().length() > 0) {
+                plistString(sb, "NSLocalNetworkUsageDescription",
+                        IPhoneBuilder.plistEscape(why));
+            }
+            sb.append("    <key>NSBonjourServices</key>\n    <array>\n");
+            for (String service : bonjour) {
+                sb.append("        <string>")
+                        .append(IPhoneBuilder.plistEscape(service))
+                        .append("</string>\n");
+            }
+            sb.append("    </array>\n");
+        }
         sb.append("</dict>\n</plist>\n");
         File plist = new File(appSrcDir, request.getMainClass() + "-TV-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));

@@ -207,7 +207,12 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         }
         android.net.MacAddress address = info.getDeviceMacAddress();
         String mac = address == null ? null : address.toString();
-        String id = mac != null ? mac : Integer.toString(info.getId());
+        // The platform's association id, which is what AndroidNearbyBackend
+        // encodes from API 33 up. One device can hold several associations
+        // and they all share its address, so the address cannot name one --
+        // and an id that did not match the backend's would have a presence
+        // event contradicting the association the app already holds.
+        String id = Integer.toString(info.getId());
         if (UNOBSERVED.contains(id)) {
             // The platform keeps watching until told otherwise, and it
             // outlives the process. An event for an association the app has
