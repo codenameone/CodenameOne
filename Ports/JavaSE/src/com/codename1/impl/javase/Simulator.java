@@ -477,6 +477,16 @@ public class Simulator {
      * yet -- the loader is built from {@code files} further down.</p>
      */
     private static void publishAnnotationBuildHints(File projectDir, String classPathStr) {
+        // A reload re-enters main() in the SAME JVM, so anything published last
+        // time is still set. Withdraw it before deciding anything: otherwise the
+        // "existing value wins" rule that protects -D also protects the previous
+        // build's annotation value, and an edited @Desktop(titleBar = ...) -- or
+        // a deleted annotation, which takes an early return below -- keeps
+        // showing the old setting until the process is restarted.
+        //
+        // Only what THIS method installed is withdrawn. A -D was never installed
+        // here, because a key already set is skipped, so it is never a candidate.
+        withdrawPublishedHints();
         if (projectDir == null) {
             return;
         }
@@ -559,6 +569,7 @@ public class Simulator {
             }
             if (System.getProperty(key) == null) {
                 System.setProperty(key, p.getProperty(key));
+                PUBLISHED_HINTS.add(key);
                 applied++;
             }
         }
@@ -568,6 +579,28 @@ public class Simulator {
     }
 
     /**
+     * Keys this class installed into the system properties, so a reload can take
+     * them back out.
+     *
+     * <p>Static because a reload re-enters {@code main} in the same JVM rather
+     * than starting a process.</p>
+     */
+    private static final java.util.Set<String> PUBLISHED_HINTS =
+            new java.util.HashSet<String>();
+
+    /** Removes what a previous launch published, leaving anything else alone. */
+    private static void withdrawPublishedHints() {
+        if (PUBLISHED_HINTS.isEmpty()) {
+            return;
+        }
+        for (String key : PUBLISHED_HINTS) {
+            System.clearProperty(key);
+        }
+        PUBLISHED_HINTS.clear();
+    }
+
+    /**
+     * The properties key that declares the same setting as {@code key} in the    /**
      * The properties key that declares the same setting as {@code key} in the
      * settings file, or null when the file declares none of its spellings.
      *
