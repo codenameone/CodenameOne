@@ -1,0 +1,10 @@
+package androidx.wear.tiles;
+import android.content.Context;
+import androidx.wear.protolayout.ResourceBuilders;
+import com.google.common.util.concurrent.ListenableFuture;
+public abstract class TileService extends Context {
+    protected abstract ListenableFuture<TileBuilders.Tile> onTileRequest(
+            RequestBuilders.TileRequest request);
+    protected abstract ListenableFuture<ResourceBuilders.Resources> onTileResourcesRequest(
+            RequestBuilders.ResourcesRequest request);
+}

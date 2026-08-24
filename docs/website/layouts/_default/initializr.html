@@ -226,12 +226,17 @@ body.cn1-initializr-page-body .main {
     });
 
     window.addEventListener("message", function (evt) {
-      if (evt.source !== frame.contentWindow || !evt.data || evt.data.type !== "cn1-initializr-ui-ready") {
+      if (evt.source !== frame.contentWindow || !evt.data) {
         return;
       }
-      window.requestAnimationFrame(function () {
-        hideLoader();
-      });
+      if (evt.data.type === "cn1-initializr-ui-ready") {
+        window.requestAnimationFrame(function () {
+          hideLoader();
+        });
+      } else if (evt.data.type === "cn1-initializr-project-downloaded" &&
+                 window.cn1CrispEvents && window.cn1CrispEvents.initializrProjectDownloaded) {
+        window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+      }
     });
   }
 })();

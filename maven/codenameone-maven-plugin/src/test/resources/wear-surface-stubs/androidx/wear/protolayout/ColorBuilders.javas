@@ -1,0 +1,5 @@
+package androidx.wear.protolayout;
+public final class ColorBuilders {
+    public static class ColorProp { }
+    public static ColorProp argb(int c) { return null; }
+}

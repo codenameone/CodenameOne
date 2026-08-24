@@ -24,9 +24,15 @@ package com.codename1.builders;
 
 import org.apache.tools.ant.BuildException;
 
+import com.codename1.util.IOSWidgetExtensionBuilder;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -57,10 +63,16 @@ import java.nio.charset.StandardCharsets;
 class WatchNativeBuilder {
     private final IPhoneBuilder owner;
 
-    // watchOS floor: single-target WKApplication apps, WidgetKit complications,
-    // and the SwiftUI onChange(of:) two-parameter API the generated
-    // CN1WatchRootView uses.
-    private static final String MIN_DEPLOYMENT_TARGET = "10.0";
+    /**
+     * watchOS floor for the watch APP: single-target WKApplication apps and the SwiftUI
+     * onChange(of:) two-parameter API the generated CN1WatchRootView uses.
+     *
+     * <p>Package-visible because the complication extension has to agree with it. WidgetKit
+     * itself goes back to watchOS 9 and the extension can build there, but it is embedded in
+     * this app -- so a watch that cannot install the app cannot show its complication either,
+     * and an extension advertising 9 while the host requires 10 is advertising nothing.</p>
+     */
+    static final String MIN_DEPLOYMENT_TARGET = "10.0";
 
     // Derived build state.
     private boolean enabled;
@@ -79,6 +91,17 @@ class WatchNativeBuilder {
     private boolean distinctWatchMain;
     // Explicit opt-in/out for HealthKit on the watch bundle.
     private String healthHint;
+    // The generated CN1WatchWidgets folder under dist/, or null when the app declares no watch
+    // complication. Set by IPhoneBuilder before applyXcodeSettings runs, because the extension
+    // is embedded in the WATCH app target and that target does not exist until this builder
+    // creates it -- which is why this cannot ride the ordinary app-extension path.
+    private File watchWidgetExtensionDir;
+    // The App Group the watch app and its extension share. Same identifier as the phone's; the
+    // container behind it is watch-local, which is what makes the watch publish for itself.
+    private String surfacesAppGroup;
+    // The extension's watchOS deployment target, so the plist can advertise the same floor the
+    // natives compare against.
+    private String surfacesMinOS;
     // watchNative.health.workoutProcessing, kept so the entitlement
     // decision can read it too -- a workout session is HealthKit.
     private String workoutProcessingHint;
@@ -188,6 +211,30 @@ class WatchNativeBuilder {
 
     boolean isEnabled() {
         return enabled;
+    }
+
+    /**
+     * Declares the generated watch widget extension so the Xcode script embeds it in the watch
+     * app.
+     *
+     * @param extensionDir the CN1WatchWidgets folder under dist/, or null for no complication
+     * @param appGroup the App Group shared by the watch app and its extension
+     * @param minOS the extension's watchOS deployment target
+     */
+    void setWidgetExtension(File extensionDir, String appGroup, String minOS) {
+        this.watchWidgetExtensionDir = extensionDir;
+        this.surfacesAppGroup = appGroup;
+        this.surfacesMinOS = minOS;
+    }
+
+    /** The App Group the watch bundle needs entitled, or null when it publishes no surfaces. */
+    String getSurfacesAppGroup() {
+        return surfacesAppGroup;
+    }
+
+    /** The extension's watchOS floor, advertised to the natives through the watch plist. */
+    String getSurfacesMinOS() {
+        return surfacesMinOS;
     }
 
     /**
@@ -583,11 +630,33 @@ class WatchNativeBuilder {
           .append("@main\n")
           .append("struct CN1WatchApp: App {\n")
           .append("    @WKApplicationDelegateAdaptor var delegate: CN1WatchAppDelegate\n")
-          .append("    var body: some Scene {\n")
-          .append("        WindowGroup { CN1WatchRootView() }\n")
-          .append("    }\n")
+          .append("    var body: some Scene {\n");
+        if (watchWidgetExtensionDir != null) {
+            // A complication tap launches the watch app with the widgetURL rather than handing it
+            // to a delegate -- there is no UIApplicationDelegate here at all -- so the scene is
+            // the only place it can be caught. Without this the tap opened the app and the action
+            // went nowhere. Surfaces.dispatchAction queues until the handler registers, which is
+            // what makes the cold-start case (the usual one for a complication) work.
+            sw.append("        WindowGroup {\n")
+              .append("            CN1WatchRootView()\n")
+              .append("                .onOpenURL { url in\n")
+              .append("                    cn1_watch_surface_url(url.absoluteString)\n")
+              .append("                }\n")
+              .append("        }\n");
+        } else {
+            sw.append("        WindowGroup { CN1WatchRootView() }\n");
+        }
+        sw.append("    }\n")
           .append("}\n\n")
           .append("final class CN1WatchAppDelegate: NSObject, WKApplicationDelegate {\n")
+          // BEFORE anything SwiftUI does, and deliberately not from initVM. A mirrored
+          // complication update wakes a terminated watch app in the background, where the root
+          // view is not guaranteed to appear -- so CN1WatchHost.startWithWidth() may never run,
+          // initVM with it, and the WCSession activation that lives there never happens. That is
+          // precisely the launch the mirror causes, so putting the activation anywhere the VM
+          // gates would leave it unreachable in its own use case. This delegate callback runs on
+          // every launch either way.
+          .append("    func applicationDidFinishLaunching() { cn1_watch_bootstrap_didFinishLaunching() }\n")
           .append("    func applicationDidBecomeActive() { CN1WatchHost.shared().applicationDidBecomeActive() }\n")
           .append("    func applicationWillResignActive() { CN1WatchHost.shared().applicationWillResignActive() }\n")
           // The active/resign pair only starts and stops the paint pump. These two carry the CN1
@@ -713,7 +782,19 @@ class WatchNativeBuilder {
           .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n")
           .append("extern void cn1_watch_runtime_didEnterBackground(void);\n")
           .append("extern void cn1_watch_runtime_willEnterForeground(void);\n\n")
-          .append("// App-specific entry: register natives + set the main class, init\n")
+          // Always defined, whatever this build carries, so the Swift delegate can call it
+          // unconditionally. Its body is what changes.
+          .append("// Called from the app delegate on EVERY launch, including a background wake\n")
+          .append("// that never shows the root view -- see the comment on the call site.\n");
+        if (watchWidgetExtensionDir != null) {
+            bs.append("extern void cn1_watch_activate_connectivity(void);\n")
+              .append("void cn1_watch_bootstrap_didFinishLaunching(void) {\n")
+              .append("    cn1_watch_activate_connectivity();\n")
+              .append("}\n\n");
+        } else {
+            bs.append("void cn1_watch_bootstrap_didFinishLaunching(void) { }\n\n");
+        }
+        bs.append("// App-specific entry: register natives + set the main class, init\n")
           .append("// Display (starts the EDT) and block this thread inside initVM.\n")
           .append("extern void ").append(mainStub)
           .append("_main___java_lang_String_1ARRAY(struct ThreadLocalData* threadStateData, JAVA_OBJECT arg);\n")
@@ -739,8 +820,22 @@ class WatchNativeBuilder {
                 bs.toString().getBytes(StandardCharsets.UTF_8));
 
         // 3) Bridging header.
+        StringBuilder bridging = new StringBuilder("#import \"CN1WatchHost.h\"\n");
+        // Always declared, because the generated delegate always calls it and the bootstrap
+        // always defines it. What differs is whether its body does anything.
+        bridging.append("\n// Launch hook: implemented in the generated CN1WatchBootstrap.m,\n")
+                .append("// called from CN1WatchAppDelegate.applicationDidFinishLaunching.\n")
+                .append("void cn1_watch_bootstrap_didFinishLaunching(void);\n");
+        if (watchWidgetExtensionDir != null) {
+            // The complication tap path. A plain C function rather than an Objective-C class, so
+            // Swift only sees it if it is declared in the bridging header -- and the SwiftUI
+            // scene's onOpenURL is the only place a watch app can catch that URL at all.
+            bridging.append("\n// Complication tap: implemented in IOSNative.m, called from the\n")
+                    .append("// generated CN1WatchApp scene's onOpenURL.\n")
+                    .append("void cn1_watch_surface_url(const char *url);\n");
+        }
         owner.createFile(new File(appSrcDir, mainClass + "-Watch-Bridging-Header.h"),
-                "#import \"CN1WatchHost.h\"\n".getBytes(StandardCharsets.UTF_8));
+                bridging.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -1368,6 +1463,42 @@ class WatchNativeBuilder {
                 : request.getArg("ios.bundleVersion", shortVersion(request)));
         // Modern single-target watch app marker.
         sb.append("    <key>WKApplication</key>\n    <true/>\n");
+        // Surfaces on the watch. Same keys, same meaning and the same reader as the phone's:
+        // the natives resolve the App Group container through the first and compare the running
+        // OS against the second. The floor differs, though -- the watch extension targets
+        // watchOS 10 where the phone's targets iOS 16.1 -- and the natives compare against the
+        // OS actually running, so leaving this to the iOS default would have every watch report
+        // no widget support.
+        if (surfacesAppGroup != null && surfacesAppGroup.length() > 0) {
+            plistString(sb, IOSWidgetExtensionBuilder.APP_GROUP_PLIST_KEY, surfacesAppGroup);
+            plistString(sb, "CN1SurfacesMinOS", surfacesMinOS == null
+                    ? IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET : surfacesMinOS);
+            // The complication tap's own scheme. A widget supplies a <scheme>:// widgetURL and
+            // the generated CN1WatchApp scene waits for it in onOpenURL -- but the watch is a
+            // separate bundle and inherits none of the phone's URL types, so without this
+            // declaration watchOS has nothing to route the URL to and the tap dispatches nothing.
+            //
+            // The scheme is this app's own, cn1surface.<bundle id>, and the bare cn1surface is
+            // deliberately NOT registered here. A URL scheme is a global claim, and the watch is
+            // where that mattered most: a complication tap is routed by the scheme and nothing
+            // else, so two Codename One apps on one watch both claiming the bare name meant a tap
+            // could open the other app. This registration is new, so nothing holds a watch link
+            // built with the old name and there is nothing to keep compatible.
+            // From the WATCH bundle id, which is what the watch extension was built with
+            // (setHostBundleId passes <package>.watchkitapp) and therefore what its widgetURL
+            // carries. Composing this from the phone's package instead would register a scheme
+            // nothing generates -- the plist would look right, the tap would route nowhere, and
+            // the only symptom would be a complication that does nothing when touched.
+            String scheme = IOSWidgetExtensionBuilder.surfaceScheme(bundleId);
+            sb.append("    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n")
+              .append("            <key>CFBundleURLName</key>\n")
+              .append("            <string>").append(escapeXml(request.getPackageName()))
+              .append(".cn1surface</string>\n")
+              .append("            <key>CFBundleURLSchemes</key>\n")
+              .append("            <array>\n                <string>")
+              .append(escapeXml(scheme)).append("</string>\n")
+              .append("            </array>\n        </dict>\n    </array>\n");
+        }
         if (isStandalone()) {
             // A standalone bundle must SAY it is watch-only, not merely omit the companion key.
             // Without WKWatchOnly the bundle is neither tied to a containing iOS app nor declared
@@ -1717,13 +1848,23 @@ class WatchNativeBuilder {
      */
     private void writeWatchEntitlements(BuildRequest request, File appSrcDir,
             boolean usesHealth) throws IOException {
-        if (!usesHealth) {
+        if (!watchNeedsEntitlements(usesHealth)) {
             return;
         }
         owner.createFile(new File(appSrcDir,
                 request.getMainClass() + "-Watch.entitlements"),
-                watchEntitlementsPlist(request, workoutProcessingHint)
-                        .getBytes(StandardCharsets.UTF_8));
+                watchEntitlementsPlist(request, workoutProcessingHint, usesHealth,
+                        surfacesAppGroup).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// Whether the watch bundle needs an entitlements file at all.
+    ///
+    /// It started as "does it use HealthKit", which was the only capability the watch did not
+    /// inherit from the phone. Publishing complications adds a second: the watch app and its
+    /// widget extension reach each other through an App Group, and the watch bundle is signed
+    /// with this file and nothing else.
+    private boolean watchNeedsEntitlements(boolean usesHealth) {
+        return usesHealth || (surfacesAppGroup != null && surfacesAppGroup.length() > 0);
     }
 
     /// Whether a HealthKit capability is asked for, in either spelling.
@@ -1752,12 +1893,43 @@ class WatchNativeBuilder {
     /// build time.
     static String watchEntitlementsPlist(BuildRequest request,
             String workoutProcessingHint) {
+        return watchEntitlementsPlist(request, workoutProcessingHint, true, null);
+    }
+
+    /// As above, but saying which capabilities the watch bundle actually needs.
+    ///
+    /// Both are opt-in and neither implies the other. HealthKit was the only capability the
+    /// watch did not inherit from the phone until complications arrived; publishing them adds
+    /// an App Group, and a watch app may want either, both or -- for the two-argument overload's
+    /// historical callers -- just the first.
+    ///
+    /// Granting one that is not used is not harmless: entitlement validation refuses a signature
+    /// carrying a capability the provisioning profile does not have, which is the same reason
+    /// background-delivery and recalibrate-estimates below are conditional rather than always on.
+    ///
+    /// The App Group id is the same string the phone uses. What differs is the container behind
+    /// it: on the watch it resolves to a watch-local directory the phone cannot see, which is
+    /// why the watch publishes its own timelines rather than reading the phone's.
+    ///
+    /// @param request the build
+    /// @param workoutProcessingHint the workout hint, which implies HealthKit
+    /// @param usesHealth whether to grant the HealthKit capability
+    /// @param appGroup the App Group to entitle, or null when the watch publishes no surfaces
+    /// @return the entitlements plist text
+    static String watchEntitlementsPlist(BuildRequest request,
+            String workoutProcessingHint, boolean usesHealth, String appGroup) {
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
           .append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" ")
           .append("\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
-          .append("<plist version=\"1.0\">\n<dict>\n")
-          .append("    <key>com.apple.developer.healthkit</key>\n")
+          .append("<plist version=\"1.0\">\n<dict>\n");
+        if (appGroup != null && appGroup.length() > 0) {
+            sb.append("    <key>com.apple.security.application-groups</key>\n")
+              .append("    <array>\n        <string>").append(escapeXml(appGroup))
+              .append("</string>\n    </array>\n");
+        }
+        if (usesHealth) {
+        sb.append("    <key>com.apple.developer.healthkit</key>\n")
           .append("    <true/>\n");
         // Background delivery only, not workout processing. A workout
         // keeps running through WKBackgroundModes=workout-processing in
@@ -1782,9 +1954,11 @@ class WatchNativeBuilder {
             sb.append("    <key>com.apple.developer.healthkit")
               .append(".recalibrate-estimates</key>\n    <true/>\n");
         }
+        }
         sb.append("</dict>\n</plist>\n");
         return sb.toString();
     }
+
 
     /**
      * The CODE_SIGN_ENTITLEMENTS setting for the watch target, or an empty
@@ -1801,7 +1975,7 @@ class WatchNativeBuilder {
         // description supplied through ios.plistInject produced a bundle that declared HealthKit
         // and was signed without the entitlement, so authorization failed on device.
         boolean phoneUsesHealth = owner.phoneUsesHealthData(request);
-        if (!watchUsesHealth(phoneUsesHealth)) {
+        if (!watchNeedsEntitlements(watchUsesHealth(phoneUsesHealth))) {
             return "";
         }
         return "  bs['CODE_SIGN_ENTITLEMENTS'] = '"
@@ -2034,8 +2208,21 @@ class WatchNativeBuilder {
                 // translated sources.
                 .append("watch_src = '").append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src'\n")
                 .append("entry_existing = watch_target.source_build_phase.files.to_a.map { |bf| bf.file_ref && bf.file_ref.path ? File.basename(bf.file_ref.path) : nil }\n")
-                .append("%w[CN1WatchApp.swift CN1WatchBootstrap.m].each do |name|\n")
+                .append("%w[CN1WatchApp.swift CN1WatchBootstrap.m")
+                // The app-side surfaces glue, when the app publishes complications. IOSNative
+                // reaches CN1SurfaceBridge through NSClassFromString and CN1SurfaceConfig
+                // supplies the App Group constant, so without both on the watch target every
+                // surfaces native finds no bridge and answers unsupported.
+                //
+                // It only needs saying for the watch's OWN translation: the shared-translation
+                // branch above copies the app target's compile sources, which the schemes script
+                // has already swept these into. The de-dupe by basename keeps that case correct.
+                .append(watchWidgetExtensionDir == null
+                        ? "" : " CN1SurfaceBridge.swift CN1SurfaceConfig.swift")
+                .append("].each do |name|\n")
                 .append("  next if entry_existing.include?(name)\n")
+                .append("  path = File.join(File.dirname(project_file), watch_src, name)\n")
+                .append("  next unless File.exist?(path)\n")
                 .append("  ref = xcproj.main_group.new_reference(watch_src + '/' + name)\n")
                 .append("  watch_target.source_build_phase.add_file_reference(ref)\n")
                 .append("end\n")
@@ -2127,6 +2314,8 @@ class WatchNativeBuilder {
             s.append("  bs['DEVELOPMENT_TEAM'] = '").append(resolvedTeamId).append("'\n");
         }
         s.append("end\n");
+
+        appendWidgetExtension(s, tmpFile, resolvedTeamId);
 
         // The generated phone Stub (translated <MainClass>) defines the C
         // `int main()` (the iOS entry). The watch app is SwiftUI-rooted
@@ -3237,4 +3426,111 @@ class WatchNativeBuilder {
         }
         return s.toString();
     }
+
+    /**
+     * Creates the watchOS widget-extension target and embeds it in the WATCH app.
+     *
+     * <p>A complication is a WidgetKit widget, so this is the same shape as the iOS extension
+     * {@code IPhoneBuilder.appendWidgetExtensionRuby} builds -- an app extension in the host's
+     * {@code PlugIns/} folder -- with the watch app as the host instead of the phone app.</p>
+     *
+     * <p><b>Both distributions fall out of that choice.</b> Because the extension lives inside
+     * the watch app rather than beside it, the companion case needs nothing extra: the iOS
+     * app's "Embed Watch Content" phase copies the finished watch app with the .appex already
+     * in it, and the platform filter that keeps the watch tree out of the Mac Catalyst slice
+     * covers the extension for free. A standalone build removes that phase entirely and the
+     * extension simply rides in the product. There is no branch here for either.</p>
+     *
+     * <p>The target type is {@code :app_extension}, not {@code :watch2_extension}. The latter
+     * is the legacy paired WatchKit app extension -- the same trap as {@code :application} vs
+     * {@code :watch2_app} above -- while a WidgetKit extension is a plain app extension on
+     * every platform Apple ships it on.</p>
+     */
+    private void appendWidgetExtension(StringBuilder s, File tmpFile, String resolvedTeamId) {
+        if (watchWidgetExtensionDir == null || !watchWidgetExtensionDir.isDirectory()) {
+            return;
+        }
+        String extensionName = watchWidgetExtensionDir.getName();
+        File distDir = new File(tmpFile, "dist");
+        Map<String, String> buildSettings = new LinkedHashMap<String, String>();
+        buildSettings.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        // The watch app is one bundle deeper than a phone app, and its PlugIns one deeper
+        // still, so the runpath needs the extra level the phone extension does not.
+        buildSettings.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks "
+                + "@executable_path/../../Frameworks @executable_path/../../../../Frameworks");
+        buildSettings.put("CLANG_ENABLE_MODULES", "YES");
+        File props = new File(watchWidgetExtensionDir, "buildSettings.properties");
+        if (props.exists()) {
+            Properties loaded = new Properties();
+            FileInputStream in = null;
+            try {
+                in = new FileInputStream(props);
+                loaded.load(in);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to read " + props, ex);
+            } finally {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (IOException ignore) {
+                        // Nothing useful to do; the properties are already loaded or the read
+                        // failed above.
+                    }
+                }
+            }
+            for (Object key : loaded.keySet()) {
+                if (key instanceof String) {
+                    buildSettings.put((String) key, loaded.getProperty((String) key));
+                }
+            }
+            // Loaded, so it must not also be added to the Xcode group as a resource.
+            props.delete();
+        }
+        if (resolvedTeamId != null && !resolvedTeamId.isEmpty()) {
+            buildSettings.put("DEVELOPMENT_TEAM", resolvedTeamId);
+        }
+        String target = buildSettings.get("WATCHOS_DEPLOYMENT_TARGET");
+        if (target == null || target.length() == 0) {
+            target = IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET;
+        }
+
+        // Guarded so re-running the script (the build re-executes the schemes ruby after
+        // dependency integration) does not duplicate the target.
+        s.append("\nif xcproj.targets.find{|e| e.name=='")
+                .append(IPhoneBuilder.escapeRubyStr(extensionName)).append("'}.nil?\n");
+        s.append("  ext_target = xcproj.new_target(:app_extension, '")
+                .append(IPhoneBuilder.escapeRubyStr(extensionName)).append("', :watchos, '")
+                .append(IPhoneBuilder.escapeRubyStr(target)).append("')\n");
+        s.append("  ext_group = xcproj.new_group('")
+                .append(IPhoneBuilder.escapeRubyStr(extensionName)).append("')\n");
+        IPhoneBuilder.appendFilesToXcodeProjGroup(s, watchWidgetExtensionDir,
+                "ext_group", "ext_target", distDir);
+        s.append("  watch_target.add_dependency(ext_target)\n");
+        s.append("  ext_ref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('")
+                .append(IPhoneBuilder.escapeRubyStr(extensionName))
+                .append(".appex', \"BUILT_PRODUCTS_DIR\")\n");
+        // "Embed Foundation Extensions" is what Xcode calls this phase on watchOS; the
+        // destination is the same PlugIns folder (spec 13) the phone extension uses.
+        s.append("  ext_embed = watch_target.copy_files_build_phases"
+                + ".find{|p| p.name=='Embed Foundation Extensions'} || "
+                + "watch_target.new_copy_files_build_phase('Embed Foundation Extensions')\n");
+        s.append("  ext_embed.build_action_mask = \"2147483647\"\n");
+        s.append("  ext_embed.dst_subfolder_spec = \"13\"\n");
+        s.append("  ext_embed.run_only_for_deployment_postprocessing = \"0\"\n");
+        s.append("  ext_embed.add_file_reference(ext_ref)\n");
+        s.append("  ext_target.build_configurations.each{|e|\n");
+        for (Map.Entry<String, String> e : buildSettings.entrySet()) {
+            // SINGLE-quoted on both sides. escapeRubyStr escapes a backslash and a single quote,
+            // which is exactly a single-quoted Ruby literal's alphabet -- and a double-quoted one
+            // needs more than that: a provisioning profile named Acme "Watch" closed the literal
+            // and made the generated project script fail to parse, and a name containing #{ would
+            // have been interpolated. Single quotes need neither escape.
+            s.append("    e.build_settings['").append(IPhoneBuilder.escapeRubyStr(e.getKey()))
+                    .append("'] = '").append(IPhoneBuilder.escapeRubyStr(e.getValue()))
+                    .append("'\n");
+        }
+        s.append("  }\n");
+        s.append("end\n");
+    }
+
 }

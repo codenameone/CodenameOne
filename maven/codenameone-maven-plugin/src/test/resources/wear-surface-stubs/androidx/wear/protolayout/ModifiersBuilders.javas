@@ -1,0 +1,40 @@
+package androidx.wear.protolayout;
+public final class ModifiersBuilders {
+    public static class Padding {
+        public static class Builder {
+            public Builder setStart(DimensionBuilders.DpProp d) { return this; }
+            public Builder setEnd(DimensionBuilders.DpProp d) { return this; }
+            public Builder setTop(DimensionBuilders.DpProp d) { return this; }
+            public Builder setBottom(DimensionBuilders.DpProp d) { return this; }
+            public Padding build() { return null; }
+        }
+    }
+    public static class Corner {
+        public static class Builder {
+            public Builder setRadius(DimensionBuilders.DpProp d) { return this; }
+            public Corner build() { return null; }
+        }
+    }
+    public static class Background {
+        public static class Builder {
+            public Builder setColor(ColorBuilders.ColorProp c) { return this; }
+            public Builder setCorner(Corner c) { return this; }
+            public Background build() { return null; }
+        }
+    }
+    public static class Clickable {
+        public static class Builder {
+            public Builder setId(String id) { return this; }
+            public Builder setOnClick(ActionBuilders.Action a) { return this; }
+            public Clickable build() { return null; }
+        }
+    }
+    public static class Modifiers {
+        public static class Builder {
+            public Builder setPadding(Padding p) { return this; }
+            public Builder setBackground(Background b) { return this; }
+            public Builder setClickable(Clickable c) { return this; }
+            public Modifiers build() { return null; }
+        }
+    }
+}

@@ -1202,6 +1202,28 @@ public final class IOSNative {
      */
     native void surfacesEndActivity(String activityId, String finalStateJson, boolean dismissImmediately);
 
+    /**
+     * Mirrors a published timeline to the paired watch, when the kind declares a complication
+     * family and this build has a watch app to receive it.
+     *
+     * <p>An App Group container is device-local -- the watch resolves the same identifier to a
+     * directory of its own -- so a phone-side publish is invisible to a complication until it
+     * travels. This is that transport. It is budgeted and best-effort by nature: the native
+     * degrades through progressively weaker delivery and finally to nothing, logging once at
+     * each step, because a failed mirror must never break the publish that already succeeded
+     * locally.</p>
+     *
+     * <p>A no-op on a build with no watch app, on a kind with no watch family, and on the watch
+     * itself -- where the app's own publish is authoritative and mirroring back would loop.</p>
+     *
+     * @param kindId the widget kind
+     * @param timelineJson the serialized timeline
+     * @param imageNames names of the images the timeline references, may be empty
+     * @param imageBlobs the corresponding PNG bytes, parallel to imageNames
+     */
+    native void surfacesMirrorToWatch(String kindId, String timelineJson,
+            String[] imageNames, byte[][] imageBlobs);
+
     /** True when this build/device can render WidgetKit widgets (iOS 14+, app group resolvable). */
     native boolean surfacesWidgetsSupported();
 

@@ -1,0 +1,5 @@
+package androidx.wear.watchface.complications.datasource;
+import androidx.wear.watchface.complications.data.ComplicationData;
+public final class TimelineEntry {
+    public TimelineEntry(TimeInterval validity, ComplicationData data) { }
+}

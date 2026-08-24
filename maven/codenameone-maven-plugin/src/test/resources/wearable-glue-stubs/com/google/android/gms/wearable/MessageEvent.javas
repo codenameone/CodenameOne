@@ -1,0 +1,13 @@
+package com.google.android.gms.wearable;
+/**
+ * Deliberately NOT Freezable, which is what the real interface says.
+ *
+ * <p>DataEvent below extends Freezable and this does not. Handing MessageEvent a freeze() it
+ * does not have is exactly the mistake this stub tree exists to catch.</p>
+ */
+public interface MessageEvent {
+    int getRequestId();
+    String getPath();
+    String getSourceNodeId();
+    byte[] getData();
+}

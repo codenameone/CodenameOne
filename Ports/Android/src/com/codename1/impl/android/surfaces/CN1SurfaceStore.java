@@ -85,7 +85,31 @@ public final class CN1SurfaceStore {
         deleteUnreferencedImages(dir, timelineJson);
     }
 
-    private static void deleteUnreferencedImages(File dir, String timelineJson) {
+    /// Deletes image blobs a timeline no longer references. The document's `images` list is
+    /// the complete reference set, and blob names are content hashes, so a changed image would
+    /// otherwise leave its predecessor behind for ever.
+    ///
+    /// Package-private rather than private because the mirror receiver persists a timeline that
+    /// arrived over the Data Layer rather than one this process published, and needs the same
+    /// collection afterwards.
+    static void deleteUnreferencedImages(File dir, String timelineJson) {
+        deleteUnreferencedImages(dir, timelineJson, 0L);
+    }
+
+    /// The same collection, but sparing blobs written within `graceMillis`.
+    ///
+    /// The mirror needs this because on the watch the two halves of a publication arrive by
+    /// different routes: the descriptor is a Data Layer item, which COLLAPSES to the newest value
+    /// when delivery is delayed, while each image is a separate transfer with its own sequence
+    /// and none of them collapse. So after a disconnection the watch can receive one descriptor
+    /// and then every missed publication's artwork behind it -- and an unreferenced blob there is
+    /// ambiguous: it is either art from a superseded publish, or art for a descriptor that has
+    /// not landed yet. The grace tells them apart by age, since art still waiting for its
+    /// descriptor is seconds old and art from a superseded publish is not.
+    ///
+    /// A zero grace is the ordinary publish path, where the descriptor is written first and the
+    /// reference set is authoritative immediately.
+    static void deleteUnreferencedImages(File dir, String timelineJson, long graceMillis) {
         try {
             org.json.JSONObject doc = new org.json.JSONObject(timelineJson);
             org.json.JSONArray names = doc.optJSONArray("images");
@@ -99,10 +123,12 @@ public final class CN1SurfaceStore {
             if (files == null) {
                 return;
             }
+            long spareAfter = System.currentTimeMillis() - graceMillis;
             for (File f : files) {
                 String name = f.getName();
                 if (name.endsWith(".png")
-                        && !referenced.contains(name.substring(0, name.length() - 4))) {
+                        && !referenced.contains(name.substring(0, name.length() - 4))
+                        && (graceMillis <= 0 || f.lastModified() < spareAfter)) {
                     delete(f);
                 }
             }
