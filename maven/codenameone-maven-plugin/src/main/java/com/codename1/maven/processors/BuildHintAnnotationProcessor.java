@@ -644,20 +644,32 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                     out[i++] = ' ';
                 }
             } else if (c == '/' && i + 1 < out.length && out[i + 1] == '*') {
-                out[i++] = ' ';
-                out[i++] = ' ';
-                while (i < out.length && !(out[i] == '*' && i + 1 < out.length
-                        && out[i + 1] == '/')) {
+                // Kotlin block comments NEST; Java's do not. Stopping at the
+                // first */ in Kotlin ends the comment early, and the text after
+                // it -- `package old.name */` in a commented-out block -- is then
+                // read as live code, so a class looks like it belongs elsewhere
+                // and a live annotated one is dropped as an orphan.
+                int depth = 0;
+                while (i < out.length) {
+                    if (out[i] == '/' && i + 1 < out.length && out[i + 1] == '*') {
+                        depth++;
+                        out[i++] = ' ';
+                        out[i++] = ' ';
+                        continue;
+                    }
+                    if (out[i] == '*' && i + 1 < out.length && out[i + 1] == '/') {
+                        depth--;
+                        out[i++] = ' ';
+                        out[i++] = ' ';
+                        if (depth == 0 || !kotlin) {
+                            break;
+                        }
+                        continue;
+                    }
                     if (out[i] != '\n') {
                         out[i] = ' ';
                     }
                     i++;
-                }
-                if (i < out.length) {
-                    out[i++] = ' ';
-                }
-                if (i < out.length) {
-                    out[i++] = ' ';
                 }
             } else if (c == '\'') {
                 // A char literal. '{' is legal and would otherwise be counted as

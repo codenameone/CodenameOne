@@ -605,6 +605,19 @@ public class BuildHintAnnotationProcessorTest {
                 "package com . example . deep ;\n", false));
     }
 
+    /// Kotlin block comments NEST; Java's do not. Stopping at the first `*/` in
+    /// Kotlin ended the comment early, so a commented-out package declaration was
+    /// read as live code and a class looked like it belonged elsewhere.
+    @Test
+    public void aNestedKotlinBlockCommentStaysClosed() {
+        String kt = "/* docs /* sample */ package old.name */\n"
+                + "package com.example\nclass MyApp\n";
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(kt, true));
+        // Java does not nest, so there the inner `*/` really does close it and
+        // `package old.name` is what follows.
+        assertEquals("old.name", BuildHintAnnotationProcessor.declaredPackageIn(kt, false));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------

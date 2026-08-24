@@ -2542,6 +2542,30 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// The index just past the dotted name starting at or after `from`, or
+    /// `from` when there is none. The same walk as `qualifiedNameAt`, so the two
+    /// cannot disagree about where a name ends.
+    static int qualifiedNameEnd(String source, int from, boolean kotlin) {
+        int i = nextLiveChar(source, from, kotlin);
+        int end = from;
+        while (i >= 0 && i < source.length()) {
+            int stop = i;
+            while (stop < source.length() && continuesAName(source.charAt(stop))) {
+                stop++;
+            }
+            if (stop == i) {
+                return end;
+            }
+            end = stop;
+            int dot = nextLiveChar(source, stop, kotlin);
+            if (dot < 0 || source.charAt(dot) != '.') {
+                return end;
+            }
+            i = nextLiveChar(source, dot + 1, kotlin);
+        }
+        return end;
+    }
+
     /// The dotted name starting at or after `from`, stepping over whitespace and
     /// comments around each dot.
     static String qualifiedNameAt(String source, int from, boolean kotlin) {
@@ -2722,52 +2746,34 @@ public class CodenameOneSettings extends Lifecycle {
             // processor never emits, which is indistinguishable from the tool
             // being broken.
             boolean imported = importsAnnotation(source, simple, kotlin);
-            java.util.List<String> markerList = new java.util.ArrayList<String>();
-            if (imported) {
-                markerList.add("@" + simple);
-            }
-            markerList.add("@com.codename1.annotations.buildhints." + simple);
-            if (alias != null) {
-                markerList.add("@" + alias);
-            }
-            String[] markers = markerList.toArray(new String[markerList.size()]);
+            String qualified = "com.codename1.annotations.buildhints." + simple;
+
+            // Every `@` that is real code, with the name after it read component
+            // by component. Matching literal strings could not see
+            // `@com.codename1.annotations. /* generated */ buildhints.Ios`, which
+            // is legal -- ownership then read as empty and Add wrote the
+            // duplicate.
+            int at = nextMarker(source, "@", 0, kotlin);
             boolean found = false;
-            for (int m = 0; m < markers.length && !found; m++) {
-                // Found by walking the source rather than by indexOf, so a
-                // commented-out annotation or one quoted in a string is not read
-                // as live code. That mattered in the direction nobody would
-                // notice: a `// @Ios(teamId = "old")` left behind made Settings
-                // treat the hint as annotation-owned and withhold Add and the
-                // editor, for a hint the processor never emits.
-                int at = nextMarker(source, markers[m], 0, kotlin);
-                while (at >= 0) {
-                    // "@Ios" must not match "@IosPrivacy": the next character has
-                    // to end the name.
-                    int after = at + markers[m].length();
-                    if (after < source.length() && continuesAName(source.charAt(after))) {
-                        at = nextMarker(source, markers[m], after, kotlin);
-                        continue;
-                    }
-                    // The annotation's OWN argument list, not the next one in
-                    // the file. Parentheses are optional -- a bare `@Ios` is
-                    // legal -- and searching forward then adopted whatever call
-                    // came next, so `@Ios` above a `configure(teamId = "...")`
-                    // read as owning ios.teamId and Settings withheld controls
-                    // for a hint the processor never emits.
+            while (at >= 0 && !found) {
+                String name = qualifiedNameAt(source, at + 1, kotlin);
+                int after = qualifiedNameEnd(source, at + 1, kotlin);
+                boolean ours = (imported && name.equals(simple))
+                        || name.equals(qualified)
+                        || (alias != null && name.equals(alias));
+                if (ours) {
                     int open = nextLiveChar(source, after, kotlin);
-                    if (open < 0 || source.charAt(open) != '(') {
-                        at = nextMarker(source, markers[m], after, kotlin);
-                        continue;
+                    if (open >= 0 && source.charAt(open) == '(') {
+                        String args = balancedArgs(source, open, kotlin);
+                        if (args != null && declaresAttribute(args, h.attr(), kotlin)) {
+                            out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
+                                    "@" + simple + "(" + h.attr() + ")");
+                            found = true;
+                            break;
+                        }
                     }
-                    String args = balancedArgs(source, open, kotlin);
-                    if (args != null && declaresAttribute(args, h.attr(), kotlin)) {
-                        out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
-                                "@" + simple + "(" + h.attr() + ")");
-                        found = true;
-                        break;
-                    }
-                    at = nextMarker(source, markers[m], after, kotlin);
                 }
+                at = nextMarker(source, "@", at + 1, kotlin);
             }
         }
     }
@@ -2969,8 +2975,32 @@ public class CodenameOneSettings extends Lifecycle {
                 return nl < 0 ? s.length() : nl;
             }
             if (n == '*') {
-                int close = s.indexOf("*/", i + 2);
-                return close < 0 ? s.length() : close + 2;
+                // Kotlin block comments NEST; Java's do not. Stopping at the
+                // first */ in Kotlin ends the comment early and the rest of it is
+                // then read as live code.
+                if (!kotlin) {
+                    int close = s.indexOf("*/", i + 2);
+                    return close < 0 ? s.length() : close + 2;
+                }
+                int depth = 0;
+                int j = i;
+                while (j < s.length()) {
+                    if (s.charAt(j) == '/' && j + 1 < s.length() && s.charAt(j + 1) == '*') {
+                        depth++;
+                        j += 2;
+                        continue;
+                    }
+                    if (s.charAt(j) == '*' && j + 1 < s.length() && s.charAt(j + 1) == '/') {
+                        depth--;
+                        j += 2;
+                        if (depth == 0) {
+                            return j;
+                        }
+                        continue;
+                    }
+                    j++;
+                }
+                return s.length();
             }
         }
         return i;

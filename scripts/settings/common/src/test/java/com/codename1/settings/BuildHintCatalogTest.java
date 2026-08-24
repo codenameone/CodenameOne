@@ -825,4 +825,44 @@ public class BuildHintCatalogTest {
         assertFalse(CodenameOneSettings.declaresClass(
                 "package com . other;\npublic class MyApp {}\n", "MyApp", "com.example", false));
     }
+
+    /// A fully qualified annotation may carry separators between components, and
+    /// matching a contiguous literal could not see it -- ownership read as empty
+    /// and Add wrote the duplicate.
+    @Test
+    public void aQualifiedAnnotationMaySpanSeparators() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations. /* generated */ buildhints.Ios(teamId = \"X\")\n"
+                        + "public class MyApp {}\n", out, false);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations\n    .buildhints\n    .Ios(teamId = \"X\")\n"
+                        + "class MyApp\n", out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// Another library's qualified annotation of the same simple name is not ours
+    /// however it is spaced.
+    @Test
+    public void aQualifiedForeignAnnotationIsStillNotOurs() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.example . other . Ios(teamId = \"X\")\npublic class MyApp {}\n",
+                out, false);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Kotlin block comments NEST. Stopping at the first `*/` ended the comment
+    /// early, so a commented-out package declaration was read as live code.
+    @Test
+    public void aNestedKotlinBlockCommentStaysClosed() {
+        String kt = "/* docs /* sample */ package old.name */\n"
+                + "package com.example\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example", true));
+        // Java does not nest, so the same text really does end at the inner `*/`.
+        assertFalse(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example", false));
+    }
 }
