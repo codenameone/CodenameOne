@@ -11416,37 +11416,6 @@ public class IPhoneBuilder extends Executor {
         return range == null ? "" : plist.substring(range[0], range[1]);
     }
 
-    /// Whether a plist fragment sets the given key to `<true/>`.
-    ///
-    /// Deliberately not a plist parse. This is a fragment the application supplied, its
-    /// shape is not ours, and the question is narrow: does this one key say true. The
-    /// value of a key is the element that follows it, so this looks at that element and
-    /// nothing else. Anything unrecognised answers false, which is the safe direction --
-    /// the build stops and says what is missing rather than producing a bundle whose
-    /// windows silently never work.
-    ///
-    /// #### Parameters
-    ///
-    /// - `plist`: the injected plist fragment
-    ///
-    /// - `key`: the key to look for
-    ///
-    /// #### Returns
-    ///
-    /// true if the key is present and its value is `<true/>`
-    static boolean plistKeyIsTrue(String plist, String key) {
-        int at = plistKeyIndex(plist, key);
-        if (at < 0) {
-            return false;
-        }
-        // The value of a key is the element that follows it, so read that element's
-        // name rather than matching a spelling. "<true/>" and "<true />" and
-        // "<true></true>" are the same element, and rejecting the ones with a space in
-        // them would fail a build over valid XML -- worse than the misconfiguration
-        // this check exists to catch, because it stops a build that would have worked.
-        return "true".equals(nextElementName(plist, plistKeyEnd(plist, at)));
-    }
-
     /// Whether the fragment actually declares the given key.
     ///
     /// The rest of this method tests the injected plist with plain `contains`, which is
@@ -12127,33 +12096,6 @@ public class IPhoneBuilder extends Executor {
         return members;
     }
 
-    static boolean plistWiresWindowSceneDelegate(String plist) {
-        int role = plistKeyIndex(plist, "UIWindowSceneSessionRoleApplication");
-        if (role < 0) {
-            return false;
-        }
-        int afterKey = plistKeyEnd(plist, role);
-        // Bounded by this role's own value element, so a CarPlay configuration cannot
-        // answer for it and nothing declared inside the role can end it early.
-        int end = plistValueElementEnd(plist, afterKey);
-        if (end < 0) {
-            end = plist.length();
-        }
-        // Bound to its key rather than found anywhere in the role. The class name can
-        // appear as some other live value -- a UISceneConfigurationName of
-        // "CodenameOne_GLSceneDelegate" is legal -- while UISceneDelegateClassName
-        // names somebody else, and a manifest like that cannot adopt a window.
-        int at = plistKeyIndex(plist, "UISceneDelegateClassName", afterKey);
-        while (at >= 0 && at < end) {
-            if ("CodenameOne_GLSceneDelegate".equals(
-                    plistStringValueAfter(plist, plistKeyEnd(plist, at)))) {
-                return true;
-            }
-            at = plistKeyIndex(plist, "UISceneDelegateClassName", plistKeyEnd(plist, at));
-        }
-        return false;
-    }
-
     /// Index just past the element that is the value at `from`, honouring nesting, or
     /// -1 when there is no element there.
     ///
@@ -12315,9 +12257,9 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         // Structural, like every other closing tag this parser reads. "</string >" ends
-        // a string just as "</string>" does, and matching the literal made
-        // plistWiresWindowSceneDelegate report the delegate missing and abort a build
-        // that was correctly configured.
+        // a string just as "</string>" does, and matching the literal made the window
+        // role check report the delegate missing and abort a build that was correctly
+        // configured.
         int close = plistCloseElementIndex(plist, "string", open);
         if (close < 0) {
             return null;

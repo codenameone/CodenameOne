@@ -104,7 +104,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist),
                 "a key nested in another dictionary is not a member of the manifest");
         // And this is exactly what the unscoped question would have answered.
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+        assertTrue(keyIsTrueAnywhere(
                         IPhoneBuilder.plistManifestScope(plist),
                         "UIApplicationSupportsMultipleScenes"),
                 "the search-anywhere question is what accepted it");
@@ -122,7 +122,7 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "    <key>UISceneConfigurations</key>\n    <dict>\n    </dict>\n");
         assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(plist),
                 "a role outside UISceneConfigurations configures nothing");
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                         IPhoneBuilder.plistManifestScope(plist)),
                 "the search-anywhere question is what accepted it");
     }
@@ -461,7 +461,7 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void aKeySetToFalseIsNotAcceptedAsTrue() {
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+        assertFalse(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key><false/>",
                 "UIApplicationSupportsMultipleScenes"),
                 "the key is present but says false, which is the case that has to be caught");
@@ -469,7 +469,7 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void aKeySetToTrueIsAccepted() {
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+        assertTrue(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key>\n    <true/>",
                 "UIApplicationSupportsMultipleScenes"));
     }
@@ -478,12 +478,12 @@ class IPhoneBuilderSceneManifestValidationTest {
     void aLaterUnrelatedTrueDoesNotVouchForThisKey() {
         // The value of a key is the element that follows it. A <true/> belonging to
         // some other key further down says nothing about this one.
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+        assertFalse(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key><false/>\n"
                         + "<key>UISomethingElse</key><true/>",
                 "UIApplicationSupportsMultipleScenes"),
                 "a true further down the plist belongs to a different key");
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+        assertFalse(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key>\n"
                         + "<key>UISomethingElse</key><true/>",
                 "UIApplicationSupportsMultipleScenes"),
@@ -492,17 +492,17 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void anAbsentKeyIsNotTrue() {
-        assertFalse(IPhoneBuilder.plistKeyIsTrue("<key>UIOther</key><true/>",
+        assertFalse(keyIsTrueAnywhere("<key>UIOther</key><true/>",
                 "UIApplicationSupportsMultipleScenes"));
     }
 
     @Test
     void theWindowRoleHasToNameCodenameOnesDelegate() {
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"));
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>SomeoneElsesSceneDelegate</string></dict></array>"),
@@ -518,7 +518,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // of the fragment -- and a later role's delegate then vouched for a window role
         // that names somebody else. Which is the same hole the CarPlay case above closes,
         // reopened by a space.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array ><dict custom=\"x\">"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>SomeoneElsesSceneDelegate</string></dict></array >"
@@ -532,7 +532,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void whitespaceOnContainerTagsStillAcceptsAValidManifest() {
         // The other direction: the same formatting on a correctly wired manifest has to
         // keep passing, so the rule above cannot be satisfied by rejecting everything.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array ><dict custom=\"x\">"
                         + "<key>UISceneNested</key><array ><string>a</string></array >"
                         + "<key>UISceneDelegateClassName</key>"
@@ -545,7 +545,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // "<array/>" is an element but not a level. Counting it as one leaves the depth
         // permanently ahead, the real closing tag is swallowed, and the role runs to the
         // end of the fragment -- which would let a later role's delegate vouch for it.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneEmptyThing</key><array/>"
                         + "<key>UISceneDelegateClassName</key>"
@@ -560,7 +560,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void aCloseTagNameThatMerelyStartsTheSameDoesNotClose() {
         // "</arrayish>" starts with "</array" and must not be taken for the array's
         // closing tag; only whitespace may sit between the name and the ">".
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"));
@@ -576,7 +576,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         assertTrue(IPhoneBuilder.plistDeclaresKey(
                 "<key>UIApplicationSceneManifest</key >", "UIApplicationSceneManifest"),
                 "a key whose closing tag carries whitespace is still declared");
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+        assertTrue(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key ><true/>",
                 "UIApplicationSupportsMultipleScenes"),
                 "and its value is still readable, which is what plistKeyEnd decides");
@@ -586,7 +586,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void aWholeManifestSurvivesWhitespaceInEveryClosingTag() {
         // The two structural parsers together, over a fragment where every closing tag
         // is spaced. This is valid XML and a build using it must not be rejected.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key ><array ><dict >"
                         + "<key>UISceneDelegateClassName</key >"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict ></array >"),
@@ -597,7 +597,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void aStringClosedWithWhitespaceStillHoldsItsValue() {
         // "</string >" ends a string exactly as "</string>" does. Matching the literal
         // made the delegate look absent and aborted a correctly configured build.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string ></dict></array>"),
@@ -610,7 +610,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // CarPlay declares its own role and its own delegate. Searching the whole
         // fragment for the delegate name would let CarPlay's configuration vouch for a
         // window role that names nobody.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>SomeoneElsesSceneDelegate</string></dict></array>"
@@ -627,7 +627,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // misconfiguration this check exists to catch.
         for (String spelling : new String[]{"<true/>", "<true />", "<true></true>",
                 "\n    <true/>", "<!-- on --><true/>"}) {
-            assertTrue(IPhoneBuilder.plistKeyIsTrue(
+            assertTrue(keyIsTrueAnywhere(
                     "<key>UIApplicationSupportsMultipleScenes</key>" + spelling,
                     "UIApplicationSupportsMultipleScenes"),
                     "should accept " + spelling);
@@ -637,7 +637,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     @Test
     void theValidXmlSpellingsOfFalseAreAllRejected() {
         for (String spelling : new String[]{"<false/>", "<false />", "<false></false>"}) {
-            assertFalse(IPhoneBuilder.plistKeyIsTrue(
+            assertFalse(keyIsTrueAnywhere(
                     "<key>UIApplicationSupportsMultipleScenes</key>" + spelling,
                     "UIApplicationSupportsMultipleScenes"),
                     "should reject " + spelling);
@@ -670,7 +670,7 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void aCommentedKeyDoesNotVouchForItsValue() {
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+        assertFalse(keyIsTrueAnywhere(
                 "<!-- <key>UIApplicationSupportsMultipleScenes</key><true/> -->",
                 "UIApplicationSupportsMultipleScenes"),
                 "a key and value that exist only inside a comment enable nothing");
@@ -682,12 +682,12 @@ class IPhoneBuilderSceneManifestValidationTest {
         // opening and resuming at the next '<' lands inside the comment, so the value
         // someone commented out would be read as the live one -- in the direction that
         // silently enables multi-window on a manifest that disables it.
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(
+        assertFalse(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key>"
                         + "<!-- <true/> was here --><false/>",
                 "UIApplicationSupportsMultipleScenes"),
                 "the commented-out true must not stand in for the real false");
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+        assertTrue(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key>"
                         + "<!-- <false/> was here --><true/>",
                 "UIApplicationSupportsMultipleScenes"),
@@ -700,7 +700,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // names another delegate: matching the mention would accept a manifest whose
         // real scene configuration cannot adopt a window, and the failure then happens
         // at run time.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<!-- <key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array> -->"
@@ -716,7 +716,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // Legal manifest: the configuration is *named* after our delegate while the
         // delegate class is somebody else's. Matching the text anywhere in the role
         // accepts it, and that build cannot adopt a secondary window.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneConfigurationName</key>"
                         + "<string>CodenameOne_GLSceneDelegate</string>"
@@ -729,7 +729,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void oneMatchingConfigurationAmongSeveralIsEnough() {
         // A role may declare more than one configuration; windows can be adopted as
         // long as one of them is ours.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array>"
                         + "<dict><key>UISceneDelegateClassName</key>"
                         + "<string>SomeoneElsesSceneDelegate</string></dict>"
@@ -743,7 +743,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // bounded by the *text* "SceneSessionRole", so a string value containing those
         // words cut it short and hid a delegate that really is wired -- failing a build
         // that was going to work, which is the expensive direction.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>CFBundleName</key>"
                         + "<string>notes about SceneSessionRole handling</string>"
@@ -762,11 +762,11 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "<key>\n    UIApplicationSceneManifest\n</key><dict/>",
                 "UIApplicationSceneManifest"),
                 "a key element with whitespace around its name is still that key");
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+        assertTrue(keyIsTrueAnywhere(
                 "<key> UIApplicationSupportsMultipleScenes </key><true/>",
                 "UIApplicationSupportsMultipleScenes"),
                 "and its value is still readable");
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>\n UIWindowSceneSessionRoleApplication \n</key><array><dict>"
                         + "<key> UISceneDelegateClassName </key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
@@ -786,7 +786,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         // A custom key declared inside the role, whose name happens to contain the
         // words. Ending the role there stops the search before the delegate and rejects
         // a manifest that is correctly wired.
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>MySceneSessionRoleMetadata</key><string>x</string>"
                         + "<key>UISceneDelegateClassName</key>"
@@ -798,7 +798,7 @@ class IPhoneBuilderSceneManifestValidationTest {
     void theRoleStillEndsAtItsOwnArray() {
         // The boundary still has to hold: a CarPlay role after this one, naming our
         // delegate, must not vouch for a window role that names somebody else.
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string>SomeoneElsesSceneDelegate</string></dict></array>"
@@ -810,7 +810,7 @@ class IPhoneBuilderSceneManifestValidationTest {
 
     @Test
     void nestedArraysInsideTheRoleDoNotEndItEarly() {
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>SomeList</key><array><string>a</string></array>"
                         + "<key>UISceneDelegateClassName</key>"
@@ -826,7 +826,7 @@ class IPhoneBuilderSceneManifestValidationTest {
         assertTrue(IPhoneBuilder.plistDeclaresKey(
                 "<key >UIApplicationSceneManifest</key><dict/>",
                 "UIApplicationSceneManifest"));
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+        assertTrue(wiresWindowSceneDelegateAnywhere(
                 "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
                         + "<key>UISceneDelegateClassName</key>"
                         + "<string xml:space=\"preserve\">CodenameOne_GLSceneDelegate</string>"
@@ -857,13 +857,13 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "<key>UIApplicationSupportsMultipleScenes</key><false/></dict>";
         String scope = IPhoneBuilder.plistManifestScope(plist);
         // The whole fragment answers true here, which is the false accept being fixed.
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(plist,
+        assertTrue(keyIsTrueAnywhere(plist,
                 "UIApplicationSupportsMultipleScenes"),
                 "unscoped, the unrelated dictionary answers -- this is the bug");
-        assertFalse(IPhoneBuilder.plistKeyIsTrue(scope,
+        assertFalse(keyIsTrueAnywhere(scope,
                 "UIApplicationSupportsMultipleScenes"),
                 "the manifest says false, whatever the unrelated dictionary says");
-        assertFalse(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+        assertFalse(wiresWindowSceneDelegateAnywhere(scope),
                 "and the role in the unrelated dictionary is not the manifest's");
     }
 
@@ -876,9 +876,9 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "<key>UISceneDelegateClassName</key>"
                 + "<string>CodenameOne_GLSceneDelegate</string></dict></array></dict></dict>";
         String scope = IPhoneBuilder.plistManifestScope(plist);
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(scope,
+        assertTrue(keyIsTrueAnywhere(scope,
                 "UIApplicationSupportsMultipleScenes"));
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+        assertTrue(wiresWindowSceneDelegateAnywhere(scope),
                 "a nested UISceneConfigurations dictionary must not put the role out of "
                         + "scope");
     }
@@ -895,10 +895,62 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "<key>UISceneDelegateClassName</key>"
                 + "<string>CodenameOne_GLSceneDelegate</string></dict></array></dict>";
         String scope = IPhoneBuilder.plistManifestScope(plist);
-        assertTrue(IPhoneBuilder.plistKeyIsTrue(scope,
+        assertTrue(keyIsTrueAnywhere(scope,
                 "UIApplicationSupportsMultipleScenes"),
                 "the commented closing tag must not end the manifest");
-        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(scope),
+        assertTrue(wiresWindowSceneDelegateAnywhere(scope),
                 "and the role after it is still inside the manifest");
+    }
+    /**
+     * The unscoped questions this validation used to ask, kept here rather than in the
+     * builder because nothing there asks them any more: every real question is scoped
+     * to the dictionary UIKit reads it from. They stay because the cases below are
+     * really about the parser underneath -- whitespace in closing tags, comments,
+     * self-closing containers, nesting, attributes -- and asking it through the
+     * simplest possible wrapper is the clearest way to reach it.
+     *
+     * <p>Leaving them in the builder would have been worse than dead weight: an
+     * "is this key true anywhere in here" helper sitting beside the scoped ones is an
+     * invitation to reach for it again, and reaching for it is what produced three
+     * rounds of nesting defects.</p>
+     */
+    private static boolean keyIsTrueAnywhere(String plist, String key) {
+        int at = IPhoneBuilder.plistKeyIndex(plist, key);
+        if (at < 0) {
+            return false;
+        }
+        // The value of a key is the element that follows it, so read that element's
+        // name rather than matching a spelling: "<true/>", "<true />" and
+        // "<true></true>" are the same element.
+        return "true".equals(
+                IPhoneBuilder.nextElementName(plist, IPhoneBuilder.plistKeyEnd(plist, at)));
+    }
+
+    /** The unscoped window-role question; see {@link #keyIsTrueAnywhere}. */
+    private static boolean wiresWindowSceneDelegateAnywhere(String plist) {
+        int role = IPhoneBuilder.plistKeyIndex(plist, "UIWindowSceneSessionRoleApplication");
+        if (role < 0) {
+            return false;
+        }
+        int afterKey = IPhoneBuilder.plistKeyEnd(plist, role);
+        // Bounded by this role's own value element, so a CarPlay configuration cannot
+        // answer for it and nothing declared inside the role can end it early.
+        int end = IPhoneBuilder.plistValueElementEnd(plist, afterKey);
+        if (end < 0) {
+            end = plist.length();
+        }
+        // Bound to its key rather than found anywhere in the role: the class name can
+        // appear as some other live value while UISceneDelegateClassName names
+        // somebody else.
+        int at = IPhoneBuilder.plistKeyIndex(plist, "UISceneDelegateClassName", afterKey);
+        while (at >= 0 && at < end) {
+            if ("CodenameOne_GLSceneDelegate".equals(IPhoneBuilder.plistStringValueAfter(
+                    plist, IPhoneBuilder.plistKeyEnd(plist, at)))) {
+                return true;
+            }
+            at = IPhoneBuilder.plistKeyIndex(plist, "UISceneDelegateClassName",
+                    IPhoneBuilder.plistKeyEnd(plist, at));
+        }
+        return false;
     }
 }
