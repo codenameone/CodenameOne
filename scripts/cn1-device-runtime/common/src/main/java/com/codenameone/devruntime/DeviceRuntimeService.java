@@ -1293,7 +1293,27 @@ public class DeviceRuntimeService {
      * has to avoid. Its own design travelling with it is the visible proof that
      * what is on screen is the pushed code.</p>
      */
-    private void applyPushedTheme(byte[] themeBytes) {
+    private void applyPushedTheme(final byte[] themeBytes) {
+        // On the event thread. UIManager.refreshTheme() walks the current
+        // form and updates its cached styles, and Form components published
+        // through setGlobalResources are read by paint(); doing this from
+        // the socket worker while the EDT may be painting or handling
+        // input caused race-dependent corruption or exceptions. Install
+        // reaches here off-EDT, so a callSeriallyAndWait hop is required;
+        // teardown paths that already run from the UI reuse the inline
+        // branch to avoid re-entering the pump.
+        if (Display.getInstance().isEdt()) {
+            applyPushedThemeOnEdt(themeBytes);
+            return;
+        }
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            public void run() {
+                applyPushedThemeOnEdt(themeBytes);
+            }
+        });
+    }
+
+    private void applyPushedThemeOnEdt(byte[] themeBytes) {
         try {
             if (themeBytes == null) {
                 if (hostTheme != null) {
