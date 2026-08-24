@@ -169,6 +169,13 @@ final class BuildHintsDesktop {
                 .platform("linux")
                 .consumedBy("LinuxNativeBuilder"));
 
+        h.add(new Hint("linux.nativeVerify")
+                .group(HintGroup.LINUX)
+                .type(HintType.STRING)
+                .platform("linux")
+                .consumedBy("LinuxNativeBuilder")
+                .doc("`nativeVerify` for the native Linux translation alone."));
+
         h.add(new Hint("linux.cc")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
@@ -227,6 +234,13 @@ final class BuildHintsDesktop {
                 .def("false")
                 .platform("windows")
                 .consumedBy("WindowsNativeBuilder"));
+
+        h.add(new Hint("windows.nativeVerify")
+                .group(HintGroup.WINDOWS)
+                .type(HintType.STRING)
+                .platform("windows")
+                .consumedBy("WindowsNativeBuilder")
+                .doc("`nativeVerify` for the native Windows translation alone."));
 
         h.add(new Hint("windows.debug")
                 .group(HintGroup.WINDOWS)

@@ -417,21 +417,27 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         if (value == null) {
             return null;
         }
-        String v = value.trim();
+        // Trimmed only where the surrounding space cannot be part of the value:
+        // "true ", " 24" and " modern" all mean what they say. A string does not
+        // get that treatment -- an ios.glAppDelegateHeader ending in a newline
+        // after a // comment needs that newline, and losing it comments out
+        // whatever the builder generates next. The verification build would not
+        // notice, since it checks that the key came back and not what it holds.
+        String v = value;
         switch (hint.type()) {
             case BOOLEAN:
-                if ("true".equalsIgnoreCase(v)) return "true";
-                if ("false".equalsIgnoreCase(v)) return "false";
+                if ("true".equalsIgnoreCase(v.trim())) return "true";
+                if ("false".equalsIgnoreCase(v.trim())) return "false";
                 return null;
             case INT:
                 try {
-                    return String.valueOf(Integer.parseInt(v));
+                    return String.valueOf(Integer.parseInt(v.trim()));
                 } catch (NumberFormatException ex) {
                     return null;
                 }
             case ENUM:
                 for (String allowed : hint.values()) {
-                    if (allowed.equalsIgnoreCase(v)) {
+                    if (allowed.equalsIgnoreCase(v.trim())) {
                         return hint.enumName() + "." + enumConstant(allowed);
                     }
                 }
@@ -708,7 +714,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * or a comment.
      *
      * <p>Follows {@code java.util.Properties}: the key runs to the first
-     * unescaped {@code =}, {@code :} or whitespace.</p>
+     * unescaped {@code =}, {@code :} or whitespace, and {@code \}{@code uXXXX}
+     * decodes to the character it names. The escape matters because the key this
+     * returns is compared against one {@code Properties.load} produced: a file
+     * writing {@code codename1.arg.\}{@code u0069os.teamId} declares
+     * {@code ios.teamId}, and reading it as {@code u0069os.teamId} leaves the
+     * original line in place, so the migration rolls back over a duplicate
+     * declaration it created itself.</p>
      */
     static String propertyKeyOf(String logicalLine) {
         int i = 0;
@@ -726,7 +738,17 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         for (; i < logicalLine.length(); i++) {
             char c = logicalLine.charAt(i);
             if (c == '\\' && i + 1 < logicalLine.length()) {
-                key.append(logicalLine.charAt(++i));
+                char escaped = logicalLine.charAt(++i);
+                if (escaped == 'u' && i + 4 < logicalLine.length()) {
+                    String hex = logicalLine.substring(i + 1, i + 5);
+                    int value = hexValue(hex);
+                    if (value >= 0) {
+                        key.append((char) value);
+                        i += 4;
+                        continue;
+                    }
+                }
+                key.append(escaped);
                 continue;
             }
             if (c == '=' || c == ':' || isPropertySpace(c)) {
@@ -739,6 +761,19 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
 
     private static boolean isPropertySpace(char c) {
         return c == ' ' || c == '\t' || c == '\f';
+    }
+
+    /** Four hex digits as a char value, or -1 when they are not four hex digits. */
+    private static int hexValue(String hex) {
+        int value = 0;
+        for (int i = 0; i < hex.length(); i++) {
+            int digit = Character.digit(hex.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
     }
 
     /** The encoding {@code Properties.load(InputStream)} reads. */

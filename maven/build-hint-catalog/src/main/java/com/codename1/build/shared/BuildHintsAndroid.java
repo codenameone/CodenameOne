@@ -827,6 +827,13 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
+        h.add(new Hint("android.maps.provider")
+                .group(HintGroup.ANDROID)
+                .type(HintType.STRING)
+                .platform("android")
+                .consumedBy("MapsProviderInjector")
+                .doc("Android's own native map provider, overriding `maps.provider`."));
+
         h.add(new Hint("android.min_sdk_version")
                 .annotatedAs(HintGroup.ANDROID, "minSdkVersion")
                 .type(HintType.INT)

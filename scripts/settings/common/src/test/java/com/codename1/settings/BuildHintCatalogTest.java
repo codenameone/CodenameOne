@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -258,5 +259,28 @@ public class BuildHintCatalogTest {
         BuildHintCatalog catalog = BuildHintCatalog.load();
         assertFalse(catalog.search("pods").isEmpty());
         assertFalse(catalog.search("android").isEmpty());
+    }
+
+    /// Kotlin lets a file rename what it imports, and then the annotation's own
+    /// name appears nowhere in the source. Reading that as unowned put the hint
+    /// back on the Add list, and Add writes the properties line that makes the
+    /// next process-annotations fail on a duplicate the tool itself created.
+    @Test
+    public void aKotlinAliasedImportIsRecognized() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The alias only counts when it really is one: the import must say `as`.
+    @Test
+    public void aPlainImportIsNotReadAsAnAlias() {
+        String src = "import com.codename1.annotations.buildhints.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n";
+        assertNull(CodenameOneSettings.kotlinImportAlias(src, "Ios"));
     }
 }

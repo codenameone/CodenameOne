@@ -342,7 +342,23 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("MapsProviderInjector"));
+                .consumedBy("MapsProviderInjector")
+                .doc("Selects the native map provider. `android.maps.provider` and "
+                        + "`ios.maps.provider` override it for one platform."));
+
+        h.add(new Hint("nativeVerify")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING)
+                .platform("general")
+                .consumedBy("IPhoneBuilder", "LinuxNativeBuilder", "WindowsNativeBuilder")
+                .doc("`strict` or `warn` turns on ParparVM's native signature check for this build; "
+                        + "anything else leaves it off, which is the default. ParparVM encodes the whole "
+                        + "Java signature in the C function name, so a native spelled even slightly "
+                        + "differently never reaches the linker as an error: the correctly named symbol "
+                        + "is simply absent, "
+                        + "the dead-code pass reads that as unused, and the feature ships inert. "
+                        + "`ios.nativeVerify`, `linux.nativeVerify` and `windows.nativeVerify` override "
+                        + "it for one platform."));
 
         h.add(new Hint("nativeTheme")
                 .annotatedAs(HintGroup.GENERAL, "nativeTheme")

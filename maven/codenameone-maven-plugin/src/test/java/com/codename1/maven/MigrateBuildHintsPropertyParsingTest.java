@@ -139,4 +139,20 @@ public class MigrateBuildHintsPropertyParsingTest {
     public void aControlCharacterIsEscaped() {
         assertEquals("\"\\u0001\"", MigrateBuildHintsMojo.quoteFor("\u0001", false));
     }
+
+    /// `Properties.load` decodes a Unicode escape in a KEY too, so the key this parser
+    /// returns has to be the decoded one. Reading the escape literally left the
+    /// original line in place, and the migration then rolled back over a
+    /// duplicate declaration it had created itself.
+    @Test
+    public void aUnicodeEscapeInAKeyIsDecoded() {
+        assertEquals("codename1.arg.ios.teamId",
+                MigrateBuildHintsMojo.propertyKeyOf("codename1.arg.\\u0069os.teamId=ABCDE"));
+    }
+
+    /// Not every backslash-u is an escape. Four hex digits or it is a literal u.
+    @Test
+    public void aMalformedUnicodeEscapeIsNotDecoded() {
+        assertEquals("a.uZZZZb", MigrateBuildHintsMojo.propertyKeyOf("a.\\uZZZZb=1"));
+    }
 }

@@ -1,0 +1,22 @@
+# Call sites that BUILD a hint name rather than writing it as a literal, so no
+# literal anywhere in the tree names the hint. The miner cannot resolve these --
+# the platform, or the entitlement, is only known at run time -- and before this
+# file existed it did not report them either, so the gate could print "all
+# described" while android.maps.provider and ios.nativeVerify had no catalog row
+# at all.
+#
+# Every site the miner finds must be listed here with what it expands to, and
+# every expansion must be catalogued or match a dynamic pattern. A new computed
+# site therefore forces a catalog decision instead of disappearing.
+#
+# Format: <file>:<line>|<expansion>[,<expansion>...]
+#
+# Only sites whose expression contains a string literal are reported. A helper
+# that forwards a variable -- getArg(key, ...) inside a wrapper -- gets its
+# literal from its caller, which the ordinary literal pass already mines.
+
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MapsProviderInjector.java|android.maps.provider,ios.maps.provider
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/NativeVerifyOption.java|ios.nativeVerify,linux.nativeVerify,windows.nativeVerify
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/MacNativeBuilder.java|macNative.provisioningProfile.appStore,macNative.provisioningProfile.developerID
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/IPhoneBuilder.java|ios.entitlements.com.apple.developer.healthkit.access
+maven/codenameone-maven-plugin/src/main/java/com/codename1/builders/WatchNativeBuilder.java|ios.entitlements.com.apple.developer.healthkit.access

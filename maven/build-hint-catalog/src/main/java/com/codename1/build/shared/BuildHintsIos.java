@@ -737,6 +737,13 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
+        h.add(new Hint("ios.maps.provider")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("MapsProviderInjector")
+                .doc("iOS's own native map provider, overriding `maps.provider`."));
+
         h.add(new Hint("ios.metal")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
@@ -804,6 +811,13 @@ final class BuildHintsIos {
                 .consumedBy("IPhoneBuilder")
                 .doc("Set to true to enable iOS multitasking and split-screen support. This only works if "
                         + "`ios.xcode_verson=9.2`."));
+
+        h.add(new Hint("ios.nativeVerify")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .consumedBy("IPhoneBuilder")
+                .doc("`nativeVerify` for the iOS translation alone."));
 
         h.add(new Hint("ios.newStorageLocation")
                 .annotatedAs(HintGroup.IOS, "newStorageLocation")

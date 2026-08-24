@@ -2187,6 +2187,45 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
+    ///
+    /// Kotlin lets a file rename what it imports, and then the annotation never
+    /// appears under its own name anywhere in the source. Missing that reads the
+    /// hint as unowned, so Settings offers it for Add, writes the properties
+    /// line, and the next `process-annotations` fails on the duplicate the tool
+    /// itself created.
+    static String kotlinImportAlias(String source, String simple) {
+        String needle = "com.codename1.annotations.buildhints." + simple;
+        int at = source.indexOf(needle);
+        while (at >= 0) {
+            int after = at + needle.length();
+            if (after >= source.length() || !continuesAName(source.charAt(after))) {
+                int i = after;
+                while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
+                    i++;
+                }
+                if (source.regionMatches(i, "as", 0, 2)
+                        && i + 2 < source.length()
+                        && !continuesAName(source.charAt(i + 2))) {
+                    i += 2;
+                    while (i < source.length()
+                            && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
+                        i++;
+                    }
+                    int start = i;
+                    while (i < source.length() && continuesAName(source.charAt(i))) {
+                        i++;
+                    }
+                    if (i > start) {
+                        return source.substring(start, i);
+                    }
+                }
+            }
+            at = source.indexOf(needle, after);
+        }
+        return null;
+    }
+
     /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.
     static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out) {
         for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
@@ -2194,13 +2233,21 @@ public class CodenameOneSettings extends Lifecycle {
                 continue;
             }
             String simple = h.group().annotationSimpleName();
-            // Both spellings are valid: the imported simple name, and the fully
-            // qualified one, which needs no import. Missing the qualified form
-            // left the hint editable and Add wrote the duplicate declaration.
-            String[] markers = {
-                "@" + simple,
-                "@com.codename1.annotations.buildhints." + simple,
-            };
+            // Three spellings are valid: the imported simple name, the fully
+            // qualified one, which needs no import, and a Kotlin alias, under
+            // which the annotation's own name appears nowhere. Missing any of
+            // them leaves the hint editable and Add writes the duplicate.
+            String alias = kotlinImportAlias(source, simple);
+            String[] markers = alias == null
+                ? new String[] {
+                    "@" + simple,
+                    "@com.codename1.annotations.buildhints." + simple,
+                  }
+                : new String[] {
+                    "@" + simple,
+                    "@com.codename1.annotations.buildhints." + simple,
+                    "@" + alias,
+                  };
             boolean found = false;
             for (int m = 0; m < markers.length && !found; m++) {
                 int at = source.indexOf(markers[m]);

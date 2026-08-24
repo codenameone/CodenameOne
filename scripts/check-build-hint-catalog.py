@@ -15,6 +15,7 @@ import fnmatch, os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 BASELINE = os.path.join(ROOT, "scripts", "build-hint-catalog-baseline.txt")
+COMPUTED_SITES = os.path.join(ROOT, "scripts", "build-hint-computed-sites.txt")
 CATALOG_CLASSES = os.path.join(ROOT, "maven/build-hint-catalog/target/classes")
 
 
@@ -147,7 +148,46 @@ def main():
               "green build and no effect.", file=sys.stderr)
         return 1
 
-    print(f"check-build-hint-catalog: {len(miner.hits)} hints read, all described by the catalog"
+    # Sites that build a hint name instead of writing it. Nothing in the tree
+    # names the hint they read, so the pass above cannot see it -- which is how
+    # this gate came to report "all described" while android.maps.provider and
+    # ios.nativeVerify had no catalog row.
+    declared = {}
+    if os.path.exists(COMPUTED_SITES):
+        with open(COMPUTED_SITES, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                where, _, expansions = line.partition("|")
+                declared[where] = [e for e in expansions.split(",") if e]
+
+    computed_bad = []
+    for expr, path, line_no in miner.hits_computed():
+        if path not in declared:
+            computed_bad.append(
+                f"{path}:{line_no}  builds a hint name from `{expr}` and is not listed")
+            continue
+        for name in declared[path]:
+            if name in known or any(fnmatch.fnmatch(name, p) for p in patterns):
+                continue
+            computed_bad.append(
+                f"{path}:{line_no}  expands to {name}, which the catalog does not describe")
+    for path in sorted(set(declared) - {p for _, p, _ in miner.hits_computed()}):
+        computed_bad.append(f"{path}  is listed but no longer builds a hint name")
+    if computed_bad:
+        print("check-build-hint-catalog: computed hint names are unaccounted for:",
+              file=sys.stderr)
+        for line in sorted(set(computed_bad)):
+            print("  " + line, file=sys.stderr)
+        print("\nList the site in scripts/build-hint-computed-sites.txt with what it "
+              "expands to, and catalogue each expansion. A hint whose name is only ever "
+              "computed is invisible to every literal search, including this one.",
+              file=sys.stderr)
+        return 1
+
+    print(f"check-build-hint-catalog: {len(miner.hits)} hints read, all described by the "
+          f"catalog; {len(declared)} computed site(s) accounted for"
           + (f" ({len(baseline)} baselined)" if baseline else ""))
     return 0
 

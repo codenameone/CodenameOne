@@ -636,6 +636,12 @@
 |_(none)_
 |Embeds XML content into the <queries> section of the Android manifest file. This is https://developer.android.com/training/package-visibility[required in Android 11 for package visibility]. See https://developer.android.com/guide/topics/manifest/queries-element[queries element Android documentation].
 
+|android.maps.provider
+|string
+|_(none)_
+|_(none)_
+|Android's own native map provider, overriding `maps.provider`.
+
 |android.messagingService
 |string
 |_(none)_
@@ -1582,13 +1588,19 @@
 |string
 |_(none)_
 |_(none)_
-|
+|Selects the native map provider. `android.maps.provider` and `ios.maps.provider` override it for one platform.
 
 |nativeTheme
 |`modern`, `legacy`, `custom`
 |_(none)_
 |`@Build(nativeTheme)`
 |`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.
+
+|nativeVerify
+|string
+|_(none)_
+|_(none)_
+|`strict` or `warn` turns on ParparVM's native signature check for this build; anything else leaves it off, which is the default. ParparVM encodes the whole Java signature in the C function name, so a native spelled even slightly differently never reaches the linker as an error: the correctly named symbol is simply absent, the dead-code pass reads that as unused, and the feature ships inert. `ios.nativeVerify`, `linux.nativeVerify` and `windows.nativeVerify` override it for one platform.
 
 |noExtraResources
 |boolean
@@ -2328,6 +2340,12 @@
 |_(none)_
 |
 
+|ios.maps.provider
+|string
+|_(none)_
+|_(none)_
+|iOS's own native map provider, overriding `maps.provider`.
+
 |ios.metal
 |boolean
 |`true`
@@ -2375,6 +2393,12 @@
 |`true`
 |_(none)_
 |Set to true to enable iOS multitasking and split-screen support. This only works if `ios.xcode_verson=9.2`.
+
+|ios.nativeVerify
+|string
+|_(none)_
+|_(none)_
+|`nativeVerify` for the iOS translation alone.
 
 |ios.newPipeline
 |boolean
@@ -2868,6 +2892,12 @@
 |_(none)_
 |
 
+|linux.nativeVerify
+|string
+|_(none)_
+|_(none)_
+|`nativeVerify` for the native Linux translation alone.
+
 |linux.toolchain
 |string
 |_(none)_
@@ -3197,6 +3227,12 @@
 |_(none)_
 |_(none)_
 |
+
+|windows.nativeVerify
+|string
+|_(none)_
+|_(none)_
+|`nativeVerify` for the native Windows translation alone.
 
 |windows.sdkRoot
 |string

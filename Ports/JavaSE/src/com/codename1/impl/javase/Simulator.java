@@ -503,6 +503,30 @@ public class Simulator {
                 }
             }
         }
+        File staleAgainst = classNewerThanManifest(projectDir, p, f);
+        if (staleAgainst != null) {
+            // Nothing removes target/classes between builds, so a project that ran
+            // process-annotations once and then stopped -- goal unbound, skipped,
+            // or bound to a phase that no longer runs -- keeps a manifest that
+            // looks entirely valid while the annotations beside it have moved on.
+            // The device build refuses this outright; the simulator would
+            // otherwise run on the previous values of hints it can actually see,
+            // such as desktop.titleBar and nativeTheme, and show the wrong thing
+            // with no indication why.
+            //
+            // Judged on timestamps rather than the manifest's own fingerprint:
+            // recomputing that means parsing the class file's annotation table,
+            // and the simulator has no bytecode reader. The comparison is sound in
+            // the direction that matters -- process-classes always follows compile
+            // within a build, so a main class newer than the manifest cannot have
+            // produced it.
+            System.err.println("Warning: " + f + " is older than "
+                    + staleAgainst.getName() + ", so it was produced by an earlier build "
+                    + "and its build hints were NOT applied.");
+            System.err.println("         Rebuild the project so the cn1 process-annotations "
+                    + "goal regenerates it.");
+            return;
+        }
         int applied = 0;
         for (String key : p.stringPropertyNames()) {
             if (!key.startsWith("codename1.arg.")) {
@@ -516,5 +540,31 @@ public class Simulator {
         if (applied > 0) {
             System.out.println("Applied " + applied + " build hint(s) from annotations");
         }
+    }
+
+    /**
+     * The compiled main class when it is newer than the manifest, or null.
+     *
+     * <p>Null whenever the question cannot be answered -- no main class recorded,
+     * no class file for it, no readable timestamps -- so the manifest is taken at
+     * face value rather than discarded on a guess.</p>
+     */
+    private static File classNewerThanManifest(File projectDir, java.util.Properties manifest,
+                                               File manifestFile) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        File classFile = new File(new File(projectDir, "target" + File.separator + "classes"),
+                main.trim().replace('.', File.separatorChar) + ".class");
+        if (!classFile.isFile()) {
+            return null;
+        }
+        long classTime = classFile.lastModified();
+        long manifestTime = manifestFile.lastModified();
+        if (classTime == 0L || manifestTime == 0L) {
+            return null;
+        }
+        return classTime > manifestTime ? classFile : null;
     }
 }

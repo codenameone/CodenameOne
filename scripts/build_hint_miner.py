@@ -9,6 +9,19 @@ Arguments are split with a paren/quote-balanced scan rather than a regex,
 because calls nest: getArg("ios.urlSchemes", getArg("ios.urlScheme", "")).
 A regex that stops at the first comma both mis-reads the outer default and
 consumes the inner call, silently dropping a hint from the catalog.
+
+Not every hint name is written as a literal at the point it is read. Two shapes
+occur and both used to be invisible, which let the gate report "all described"
+while real hints had no catalog row at all:
+
+  getArg(HINT, null)                        NativeVerifyOption, HINT="nativeVerify"
+  getArg(platform + ".maps.provider", ...)  MapsProviderInjector
+
+The first is resolved: a `static final String` in the same file whose value is a
+literal is substituted. The second cannot be -- the platform is only known at
+run time -- so it is reported as a COMPUTED site instead of ignored, and the
+checker holds those against the catalog rather than letting them pass in
+silence.
 """
 import re, os, sys, json, collections
 
@@ -24,6 +37,15 @@ OPENERS = [
 
 _ESCAPES = {'n': '\n', 't': '\t', 'r': '\r', 'b': '\b', 'f': '\f',
             '"': '"', "'": "'", '\\': '\\'}
+
+# getArg/arg/booleanArg whose first argument is not a string literal. \s covers the
+# line-wrapped calls, which are plain literal reads once the newline is crossed.
+COMPUTED_OPENER = re.compile(
+    r'\b(?:getArg|booleanArg)\(\s*(?!")|(?<![A-Za-z0-9_.])arg\(\s*(?!")')
+
+# static final String NAME = "literal";  -- the only constant shape worth resolving.
+CONST_DECL = re.compile(
+    r'\bstatic\s+final\s+String\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*;')
 
 
 def read_literal(text, i):
@@ -82,6 +104,36 @@ def split_args(text, i):
 LITERAL_DEFAULT = re.compile(r'null|true|false|-?\d+|"(?:[^"\\]|\\.)*"')
 
 hits = collections.defaultdict(list)
+computed = []
+
+
+def first_argument(text, open_paren):
+    """The first argument's source text, or None when the call is malformed."""
+    args = split_args(text, open_paren + 1)
+    return args[0] if args else None
+
+
+def resolve_constants(expr, constants):
+    """Substitute same-file string constants into a first-argument expression."""
+    return re.sub(r'\b([A-Za-z_][A-Za-z0-9_]*)\b',
+                  lambda m: json.dumps(constants[m.group(1)]) if m.group(1) in constants
+                  else m.group(0),
+                  expr)
+
+
+def concat_of_literals(expr):
+    """The value of a `"a" + "b"` expression, or None when a piece is not a literal."""
+    parts = [p.strip() for p in expr.split('+')]
+    out = []
+    for part in parts:
+        if len(part) >= 2 and part.startswith('"') and part.endswith('"'):
+            lit, _ = read_literal(part, 1)
+            if lit is None:
+                return None
+            out.append(lit)
+        else:
+            return None
+    return "".join(out)
 
 for dirpath, _, files in os.walk(SRC):
     for fn in sorted(files):
@@ -91,6 +143,28 @@ for dirpath, _, files in os.walk(SRC):
         with open(path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()
         rel = os.path.relpath(path, ROOT)
+        constants = {m.group(1): (read_literal(m.group(0), m.group(0).index('"') + 1)[0] or "")
+                     for m in CONST_DECL.finditer(text)}
+        for m in COMPUTED_OPENER.finditer(text):
+            open_paren = text.rindex('(', m.start(), m.end())
+            expr = first_argument(text, open_paren)
+            if not expr:
+                continue
+            line = text.count("\n", 0, m.start()) + 1
+            resolved = concat_of_literals(resolve_constants(expr, constants))
+            if resolved is not None:
+                # Fully resolved -- an ordinary hint read that merely spelled its
+                # name with a constant.
+                hits[resolved].append(("<expr>", rel, line))
+            elif '"' in expr:
+                # The name is being BUILT here, so no literal anywhere names it and
+                # the literal pass cannot see it. Worth reporting.
+                computed.append({"expr": " ".join(expr.split()),
+                                 "file": rel, "line": line})
+            # Anything else is a forwarding helper -- getArg(key, ...) inside a
+            # wrapper, or the declaration of getArg itself -- whose caller passes a
+            # literal that the literal pass already mines. Reporting those would bury
+            # the handful of sites that genuinely compute a name.
         for pat, prefixed in OPENERS:
             for m in pat.finditer(text):
                 # position of the char just after the opening quote of arg 1
@@ -112,10 +186,20 @@ for dirpath, _, files in os.walk(SRC):
                 line = text.count("\n", 0, m.start()) + 1
                 hits[key].append((default or "null", rel, line))
 
+def hits_computed():
+    """(expression, file, line) for every site that builds a hint name."""
+    return sorted((c["expr"], c["file"], c["line"]) for c in computed)
+
+
 if __name__ == "__main__":
-    print(f"distinct keys mined: {len(hits)}", file=sys.stderr)
+    print(f"distinct keys mined: {len(hits)}, computed sites: {len(computed)}",
+          file=sys.stderr)
     out = sys.argv[1] if len(sys.argv) > 1 else "-"
     payload = {k: v for k, v in sorted(hits.items())}
+    # Under a key no hint name can take, so a consumer reading this as a plain
+    # name->sites map cannot mistake it for a hint.
+    payload["#computed"] = sorted(
+        (c["expr"], c["file"], c["line"]) for c in computed)
     if out == "-":
         json.dump(payload, sys.stdout, indent=1)
     else:
