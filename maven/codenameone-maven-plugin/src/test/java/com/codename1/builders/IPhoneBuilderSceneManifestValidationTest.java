@@ -171,6 +171,18 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aStringClosedWithWhitespaceStillHoldsItsValue() {
+        // "</string >" ends a string exactly as "</string>" does. Matching the literal
+        // made the delegate look absent and aborted a correctly configured build.
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                "<key>UIWindowSceneSessionRoleApplication</key><array><dict>"
+                        + "<key>UISceneDelegateClassName</key>"
+                        + "<string>CodenameOne_GLSceneDelegate</string ></dict></array>"),
+                "a delegate whose string tag closes with whitespace is still that "
+                        + "delegate");
+    }
+
+    @Test
     void anotherRolesDelegateDoesNotCountAsTheWindowRoles() {
         // CarPlay declares its own role and its own delegate. Searching the whole
         // fragment for the delegate name would let CarPlay's configuration vouch for a

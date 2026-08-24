@@ -1397,6 +1397,20 @@ public final class Display extends CN1Constants {
                 // paint transition or intro animations and don't do anything else if such
                 // animations are in progress...
                 paintTransitionAnimation();
+                // Except the other windows. A transition belongs to the main surface,
+                // and this early return is what keeps the rest of the loop off it while
+                // one is running -- but a secondary window is an independent native
+                // window and has no part in it. Left out, an ordinary form transition
+                // froze every open window for its duration: no painting, no animation.
+                //
+                // Input stays queued rather than being dispatched here. That is how the
+                // main surface already behaves during a transition, and draining the
+                // shared queue from this branch would change the main path's semantics
+                // to fix a window's -- a worse trade than a few hundred milliseconds of
+                // deferred input.
+                if (Desktop.getInstance().hasOpenWindows()) {
+                    Desktop.getInstance().paintWindows();
+                }
                 return;
             }
         } catch (RuntimeException ignor) {

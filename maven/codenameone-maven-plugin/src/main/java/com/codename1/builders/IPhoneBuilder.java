@@ -6369,9 +6369,13 @@ public class IPhoneBuilder extends Executor {
     }
 
     static String mergeUserActivityTypes(String inject, List<Map<String, Object>> intents) {
-        int key = inject.indexOf("NSUserActivityTypes");
-        int open = key < 0 ? -1 : inject.indexOf("<array>", key);
-        int close = open < 0 ? -1 : inject.indexOf("</array>", open);
+        // The same structural reading the rest of the plist parsing uses: this walks a
+        // fragment the application supplied, so "<array >" and "</array >" are shapes it
+        // has to accept. Found by enumerating every literal closing tag left in this
+        // file rather than waiting for the next one to be reported.
+        int key = plistKeyIndex(inject, "NSUserActivityTypes");
+        int open = key < 0 ? -1 : plistElementIndex(inject, "array", key);
+        int close = open < 0 ? -1 : plistCloseElementIndex(inject, "array", open);
         if (close < 0) {
             return inject;
         }
@@ -7429,7 +7433,11 @@ public class IPhoneBuilder extends Executor {
         if (contentStart < 0) {
             return null;
         }
-        int close = plist.indexOf("</string>", open);
+        // Structural, like every other closing tag this parser reads. "</string >" ends
+        // a string just as "</string>" does, and matching the literal made
+        // plistWiresWindowSceneDelegate report the delegate missing and abort a build
+        // that was correctly configured.
+        int close = plistCloseElementIndex(plist, "string", open);
         if (close < 0) {
             return null;
         }

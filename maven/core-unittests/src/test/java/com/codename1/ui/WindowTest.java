@@ -4289,6 +4289,41 @@ class WindowTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void aWindowKeepsPaintingWhileTheMainFormTransitions() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("independent", new BorderLayout());
+        w.setWindowSize(320, 240);
+        w.add(BorderLayout.CENTER, new Label("alive"));
+        w.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        try {
+            // Put the main surface into a transition. The event loop takes an early
+            // return while one is running, which is right for the main surface and
+            // wrong for a window that has no part in it.
+            Form next = new Form("next", new BorderLayout());
+            next.setTransitionInAnimator(
+                    com.codename1.ui.animations.CommonTransitions.createFade(300));
+            next.show();
+
+            int before = peer.getPaintCount();
+            for (int iter = 0; iter < 6; iter++) {
+                w.repaint();
+                DisplayTest.flushEdt();
+            }
+
+            assertTrue(peer.getPaintCount() > before,
+                    "a secondary window is an independent native window and must keep "
+                            + "painting while the main form transitions; it painted "
+                            + before + " times before and " + peer.getPaintCount()
+                            + " after");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
     /// Counts pointer drags reaching a component.
     private static final class DragCountingComponent extends Component {
         private int drags;
