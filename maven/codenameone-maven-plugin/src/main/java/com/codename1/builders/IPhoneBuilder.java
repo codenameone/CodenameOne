@@ -8370,25 +8370,26 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    /// The build settings Xcode defines UNCONDITIONALLY for every target, which this builder does
+    /// The build settings Xcode gives every target a NON-EMPTY value for, which this builder does
     /// not model and must not treat as missing.
     ///
-    /// Every name here is one Xcode always has a value for, whatever the project says. That is
-    /// the whole test for membership, and it is stricter than "a setting Xcode knows about":
-    /// MARKETING_VERSION and CURRENT_PROJECT_VERSION are Xcode's names but the PROJECT's to
-    /// define, so an identifier written through one of them in a project that never sets it
-    /// expands to nothing and ships as "com.example.app." -- exactly the malformed identifier
-    /// this guard exists to prevent. Optional settings therefore belong on the other side of the
-    /// line: an identifier through one is dropped, and the derived default -- which is always
-    /// valid -- stands instead.
+    /// Two things disqualify a name, and both have been learned here the hard way. A setting the
+    /// PROJECT defines rather than Xcode -- MARKETING_VERSION, CURRENT_PROJECT_VERSION,
+    /// DEVELOPMENT_TEAM -- expands to nothing in a project that never sets it. And a setting Xcode
+    /// always defines but leaves EMPTY does the same: EXECUTABLE_PREFIX and EXECUTABLE_SUFFIX are
+    /// both blank for an extension's Mach-O executable. Either way the identifier ships as
+    /// "com.example.app." -- the malformed identifier this guard exists to prevent, waved through
+    /// by the guard itself.
+    ///
+    /// So membership is "Xcode always supplies this, and it is never empty". Anything else is
+    /// dropped, and the derived default -- which is always valid -- stands instead.
     ///
     /// Not a complete list of Xcode's settings, and it does not need to be: only the ones that
     /// plausibly appear in a bundle identifier.
     private static final java.util.Set<String> XCODE_PROVIDED_SETTINGS =
             new java.util.HashSet<String>(java.util.Arrays.asList(
-                    "EXECUTABLE_NAME", "EXECUTABLE_PREFIX", "EXECUTABLE_SUFFIX",
-                    "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME", "PROJECT_NAME",
-                    "CONFIGURATION", "SDK_NAME", "SDK_VERSION", "PLATFORM_NAME",
+                    "EXECUTABLE_NAME", "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME",
+                    "PROJECT_NAME", "CONFIGURATION", "SDK_NAME", "SDK_VERSION", "PLATFORM_NAME",
                     "CURRENT_ARCH", "ARCHS", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME",
                     "SRCROOT", "PROJECT_DIR", "BUILT_PRODUCTS_DIR", "TARGET_BUILD_DIR"));
 

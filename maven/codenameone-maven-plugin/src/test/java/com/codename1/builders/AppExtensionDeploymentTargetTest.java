@@ -1580,6 +1580,14 @@ public class AppExtensionDeploymentTargetTest {
                 "com.example.app.$(CURRENT_PROJECT_VERSION)", none));
         assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
                 "com.example.app.$(DEVELOPMENT_TEAM)", none));
+
+        // And a setting Xcode always defines but leaves EMPTY fails the same test for the same
+        // reason: both of these are blank for an extension's Mach-O executable, so the identifier
+        // would ship as "com.example.app." either way.
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(EXECUTABLE_PREFIX)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(EXECUTABLE_SUFFIX)", none));
     }
 
     @Test
