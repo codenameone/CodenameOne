@@ -622,9 +622,21 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 NearbyTransport.deliverDisconnected(
                         encode(endpointId, nameOf(endpointId)));
                 connectedEndpoints.remove(endpointId);
-                endpointNames.remove(endpointId);
-                // Cleared with the name, for the reason onEndpointLost does.
-                endpointServices.remove(endpointId);
+                // Only when discovery has ALSO lost sight of it. A connection
+                // can close while the peer is still being advertised and
+                // still in the discovered set -- the app disconnects, or the
+                // link drops -- and dropping the name and service there meant
+                // the later onEndpointLost for that same peer encoded it out
+                // of empty maps, so the app was told an endpoint it knew by
+                // name had been lost, with no name and no service on it.
+                //
+                // When discovery is not watching it, this is the last event
+                // that will ever mention the endpoint, so the entries go now
+                // or they never do.
+                if (!discoveredEndpoints.contains(endpointId)) {
+                    endpointNames.remove(endpointId);
+                    endpointServices.remove(endpointId);
+                }
             }
         };
     }

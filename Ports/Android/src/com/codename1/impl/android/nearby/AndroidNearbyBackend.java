@@ -384,6 +384,16 @@ public class AndroidNearbyBackend implements NearbyBridge {
             @Override
             public void run() {
                 while (host.isRequestForPermission()) {
+                    // The flag is cleared by the activity the result is
+                    // delivered TO, and Android delivers it to whichever
+                    // activity is alive when the dialog closes. If this one
+                    // was recreated while the dialog was open its flag is
+                    // never cleared again -- so this loop spun for the life
+                    // of the process, holding the invokeAndBlock worker and
+                    // leaving the permission request unresolved for good.
+                    if (isGone(host)) {
+                        return;
+                    }
                     try {
                         Thread.sleep(50);
                     } catch (InterruptedException interrupted) {
@@ -393,13 +403,38 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 }
             }
         });
+        // Asked of the CURRENT context, not the activity captured above,
+        // which may be the one that just went away. A grant belongs to the
+        // application, so any live context answers for it.
+        Activity current = AndroidImplementation.getActivity();
+        Context ctx = current != null ? (Context) current
+                : activity.getApplicationContext();
+        if (ctx == null) {
+            return false;
+        }
         for (int i = 0; i < perms.size(); i++) {
-            if (activity.checkSelfPermission(perms.get(i))
+            if (ctx.checkSelfPermission(perms.get(i))
                     != PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
         }
         return true;
+    }
+
+    /// True when waiting on this activity can no longer end.
+    ///
+    /// Either it has been destroyed, or the port has moved on to another one
+    /// -- in both cases the permission result is going somewhere else and
+    /// this activity's flag stays set for good.
+    private static boolean isGone(Activity host) {
+        if (host.isFinishing()) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT >= 17 && host.isDestroyed()) {
+            return true;
+        }
+        Activity current = AndroidImplementation.getActivity();
+        return current != null && current != host;
     }
 
     // ------------------------------------------------------------------
