@@ -14933,7 +14933,8 @@ static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
-// Called from METALView's accessibilityElements getter: a real client asked for
+// Called from the METALView / EAGLView accessibilityElements getters: a real
+// client asked for
 // the tree. This, not the running flags, is what makes the gate correct for the
 // technologies UIKit will not report -- see the comment on that getter.
 void cn1AccessibilityNoteClientQuery(void) {

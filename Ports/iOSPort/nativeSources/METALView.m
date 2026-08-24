@@ -491,8 +491,13 @@ int cn1DirectToDrawableEnabled(void) {
 // notifications -- i.e. to the behaviour without this hook, not to something
 // worse.
 - (NSArray *)accessibilityElements {
+#if !TARGET_OS_WATCH
+    // The note function is itself gated on !TARGET_OS_WATCH (UIAccessibility's
+    // status notifications do not exist there), so the call has to be too or the
+    // watch build fails to link.
     extern void cn1AccessibilityNoteClientQuery(void);
     cn1AccessibilityNoteClientQuery();
+#endif
     return [super accessibilityElements];
 }
 

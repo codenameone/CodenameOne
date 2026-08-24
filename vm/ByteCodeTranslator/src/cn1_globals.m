@@ -1835,7 +1835,9 @@ void codenameOneGCMark() {
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
         // Most entries are JAVA_NULL now (the pool fills on first use); the
         // explicit test skips the call rather than paying it per empty slot.
-        JAVA_OBJECT poolEntry = constantPoolObjects[iter];
+        // Acquire for the same reason: the collector marks through this pointer
+        // and must see a fully constructed String behind it.
+        JAVA_OBJECT poolEntry = (JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[iter], __ATOMIC_ACQUIRE);
         if(poolEntry != JAVA_NULL) {
             gcMarkObject(d, poolEntry, JAVA_TRUE);
         }
@@ -8775,10 +8777,13 @@ static pthread_mutex_t constantPoolMutex = PTHREAD_MUTEX_INITIALIZER;
 JAVA_OBJECT cn1MaterializeConstantPoolString(int off) {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     pthread_mutex_lock(&constantPoolMutex);
-    JAVA_OBJECT o = constantPoolObjects[off];
+    JAVA_OBJECT o = (JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE);
     if(o == JAVA_NULL) {
         o = newStringFromCString(threadStateData, constantPool[off]);
-        constantPoolObjects[off] = o;
+        // RELEASE so a reader that sees this pointer also sees the String's
+        // fields. The mutex orders writers against each other and nothing else:
+        // the fast path in STRING_FROM_CONSTANT_POOL_OFFSET never acquires it.
+        __atomic_store_n(&constantPoolObjects[off], o, __ATOMIC_RELEASE);
     }
     pthread_mutex_unlock(&constantPoolMutex);
     return o;

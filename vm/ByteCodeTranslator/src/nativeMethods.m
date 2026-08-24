@@ -1574,7 +1574,14 @@ JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ON
 
 JAVA_OBJECT java_lang_Class_getSuperclass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
     struct clazz* clz = (struct clazz*)cls;
-    // Object, interfaces, primitives and void have no superclass.
+    // Object, primitives and void already carry a null baseClass, so they need
+    // no special case. Interfaces DO: a class file records java/lang/Object as
+    // an interface's super_class and Parser.visit copies that straight into
+    // baseClass, so the isInterface flag is the only thing separating them --
+    // and Class.getSuperclass() is required to report null for an interface.
+    if(clz->isInterface) {
+        return JAVA_NULL;
+    }
     return (JAVA_OBJECT)clz->baseClass;
 }
 

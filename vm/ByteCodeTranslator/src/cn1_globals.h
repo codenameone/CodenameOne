@@ -776,9 +776,17 @@ extern JAVA_OBJECT cn1MaterializeConstantPoolString(int off);
 /// Start-up attribution probe; prints elapsed-since-process-start when
 /// CN1_STARTUP_PHASES is set, and costs one cached getenv otherwise.
 extern void cn1StartupPhase(const char* name);
+/// ACQUIRE, paired with the RELEASE store in cn1MaterializeConstantPoolString.
+/// The mutex there serialises writers and keeps literal identity, but it
+/// establishes nothing with these readers -- they never take it. Without the
+/// pairing a thread may observe the published pointer while the String's fields
+/// are still invisible to it (a plain concurrent read/write is a data race in
+/// any case, and on arm64 it is one that actually reorders).
+#define CN1_CONSTANT_POOL_LOAD(off) \
+    ((JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE))
 #define STRING_FROM_CONSTANT_POOL_OFFSET(off) \
-    (__builtin_expect(constantPoolObjects[off] != JAVA_NULL, 1) \
-        ? constantPoolObjects[off] : cn1MaterializeConstantPoolString(off))
+    (__builtin_expect(CN1_CONSTANT_POOL_LOAD(off) != JAVA_NULL, 1) \
+        ? CN1_CONSTANT_POOL_LOAD(off) : cn1MaterializeConstantPoolString(off))
 
 #define BC_IINC(val, num) ilocals_##val##_ += num;
 

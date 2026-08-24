@@ -1845,8 +1845,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (isDirectToDrawable() && hasPendingPaints()) {
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
-                f.setDirtyRegion(null);
-                repaint(f);
+                // Painted HERE rather than enqueued. repaint(f) would append,
+                // and the superclass drains in order, so the full-form paint
+                // would land on top of overlay animations already queued --
+                // Container.TransitionAnimation queues its Transition through
+                // Display.repaint(t), and painting the form over it makes the
+                // transition vanish or snap to its end state. The background
+                // has to go down first and the queue drain on top of it.
+                Graphics wrapper = getCodenameOneGraphics();
+                if (wrapper != null) {
+                    int dwidth = getDisplayWidth();
+                    int dheight = getDisplayHeight();
+                    wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                    wrapper.resetAffine();
+                    wrapper.setClip(0, 0, dwidth, dheight);
+                    f.setDirtyRegion(null);
+                    f.paintComponent(wrapper, true);
+                }
             }
         }
         super.paintDirty();
