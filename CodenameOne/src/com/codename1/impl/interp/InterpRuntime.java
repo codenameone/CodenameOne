@@ -2788,7 +2788,7 @@ public final class InterpRuntime {
                         if (dst != null) {
                             args[argIdx] = dst;
                         }
-                        break;
+                        break;   //NOPMD AvoidBranchingStatementAsLastInLoop - one cluster claims the slot
                     }
                 }
             }
