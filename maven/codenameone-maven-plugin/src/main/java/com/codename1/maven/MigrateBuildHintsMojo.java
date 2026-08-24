@@ -894,7 +894,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // rolled back a migration that was otherwise correct.
             int pkg = livePackageIndex(blankedHead);
             int anchor = pkg >= 0 ? endOfPackageDeclaration(blankedHead, pkg)
-                    : startOfLeadingAnnotations(head, kotlin);
+                    : startOfFirstDeclaration(head, kotlin);
             head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
@@ -1074,102 +1074,95 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return endOfDeclarationLine(code, i);
     }
 
-    /// The index in `head` where the run of annotations immediately preceding the
-    /// declaration begins, or `head.length()` when there is none.
+    /// The offset in `original` where an import may be inserted: before the
+    /// FIRST top-level declaration, whatever it is.
     ///
-    /// Walks back over whitespace and complete `@Name(...)` forms, matching
-    /// parentheses so a multi-line annotation does not stop the walk early.
+    /// Only for a file with no package declaration and no existing import --
+    /// otherwise the anchor is the end of one of those. This replaced a backward
+    /// walk from the main class over its annotations and modifiers, which
+    /// answered the wrong question: an import goes above EVERY top-level
+    /// declaration, so a `fun helper() {}` written before the main class left
+    /// the import below it and the verification build rejected the file. There
+    /// is nothing to back over once the anchor is the first declaration in the
+    /// file, which is also why the annotation and modifier cases it used to
+    /// handle now need no handling.
     ///
-    /// Over blanked code, because an argument may contain a parenthesis inside a
-    /// string -- `@SuppressWarnings("a(b")` -- and counting that one leaves the
-    /// walk stranded in the middle of a literal. Positions are preserved by the
-    /// blanking, so the index returned indexes the original text.
-    static int startOfLeadingAnnotations(String original) {
-        return startOfLeadingAnnotations(original, false);
+    /// Kotlin's FILE annotations are the exception, and the only one: the
+    /// grammar puts them above the package header and the imports both, so the
+    /// leading `@file:` run is stepped over rather than displaced.
+    static int startOfFirstDeclaration(String original) {
+        return startOfFirstDeclaration(original, false);
     }
 
-    static int startOfLeadingAnnotations(String original, boolean kotlin) {
-        String head = com.codename1.maven.processors.BuildHintAnnotationProcessor
+    static int startOfFirstDeclaration(String original, boolean kotlin) {
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .blankNonCode(original, kotlin);
-        int at = head.length();
+        int i = 0;
         while (true) {
-            int i = at - 1;
-            while (i >= 0 && Character.isWhitespace(head.charAt(i))) {
-                i--;
+            while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+                i++;
             }
-            if (i < 0) {
-                return at;
+            if (i >= code.length()) {
+                return code.length();
             }
-            // A MODIFIER may sit between the annotations and the keyword, or
-            // before them: `public @Deprecated final class Main` is legal, and
-            // the modifier walk from the keyword stops at the annotation. Backing
-            // up only over the annotation run left `public` above the insertion
-            // point, so the import went between it and the rest of its own
-            // declaration and verification rolled the migration back.
-            int wordStart = i + 1;
-            while (wordStart > 0 && (Character.isJavaIdentifierPart(head.charAt(wordStart - 1))
-                    || head.charAt(wordStart - 1) == '-')) {
-                wordStart--;
+            if (!kotlin || !fileAnnotationAt(code, i)) {
+                return i;
             }
-            if (wordStart <= i && (wordStart == 0 || head.charAt(wordStart - 1) != '@')
-                    && isModifier(head.substring(wordStart, i + 1))) {
-                at = wordStart;
-                continue;
+            int after = endOfAnnotation(code, i);
+            if (after <= i) {
+                return i;
             }
-            if (head.charAt(i) == ')') {
-                int depth = 0;
-                while (i >= 0) {
-                    char c = head.charAt(i);
-                    if (c == ')') {
-                        depth++;
-                    } else if (c == '(') {
-                        depth--;
-                        if (depth == 0) {
-                            i--;
-                            break;
-                        }
-                    }
-                    i--;
-                }
-                if (depth != 0) {
-                    return at;
-                }
-            }
-            // The annotation's name, then its @. A Kotlin component may be
-            // ESCAPED, and a backtick is not an identifier character -- so the
-            // scan stopped on it, read no name, and left `@`when`` out of the
-            // leading run. The generated import then went between the
-            // annotation and the class, where Kotlin does not allow one, and
-            // verification rolled back a valid migration.
-            boolean readAName = false;
-            while (i >= 0) {
-                if (head.charAt(i) == '`') {
-                    int open = head.lastIndexOf('`', i - 1);
-                    if (open < 0) {
-                        return at;
-                    }
-                    i = open - 1;
-                    readAName = true;
-                } else if (Character.isJavaIdentifierPart(head.charAt(i))) {
-                    while (i >= 0 && Character.isJavaIdentifierPart(head.charAt(i))) {
-                        i--;
-                    }
-                    readAName = true;
-                } else {
-                    break;
-                }
-                // A qualified annotation name continues through its dots.
-                if (i >= 0 && head.charAt(i) == '.') {
-                    i--;
-                    continue;
-                }
-                break;
-            }
-            if (i < 0 || head.charAt(i) != '@' || !readAName) {
-                return at;
-            }
-            at = i;
+            i = after;
         }
+    }
+
+    /// Whether `@file:` starts at `at`. Kotlin allows space around the colon.
+    private static boolean fileAnnotationAt(String code, int at) {
+        if (at >= code.length() || code.charAt(at) != '@') {
+            return false;
+        }
+        int i = at + 1;
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        if (!code.startsWith("file", i)) {
+            return false;
+        }
+        i += 4;
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        return i < code.length() && code.charAt(i) == ':';
+    }
+
+    /// The offset just past the annotation starting at `at`, or `at` when it
+    /// cannot be read. Blanked code, so a parenthesis inside a literal is gone.
+    private static int endOfAnnotation(String code, int at) {
+        int i = at + 1;
+        while (i < code.length() && (Character.isWhitespace(code.charAt(i))
+                || code.charAt(i) == ':' || code.charAt(i) == '.'
+                || Character.isJavaIdentifierPart(code.charAt(i)))) {
+            i++;
+        }
+        int probe = i;
+        while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+            probe++;
+        }
+        if (probe >= code.length() || code.charAt(probe) != '(') {
+            return i;
+        }
+        int depth = 0;
+        for (int j = probe; j < code.length(); j++) {
+            if (code.charAt(j) == '(') {
+                depth++;
+            } else if (code.charAt(j) == ')') {
+                depth--;
+                if (depth == 0) {
+                    return j + 1;
+                }
+            }
+        }
+        return at;
     }
 
     /// One thing this deliberately does NOT do: translate Java's unicode

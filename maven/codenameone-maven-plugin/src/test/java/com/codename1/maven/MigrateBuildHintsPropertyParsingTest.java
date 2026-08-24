@@ -233,6 +233,20 @@ public class MigrateBuildHintsPropertyParsingTest {
                 MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
     }
 
+    /// An import goes above EVERY top-level declaration, so the anchor for a
+    /// file with no package and no import is the first declaration in it --
+    /// whatever kind it is. Anchoring on the MAIN class instead put the import
+    /// below a `fun helper()` written before it, which neither language allows,
+    /// and verification rolled back a valid migration.
+    @Test
+    public void theAnchorIsTheFirstDeclarationNotTheMainClass() {
+        String kt = "fun helper() {}\n\nclass MyApp\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(kt, true));
+
+        String java = "class Helper {}\n\n@Deprecated\nclass MyApp {}\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(java));
+    }
+
     /// A default-package class that already carries an annotation: the import
     /// must go ABOVE it. Anchoring on the declaration put the import between the
     /// annotation and the class, which is not valid in either language.
@@ -240,63 +254,56 @@ public class MigrateBuildHintsPropertyParsingTest {
     public void theImportGoesAboveAnExistingAnnotation() {
         String head = "/* c */\n@SuppressWarnings(\"unchecked\")\n";
         assertEquals(head.indexOf("@SuppressWarnings"),
-                MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
-    }
-
-    /// Modifiers and annotations may INTERLEAVE: `public @Deprecated final
-    /// class Main` is legal. The modifier walk from the keyword stops at the
-    /// annotation, so backing up only over the annotation run left `public`
-    /// above the insertion point -- the import went between it and the rest of
-    /// its own declaration, and verification rolled the migration back.
-    @Test
-    public void theAnchorClearsModifiersInterleavedWithAnnotations() {
-        String head = "public @Deprecated ";
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
-
-        // A modifier alone, with no annotation at all.
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations("public "));
-
-        // A word that is NOT a modifier still ends the walk, or the anchor would
-        // climb out of the declaration and into whatever precedes it.
-        String other = "int x = 1;\n@Deprecated\n";
-        assertEquals(other.indexOf("@Deprecated"),
-                MigrateBuildHintsMojo.startOfLeadingAnnotations(other));
-    }
-
-    /// A Kotlin annotation may have an ESCAPED name, and a backtick is not an
-    /// identifier character -- so the backward walk stopped on it, read no name,
-    /// and left `@`when`` out of the leading run. The generated import then went
-    /// between the annotation and the class, where Kotlin does not allow one.
-    @Test
-    public void anEscapedAnnotationNameIsPartOfTheLeadingRun() {
-        String head = "@`when`\n";
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
-
-        String withArgs = "@`when`(\"x\")\n@Deprecated\n";
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(withArgs));
-
-        // A qualified name may escape a component too.
-        String qualified = "@com.`when`.Ann\n";
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(qualified));
-
-        // A lone backtick run that is not an annotation is still not one.
-        String notAnnotation = "`when`\n";
-        assertEquals(notAnnotation.length(),
-                MigrateBuildHintsMojo.startOfLeadingAnnotations(notAnnotation));
+                MigrateBuildHintsMojo.startOfFirstDeclaration(head));
     }
 
     /// A parenthesis inside an annotation argument must not stop the walk.
     @Test
     public void anArgumentContainingAParenthesisDoesNotStopTheWalk() {
         String head = "@Deprecated\n@SuppressWarnings(\"a(b\")\n";
-        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(head));
     }
 
-    /// With no annotation there is nothing to move above.
+    /// With no declaration there is nothing to go above.
     @Test
-    public void withNoAnnotationTheAnchorIsTheEnd() {
+    public void withNoDeclarationTheAnchorIsTheEnd() {
         String head = "/* copyright */\n\n";
-        assertEquals(head.length(), MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+        assertEquals(head.length(), MigrateBuildHintsMojo.startOfFirstDeclaration(head));
+    }
+
+    /// Modifiers and annotations may interleave: `public @Deprecated final
+    /// class Main` is legal, and the whole run is below the import.
+    @Test
+    public void theAnchorClearsModifiersInterleavedWithAnnotations() {
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration("public @Deprecated "));
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration("public "));
+    }
+
+    /// A Kotlin annotation may have an ESCAPED name, which is code the scan has
+    /// to read rather than stop on.
+    @Test
+    public void anEscapedAnnotationNameIsPartOfTheLeadingRun() {
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration("@`when`\n", true));
+        assertEquals(0,
+                MigrateBuildHintsMojo.startOfFirstDeclaration("@`when`(\"x\")\n@Deprecated\n", true));
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration("@com.`when`.Ann\n", true));
+    }
+
+    /// Kotlin's FILE annotations sit above the package header and the imports
+    /// both, so the import goes BELOW them -- the one thing the anchor steps
+    /// over rather than displaces.
+    @Test
+    public void aKotlinFileAnnotationStaysAboveTheImport() {
+        String kt = "@file:Suppress(\"unchecked\")\n@file:JvmName(\"X\")\n\nclass MyApp\n";
+        assertEquals(kt.indexOf("class MyApp"),
+                MigrateBuildHintsMojo.startOfFirstDeclaration(kt, true));
+
+        // An ordinary annotation is not a file annotation.
+        String ordinary = "@Suppress(\"unchecked\")\nclass MyApp\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(ordinary, true));
+
+        // Java has no such form, so `@file` there is an ordinary annotation.
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(kt, false));
     }
 
     /// The migration's source lookup must require a TOP-LEVEL declaration. A
