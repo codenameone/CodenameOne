@@ -88,6 +88,20 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// shipping last week's configuration.
     public static final String SOURCE_DIGEST_KEY = "cn1.buildHints.sourceDigest";
 
+    /// The compiled main class's own bytes, for a consumer that cannot read
+    /// bytecode.
+    ///
+    /// The simulator lives in the JavaSE port and has no bytecode reader, so it
+    /// cannot recompute [#SOURCE_DIGEST_KEY] and was left comparing file
+    /// timestamps. Those are not always available to compare: a jar records
+    /// entry times to two-second granularity, and a build configured for
+    /// reproducible output stamps every entry identically -- which makes the
+    /// comparison inert rather than merely coarse, so a manifest left behind by
+    /// an earlier build reads as current and the simulator runs the previous
+    /// values of hints it can actually see. Hashing the class file needs no
+    /// bytecode reader at all.
+    public static final String CLASS_DIGEST_KEY = "cn1.buildHints.classDigest";
+
     /// hint name to value, sorted so the emitted bytes are stable.
     private final Map<String, String> hints = new TreeMap<String, String>();
     /// hint name to "@Ios(pods)".
@@ -1257,6 +1271,47 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
+    /// SHA-256 of the compiled main class, hex, or null when it cannot be read.
+    ///
+    /// Nothing rewrites the class after `process-classes` in a Codename One
+    /// project, so this identifies the build that produced the manifest beside
+    /// it. A project that does add such a step would see the manifest reported
+    /// as stale, which is why the consumer treats a missing value as "cannot
+    /// tell" rather than as proof of anything.
+    private static String compiledClassDigest(ProcessorContext ctx, String main) {
+        if (main == null) {
+            return null;
+        }
+        File dir = ctx.getOutputClassDir();
+        if (dir == null) {
+            return null;
+        }
+        File f = new File(dir, main.replace('.', File.separatorChar) + ".class");
+        if (!f.isFile()) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            java.io.InputStream in = new java.io.FileInputStream(f);
+            try {
+                byte[] buf = new byte[8192];
+                for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                    md.update(buf, 0, n);
+                }
+            } finally {
+                in.close();
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.io.IOException | java.security.NoSuchAlgorithmException ex) {
+            return null;
+        }
+    }
+
     private byte[] serialize(ProcessorContext ctx) throws ProcessingException {
         StringBuilder sb = new StringBuilder();
         sb.append("# Generated from build hint annotations by the Codename One Maven plugin.\n");
@@ -1267,6 +1322,10 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         sb.append(SOURCE_DIGEST_KEY).append('=')
           .append(sourceDigest(annotated.get(0))).append('\n');
+        String compiled = compiledClassDigest(ctx, main);
+        if (compiled != null) {
+            sb.append(CLASS_DIGEST_KEY).append('=').append(compiled).append('\n');
+        }
         for (Map.Entry<String, String> e : hints.entrySet()) {
             sb.append(escape(BuildHints.ARG_PREFIX + e.getKey())).append('=')
               .append(escape(e.getValue())).append('\n');

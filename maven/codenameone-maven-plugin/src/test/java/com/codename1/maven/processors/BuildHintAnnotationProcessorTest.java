@@ -582,6 +582,43 @@ public class BuildHintAnnotationProcessorTest {
                 false));
     }
 
+    /// The simulator has no bytecode reader, so it cannot recompute the source
+    /// digest and was left comparing file timestamps -- which a jar records to
+    /// two seconds and a reproducible build stamps identically, making the
+    /// comparison inert rather than coarse. Hashing the class file needs no
+    /// bytecode reader, so the manifest records that instead.
+    @Test
+    public void theManifestRecordsTheCompiledClassesOwnDigest() throws Exception {
+        File classes = compile("@Ios(teamId = \"ABCDE12345\")");
+        ProcessorContext ctx = run(classes, settings(), MAIN, true);
+        Properties p = new Properties();
+        p.load(new ByteArrayInputStream(ctx.getEmittedResources()
+                .get(BuildHintAnnotationProcessor.MANIFEST_RESOURCE)));
+
+        String recorded = p.getProperty(BuildHintAnnotationProcessor.CLASS_DIGEST_KEY);
+        assertTrue("no class digest was recorded", recorded != null);
+        assertEquals(sha256Of(new File(classes, "com/example/MyApp.class")), recorded);
+    }
+
+    private static String sha256Of(File f) throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                md.update(buf, 0, n);
+            }
+        } finally {
+            in.close();
+        }
+        StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest()) {
+            hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+            hex.append(Character.forDigit(b & 0xF, 16));
+        }
+        return hex.toString();
+    }
+
     /// A qualified name may escape a COMPONENT: `package com.`when`` is legal
     /// Kotlin and the compiled class belongs to `com.when`. Stopping at the
     /// backtick recorded `com.`, so a live annotated class looked like it

@@ -912,12 +912,39 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * happens to appear first.</p>
      */
     /// Whether blanked `code` contains a live import of the build hint package.
+    /// The end of the declaration that has been read up to `i`: its terminating
+    /// semicolon if it has one, then the rest of that line.
+    ///
+    /// Any whitespace before the semicolon, newlines included -- a blanked block
+    /// comment keeps its newlines, so `import foo.Bar /* note\n */ ;` left the
+    /// semicolon unconsumed and ended the declaration at that newline, INSIDE
+    /// the comment. The generated import was written there and stayed commented
+    /// out, so the annotations failed verification and a valid migration was
+    /// rolled back. Only taken when a semicolon is what follows, so a Kotlin
+    /// declaration that has none still ends on its own line.
+    private static int endOfDeclarationLine(String code, int i) {
+        int probe = i;
+        while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+            probe++;
+        }
+        if (probe < code.length() && code.charAt(probe) == ';') {
+            i = probe + 1;
+        }
+        int eol = code.indexOf('\n', i);
+        return eol < 0 ? code.length() : eol + 1;
+    }
+
     static boolean importsBuildHints(String code) {
         for (int at = importKeywordAt(code, 0); at >= 0;
                 at = importKeywordAt(code, at + "import".length())) {
             String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
                     .qualifiedNameAt(code, at + "import".length());
-            if (name.startsWith("com.codename1.annotations.buildhints")) {
+            // The PACKAGE, not any name that starts with its letters. An
+            // unrelated com.codename1.annotations.buildhintsExtra.Widget read as
+            // "already imported" and aborted a migration with nothing to
+            // conflict with.
+            if (name.equals("com.codename1.annotations.buildhints")
+                    || name.startsWith("com.codename1.annotations.buildhints.")) {
                 return true;
             }
         }
@@ -988,14 +1015,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             }
             i = probe + 2;
         }
-        while (i < code.length() && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
-            i++;
-        }
-        if (i < code.length() && code.charAt(i) == ';') {
-            i++;
-        }
-        int eol = code.indexOf('\n', i);
-        return eol < 0 ? code.length() : eol + 1;
+        return endOfDeclarationLine(code, i);
     }
 
     /// The offset of the `package` keyword in already-blanked code, or -1.
@@ -1034,14 +1054,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // disagree about where a name ends.
         int i = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .qualifiedNameEnd(code, pkgAt + "package".length());
-        while (i < code.length() && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
-            i++;
-        }
-        if (i < code.length() && code.charAt(i) == ';') {
-            i++;
-        }
-        int eol = code.indexOf('\n', i);
-        return eol < 0 ? code.length() : eol + 1;
+        return endOfDeclarationLine(code, i);
     }
 
     /// The index in `head` where the run of annotations immediately preceding the

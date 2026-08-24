@@ -371,6 +371,46 @@ public class MigrateBuildHintsPropertyParsingTest {
                 MigrateBuildHintsMojo.classDeclarationIndex(src, true, "Other"));
     }
 
+    /// The build hints PACKAGE, not any name that starts with its letters. An
+    /// unrelated `com.codename1.annotations.buildhintsExtra.Widget` read as
+    /// "already imported" and aborted a migration with nothing to conflict with.
+    @Test
+    public void anImportOfALongerPackageIsNotOurs() {
+        String other = com.codename1.maven.processors.BuildHintAnnotationProcessor.blankNonCode(
+                "import com.codename1.annotations.buildhintsExtra.Widget;\n"
+                        + "public class MyApp {}\n", false);
+        assertFalse(MigrateBuildHintsMojo.importsBuildHints(other));
+
+        String ours = com.codename1.maven.processors.BuildHintAnnotationProcessor.blankNonCode(
+                "import com.codename1.annotations.buildhints.*;\npublic class MyApp {}\n",
+                false);
+        assertTrue(MigrateBuildHintsMojo.importsBuildHints(ours));
+    }
+
+    /// A blanked block comment keeps its newlines, so
+    /// `import foo.Bar /* note\n */ ;` left the semicolon unconsumed and ended
+    /// the declaration at that newline -- INSIDE the comment, where the
+    /// generated import was then written and stayed commented out.
+    @Test
+    public void theInsertionPointClearsAMultiLineTrailingComment() {
+        String head = "import foo.Bar /* note\n */ ;\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int last = MigrateBuildHintsMojo.lastImportIndex(code);
+        assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
+    }
+
+    /// The package declaration has the same terminator and the same hazard.
+    @Test
+    public void theAnchorClearsAMultiLineTrailingComment() {
+        String head = "package com.example /* note\n */ ;\nclass X {}\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int pkg = MigrateBuildHintsMojo.livePackageIndex(code);
+        assertEquals(head.indexOf("class X"),
+                MigrateBuildHintsMojo.endOfPackageDeclaration(code, pkg));
+    }
+
     /// `static` is a modifier, not the imported name. Reading it as the name
     /// ended the declaration at the newline inside the REAL name, so the
     /// generated import was spliced into the middle of the static import and the

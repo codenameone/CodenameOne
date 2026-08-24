@@ -510,11 +510,8 @@ public class Simulator {
         }
         // Sharing an archive does not mean sharing a build. Nothing deletes an
         // old manifest from target/classes, so a recompiled main class and last
-        // week's resource are packaged into the same jar -- with their own entry
-        // timestamps, which is what tells them apart.
-        String staleAgainst = found.jar != null
-                ? classNewerThanManifestInJar(p, found.jar)
-                : (f == null ? null : classNewerThanManifest(p, f));
+        // week's resource are packaged into the same jar.
+        String staleAgainst = staleManifestReason(p, found);
         if (staleAgainst != null) {
             // Nothing removes target/classes between builds, so a project that ran
             // process-annotations once and then stopped -- goal unbound, skipped,
@@ -531,8 +528,8 @@ public class Simulator {
             // the direction that matters -- process-classes always follows compile
             // within a build, so a main class newer than the manifest cannot have
             // produced it.
-            System.err.println("Warning: " + found.where + " is older than "
-                    + staleAgainst + ", so it was produced by an earlier build "
+            System.err.println("Warning: " + found.where + " " + staleAgainst
+                    + ", so it was produced by an earlier build "
                     + "and its build hints were NOT applied.");
             System.err.println("         Rebuild the project so the cn1 process-annotations "
                     + "goal regenerates it.");
@@ -857,6 +854,119 @@ public class Simulator {
      * no class file for it, no readable timestamps -- so the manifest is taken at
      * face value rather than discarded on a guess.</p>
      */
+    /**
+     * Why the manifest was left behind by an earlier build, or null when it is
+     * current.
+     *
+     * <p>By the class file's own contents when the manifest records them, and
+     * only otherwise by timestamps. Timestamps are not always available to
+     * compare: a jar records entry times to two-second granularity, and a build
+     * configured for reproducible output stamps every entry identically, which
+     * makes the comparison inert rather than merely coarse. A manifest with no
+     * recorded digest is one an older plugin wrote, so it falls back rather than
+     * being refused.</p>
+     */
+    static String staleManifestReason(java.util.Properties manifest,
+                                      FoundManifest found) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        String recorded = manifest.getProperty("cn1.buildHints.classDigest");
+        if (recorded != null && recorded.length() > 0) {
+            String actual = found.jar != null
+                    ? digestOfJarEntry(found.jar, entry)
+                    : digestOfFile(classFileBeside(found.file, main));
+            if (actual != null) {
+                return recorded.equals(actual) ? null
+                        : "does not describe the compiled " + entry;
+            }
+        }
+        String older = found.jar != null
+                ? classNewerThanManifestInJar(manifest, found.jar)
+                : (found.file == null ? null : classNewerThanManifest(manifest, found.file));
+        return older == null ? null : "is older than " + older;
+    }
+
+    /** The compiled main class in the output directory the manifest sits in. */
+    private static File classFileBeside(File manifestFile, String main) {
+        if (manifestFile == null) {
+            return null;
+        }
+        File classes = manifestFile.getParentFile();                  // .../codenameone
+        classes = classes == null ? null : classes.getParentFile();   // .../META-INF
+        classes = classes == null ? null : classes.getParentFile();   // the output dir
+        if (classes == null) {
+            return null;
+        }
+        File f = new File(classes, main.trim().replace('.', File.separatorChar) + ".class");
+        return f.isFile() ? f : null;
+    }
+
+    /** SHA-256 of a file, hex, or null when it cannot be read. */
+    private static String digestOfFile(File f) {
+        if (f == null) {
+            return null;
+        }
+        try {
+            java.io.InputStream in = new FileInputStream(f);
+            try {
+                return digestOf(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** SHA-256 of one jar entry, hex, or null when it is absent or unreadable. */
+    static String digestOfJarEntry(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                return digestOf(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static String digestOf(java.io.InputStream in) throws IOException {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                md.update(buf, 0, n);
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            return null;
+        }
+    }
+
     /**
      * As above, for a manifest read out of a jar: the two entries' own
      * timestamps, since being in one archive proves nothing about which build

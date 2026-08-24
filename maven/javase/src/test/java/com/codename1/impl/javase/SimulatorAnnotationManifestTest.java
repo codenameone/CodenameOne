@@ -118,7 +118,7 @@ public class SimulatorAnnotationManifestTest {
             ZipEntry cls = new ZipEntry("com/example/MyApp.class");
             cls.setTime(classTime);
             out.putNextEntry(cls);
-            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+            out.write(CLASS_BYTES);
             out.closeEntry();
 
             ZipEntry res = new ZipEntry("META-INF/codenameone/build-hints.properties");
@@ -172,5 +172,71 @@ public class SimulatorAnnotationManifestTest {
 
         assertNull(Simulator.classNewerThanManifestInJar(
                 stampedFor("com.other.TheirApp"), jar));
+    }
+
+    private static final byte[] CLASS_BYTES =
+            new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE};
+
+    /** SHA-256 of what jarWith puts in the class entry, hex. */
+    private static String classBytesDigest() throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        md.update(CLASS_BYTES);
+        StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest()) {
+            hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+            hex.append(Character.forDigit(b & 0xF, 16));
+        }
+        return hex.toString();
+    }
+
+    private static Properties stamped(String mainClass, String classDigest) {
+        Properties p = stampedFor(mainClass);
+        if (classDigest != null) {
+            p.setProperty("cn1.buildHints.classDigest", classDigest);
+        }
+        return p;
+    }
+
+    /**
+     * Zip records entry times to two seconds, and a build configured for
+     * reproducible output stamps every entry identically -- so a stale manifest
+     * and the class it no longer describes can compare EQUAL, which made the
+     * timestamp rule inert rather than merely coarse. The recorded contents of
+     * the class settle it.
+     */
+    @Test
+    public void aStaleManifestIsDetectedWhenTheTimestampsAreEqual(@TempDir File tmp)
+            throws Exception {
+        long same = 1600000000000L;
+        File jar = jarWith(tmp, "app-reproducible.jar", same, same);
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", "0000deadbeef"), null, jar, "app-reproducible.jar");
+        assertEquals("does not describe the compiled com/example/MyApp.class",
+                Simulator.staleManifestReason(found.hints, found));
+    }
+
+    /** ...and a digest that matches settles it the other way, timestamps aside. */
+    @Test
+    public void aMatchingClassDigestOutranksTheTimestamps(@TempDir File tmp) throws Exception {
+        long manifest = 1600000000000L;
+        File jar = jarWith(tmp, "app-touched.jar", manifest + 60000L, manifest);
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", classBytesDigest()), null, jar, "app-touched.jar");
+        assertNull(Simulator.staleManifestReason(found.hints, found));
+    }
+
+    /** A manifest an older plugin wrote records no digest, so timestamps still decide. */
+    @Test
+    public void withoutARecordedDigestTheTimestampsStillDecide(@TempDir File tmp)
+            throws Exception {
+        long manifest = 1600000000000L;
+        File jar = jarWith(tmp, "app-old.jar", manifest + 60000L, manifest);
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", null), null, jar, "app-old.jar");
+        assertEquals("is older than com/example/MyApp.class",
+                Simulator.staleManifestReason(found.hints, found));
     }
 }
