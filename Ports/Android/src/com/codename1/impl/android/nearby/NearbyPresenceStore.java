@@ -127,6 +127,35 @@ class NearbyPresenceStore {
 
     private static long presenceSequence;
 
+    /// The last presence each association was reported with.
+    ///
+    /// getAssociations() encoded every association as absent, so an app
+    /// following CompanionDevice.isPresent()'s own instruction to re-read
+    /// the association turned a device that had just appeared back into one
+    /// that was not there. The platform has no query for this -- presence
+    /// arrives as an event and nowhere else -- so the last event is the only
+    /// answer there is.
+    private static final java.util.Map<String, Boolean> PRESENT =
+            Collections.synchronizedMap(new java.util.HashMap<String,
+                    Boolean>());
+
+    /// Guards the whole persisted backlog, read-modify-write and all.
+    ///
+    /// The service persists on its callback thread while the backend
+    /// restores on the thread that built it. Unsynchronized, the restore
+    /// could read the stored rows, the service append one to what it had
+    /// read, and the restore then delete the KEY -- taking with it an event
+    /// that was never returned. If the process died before its in-memory
+    /// copy reached a listener that event was gone, which is precisely the
+    /// cold start this store exists for.
+    private static final Object STORE_LOCK = new Object();
+
+    /// Whether this association was last reported present.
+    static boolean isPresent(String associationId) {
+        Boolean known = PRESENT.get(associationId);
+        return known != null && known.booleanValue();
+    }
+
     /// Hands an event to the backlog, persisting it only if nobody is
     /// listening.
     ///
@@ -141,7 +170,11 @@ class NearbyPresenceStore {
         return UNOBSERVED.contains(associationId);
     }
 
-    static void record(Context ctx, String encoded, boolean present) {
+    static void record(Context ctx, String associationId, String encoded,
+            boolean present) {
+        if (associationId != null) {
+            PRESENT.put(associationId, Boolean.valueOf(present));
+        }
         if (CompanionDevices.hasPresenceListener()) {
             CompanionDevices.deliverPresenceChanged(encoded, present);
             return;
@@ -164,35 +197,38 @@ class NearbyPresenceStore {
         if (ctx == null) {
             return;
         }
-        try {
-            SharedPreferences prefs = ctx.getSharedPreferences(
-                    PRESENCE_PREFS, Context.MODE_PRIVATE);
-            String existing = prefs.getString(PRESENCE_KEY, "");
-            List<String> rows = new ArrayList<String>();
-            if (existing.length() > 0) {
-                for (String r : existing.split("\n")) {
-                    if (r.length() > 0) {
-                        rows.add(r);
+        synchronized (STORE_LOCK) {
+            try {
+                SharedPreferences prefs = ctx.getSharedPreferences(
+                        PRESENCE_PREFS, Context.MODE_PRIVATE);
+                String existing = prefs.getString(PRESENCE_KEY, "");
+                List<String> rows = new ArrayList<String>();
+                if (existing.length() > 0) {
+                    for (String r : existing.split("\n")) {
+                        if (r.length() > 0) {
+                            rows.add(r);
+                        }
                     }
                 }
-            }
-            rows.add(row);
-            while (rows.size() > MAX_PERSISTED) {
-                rows.remove(0);
-            }
-            StringBuilder out = new StringBuilder();
-            for (int i = 0; i < rows.size(); i++) {
-                if (i > 0) {
-                    out.append('\n');
+                rows.add(row);
+                while (rows.size() > MAX_PERSISTED) {
+                    rows.remove(0);
                 }
-                out.append(rows.get(i));
+                StringBuilder out = new StringBuilder();
+                for (int i = 0; i < rows.size(); i++) {
+                    if (i > 0) {
+                        out.append('\n');
+                    }
+                    out.append(rows.get(i));
+                }
+                prefs.edit().putString(PRESENCE_KEY, out.toString()).commit();
+            } catch (Throwable unavailable) {
+                // Nothing can be done about a store that will not take it, and
+                // failing the event outright would lose what the in-memory
+                // backlog can still carry for a process that lives long enough.
+                Log.w("CN1Nearby", "presence backlog not persisted",
+                        unavailable);
             }
-            prefs.edit().putString(PRESENCE_KEY, out.toString()).commit();
-        } catch (Throwable unavailable) {
-            // Nothing can be done about a store that will not take it, and
-            // failing the event outright would lose what the in-memory
-            // backlog can still carry for a process that lives long enough.
-            Log.w("CN1Nearby", "presence backlog not persisted", unavailable);
         }
     }
 
@@ -214,13 +250,16 @@ class NearbyPresenceStore {
             return new String[0];
         }
         String existing;
-        try {
-            SharedPreferences prefs = ctx.getSharedPreferences(
-                    PRESENCE_PREFS, Context.MODE_PRIVATE);
-            existing = prefs.getString(PRESENCE_KEY, "");
-            prefs.edit().remove(PRESENCE_KEY).commit();
-        } catch (Throwable unavailable) {
-            return new String[0];
+        // Read and removed as ONE step, against the same lock persist takes.
+        synchronized (STORE_LOCK) {
+            try {
+                SharedPreferences prefs = ctx.getSharedPreferences(
+                        PRESENCE_PREFS, Context.MODE_PRIVATE);
+                existing = prefs.getString(PRESENCE_KEY, "");
+                prefs.edit().remove(PRESENCE_KEY).commit();
+            } catch (Throwable unavailable) {
+                return new String[0];
+            }
         }
         if (existing.length() == 0) {
             return new String[0];

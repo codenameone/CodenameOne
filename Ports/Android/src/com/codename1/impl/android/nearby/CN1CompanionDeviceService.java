@@ -147,7 +147,7 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
         }
         String encoded = sanitize(address) + '\t' + sanitize(address) + '\t'
                 + sanitize(address) + "\t0\t" + (present ? '1' : '0');
-        NearbyPresenceStore.record(this, encoded, present);
+        NearbyPresenceStore.record(this, address, encoded, present);
     }
 
     private void deliver(AssociationInfo info, boolean present) {
@@ -179,7 +179,7 @@ public class CN1CompanionDeviceService extends CompanionDeviceService {
                 + sanitize(mac == null ? "" : mac) + '\t'
                 + AndroidNearbyBackend.profileOrdinalOf(info) + '\t'
                 + (present ? '1' : '0');
-        NearbyPresenceStore.record(this, encoded, present);
+        NearbyPresenceStore.record(this, id, encoded, present);
     }
 
     private static String sanitize(String s) {

@@ -714,6 +714,16 @@ public class AndroidNearbyBackend implements NearbyBridge {
 
             @Override
             public void onFailure(CharSequence error) {
+                // Still ours? The platform can answer long after an activity
+                // recreation released this request and a new chooser took
+                // the slot, and releaseResultListener is NOT owner-checked:
+                // a stale failure tore down the live request's listener, so
+                // its chooser result went nowhere and its resource never
+                // settled. launch() checks the same thing for the same
+                // reason.
+                if (pendingAssociate() != requestId) {
+                    return;
+                }
                 releaseAssociate(requestId);
                 // The listener was installed before associate() was called,
                 // and installing one marks CodenameOneActivity as waiting for
@@ -937,16 +947,22 @@ public class AndroidNearbyBackend implements NearbyBridge {
         if (cdm == null) {
             return new String[0];
         }
+        // With the presence each association was last reported with, not a
+        // flat false. CompanionDevice.isPresent() tells the app to re-read
+        // the association for a current answer, and re-reading turned a
+        // device that had just appeared back into one that was not there.
         List<String> out = new ArrayList<String>();
         if (Build.VERSION.SDK_INT >= 33) {
             List<AssociationInfo> all = cdm.getMyAssociations();
             for (int i = 0; all != null && i < all.size(); i++) {
-                out.add(encode(all.get(i), false));
+                out.add(encode(all.get(i),
+                        NearbyPresenceStore.isPresent(idOf(all.get(i)))));
             }
         } else {
             List<String> legacy = cdm.getAssociations();
             for (int i = 0; legacy != null && i < legacy.size(); i++) {
-                out.add(encodeLegacy(legacy.get(i), legacy.get(i), false));
+                out.add(encodeLegacy(legacy.get(i), legacy.get(i),
+                        NearbyPresenceStore.isPresent(legacy.get(i))));
             }
         }
         return out.toArray(new String[out.size()]);
