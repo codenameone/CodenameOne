@@ -86,24 +86,23 @@ jobs:
               );
             }
 
+            let latest;
             if (context.eventName === 'workflow_run') {
-              const run = context.payload.workflow_run;
-              if (run.conclusion !== 'success') {
-                addProblem(
-                  'blog-run',
-                  `The blog syndication workflow concluded with **${run.conclusion || 'unknown'}**: ${run.html_url}`
-                );
-              }
+              // The workflow-runs API can lag behind the completed event that
+              // triggered this job. Trust the event payload so a successful
+              // run cannot be mistaken for an older, stale run.
+              latest = context.payload.workflow_run;
+            } else {
+              const workflowRuns = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'blog-syndication.yml',
+                branch: context.payload.repository.default_branch,
+                per_page: 10,
+              });
+              latest = workflowRuns.data.workflow_runs.find(run => run.status === 'completed');
             }
 
-            const workflowRuns = await github.rest.actions.listWorkflowRuns({
-              owner,
-              repo,
-              workflow_id: 'blog-syndication.yml',
-              branch: context.payload.repository.default_branch,
-              per_page: 10,
-            });
-            const latest = workflowRuns.data.workflow_runs.find(run => run.status === 'completed');
             if (!latest) {
               addProblem('missing-blog-run', 'No completed blog syndication workflow run was found.');
             } else {
