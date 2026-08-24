@@ -16490,6 +16490,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boole
 #if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 
 #import "CN1WatchConnectivity.h"
+// The translated entry points the cn1_wearable_deliver* functions below call. Without this
+// they are implicit declarations, which the watchOS slice rejects outright -- "call to
+// undeclared function 'com_codename1_impl_ios_IOSWearableCallbacks_nativeMessageReceived...'"
+// -- so the same source compiled for the phone and not for the watch beside it.
+//
+// The diagnostic is the lucky part. An invented prototype returns int and passes the thread
+// state, two JAVA_OBJECTs and an int through whatever registers the default promotions
+// choose, so where it does link it delivers a message built out of the wrong arguments.
+// Same reasoning, and the same fix, as the IOSIntentCallbacks import in
+// CodenameOne_GLAppDelegate.m.
+//
+// Inside the guard rather than beside the other includes at the top of the file: on a slice
+// with WatchConnectivity off the class may not be translated at all, and then the header
+// does not exist.
+#include "com_codename1_impl_ios_IOSWearableCallbacks.h"
 
 #if TARGET_OS_WATCH
 // Brings the session up on the watch without anyone asking for it.
