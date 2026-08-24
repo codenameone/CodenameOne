@@ -478,6 +478,8 @@ static void cn1nbSettleRangingStart(CN1NearbyRangingSession *entry)
 /// such signal, so the receiving end sends one back and the terminal status
 /// waits for it.
 @property (nonatomic, retain) NSMutableDictionary *awaitingAck;
+/// Names each recorded send, so its timeout settles that send and no other.
+@property (nonatomic, assign) JAVA_LONG ackToken;
 @property (nonatomic, assign) int pendingAdvertiseRequest;
 @property (nonatomic, assign) int pendingDiscoverRequest;
 /// The advertising and discovery services are tracked SEPARATELY.
@@ -941,13 +943,18 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// taken the entry, and taking it is what decides who reports the terminal
 /// status.
 - (void)scheduleAckTimeout:(JAVA_INT)payloadId fromPeer:(NSString *)pid
-                   encoded:(NSString *)encoded {
+                     token:(JAVA_LONG)token encoded:(NSString *)encoded {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                     (int64_t)CN1_NEARBY_ACK_TIMEOUT_NS),
             dispatch_get_main_queue(), ^{
         @autoreleasepool {
             JAVA_LONG length = -1;
-            if (![self takeAck:payloadId fromPeer:pid length:&length]) {
+            // ITS send, named by token. Keyed by peer and payload alone this
+            // timer took whatever was outstanding, so a repeat send of the
+            // same Payload to the same peer was failed by the previous
+            // send's timer, well inside its own thirty seconds.
+            if (![self takeAck:payloadId fromPeer:pid token:token
+                        length:&length]) {
                 return;
             }
             com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
@@ -965,8 +972,11 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// which had already reported the whole payload -- so a listener that
 /// persists or displays the terminal update regressed a finished transfer
 /// back to zero bytes.
-- (void)awaitAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid
-          length:(JAVA_LONG)length {
+/// #### Returns
+///
+/// the token identifying THIS send, which its timeout settles by
+- (JAVA_LONG)awaitAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid
+               length:(JAVA_LONG)length {
     @synchronized (self) {
         NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
         if (ids == nil) {
@@ -984,8 +994,17 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             outstanding = [NSMutableArray array];
             [ids setObject:outstanding forKey:key];
         }
-        [outstanding addObject:[NSNumber numberWithLongLong:
-                (long long)length]];
+        // Each entry carries a token as well as its length. Peer and
+        // payload id alone did not identify a SEND: sending the same Payload
+        // to the same peer again within the timeout window let the earlier
+        // send's timer take the newer send's record and fail it early, and
+        // the acknowledgement that then arrived for it was dropped as
+        // unknown.
+        JAVA_LONG token = ++self->_ackToken;
+        [outstanding addObject:[NSArray arrayWithObjects:
+                [NSNumber numberWithLongLong:(long long)token],
+                [NSNumber numberWithLongLong:(long long)length], nil]];
+        return token;
     }
 }
 
@@ -994,6 +1013,16 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 /// handing back the length that send was recorded with.
 - (BOOL)takeAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid
           length:(JAVA_LONG *)outLength {
+    // Any outstanding send of it. An acknowledgement frame carries a payload
+    // id and nothing else, so it cannot name which send it answers -- and
+    // with equal lengths under one id, it does not need to.
+    return [self takeAck:payloadId fromPeer:pid token:0 length:outLength];
+}
+
+/// Takes one specific send when `token` is non-zero, or any outstanding one
+/// when it is zero.
+- (BOOL)takeAck:(JAVA_INT)payloadId fromPeer:(NSString *)pid
+           token:(JAVA_LONG)token length:(JAVA_LONG *)outLength {
     @synchronized (self) {
         NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
         NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
@@ -1001,10 +1030,29 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if (outstanding == nil || [outstanding count] == 0) {
             return NO;
         }
-        if (outLength != NULL) {
-            *outLength = (JAVA_LONG)[[outstanding lastObject] longLongValue];
+        NSUInteger at = [outstanding count] - 1;
+        if (token != 0) {
+            at = NSNotFound;
+            for (NSUInteger i = 0; i < [outstanding count]; i++) {
+                NSArray *entry = [outstanding objectAtIndex:i];
+                if ((JAVA_LONG)[[entry objectAtIndex:0] longLongValue]
+                        == token) {
+                    at = i;
+                    break;
+                }
+            }
+            if (at == NSNotFound) {
+                // Its send is already settled. Taking whatever else is here
+                // would fail a DIFFERENT send, which is the bug the token
+                // exists to prevent.
+                return NO;
+            }
         }
-        [outstanding removeLastObject];
+        if (outLength != NULL) {
+            *outLength = (JAVA_LONG)[[[outstanding objectAtIndex:at]
+                    objectAtIndex:1] longLongValue];
+        }
+        [outstanding removeObjectAtIndex:at];
         if ([outstanding count] == 0) {
             [ids removeObjectForKey:key];
         }
@@ -1030,8 +1078,9 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             if (outstanding == nil) {
                 continue;
             }
-            for (NSNumber *length in outstanding) {
-                [out addObject:[NSArray arrayWithObjects:pid, length, nil]];
+            for (NSArray *entry in outstanding) {
+                [out addObject:[NSArray arrayWithObjects:pid,
+                        [entry objectAtIndex:1], nil]];
             }
             [ids removeObjectForKey:key];
             if ([ids count] == 0) {
@@ -1059,8 +1108,9 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // crashed before either the failure or the disconnection was
         // delivered. An untyped NSArray * cannot catch that; this can.
         for (NSNumber *key in [ids allKeys]) {
-            for (NSNumber *length in [ids objectForKey:key]) {
-                [out addObject:[NSArray arrayWithObjects:key, length, nil]];
+            for (NSArray *entry in [ids objectForKey:key]) {
+                [out addObject:[NSArray arrayWithObjects:key,
+                        [entry objectAtIndex:1], nil]];
             }
         }
         [self.awaitingAck removeObjectForKey:pid];
@@ -3099,9 +3149,10 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             // fail a payload the peer already had. Reporting progress first
             // keeps the order right as well: SUCCESS can now only follow the
             // IN_PROGRESS it belongs to, never precede it.
-            [cn1nbTransport awaitAck:payloadId
-                            fromPeer:[peerIds objectAtIndex:i]
-                              length:(JAVA_LONG)[data length]];
+            JAVA_LONG ackToken = [cn1nbTransport
+                    awaitAck:payloadId
+                    fromPeer:[peerIds objectAtIndex:i]
+                      length:(JAVA_LONG)[data length]];
             // Queued, not delivered. sendData returning YES says the message
             // was accepted for sending, and PayloadStatus.SUCCESS documents
             // that every byte ARRIVED -- which is what Android reports,
@@ -3130,6 +3181,7 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 JAVA_LONG unused = -1;
                 if ([cn1nbTransport takeAck:payloadId
                                    fromPeer:[peerIds objectAtIndex:i]
+                                      token:ackToken
                                      length:&unused]) {
                     com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                             CN1_THREAD_STATE_PASS_ARG cn1nbJString(encoded),
@@ -3140,6 +3192,7 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             }
             [cn1nbTransport scheduleAckTimeout:payloadId
                                       fromPeer:[peerIds objectAtIndex:i]
+                                         token:ackToken
                                        encoded:encoded];
         }
         if (!sent) {
