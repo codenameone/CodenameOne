@@ -4414,12 +4414,12 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
-    void disposingWindowsMidPressDoesNotExhaustTheDragSlots() {
+    void disposingWindowsMidPressDoesNotExhaustTheDragFilter() {
         implementation.setMultiWindowSupported(true);
-        // One more than the implementation tracks, so a leak of one slot per window
-        // is certain to have used them all up by the end.
-        int slots = 8;
-        for (int iter = 0; iter < slots + 1; iter++) {
+        // Comfortably more than the fixed table this used to be tracked in, so a leak
+        // of one entry per window would have used the whole table up by the end.
+        int windows = 12;
+        for (int iter = 0; iter < windows; iter++) {
             Window doomed = new Window("doomed" + iter, new BorderLayout());
             doomed.setWindowSize(400, 300);
             doomed.add(BorderLayout.CENTER, new DragCountingComponent());
@@ -4427,15 +4427,16 @@ class WindowTest extends UITestBase {
             doomed.asContainer().revalidate();
             // Pressed and then disposed without a release, which is what happens when
             // a window is closed from inside its own pressed handler or the platform
-            // takes the pointer away. The slot is claimed here and nothing else will
-            // ever give it back: window ids are not reused.
+            // takes the pointer away. The filter state belongs to the window, so it
+            // goes with it; a table keyed by window id would keep the entry forever,
+            // since window ids are not reused.
             implementation.windowPointerPressedForTest(doomed.getWindowId(), 100, 100);
             doomed.dispose();
             DisplayTest.flushEdt();
         }
 
-        // A fresh window must still get the activation filter. With the slots leaked,
-        // windowDragSlot answers -1 and the passthrough delivers jitter as a drag.
+        // A fresh window must still get the activation filter. Starved of entries,
+        // the filter falls through and delivers the jitter as a real drag.
         Window w = new Window("after", new BorderLayout());
         w.setWindowSize(400, 300);
         DragCountingComponent c = new DragCountingComponent();
@@ -4447,7 +4448,7 @@ class WindowTest extends UITestBase {
         DisplayTest.flushEdt();
         assertEquals(0, c.drags,
                 "a pixel of jitter is still not a drag after windows were disposed "
-                        + "mid-press; the filter must not be starved of slots");
+                        + "mid-press; the filter must not be starved");
 
         // And the filter still passes a real drag, so this is not just a dead window.
         for (int iter = 0; iter < 12; iter++) {
@@ -4456,6 +4457,61 @@ class WindowTest extends UITestBase {
         DisplayTest.flushEdt();
         assertTrue(c.drags > 0, "real movement must still reach the component");
         w.dispose();
+    }
+
+    @FormTest
+    void everyOpenWindowFiltersItsOwnDragNoMatterHowMany() {
+        implementation.setMultiWindowSupported(true);
+        // More than the fixed table of eight this used to be tracked in. Past that,
+        // the ninth window onwards got no filter at all and jitter reached it as a
+        // drag, which is the failure a per-window filter cannot have.
+        int count = 16;
+        java.util.List<Window> windows = new java.util.ArrayList<Window>();
+        java.util.List<DragCountingComponent> targets =
+                new java.util.ArrayList<DragCountingComponent>();
+        try {
+            for (int iter = 0; iter < count; iter++) {
+                Window w = new Window("concurrent" + iter, new BorderLayout());
+                w.setWindowSize(400, 300);
+                DragCountingComponent c = new DragCountingComponent();
+                w.add(BorderLayout.CENTER, c);
+                w.show();
+                w.asContainer().revalidate();
+                windows.add(w);
+                targets.add(c);
+            }
+            DisplayTest.flushEdt();
+
+            // Every one of them is pressed and jittered, all at once.
+            for (Window w : windows) {
+                implementation.windowPointerPressedForTest(w.getWindowId(), 100, 100);
+            }
+            for (Window w : windows) {
+                implementation.windowPointerDraggedForTest(w.getWindowId(), 101, 100);
+            }
+            DisplayTest.flushEdt();
+            for (int iter = 0; iter < count; iter++) {
+                assertEquals(0, targets.get(iter).drags,
+                        "window " + iter + " must filter its own jitter even with "
+                                + count + " windows dragging at once");
+            }
+
+            // And a real drag in the last one still gets through, so the filter is
+            // doing its job rather than swallowing everything.
+            Window last = windows.get(count - 1);
+            for (int iter = 0; iter < 12; iter++) {
+                implementation.windowPointerDraggedForTest(last.getWindowId(),
+                        100 + iter * 20, 100);
+            }
+            DisplayTest.flushEdt();
+            assertTrue(targets.get(count - 1).drags > 0,
+                    "real movement still reaches the last window");
+        } finally {
+            for (Window w : windows) {
+                w.dispose();
+            }
+            DisplayTest.flushEdt();
+        }
     }
 
     @FormTest

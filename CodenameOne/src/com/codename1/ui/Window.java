@@ -95,6 +95,12 @@ public class Window extends Container implements TopLevelContainer {
     private final int windowId;
     private Object nativePeer;
     private com.codename1.impl.PaintSurface paintSurface;
+
+    /// This window's drag-activation filter. Owned here rather than in a table keyed
+    /// by window id on the implementation, so it dies with the window and nothing
+    /// caps how many windows can be dragged at once.
+    private final com.codename1.impl.PointerDragActivation dragActivation =
+            new com.codename1.impl.PointerDragActivation();
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
@@ -282,6 +288,10 @@ public class Window extends Container implements TopLevelContainer {
 
     Object getNativePeer() {
         return nativePeer;
+    }
+
+    com.codename1.impl.PointerDragActivation getDragActivation() {
+        return dragActivation;
     }
 
     com.codename1.impl.PaintSurface getPaintSurface() {

@@ -169,74 +169,24 @@ public abstract class CodenameOneImplementation {
     /// How many windows may have a drag gesture in flight at once. A touchscreen can
     /// have a contact down in two windows at the same time, and the framework already
     /// keys press targets and drag histories per window rather than globally.
-    private static final int TRACKED_WINDOW_DRAGS = 8;
-
-    /// Drag activation state per window, kept apart from the main surface's because
-    /// nothing resets that one for a window gesture. Slot 0 of each array is used by
-    /// whichever window claims it; windowDragIds holds the owner, 0 meaning free.
-    private final int[] windowDragIds = new int[TRACKED_WINDOW_DRAGS];
-    private final boolean[] windowDragStarted = new boolean[TRACKED_WINDOW_DRAGS];
-    private final int[] windowDragActivationCounter = new int[TRACKED_WINDOW_DRAGS];
-    private final int[] windowDragActivationX = new int[TRACKED_WINDOW_DRAGS];
-    private final int[] windowDragActivationY = new int[TRACKED_WINDOW_DRAGS];
-
-    /// The slot tracking this window's drag gesture, claiming a free one when asked.
+    /// Drops any drag-activation state held for a window.
+    ///
+    /// A window can be disposed or lose the native pointer while a press is still
+    /// down, and then no release ever arrives to end the gesture. The next press in a
+    /// window reset for reuse would otherwise continue the old one, which reads as a
+    /// drag already in progress. The framework calls this from its own window input
+    /// cancellation, which until now cleared only its own records.
     ///
     /// #### Parameters
     ///
-    /// - `windowId`: the window to look up
-    ///
-    /// - `claim`: whether to take a free slot when the window has none
-    ///
-    /// #### Returns
-    ///
-    /// the slot, or -1 when the window has none and none was claimed
-    private int windowDragSlot(int windowId, boolean claim) {
-        int free = -1;
-        for (int iter = 0; iter < TRACKED_WINDOW_DRAGS; iter++) {
-            if (windowDragIds[iter] == windowId) {
-                return iter;
-            }
-            if (free < 0 && windowDragIds[iter] == 0) {
-                free = iter;
-            }
-        }
-        if (!claim || free < 0) {
-            return -1;
-        }
-        windowDragIds[free] = windowId;
-        windowDragStarted[free] = false;
-        windowDragActivationCounter[free] = 0;
-        return free;
-    }
-
-    /// Releases a window's drag slot.
-    private void releaseWindowDragSlot(int windowId) {
-        int slot = windowDragSlot(windowId, false);
-        if (slot >= 0) {
-            windowDragIds[slot] = 0;
-            windowDragStarted[slot] = false;
-            windowDragActivationCounter[slot] = 0;
-        }
-    }
-
-    /// Drops any drag-activation state this implementation holds for a window.
-    ///
-    /// The slot is claimed on press and released on release, but a window can be
-    /// disposed or lose the native pointer while a press is still down, and then no
-    /// release ever arrives. Window ids are never reused, so the slot would be held by
-    /// a dead id for the life of the process -- and after eight of those there are no
-    /// slots left, `windowDragSlot` starts answering -1, and the passthrough it falls
-    /// into hands every window a pixel of jitter as a real drag. The framework calls
-    /// this from its own window input cancellation, which until now cleared only its
-    /// own records.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the window's id; zero -- the main surface -- has no slot
+    /// - `windowId`: the window's id; zero -- the main surface -- keeps its state in
+    /// fields on this class and is not affected
     public void releaseWindowInputState(int windowId) {
         if (windowId > 0) {
-            releaseWindowDragSlot(windowId);
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
         }
     }
 
@@ -3231,8 +3181,10 @@ public abstract class CodenameOneImplementation {
         if (windowId > 0) {
             // A new gesture in this window starts its own activation filter over,
             // leaving any other window's gesture alone.
-            releaseWindowDragSlot(windowId);
-            windowDragSlot(windowId, true);
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
         }
         if (windowId == 0) {
             pointerPressed(x, y);
@@ -3255,7 +3207,10 @@ public abstract class CodenameOneImplementation {
     /// - `y`: the position of the event
     protected void windowPointerReleased(int windowId, int x, int y) {
         if (windowId > 0) {
-            releaseWindowDragSlot(windowId);
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
         }
         if (windowId == 0) {
             pointerReleased(x, y);
@@ -3293,25 +3248,26 @@ public abstract class CodenameOneImplementation {
             // through made a pixel of jitter after a press into a drag, which activates
             // drag and drop and moves a draggable component on what was meant as a
             // click.
-            int slot = windowDragSlot(windowId, true);
-            if (slot < 0) {
-                // More windows dragging at once than there are slots. Filtering is a
-                // refinement, so let the gesture through rather than swallow it.
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act == null) {
+                // No window under this id any more -- disposed with events still in
+                // flight. Filtering is a refinement, so let the gesture through rather
+                // than swallow it.
                 Desktop.getInstance().windowPointerDragged(windowId, x, y);
                 return;
             }
             boolean started = false;
-            if (!windowDragStarted[slot]) {
+            if (!act.started) {
                 try {
-                    started = hasWindowDragStarted(windowId, slot, x[0], y[0]);
+                    started = hasWindowDragStarted(windowId, act, x[0], y[0]);
                 } catch (Throwable t) {
                     // Matches the main path: a filter that throws must not take the
                     // gesture with it.
                     Log.e(t);
                 }
             }
-            if (windowDragStarted[slot] || started) {
-                windowDragStarted[slot] = true;
+            if (act.started || started) {
+                act.started = true;
                 Desktop.getInstance().windowPointerDragged(windowId, x, y);
             }
             return;
@@ -3358,7 +3314,7 @@ public abstract class CodenameOneImplementation {
             keyReleased(keyCode);
             return;
         }
-        com.codename1.ui.Desktop.getInstance().windowKeyReleased(windowId, keyCode);
+        Desktop.getInstance().windowKeyReleased(windowId, keyCode);
     }
 
     /// Returns the native window peer owning the given component, or null when the
@@ -3373,7 +3329,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// the owning window's native peer, or null for the main surface
     public final Object getWindowPeerForComponent(Component cmp) {
-        return com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
+        return Desktop.getInstance().getWindowPeerForComponent(cmp);
     }
 
     /// Subclasses should invoke this method, it delegates the event to the display and into
@@ -3590,25 +3546,23 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// true if the drag should propagate into Codename One
-    protected boolean hasWindowDragStarted(final int windowId, final int slot,
+    protected boolean hasWindowDragStarted(final int windowId, final PointerDragActivation act,
             final int x, final int y) {
         int surfaceWidth = Desktop.getInstance().windowWidth(windowId);
         int surfaceHeight = Desktop.getInstance().windowHeight(windowId);
         if (surfaceWidth <= 0 || surfaceHeight <= 0) {
             return false;
         }
-        if (windowDragActivationCounter[slot] == 0) {
-            windowDragActivationX[slot] = x;
-            windowDragActivationY[slot] = y;
-            windowDragActivationCounter[slot]++;
+        if (act.counter == 0) {
+            act.x = x;
+            act.y = y;
+            act.counter++;
             return false;
         }
-        windowDragActivationCounter[slot]++;
+        act.counter++;
         if (dragPassedThreshold(Desktop.getInstance().windowDragRegionStatus(windowId, x, y),
-                surfaceWidth, surfaceHeight,
-                windowDragActivationX[slot], windowDragActivationY[slot],
-                windowDragActivationCounter[slot], x, y)) {
-            windowDragActivationCounter[slot] = getDragAutoActivationThreshold() + 1;
+                surfaceWidth, surfaceHeight, act.x, act.y, act.counter, x, y)) {
+            act.counter = getDragAutoActivationThreshold() + 1;
             return true;
         }
         return false;
@@ -9345,7 +9299,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (com.codename1.ui.Desktop.getInstance().windowMouseWheelEvent(
+                if (Desktop.getInstance().windowMouseWheelEvent(
                         windowId, x, y, scrollX, scrollY, precise, modifiers)) {
                     return;
                 }

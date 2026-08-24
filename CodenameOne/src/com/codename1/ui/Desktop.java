@@ -1173,6 +1173,21 @@ public final class Desktop {
         Display.getInstance().windowRotationGestureImpl(windowId, x, y, radians);
     }
 
+    /// The drag-activation filter belonging to one window, which the implementation
+    /// applies to that window's pointer moves.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// #### Returns
+    ///
+    /// the window's filter, or null when no window holds that id
+    public com.codename1.impl.PointerDragActivation windowDragActivation(int windowId) {
+        Window w = windowById(windowId);
+        return w == null ? null : w.getDragActivation();
+    }
+
     /// Returns the native window peer owning the given component, or null when it
     /// belongs to the application's main surface. Ports use this to place native peers
     /// and native text editors into the correct window.
