@@ -1454,4 +1454,67 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("1,2", resolved);
         assertEquals(resolved, IPhoneBuilder.narrowDeviceFamily(resolved, "1,2"));
     }
+
+    @Test
+    public void aQualifiedIdentifierIsResolvedInItsOwnContext() throws Exception {
+        File dist = tmp.newFolder("dist90");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID[config=Debug]", "com.example.app.Debug");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]", "$(EXTENSION_ID)");
+
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(settings,
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        settings));
+
+        // Judged against one map flattened for the RELEASE archive, the Debug helper is invisible
+        // and the entry read as resolving to nothing -- deleted, taking the Debug
+        // configuration's identifier with it while the plist reconciliation had already stood
+        // down for it.
+        assertEquals("$(EXTENSION_ID)", settings.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
+
+    @Test
+    public void deviceFamiliesAreComparedAsSets() {
+        // "1, 2" and "1,2" are the same declaration; judging them unequal materialized a
+        // reference that did not need clamping and froze it for every other configuration.
+        assertTrue(IPhoneBuilder.sameDeviceFamilies("1, 2", "1,2"));
+        assertTrue(IPhoneBuilder.sameDeviceFamilies("2,1", "1,2"));
+        assertFalse(IPhoneBuilder.sameDeviceFamilies("1", "1,2"));
+        assertTrue(IPhoneBuilder.sameDeviceFamilies("", ""));
+    }
+
+    @Test
+    public void aVariantSurvivesTheEntitlementsPathResolution() throws Exception {
+        File dist = tmp.newFolder("dist91");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "plain.entitlements"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>keychain-access-groups</key><array/>\n</dict></plist>\n");
+        write(new File(extension, "wallet.entitlements"),
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\"><dict>\n"
+                + "<key>com.apple.developer.payment-pass-provisioning</key><true/>\n"
+                + "</dict></plist>\n");
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "normal profile");
+        settings.put("ENTITLEMENTS_FILE[variant=normal]", "WalletUIExtension/plain.entitlements");
+        settings.put("ENTITLEMENTS_FILE[variant=profile]",
+                "WalletUIExtension/wallet.entitlements");
+        settings.put("CODE_SIGN_ENTITLEMENTS", "$(ENTITLEMENTS_FILE)");
+
+        java.util.List<File> perVariant =
+                IPhoneBuilder.appExtensionSigningEntitlementsPerVariant(extension, settings, null,
+                        IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                                settings));
+
+        // The path is written through a variant-qualified helper. Resolving it rebuilt a context
+        // from BUILD_VARIANTS -- both variants again -- so the helper's equally specific values
+        // were picked by map order and both passes could read the plain file, leaving the shared
+        // floor at 12.0 while Xcode signs the profile variant for payment-pass provisioning.
+        assertEquals(perVariant.toString(), 2, perVariant.size());
+        assertEquals("14.0", IPhoneBuilder.appExtensionDeploymentFloor(perVariant));
+    }
 }

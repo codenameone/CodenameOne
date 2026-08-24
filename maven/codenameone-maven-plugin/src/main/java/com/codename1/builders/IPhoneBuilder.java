@@ -5166,9 +5166,7 @@ public class IPhoneBuilder extends Executor {
                                         appExtensionBuildSettings(appExtension);
                                 for (String note
                                         : dropBlankBundleIdentifiers(archiveOwnSettings,
-                                                extensionSettingsWithBuiltIns(appExtension,
-                                                        archiveOwnSettings, archiveConfiguration,
-                                                        archiveSdk, archiveArch))) {
+                                                appExtension, plistContext)) {
                                     debug("The " + extensionName + " app extension: " + note + ".");
                                 }
                                 // Narrowed, not taken as given: an exported folder carries the
@@ -5202,7 +5200,7 @@ public class IPhoneBuilder extends Executor {
                                         }
                                         String narrowed = narrowDeviceFamily(declaredFamily,
                                                 hostFamily);
-                                        if (narrowed.equals(declaredFamily)) {
+                                        if (sameDeviceFamilies(narrowed, declaredFamily)) {
                                             // Already within the host's families, so there is nothing
                                             // to clamp -- and the value is left AS WRITTEN. Replacing
                                             // it with what it resolves to here froze this archive's
@@ -7187,14 +7185,34 @@ public class IPhoneBuilder extends Executor {
     /// @param configuration, {@code sdk} and {@code arch} the archive's own, since
     /// $(CONFIGURATION) in a path or an identifier is as ordinary as $(TARGET_NAME) and this
     /// build knows all three
+    /// @param context the archive's OWN, variants included. The five-argument form rebuilds one
+    /// from sdk/configuration/arch, which reads BUILD_VARIANTS afresh and so loses a single
+    /// variant a caller had selected -- the per-variant entitlements walk selects exactly that,
+    /// and resolving its path through the rebuilt context read a [variant=...] helper by map
+    /// order instead of by the variant being examined.
+    static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings, ArchiveContext context) {
+        return extensionSettingsWithBuiltIns(extensionFolder, settings,
+                context == null ? null : context.configuration,
+                context == null ? null : context.sdk,
+                context == null ? null : context.arch, context);
+    }
+
     static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
             Map<String, String> settings, String configuration, String sdk, String arch) {
+        return extensionSettingsWithBuiltIns(extensionFolder, settings, configuration, sdk, arch,
+                null);
+    }
+
+    private static Map<String, String> extensionSettingsWithBuiltIns(File extensionFolder,
+            Map<String, String> settings, String configuration, String sdk, String arch,
+            ArchiveContext context) {
         Map<String, String> out = new LinkedHashMap<String, String>();
         // Conditionals resolved to what this build gets, before anything expands a reference
         // against them: a map lookup only ever sees the plain key, and the qualified value is the
         // one Xcode uses.
-        Map<String, String> flat = flattenForContext(settings,
-                ArchiveContext.of(sdk, configuration, arch, settings));
+        Map<String, String> flat = flattenForContext(settings, context != null ? context
+                : ArchiveContext.of(sdk, configuration, arch, settings));
         if (flat != null) {
             out.putAll(flat);
         }
@@ -7368,7 +7386,7 @@ public class IPhoneBuilder extends Executor {
         // standard way to write this path; without it the path did not resolve and a different
         // file was read for the entitlement that sets the floor.
         return appExtensionSignedEntitlements(extensionFolder, winner, byName,
-                extensionSettingsWithBuiltIns(extensionFolder, settings, configuration, sdk, arch));
+                extensionSettingsWithBuiltIns(extensionFolder, settings, context));
     }
 
     /// @param sdk the SDK this build archives against ("iphoneos" or "iphonesimulator"), and
@@ -8174,6 +8192,27 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /// Whether two TARGETED_DEVICE_FAMILY values name the same families.
+    ///
+    /// Compared as sets rather than as text: "1, 2" and "1,2" are the same declaration, and
+    /// judging them unequal materialized a reference that did not need clamping -- freezing this
+    /// archive's answer into a setting other configurations read.
+    static boolean sameDeviceFamilies(String left, String right) {
+        return deviceFamilySet(left).equals(deviceFamilySet(right));
+    }
+
+    private static java.util.Set<String> deviceFamilySet(String value) {
+        java.util.Set<String> out = new java.util.TreeSet<String>();
+        if (value != null) {
+            for (String family : value.split(",")) {
+                if (family.trim().length() > 0) {
+                    out.add(family.trim());
+                }
+            }
+        }
+        return out;
+    }
+
     /// The archive's TARGETED_DEVICE_FAMILY, narrowed to what the host app actually supports.
     ///
     /// An exported extension folder usually carries the universal "1,2" from the project it came
@@ -8358,9 +8397,26 @@ public class IPhoneBuilder extends Executor {
     }
 
     /// @param resolution the settings a $(...) in an identifier expands against, Xcode's own
-    /// built-ins included, or null to judge only literal blanks
+    /// built-ins included, or null to judge only literal blanks. Built PER KEY by the caller
+    /// where a qualifier is involved: see the File overload.
     static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
             Map<String, String> resolution) {
+        return dropBlankBundleIdentifiers(settings, resolution, null, null);
+    }
+
+    /// @param extensionFolder and {@code archiveContext} let each qualified identifier be
+    /// resolved in ITS OWN context. Judged against one map flattened for the archive,
+    /// PRODUCT_BUNDLE_IDENTIFIER[config=Debug] = $(EXTENSION_ID) with only
+    /// EXTENSION_ID[config=Debug] defined resolved to nothing and was deleted -- taking the Debug
+    /// configuration's identifier with it, while the plist reconciliation had already stood down
+    /// for it. The device-family handling beside this does the same thing for the same reason.
+    static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
+            File extensionFolder, ArchiveContext archiveContext) {
+        return dropBlankBundleIdentifiers(settings, null, extensionFolder, archiveContext);
+    }
+
+    private static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
+            Map<String, String> resolution, File extensionFolder, ArchiveContext archiveContext) {
         List<String> notes = new ArrayList<String>();
         if (settings == null) {
             return notes;
@@ -8377,7 +8433,12 @@ public class IPhoneBuilder extends Executor {
                         + "without a bundle identifier, so it was dropped");
                 continue;
             }
-            if (resolution != null && value.indexOf('$') >= 0) {
+            Map<String, String> perKey = resolution;
+            if (perKey == null && extensionFolder != null) {
+                perKey = extensionSettingsWithBuiltIns(extensionFolder, settings,
+                        contextForCondition(key, archiveContext));
+            }
+            if (perKey != null && value.indexOf('$') >= 0) {
                 // An expression that comes to nothing is the same thing one step later: Xcode
                 // expands an undefined $(EXTENSION_ID) to the empty string, and the .appex ships
                 // with no identifier at all. Dropped so the derived default stands, rather than
@@ -8388,7 +8449,7 @@ public class IPhoneBuilder extends Executor {
                 // default stands -- gentler than refusing the build over a setting that may be
                 // perfectly valid on the machine that wrote it, and it still builds something
                 // signable.
-                String resolved = resolveSettingsFully(value.trim(), resolution);
+                String resolved = resolveSettingsFully(value.trim(), perKey);
                 if (resolved == null || resolved.trim().length() == 0) {
                     settings.remove(key);
                     notes.add(key + " = " + value.trim() + " is a reference this build cannot "
