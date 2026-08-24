@@ -6550,6 +6550,17 @@ public class IPhoneBuilder extends Executor {
                     out.add(arch);
                 }
             }
+            // ARCHS names them outright, with no qualified key anywhere: an archive building
+            // "arm64 x86_64" through $(CURRENT_ARCH) has two plists and only one of them was ever
+            // seen. Read in the archive's own context, since ARCHS can be conditional too.
+            String archs = winningSetting(declared, "ARCHS", own);
+            if (archs != null) {
+                for (String arch : archs.trim().split("\\s+")) {
+                    if (arch.length() > 0 && arch.indexOf('$') < 0 && !out.contains(arch)) {
+                        out.add(arch);
+                    }
+                }
+            }
         }
         if (out.isEmpty()) {
             out.add(own == null ? null : own.arch);
@@ -6615,9 +6626,12 @@ public class IPhoneBuilder extends Executor {
         // self-contradicting candidates -- [variant=profile][variant=normal] -- which the stamper
         // does not reject and would have rewritten a plist the extension never uses.
         Map<String, String> constraints = conditionsOf(key);
-        List<String> configurations = constraints.containsKey("config")
-                ? java.util.Collections.singletonList(own.configuration)
-                : java.util.Arrays.asList(PROJECT_CONFIGURATIONS);
+        // Filtered through the condition rather than taken from the context: an inactive
+        // [config=Deb*] leaves own.configuration as the PATTERN, and enumerating that supplies no
+        // CONFIGURATION at all, so Debug/Info.plist was never discovered. Filtering answers the
+        // exact case identically and the wildcard case correctly.
+        List<String> configurations = allowedBy(java.util.Arrays.asList(PROJECT_CONFIGURATIONS),
+                constraints.get("config"));
         for (String sdk : allowedBy(enumerableSdks(own, declared), constraints.get("sdk"))) {
             for (String configuration : configurations) {
                 for (String arch : allowedBy(enumerableArchs(own, declared),

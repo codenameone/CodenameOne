@@ -530,4 +530,47 @@ public class AppExtensionInfoPlistPathTest {
         assertTrue(plists.toString(), plists.values().contains(normal));
         assertTrue(plists.toString(), plists.values().contains(profile));
     }
+
+    @Test
+    public void aWildcardConfigurationEnumeratesTheConcreteOne() throws Exception {
+        File dist = tmp.newFolder("wildcard-config");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "Debug").mkdirs());
+        File debug = new File(extension, "Debug/Info.plist");
+        write(debug, identityPlist("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE[config\\=Deb*] = WalletUIExtension/$(CONFIGURATION)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // An inactive [config=Deb*] leaves the context's configuration as the PATTERN, which
+        // supplies no CONFIGURATION at all -- so Debug/Info.plist was never discovered, stamped
+        // or assigned its identifier, and a later Debug build used a target identifier its own
+        // plist disagrees with.
+        assertTrue(plists.toString(), plists.values().contains(debug));
+    }
+
+    @Test
+    public void archsDeclaresArchitecturesWithoutAnyQualifier() throws Exception {
+        File dist = tmp.newFolder("archs-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "arm64").mkdirs());
+        assertTrue(new File(extension, "x86_64").mkdirs());
+        File arm = new File(extension, "arm64/Info.plist");
+        File intel = new File(extension, "x86_64/Info.plist");
+        write(arm, identityPlist("com.example.app.Arm"));
+        write(intel, identityPlist("com.example.app.Intel"));
+        write(new File(extension, "buildSettings.properties"),
+                "ARCHS = arm64 x86_64\n"
+                + "INFOPLIST_FILE = WalletUIExtension/$(CURRENT_ARCH)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // ARCHS names them outright, with no qualified key anywhere -- read only from [arch=...]
+        // qualifiers, the second plist was never seen.
+        assertTrue(plists.toString(), plists.values().contains(arm));
+        assertTrue(plists.toString(), plists.values().contains(intel));
+    }
 }
