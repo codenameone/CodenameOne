@@ -993,6 +993,33 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     }
 }
 
+/// Takes every peer's outstanding sends of ONE payload, for a cancel.
+///
+/// #### Returns
+///
+/// pairs of the peer id and the length each send was recorded with
+- (NSArray<NSArray *> *)takeAcksForPayload:(JAVA_INT)payloadId {
+    @synchronized (self) {
+        NSNumber *key = [NSNumber numberWithInt:(int)payloadId];
+        NSMutableArray<NSArray *> *out = [NSMutableArray array];
+        for (NSString *pid in [self.awaitingAck allKeys]) {
+            NSMutableDictionary *ids = [self.awaitingAck objectForKey:pid];
+            NSMutableArray *outstanding = [ids objectForKey:key];
+            if (outstanding == nil) {
+                continue;
+            }
+            for (NSNumber *length in outstanding) {
+                [out addObject:[NSArray arrayWithObjects:pid, length, nil]];
+            }
+            [ids removeObjectForKey:key];
+            if ([ids count] == 0) {
+                [self.awaitingAck removeObjectForKey:pid];
+            }
+        }
+        return out;
+    }
+}
+
 /// Takes every payload still waiting on a peer, for a disconnect.
 - (NSArray<NSArray<NSNumber *> *> *)takeAllAcksFromPeer:(NSString *)pid {
     @synchronized (self) {
@@ -3041,14 +3068,35 @@ void com_codename1_impl_ios_IOSNative_nearbyCancelPayload___int(
         if (cn1nbTransport == nil) {
             return;
         }
-        // A file transfer CAN be cancelled -- sendResourceAtURL hands back an
+        // A file transfer CAN be recalled -- sendResourceAtURL hands back an
         // NSProgress for exactly that -- so it is, and the completion handler
-        // reports the failure. A byte payload cannot: sendData has left by the
-        // time anything could ask, which is the same outcome an app gets from
-        // cancelling one anywhere.
+        // reports the cancellation.
         NSArray *all = [cn1nbTransport takeProgressesForPayload:payloadId];
         for (NSProgress *progress in all) {
             [progress cancel];
+        }
+        // A byte payload cannot be recalled: sendData has left by the time
+        // anything could ask, and MultipeerConnectivity offers no handle on
+        // it. The SEND is still cancelled, which is what the portable API
+        // promises and what Android and the simulator do -- Nearby cannot
+        // recall queued bytes either. Its acknowledgement bookkeeping is
+        // taken here and answered CANCELED, so the send reaches the terminal
+        // status the caller asked for instead of reporting SUCCESS when the
+        // acknowledgement it was already going to get comes back. Dropping
+        // the entry is also what makes that later ack a no-op.
+        for (NSArray *cancelled in
+                [cn1nbTransport takeAcksForPayload:payloadId]) {
+            NSString *pid = [cancelled objectAtIndex:0];
+            MCPeerID *peer = [cn1nbTransport peerForId:pid];
+            if (peer == nil) {
+                continue;
+            }
+            com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
+                    CN1_THREAD_STATE_PASS_ARG
+                    cn1nbJString([cn1nbTransport encodePeer:peer]),
+                    payloadId, 0,
+                    (JAVA_LONG)[[cancelled objectAtIndex:1] longLongValue],
+                    CN1_NEARBY_PAYLOAD_CANCELED);
         }
     }
 #endif

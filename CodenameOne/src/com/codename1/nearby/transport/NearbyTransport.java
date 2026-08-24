@@ -351,7 +351,19 @@ public final class NearbyTransport {
         return out;
     }
 
-    /// Cancels an in-flight payload on both sides. Idempotent.
+    /// Cancels an in-flight payload. Idempotent.
+    ///
+    /// The send reaches
+    /// [PayloadStatus#CANCELED] on this side, and a transfer
+    /// the platform can still recall is recalled -- which for a file is
+    /// every byte not yet sent, on all three implementations.
+    ///
+    /// A BYTE payload is a different matter, and the same on every one of
+    /// them: it is handed to the platform whole, and no platform offers a
+    /// handle to take it back. Cancelling one that has already been accepted
+    /// stops this side reporting it as delivered, but the peer may receive
+    /// it anyway. Cancel a byte payload to stop waiting on it, not to
+    /// prevent its arrival.
     ///
     /// #### Parameters
     ///

@@ -114,6 +114,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     new java.util.HashSet<String>());
     private final Map<String, String> endpointServices =
             Collections.synchronizedMap(new HashMap<String, String>());
+    /// Which start each asynchronous answer belongs to.
+    ///
+    /// A stop can land between a start and the platform's answer to it, and
+    /// so can a second start. Without these the late answer resolved the
+    /// caller's request as though the state it describes were still current.
+    /// Read and written on the main thread, which is where Google delivers
+    /// these listeners and where the portable API is called from.
+    private int advertiseGeneration;
+    private int discoverGeneration;
+
     private String advertisingServiceId = "";
     private String discoveryServiceId = "";
     private String localName = "";
@@ -234,6 +244,13 @@ public class AndroidNearbyTransport implements NearbyBridge {
         final String started = serviceId == null ? "" : serviceId;
         this.advertisingServiceId = started;
         this.localName = localName == null ? "" : localName;
+        // The generation this start belongs to. Google answers the start
+        // asynchronously, and a stopAdvertising can land in front of that
+        // answer -- which then told the caller advertising was active AFTER
+        // it had stopped it, and left the platform start running behind a
+        // stop that had already returned. The simulated bridge has modelled
+        // this race from the beginning; this is the same answer.
+        final int generation = ++advertiseGeneration;
         AdvertisingOptions options = new AdvertisingOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
@@ -241,6 +258,18 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         connectionCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
+                        if (generation != advertiseGeneration) {
+                            // Stopped, so the platform is advertising for a
+                            // caller that no longer wants it. Undone here,
+                            // because the stop that ran before this had
+                            // nothing to stop.
+                            client().stopAdvertising();
+                            NearbyTransport.deliverRequestFailed(requestId,
+                                    NearbyError.SESSION_INVALIDATED.ordinal(),
+                                    "advertising was stopped before it"
+                                    + " started");
+                            return;
+                        }
                         NearbyTransport.deliverRequestOk(requestId);
                     }
                 })
@@ -254,6 +283,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void stopAdvertising() {
+        advertiseGeneration++;
         client().stopAdvertising();
     }
 
@@ -267,12 +297,23 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // discovering. The field remains for the state a later call needs.
         final String started = serviceId == null ? "" : serviceId;
         this.discoveryServiceId = started;
+        // The generation this start belongs to, for the reason
+        // startAdvertising keeps one.
+        final int generation = ++discoverGeneration;
         DiscoveryOptions options = new DiscoveryOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
         client().startDiscovery(started, discoveryCallback(started), options)
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
+                        if (generation != discoverGeneration) {
+                            client().stopDiscovery();
+                            NearbyTransport.deliverRequestFailed(requestId,
+                                    NearbyError.SESSION_INVALIDATED.ordinal(),
+                                    "discovery was stopped before it"
+                                    + " started");
+                            return;
+                        }
                         NearbyTransport.deliverRequestOk(requestId);
                     }
                 })
@@ -286,6 +327,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
     }
 
     public void stopDiscovery() {
+        discoverGeneration++;
         client().stopDiscovery();
     }
 
