@@ -146,7 +146,8 @@ public class SimulatorWindowModeVerifier {
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
             while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
-                        || isComponentInspectorDetailsUnsettled(parsed, image))
+                        || isComponentInspectorDetailsUnsettled(parsed, image)
+                        || isComponentInspectorPropertiesUnpopulated(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
@@ -217,6 +218,10 @@ public class SimulatorWindowModeVerifier {
         if (isComponentInspectorDetailsUnsettled(args, image)) {
             throw new AssertionError("Component inspector details panel had not settled before capture; textPixels="
                     + countComponentDetailsPixels(image));
+        }
+        if (isComponentInspectorPropertiesUnpopulated(args, image)) {
+            throw new AssertionError("Component inspector properties had not been populated before capture; valuePixels="
+                    + countComponentPropertyValuePixels(image));
         }
     }
 
@@ -301,6 +306,55 @@ public class SimulatorWindowModeVerifier {
      * the form still being there.
      */
     private static final int MIN_COMPONENT_DETAILS_PIXELS = 200;
+
+    /**
+     * Whether the inspector's property VALUES have not been filled in yet.
+     *
+     * <p>The details panel below settles EMPTY, so the check above waits for it to go away. The
+     * properties above it settle the other way round: the inspector selects a component and fills
+     * the Class, UUID, Coordinates, Padding and Margin rows in, and the reference holds them
+     * populated. A capture taken before the selection propagates shows the same layout with every
+     * value blank -- which is not a state the simulator settles in, and comparing it against the
+     * reference fails over timing rather than over anything the run did.</p>
+     *
+     * <p>This is the race that produced four differing screenshots in one run on a slow runner
+     * while the two commits either side of it passed. Read from the pixels for the reason the
+     * other two checks are: this verifier drives the simulator from another process.</p>
+     */
+    private static boolean isComponentInspectorPropertiesUnpopulated(Args args, BufferedImage image) {
+        if (!"component-inspector".equals(args.scenario)) {
+            return false;
+        }
+        return countComponentPropertyValuePixels(image) < MIN_COMPONENT_PROPERTY_PIXELS;
+    }
+
+    /** The text drawn in the property VALUE column, beside the Class..Margin labels. */
+    private static int countComponentPropertyValuePixels(BufferedImage image) {
+        int xMin = Math.min(image.getWidth(), 127);
+        int xMax = Math.min(image.getWidth(), 583);
+        int yMin = Math.min(image.getHeight(), 4);
+        int yMax = Math.min(image.getHeight(), 248);
+        if (xMax <= xMin || yMax <= yMin) {
+            return 0;
+        }
+        int textPixels = 0;
+        for (int y = yMin; y < yMax; y++) {
+            for (int x = xMin; x < xMax; x++) {
+                int rgb = image.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) < 100 && ((rgb >> 8) & 0xff) < 100 && (rgb & 0xff) < 100) {
+                    textPixels++;
+                }
+            }
+        }
+        return textPixels;
+    }
+
+    /**
+     * Measured on both sides of the race this fixes: the stored reference draws about 2625 dark
+     * pixels in that band and the unpopulated capture draws 84, so the threshold sits an order of
+     * magnitude clear of the failure and well under the settled state.
+     */
+    private static final int MIN_COMPONENT_PROPERTY_PIXELS = 800;
 
     private static int minimumSingleWindowDevicePixels(Args args) {
         if ("test-recorder".equals(args.scenario)) {

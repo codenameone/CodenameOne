@@ -1281,6 +1281,22 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             service == nil ? @"" : service, nil]);
 }
 
+/// Records the service an OUTGOING connection to this peer belongs to.
+///
+/// The service that peer was DISCOVERED under, not the one discovery is
+/// running for now: a restart for another service moves the field, and an
+/// invitation sent to an endpoint found under the old one would then be
+/// labelled with the new one for the life of the connection. The field is
+/// the fallback for a peer nothing recorded.
+- (void)noteOutboundConnectionServiceForPeer:(NSString *)pid {
+    NSString *discovered;
+    @synchronized (self) {
+        discovered = [self.serviceIdByPeer objectForKey:pid];
+    }
+    [self noteConnectionService:discovered != nil ? discovered
+            : self.discoverServiceId forPeer:pid];
+}
+
 /// Records the service a CONNECTION with this peer was negotiated through.
 - (void)noteConnectionService:(NSString *)serviceId
                       forPeer:(NSString *)pid {
@@ -2967,10 +2983,9 @@ void com_codename1_impl_ios_IOSNative_nearbyRequestConnection___int_java_lang_St
             return;
         }
         // Connecting OUT, so this connection belongs to whatever discovery
-        // found the peer under -- recorded as the connection's service, so a
+        // found the PEER under -- recorded as the connection's service, so a
         // later sighting under another one cannot relabel it.
-        [cn1nbTransport noteConnectionService:cn1nbTransport.discoverServiceId
-                                      forPeer:pid];
+        [cn1nbTransport noteOutboundConnectionServiceForPeer:pid];
         // Reserved BEFORE the invitation goes out, so a second
         // requestConnection made while this one is still unanswered sees the
         // slot taken.

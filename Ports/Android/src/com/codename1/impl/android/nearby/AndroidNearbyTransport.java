@@ -548,10 +548,20 @@ public class AndroidNearbyTransport implements NearbyBridge {
         String name = localName == null || localName.length() == 0
                 ? this.localName : localName;
         // Connecting OUT, so the endpoint belongs to whatever discovery
-        // found it -- the field is the right source here, and the mapping
-        // discoveryCallback recorded is left alone when one already exists.
+        // found IT -- which is the per-endpoint mapping, not the field.
+        //
+        // discoveryServiceId is the service discovery is running for NOW,
+        // and a restart for another one moves it. Passing that labelled a
+        // connection to an endpoint found under the old service with the
+        // new one, and since the connection service is recorded separately
+        // there is nothing left to correct it: the connected, payload and
+        // disconnection events all named a service the peer was never
+        // discovered on. The field remains the fallback for an endpoint
+        // nothing recorded, which is one that arrived through advertising.
+        String discovered = endpointServices.get(endpointId);
         client().requestConnection(name, endpointId,
-                        connectionCallback(discoveryServiceId))
+                        connectionCallback(discovered != null ? discovered
+                                : discoveryServiceId))
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         NearbyTransport.deliverRequestOk(requestId);
