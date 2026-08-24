@@ -184,4 +184,89 @@ public class NearbyLibraryScanTest {
                     + "; the library scan consumes exactly this string");
         }
     }
+
+    /**
+     * A class file carrying one Methodref: {@code owner.method()}.
+     *
+     * <p>Only the constant pool is read, so only the constant pool is
+     * built. Hand-assembled because the point of the test is that the
+     * owner and the method name are tied together, which is exactly what a
+     * flat byte search cannot see.</p>
+     */
+    private static byte[] callingClass(String owner, String method) {
+        java.io.ByteArrayOutputStream out =
+                new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream d = new java.io.DataOutputStream(out);
+        try {
+            d.writeInt(0xCAFEBABE);
+            d.writeShort(0);
+            d.writeShort(52);
+            // 1 owner utf8, 2 method utf8, 3 descriptor utf8, 4 Class,
+            // 5 NameAndType, 6 Methodref -- so a count of 7.
+            d.writeShort(7);
+            d.writeByte(1);
+            d.writeUTF(owner);
+            d.writeByte(1);
+            d.writeUTF(method);
+            d.writeByte(1);
+            d.writeUTF("(Ljava/lang/String;)Z");
+            d.writeByte(7);
+            d.writeShort(1);
+            d.writeByte(12);
+            d.writeShort(2);
+            d.writeShort(3);
+            d.writeByte(10);
+            d.writeShort(4);
+            d.writeShort(5);
+            d.flush();
+        } catch (java.io.IOException never) {
+            throw new IllegalStateException(never);
+        }
+        return out.toByteArray();
+    }
+
+    @Test
+    public void presenceNeedsTheCallToBeOnTheFacade(@TempDir File dir)
+            throws Exception {
+        writeJar(new File(dir, "lib.jar"), "com/acme/Watcher.class",
+                callingClass("com/codename1/nearby/companion/CompanionDevices",
+                        "startObservingPresence"));
+        NearbyManifestFragments.NearbyUsage usage =
+                NearbyManifestFragments.scanForNearbyUsage(dir);
+        assertTrue(usage.usesPresence(),
+                "a call to the facade's startObservingPresence is presence");
+        assertTrue(usage.usesCompanion(),
+                "and naming the class is companion use");
+    }
+
+    @Test
+    public void someoneElsesMethodOfThatNameIsNotPresence(@TempDir File dir)
+            throws Exception {
+        writeJar(new File(dir, "lib.jar"), "com/acme/Watcher.class",
+                callingClass("com/acme/OwnPresence",
+                        "startObservingPresence"));
+        NearbyManifestFragments.NearbyUsage usage =
+                NearbyManifestFragments.scanForNearbyUsage(dir);
+        assertFalse(usage.usesPresence(), "the name alone is not the API:"
+                + " charging an app the exported service and the background"
+                + " permissions for a library's own method is a"
+                + " store-review conversation");
+        assertTrue(usage.isEmpty(), "and nothing else was named either");
+    }
+
+    @Test
+    public void anUnreadableClassNeverClaimsPresence(@TempDir File dir)
+            throws Exception {
+        // The package fallback still applies -- keeping an implementation
+        // that might be needed costs bytes -- but presence does not fall
+        // back, because being wrong there costs permissions.
+        writeJar(new File(dir, "lib.jar"), "com/acme/Odd.class",
+                classBytes("com/codename1/nearby/companion/CompanionDevices"
+                        + "startObservingPresence"));
+        NearbyManifestFragments.NearbyUsage usage =
+                NearbyManifestFragments.scanForNearbyUsage(dir);
+        assertTrue(usage.usesCompanion(), "the package fallback still reads");
+        assertFalse(usage.usesPresence(),
+                "an unreadable class says nothing about presence");
+    }
 }

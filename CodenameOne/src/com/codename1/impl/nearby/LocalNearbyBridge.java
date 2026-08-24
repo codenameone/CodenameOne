@@ -844,7 +844,22 @@ public class LocalNearbyBridge implements NearbyBridge {
         transportGeneration++;
         discoverGeneration++;
         advertiseGeneration++;
+        // Failed, not merely forgotten. The request itself has already been
+        // answered by the first hop, so the outcome the app waits for is the
+        // connected or connectionFailed that follows -- and clearing the
+        // reservation is what stops the queued acceptance delivering either,
+        // so a stop during a pending connection ended it in silence.
+        List<String> pending = new ArrayList<String>(connecting);
         connecting.clear();
+        for (String id : pending) {
+            SimEndpoint p = findEndpoint(id);
+            if (p != null) {
+                NearbyTransport.deliverConnectionResult(p.encode(), false,
+                        NearbyError.SESSION_INVALIDATED.ordinal(),
+                        "the transport was stopped before the connection"
+                        + " completed");
+            }
+        }
         cancelledPayloads.clear();
         pendingPayloads.clear();
         List<String> doomed = new ArrayList<String>(connected);

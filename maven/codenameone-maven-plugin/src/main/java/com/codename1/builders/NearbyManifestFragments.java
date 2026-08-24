@@ -543,16 +543,180 @@ final class NearbyManifestFragments {
         if (bytes == null || bytes.length == 0) {
             return;
         }
-        String text;
-        try {
-            text = new String(bytes, "ISO-8859-1");
-        } catch (java.io.UnsupportedEncodingException never) {
+        ConstantPool pool = ConstantPool.read(bytes);
+        if (pool == null) {
+            // Not readable as a class file -- truncated, obfuscated past
+            // recognition, or simply not one. The PACKAGE answers fall back
+            // to a search of the raw bytes, which errs towards keeping an
+            // implementation that might be needed; the cost of being wrong
+            // is bytes.
+            //
+            // Presence does NOT fall back. Its cost is an exported service
+            // and the background companion permissions in the manifest of an
+            // app that never observes anything, which is a store-review
+            // conversation rather than a few kilobytes -- so an unreadable
+            // class says nothing about it.
+            String text;
+            try {
+                text = new String(bytes, "ISO-8859-1");
+            } catch (java.io.UnsupportedEncodingException never) {
+                return;
+            }
+            found.ranging |= text.indexOf(RANGING_MARKER) >= 0;
+            found.transport |= text.indexOf(TRANSPORT_MARKER) >= 0;
+            found.companion |= text.indexOf(COMPANION_MARKER) >= 0;
             return;
         }
-        found.ranging |= text.indexOf(RANGING_MARKER) >= 0;
-        found.transport |= text.indexOf(TRANSPORT_MARKER) >= 0;
-        found.companion |= text.indexOf(COMPANION_MARKER) >= 0;
-        found.presence |= text.indexOf(PRESENCE_MARKER) >= 0;
+        // The UTF8 entries alone, not the whole file: every reference to a
+        // class is stored as its name in one of them, and a byte that
+        // happens to spell a package name inside the code array is not a
+        // reference to anything.
+        for (int iter = 0; iter < pool.size(); iter++) {
+            String utf8 = pool.utf8At(iter);
+            if (utf8 == null) {
+                continue;
+            }
+            found.ranging |= utf8.indexOf(RANGING_MARKER) >= 0;
+            found.transport |= utf8.indexOf(TRANSPORT_MARKER) >= 0;
+            found.companion |= utf8.indexOf(COMPANION_MARKER) >= 0;
+        }
+        // Presence is a CALL, and the owner is what makes it one. A library
+        // with its own startObservingPresence, or a string literal spelling
+        // it, is not this API being used -- and treating it as one gave an
+        // app that only associates the exported service and the background
+        // permissions of an app that observes.
+        found.presence |= pool.callsMethod(PRESENCE_OWNER, PRESENCE_MARKER);
+    }
+
+    /// The class whose startObservingPresence means presence observation.
+    private static final String PRESENCE_OWNER =
+            "com/codename1/nearby/companion/CompanionDevices";
+
+    /// The constant pool of one class file, and nothing else from it.
+    ///
+    /// Hand-read rather than taken from ASM: this file is mirrored into the
+    /// BuildDaemon, which is pinned to an ASM that stops at Java 8 bytecode,
+    /// and a scan the two copies disagree about is worse than no scan. The
+    /// constant pool format has not changed since Java 1.0 and new tags are
+    /// skippable by length, so this reads every class file either tree will
+    /// ever be handed.
+    private static final class ConstantPool {
+
+        private final int[] tags;
+        private final int[] first;
+        private final int[] second;
+        private final String[] strings;
+
+        private ConstantPool(int count) {
+            tags = new int[count];
+            first = new int[count];
+            second = new int[count];
+            strings = new String[count];
+        }
+
+        private int size() {
+            return tags.length;
+        }
+
+        private String utf8At(int index) {
+            if (index < 0 || index >= strings.length) {
+                return null;
+            }
+            return strings[index];
+        }
+
+        /// Whether some Methodref names this owner and this method.
+        private boolean callsMethod(String owner, String method) {
+            for (int iter = 0; iter < tags.length; iter++) {
+                // 10 Methodref, 11 InterfaceMethodref. A static call on a
+                // final class is the first; the second is here so a facade
+                // reached through an interface counts too.
+                if (tags[iter] != 10 && tags[iter] != 11) {
+                    continue;
+                }
+                if (!owner.equals(classNameAt(first[iter]))) {
+                    continue;
+                }
+                int nameAndType = second[iter];
+                if (nameAndType < 0 || nameAndType >= tags.length
+                        || tags[nameAndType] != 12) {
+                    continue;
+                }
+                if (method.equals(utf8At(first[nameAndType]))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private String classNameAt(int index) {
+            if (index < 0 || index >= tags.length || tags[index] != 7) {
+                return null;
+            }
+            return utf8At(first[index]);
+        }
+
+        /// Reads the pool, or null when this is not a class file it can read.
+        private static ConstantPool read(byte[] b) {
+            if (b == null || b.length < 10) {
+                return null;
+            }
+            if ((b[0] & 0xff) != 0xCA || (b[1] & 0xff) != 0xFE
+                    || (b[2] & 0xff) != 0xBA || (b[3] & 0xff) != 0xBE) {
+                return null;
+            }
+            int count = u2(b, 8);
+            if (count < 1) {
+                return null;
+            }
+            ConstantPool pool = new ConstantPool(count);
+            int at = 10;
+            try {
+                for (int iter = 1; iter < count; iter++) {
+                    int tag = b[at++] & 0xff;
+                    pool.tags[iter] = tag;
+                    if (tag == 1) {
+                        int length = u2(b, at);
+                        at += 2;
+                        pool.strings[iter] = new String(b, at, length,
+                                "UTF-8");
+                        at += length;
+                    } else if (tag == 7 || tag == 8 || tag == 16
+                            || tag == 19 || tag == 20) {
+                        pool.first[iter] = u2(b, at);
+                        at += 2;
+                    } else if (tag == 15) {
+                        pool.first[iter] = b[at + 1] & 0xff;
+                        at += 3;
+                    } else if (tag == 3 || tag == 4) {
+                        at += 4;
+                    } else if (tag == 5 || tag == 6) {
+                        at += 8;
+                        // A long or a double takes TWO pool entries, and the
+                        // second is unusable. Skipping the increment here is
+                        // the classic way to misread every entry after one.
+                        iter++;
+                    } else if (tag == 9 || tag == 10 || tag == 11
+                            || tag == 12 || tag == 17 || tag == 18) {
+                        pool.first[iter] = u2(b, at);
+                        pool.second[iter] = u2(b, at + 2);
+                        at += 4;
+                    } else {
+                        // A tag from a class file newer than this code knows.
+                        // Its length is unknown, so nothing after it can be
+                        // read: the pool is abandoned rather than guessed at.
+                        return null;
+                    }
+                }
+            } catch (Throwable truncated) {
+                return null;
+            }
+            return pool;
+        }
+
+        private static int u2(byte[] b, int at) {
+            return ((b[at] & 0xff) << 8) | (b[at + 1] & 0xff);
+        }
     }
 
     private static byte[] readAll(java.io.File file) {

@@ -905,6 +905,47 @@ class LocalNearbyTest {
                 "a connected endpoint still reports its disconnection");
     }
 
+    @Test
+    void stoppingDuringAPendingConnectionFailsIt() {
+        // The request was already answered by the first hop, so the outcome
+        // the app waits for is what follows -- and clearing the reservation
+        // is what stops the queued acceptance delivering it. Ending the
+        // attempt in silence left a listener waiting for good.
+        final List<Endpoint> connected = new ArrayList<Endpoint>();
+        final List<Integer> failures = new ArrayList<Integer>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void connected(Endpoint e) {
+                connected.add(e);
+            }
+
+            @Override
+            public void connectionFailed(Endpoint e, NearbyException error) {
+                failures.add(Integer.valueOf(1));
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        assertNotNull(e);
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        NearbyTransport.requestConnection(e, "me");
+        NearbyTransport.stop();
+        drain(queue);
+
+        assertTrue(connected.isEmpty(),
+                "a stopped transport must not connect: " + connected);
+        assertEquals(1, failures.size(),
+                "the pending connection has to be answered, not dropped");
+    }
+
     /// Runs every parked delivery, including any the deliveries themselves
     /// park, until nothing is left.
     private static void drain(List<Runnable> queue) {
