@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -52,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SurfaceTest {
 
     /** Records bridge calls so publishing and live activity behaviour can be asserted. */
-    private static final class FakeBridge implements SurfaceBridge {
+    private static class FakeBridge implements SurfaceBridge {
         boolean widgetsSupported = true;
         boolean activitiesSupported = true;
         String publishedKind;
@@ -432,6 +433,65 @@ class SurfaceTest {
 
         Surfaces.reloadWidgets(null);
         assertNull(bridge.reloadedKind);
+    }
+
+    /// A publish is a write followed by a hand-off to the watch, and the platform bridges pair
+    /// them by doing both inside this one call. Two threads publishing one kind must therefore
+    /// not be inside it at once: interleaved, the later write can be paired with the earlier
+    /// hand-off and the watch keeps a descriptor the phone has already replaced. publish() is
+    /// documented as callable from any thread, so this is a supported call pattern.
+    @Test
+    void concurrentPublishesOfOneKindDoNotInterleave() throws Exception {
+        final java.util.concurrent.atomic.AtomicInteger inFlight =
+                new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger peak =
+                new java.util.concurrent.atomic.AtomicInteger();
+        FakeBridge bridge = new FakeBridge() {
+            @Override
+            public void publishWidgetTimeline(String kindId, String timelineJson,
+                    Map<String, byte[]> images) {
+                int now = inFlight.incrementAndGet();
+                // Highest seen, not last seen: the failing interleaving is transient.
+                while (true) {
+                    int was = peak.get();
+                    if (now <= was || peak.compareAndSet(was, now)) {
+                        break;
+                    }
+                }
+                try {
+                    // Wide enough that an unserialized run overlaps rather than merely being
+                    // able to. Without the lock this test fails essentially every time.
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                inFlight.decrementAndGet();
+                super.publishWidgetTimeline(kindId, timelineJson, images);
+            }
+        };
+        Surfaces.setBridge(bridge);
+        Surfaces.registerWidgetKind(new WidgetKind("delivery_status")
+                .setDisplayName("Delivery").addSupportedSize(WidgetSize.SMALL));
+
+        Thread[] threads = new Thread[6];
+        for (int i = 0; i < threads.length; i++) {
+            final int n = i;
+            threads[i] = new Thread(new Runnable() {
+                public void run() {
+                    Surfaces.publish("delivery_status",
+                            new WidgetTimeline().setContent(new SurfaceText("v" + n)));
+                }
+            });
+        }
+        for (Thread t : threads) {
+            t.start();
+        }
+        for (Thread t : threads) {
+            t.join();
+        }
+
+        assertEquals(1, peak.get());
+        assertEquals("delivery_status", bridge.publishedKind);
     }
 
     @Test
@@ -849,6 +909,52 @@ class SurfaceTest {
         SurfaceDiagnostics.beforeRasterizingImageEncode();
         Surfaces.publish("never_registered", new WidgetTimeline()
                 .setContent(new SurfaceText("x")));
+    }
+
+    /// A timeline names its images rather than embedding them -- the serializer hashes the bytes
+    /// and puts the hash on the wire -- so a descriptor produced elsewhere is only complete if
+    /// its side-map came with it. publishRemote used to discard the map unconditionally, which
+    /// made every referenced image render as a gap.
+    @Test
+    void publishRemoteCarriesTheImagesTheDescriptorReferences() {
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+        Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+        images.put("abc123", new byte[] {1, 2, 3});
+
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}", images);
+
+        assertEquals("scores", bridge.publishedKind);
+        assertEquals(1, bridge.publishedImages.size());
+        assertArrayEquals(new byte[] {1, 2, 3}, bridge.publishedImages.get("abc123"));
+    }
+
+    /// The two-argument form is the older entry point and must keep behaving as it did.
+    @Test
+    void publishRemoteWithoutImagesPassesAnEmptyMap() {
+        FakeBridge bridge = new FakeBridge();
+        Surfaces.setBridge(bridge);
+
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}");
+
+        assertEquals("scores", bridge.publishedKind);
+        assertTrue(bridge.publishedImages.isEmpty());
+        // And a null map is the same thing, not a crash.
+        Surfaces.publishRemote("scores", "{\"layouts\":{}}", null);
+        assertTrue(bridge.publishedImages.isEmpty());
+    }
+
+    /// Nothing reaches an unsupported platform, with or without imagery.
+    @Test
+    void publishRemoteIsInertWhereWidgetsAreUnsupported() {
+        FakeBridge bridge = new FakeBridge();
+        bridge.widgetsSupported = false;
+        Surfaces.setBridge(bridge);
+
+        Surfaces.publishRemote("scores", "{}", new LinkedHashMap<String, byte[]>());
+        Surfaces.publishRemote("scores", "{}");
+
+        assertNull(bridge.publishedKind);
     }
 
     @Test

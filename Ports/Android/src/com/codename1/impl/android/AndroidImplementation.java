@@ -192,6 +192,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.net.HttpURLConnection;
@@ -1578,6 +1579,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             setActivity(null);
             setContext((Context)m);
+        }
+        // The nearby bridge is cached for the life of the process while
+        // Android recreates the activity freely -- a configuration change,
+        // or "Don't keep activities". An association chooser opened by the
+        // old activity delivers its result to the NEW one, where the
+        // backend's result listener is not installed, so the association
+        // resource never settled and every later association answered BUSY.
+        // Told here because this is the one place that knows it changed.
+        if (nearbyBridge != null) {
+            nearbyBridge.onActivityChanged();
         }
 
         instance = this;
@@ -7517,17 +7528,337 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /**
+     * Directory holding storage writes still in progress.
+     *
+     * <p>A sibling of the files dir rather than something inside it. Every name is a
+     * legal storage key, so no name reserved inside that namespace can be kept clear
+     * of the application: a key called after the scratch area would either be
+     * unstorable or, if it already existed as a file, would stop the directory being
+     * created and fail every write from then on. Outside the namespace there is
+     * nothing to collide with. It stays on the same filesystem as the entries, which
+     * is what lets a write be published by renaming.</p>
+     */
+    private static final String STORAGE_SCRATCH_DIR = "cn1-storage-scratch";
+
+    /**
+     * Suffix of the file each process locks for as long as it is running, so that the
+     * others can tell whether the writes it left behind are still being written.
+     *
+     * <p>This replaces judging a scratch file by its age. An application may run more
+     * than one process, each with its own copy of this class and so its own idea of
+     * what is open, and age was the only thing they all agreed on -- but
+     * {@code lastModified} is a wall clock reading, and a clock that jumps forward
+     * makes a file being written this moment look arbitrarily old. A lock says
+     * whether the writer is there, and the system drops it when a process ends
+     * however it ends, so it cannot outlive the process it stands for.</p>
+     */
+    private static final String STORAGE_LIVE_SUFFIX = ".live";
+
+    /**
+     * How long to leave between sweeps. A rate limit rather than a judgement about
+     * any file, measured on the monotonic clock so that setting the wall clock cannot
+     * disturb it.
+     */
+    private static final long STORAGE_SWEEP_INTERVAL = 5L * 60L * 1000L;
+
+    /**
+     * Distinguishes the scratch files of concurrent writes. Paired with the process
+     * id, since a second process counts from the beginning as well.
+     */
+    private static final AtomicLong storageScratchCounter = new AtomicLong();
+
+    /**
+     * Guards the instant at which a write is published or abandoned, and the set of
+     * writes that are still open. Deleting an entry and publishing one have to take
+     * turns: otherwise a write that renames its scratch file just after another
+     * thread deleted the entry brings the deleted entry back.
+     */
+    private static final Object storagePublishLock = new Object();
+
+    /**
+     * Name of the file whose lock serializes storage writes between processes.
+     */
+    private static final String STORAGE_LOCK_FILE = ".lock";
+
+    /**
+     * The cross process lock, and the handle it is taken on, while this process holds
+     * it. Guarded by {@link #storagePublishLock}, so only one thread here ever has it.
+     */
+    private static RandomAccessFile storageLockHandle;
+    private static FileLock storageLockAcrossProcesses;
+
+    /**
+     * The lock this process holds for as long as it runs, saying that the scratch
+     * files bearing its process id are still being written. Never released: the
+     * system takes it back when the process ends.
+     */
+    private static RandomAccessFile storageLiveHandle;
+    private static FileLock storageLiveLock;
+
+    /**
+     * How many nested claims this process has on the cross process lock. A
+     * {@code FileLock} is held by the whole VM and cannot be taken twice, and
+     * clearStorage claims it and then calls deleteStorageFile for every entry.
+     */
+    private static int storageLockDepth;
+
+    /**
+     * Claims the storage for this process, so that creating a scratch file, deleting
+     * an entry and publishing a write cannot interleave between processes.
+     *
+     * <p>Unlinking a writer's scratch file is what cancels it, and that only reaches
+     * the writes that exist when the deletion looks. Without this a second process
+     * could create its scratch file just after a deletion had scanned for them, and
+     * publish over the entry that deletion went on to remove. A lock the filesystem
+     * arbitrates is the only thing both processes can see; the system drops it when a
+     * process ends however it ends, so it cannot be left held by a crash.</p>
+     *
+     * <p>Best effort: if the lock cannot be taken the work still goes ahead, since a
+     * storage that stops writing would be worse than one exposed to a race that only
+     * an application with more than one process can reach at all.</p>
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     */
+    private static void lockStorageAcrossProcesses() {
+        if (storageLockDepth == 0) {
+            try {
+                File dir = storageScratchDir();
+                if (dir.isDirectory() || dir.mkdirs() || dir.isDirectory()) {
+                    // kept before the lock is attempted rather than after it succeeds,
+                    // so that a lock which throws still leaves releaseStorageLock
+                    // something to close. Otherwise a filesystem that refuses to lock
+                    // leaks a descriptor on every storage operation until unrelated
+                    // files stop opening.
+                    storageLockHandle =
+                            new RandomAccessFile(new File(dir, STORAGE_LOCK_FILE), "rw");
+                    storageLockAcrossProcesses = storageLockHandle.getChannel().lock();
+                }
+            } catch (Throwable t) {
+                // android's log, not ours: the default log writer is a storage stream,
+                // so reporting this through it would come back through here with the
+                // depth still at zero and fail the same way, again and again
+                Log.e("CodenameOne", "Could not lock the storage", t);
+                releaseStorageLock();
+            }
+        }
+        storageLockDepth++;
+    }
+
+    /**
+     * Gives up this process's claim on the storage.
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     */
+    private static void unlockStorageAcrossProcesses() {
+        storageLockDepth--;
+        if (storageLockDepth == 0) {
+            releaseStorageLock();
+        }
+    }
+
+    /**
+     * Drops the cross process lock and the handle it was taken on, whichever of them
+     * this process actually got.
+     */
+    private static void releaseStorageLock() {
+        try {
+            if (storageLockAcrossProcesses != null) {
+                storageLockAcrossProcesses.release();
+            }
+        } catch (Throwable t) {
+            Log.e("CodenameOne", "Could not release the storage lock", t);
+        }
+        storageLockAcrossProcesses = null;
+        try {
+            if (storageLockHandle != null) {
+                storageLockHandle.close();
+            }
+        } catch (Throwable t) {
+            Log.e("CodenameOne", "Could not close the storage lock", t);
+        }
+        storageLockHandle = null;
+    }
+
+    /**
+     * The writes that are currently open, so that deleting an entry can cancel them.
+     * Guarded by {@link #storagePublishLock}.
+     */
+    private static final List<StorageOutputStream> openStorageWrites =
+            new ArrayList<StorageOutputStream>();
+
+    /**
+     * When the scratch area is next worth looking at, on the monotonic clock. Keeps
+     * the sweep from running on every write without ever being the thing that decides
+     * whether a file is abandoned. Guarded by {@link #storagePublishLock}.
+     */
+    private static long nextStorageScratchSweep;
+
+    /**
      * @inheritDoc
      */
     public void deleteStorageFile(String name) {
-        getContext().deleteFile(name);
+        synchronized (storagePublishLock) {
+            lockStorageAcrossProcesses();
+            try {
+                // cancelled before the entry goes, and under the same lock the
+                // publishing rename takes, so a write that is already mid close
+                // cannot put the entry back afterwards.
+                for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                    openStorageWrites.get(iter).cancel(name);
+                }
+                // the same for writes in another process, which the monitor above
+                // knows nothing about. Unlinking a scratch file cancels it: the
+                // writer keeps a working descriptor on an inode with no name, exactly
+                // as it used to keep one on an entry deleted underneath it, and the
+                // rename that would have published it can no longer find anything to
+                // rename. Scratch files go first, so a publish that slips through
+                // between the two still leaves an entry for the delete to remove.
+                discardScratchFilesFor(name);
+                getContext().deleteFile(name);
+            } finally {
+                unlockStorageAcrossProcesses();
+            }
+        }
+    }
+
+    /**
+     * Unlinks every scratch file being written for the given entry, in this process
+     * or any other, which is what cancels those writes.
+     *
+     * @param name the storage entry
+     */
+    private static void discardScratchFilesFor(String name) {
+        try {
+            String prefix = storageScratchPrefix(name);
+            File[] scratch = storageScratchDir().listFiles();
+            if (scratch == null) {
+                return;
+            }
+            for (int iter = 0; iter < scratch.length; iter++) {
+                if (scratch[iter].getName().startsWith(prefix) && !scratch[iter].delete()) {
+                    com.codename1.io.Log.p("Could not cancel the storage write "
+                            + scratch[iter]);
+                }
+            }
+        } catch (IOException err) {
+            com.codename1.io.Log.e(err);
+        }
     }
 
     /**
      * @inheritDoc
      */
+    public void clearStorage() {
+        synchronized (storagePublishLock) {
+            // every open write, not just the ones for entries that exist. A write to
+            // an entry that is not there yet is absent from listStorageEntries, so the
+            // inherited implementation never reaches it, and it would publish a new
+            // entry moments after the storage was supposedly emptied.
+            lockStorageAcrossProcesses();
+            try {
+                for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+                    openStorageWrites.get(iter).cancel();
+                }
+                discardAllScratchFiles();
+                super.clearStorage();
+            } finally {
+                unlockStorageAcrossProcesses();
+            }
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public boolean abandonStorageWrite(String name, OutputStream writing) {
+        // this write and no other. Every write to the entry used to be given up
+        // together, so a second thread writing the same entry had its value quietly
+        // discarded and was told the write had succeeded.
+        if (writing instanceof StorageOutputStream) {
+            synchronized (storagePublishLock) {
+                ((StorageOutputStream) writing).cancel();
+            }
+            // such a write leaves the entry untouched until it is published, so
+            // whatever was stored is still there
+            return true;
+        }
+        // a stream that never opened cannot have touched anything either. Anything
+        // else wrote into the entry itself and the caller has to clear up after it.
+        return writing == null;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * <p>Writes into the entry, as it always has. A caller may hold this open and
+     * expect what it flushes to be readable meanwhile -- the log writer keeps one for
+     * the life of the application and sendLog reads the entry behind its back -- so
+     * an entry that appeared only on close would leave the log unreadable and lose
+     * everything written since the process started. What can be given here without
+     * changing when the entry appears is the flush that Android does not do on
+     * close.</p>
+     */
     public OutputStream createStorageOutputStream(String name) throws IOException {
-        return getContext().openFileOutput(name, 0);
+        return new SyncingStorageOutputStream(getContext().openFileOutput(name, 0));
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public OutputStream createStorageOutputStream(String name, boolean replaceWhenClosed)
+            throws IOException {
+        if (!replaceWhenClosed) {
+            return createStorageOutputStream(name);
+        }
+        sweepStorageScratchFiles();
+        return new StorageOutputStream(name);
+    }
+
+    /**
+     * Forces a stream onto the device as it closes, which Android does not do by
+     * itself, without changing anything about when what is written becomes visible.
+     */
+    private static final class SyncingStorageOutputStream extends OutputStream {
+        private final FileOutputStream out;
+        private boolean closed;
+
+        SyncingStorageOutputStream(FileOutputStream out) {
+            this.out = out;
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            out.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                out.flush();
+                out.getFD().sync();
+            } finally {
+                out.close();
+            }
+        }
     }
 
     /**
@@ -7562,6 +7893,556 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public int getStorageEntrySize(String name) {
         return (int)new File(getContext().getFilesDir(), name).length();
+    }
+
+    /**
+     * Removes the scratch files left behind by a run that died mid write, once they
+     * are old enough that nothing can still be writing them.
+     */
+    private void sweepStorageScratchFiles() {
+        synchronized (storagePublishLock) {
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (now < nextStorageScratchSweep) {
+                return;
+            }
+            nextStorageScratchSweep = now + STORAGE_SWEEP_INTERVAL;
+            // under the lock the other processes take to start a write or to say they
+            // are running. Finding an owner gone and then deleting its files are two
+            // steps, and a process id is handed out again the moment its holder is
+            // gone: without this a process could be given the id just examined, say so
+            // and start writing, and have this sweep delete the write it had only just
+            // begun -- or the very file it had said it was alive with, after which
+            // every later sweep would take it for gone.
+            lockStorageAcrossProcesses();
+            try {
+                File dir = storageScratchDir();
+                File[] files = dir.listFiles();
+                if (files == null) {
+                    return;
+                }
+                int mine = android.os.Process.myPid();
+                for (int iter = 0; iter < files.length; iter++) {
+                    if (isStorageLockFile(files[iter])) {
+                        continue;
+                    }
+                    int owner = storageScratchOwner(files[iter].getName());
+                    // this process knows what it is doing without asking, and never
+                    // tries to lock its own liveness file, which it already holds
+                    if (owner < 0 || owner == mine || isProcessWriting(dir, owner)) {
+                        continue;
+                    }
+                    if (!files[iter].delete()) {
+                        com.codename1.io.Log.p("Could not remove the abandoned storage "
+                                + "scratch file " + files[iter]);
+                    }
+                }
+            } catch (Throwable t) {
+                // a sweep that fails costs disk space, never correctness
+                com.codename1.io.Log.e(t);
+            } finally {
+                unlockStorageAcrossProcesses();
+            }
+        }
+    }
+
+    /**
+     * The process a file in the scratch directory belongs to.
+     *
+     * @param fileName the name of the file
+     * @return the process id, or -1 if the name does not carry one
+     */
+    private static int storageScratchOwner(String fileName) {
+        String pid;
+        if (fileName.endsWith(STORAGE_LIVE_SUFFIX)) {
+            pid = fileName.substring(0, fileName.length() - STORAGE_LIVE_SUFFIX.length());
+        } else {
+            int digest = fileName.indexOf('-');
+            int counter = digest < 0 ? -1 : fileName.indexOf('-', digest + 1);
+            if (counter < 0) {
+                return -1;
+            }
+            pid = fileName.substring(digest + 1, counter);
+        }
+        try {
+            return Integer.parseInt(pid);
+        } catch (NumberFormatException err) {
+            return -1;
+        }
+    }
+
+    /**
+     * Whether the given process is still running, and so may still be writing the
+     * scratch files that carry its id.
+     *
+     * <p>Asked of the filesystem rather than of {@code /proc}, which since Android 9
+     * shows a process only itself. A lock that can be taken is one nobody is holding.
+     * Anything unexpected counts as running, since deleting another process's work on
+     * a guess is the one outcome worth avoiding here.</p>
+     *
+     * @param dir the scratch directory
+     * @param pid the process to ask about
+     * @return true if that process appears to be running
+     */
+    private static boolean isProcessWriting(File dir, int pid) {
+        File live = new File(dir, pid + STORAGE_LIVE_SUFFIX);
+        if (!live.exists()) {
+            return false;
+        }
+        RandomAccessFile handle = null;
+        FileLock held = null;
+        try {
+            handle = new RandomAccessFile(live, "rw");
+            held = handle.getChannel().tryLock();
+            return held == null;
+        } catch (Throwable t) {
+            return true;
+        } finally {
+            try {
+                if (held != null) {
+                    held.release();
+                }
+                if (handle != null) {
+                    handle.close();
+                }
+            } catch (Throwable t) {
+                com.codename1.io.Log.e(t);
+            }
+        }
+    }
+
+    /**
+     * Says, for as long as this process runs, that the scratch files carrying its
+     * process id are still being written.
+     *
+     * @param dir the scratch directory
+     */
+    private static void claimStorageLiveness(File dir) {
+        synchronized (storagePublishLock) {
+            if (storageLiveLock != null) {
+                return;
+            }
+            // under the same lock the sweep takes, so that saying this process is
+            // running and clearing what the last holder of its id left behind cannot
+            // land in the middle of another process deciding that id is gone
+            lockStorageAcrossProcesses();
+            try {
+                try {
+                    storageLiveHandle = new RandomAccessFile(
+                            new File(dir, android.os.Process.myPid() + STORAGE_LIVE_SUFFIX), "rw");
+                    storageLiveLock = storageLiveHandle.getChannel().lock();
+                } catch (Throwable t) {
+                    // android's log for the same reason as above
+                    Log.e("CodenameOne", "Could not claim the storage liveness file", t);
+                    try {
+                        if (storageLiveHandle != null) {
+                            storageLiveHandle.close();
+                        }
+                    } catch (Throwable ignored) {
+                        Log.e("CodenameOne", "Could not close the liveness file", ignored);
+                    }
+                    // the lock as well as the handle: closing the handle gives up the
+                    // lock, and a lock this process still believed it held is one it
+                    // would never take again, which leaves every other process reading
+                    // it as gone and free to delete the writes it has in flight
+                    storageLiveHandle = null;
+                    storageLiveLock = null;
+                    return;
+                }
+                try {
+                    discardEarlierIncarnation(dir);
+                } catch (Throwable t) {
+                    // separately, because the claim above has already succeeded and
+                    // clearing up after whoever held this id last is not worth giving
+                    // it up for. The leftovers keep until a later sweep.
+                    Log.e("CodenameOne", "Could not clear the earlier incarnation", t);
+                }
+            } finally {
+                unlockStorageAcrossProcesses();
+            }
+        }
+    }
+
+    /**
+     * Unlinks every scratch file there is, cancelling every write in progress in any
+     * process.
+     */
+    private static void discardAllScratchFiles() {
+        try {
+            File[] scratch = storageScratchDir().listFiles();
+            if (scratch == null) {
+                return;
+            }
+            for (int iter = 0; iter < scratch.length; iter++) {
+                if (!isStorageMarkerFile(scratch[iter]) && !scratch[iter].delete()) {
+                    com.codename1.io.Log.p("Could not cancel the storage write "
+                            + scratch[iter]);
+                }
+            }
+        } catch (IOException err) {
+            com.codename1.io.Log.e(err);
+        }
+    }
+
+    /**
+     * Whether the given file is the one whose lock serializes the processes, rather
+     * than a write in progress.
+     *
+     * <p>It has to survive both the clear and the sweep. Linux lets a locked file be
+     * unlinked, and the lock goes with the inode rather than the name, so a process
+     * that removed it while holding it would leave the next process free to create
+     * the name afresh and take a lock on a different inode: both would then hold
+     * "the" lock and neither would wait for the other. Nothing writes to it either,
+     * so its age says nothing about whether it is in use.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if the file is the lock
+     */
+    private static boolean isStorageLockFile(File file) {
+        return STORAGE_LOCK_FILE.equals(file.getName());
+    }
+
+    /**
+     * Removes whatever a previous process left behind under this process's id.
+     *
+     * <p>Android hands out a process id again once the process holding it is gone, so
+     * after a crash or a reboot the files an earlier incarnation abandoned can be
+     * sitting under the id this one has just been given. The sweep passes over
+     * anything bearing its own id, on the grounds that a process knows its own work,
+     * which would leave those files where they are for good.</p>
+     *
+     * <p>Usually this runs before the first write, when the process owns nothing and
+     * everything under its id must belong to the incarnation before it. That is not
+     * guaranteed: a claim that fails is retried by the next write, by which time this
+     * process may have writes of its own open. Those are known exactly and are left
+     * alone -- deleting one would fail a write that had already been serialized.</p>
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     *
+     * @param dir the scratch directory
+     */
+    private static void discardEarlierIncarnation(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        int mine = android.os.Process.myPid();
+        for (int iter = 0; iter < files.length; iter++) {
+            if (!isStorageMarkerFile(files[iter])
+                    && storageScratchOwner(files[iter].getName()) == mine
+                    && !isOpenStorageWrite(files[iter])
+                    && !files[iter].delete()) {
+                com.codename1.io.Log.p("Could not remove the abandoned storage scratch "
+                        + "file " + files[iter]);
+            }
+        }
+    }
+
+    /**
+     * Whether the given scratch file belongs to a write this process has open.
+     *
+     * <p>The caller must hold {@link #storagePublishLock}.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if a write in this process is using it
+     */
+    private static boolean isOpenStorageWrite(File file) {
+        for (int iter = 0; iter < openStorageWrites.size(); iter++) {
+            if (openStorageWrites.get(iter).scratch.equals(file)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the given file is one of the markers the processes keep about
+     * themselves, rather than a write in progress.
+     *
+     * <p>Clearing the storage throws away the writes, and nothing else. A process
+     * whose liveness file was taken from underneath it goes on holding the lock, so
+     * it never notices and never makes the name again, and from then on every other
+     * process reads it as gone and feels free to delete the writes it has in flight.
+     * The sweep is the one place a liveness file is removed, and only once its owner
+     * is known to be gone.</p>
+     *
+     * @param file a file in the scratch directory
+     * @return true if the file is a marker rather than a pending write
+     */
+    private static boolean isStorageMarkerFile(File file) {
+        return isStorageLockFile(file) || file.getName().endsWith(STORAGE_LIVE_SUFFIX);
+    }
+
+    /**
+     * The start of the name of every scratch file for the given entry.
+     *
+     * <p>A digest rather than the entry itself: an entry name may be as long as the
+     * filesystem allows on its own, so anything built by appending to one would be
+     * refused. Fixed width, and specific enough that one entry's deletion does not
+     * cancel another's write.</p>
+     *
+     * @param name the storage entry
+     * @return the prefix shared by that entry's scratch files
+     * @throws IOException if the digest is unavailable
+     */
+    private static String storageScratchPrefix(String name) throws IOException {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(name.getBytes("UTF-8"));
+            StringBuilder b = new StringBuilder(digest.length * 2);
+            for (int iter = 0; iter < digest.length; iter++) {
+                b.append(Character.forDigit((digest[iter] >> 4) & 0xf, 16));
+                b.append(Character.forDigit(digest[iter] & 0xf, 16));
+            }
+            return b.append('-').toString();
+        } catch (java.security.NoSuchAlgorithmException err) {
+            throw new IOException("No SHA-256 to name storage scratch files with", err);
+        }
+    }
+
+    /**
+     * Resolves a storage entry to its file, refusing anything that would land outside
+     * the storage directory.
+     *
+     * <p>{@code openFileOutput} used to make this check on our behalf and reject any
+     * name holding a path separator. Publishing by rename does not: with name
+     * normalization turned off a key like {@code ../shared_prefs/settings.xml}
+     * reaches here as it was written, and {@code File} resolves it, which would put
+     * the rename anywhere in the application's private data and leave behind an entry
+     * that Storage itself could no longer read or delete.</p>
+     *
+     * @param name the storage entry
+     * @return the file the entry is stored in
+     * @throws IOException if the name does not name an entry in the storage directory
+     */
+    private static File storageEntryFile(String name) throws IOException {
+        File dir = getContext().getFilesDir();
+        if (name.indexOf('/') >= 0 || name.indexOf(File.separatorChar) >= 0) {
+            throw new IOException("Storage entry " + name + " contains a path separator");
+        }
+        File entry = new File(dir, name);
+        if (!dir.equals(entry.getParentFile())) {
+            throw new IOException("Storage entry " + name + " resolves outside " + dir);
+        }
+        return entry;
+    }
+
+    /**
+     * The directory holding the writes that are in progress.
+     *
+     * @return the scratch directory, which is not guaranteed to exist yet
+     * @throws IOException if the application has no data directory to put it in
+     */
+    private static File storageScratchDir() throws IOException {
+        File files = getContext().getFilesDir();
+        File data = files.getParentFile();
+        if (data == null) {
+            throw new IOException("No application data directory above " + files);
+        }
+        return new File(data, STORAGE_SCRATCH_DIR);
+    }
+
+    /**
+     * Writes a storage entry to a scratch file, forces the bytes onto the device and
+     * only then renames that file over the entry.
+     *
+     * <p>{@code openFileOutput} truncates the entry as it opens it, and Android does
+     * not flush a file on close. Writing the entry in place therefore left a window
+     * on every single write in which the entry was empty or half written on disk, and
+     * left the bytes of a completed write sitting in the page cache for as long as
+     * the kernel felt like holding them. An abrupt end to the process or to the
+     * device inside either window -- a low memory kill, a force stop, a battery pull,
+     * a panic -- lost the entry, and on a filesystem that journals the truncation
+     * ahead of the data it came back as a zero length file. How wide those windows
+     * are is a property of the filesystem and of how eagerly the vendor kills
+     * background processes, which is why this only ever showed up on some devices.</p>
+     *
+     * <p>The entry now changes in a single rename, which the filesystem cannot show
+     * half done, and the bytes reach the device before that rename is made.</p>
+     */
+    private static final class StorageOutputStream extends OutputStream {
+        private final String name;
+        private final File target;
+        private final File scratch;
+        private final FileOutputStream out;
+        private boolean closed;
+        private boolean cancelled;
+
+        StorageOutputStream(String name) throws IOException {
+            this.name = name;
+            this.target = storageEntryFile(name);
+            File dir = storageScratchDir();
+            if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+                throw new IOException("Could not create the storage scratch directory "
+                        + dir);
+            }
+            // the write goes ahead whether or not that succeeded. A claim can only
+            // fail where the filesystem will not lock, and refusing to write would
+            // turn that into an application that cannot store anything -- far worse
+            // than what it costs, which is that another process sweeping at that
+            // moment may take this write for abandoned and unlink it. That fails the
+            // write, honestly, and leaves what was already stored where it is; the
+            // next write claims again. Same trade the cross process lock makes.
+            claimStorageLiveness(dir);
+            // the digest of the entry lets another process find and cancel this write.
+            // The process id separates concurrent processes, whose counters both start
+            // from the beginning, and the counter separates writes within one.
+            this.scratch = new File(dir, storageScratchPrefix(name)
+                    + android.os.Process.myPid() + "-"
+                    + storageScratchCounter.incrementAndGet());
+            // created and registered as one step under the lock a deletion takes.
+            // Registering afterwards would leave a write whose scratch file already
+            // exists but which a concurrent deleteStorageFile cannot see to cancel,
+            // and that write would rename itself over the entry that was deleted.
+            synchronized (storagePublishLock) {
+                lockStorageAcrossProcesses();
+                try {
+                    this.out = new FileOutputStream(scratch);
+                    openStorageWrites.add(this);
+                } finally {
+                    unlockStorageAcrossProcesses();
+                }
+            }
+        }
+
+        /**
+         * Marks this write as one that must not be published, whatever entry it is
+         * for. Called holding {@link #storagePublishLock}.
+         */
+        void cancel() {
+            cancelled = true;
+        }
+
+        /**
+         * Marks this write as one that must not be published, because the entry it
+         * would publish over has been deleted since it opened. Called holding
+         * {@link #storagePublishLock}.
+         *
+         * @param entry the entry being deleted
+         */
+        void cancel(String entry) {
+            if (name.equals(entry)) {
+                cancelled = true;
+            }
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+            out.write(b);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            out.write(b, off, len);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            out.flush();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                try {
+                    out.flush();
+                    out.getFD().sync();
+                } finally {
+                    out.close();
+                }
+                publish();
+            } finally {
+                synchronized (storagePublishLock) {
+                    openStorageWrites.remove(this);
+                }
+                if (scratch.exists() && !scratch.delete()) {
+                    com.codename1.io.Log.p("Could not remove the storage scratch file "
+                            + scratch);
+                }
+            }
+        }
+
+        /**
+         * Renames the scratch file over the entry, which is the point at which the
+         * write becomes visible.
+         *
+         * @throws IOException if the entry could not be replaced, so that the caller
+         *   that wrote it hears about it rather than being told the write succeeded
+         */
+        private void publish() throws IOException {
+            synchronized (storagePublishLock) {
+                lockStorageAcrossProcesses();
+                try {
+                    // the one case where not publishing is not a failure: this
+                    // process cancelled the write itself, so the caller either asked
+                    // for the entry to go or is already abandoning the write. Failing
+                    // here would only log noise over an outcome that is already known.
+                    if (cancelled) {
+                        return;
+                    }
+                    if (scratch.renameTo(target)) {
+                        syncStorageDirectory(target.getParentFile());
+                        return;
+                    }
+                    // A missing scratch file is not reported as a success. Another
+                    // process unlinking it does mean this entry was deleted, and
+                    // failing here reaches the same place -- writeObject deletes the
+                    // entry on a failed write -- while still telling the caller that
+                    // what it wrote did not land. Anything else that removed the file
+                    // gets the same honest answer, where calling it a success would
+                    // leave the caller believing in a value the storage never took.
+                    throw new IOException("Could not store " + name);
+                } finally {
+                    unlockStorageAcrossProcesses();
+                }
+            }
+        }
+    }
+
+    /**
+     * Forces a rename in the given directory onto the device, so that a completed
+     * write does not fall back to its previous contents after an abrupt shutdown.
+     * Best effort: without it a crash can still only cost the newest write, never the
+     * integrity of an entry.
+     *
+     * @param dir the directory holding the storage entries
+     */
+    private static void syncStorageDirectory(File dir) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        try {
+            DirectorySync.sync(dir);
+        } catch (Throwable t) {
+            // some filesystems refuse to sync a directory handle
+        }
+    }
+
+    /**
+     * Isolates the API 21 syscalls, so that verifying {@code AndroidImplementation}
+     * on an older device never has to resolve them.
+     */
+    private static final class DirectorySync {
+        private DirectorySync() {
+        }
+
+        static void sync(File dir) throws android.system.ErrnoException {
+            java.io.FileDescriptor fd = android.system.Os.open(dir.getPath(),
+                    android.system.OsConstants.O_RDONLY, 0);
+            try {
+                android.system.Os.fsync(fd);
+            } finally {
+                android.system.Os.close(fd);
+            }
+        }
     }
 
     private String addFile(String s) {
@@ -12626,6 +13507,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    private AndroidNearbyBridge nearbyBridge;
+
+    /// The nearby bridge, which finds its own implementation.
+    ///
+    /// Always returned rather than conditionally null: the shell answers every
+    /// capability query honestly whether or not the optional backend was
+    /// bundled, so the public API reports NOT_SUPPORTED without this getter
+    /// having to know how the app was built.
+    @Override
+    public synchronized com.codename1.nearby.spi.NearbyBridge
+            getNearbyBridge() {
+        // Synchronized, because two threads reaching nearby for the first
+        // time both saw null and both built a backend. Only one was kept,
+        // and the loser could already have prepared a UWB session or taken
+        // the companion chooser slot in state nothing could reach again --
+        // so a later start or stop could not find its session, and the radio
+        // it had opened stayed open.
+        if (nearbyBridge == null) {
+            nearbyBridge = new AndroidNearbyBridge(getActivity());
+        }
+        return nearbyBridge;
     }
 
     @Override

@@ -1,0 +1,5 @@
+package androidx.wear.watchface.complications.data;
+/** Stub mirroring the real API: a reference instant a countdown runs toward. */
+public class CountDownTimeReference {
+    public CountDownTimeReference(java.time.Instant instant) { }
+}

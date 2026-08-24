@@ -117,7 +117,7 @@
              entry in nbproject/project.properties and in maven/android/pom.xml. -->
         <javac destdir="build/tmp"
             classpath="${javac.classpath}:build/tmp"
-            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**,com/codename1/impl/android/cipher/**">
+            excludes="com/codename1/impl/android/ar/**,com/codename1/impl/android/ai/**,com/codename1/impl/android/cipher/**,com/codename1/impl/android/nearby/**">
             <src path="${src.dir}" />
         </javac>
         <jar jarfile="${dist.jar}" basedir="build/tmp">

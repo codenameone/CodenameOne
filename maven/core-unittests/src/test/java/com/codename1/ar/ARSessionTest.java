@@ -26,8 +26,12 @@ import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import com.codename1.ui.Display;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -306,18 +310,59 @@ class ARSessionTest extends UITestBase {
 
     // ---- event bridge ----
 
+    /// Runs the given work with the EDT parked, so that nothing it posts can be
+    /// drained before it has finished.
+    ///
+    /// The bridge coalesces per-frame refinements only for as long as they are still
+    /// pending, which is the right behaviour -- a fast EDT is allowed to deliver two
+    /// updates as two events. That makes "the same batch" something a test has to
+    /// arrange rather than assume: with the EDT free to run, it can drain between two
+    /// calls here and the coalescing under test never gets the chance to happen.
+    /// Parking it first is what makes these assertions about the bridge instead of
+    /// about how busy the machine was.
+    ///
+    /// @param batch the events to post, and any assertion about what has not been
+    ///   delivered yet
+    private void inOneBatch(Runnable batch) {
+        final CountDownLatch parked = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                parked.countDown();
+                try {
+                    release.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        try {
+            assertTrue(parked.await(10, TimeUnit.SECONDS), "the EDT never parked");
+            batch.run();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } finally {
+            release.countDown();
+        }
+        flushSerialCalls();
+    }
+
     @Test
     void planeEventsFromBackgroundThreadArriveAfterFlush() {
         open();
         listenAll();
-        impl.onBackgroundThread(new Runnable() {
+        inOneBatch(new Runnable() {
             public void run() {
-                impl.sink.onPlaneAdded(plane("p1"));
+                impl.onBackgroundThread(new Runnable() {
+                    public void run() {
+                        impl.sink.onPlaneAdded(plane("p1"));
+                    }
+                });
+                // Nothing delivered until the EDT drains.
+                assertEquals(0, planeEvents.size());
             }
         });
-        // Nothing delivered until the EDT drains.
-        assertEquals(0, planeEvents.size());
-        flushSerialCalls();
         assertEquals(1, planeEvents.size());
         assertEquals(ARPlaneEvent.Kind.ADDED, planeEvents.get(0).getKind());
         assertEquals("p1", planeEvents.get(0).getPlane().getId());
@@ -334,13 +379,16 @@ class ARSessionTest extends UITestBase {
 
         final ARPlane last = new ARPlane("p1", ARPlane.Type.HORIZONTAL_UP, ARPose.IDENTITY,
                 5f, 5f, null, ARTrackingState.TRACKING);
-        impl.onBackgroundThread(new Runnable() {
+        inOneBatch(new Runnable() {
             public void run() {
-                impl.sink.onPlaneUpdated(plane("p1"));
-                impl.sink.onPlaneUpdated(last);
+                impl.onBackgroundThread(new Runnable() {
+                    public void run() {
+                        impl.sink.onPlaneUpdated(plane("p1"));
+                        impl.sink.onPlaneUpdated(last);
+                    }
+                });
             }
         });
-        flushSerialCalls();
         assertEquals(1, planeEvents.size(), "two updates for one id coalesce into one event");
         assertEquals(ARPlaneEvent.Kind.UPDATED, planeEvents.get(0).getKind());
         assertEquals(5f, session.getPlanes()[0].getExtentX(), 0f);
@@ -354,9 +402,12 @@ class ARSessionTest extends UITestBase {
         flushSerialCalls();
         planeEvents.clear();
 
-        impl.sink.onPlaneRemoved("p1");
-        impl.sink.onPlaneUpdated(plane("p1"));
-        flushSerialCalls();
+        inOneBatch(new Runnable() {
+            public void run() {
+                impl.sink.onPlaneRemoved("p1");
+                impl.sink.onPlaneUpdated(plane("p1"));
+            }
+        });
         assertEquals(1, planeEvents.size(), "the stale update after removal is dropped");
         assertEquals(ARPlaneEvent.Kind.REMOVED, planeEvents.get(0).getKind());
         assertEquals(0, session.getPlanes().length);
@@ -368,9 +419,12 @@ class ARSessionTest extends UITestBase {
         listenAll();
         final ARPlane refined = new ARPlane("p1", ARPlane.Type.HORIZONTAL_UP, ARPose.IDENTITY,
                 3f, 3f, null, ARTrackingState.TRACKING);
-        impl.sink.onPlaneUpdated(refined);
-        impl.sink.onPlaneAdded(plane("p1"));
-        flushSerialCalls();
+        inOneBatch(new Runnable() {
+            public void run() {
+                impl.sink.onPlaneUpdated(refined);
+                impl.sink.onPlaneAdded(plane("p1"));
+            }
+        });
         // Ordered add applies first, then the coalesced refinement.
         assertEquals(2, planeEvents.size());
         assertEquals(ARPlaneEvent.Kind.ADDED, planeEvents.get(0).getKind());

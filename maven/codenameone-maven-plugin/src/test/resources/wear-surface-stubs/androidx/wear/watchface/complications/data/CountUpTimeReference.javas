@@ -1,0 +1,5 @@
+package androidx.wear.watchface.complications.data;
+/** Stub mirroring the real API: a reference instant a stopwatch counts up from. */
+public class CountUpTimeReference {
+    public CountUpTimeReference(java.time.Instant instant) { }
+}

@@ -13,11 +13,18 @@
   {{- $failed := 0 -}}
   {{- $skipped := 0 -}}
   {{- $notRun := 0 -}}
+  {{- $awaiting := 0 -}}
   {{- $failedTests := slice -}}
   {{- $skippedTests := slice -}}
   {{- range $feature.tests -}}
     {{- $result := index $report.tests . -}}
-    {{- $status := "not-run" -}}
+    {{- /* Absent and "not-run" are different claims. "not-run" means this port
+           ran the suite with the test in its contract and nothing reported
+           back, which is a defect. Absent means the run predates the test --
+           the ordinary state of every port for a day after one is registered --
+           and calling that a defect is what used to make registering a test
+           require editing eleven reports. */ -}}
+    {{- $status := "awaiting" -}}
     {{- with $result -}}{{- $status = .status -}}{{- end -}}
     {{- if eq $status "pass" -}}
       {{- $passed = add $passed 1 -}}
@@ -27,6 +34,8 @@
     {{- else if eq $status "skip" -}}
       {{- $skipped = add $skipped 1 -}}
       {{- $skippedTests = $skippedTests | append . -}}
+    {{- else if eq $status "awaiting" -}}
+      {{- $awaiting = add $awaiting 1 -}}
     {{- else -}}
       {{- $notRun = add $notRun 1 -}}
     {{- end -}}
@@ -63,7 +72,12 @@
               {{- with .ports -}}
                 {{- $portAllowed = in . $port.id -}}
               {{- end -}}
-              {{- if and $portAllowed (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
+              {{- /* An empty prefix is not a match. hasPrefix answers true for
+                     every reason against "", so a code that lost its prefix to a
+                     typo would render any future skip of that test as green and
+                     documented. The contract validator refuses such an erratum,
+                     and this is the same rule on the side that draws the tick. */ -}}
+              {{- if and $portAllowed .prefix (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
             {{- end -}}
             {{- if not $ok -}}{{- $allMatched = false -}}{{- end -}}
           {{- end -}}
@@ -80,7 +94,8 @@
   {{- $total := len $feature.tests -}}
   {{- $state = "partial" -}}
   {{- $mark = "−" -}}
-  {{- $label = printf "%d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
+  {{- $awaitingNote := cond (gt $awaiting 0) (printf ", %d awaiting this port's next run" $awaiting) "" -}}
+  {{- $label = printf "%d passed, %d skipped, %d not run%s" $passed $skipped $notRun $awaitingNote -}}
   {{- /* Evidence is per feature. A run that stopped early leaves its own
          unreached tests as "not run" below, and the port card reports the
          incomplete run; that is not a reason to withdraw the result of a
@@ -104,7 +119,7 @@
       {{- $label = printf "%d of %d mapped tests passed; %s skipped by the CI environment, see the skipped-test errata%s" $passed $total (delimit $skippedTests ", ") $incomplete -}}
     {{- end -}}
   {{- else if not $complete -}}
-    {{- $label = printf "Suite did not finish; %d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
+    {{- $label = printf "Suite did not finish; %d passed, %d skipped, %d not run%s" $passed $skipped $notRun $awaitingNote -}}
   {{- else if eq $skipped $total -}}
     {{- $label = "All mapped tests skipped" -}}
   {{- end -}}

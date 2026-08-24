@@ -155,6 +155,8 @@ include::Near-Field-Communication.asciidoc[]
 
 include::Bluetooth.asciidoc[]
 
+include::Nearby-Devices.asciidoc[]
+
 include::Health.asciidoc[]
 
 include::Smart-Home.asciidoc[]

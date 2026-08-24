@@ -436,6 +436,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new FloatingToStringTest(),
             new StringFormatTest(),
             new ClipboardRoundTripTest(),
+            // Log is an extension point (subclass + override createWriter) and the
+            // JavaScript port used to shadow Log.e with a console stub, so a
+            // subclass's writer was never created (issue #5519). Assertion-only.
+            new LogSubclassCaptureTest(),
             // External surfaces assertion tests (no screenshots): the serializer wire format
             // round-tripped through JSONParser on the device VM, the timeline-selection helpers
             // the desktop widget renderers use, action dispatch (cold-start queue + EDT

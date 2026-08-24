@@ -109,7 +109,20 @@ class TvNativeBuilder {
             // HealthKit does not exist on tvOS at all. The iOS slice links it when the app
             // references com.codename1.health, so weak-link it here or the tvOS slice fails
             // to link. CN1Health.m additionally compiles itself out via TARGET_OS_TV.
-            + "HealthKit.framework";
+            + "HealthKit.framework;"
+            // NearbyInteraction and AccessorySetupKit are absent from the
+            // tvOS SDK; the iOS slice links them when the app references
+            // com.codename1.nearby.ranging or .companion, so weak-link them
+            // here or the tvOS slice fails while resolving the framework.
+            // CN1Nearby.m already compiles both halves out via the
+            // TARGET_OS_TV undefs in CodenameOne_GLViewController.h, so
+            // nothing on the tvOS slice calls into them.
+            //
+            // MultipeerConnectivity is deliberately NOT here, and that was
+            // measured rather than assumed: the tvOS SDK ships it, so the
+            // transport links normally and weak-linking would only obscure
+            // that. Same distinction the CoreSpotlight note below draws.
+            + "NearbyInteraction.framework;AccessorySetupKit.framework";
     // CoreSpotlight is deliberately NOT in this list, although the watch list carries it.
     //
     // The two platforms differ, and it was measured rather than reasoned about. On the
@@ -232,9 +245,74 @@ class TvNativeBuilder {
             }
             sb.append("    </array>\n");
         }
+        // The local-network keys the nearby transport needs, copied from what
+        // the iOS slice resolved.
+        //
+        // MultipeerConnectivity ships on tvOS and is deliberately linked for
+        // this slice, but tvOS 14 gates local-network discovery on the same
+        // two declarations iOS does -- and this plist is generated
+        // separately, carrying only bundle metadata, capabilities and fonts.
+        // So the framework was there, the native transport was compiled in,
+        // and the target could neither advertise nor browse.
+        //
+        // Keyed off the Bonjour services because that array is written only
+        // for a build that uses the transport; an app that declares none is
+        // not one, and gets neither key.
+        java.util.List<String> bonjour = tvBonjourServices(request);
+        if (!bonjour.isEmpty()) {
+            // The EFFECTIVE value, the same one IPhoneBuilder validates:
+            // ios.plistInject wins over the hint, so an app that declared a
+            // perfectly good disclosure there left the hint blank and the
+            // tvOS plist -- reading the hint -- omitted the key entirely.
+            String why = IPhoneBuilder.effectivePurposeString(request,
+                    "ios.NSLocalNetworkUsageDescription");
+            if (why != null && why.trim().length() > 0) {
+                plistString(sb, "NSLocalNetworkUsageDescription",
+                        IPhoneBuilder.plistEscape(why));
+            }
+            sb.append("    <key>NSBonjourServices</key>\n    <array>\n");
+            for (String service : bonjour) {
+                sb.append("        <string>")
+                        .append(IPhoneBuilder.plistEscape(service))
+                        .append("</string>\n");
+            }
+            sb.append("    </array>\n");
+        }
         sb.append("</dict>\n</plist>\n");
         File plist = new File(appSrcDir, request.getMainClass() + "-TV-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The Bonjour service types the iOS slice ended up declaring.
+    ///
+    /// TWO sources, because the build writes to whichever the app left it.
+    /// An app that declares the array itself puts it in ios.plistInject and
+    /// the merge leaves it alone; every other build -- the ordinary
+    /// generated one -- gets a comma-separated hint in ios.NSBonjourServices
+    /// instead. Reading only the first found nothing in the normal case, so
+    /// the tvOS plist was written without either local-network key and the
+    /// slice still could not discover anything.
+    private static java.util.List<String> tvBonjourServices(
+            BuildRequest request) {
+        java.util.List<String> declared = WatchNativeBuilder
+                .injectedPlistStringArray(request, "NSBonjourServices");
+        if (!declared.isEmpty()) {
+            return declared;
+        }
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String hint = request.getArg("ios.NSBonjourServices", "");
+        if (hint == null) {
+            return out;
+        }
+        // Both separators, because mergeNearbyBonjourServices splits on both
+        // when it reads the hint back.
+        for (String entry : hint.split("[,;]")) {
+            String service = entry.trim();
+            if (service.length() > 0) {
+                out.add(service);
+            }
+        }
+        return out;
     }
 
     private static void plistString(StringBuilder sb, String key, String value) {

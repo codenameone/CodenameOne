@@ -1,0 +1,7 @@
+package com.google.android.gms.wearable;
+public class DataEventBuffer implements Iterable<DataEvent> {
+    public java.util.Iterator<DataEvent> iterator() { return null; }
+    public int getCount() { return 0; }
+    public DataEvent get(int i) { return null; }
+    public void release() { }
+}

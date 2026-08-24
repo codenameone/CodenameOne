@@ -170,7 +170,14 @@ func cn1Color(_ spec: Any?) -> Color? {
         case "secondaryLabel":
             return Color.secondary
         case "background":
+            // systemBackground is API_UNAVAILABLE(watchos). A watch face composites over
+            // black and has no light appearance, so black is the answer the role means
+            // there rather than a stand-in for one.
+#if os(watchOS)
+            return Color.black
+#else
             return Color(UIColor.systemBackground)
+#endif
         case "accent":
             return Color.accentColor
         default:
@@ -181,9 +188,16 @@ func cn1Color(_ spec: Any?) -> Color? {
         return nil
     }
     let dark = cn1Int(dict["d"]) ?? light
+    // colorWithDynamicProvider: is API_UNAVAILABLE(watchos), and there is nothing to resolve
+    // there anyway: watchOS has no light appearance, so the dark half of the pair is the
+    // right colour rather than a degraded one.
+#if os(watchOS)
+    return Color(cn1UIColor(argb: dark))
+#else
     return Color(UIColor { trait in
         trait.userInterfaceStyle == .dark ? cn1UIColor(argb: dark) : cn1UIColor(argb: light)
     })
+#endif
 }
 
 // MARK: - Vector node parsing
@@ -258,14 +272,19 @@ func cn1Alignment(_ value: Any?) -> Alignment? {
 
 // MARK: - Actions
 
-/// Builds the canonical surfaces deep link cn1surface://a?src=..&id=..&p=<url-encoded JSON>
+/// Builds the canonical surfaces deep link <scheme>://a?src=..&id=..&p=<url-encoded JSON>
 /// handled by the Codename One app delegate.
+///
+/// The scheme is this app's own (cn1surface.<bundle id>) rather than the bare cn1surface every
+/// Codename One app used to claim: a URL scheme is a global registration, and on the watch --
+/// where a complication tap is routed by nothing else -- two installed apps claiming one name
+/// meant the tap could open the wrong bundle.
 func cn1ActionURL(source: String, action: [String: Any]) -> URL? {
     guard let actionId = action["id"] as? String else {
         return nil
     }
     var components = URLComponents()
-    components.scheme = "cn1surface"
+    components.scheme = cn1SurfaceScheme
     components.host = "a"
     var items = [URLQueryItem(name: "src", value: source), URLQueryItem(name: "id", value: actionId)]
     if let params = action["p"], JSONSerialization.isValidJSONObject(params),

@@ -1202,6 +1202,28 @@ public final class IOSNative {
      */
     native void surfacesEndActivity(String activityId, String finalStateJson, boolean dismissImmediately);
 
+    /**
+     * Mirrors a published timeline to the paired watch, when the kind declares a complication
+     * family and this build has a watch app to receive it.
+     *
+     * <p>An App Group container is device-local -- the watch resolves the same identifier to a
+     * directory of its own -- so a phone-side publish is invisible to a complication until it
+     * travels. This is that transport. It is budgeted and best-effort by nature: the native
+     * degrades through progressively weaker delivery and finally to nothing, logging once at
+     * each step, because a failed mirror must never break the publish that already succeeded
+     * locally.</p>
+     *
+     * <p>A no-op on a build with no watch app, on a kind with no watch family, and on the watch
+     * itself -- where the app's own publish is authoritative and mirroring back would loop.</p>
+     *
+     * @param kindId the widget kind
+     * @param timelineJson the serialized timeline
+     * @param imageNames names of the images the timeline references, may be empty
+     * @param imageBlobs the corresponding PNG bytes, parallel to imageNames
+     */
+    native void surfacesMirrorToWatch(String kindId, String timelineJson,
+            String[] imageNames, byte[][] imageBlobs);
+
     /** True when this build/device can render WidgetKit widgets (iOS 14+, app group resolvable). */
     native boolean surfacesWidgetsSupported();
 
@@ -1893,4 +1915,137 @@ public final class IOSNative {
     /// private-key DER length. Returns 0 on success, negative on error.
     native int generateRsaKeyPair(int bits, byte[] outPub, byte[] outPriv, int[] lengths);
 
+
+    // --- Nearby devices (Nearby Interaction, MultipeerConnectivity, ----------
+    //     AccessorySetupKit) ------------------------------------------------
+    // Backs com.codename1.nearby. Compiled only when the builder flipped
+    // CN1_INCLUDE_NEARBY, and each of the three halves only when its own
+    // define is on -- an app that references one package must not link the
+    // frameworks the other two need.
+    //
+    // Structured values cross as the tab-delimited records
+    // com.codename1.impl.nearby.NearbyWire defines, joined with newlines when
+    // there is more than one. IOSNearbyBridge does the splitting. A record
+    // field can never contain a newline: NearbyWire.sanitize replaces one with
+    // a space before it is ever encoded.
+    //
+    // Answers never come back through a return value; they arrive later on
+    // IOSNearbyCallbacks.
+
+    /** True when this build linked Nearby Interaction and the device has the radio. */
+    native boolean nearbyRangingSupported();
+
+    /** True when this build linked AccessorySetupKit and the OS is new enough. */
+    native boolean nearbyCompanionSupported();
+
+    /** True when this build linked MultipeerConnectivity. */
+    native boolean nearbyTransportSupported();
+
+    /** The com.codename1.nearby.NearbyAvailability ordinal for ranging. */
+    native int nearbyRangingAvailability();
+
+    /** The com.codename1.nearby.NearbyAvailability ordinal for association. */
+    native int nearbyCompanionAvailability();
+
+    /** The com.codename1.nearby.NearbyAvailability ordinal for the transport. */
+    native int nearbyTransportAvailability();
+
+    /** An OR of the NearbyBridge.CAPABILITY_ bits this device can produce. */
+    native int nearbyRangingCapabilities();
+
+    /**
+     * Requests the permissions behind the given NearbyBridge.PERMISSION_ bits.
+     * Answers via IOSNearbyCallbacks.permissionResult.
+     */
+    native void nearbyRequestPermissions(int requestId, int permissionBits);
+
+    /**
+     * Allocates an NISession and publishes its discovery token. Answers via
+     * IOSNearbyCallbacks.sessionPrepared.
+     */
+    native void nearbyPrepareSession(int requestId, int sessionHandle,
+            boolean controller);
+
+    /**
+     * Runs the session against a peer token. Answers via
+     * IOSNearbyCallbacks.sessionStarted.
+     */
+    native void nearbyStartRanging(int requestId, int sessionHandle,
+            byte[] peerToken);
+
+    /**
+     * Runs the session against an accessory's configuration data. Answers via
+     * IOSNearbyCallbacks.accessoryConfiguration with the bytes to send back.
+     */
+    native void nearbyStartAccessoryRanging(int requestId, int sessionHandle,
+            byte[] accessoryData);
+
+    /** Invalidates a session and releases the radio. Idempotent. */
+    native void nearbyStopSession(int sessionHandle);
+
+    /**
+     * Shows the AccessorySetupKit picker. Answers via
+     * IOSNearbyCallbacks.associated.
+     *
+     * @param joinedFilters the encoded filters, newline-joined, never null
+     */
+    native void nearbyAssociate(int requestId, int profile,
+            boolean singleDevice, String joinedFilters);
+
+    /** Every association this app holds, as newline-joined encoded records. */
+    native String nearbyAssociations();
+
+    /** Drops an association. Answers via IOSNearbyCallbacks.disassociated. */
+    native void nearbyDisassociate(int requestId, String associationId);
+
+    /** Starts watching an association; true when the platform accepted. */
+    native boolean nearbyStartObservingPresence(String associationId);
+
+    /** Stops watching an association. Idempotent. */
+    native void nearbyStopObservingPresence(String associationId);
+
+    /** The largest byte payload MultipeerConnectivity accepts in one send. */
+    native int nearbyMaxPayloadSize();
+
+    /** Starts advertising. Answers via IOSNearbyCallbacks.transportOk. */
+    native void nearbyStartAdvertising(int requestId, String serviceId,
+            String localName, int strategy);
+
+    /** Stops advertising. Idempotent. */
+    native void nearbyStopAdvertising();
+
+    /** Starts browsing. Answers via IOSNearbyCallbacks.transportOk. */
+    native void nearbyStartDiscovery(int requestId, String serviceId,
+            int strategy);
+
+    /** Stops browsing. Idempotent. */
+    native void nearbyStopDiscovery();
+
+    /** Invites a peer. Answers via IOSNearbyCallbacks.transportOk. */
+    native void nearbyRequestConnection(int requestId, String endpointId,
+            String localName);
+
+    /** Accepts an invitation. Answers via IOSNearbyCallbacks.transportOk. */
+    native void nearbyAcceptConnection(int requestId, String endpointId);
+
+    /** Declines an invitation. */
+    native void nearbyRejectConnection(String endpointId);
+
+    /**
+     * Sends a payload. Answers via IOSNearbyCallbacks.transportOk once the
+     * payload is handed to the session.
+     *
+     * @param joinedEndpointIds the recipients, newline-joined
+     */
+    native void nearbySendPayload(int requestId, String joinedEndpointIds,
+            int payloadId, int payloadType, byte[] bytes, String path);
+
+    /** Cancels an in-flight payload. Idempotent. */
+    native void nearbyCancelPayload(int payloadId);
+
+    /** Disconnects one peer. Idempotent. */
+    native void nearbyDisconnect(String endpointId);
+
+    /** Stops advertising and browsing and drops every session. */
+    native void nearbyStopAllTransport();
 }

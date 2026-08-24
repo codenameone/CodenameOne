@@ -1,0 +1,2 @@
+package androidx.wear.watchface.complications.data;
+public class NoDataComplicationData extends ComplicationData { public NoDataComplicationData() { } }

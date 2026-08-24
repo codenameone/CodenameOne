@@ -1,48 +1,48 @@
 {
-  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
-  "generated_at": "2026-08-19T10:56:00Z",
+  "commit": "73bd710543cba1d6728b9e0e92d436fb0d95580a",
+  "generated_at": "2026-08-23T12:04:41Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 244264539
+        "duration_ns": 239946561
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 27436409
+        "duration_ns": 27210736
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 39081845
+        "duration_ns": 41392475
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 76918383
+        "duration_ns": 75971442
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 49941482
+        "duration_ns": 48763849
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 178465217
+        "duration_ns": 174560158
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3233252273
+        "duration_ns": 2865454230
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 150670050
+        "duration_ns": 142840314
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 182631896
+        "duration_ns": 167246876
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 41656108
+        "duration_ns": 39554939
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,14 +52,14 @@
     "suite_checksum": 0
   },
   "port": "linux-x64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868573",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32636698010",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 176,
     "fail": 0,
-    "skip": 3,
-    "not-run": 0
+    "not-run": 0,
+    "pass": 177,
+    "skip": 3
   },
   "tests": {
     "ARApiTest": {
@@ -462,6 +462,10 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
+      "status": "pass"
+    },
+    "LogSubclassCaptureTest": {
+      "feature": "logging-diagnostics",
       "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {

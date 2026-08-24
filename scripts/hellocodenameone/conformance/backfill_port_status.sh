@@ -404,18 +404,44 @@ echo "Port status sweep: published ${published} report(s), ${skipped} already cu
 # table, which is exactly the failure this sweep exists to prevent.
 stale_days="$(jq -r '.stale_after_days' "${MANIFEST}")"
 problems=()
+published_dir="${tmp_dir}/published"
+contracts_dir="${tmp_dir}/contracts"
+mkdir -p "${published_dir}" "${contracts_dir}"
 while IFS= read -r port; do
   if ! gh api "repos/${GITHUB_REPOSITORY}/contents/ports/${port}.json?ref=${DATA_BRANCH}" \
       --jq '.content' 2>/dev/null | decode_base64 > "${tmp_dir}/check.json" 2>/dev/null; then
     problems+=("${port}: no published report")
     continue
   fi
+  cp "${tmp_dir}/check.json" "${published_dir}/${port}.json"
+  # The contract this report's own run was built against. Comparing reports to
+  # each other cannot see a test missing from ALL of them -- there is no older
+  # report left to prove it existed -- and a test nothing runs anywhere is the
+  # worst version of what this gate is for. Reading the manifest at the report's
+  # commit answers it directly: a run whose own contract listed the test has no
+  # excuse for reporting nothing. A fetch that fails simply leaves the port out,
+  # which keeps the weaker comparison rather than inventing an obligation.
+  report_commit="$(jq -r '.commit // empty' "${tmp_dir}/check.json" 2>/dev/null || true)"
+  if [ -n "${report_commit}" ]; then
+    gh api "repos/${GITHUB_REPOSITORY}/contents/docs/website/data/port_status.json?ref=${report_commit}" \
+        --jq '.content' 2>/dev/null | decode_base64 > "${contracts_dir}/${port}.json" 2>/dev/null \
+        || rm -f "${contracts_dir}/${port}.json"
+  fi
   # Freshness alone is not enough: a published report the website rejects
   # leaves the column on its checked-in fallback, which is the state this
   # sweep exists to detect.
   accept_status=0
   python3 "${SCRIPT_DIR}/port_status.py" accept --port "${port}" --report "${tmp_dir}/check.json" >/dev/null || accept_status=$?
-  if [ "${accept_status}" -ne 0 ]; then
+  # Contract drift is not a problem here, for the same reason the candidate loop
+  # above says it is not one: a report built before a newly registered test is
+  # the expected state of every port between that merge and its next run. This
+  # loop used to call it one, so the sweep failed for a day after any test was
+  # added -- and, worse, exited before the coverage gate below could look at the
+  # very reports whose "the run predates the test" case that gate exists to
+  # tolerate. Only a report the website cannot use is a defect.
+  if [ "${accept_status}" -eq "${ACCEPT_CONTRACT_DRIFT}" ]; then
+    echo "${port}: published report is $(describe_accept_status "${accept_status}")." >&2
+  elif [ "${accept_status}" -ne 0 ]; then
     problems+=("${port}: published report is $(describe_accept_status "${accept_status}")")
     continue
   fi
@@ -468,3 +494,13 @@ if [ ${#unusable[@]} -gt 0 ]; then
 fi
 
 echo "Every port in the contract has a report inside the ${stale_days}-day window."
+
+# Freshness says the port reported; it does not say the port reported on every
+# test. That obligation used to be enforced against the checked-in fallbacks,
+# where a branch could satisfy it by typing "pass" -- so it is enforced here
+# instead, against what the ports actually published, where nothing anyone
+# writes in a pull request can reach it. A registered test runs on every port,
+# and the only permitted exception is a skip the suite itself emits with an
+# erratum explaining it.
+python3 "${SCRIPT_DIR}/port_status.py" coverage \
+  --reports "${published_dir}" --contracts "${contracts_dir}"

@@ -38,6 +38,10 @@
 import Foundation
 import SwiftUI
 import UIKit
+#if os(watchOS)
+// The downsampling path below; ImageIO is present in the watchOS SDK.
+import ImageIO
+#endif
 
 /// Everything a render pass needs besides the node itself.
 ///
@@ -262,17 +266,40 @@ private func cn1RenderDynamicText(_ node: [String: Any], _ ctx: CN1RenderContext
 
 // MARK: - Images
 
+// A complication is a few dozen points on its longest side and the watch extension's memory
+// cap is far below the phone's, so the watch ceiling is a quarter of the phone's rather than
+// the same number.
+#if os(watchOS)
+private let cn1MaxImageDimension: CGFloat = 256
+#else
 private let cn1MaxImageDimension: CGFloat = 1024
+#endif
 
 /// Widget extensions run under a tight (~30MB) memory cap: decode from the app group
-/// container and downsample anything larger than 1024px on its longest side.
+/// container and downsample anything larger than the platform ceiling on its longest side.
 @available(iOS 14.0, *)
 private func cn1LoadImage(_ dir: URL?, name: String) -> UIImage? {
     guard let dir = dir, !name.isEmpty else {
         return nil
     }
-    let path = dir.appendingPathComponent(name + ".png").path
-    guard let image = UIImage(contentsOfFile: path) else {
+    let url = dir.appendingPathComponent(name + ".png")
+#if os(watchOS)
+    // UIGraphicsImageRenderer is API_UNAVAILABLE(watchos). ImageIO is in the watchOS SDK and
+    // is the better tool here anyway: it downsamples during decode, so the full-size bitmap
+    // is never resident -- which matters more on the watch than on the phone.
+    let options: [CFString: Any] = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceShouldCacheImmediately: true,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceThumbnailMaxPixelSize: cn1MaxImageDimension
+    ]
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+        return UIImage(contentsOfFile: url.path)
+    }
+    return UIImage(cgImage: thumb)
+#else
+    guard let image = UIImage(contentsOfFile: url.path) else {
         return nil
     }
     let largest = max(image.size.width, image.size.height)
@@ -285,6 +312,7 @@ private func cn1LoadImage(_ dir: URL?, name: String) -> UIImage? {
     return renderer.image { _ in
         image.draw(in: CGRect(origin: .zero, size: target))
     }
+#endif
 }
 
 @available(iOS 14.0, *)

@@ -1,0 +1,8 @@
+package androidx.wear.watchface.complications.data;
+public final class ComplicationType {
+    public static final ComplicationType SHORT_TEXT = new ComplicationType();
+    public static final ComplicationType LONG_TEXT = new ComplicationType();
+    public static final ComplicationType RANGED_VALUE = new ComplicationType();
+    public static final ComplicationType MONOCHROMATIC_IMAGE = new ComplicationType();
+    public static final ComplicationType SMALL_IMAGE = new ComplicationType();
+}

@@ -131,6 +131,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Writer;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -3685,6 +3687,46 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void systemOut(String content) {
         consoleLog(content);
     }
+
+    /**
+     * Writes the throwable's trace into the log writer. Without this override the
+     * inherited implementation is an empty method, so {@code Log.e(t)} produced an
+     * entry with no trace in it at all -- half of issue #5519.
+     *
+     * <p>The other ports hand the writer to {@code Throwable.printStackTrace(PrintWriter)},
+     * but this port's {@code java.io} surface has no {@code PrintWriter}, and
+     * {@code getStackTrace()} deliberately returns no frames here: the field behind it
+     * holds a JavaScript {@code Error().stack} (captured for every throwable in
+     * {@code jvm.newObject}), which {@code Throwable.parseStackString} refuses to parse
+     * into Java frames rather than fabricate bogus ones. So capture what
+     * {@code printStackTrace(PrintStream)} renders -- that JavaScript stack, which is
+     * the only trace this port actually has -- and prefix it with {@code toString()} so
+     * the class and message are present the way the other ports print them.</p>
+     */
+    @Override
+    public void printStackTraceToStream(Throwable t, Writer o) {
+        if (t == null || o == null) {
+            return;
+        }
+        try {
+            ByteArrayOutputStream rendered = new ByteArrayOutputStream();
+            PrintStream out = new PrintStream(rendered);
+            t.printStackTrace(out);
+            out.close();
+            o.write(t.toString());
+            o.write("\n");
+            o.write(new String(rendered.toByteArray(), "UTF-8"));
+            o.write("\n");
+        } catch (Throwable err) {
+            // Deliberately Throwable, not IOException: this runs while a failure
+            // is already being reported, and Log.logThrowable only guards its
+            // call with catch(IOException). Letting anything escape here would
+            // turn "the log could not be written" into a second exception thrown
+            // at whoever called Log.e(). There is nowhere better to report it
+            // than the console.
+            consoleLog("printStackTraceToStream failed: " + err);
+        }
+    }
     
     /**
      * @inheritDoc
@@ -7019,6 +7061,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private com.codename1.home.spi.HomeBridge homeBridge;
 
+    private com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
+
     /// Returns a local simulated home. There is no HomeKit or Google Home on
     /// this port, so the bridge reports
     /// {@code HomeAvailability.LOCAL_ONLY}: the accessories are furnished by
@@ -7047,6 +7091,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return homeBridge;
         }
     }
+
+    /// The nearby bridge for the JavaScript port: a simulated
+    /// implementation rather than no implementation, for the same reason
+    /// [#getHomeBridge()] carries one.
+    /// Ranging UI, an association flow and a transport screen are almost
+    /// entirely code with nothing to do with radios, and a port that reported
+    /// nothing would make all of it testable only on a pair of phones.
+    ///
+    /// It reports `LOCAL_ONLY`, never `AVAILABLE`, so an app can tell the
+    /// developer the peers it is tracking are not real.
+    @Override
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        // Guarded for the reason the home bridge is: the bridge holds the
+        // live sessions, the association store and the connection set, and
+        // two threads racing this getter would each get their own -- a
+        // session prepared through one would be invisible to the other.
+        synchronized (HTML5Implementation.class) {
+            if (nearbyBridge == null) {
+                com.codename1.impl.nearby.LocalNearbyBridge local =
+                        new com.codename1.impl.nearby.LocalNearbyBridge();
+                com.codename1.impl.nearby.SyntheticNearby.populate(local);
+                nearbyBridge = local;
+            }
+            return nearbyBridge;
+        }
+    }
+
 
     private com.codename1.media.VideoIO videoIO;
     private boolean videoIOResolved;
