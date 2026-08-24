@@ -769,7 +769,7 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
     // invitation had not been answered left the slot held -- and every later
     // STAR or POINT_TO_POINT request answered BUSY until the whole transport
     // was stopped.
-    [self clearInviting:endpointId];
+    BOOL wasInviting = [self takeInviting:endpointId];
     // Reported here, because clearing the delegate above is what stops
     // didChangeState:NotConnected from reporting it. A deliberate close is
     // still a disconnection as far as the app is concerned, and suppressing
@@ -799,6 +799,28 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
             com_codename1_impl_ios_IOSNearbyCallbacks_disconnected___java_lang_String(
                     getThreadLocalData(), cn1nbJString(encoded));
         }
+        return;
+    }
+    if (!wasInviting) {
+        return;
+    }
+    // Never connected, but an invitation WAS outstanding. requestConnection
+    // resolves as soon as the invitation is sent, so the outcome an app
+    // waits for is the connected or connectionFailed that follows -- and
+    // clearing the delegate above is what stops the framework delivering
+    // either. Closing here therefore ended the connection attempt in
+    // silence, and nothing would ever have said what became of it.
+    //
+    // The same code and the same wording the simulated bridge answers this
+    // case with, so the two agree about what a disconnect during a pending
+    // connection looks like.
+    MCPeerID *pending = [self peerForId:endpointId];
+    if (pending != nil) {
+        com_codename1_impl_ios_IOSNearbyCallbacks_connectionResult___java_lang_String_boolean_int_java_lang_String(
+                getThreadLocalData(), cn1nbJString([self encodePeer:pending]),
+                JAVA_FALSE, CN1_NEARBY_ERR_SESSION_INVALIDATED,
+                cn1nbJString(@"the connection was disconnected before it"
+                        @" completed"));
     }
 }
 
@@ -1055,8 +1077,17 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
 
 /// Forgets an invitation that has been answered, either way.
 - (void)clearInviting:(NSString *)pid {
+    [self takeInviting:pid];
+}
+
+/// Forgets an invitation, answering whether one was outstanding.
+- (BOOL)takeInviting:(NSString *)pid {
     @synchronized (self) {
+        if (![self.inviting containsObject:pid]) {
+            return NO;
+        }
         [self.inviting removeObject:pid];
+        return YES;
     }
 }
 
@@ -2652,12 +2683,16 @@ void com_codename1_impl_ios_IOSNative_nearbyStartAdvertising___int_java_lang_Str
         // A start within the grace period of an earlier one replaces its
         // pending id, and the earlier settler would then see a mismatch and
         // return -- leaving that caller's AsyncResource pending for good.
-        // Answered on the way out: advertising did start, and the newer call
-        // is what changed it.
+        // Failed on the way out, for the reason a stop fails one: the
+        // advertiser that caller asked for has just been torn down and
+        // replaced with another service id, so its continuation would run
+        // against a service that is no longer being advertised.
         int superseded = t.pendingAdvertiseRequest;
         t.pendingAdvertiseRequest = requestId;
         if (superseded != 0 && superseded != requestId) {
-            cn1nbTransportOk(superseded);
+            cn1nbFailTransport(superseded,
+                    CN1_NEARBY_ERR_SESSION_INVALIDATED,
+                    @"another advertising start replaced this one");
         }
         [t.advertiser startAdvertisingPeer];
         cn1nbSettleTransportStart(t, YES, requestId);
@@ -2709,11 +2744,13 @@ void com_codename1_impl_ios_IOSNative_nearbyStartDiscovery___int_java_lang_Strin
                 serviceType:t.discoverServiceType] autorelease];
         t.browser.delegate = t;
         t.discoverStrategy = (int)strategy;
-        // Answered for the reason the advertising path is.
+        // Failed for the reason the advertising path is.
         int superseded = t.pendingDiscoverRequest;
         t.pendingDiscoverRequest = requestId;
         if (superseded != 0 && superseded != requestId) {
-            cn1nbTransportOk(superseded);
+            cn1nbFailTransport(superseded,
+                    CN1_NEARBY_ERR_SESSION_INVALIDATED,
+                    @"another discovery start replaced this one");
         }
         [t.browser startBrowsingForPeers];
         cn1nbSettleTransportStart(t, NO, requestId);

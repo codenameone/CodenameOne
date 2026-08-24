@@ -124,6 +124,17 @@ public class AndroidNearbyTransport implements NearbyBridge {
     private int advertiseGeneration;
     private int discoverGeneration;
 
+    /// Whether anyone still wants the radio doing this.
+    ///
+    /// A stale start has to tell "stopped, and nobody has asked since" from
+    /// "superseded by a newer start". Google's stopAdvertising and
+    /// stopDiscovery are GLOBAL -- there is one advertiser per client -- so
+    /// undoing a stale start in the second case stopped the replacement that
+    /// had just taken over, and that replacement then reported success on a
+    /// radio this call had switched off.
+    private boolean advertisingWanted;
+    private boolean discoveringWanted;
+
     private String advertisingServiceId = "";
     private String discoveryServiceId = "";
     private String localName = "";
@@ -251,6 +262,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // stop that had already returned. The simulated bridge has modelled
         // this race from the beginning; this is the same answer.
         final int generation = ++advertiseGeneration;
+        advertisingWanted = true;
         AdvertisingOptions options = new AdvertisingOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
@@ -262,8 +274,13 @@ public class AndroidNearbyTransport implements NearbyBridge {
                             // Stopped, so the platform is advertising for a
                             // caller that no longer wants it. Undone here,
                             // because the stop that ran before this had
-                            // nothing to stop.
-                            client().stopAdvertising();
+                            // nothing to stop -- but ONLY when nobody has
+                            // asked to advertise since. stopAdvertising is
+                            // global, so calling it when a newer start has
+                            // taken over stopped that one instead.
+                            if (!advertisingWanted) {
+                                client().stopAdvertising();
+                            }
                             NearbyTransport.deliverRequestFailed(requestId,
                                     NearbyError.SESSION_INVALIDATED.ordinal(),
                                     "advertising was stopped before it"
@@ -284,6 +301,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void stopAdvertising() {
         advertiseGeneration++;
+        advertisingWanted = false;
         client().stopAdvertising();
     }
 
@@ -300,6 +318,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // The generation this start belongs to, for the reason
         // startAdvertising keeps one.
         final int generation = ++discoverGeneration;
+        discoveringWanted = true;
         DiscoveryOptions options = new DiscoveryOptions.Builder()
                 .setStrategy(strategyFor(strategy))
                 .build();
@@ -307,7 +326,11 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         if (generation != discoverGeneration) {
-                            client().stopDiscovery();
+                            // Only when nobody has asked since, for the
+                            // reason the advertising branch gives.
+                            if (!discoveringWanted) {
+                                client().stopDiscovery();
+                            }
                             NearbyTransport.deliverRequestFailed(requestId,
                                     NearbyError.SESSION_INVALIDATED.ordinal(),
                                     "discovery was stopped before it"
@@ -328,6 +351,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
 
     public void stopDiscovery() {
         discoverGeneration++;
+        discoveringWanted = false;
         client().stopDiscovery();
     }
 
@@ -499,6 +523,8 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // the stop.
         advertiseGeneration++;
         discoverGeneration++;
+        advertisingWanted = false;
+        discoveringWanted = false;
         client().stopAdvertising();
         client().stopDiscovery();
         client().stopAllEndpoints();
