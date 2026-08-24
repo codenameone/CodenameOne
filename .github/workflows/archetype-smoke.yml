@@ -64,7 +64,7 @@ jobs:
         # before it had installed anything, one of several jobs Maven Central refused on this
         # branch in a day. A build failure in our own code still fails on the first attempt.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
           RETRY_ATTEMPTS: '5'
           RETRY_DELAY_SECONDS: '60'
         run: |

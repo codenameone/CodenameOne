@@ -86,7 +86,7 @@ jobs:
           # without it, so a test that failed once and passed on a later attempt would take
           # this gate green and hide the race that produced it. The wrapper's own docs
           # require this filter for test-running commands.
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
         run: |
           cd maven
           bash $GITHUB_WORKSPACE/scripts/ci/retry.sh mvn -B -pl designer -am -DunitTests=true -Dcodename1.platform=javase \
