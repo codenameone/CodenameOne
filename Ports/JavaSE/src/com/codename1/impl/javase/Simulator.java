@@ -690,7 +690,7 @@ public class Simulator {
      * build the simulator runs resolves the application's own common module as a
      * dependency artifact, so its manifest has no path of its own.</p>
      */
-    private static final class FoundManifest {
+    static final class FoundManifest {
         final java.util.Properties hints;
         /** The file on disk, or null when it came out of a jar. */
         final File file;
@@ -703,8 +703,8 @@ public class Simulator {
         }
     }
 
-    private static FoundManifest findAnnotationManifest(File projectDir, String classPathStr,
-                                                        String expectedMain) {
+    static FoundManifest findAnnotationManifest(File projectDir, String classPathStr,
+                                               String expectedMain) {
         String resource = "META-INF" + File.separator + "codenameone"
                 + File.separator + "build-hints.properties";
         String entryName = "META-INF/codenameone/build-hints.properties";
@@ -715,6 +715,7 @@ public class Simulator {
         // manifest and the old class beside it, so the staleness check compares
         // two obsolete files against each other, finds them consistent, and
         // publishes last week's hints while the real ones sit on the classpath.
+        FoundManifest fallback = null;
         if (classPathStr != null) {
             for (String entry
                     : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
@@ -727,7 +728,26 @@ public class Simulator {
                     if (candidate.isFile()) {
                         java.util.Properties loaded = readProperties(candidate);
                         if (loaded != null) {
-                            return new FoundManifest(loaded, candidate, candidate.toString());
+                            // The stamp decides here too. A reactor dependency or
+                            // a stale JavaSE output directory earlier on the
+                            // classpath can carry ANOTHER application's manifest,
+                            // and taking it ended the search: the caller then saw
+                            // a main class that was not this one and published
+                            // nothing at all, so cn1:run silently dropped
+                            // desktop.titleBar and nativeTheme while this
+                            // application's own manifest sat in a later entry.
+                            String stamp = loaded.getProperty("cn1.buildHints.mainClass");
+                            FoundManifest found =
+                                    new FoundManifest(loaded, candidate, candidate.toString());
+                            if (expectedMain == null || expectedMain.equals(stamp)) {
+                                return found;
+                            }
+                            if (stamp == null && fallback == null) {
+                                // No stamp is not a foreign manifest, only an
+                                // unidentifiable one. Kept as a last resort so a
+                                // manifest that predates the stamp is still read.
+                                fallback = found;
+                            }
                         }
                     }
                     continue;
@@ -750,6 +770,9 @@ public class Simulator {
                     }
                 }
             }
+        }
+        if (fallback != null) {
+            return fallback;
         }
         // Only when the classpath carries none: a launch that did not pass the
         // module's output directory at all still finds a conventional build.

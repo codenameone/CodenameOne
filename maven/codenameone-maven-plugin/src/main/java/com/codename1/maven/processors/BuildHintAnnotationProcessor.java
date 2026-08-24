@@ -669,6 +669,36 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 }
                 return stop + 1;
             }
+            // A COMPONENT may be escaped too: `package com.`when`` is legal
+            // Kotlin and the compiled class belongs to com.when. Stopping at the
+            // backtick recorded `com.`, so a live annotated class looked like it
+            // belonged to another package, was dropped as an orphan, and its
+            // misplaced hints went unreported on a green build. A backtick is
+            // not Java source outside a comment or literal, both already blanked,
+            // so this needs no language flag.
+            if (stop < code.length() && code.charAt(stop) == '`') {
+                int close = code.indexOf('`', stop + 1);
+                if (close < 0) {
+                    return end;
+                }
+                if (name != null) {
+                    name.append(code, stop + 1, close);
+                }
+                stop = close + 1;
+                end = stop;
+                int nextDot = stop;
+                while (nextDot < code.length() && Character.isWhitespace(code.charAt(nextDot))) {
+                    nextDot++;
+                }
+                if (nextDot >= code.length() || code.charAt(nextDot) != '.') {
+                    return end;
+                }
+                if (name != null) {
+                    name.append('.');
+                }
+                i = nextDot + 1;
+                continue;
+            }
             while (stop < code.length() && Character.isJavaIdentifierPart(code.charAt(stop))) {
                 stop++;
             }

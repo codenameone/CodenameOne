@@ -1141,17 +1141,29 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
                     n++;
                 }
+                // Kotlin may ESCAPE the declared name in backticks, and
+                // codename1.mainName holds the name between them. Reading only
+                // identifier characters recorded nothing for `class `when``, so
+                // the goal reported "Could not find the class declaration" and
+                // rolled back a valid migration of a file it had just accepted.
                 int end = n;
-                while (end < code.length()
-                        && Character.isJavaIdentifierPart(code.charAt(end))) {
-                    end++;
+                String declared;
+                if (kotlin && n < code.length() && code.charAt(n) == '`') {
+                    int close = code.indexOf('`', n + 1);
+                    declared = close < 0 ? "" : code.substring(n + 1, close);
+                } else {
+                    while (end < code.length()
+                            && Character.isJavaIdentifierPart(code.charAt(end))) {
+                        end++;
+                    }
+                    declared = code.substring(n, end);
                 }
-                if (end > n) {
+                if (declared.length() > 0) {
                     // The declaration's own modifiers come before the keyword, and
                     // the annotations have to go before those.
                     int start = startOfModifiers(code, i);
                     if (simpleName != null && simpleName.length() > 0
-                            && code.substring(n, end).equals(simpleName)) {
+                            && declared.equals(simpleName)) {
                         return start;
                     }
                     if (first < 0) {

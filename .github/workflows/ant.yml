@@ -46,24 +46,38 @@ jobs:
     - name: Install dependencies
       run: bash scripts/ci/apt-get-install.sh xvfb
     - name: Build with Maven (core + in-tree archetypes)
+      # Every other Maven step in this repository goes through the shared retry
+      # helper because Maven Central answers 403/429 from the runner CDN edge
+      # often enough to kill a step outright -- it dies resolving a dependency
+      # POM, before a line is compiled, so nothing about the branch is being
+      # tested when it happens. This workflow was the one that never did, and it
+      # is a required check. RETRY_ONLY_MATCHING keeps every other failure
+      # failing on the first attempt, so a re-run cannot launder a flaky test
+      # into a pass.
+      env:
+        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies'
       run: |
         # The cn1{app,lib}-archetype modules are part of the maven/ reactor,
         # so this single install also stages them into the local repo.
         # -Darchetype.test.skip=true keeps the build fast; the heavier
         # archetype ITs run in the release workflow.
         cd maven
-        xvfb-run -a mvn install -Plocal-dev-javase -Darchetype.test.skip=true
+        bash ../scripts/ci/retry.sh xvfb-run -a mvn install -Plocal-dev-javase -Darchetype.test.skip=true
 
     - name: Refresh archetype catalog
+      env:
+        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies'
       run: |
         cd maven
-        xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
-        xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
+        bash ../scripts/ci/retry.sh xvfb-run -a mvn archetype:update-local-catalog -Plocal-dev-javase
+        bash ../scripts/ci/retry.sh xvfb-run -a mvn archetype:crawl -Plocal-dev-javase
     - name: Run Maven Unit Tests
+      env:
+        RETRY_ONLY_MATCHING: 'status( code)?: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not collect dependencies'
       run: |
         pwd
-        xvfb-run -a bash tests/all.sh
+        bash scripts/ci/retry.sh xvfb-run -a bash tests/all.sh
         cd maven/integration-tests
-        xvfb-run -a bash all.sh
+        bash ../../scripts/ci/retry.sh xvfb-run -a bash all.sh
 
   

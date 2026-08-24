@@ -354,6 +354,23 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
     }
 
+    /// A Kotlin main class may escape its name in backticks, and
+    /// `codename1.mainName` holds the name between them. Reading only identifier
+    /// characters recorded nothing, so the goal reported "Could not find the
+    /// class declaration" and rolled back a valid migration of a file the
+    /// lookup had just accepted as the right one.
+    @Test
+    public void theDeclarationLocatorReadsAnEscapedKotlinName() {
+        String src = "package com.example\n\nclass `when` {\n}\n";
+        assertEquals(src.indexOf("class `when`"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, true, "when"));
+        // An escaped declaration also counts as the first one, which is what a
+        // name that matches nothing falls back to. Recording no name at all left
+        // even that fallback unset.
+        assertEquals(src.indexOf("class `when`"),
+                MigrateBuildHintsMojo.classDeclarationIndex(src, true, "Other"));
+    }
+
     /// `static` is a modifier, not the imported name. Reading it as the name
     /// ended the declaration at the newline inside the REAL name, so the
     /// generated import was spliced into the middle of the static import and the

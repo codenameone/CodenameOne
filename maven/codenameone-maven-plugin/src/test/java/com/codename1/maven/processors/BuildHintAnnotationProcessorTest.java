@@ -582,6 +582,24 @@ public class BuildHintAnnotationProcessorTest {
                 false));
     }
 
+    /// A qualified name may escape a COMPONENT: `package com.`when`` is legal
+    /// Kotlin and the compiled class belongs to `com.when`. Stopping at the
+    /// backtick recorded `com.`, so a live annotated class looked like it
+    /// belonged to another package, was dropped as an orphan, and its misplaced
+    /// hints went unreported on a green build.
+    @Test
+    public void aQualifiedNameMayEscapeAComponent() {
+        assertEquals("com.when", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com.`when`\nclass Foo\n", true));
+        assertEquals("com.when.x", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com.`when`.x\nclass Foo\n", true));
+        // The first component too, and an ordinary name is unchanged.
+        assertEquals("in.example", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package `in`.example\nclass Foo\n", true));
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com.example\nclass Foo\n", true));
+    }
+
     /// Kotlin lets a declaration escape its name in backticks, and the binary
     /// name is plainly the text between them. Reading it with the identifier
     /// rule recorded an empty name, so a LIVE annotated type looked undeclared,
