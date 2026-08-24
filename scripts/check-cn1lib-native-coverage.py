@@ -13,6 +13,13 @@ compile" but "is there a job that would have found out". It also requires a
 library that pulls a CocoaPod to pin it, because an unpinned pod moves the API
 underneath sources that are only compiled when the pod is fetched.
 
+Coverage is read from evidence rather than from a workflow's name. A file
+counts only if it stages a cn1lib's Objective-C and runs xcodebuild over it,
+and a library counts only if that workflow also triggers on its own path --
+otherwise a matrix over "lib:" in some unrelated packaging job would report a
+library as covered while nothing ever compiled it, and a library missing from
+the trigger paths would be compiled only when something else changed.
+
 The Android half needs no registry: check-cn1lib-android-api.py enumerates
 libraries from the filesystem, so it cannot miss one.
 
@@ -47,22 +54,45 @@ def libraries_with_ios_sources():
             yield name
 
 
+def compiles_cn1lib_natives(text):
+    """True when a workflow stages a cn1lib's Objective-C and builds it.
+
+    Naming a library in a matrix proves nothing on its own; these two markers
+    are what separate a native check from any other job that happens to loop
+    over libraries.
+    """
+    return 'ios/src/main/objectivec' in text and 'xcodebuild' in text
+
+
 def covered_libraries():
+    """Two maps: libraries a native check compiles, and libraries a native
+    check names but never triggers for."""
     covered = {}
+    untriggered = {}
     if not os.path.isdir(WORKFLOWS):
-        return covered
+        return covered, untriggered
     for name in sorted(os.listdir(WORKFLOWS)):
         if not name.endswith(('.yml', '.yaml')):
             continue
         with open(os.path.join(WORKFLOWS, name), encoding='utf-8') as f:
             text = f.read()
+        if not compiles_cn1lib_natives(text):
+            continue
         found = set(MATRIX_ENTRY.findall(text))
         for group in MATRIX_LIST.findall(text):
             found.update(part.strip() for part in group.split(','))
         for lib in found:
-            if lib.startswith('cn1-'):
+            if not lib.startswith('cn1-'):
+                continue
+            # A library the workflow never triggers for is compiled only when
+            # something else in that workflow's paths changes, which is not
+            # coverage of a change to the library. Recorded separately so the
+            # finding can say which of the two is missing.
+            if ("maven/%s/**" % lib) in text:
                 covered.setdefault(lib, name)
-    return covered
+            else:
+                untriggered.setdefault(lib, name)
+    return covered, untriggered
 
 
 def pod_findings(lib):
@@ -88,15 +118,22 @@ def pod_findings(lib):
 
 
 def main():
-    covered = covered_libraries()
+    covered, untriggered = covered_libraries()
     findings = []
     libs = list(libraries_with_ios_sources())
     for lib in libs:
-        if lib not in covered:
+        if lib in untriggered:
+            findings.append(
+                "%s is in %s's matrix, but that workflow does not trigger on "
+                "'maven/%s/**', so a change to the library does not run the "
+                "check. Add the path to its pull_request and push filters."
+                % (lib, untriggered[lib], lib))
+        elif lib not in covered:
             findings.append(
                 '%s ships Objective-C under maven/%s/ios/src/main/objectivec '
-                'but no workflow matrix names it, so nothing compiles it before '
-                'a customer does. Add it to a native-check workflow.'
+                'but no workflow both compiles it and triggers on its path, so '
+                'nothing compiles it before a customer does. Add it to a '
+                'native-check workflow.'
                 % (lib, lib))
         findings.extend(pod_findings(lib))
 
