@@ -239,4 +239,67 @@ public class SimulatorAnnotationManifestTest {
         assertEquals("is older than com/example/MyApp.class",
                 Simulator.staleManifestReason(found.hints, found));
     }
+
+    /** A directory holding a class file and a manifest that does or does not describe it. */
+    private static File outputDir(File parent, String name, String hint, boolean current)
+            throws Exception {
+        File dir = new File(parent, name);
+        File cls = new File(dir, "com/example/MyApp.class");
+        cls.getParentFile().mkdirs();
+        FileOutputStream cs = new FileOutputStream(cls);
+        try {
+            cs.write(CLASS_BYTES);
+        } finally {
+            cs.close();
+        }
+        File out = new File(dir, "META-INF/codenameone");
+        out.mkdirs();
+        Properties p = new Properties();
+        p.setProperty("cn1.buildHints.mainClass", "com.example.MyApp");
+        p.setProperty("cn1.buildHints.classDigest",
+                current ? classBytesDigest() : "0000notthisbuild");
+        p.setProperty("codename1.arg.desktop.titleBar", hint);
+        FileOutputStream os = new FileOutputStream(new File(out, "build-hints.properties"));
+        try {
+            p.store(os, null);
+        } finally {
+            os.close();
+        }
+        return dir;
+    }
+
+    /**
+     * A leftover output directory earlier on the classpath carries a manifest
+     * stamped for this same main class. Taking it ended the search, and the
+     * caller then reported it stale and published nothing -- while the current
+     * manifest sat in a later entry, so <code>cn1:run</code> dropped every
+     * annotated hint.
+     */
+    @Test
+    public void aStaleManifestForThisApplicationIsPassedOver(@TempDir File tmp) throws Exception {
+        File old = outputDir(tmp, "stale-classes", "MINIMAL", false);
+        File now = outputDir(tmp, "current-classes", "NATIVE", true);
+
+        String cp = old.getAbsolutePath() + File.pathSeparator + now.getAbsolutePath();
+        Simulator.FoundManifest found =
+                Simulator.findAnnotationManifest(tmp, cp, "com.example.MyApp");
+        assertNotNull(found);
+        assertEquals("NATIVE", found.hints.getProperty("codename1.arg.desktop.titleBar"));
+    }
+
+    /**
+     * With nothing current anywhere the stale one is still returned, so the
+     * caller can say which file it is and why it was not used.
+     */
+    @Test
+    public void withNothingCurrentTheStaleOneIsStillReported(@TempDir File tmp) throws Exception {
+        File old = outputDir(tmp, "only-stale", "MINIMAL", false);
+
+        Simulator.FoundManifest found =
+                Simulator.findAnnotationManifest(tmp, old.getAbsolutePath(), "com.example.MyApp");
+        assertNotNull(found);
+        assertEquals("MINIMAL", found.hints.getProperty("codename1.arg.desktop.titleBar"));
+        assertEquals("does not describe the compiled com/example/MyApp.class",
+                Simulator.staleManifestReason(found.hints, found));
+    }
 }

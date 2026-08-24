@@ -723,6 +723,7 @@ public class Simulator {
         // two obsolete files against each other, finds them consistent, and
         // publishes last week's hints while the real ones sit on the classpath.
         FoundManifest fallback = null;
+        FoundManifest stale = null;
         if (classPathStr != null) {
             for (String entry
                     : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
@@ -748,7 +749,21 @@ public class Simulator {
                                     new FoundManifest(loaded, candidate, null,
                                             candidate.toString());
                             if (expectedMain == null || expectedMain.equals(stamp)) {
-                                return found;
+                                // Right application, but possibly the wrong
+                                // build: a leftover output directory earlier on
+                                // the classpath carries a manifest stamped for
+                                // this same main class, and taking it ended the
+                                // search -- the caller then reported it stale and
+                                // published nothing, while the current manifest
+                                // sat in a later entry. The first stale one is
+                                // kept so that finding NO current manifest still
+                                // says why.
+                                if (staleManifestReason(loaded, found) == null) {
+                                    return found;
+                                }
+                                if (stale == null) {
+                                    stale = found;
+                                }
                             }
                             if (stamp == null && fallback == null) {
                                 // No stamp is not a foreign manifest, only an
@@ -774,8 +789,14 @@ public class Simulator {
                     java.util.Properties loaded = readJarEntry(dir, entryName);
                     if (loaded != null
                             && expectedMain.equals(loaded.getProperty("cn1.buildHints.mainClass"))) {
-                        return new FoundManifest(loaded, null, dir,
+                        FoundManifest found = new FoundManifest(loaded, null, dir,
                                 entryName + " in " + dir.getName());
+                        if (staleManifestReason(loaded, found) == null) {
+                            return found;
+                        }
+                        if (stale == null) {
+                            stale = found;
+                        }
                     }
                 }
             }
@@ -787,12 +808,21 @@ public class Simulator {
         // module's output directory at all still finds a conventional build.
         File conventional = new File(projectDir, "target" + File.separator + "classes"
                 + File.separator + resource);
-        if (!conventional.isFile()) {
-            return null;
+        java.util.Properties loaded = conventional.isFile() ? readProperties(conventional) : null;
+        if (loaded != null) {
+            FoundManifest found =
+                    new FoundManifest(loaded, conventional, null, conventional.toString());
+            if (staleManifestReason(loaded, found) == null) {
+                return found;
+            }
+            if (stale == null) {
+                stale = found;
+            }
         }
-        java.util.Properties loaded = readProperties(conventional);
-        return loaded == null ? null
-                : new FoundManifest(loaded, conventional, null, conventional.toString());
+        // Nothing current anywhere. The stale one is returned rather than
+        // nothing, so the caller can say which file it is and why it was not
+        // used instead of silently applying no hints at all.
+        return stale;
     }
 
     /** Loads a properties file, or null when it cannot be read. */

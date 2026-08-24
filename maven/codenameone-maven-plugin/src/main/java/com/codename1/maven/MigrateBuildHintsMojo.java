@@ -1118,13 +1118,37 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     return at;
                 }
             }
-            // The annotation's name, then its @.
-            int nameEnd = i + 1;
-            while (i >= 0 && (Character.isJavaIdentifierPart(head.charAt(i))
-                    || head.charAt(i) == '.')) {
-                i--;
+            // The annotation's name, then its @. A Kotlin component may be
+            // ESCAPED, and a backtick is not an identifier character -- so the
+            // scan stopped on it, read no name, and left `@`when`` out of the
+            // leading run. The generated import then went between the
+            // annotation and the class, where Kotlin does not allow one, and
+            // verification rolled back a valid migration.
+            boolean readAName = false;
+            while (i >= 0) {
+                if (head.charAt(i) == '`') {
+                    int open = head.lastIndexOf('`', i - 1);
+                    if (open < 0) {
+                        return at;
+                    }
+                    i = open - 1;
+                    readAName = true;
+                } else if (Character.isJavaIdentifierPart(head.charAt(i))) {
+                    while (i >= 0 && Character.isJavaIdentifierPart(head.charAt(i))) {
+                        i--;
+                    }
+                    readAName = true;
+                } else {
+                    break;
+                }
+                // A qualified annotation name continues through its dots.
+                if (i >= 0 && head.charAt(i) == '.') {
+                    i--;
+                    continue;
+                }
+                break;
             }
-            if (i < 0 || head.charAt(i) != '@' || nameEnd == i + 1) {
+            if (i < 0 || head.charAt(i) != '@' || !readAName) {
                 return at;
             }
             at = i;

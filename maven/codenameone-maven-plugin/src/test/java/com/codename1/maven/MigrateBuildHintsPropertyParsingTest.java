@@ -241,6 +241,28 @@ public class MigrateBuildHintsPropertyParsingTest {
                 MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
     }
 
+    /// A Kotlin annotation may have an ESCAPED name, and a backtick is not an
+    /// identifier character -- so the backward walk stopped on it, read no name,
+    /// and left `@`when`` out of the leading run. The generated import then went
+    /// between the annotation and the class, where Kotlin does not allow one.
+    @Test
+    public void anEscapedAnnotationNameIsPartOfTheLeadingRun() {
+        String head = "@`when`\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+
+        String withArgs = "@`when`(\"x\")\n@Deprecated\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(withArgs));
+
+        // A qualified name may escape a component too.
+        String qualified = "@com.`when`.Ann\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(qualified));
+
+        // A lone backtick run that is not an annotation is still not one.
+        String notAnnotation = "`when`\n";
+        assertEquals(notAnnotation.length(),
+                MigrateBuildHintsMojo.startOfLeadingAnnotations(notAnnotation));
+    }
+
     /// A parenthesis inside an annotation argument must not stop the walk.
     @Test
     public void anArgumentContainingAParenthesisDoesNotStopTheWalk() {
