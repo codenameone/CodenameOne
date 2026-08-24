@@ -2145,4 +2145,53 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Widget$(EFFECTIVE_PLATFORM_NAME)",
                 settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
     }
+
+    /// The three cases identifierAsBuilt exists to keep apart. Confusing them is what made these
+    /// repairs delete settings that were never broken and keep ones that were, so all three are
+    /// pinned together rather than one at a time.
+    @Test
+    public void anIdentifierIsJudgedByWhatXcodeWillActuallyBuild() throws Exception {
+        // 1. A name nothing will define. The generated target carries only what
+        // buildSettings.properties wrote -- no .xcconfig from the archive's original project
+        // comes across -- so Xcode expands it to nothing and the TRUNCATION is what ships.
+        java.util.Map<String, String> outside = new java.util.LinkedHashMap<String, String>();
+        outside.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        outside.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]", "$(APP_ID_PREFIX).Ext.debug");
+        IPhoneBuilder.repairQualifiedExtensionSettings(outside, "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", outside));
+        assertFalse(outside.containsKey("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // 2. Xcode's OWN to supply, with a head under the host: this build cannot say what it
+        // comes to, and what it can see is fine. Left exactly as written.
+        java.util.Map<String, String> supplied = new java.util.LinkedHashMap<String, String>();
+        supplied.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        supplied.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                "com.example.app.$(EXECUTABLE_NAME)");
+        IPhoneBuilder.repairQualifiedExtensionSettings(supplied, "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", supplied));
+        assertEquals("com.example.app.$(EXECUTABLE_NAME)",
+                supplied.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // 3. Xcode's own to supply, but the head is plainly foreign. Unknowable at the end is no
+        // reason to ignore what is written at the front.
+        java.util.Map<String, String> foreignHead = new java.util.LinkedHashMap<String, String>();
+        foreignHead.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        foreignHead.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                "com.other.$(EXECUTABLE_NAME)");
+        IPhoneBuilder.repairQualifiedExtensionSettings(foreignHead, "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", foreignHead));
+        assertFalse(foreignHead.containsKey("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // And the same three through a HELPER, since that repair asks the same question.
+        java.util.Map<String, String> viaHelper = new java.util.LinkedHashMap<String, String>();
+        viaHelper.put("EXTENSION_ID", "com.example.app.Ext");
+        viaHelper.put("EXTENSION_ID[config=Debug]", "com.example.app.$(EXECUTABLE_NAME)");
+        viaHelper.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(viaHelper,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", viaHelper));
+        assertEquals("com.example.app.$(EXECUTABLE_NAME)",
+                viaHelper.get("EXTENSION_ID[config=Debug]"));
+        assertEquals(notes.toString(), 0, notes.size());
+    }
 }

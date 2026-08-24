@@ -7830,8 +7830,9 @@ public class IPhoneBuilder extends Executor {
             // with it. An identifier that resolves to nothing is left exactly as written: this
             // build cannot evaluate it, which is not the same as knowing it is wrong. A
             // deployment target is the other way round, for the reason below.
-            String resolved = resolveSettingsInValue(value, key.indexOf('[') < 0 ? flat
-                    : flattenForContext(settings, contextForCondition(key, context)));
+            Map<String, String> flatForKey = key.indexOf('[') < 0 ? flat
+                    : flattenForContext(settings, contextForCondition(key, context));
+            String resolved = resolveSettingsInValue(value, flatForKey);
             if (resolved.length() == 0) {
                 // Nothing left after expansion. For a deployment target that is not "cannot
                 // tell": Xcode expands the same missing reference to the same nothing, and an
@@ -7874,11 +7875,19 @@ public class IPhoneBuilder extends Executor {
                     && isDeploymentTargetBelow(resolved, floor)) {
                 settings.put(key, floor);
                 notes.add(key + " raised from " + value + " to " + floor);
-            } else if (isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER") && hostPackage != null
-                    && !resolved.startsWith(hostPackage + ".")) {
-                settings.remove(key);
-                notes.add(key + " = " + value + " dropped, since an embedded extension must be "
-                        + "under " + hostPackage);
+            } else if (isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER") && hostPackage != null) {
+                // What it comes to when this build can say, and the literal head when it
+                // cannot: com.other.$(EXECUTABLE_NAME) is unknowable at the end and plainly
+                // foreign at the front, and answering "cannot say" to the whole thing let it
+                // through.
+                String asBuilt = identifierAsBuilt(value, flatForKey);
+                boolean foreign = asBuilt != null ? !asBuilt.startsWith(hostPackage + ".")
+                        : !startsUnderHost(value, flatForKey, hostPackage);
+                if (foreign) {
+                    settings.remove(key);
+                    notes.add(key + " = " + value + " dropped, since an embedded extension must "
+                            + "be under " + hostPackage);
+                }
             }
         }
         notes.addAll(dropHelpersThatLeaveTheNamespace(settings, hostPackage, context));
@@ -8044,15 +8053,42 @@ public class IPhoneBuilder extends Executor {
         return notes;
     }
 
+    /// What Xcode will actually build this identifier into, or null when this build cannot say.
+    ///
+    /// Three cases, and getting them confused is what made two repairs delete settings that were
+    /// never broken and keep ones that were:
+    ///
+    /// - It resolves completely: that is the answer.
+    /// - What is left unexpanded is Xcode's OWN to supply -- $(EXECUTABLE_NAME) and the rest of
+    ///   XCODE_PROVIDED_SETTINGS -- so this build cannot say what it comes to. Null; judge such a
+    ///   value by its literal head instead (see startsUnderHost).
+    /// - What is left unexpanded is a name nothing will define. The generated target carries only
+    ///   the settings written from buildSettings.properties -- no .xcconfig from the archive's
+    ///   original project comes across -- so Xcode expands that reference to the empty string and
+    ///   the TRUNCATION is what ships. That is the answer, and it is usually an invalid
+    ///   identifier, which is the point.
+    static String identifierAsBuilt(String value, Map<String, String> settings) {
+        if (value == null || value.trim().length() == 0) {
+            return null;
+        }
+        String fully = resolveSettingsFully(value.trim(), settings);
+        if (fully != null) {
+            return fully.length() == 0 ? null : fully;
+        }
+        if (referencesOnlyXcodeSettings(value.trim(), settings)) {
+            return null;
+        }
+        String truncated = resolveSettingsInValue(value.trim(), settings);
+        return truncated.length() == 0 ? null : truncated;
+    }
+
     /// The extension's identifier as {@code context} gets it, or null when this build cannot say.
     private static String identifierIn(Map<String, String> settings, ArchiveContext context) {
         String declared = winningSetting(settings, "PRODUCT_BUNDLE_IDENTIFIER", context);
         if (declared == null || declared.trim().length() == 0) {
             return null;
         }
-        String resolved = resolveSettingsInValue(declared.trim(),
-                flattenForContext(settings, context));
-        return resolved.length() == 0 ? null : resolved;
+        return identifierAsBuilt(declared.trim(), flattenForContext(settings, context));
     }
 
 
