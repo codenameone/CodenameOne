@@ -7603,6 +7603,18 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
     }
     id<MTLTexture> src = mv.screenTexture;
     if (src == nil) {
+        // Direct-to-drawable mode (CN1_DIRECT_DRAWABLE, opt-in) keeps no
+        // retained screen texture, so there is nothing here to read back and
+        // the caller falls through to drawViewHierarchyInRect:. That is correct
+        // on device but samples the CALayer's presented drawable, so it can lag
+        // a frame -- exactly the staleness this readback exists to avoid, and
+        // on headless Catalyst (no display link) it can be stale indefinitely.
+        //
+        // Reading the live drawable instead is not the fix: retaining it past
+        // present starves nextDrawable, and after present the buffer is
+        // recycled for the following frame. A deterministic capture needs a
+        // one-shot render into a scratch target, which is worth doing when the
+        // mode stops being opt-in. Until then the default path is unaffected.
         return NULL;
     }
     NSUInteger w = src.width;
@@ -14903,12 +14915,10 @@ void cn1RegisterAccessibilityStatusObservers(void);
 // empty until some unrelated UI change happened to invalidate something. These
 // notifications are the trigger for that transition.
 //
-// They also cover the technologies whose running state UIKit will not report:
-// enabling Voice Control or Full Keyboard Access flips VoiceOver/AssistiveTouch
-// often enough in practice, but not always -- so once ANY of these fires we
-// latch eager projection on for the rest of the process rather than trusting a
-// flag that has no way to describe them. Paying one process's worth of eager
-// projection is the right side to err on for an accessibility feature.
+// Once any of them fires we latch eager projection on for the rest of the
+// process rather than flipping it back and forth. The technologies UIKit will
+// not report at all are handled by cn1AccessibilityNoteClientQuery below, which
+// does not depend on flags or notifications.
 static BOOL cn1A11yLatched = NO;
 
 BOOL cn1AccessibilityEagerLatched(void) {
@@ -14918,6 +14928,18 @@ BOOL cn1AccessibilityEagerLatched(void) {
 static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
                                           CFStringRef name, const void *object,
                                           CFDictionaryRef userInfo) {
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+// Called from METALView's accessibilityElements getter: a real client asked for
+// the tree. This, not the running flags, is what makes the gate correct for the
+// technologies UIKit will not report -- see the comment on that getter.
+void cn1AccessibilityNoteClientQuery(void) {
+    if(cn1A11yLatched) {
+        return;   // one transition only; this is on a UIKit query path
+    }
     cn1A11yLatched = YES;
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);

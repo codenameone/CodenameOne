@@ -469,6 +469,33 @@ int cn1DirectToDrawableEnabled(void) {
     return cn1DirectToDrawable();
 }
 
+// UIKit asks a container for its accessibility elements only when something is
+// actually consuming the semantic tree, so this query IS the signal that a
+// client exists -- and unlike UIAccessibilityIsVoiceOverRunning and friends it
+// does not depend on per-technology flags. That matters because UIKit publishes
+// running flags for exactly three technologies (VoiceOver, Switch Control,
+// AssistiveTouch) and none for Voice Control or Full Keyboard Access, so a
+// flags-only gate cannot see those clients at all -- including when they are
+// already enabled at launch, where no status notification ever fires either.
+//
+// Latching here covers every technology, present and future. The first query
+// may see a tree that has not been projected yet; noting the client schedules
+// that projection and the resulting layout-changed notification brings the
+// client back for the real one, so it is self-correcting rather than a
+// permanently empty tree.
+//
+// One configuration this does not see: CodenameOne_GLViewController re-roots
+// self.view to a plain UIView when a peer component is added mid-transition, and
+// updateAccessibilityTree then sets the elements on THAT view rather than on
+// this one. There the gate falls back to the running flags and the status
+// notifications -- i.e. to the behaviour without this hook, not to something
+// worse.
+- (NSArray *)accessibilityElements {
+    extern void cn1AccessibilityNoteClientQuery(void);
+    cn1AccessibilityNoteClientQuery();
+    return [super accessibilityElements];
+}
+
 - (void)cn1SetupMetal {
     self.clearsContextBeforeDrawing = NO;
     if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
