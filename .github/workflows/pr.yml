@@ -464,13 +464,19 @@ jobs:
       - name: Check cn1lib native CI coverage
         if: ${{ matrix.java-version == 8 }}
         run: python3 scripts/check-cn1lib-native-coverage.py
-      - name: Install a C compiler for the cn1lib native source check
+      - name: Install C compilers for the cn1lib native source check
         if: ${{ matrix.java-version == 8 }}
-        # gcc is baked into the pr-ci-container image
-        # (.ci/container/Dockerfile); this step covers running against the
-        # previously published container before the rebuild propagates.
-        # Bounded for the same reason as the libdbus step above.
-        run: timeout 300 apt-get update -qq && timeout 300 apt-get install -y -qq gcc
+        # gcc for the Linux glue and the mingw-w64 cross compiler for the
+        # Windows glue, whose _WIN32 half (windows.h, LoadLibraryA,
+        # GetProcAddress) does not exist for a host target -- compiled as host
+        # C it parses the #else branch and reports success. Both are baked into
+        # the pr-ci-container image (.ci/container/Dockerfile); this step
+        # covers running against the previously published container before the
+        # rebuild propagates. Bounded for the same reason as the libdbus step
+        # above.
+        run: |
+          timeout 300 apt-get update -qq \
+            && timeout 300 apt-get install -y -qq gcc gcc-mingw-w64-x86-64
       # The two platforms whose cn1lib sources need no SDK to check: the C
       # glue the native win32/Linux ports compile into the app, and the
       # JavaScript port implementations, which have no build step at all.

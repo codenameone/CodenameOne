@@ -12,6 +12,14 @@ Two platforms in a cn1lib need nothing but a C compiler or node to check:
 Neither is covered by the per-platform workflows, which need Xcode or an
 Android SDK. This runs anywhere.
 
+The Windows sources are compiled for a Windows target rather than the host,
+because most of what is Windows-specific in them sits behind _WIN32 -- the
+windows.h include, LoadLibraryA, GetProcAddress. Compiling them as host C
+parses the #else half and reports success, which is a green light for code
+nothing read. A mingw-w64 cross compiler supplies the Win32 headers for that;
+the port itself is built with clang-cl, so this gate is about the API existing
+and the syntax parsing, not about matching that ABI.
+
   scripts/check-cn1lib-native-sources.py [--require-all]
 
 Not covered here, deliberately: cn1-ai-whisper's android-aar JNI sources. They
@@ -26,7 +34,10 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CN1_GLOBALS = os.path.join(REPO, 'vm', 'ByteCodeTranslator', 'src', 'cn1_globals.h')
+TRANSLATOR_SRC = os.path.join(REPO, 'vm', 'ByteCodeTranslator', 'src')
+# cn1_globals.h includes cn1_win_compat.h under _WIN32 and pthread.h otherwise,
+# so the Windows half does not even parse without the compat header beside it.
+PORT_HEADERS = ['cn1_globals.h', 'cn1_win_compat.h']
 
 
 def libraries():
@@ -46,10 +57,25 @@ def sources(lib, *parts):
 
 
 def c_sources(lib):
+    """Yield (platform, path) for the desktop ports' C glue."""
     for platform in ('linux', 'win'):
         for path in sources(lib, platform, 'src', 'main', 'c'):
             if path.endswith('.c'):
-                yield path
+                yield platform, path
+
+
+def windows_compiler():
+    """A compiler that targets Windows, or None."""
+    explicit = os.environ.get('CC_WIN')
+    if explicit:
+        return explicit
+    if sys.platform == 'win32':
+        return os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
+    for name in ('x86_64-w64-mingw32-gcc', 'i686-w64-mingw32-gcc'):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
 
 
 def js_sources(lib):
@@ -61,7 +87,9 @@ def js_sources(lib):
 def prepare_headers(work):
     """The include directory a translated project would give these sources."""
     os.makedirs(work, exist_ok=True)
-    shutil.copyfile(CN1_GLOBALS, os.path.join(work, 'cn1_globals.h'))
+    for header in PORT_HEADERS:
+        shutil.copyfile(os.path.join(TRANSLATOR_SRC, header),
+                        os.path.join(work, header))
     # Generated per translation from the app's class list; the glue does not
     # read it, so an empty stand-in lets cn1_globals.h parse on its own.
     with open(os.path.join(work, 'cn1_class_method_index.h'), 'w') as f:
@@ -75,21 +103,24 @@ def main(argv):
     skipped = []
 
     cc = os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
+    win_cc = windows_compiler()
     node = shutil.which('node')
     work = prepare_headers(os.path.join(REPO, 'maven', 'target',
                                         'cn1lib-native-sources'))
 
     checked = 0
     for lib in libraries():
-        for path in c_sources(lib):
+        for platform, path in c_sources(lib):
             rel = os.path.relpath(path, REPO)
-            if cc is None:
-                skipped.append('%s (no C compiler; set CC)' % rel)
+            compiler = win_cc if platform == 'win' else cc
+            if compiler is None:
+                skipped.append('%s (no %s; set %s)'
+                               % (rel,
+                                  'Windows-targeting compiler' if platform == 'win'
+                                  else 'C compiler',
+                                  'CC_WIN' if platform == 'win' else 'CC'))
                 continue
-            # The Windows-only branches of these files are behind _WIN32 and
-            # need the Windows SDK, so on any other host this checks the
-            # portable half. That is still every line the two files share.
-            result = subprocess.run([cc, '-fsyntax-only', '-I', work, path],
+            result = subprocess.run([compiler, '-fsyntax-only', '-I', work, path],
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT)
             if result.returncode != 0:
@@ -97,7 +128,8 @@ def main(argv):
                                 % (rel, result.stdout.decode('utf-8', 'replace').strip()))
             else:
                 checked += 1
-                print('  %s: compiles' % rel)
+                print('  %s: compiles (%s target)'
+                      % (rel, 'Win32' if platform == 'win' else 'host'))
 
         for path in js_sources(lib):
             rel = os.path.relpath(path, REPO)
