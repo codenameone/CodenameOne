@@ -3830,6 +3830,23 @@ public final class InterpRuntime {
         return isInstanceOf(v, externOwnerName(ext));
     }
 
+    /// Whether a pushed class declares an assignability edge to a host
+    /// type by name -- either through its host superclass chain or any
+    /// host interface anywhere in its supertype set. Used by
+    /// `isInstanceOf` to answer for markers the peer factory has to
+    /// leave off the shim.
+    private boolean declaresHostSupertype(InterpClass type, String hostName) {
+        Vector externs = new Vector();
+        type.collectHostSupertypes(externs);
+        for (int i = 0; i < externs.size(); i++) {
+            int ext = ((Integer) externs.elementAt(i)).intValue();
+            if (hostName.equals(externOwnerName(ext))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// The same test against a type named directly, which is what
     /// `Class.isInstance` has and an extern index is not.
     private boolean isInstanceOf(Object v, String name) throws Throwable {
@@ -3860,8 +3877,19 @@ public final class InterpRuntime {
                 return true;
             }
             Object hostClass = linker.findClass(name);
-            return hostClass != null && io.hostPeer != null
-                    && linker.isInstance(hostClass, io.hostPeer);
+            if (hostClass != null && io.hostPeer != null
+                    && linker.isInstance(hostClass, io.hostPeer)) {
+                return true;
+            }
+            // The peer may not carry every host interface the pushed class
+            // declares: marker interfaces (Serializable, Cloneable) are
+            // filtered before `createPeer` because the shim factory can
+            // only take one host interface at a time. `instanceof
+            // Serializable` on a `class Foo implements Runnable,
+            // Serializable {}` -- or on the intersection lambda
+            // `(Runnable & Serializable)() -> {}` -- must still answer
+            // true, so consult what the class actually declared.
+            return declaresHostSupertype(io.type, name);
         }
         Object hostClass = linker.findClass(name);
         return hostClass != null && linker.isInstance(hostClass, v);
