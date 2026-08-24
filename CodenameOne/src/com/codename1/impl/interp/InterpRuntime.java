@@ -2497,11 +2497,29 @@ public final class InterpRuntime {
         // sorted through Collections.sort casts to Comparable, and Enum
         // supplies that. `enumCall` answers `compareTo`, so the shim only
         // needs to advertise the interface; the interpreter routes the
-        // call back. Comparable and Serializable are the two Enum brings
-        // in on every JDK.
+        // call back. Serializable is deliberately not added: it is a
+        // marker with no methods, this runtime has no serialization
+        // support, and forcing it alongside Comparable would push the
+        // enum peer to the two-interface case the factory rejects (a
+        // shim is generated per interface). Any class the pushed program
+        // has that legitimately implements Serializable is filtered on
+        // the same principle just below.
         if (io.enumOrdinal >= 0) {
             addIfPresent(interfaces, "java/lang/Comparable");
-            addIfPresent(interfaces, "java/io/Serializable");
+        }
+        // Markers with no callable methods -- Serializable and Cloneable --
+        // cannot exercise a shim on this runtime, and adding them alongside
+        // a real interface (a common shape: `class Task implements
+        // Runnable, Serializable`) would demand a combined shim the
+        // factory has no generator for. Drop them so the peer gets built
+        // around the substantive interface. A cast to Serializable in
+        // pushed code still fails; that is a limitation of a runtime with
+        // no serialization, not a bug the peer factory can hide.
+        for (int i = interfaces.size() - 1; i >= 0; i--) {
+            String n = (String) interfaces.elementAt(i);
+            if ("java/io/Serializable".equals(n) || "java/lang/Cloneable".equals(n)) {
+                interfaces.removeElementAt(i);
+            }
         }
 
         if (hostSuperclassName == null && interfaces.isEmpty()) {
