@@ -573,6 +573,57 @@ class MacNativeBuilder {
      * Catalyst slice (excluded GL-only sources, stub-header search
      * path, OpenGLES iOS-only re-link, etc.).
      */
+    /// Writes the Mac slice's Info.plist: a copy of the finished one differing in
+    /// `UIApplicationSupportsMultipleScenes`, which `com.codename1.ui.Window` needs
+    /// and the iOS slice must not have.
+    ///
+    /// Generated from the finished file rather than maintained beside it, so it picks
+    /// up everything the build put there -- the orientation stripping and the
+    /// prerendered-icon rewrite both edit that plist before this runs -- and cannot
+    /// drift from it.
+    ///
+    /// Does nothing unless windows were asked for. A Catalyst build that never
+    /// mentioned them wants the two slices reading exactly the same file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tmpFile`: the build's working directory
+    ///
+    /// - `mainClass`: the application's main class, which names the file
+    ///
+    /// #### Returns
+    ///
+    /// the project-relative path for INFOPLIST_FILE, or null when there is nothing to
+    /// change
+    private String writeCatalystInfoPlist(File tmpFile, String mainClass) throws BuildException {
+        File source = IPhoneBuilder.hostAppInfoPlist(tmpFile, mainClass);
+        if (!source.exists()) {
+            return null;
+        }
+        try {
+            String plist = new String(
+                    Files.readAllBytes(source.toPath()), StandardCharsets.UTF_8);
+            String enabled = IPhoneBuilder.plistWithMultipleScenesEnabled(plist);
+            if (enabled.equals(plist)) {
+                // Nothing to say differently, so let both slices read the one file.
+                return null;
+            }
+            File distSrc = new File(new File(tmpFile, "dist"), mainClass + "-src");
+            if (!distSrc.isDirectory()) {
+                return null;
+            }
+            File target = new File(distSrc, mainClass + "-MacCatalyst-Info.plist");
+            Files.write(target.toPath(), enabled.getBytes(StandardCharsets.UTF_8));
+            // Relative to the project directory, which is what INFOPLIST_FILE is
+            // resolved against and the form the generated project already uses.
+            return mainClass + "-src/" + target.getName();
+        } catch (IOException ex) {
+            throw new BuildException(
+                    "Unable to write the Mac Catalyst Info.plist beside "
+                    + source.getAbsolutePath(), ex);
+        }
+    }
+
     void applyXcodeSettings(BuildRequest request, File tmpFile, String buildVersion)
             throws BuildException {
         File hooksDir = new File(tmpFile, "hooks");
@@ -582,6 +633,7 @@ class MacNativeBuilder {
         String projectFile = new File(tmpFile, "dist/" + mainClass + ".xcodeproj").getAbsolutePath();
         String resolvedTeamId = owner.sanitizeTeamId(teamId, "macNative.teamId");
         boolean manualSigning = "manual".equalsIgnoreCase(signingStyle);
+        String catalystPlist = writeCatalystInfoPlist(tmpFile, mainClass);
 
         // For the "both" case the AppStore variant is wired as the default
         // CODE_SIGN_ENTITLEMENTS; xcodebuild -exportOptionsPlist picks up the
@@ -602,7 +654,18 @@ class MacNativeBuilder {
                 .append("') unless target\n")
                 .append("target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
-                .append("  bs['SUPPORTS_MACCATALYST'] = 'YES'\n")
+                .append("  bs['SUPPORTS_MACCATALYST'] = 'YES'\n");
+        if (catalystPlist != null) {
+            // SDK-qualified, like PRODUCT_BUNDLE_IDENTIFIER and DEVELOPMENT_TEAM
+            // below. This is one target and the same build ships the iPhone/iPad
+            // slice, so it is the only place the two destinations can be told apart:
+            // com.codename1.ui.Window needs UIApplicationSupportsMultipleScenes true,
+            // and turning that on in the shared plist would opt every iPad build into
+            // multi-window behaviour it never asked for.
+            s.append("  bs['INFOPLIST_FILE[sdk=macosx*]'] = '")
+                    .append(IPhoneBuilder.escapeRubyStr(catalystPlist)).append("'\n");
+        }
+        s
                 .append("  bs['SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD'] = 'NO'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '1,2,6'\n")
                 .append("  bs['DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER'] = '")

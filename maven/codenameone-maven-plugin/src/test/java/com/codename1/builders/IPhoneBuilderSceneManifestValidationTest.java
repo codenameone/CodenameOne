@@ -36,6 +36,149 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class IPhoneBuilderSceneManifestValidationTest {
 
+    private static final String WINDOW_ROLE =
+            "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+            + "        <array>\n"
+            + "            <dict>\n"
+            + "                <key>UISceneDelegateClassName</key>\n"
+            + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+            + "            </dict>\n"
+            + "        </array>\n";
+
+    private static String manifest(String body) {
+        return "<key>UIApplicationSceneManifest</key>\n<dict>\n" + body + "</dict>";
+    }
+
+    private static String wellFormedManifest() {
+        return manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n");
+    }
+
+    @Test
+    void aWellFormedManifestSatisfiesBothQuestions() {
+        String plist = wellFormedManifest();
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(plist));
+    }
+
+    @Test
+    void theSupportKeyHasToBeAMemberOfTheManifestNotBuriedInIt() {
+        // The key is inside an unrelated metadata dictionary nested in the manifest.
+        // UIKit reads members of the manifest dictionary, so it ignores this one and
+        // the app has no multi-scene support -- but a search that only asks whether
+        // the key appears anywhere in the manifest says yes.
+        String plist = manifest(
+                "    <key>CN1Metadata</key>\n    <dict>\n"
+                + "        <key>UIApplicationSupportsMultipleScenes</key>\n"
+                + "        <true/>\n"
+                + "    </dict>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n");
+        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist),
+                "a key nested in another dictionary is not a member of the manifest");
+        // And this is exactly what the unscoped question would have answered.
+        assertTrue(IPhoneBuilder.plistKeyIsTrue(
+                        IPhoneBuilder.plistManifestScope(plist),
+                        "UIApplicationSupportsMultipleScenes"),
+                "the search-anywhere question is what accepted it");
+    }
+
+    @Test
+    void theWindowRoleHasToBeAMemberOfUISceneConfigurations() {
+        // The role sits in an unrelated dictionary rather than under
+        // UISceneConfigurations, so UIKit has no configuration to create a window with.
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>CN1Metadata</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n    </dict>\n");
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(plist),
+                "a role outside UISceneConfigurations configures nothing");
+        assertTrue(IPhoneBuilder.plistWiresWindowSceneDelegate(
+                        IPhoneBuilder.plistManifestScope(plist)),
+                "the search-anywhere question is what accepted it");
+    }
+
+    @Test
+    void aManifestWithNoSceneConfigurationsAtAllWiresNothing() {
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n");
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(plist));
+    }
+
+    @Test
+    void aCommentedMemberIsNotAMember() {
+        String plist = manifest(
+                "    <!-- <key>UIApplicationSupportsMultipleScenes</key><true/> -->\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n");
+        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
+    }
+
+    @Test
+    void whitespaceInTheContainerTagsDoesNotHideMembership() {
+        String plist = wellFormedManifest()
+                .replace("</key>", "</key >")
+                .replace("<dict>", "<dict >");
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(plist));
+    }
+
+    @Test
+    void theMacSliceGetsMultipleScenesAndTheSharedPlistDoesNot() {
+        // One Info.plist serves both destinations of one target, so the shared file
+        // stays false and the Mac copy is what differs. Getting this backwards opts
+        // every iPad build into multi-window behaviour it never asked for.
+        String shared = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n");
+        String mac = IPhoneBuilder.plistWithMultipleScenesEnabled(shared);
+        assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(shared),
+                "the shared plist the iOS slice reads must stay false");
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac),
+                "the Mac slice's copy must say true");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(mac),
+                "and must keep the scene configuration");
+    }
+
+    @Test
+    void theFlipTouchesOnlyTheManifestsOwnMember() {
+        // A key of the same name in an unrelated dictionary is somebody else's, and
+        // rewriting it would change a setting the application chose.
+        String plist = "<key>CN1Metadata</key>\n<dict>\n"
+                + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "</dict>\n"
+                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n");
+        String mac = IPhoneBuilder.plistWithMultipleScenesEnabled(plist);
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac));
+        assertTrue(mac.startsWith("<key>CN1Metadata</key>\n<dict>\n"
+                        + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                        + "</dict>"),
+                "the unrelated dictionary is left exactly as it was");
+    }
+
+    @Test
+    void aPlistWithNoSceneManifestIsReturnedUnchanged() {
+        String plist = "<key>CFBundleName</key><string>x</string>";
+        assertTrue(plist.equals(IPhoneBuilder.plistWithMultipleScenesEnabled(plist)));
+    }
+
+    @Test
+    void theFlipIsIdempotent() {
+        String once = IPhoneBuilder.plistWithMultipleScenesEnabled(wellFormedManifest());
+        assertTrue(once.equals(IPhoneBuilder.plistWithMultipleScenesEnabled(once)),
+                "a manifest that already says true needs no second copy");
+    }
+
     @Test
     void aKeySetToFalseIsNotAcceptedAsTrue() {
         assertFalse(IPhoneBuilder.plistKeyIsTrue(
