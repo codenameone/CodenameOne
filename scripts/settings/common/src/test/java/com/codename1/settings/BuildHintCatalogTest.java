@@ -1027,4 +1027,22 @@ public class BuildHintCatalogTest {
                 java.util.Collections.singletonList(importAliasElsewhere));
         assertNull(owned.get("ios.teamId"));
     }
+
+    /// Both languages allow a non-ASCII identifier. Stopping at the first such
+    /// character read a short name, so the real main source was rejected and
+    /// Settings could offer a hint an annotation already owns.
+    @Test
+    public void aNonAsciiNameIsStillAName() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.\u5e94\u7528;\npublic class MyApp {}\n", "MyApp", "com.\u5e94\u7528"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.\u5e94\u7528;\npublic class MyApp {}\n", "MyApp", "com"));
+        // The class name too.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class \u5e94\u7528 {}\n", "\u5e94\u7528",
+                "com.example"));
+        // An ASCII name is unchanged, and a separator still separates.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class MyApp {}\n", "MyApp", "com.example"));
+    }
 }

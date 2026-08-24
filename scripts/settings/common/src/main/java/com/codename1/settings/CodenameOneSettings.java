@@ -3022,8 +3022,22 @@ public class CodenameOneSettings extends Lifecycle {
     /// Hand-rolled because Character.isJavaIdentifierPart is outside the
     /// Codename One API subset, and this class is compiled as app code.
     private static boolean continuesAName(char c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                || (c >= '0' && c <= '9') || c == '_' || c == '$';
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '$') {
+            return true;
+        }
+        // Both languages allow a non-ASCII identifier -- `package com.应用` is
+        // valid Java and Kotlin -- and stopping at the first such character read
+        // a short name, so the real main source was rejected and Settings could
+        // offer a hint an annotation already owns.
+        //
+        // Everything outside ASCII that is not whitespace counts, since
+        // Character.isJavaIdentifierPart is outside the Codename One API subset
+        // this class is compiled against. That is wider than the language rule,
+        // but only by characters that cannot legally sit next to an identifier
+        // in source the compiler has already accepted -- and the alternative,
+        // rejecting all of them, is wrong for every name that has one.
+        return c >= 0x80 && !Character.isWhitespace(c);
     }
 
     /// The index of the next character that is neither whitespace nor part of a
