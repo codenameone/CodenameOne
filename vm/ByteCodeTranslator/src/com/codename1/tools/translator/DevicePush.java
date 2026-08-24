@@ -34,11 +34,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -747,6 +750,27 @@ public final class DevicePush {
 
     private static void rememberSecret(String deviceId, byte[] secret) throws IOException {
         Path f = secretsFile();
+        createParent(f);
+        // Two concurrent Maven / IDE pushes could otherwise each load the
+        // same file, add their own line, and race the atomic move so the
+        // later replacement silently discards the earlier's newly-added
+        // secret. An advisory OS-level lock on a sibling .lock file makes
+        // the load/update/replace one transaction across processes; the
+        // lock is held only for the duration of this write, so parallel
+        // pushes queue instead of overwriting each other. `RandomAccessFile`
+        // is used rather than FileChannel.open so the file is created if
+        // absent -- Files.createFile would race the neighbour trying to do
+        // the same.
+        Path lockPath = f.resolveSibling(f.getFileName() + ".lock");
+        try (RandomAccessFile lockFile = new RandomAccessFile(lockPath.toFile(), "rw");
+             FileChannel lockChannel = lockFile.getChannel();
+             FileLock ignored = lockChannel.lock()) {
+            rememberSecretLocked(f, deviceId, secret);
+        }
+    }
+
+    private static void rememberSecretLocked(Path f, String deviceId, byte[] secret)
+            throws IOException {
         Properties p = new Properties();
         if (Files.exists(f)) {
             InputStream in = Files.newInputStream(f);
@@ -757,7 +781,6 @@ public final class DevicePush {
             }
         }
         p.setProperty(deviceId, hex(secret));
-        createParent(f);
         // The secret authorises running code on somebody's phone. Writing
         // directly to `f` first would open it with the process umask -- 0644
         // on most POSIX defaults -- and only chmod it afterward, leaving a

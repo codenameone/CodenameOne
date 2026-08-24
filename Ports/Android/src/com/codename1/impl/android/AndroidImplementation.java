@@ -13472,11 +13472,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 }
             }
-            if(linkLocalV4 != null) {
-                return linkLocalV4;
-            }
+            // A routable IPv6 address beats every link-local, because a
+            // link-local IPv4 (169.254.*) is unreachable off this device
+            // -- DeviceRuntimeService.sweep() then walks a /24 that has
+            // no desktop on it, and the UI shows the inferior address.
+            // Link-local IPv4 comes next (many networks still hand out
+            // one), then link-local IPv6 as a last resort.
             if(routableV6 != null) {
                 return routableV6;
+            }
+            if(linkLocalV4 != null) {
+                return linkLocalV4;
             }
             if(linkLocalV6 != null) {
                 return linkLocalV6;
