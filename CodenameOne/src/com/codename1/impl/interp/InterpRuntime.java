@@ -2589,13 +2589,32 @@ public final class InterpRuntime {
                 // classes at least resolve to their nearest host ancestor,
                 // matching the scalar conversion above.
                 Object[] src = (Object[]) args[i];
-                Object[] converted = classArrayFor(src);
-                if (converted != null) {
-                    if (classArrayPairs == null) {
-                        classArrayPairs = new Vector();
+                // Reuse an earlier materialisation for the same src, so
+                // aliased `Class<?>[]` parameters share one host array
+                // -- Java requires `a == b` when the same array reference
+                // is passed twice, and copying host mutations back through
+                // two separate dsts would otherwise let the later pair
+                // overwrite the earlier one's changes on the source.
+                Object[] converted = null;
+                if (classArrayPairs != null) {
+                    for (int k = 0; k < classArrayPairs.size(); k += 2) {
+                        if (classArrayPairs.elementAt(k) == src) {   //NOPMD CompareObjectsWithEquals - identity is the point
+                            converted = (Object[]) classArrayPairs.elementAt(k + 1);
+                            break;
+                        }
                     }
-                    classArrayPairs.addElement(src);
-                    classArrayPairs.addElement(converted);
+                }
+                if (converted == null) {
+                    converted = classArrayFor(src);
+                    if (converted != null) {
+                        if (classArrayPairs == null) {
+                            classArrayPairs = new Vector();
+                        }
+                        classArrayPairs.addElement(src);
+                        classArrayPairs.addElement(converted);
+                    }
+                }
+                if (converted != null) {
                     args[i] = converted;
                 }
             }
