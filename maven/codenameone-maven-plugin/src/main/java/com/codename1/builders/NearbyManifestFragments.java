@@ -265,7 +265,7 @@ final class NearbyManifestFragments {
     /// @return the fragment, with the declaration added or widened
     static String widenPermission(String xPermissions, String name,
             int requiredThrough) {
-        int at = xPermissions.indexOf("\"" + name + "\"");
+        int at = indexOfQuoted(xPermissions, name);
         if (at < 0) {
             return addPermission(xPermissions, name, requiredThrough > 0
                     ? " android:maxSdkVersion=\"" + requiredThrough + "\"" : "");
@@ -276,38 +276,100 @@ final class NearbyManifestFragments {
             return xPermissions;
         }
         String element = xPermissions.substring(start, end + 1);
-        String marker = "android:maxSdkVersion=\"";
-        int capAt = element.indexOf(marker);
-        if (capAt < 0) {
+        int[] cap = findAttribute(element, "android:maxSdkVersion");
+        if (cap == null) {
             // Uncapped, so it already reaches further than anything asked for.
             return xPermissions;
         }
-        int capEnd = element.indexOf('"', capAt + marker.length());
-        if (capEnd < 0) {
-            return xPermissions;
-        }
-        int cap;
+        int capped;
         try {
-            cap = Integer.parseInt(element.substring(
-                    capAt + marker.length(), capEnd).trim());
+            capped = Integer.parseInt(
+                    element.substring(cap[2], cap[3]).trim());
         } catch (NumberFormatException notANumber) {
             return xPermissions;
         }
-        if (requiredThrough > 0 && cap >= requiredThrough) {
+        if (requiredThrough > 0 && capped >= requiredThrough) {
             return xPermissions;
         }
         String widened;
         if (requiredThrough > 0) {
-            widened = element.substring(0, capAt + marker.length())
-                    + requiredThrough + element.substring(capEnd);
+            widened = element.substring(0, cap[2]) + requiredThrough
+                    + element.substring(cap[3]);
         } else {
-            widened = element.substring(0, capAt)
-                    + element.substring(capEnd + 1);
+            widened = element.substring(0, cap[0])
+                    + element.substring(cap[1]);
             // The attribute left a double space behind it.
             widened = widened.replace("  ", " ");
         }
         return xPermissions.substring(0, start) + widened
                 + xPermissions.substring(end + 1);
+    }
+
+    /// Finds `value` written as an XML attribute value, under either quote.
+    ///
+    /// Not indexOf("\"" + value + "\""): a fragment an app wrote by hand is
+    /// as likely to use single quotes, and missing the declaration meant
+    /// adding a SECOND one for the same permission.
+    private static int indexOfQuoted(String xml, String value) {
+        int at = xml.indexOf("\"" + value + "\"");
+        if (at >= 0) {
+            return at;
+        }
+        return xml.indexOf("'" + value + "'");
+    }
+
+    /// Locates one attribute of an element, tolerating what XML allows.
+    ///
+    /// `android:maxSdkVersion="30"`, `android:maxSdkVersion = "30"` and
+    /// `android:maxSdkVersion='30'` are the same attribute, and only the
+    /// first was recognised -- so a permission an app had capped in either
+    /// of the other two spellings read as UNCAPPED, was left alone as
+    /// already reaching far enough, and discovery on Android 12 asked for a
+    /// location grant the manifest still capped at 30.
+    ///
+    /// @param element the whole element text, angle brackets included
+    /// @param name the attribute name
+    /// @return {attributeStart, attributeEnd, valueStart, valueEnd}, or null
+    ///     when the element does not carry it
+    private static int[] findAttribute(String element, String name) {
+        int at = element.indexOf(name);
+        while (at >= 0) {
+            // A name that is the tail of a longer one is a different
+            // attribute: android:maxSdkVersion must not be found inside
+            // tools:android:maxSdkVersion.
+            char before = at == 0 ? ' ' : element.charAt(at - 1);
+            if (before == ' ' || before == '\t' || before == '\n'
+                    || before == '\r' || before == '<') {
+                int scan = at + name.length();
+                scan = skipSpace(element, scan);
+                if (scan < element.length() && element.charAt(scan) == '=') {
+                    scan = skipSpace(element, scan + 1);
+                    if (scan < element.length()) {
+                        char quote = element.charAt(scan);
+                        if (quote == '"' || quote == '\'') {
+                            int close = element.indexOf(quote, scan + 1);
+                            if (close > 0) {
+                                return new int[] {at, close + 1, scan + 1,
+                                        close};
+                            }
+                        }
+                    }
+                }
+            }
+            at = element.indexOf(name, at + 1);
+        }
+        return null;
+    }
+
+    private static int skipSpace(String s, int at) {
+        while (at < s.length()) {
+            char c = s.charAt(at);
+            if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+                return at;
+            }
+            at++;
+        }
+        return at;
     }
 
     /// True when a comma-separated profile list names this profile.

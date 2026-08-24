@@ -395,4 +395,40 @@ class NearbyManifestFragmentsTest {
         assertEquals(seeded, NearbyManifestFragments.inject(seeded, false,
                 false, false, false, "", 34));
     }
+
+    /**
+     * The cap is recognised in every spelling XML allows.
+     *
+     * <p>{@code android:maxSdkVersion = "30"} and
+     * {@code android:maxSdkVersion='30'} are the same attribute as the one
+     * with no spaces and double quotes, and only the last was matched -- so
+     * a hand-written fragment using either of the others read as UNCAPPED,
+     * was left alone as already reaching far enough, and discovery on
+     * Android 12 asked for a location grant the manifest still capped at
+     * 30.</p>
+     */
+    @Test
+    public void aCapIsWidenedWhateverItsSpacingAndQuotes() {
+        String[] spellings = {
+            "<uses-permission android:name=\"android.permission"
+                    + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\" />\n",
+            "<uses-permission android:name=\"android.permission"
+                    + ".ACCESS_FINE_LOCATION\" android:maxSdkVersion = \"30\" />\n",
+            "<uses-permission android:name='android.permission"
+                    + ".ACCESS_FINE_LOCATION' android:maxSdkVersion='30' />\n",
+        };
+        for (int i = 0; i < spellings.length; i++) {
+            String out = NearbyManifestFragments.inject(spellings[i], false,
+                    true, false, false, "", 34);
+            int at = out.indexOf("ACCESS_FINE_LOCATION");
+            String element = out.substring(out.lastIndexOf('<', at),
+                    out.indexOf('>', at));
+            assertTrue(element.contains("32"),
+                    "the cap should reach 32 in spelling " + i + ": "
+                    + element);
+            assertEquals(out.indexOf("ACCESS_FINE_LOCATION"),
+                    out.lastIndexOf("ACCESS_FINE_LOCATION"),
+                    "and must not be declared twice: " + out);
+        }
+    }
 }
