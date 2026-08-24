@@ -3027,6 +3027,12 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             JAVA_LONG fileBytes = fileSize == nil
                     ? -1 : (JAVA_LONG)[fileSize longLongValue];
             NSUInteger started = 0;
+            // THIS invocation's transfers. progressByPayload is keyed by the
+            // portable payload id, which two overlapping sends of the same
+            // immutable Payload share -- so cancelling by that key alone
+            // reached into a separately accepted send and cancelled its
+            // transfers too.
+            NSMutableArray *mine = [NSMutableArray array];
             for (NSUInteger i = 0; i < [peers count]; i++) {
                 MCPeerID *peer = [peers objectAtIndex:i];
                 MCSession *session = [cn1nbTransport
@@ -3085,6 +3091,7 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 if (progress != nil) {
                     started++;
                     [progressHolder addObject:progress];
+                    [mine addObject:progress];
                     [cn1nbTransport rememberProgress:progress
                                           forPayload:payloadId];
                 } else {
@@ -3109,8 +3116,10 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                 // app has been told failed must not go on to deliver the
                 // file to some of its recipients. Bytes cannot be recalled
                 // once queued; a file can.
-                for (NSProgress *partial in
-                        [cn1nbTransport takeProgressesForPayload:payloadId]) {
+                for (NSProgress *partial in mine) {
+                    [cn1nbTransport forgetProgress:
+                            [NSArray arrayWithObject:partial]
+                                        forPayload:payloadId];
                     [partial cancel];
                 }
                 cn1nbFailTransport(requestId, CN1_NEARBY_ERR_IO_ERROR,

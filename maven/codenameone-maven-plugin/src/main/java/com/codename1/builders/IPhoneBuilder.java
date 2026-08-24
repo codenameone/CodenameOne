@@ -563,11 +563,36 @@ public class IPhoneBuilder extends Executor {
     /// - `values`: the array entries
     /// - `why`: what the app loses if the entries are absent, for the log
     private void declareNearbyPlistArray(BuildRequest request, String key,
-            String[] values, String why) {
+            String[] values, String why) throws BuildException {
         String inject = request.getArg("ios.plistInject", "");
         if (WatchNativeBuilder.injectedPlistKeys(inject).contains(key)) {
-            log("ios.plistInject already declares " + key + ", so the nearby"
-                    + " entries were not added for you -- " + why + ".");
+            // Declared by the app, so the build leaves it alone -- but it
+            // has to actually CARRY what the feature needs. Accepting the
+            // key on sight let an empty array, a malformed one, or one
+            // simply missing the value through: the build succeeded, the
+            // generated entry was skipped as redundant, and the feature was
+            // inert on the device. The Bonjour merge checks its array for
+            // the same reason.
+            java.util.List<String> declared = WatchNativeBuilder
+                    .injectedPlistStringArray(request, key);
+            java.util.List<String> missing = new java.util.ArrayList<String>();
+            for (int i = 0; i < values.length; i++) {
+                String want = values[i] == null ? "" : values[i].trim();
+                if (want.length() > 0 && !declared.contains(want)) {
+                    missing.add(want);
+                }
+            }
+            if (!missing.isEmpty()) {
+                throw new BuildException("This app uses"
+                        + " com.codename1.nearby.companion and declares "
+                        + key + " through ios.plistInject, but that array"
+                        + " does not list " + missing + ". " + why
+                        + ". Add those entries to the array in"
+                        + " ios.plistInject, or remove the key from it and"
+                        + " let the build declare it for you.");
+            }
+            log("ios.plistInject already declares " + key + " and it carries"
+                    + " what nearby needs, so no entries were added for you.");
             return;
         }
         StringBuilder b = new StringBuilder(inject);
