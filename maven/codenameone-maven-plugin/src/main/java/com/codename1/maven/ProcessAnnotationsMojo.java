@@ -227,6 +227,21 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             getLog().info("cn1: emitted " + resources.size() + " generated resource(s) under "
                     + outputDirectory);
         }
+
+        // The build hint manifest records the main class's own bytes so the
+        // simulator, which has no bytecode reader, can tell a current manifest
+        // from one an earlier build left behind. A processor may REPLACE that
+        // class through emitClass -- BindingAnnotationProcessor does, for a
+        // two-way @Bindable setter -- and those are flushed above, after every
+        // finish(). So the stamp is corrected here, which is the first moment
+        // the class on disk is final. A no-op when there is no manifest.
+        try {
+            com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .restampClassDigest(outputDirectory);
+        } catch (IOException ioe) {
+            throw new MojoExecutionException(
+                    "Could not stamp the build hint manifest under " + outputDirectory, ioe);
+        }
     }
 
     private static boolean intersects(Set<String> a, Set<String> b) {

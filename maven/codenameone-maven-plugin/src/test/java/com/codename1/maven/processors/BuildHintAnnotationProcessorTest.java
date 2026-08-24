@@ -619,6 +619,94 @@ public class BuildHintAnnotationProcessorTest {
         return hex.toString();
     }
 
+    /// A processor may REPLACE the main class through `emitClass`, and those are
+    /// flushed only after every processor's `finish()` -- so a manifest written
+    /// during ours records the class as the compiler left it, not as the build
+    /// ships it. The simulator would then read a freshly generated manifest as
+    /// stale and drop every annotated hint under `cn1:run`.
+    @Test
+    public void theStampIsCorrectedOnceTheClassesAreFlushed() throws Exception {
+        File classes = compile("@Ios(teamId = \"ABCDE12345\")");
+        ProcessorContext ctx = run(classes, settings(), MAIN, true);
+        File manifest = new File(classes, BuildHintAnnotationProcessor.MANIFEST_RESOURCE);
+        manifest.getParentFile().mkdirs();
+        java.nio.file.Files.write(manifest.toPath(),
+                ctx.getEmittedResources()
+                        .get(BuildHintAnnotationProcessor.MANIFEST_RESOURCE));
+
+        // Stand in for the instrumented replacement a later processor writes.
+        File classFile = new File(classes, "com/example/MyApp.class");
+        byte[] original = java.nio.file.Files.readAllBytes(classFile.toPath());
+        byte[] replaced = new byte[original.length + 1];
+        System.arraycopy(original, 0, replaced, 0, original.length);
+        java.nio.file.Files.write(classFile.toPath(), replaced);
+
+        BuildHintAnnotationProcessor.restampClassDigest(classes);
+
+        Properties after = new Properties();
+        java.io.InputStream in = new java.io.FileInputStream(manifest);
+        try {
+            after.load(in);
+        } finally {
+            in.close();
+        }
+        assertEquals(sha256Of(classFile),
+                after.getProperty(BuildHintAnnotationProcessor.CLASS_DIGEST_KEY));
+        // Everything else is left exactly as it was.
+        assertEquals("ABCDE12345", after.getProperty("codename1.arg.ios.teamId"));
+        assertEquals(MAIN, after.getProperty("cn1.buildHints.mainClass"));
+    }
+
+    /// Nothing to correct is not an error: a project with no build hint
+    /// annotations emits no manifest at all.
+    @Test
+    public void theStampStepIsSilentWithoutAManifest() throws Exception {
+        BuildHintAnnotationProcessor.restampClassDigest(tmp.newFolder());
+    }
+
+    /// The scan for the package keyword steps over an escaped identifier too.
+    /// `fun `package helper`() {}` in a default-package file reported `helper`
+    /// as the declared package, so a live annotated class in it looked like it
+    /// belonged elsewhere and was dropped as an orphan.
+    @Test
+    public void anEscapedIdentifierIsNotAPackageDeclaration() {
+        assertEquals("", BuildHintAnnotationProcessor.declaredPackageIn(
+                "fun `package helper`() {}\n\nclass MyApp\n", true));
+        // The real one is still found when there is one.
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(
+                "package com.example\n\nfun `package helper`() {}\n", true));
+    }
+
+    /// `$` is a legal character in a Java type name, so a top-level
+    /// `class Wrong$Type` has binary name Wrong$Type and is not nested at all.
+    /// Reading every `$` as nesting looked for a `Wrong` that does not exist,
+    /// dropped the live class as an orphan, and lost the placement error it
+    /// should have raised.
+    @Test
+    public void aDollarInATopLevelJavaNameIsNotNesting() throws Exception {
+        File src = tmp.newFolder();
+        File pkgDir = new File(src, "com/example");
+        pkgDir.mkdirs();
+        java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(new File(pkgDir, "Wrong$Type.java")), "UTF-8");
+        try {
+            w.write("package com.example;\npublic class Wrong$Type {\n}\n");
+        } finally {
+            w.close();
+        }
+
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Wrong$Type",
+                        "package com.example;\npublic class Wrong$Type {\n}\n"),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        AnnotatedClass cls = ClassScanner.scan(classes).get("com/example/Wrong$Type");
+        assertTrue("the class under test must have been compiled", cls != null);
+
+        assertTrue(BuildHintAnnotationProcessor.hasBackingSource(cls,
+                java.util.Collections.singletonList(src.getAbsolutePath())));
+    }
+
     /// An escaped identifier may contain anything, spaces and keywords
     /// included, and it is left as the code it is -- so a declaration scanner
     /// has to step over it rather than read what is inside. `val `class Main``

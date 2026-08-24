@@ -31,9 +31,12 @@ import com.codename1.maven.annotations.ProcessingException;
 import com.codename1.maven.annotations.ProcessorContext;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -254,6 +257,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         String pkg = packageOf(cls.getBinaryName());
         String simpleName = simpleNameOf(cls.getBinaryName());
         String[] nestedName = nestedNameOf(cls.getBinaryName());
+        // The name with its dollars intact. `$` is a legal character in a Java
+        // type name, so a top-level `class Wrong$Type` has binary name
+        // Wrong$Type and is not nested at all -- reading every `$` as nesting
+        // looked for a `Wrong` that does not exist, dropped the live class as an
+        // orphan, and lost the placement error it should have raised.
+        int lastDot = cls.getBinaryName().lastIndexOf('.');
+        String wholeName = lastDot < 0 ? cls.getBinaryName()
+                : cls.getBinaryName().substring(lastDot + 1);
         boolean sawARoot = false;
         for (String root : roots) {
             File dir = new File(root);
@@ -261,7 +272,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
-            if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, 0)) {
+            if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, wholeName, 0)) {
                 return true;
             }
         }
@@ -301,7 +312,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// because Kotlin does not require the two to agree. Depth-limited: this runs
     /// per annotated class and a source tree is not a search index.
     private static boolean declaresPackage(File dir, String name, String pkg, String simple,
-                                           String[] nested, int depth) {
+                                           String[] nested, String whole, int depth) {
         if (depth > 24) {
             return false;
         }
@@ -311,10 +322,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for (File f : children) {
             if (f.isFile()) {
-                if (f.getName().equals(name) && matches(f, pkg, simple, nested)) {
+                if (f.getName().equals(name) && matches(f, pkg, simple, nested, whole)) {
                     return true;
                 }
-            } else if (f.isDirectory() && declaresPackage(f, name, pkg, simple, nested, depth + 1)) {
+            } else if (f.isDirectory()
+                    && declaresPackage(f, name, pkg, simple, nested, whole, depth + 1)) {
                 return true;
             }
         }
@@ -329,7 +341,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// class that used to be in it -- keeping a stale annotation owner and
     /// failing the placement check on every incremental build, which is the very
     /// thing this guard was added to stop.
-    private static boolean matches(File f, String pkg, String simple, String[] nested) {
+    private static boolean matches(File f, String pkg, String simple, String[] nested,
+                                   String whole) {
         String text = readHead(f);
         if (text == null) {
             // Unreadable: answer yes, as everywhere else here, because the only
@@ -339,8 +352,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // The file names its own language, and a triple-quoted literal is read
         // differently in each.
         boolean kotlin = f.getName().endsWith(".kt");
-        if (!pkg.equals(declaredPackageIn(text, kotlin))
-                || !declaresType(text, simple, kotlin)) {
+        if (!pkg.equals(declaredPackageIn(text, kotlin))) {
+            return false;
+        }
+        // The name as spelled, before it is read as a nesting path: `$` is legal
+        // in a Java type name, so a top-level `class Wrong$Type` really is
+        // called that.
+        if (whole != null && !whole.equals(simple) && declaresType(text, whole, kotlin)) {
+            return true;
+        }
+        if (!declaresType(text, simple, kotlin)) {
             return false;
         }
         // The whole nesting PATH has to be there, in order. Checking only the
@@ -991,6 +1012,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         String code = blankNonCode(text, kotlin);
         int i = 0;
         while (i < code.length()) {
+            // An escaped identifier is left as the code it is, so the scan has
+            // to step over it: `fun `package helper`() {}` declares a function,
+            // and reading into it reported `helper` as the declared package --
+            // which made a live annotated class in that file look like it
+            // belonged elsewhere and dropped it as an orphan.
+            int escaped = escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
             char c = code.charAt(i);
             if (!Character.isJavaIdentifierStart(c)
                     || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
@@ -1304,6 +1335,70 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
     }
 
+    /// Rewrites [#CLASS_DIGEST_KEY] in an emitted manifest to describe the class
+    /// that is actually on disk.
+    ///
+    /// A processor may REPLACE a class through `emitClass`, and the mojo flushes
+    /// those only after every processor's `finish()` -- so a manifest written
+    /// during ours records the class as the compiler left it, not as the build
+    /// ships it. `BindingAnnotationProcessor` does exactly that for a main class
+    /// with a two-way `@Bindable` setter, and processor order is whatever the
+    /// service loader returns, so reading the queued bytes instead would only
+    /// move the race. Called by the mojo once the classes are written, which is
+    /// the first moment the answer is stable.
+    ///
+    /// Silent when there is no manifest, no main class recorded, or no class
+    /// file: this only makes an existing stamp accurate.
+    public static void restampClassDigest(File outputDirectory) throws IOException {
+        File manifest = new File(outputDirectory, MANIFEST_RESOURCE);
+        if (!manifest.isFile()) {
+            return;
+        }
+        Properties p = new Properties();
+        InputStream in = new FileInputStream(manifest);
+        try {
+            p.load(in);
+        } finally {
+            in.close();
+        }
+        String main = p.getProperty(MAIN_CLASS_KEY);
+        String recorded = p.getProperty(CLASS_DIGEST_KEY);
+        if (main == null || recorded == null) {
+            return;
+        }
+        String actual = digestOfClassFile(outputDirectory, main);
+        if (actual == null || actual.equals(recorded)) {
+            return;
+        }
+        byte[] raw = readAllBytes(manifest);
+        String text = new String(raw, "ISO-8859-1");
+        String replaced = text.replace(CLASS_DIGEST_KEY + "=" + recorded,
+                CLASS_DIGEST_KEY + "=" + actual);
+        if (replaced.equals(text)) {
+            return;
+        }
+        FileOutputStream out = new FileOutputStream(manifest);
+        try {
+            out.write(replaced.getBytes("ISO-8859-1"));
+        } finally {
+            out.close();
+        }
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        InputStream in = new FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            for (int n = in.read(buf); n > 0; n = in.read(buf)) {
+                bos.write(buf, 0, n);
+            }
+        } finally {
+            in.close();
+        }
+        return bos.toByteArray();
+    }
+
     /// SHA-256 of the compiled main class, hex, or null when it cannot be read.
     ///
     /// Nothing rewrites the class after `process-classes` in a Codename One
@@ -1312,11 +1407,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// as stale, which is why the consumer treats a missing value as "cannot
     /// tell" rather than as proof of anything.
     private static String compiledClassDigest(ProcessorContext ctx, String main) {
-        if (main == null) {
-            return null;
-        }
-        File dir = ctx.getOutputClassDir();
-        if (dir == null) {
+        return ctx.getOutputClassDir() == null ? null
+                : digestOfClassFile(ctx.getOutputClassDir(), main);
+    }
+
+    private static String digestOfClassFile(File dir, String main) {
+        if (main == null || dir == null) {
             return null;
         }
         File f = new File(dir, main.replace('.', File.separatorChar) + ".class");
@@ -1325,7 +1421,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            java.io.InputStream in = new java.io.FileInputStream(f);
+            InputStream in = new FileInputStream(f);
             try {
                 byte[] buf = new byte[8192];
                 for (int n = in.read(buf); n > 0; n = in.read(buf)) {
@@ -1340,7 +1436,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 hex.append(Character.forDigit(b & 0xF, 16));
             }
             return hex.toString();
-        } catch (java.io.IOException | java.security.NoSuchAlgorithmException ex) {
+        } catch (IOException | java.security.NoSuchAlgorithmException ex) {
             return null;
         }
     }
