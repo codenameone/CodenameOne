@@ -2914,23 +2914,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
             return null;
         }
+        // A reactor `package` build hands us the dependency module's jar rather
+        // than its output directory, which findAnnotatedClasses handles alongside
+        // a directory -- that is exactly the shape this check has to work in.
         for (String element : classpathElements) {
-            File f = new File(element);
-            if (f.isDirectory()) {
-                String hit = findAnnotatedClass(f, descriptors);
-                if (hit != null) {
-                    return hit;
-                }
-                continue;
-            }
-            // A reactor `package` build hands us the dependency module's jar
-            // rather than its output directory, which is exactly the shape this
-            // check has to work in.
-            if (f.isFile() && f.getName().endsWith(".jar")) {
-                String hit = findAnnotatedClassInJar(f, descriptors);
-                if (hit != null) {
-                    return hit;
-                }
+            String hit = findAnnotatedClass(new File(element), descriptors);
+            if (hit != null) {
+                return hit;
             }
         }
         return null;
@@ -2957,21 +2947,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // processor still refuses this placement whenever it runs.
             return null;
         }
-        String hit = element.isDirectory()
-                ? findAnnotatedClass(element, descriptors)
-                : (element.isFile() && element.getName().endsWith(".jar")
-                    ? findAnnotatedClassInJar(element, descriptors) : null);
-        if (hit == null) {
-            return null;
-        }
-        try {
-            com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
-            if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                    .hasBackingSource(cls, roots)) {
-                return hit;
+        // Every candidate, not the first: rejecting one stale class must not end
+        // the search, or whether a live misplacement is reported depends on the
+        // order the directory happened to be listed in.
+        for (String hit : findAnnotatedClasses(element, descriptors)) {
+            try {
+                com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
+                if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .hasBackingSource(cls, roots)) {
+                    return hit;
+                }
+            } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+                getLog().debug("cn1: could not read " + hit + " from " + element, ex);
             }
-        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
-            getLog().debug("cn1: could not read " + hit + " from " + element, ex);
         }
         return null;
     }
@@ -3004,28 +2992,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return false;
     }
 
-    private String findAnnotatedClassInJar(File jar, java.util.Collection<String> descriptors) {
-        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar)) {
-            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                java.util.zip.ZipEntry entry = entries.nextElement();
-                if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
-                    continue;
-                }
-                try (InputStream in = zip.getInputStream(entry)) {
-                    String name = carriesBuildHintAnnotation(in, descriptors)
-                            ? entry.getName() : null;
-                    if (name != null) {
-                        return name.substring(0, name.length() - ".class".length())
-                                .replace('/', '.');
-                    }
-                }
-            }
-        } catch (IOException | RuntimeException ex) {
-            getLog().debug("cn1: could not scan " + jar + ": " + ex.getMessage());
-        }
-        return null;
-    }
 
     private boolean carriesBuildHintAnnotation(InputStream in,
                                                java.util.Collection<String> descriptors)
@@ -3049,16 +3015,59 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     private String findAnnotatedClass(File dir, java.util.Collection<String> descriptors) {
+        List<String> all = findAnnotatedClasses(dir, descriptors);
+        return all.isEmpty() ? null : all.get(0);
+    }
+
+    /**
+     * Every annotated class under this element, by BINARY name.
+     *
+     * <p>The binary name, not the file's own: returning {@code Wrong} for
+     * {@code com/example/Wrong.class} made the message name a class that does not
+     * exist, and made re-reading it by name fail, so the guard saw nothing.</p>
+     *
+     * <p>All of them, not the first: an incremental output directory can hold a
+     * stale annotated class and a live one at once, and stopping at whichever
+     * {@code File.listFiles} returned first made the answer depend on directory
+     * order.</p>
+     */
+    private List<String> findAnnotatedClasses(File element, java.util.Collection<String> descriptors) {
+        List<String> out = new ArrayList<String>();
+        if (element.isDirectory()) {
+            collectAnnotatedClasses(element, element, descriptors, out);
+        } else if (element.isFile() && element.getName().endsWith(".jar")) {
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element)) {
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+                while (entries.hasMoreElements()) {
+                    java.util.zip.ZipEntry entry = entries.nextElement();
+                    if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                        continue;
+                    }
+                    try (InputStream in = zip.getInputStream(entry)) {
+                        if (carriesBuildHintAnnotation(in, descriptors)) {
+                            out.add(entry.getName()
+                                    .substring(0, entry.getName().length() - ".class".length())
+                                    .replace('/', '.'));
+                        }
+                    }
+                }
+            } catch (IOException | RuntimeException ex) {
+                getLog().debug("cn1: could not scan " + element + ": " + ex.getMessage());
+            }
+        }
+        return out;
+    }
+
+    private void collectAnnotatedClasses(File root, File dir,
+                                         java.util.Collection<String> descriptors,
+                                         List<String> out) {
         File[] children = dir.listFiles();
         if (children == null) {
-            return null;
+            return;
         }
         for (File f : children) {
             if (f.isDirectory()) {
-                String hit = findAnnotatedClass(f, descriptors);
-                if (hit != null) {
-                    return hit;
-                }
+                collectAnnotatedClasses(root, f, descriptors, out);
                 continue;
             }
             if (!f.getName().endsWith(".class")) {
@@ -3066,13 +3075,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
             try (InputStream in = new FileInputStream(f)) {
                 if (carriesBuildHintAnnotation(in, descriptors)) {
-                    return f.getName().substring(0, f.getName().length() - ".class".length());
+                    String rel = f.getAbsolutePath()
+                            .substring(root.getAbsolutePath().length())
+                            .replace(File.separatorChar, '/');
+                    while (rel.startsWith("/")) {
+                        rel = rel.substring(1);
+                    }
+                    out.add(rel.substring(0, rel.length() - ".class".length()).replace('/', '.'));
                 }
             } catch (IOException | RuntimeException ex) {
                 getLog().debug("cn1: could not scan " + f + ": " + ex.getMessage());
             }
         }
-        return null;
     }
 
     /**

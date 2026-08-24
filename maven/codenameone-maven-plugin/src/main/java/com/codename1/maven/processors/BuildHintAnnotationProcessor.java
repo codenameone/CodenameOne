@@ -552,32 +552,56 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// The dotted name starting at or after `from`, skipping whitespace around
     /// each dot. Blanked code, so comments are whitespace already.
-    static String qualifiedNameAt(String code, int from) {
-        int i = from;
+    public static String qualifiedNameAt(String code, int from) {
         StringBuilder name = new StringBuilder();
+        readQualifiedName(code, from, name);
+        return name.toString();
+    }
+
+    /// The index just past the dotted name starting at or after `from`, or
+    /// `from` when there is none. The same walk as {@link #qualifiedNameAt}, so
+    /// the two cannot disagree about where a name ends.
+    public static int qualifiedNameEnd(String code, int from) {
+        return readQualifiedName(code, from, null);
+    }
+
+    private static int readQualifiedName(String code, int from, StringBuilder name) {
+        int i = from;
+        int end = from;
         while (i < code.length()) {
             while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
                 i++;
             }
-            int end = i;
-            while (end < code.length() && Character.isJavaIdentifierPart(code.charAt(end))) {
-                end++;
+            int stop = i;
+            if (stop < code.length() && code.charAt(stop) == '*') {
+                if (name != null) {
+                    name.append('*');
+                }
+                return stop + 1;
             }
-            if (end == i) {
-                break;
+            while (stop < code.length() && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                stop++;
             }
-            name.append(code, i, end);
-            int dot = end;
+            if (stop == i) {
+                return end;
+            }
+            if (name != null) {
+                name.append(code, i, stop);
+            }
+            end = stop;
+            int dot = stop;
             while (dot < code.length() && Character.isWhitespace(code.charAt(dot))) {
                 dot++;
             }
             if (dot >= code.length() || code.charAt(dot) != '.') {
-                break;
+                return end;
             }
-            name.append('.');
+            if (name != null) {
+                name.append('.');
+            }
             i = dot + 1;
         }
-        return name.toString();
+        return end;
     }
 
     /// Whether `text` declares a type called `simple`.

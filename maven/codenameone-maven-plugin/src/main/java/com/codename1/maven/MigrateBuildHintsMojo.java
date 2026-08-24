@@ -850,7 +850,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String importLine = kotlin
                 ? "import com.codename1.annotations.buildhints.*"
                 : "import com.codename1.annotations.buildhints.*;";
-        if (text.contains("com.codename1.annotations.buildhints")) {
+        String blanked = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(text, kotlin);
+        // A live import, not the words anywhere in the file. A comment or a
+        // string mentioning the package -- a javadoc line about build hints, say
+        // -- aborted the migration on a source that compiles perfectly well and
+        // has no import at all.
+        if (importsBuildHints(blanked)) {
             throw new IOException(source.getName() + " already imports the build hint "
                     + "annotations; migrate the remaining hints by hand so nothing is "
                     + "overwritten.");
@@ -865,10 +871,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
 
         String blankedHead = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .blankNonCode(head, kotlin);
-        int lastImport = blankedHead.lastIndexOf("\nimport ");
+        int lastImport = lastImportIndex(blankedHead);
         if (lastImport >= 0) {
-            int eol = head.indexOf('\n', lastImport + 1);
-            head = head.substring(0, eol + 1) + importLine + "\n" + head.substring(eol + 1);
+            // After the whole declaration. `import java.\n util.List;` is legal
+            // and the first newline after the keyword is inside it, so cutting
+            // there spliced the new import into the middle of the old one and the
+            // verification build rolled a correct migration back.
+            int at = endOfImportDeclaration(blankedHead, lastImport);
+            head = head.substring(0, at) + importLine + "\n" + head.substring(at);
         } else {
             // No existing import. Anchor after the package declaration, and when
             // the class is in the default package anchor above any annotation it
@@ -901,6 +911,80 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * the type named by {@code codename1.mainName} is preferred over whatever
      * happens to appear first.</p>
      */
+    /// Whether blanked `code` contains a live import of the build hint package.
+    static boolean importsBuildHints(String code) {
+        for (int at = importKeywordAt(code, 0); at >= 0;
+                at = importKeywordAt(code, at + "import".length())) {
+            String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .qualifiedNameAt(code, at + "import".length());
+            if (name.startsWith("com.codename1.annotations.buildhints")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The offset of the last live `import` keyword in blanked `code`, or -1.
+    static int lastImportIndex(String code) {
+        int last = -1;
+        for (int at = importKeywordAt(code, 0); at >= 0;
+                at = importKeywordAt(code, at + "import".length())) {
+            last = at;
+        }
+        return last;
+    }
+
+    private static int importKeywordAt(String code, int from) {
+        int i = from;
+        while (i < code.length()) {
+            char c = code.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end < code.length() && Character.isJavaIdentifierPart(code.charAt(end))) {
+                end++;
+            }
+            if ("import".equals(code.substring(i, end))) {
+                return i;
+            }
+            i = end;
+        }
+        return -1;
+    }
+
+    /// The index just past the import declaration beginning at `importAt`.
+    static int endOfImportDeclaration(String code, int importAt) {
+        int i = importAt + "import".length();
+        // The name, then an optional Kotlin `as` alias, then an optional
+        // semicolon, then the rest of that line.
+        for (int pass = 0; pass < 2; pass++) {
+            // Component by component: `import java.\n util.List;` is legal, and a
+            // contiguous run stops at the newline in the middle of the name.
+            i = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .qualifiedNameEnd(code, i);
+            int probe = i;
+            while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+                probe++;
+            }
+            if (!code.startsWith("as", probe) || probe + 2 >= code.length()
+                    || Character.isJavaIdentifierPart(code.charAt(probe + 2))) {
+                break;
+            }
+            i = probe + 2;
+        }
+        while (i < code.length() && (code.charAt(i) == ' ' || code.charAt(i) == '\t')) {
+            i++;
+        }
+        if (i < code.length() && code.charAt(i) == ';') {
+            i++;
+        }
+        int eol = code.indexOf('\n', i);
+        return eol < 0 ? code.length() : eol + 1;
+    }
+
     /// The offset of the `package` keyword in already-blanked code, or -1.
     static int livePackageIndex(String code) {
         int i = 0;

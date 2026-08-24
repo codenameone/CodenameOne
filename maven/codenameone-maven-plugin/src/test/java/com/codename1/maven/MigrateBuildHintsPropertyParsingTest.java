@@ -326,4 +326,51 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(src.indexOf("public class"),
                 MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
     }
+
+    /// The words in a comment are not an import. A javadoc line mentioning the
+    /// package aborted the migration on a source that compiles perfectly well.
+    @Test
+    public void mentioningThePackageIsNotImportingIt() {
+        String mention = com.codename1.maven.processors.BuildHintAnnotationProcessor.blankNonCode(
+                "// see com.codename1.annotations.buildhints for the annotations\n"
+                        + "public class MyApp {}\n", false);
+        assertFalse(MigrateBuildHintsMojo.importsBuildHints(mention));
+
+        String real = com.codename1.maven.processors.BuildHintAnnotationProcessor.blankNonCode(
+                "import com.codename1.annotations.buildhints.Ios;\npublic class MyApp {}\n",
+                false);
+        assertTrue(MigrateBuildHintsMojo.importsBuildHints(real));
+    }
+
+    /// An import may legally span lines, so the insertion point is the end of the
+    /// DECLARATION. Cutting at the first newline after the keyword spliced the
+    /// new import into the middle of the old one.
+    @Test
+    public void theInsertionPointClearsAMultiLineImport() {
+        String head = "import java.\n util.List;\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        int last = MigrateBuildHintsMojo.lastImportIndex(code);
+        assertEquals(head.length(), MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
+    }
+
+    /// A Kotlin alias belongs to the declaration too.
+    @Test
+    public void theInsertionPointClearsAKotlinAlias() {
+        String head = "import com.example.Ios as TheirIos\nclass X\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, true);
+        int last = MigrateBuildHintsMojo.lastImportIndex(code);
+        assertEquals(head.indexOf("class X"),
+                MigrateBuildHintsMojo.endOfImportDeclaration(code, last));
+    }
+
+    /// The LAST import is the anchor, not the first.
+    @Test
+    public void theAnchorIsTheLastImport() {
+        String head = "import a.B;\nimport c.D;\n";
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, false);
+        assertEquals(head.indexOf("import c.D"), MigrateBuildHintsMojo.lastImportIndex(code));
+    }
 }
