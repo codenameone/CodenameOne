@@ -902,4 +902,33 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.declaresClass(
                 "package com.example\nclass MyApp {\n}\n", "MyApp", "com.example"));
     }
+
+    /// An import may escape a component too -- `import
+    /// com.codename1.annotations.`buildhints`.Ios` is legal Kotlin. Reading only
+    /// identifier characters recorded `com.codename1.annotations.`, so the
+    /// import went unrecognised, a live @Ios was read as somebody else's, and
+    /// Settings could write the duplicate the next build refuses.
+    @Test
+    public void aKotlinImportMayEscapeAComponent() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.codename1.annotations.`buildhints`.Ios\n"
+                        + "class MyApp\n", "Ios", true));
+        // The type name itself, and the on-demand form.
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.codename1.annotations.buildhints.`Ios`\n"
+                        + "class MyApp\n", "Ios", true));
+        // An escaped ALIAS is the name the file then uses -- read through the
+        // reader for aliases, which is what an aliased import belongs to.
+        assertEquals("when", CodenameOneSettings.kotlinImportAlias(
+                "package com.example\n"
+                        + "import com.codename1.annotations.buildhints.Ios as `when`\n"
+                        + "class MyApp\n", "Ios", true));
+        // Somebody else's package is still somebody else's.
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.other.`buildhints`.Ios\n"
+                        + "class MyApp\n", "Ios", true));
+    }
 }

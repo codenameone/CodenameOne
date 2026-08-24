@@ -2672,14 +2672,17 @@ public class CodenameOneSettings extends Lifecycle {
                     i++;
                     break;
                 }
-                int end = i;
-                while (end < source.length() && continuesAName(source.charAt(end))) {
-                    end++;
-                }
+                // A COMPONENT may be escaped -- `import
+                // com.codename1.annotations.`buildhints`.Ios` is legal Kotlin.
+                // Reading only identifier characters recorded `annotations.`, so
+                // the import went unrecognised and a live @Ios was read as
+                // somebody else's: Settings then offered the hint as unowned and
+                // could write the duplicate the next build refuses.
+                int end = componentEnd(source, i, kotlin);
                 if (end == i) {
                     break;
                 }
-                name.append(source, i, end);
+                name.append(componentText(source, i, end, kotlin));
                 int dot = nextLiveChar(source, end, kotlin);
                 if (dot < 0 || source.charAt(dot) != '.') {
                     i = end;
@@ -2697,13 +2700,10 @@ public class CodenameOneSettings extends Lifecycle {
                     && a + 2 < source.length() && !continuesAName(source.charAt(a + 2))) {
                 int n = nextLiveChar(source, a + 2, kotlin);
                 if (n >= 0) {
-                    int nameEnd = n;
-                    while (nameEnd < source.length()
-                            && continuesAName(source.charAt(nameEnd))) {
-                        nameEnd++;
-                    }
+                    // The alias may be escaped too: `import a.B as `when``.
+                    int nameEnd = componentEnd(source, n, kotlin);
                     if (nameEnd > n) {
-                        alias = source.substring(n, nameEnd);
+                        alias = componentText(source, n, nameEnd, kotlin);
                     }
                 }
             }

@@ -2734,11 +2734,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
             if (applied > 0) {
                 getLog().info("cn1: applied " + applied + " build hint(s) from annotations");
+                failOnMisplacedAnnotations(classpathElements, expectedMain);
                 return;
             }
         }
         if (processed) {
             getLog().debug("cn1: annotations were processed and set no build hint");
+            failOnMisplacedAnnotations(classpathElements, expectedMain);
             return;
         }
         // No manifest at all. If the compiled classes carry build hint
@@ -2763,6 +2765,38 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     + "        <goal>process-annotations</goal>\n"
                     + "      </goals>\n"
                     + "    </execution>");
+        }
+    }
+
+    /**
+     * Refuses a build where a class other than the main one carries build hint
+     * annotations.
+     *
+     * <p>Run even when a manifest was accepted, because accepting one does not
+     * mean the processor ran THIS build: the fingerprint covers the main class,
+     * so an annotation added to a live class beside it leaves the manifest
+     * looking entirely current. With the goal unbound or skipped, the hints from
+     * that class reach nothing and the build succeeds having neither applied
+     * them nor said the annotation is in the wrong place -- the silent failure
+     * this whole feature exists to remove. Had the processor run, it would have
+     * refused the build for the same class.</p>
+     */
+    private void failOnMisplacedAnnotations(List<String> classpathElements, String expectedMain)
+            throws MojoFailureException {
+        if (expectedMain == null) {
+            return;
+        }
+        java.util.Collection<String> descriptors =
+                com.codename1.build.shared.BuildHintAnnotationBinding.descriptors();
+        for (String element : classpathElements) {
+            String live = liveAnnotatedClass(new File(element), descriptors, expectedMain);
+            if (live != null) {
+                throw new MojoFailureException(live + " carries build hint annotations, but they "
+                        + "are only read from the application's main class (" + expectedMain
+                        + "), so none of them reached this build.\n\nMove them onto "
+                        + expectedMain + ", or set those hints in "
+                        + "codenameone_settings.properties.");
+            }
         }
     }
 
@@ -2935,6 +2969,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * class the developer actually wrote does.</p>
      */
     private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors) {
+        return liveAnnotatedClass(element, descriptors, null);
+    }
+
+    /// As above, ignoring `exclude` -- the class the manifest was generated for,
+    /// which carrying annotations is the whole point of.
+    private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors,
+                                      String exclude) {
         List<String> roots;
         try {
             roots = project == null ? null : project.getCompileSourceRoots();
@@ -2951,6 +2992,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // the search, or whether a live misplacement is reported depends on the
         // order the directory happened to be listed in.
         for (String hit : findAnnotatedClasses(element, descriptors)) {
+            if (exclude != null && exclude.equals(hit)) {
+                continue;
+            }
             try {
                 com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
                 if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor

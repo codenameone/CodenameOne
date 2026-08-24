@@ -26,6 +26,8 @@ package com.codename1.impl.javase;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.Properties;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -102,5 +104,73 @@ public class SimulatorAnnotationManifestTest {
         manifestIn(other, "com.other.TheirApp", "MINIMAL");
         assertNull(Simulator.findAnnotationManifest(
                 tmp, other.getAbsolutePath(), "com.example.MyApp"));
+    }
+
+    /**
+     * Writes a jar holding the main class and the manifest, with the entry times
+     * given.
+     */
+    private static File jarWith(File dir, String name, long classTime, long manifestTime)
+            throws Exception {
+        File jar = new File(dir, name);
+        ZipOutputStream out = new ZipOutputStream(new FileOutputStream(jar));
+        try {
+            ZipEntry cls = new ZipEntry("com/example/MyApp.class");
+            cls.setTime(classTime);
+            out.putNextEntry(cls);
+            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+            out.closeEntry();
+
+            ZipEntry res = new ZipEntry("META-INF/codenameone/build-hints.properties");
+            res.setTime(manifestTime);
+            out.putNextEntry(res);
+            out.write("cn1.buildHints.mainClass=com.example.MyApp\n".getBytes("ISO-8859-1"));
+            out.closeEntry();
+        } finally {
+            out.close();
+        }
+        return jar;
+    }
+
+    private static Properties stampedFor(String mainClass) {
+        Properties p = new Properties();
+        p.setProperty("cn1.buildHints.mainClass", mainClass);
+        return p;
+    }
+
+    /**
+     * Sharing an archive does not mean sharing a build. Nothing deletes an old
+     * manifest from <code>target/classes</code>, so a recompiled main class and
+     * last week's resource get packaged into the same jar -- and skipping the
+     * staleness check for jars published the old annotation values.
+     */
+    @Test
+    public void aStaleManifestInsideAJarIsDetected(@TempDir File tmp) throws Exception {
+        long manifest = 1600000000000L;
+        long newerClass = manifest + 60000L;
+        File jar = jarWith(tmp, "app-stale.jar", newerClass, manifest);
+
+        assertEquals("com/example/MyApp.class", Simulator.classNewerThanManifestInJar(
+                stampedFor("com.example.MyApp"), jar));
+    }
+
+    /** A manifest written after the class it describes is current. */
+    @Test
+    public void aCurrentManifestInsideAJarIsAccepted(@TempDir File tmp) throws Exception {
+        long cls = 1600000000000L;
+        File jar = jarWith(tmp, "app-current.jar", cls, cls + 60000L);
+
+        assertNull(Simulator.classNewerThanManifestInJar(
+                stampedFor("com.example.MyApp"), jar));
+    }
+
+    /** No class of that name in the jar is nothing to compare against. */
+    @Test
+    public void aJarWithoutTheMainClassIsNotJudged(@TempDir File tmp) throws Exception {
+        long cls = 1600000000000L;
+        File jar = jarWith(tmp, "app-other.jar", cls + 60000L, cls);
+
+        assertNull(Simulator.classNewerThanManifestInJar(
+                stampedFor("com.other.TheirApp"), jar));
     }
 }

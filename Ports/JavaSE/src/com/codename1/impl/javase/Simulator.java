@@ -508,10 +508,13 @@ public class Simulator {
                     + ", not " + expectedMain + ", so its build hints were NOT applied.");
             return;
         }
-        // Only for a manifest on disk. Inside a jar the class and the manifest
-        // were written by the same build into the same archive, so they cannot
-        // disagree and there is nothing to compare.
-        File staleAgainst = f == null ? null : classNewerThanManifest(p, f);
+        // Sharing an archive does not mean sharing a build. Nothing deletes an
+        // old manifest from target/classes, so a recompiled main class and last
+        // week's resource are packaged into the same jar -- with their own entry
+        // timestamps, which is what tells them apart.
+        String staleAgainst = found.jar != null
+                ? classNewerThanManifestInJar(p, found.jar)
+                : (f == null ? null : classNewerThanManifest(p, f));
         if (staleAgainst != null) {
             // Nothing removes target/classes between builds, so a project that ran
             // process-annotations once and then stopped -- goal unbound, skipped,
@@ -529,7 +532,7 @@ public class Simulator {
             // within a build, so a main class newer than the manifest cannot have
             // produced it.
             System.err.println("Warning: " + found.where + " is older than "
-                    + staleAgainst.getName() + ", so it was produced by an earlier build "
+                    + staleAgainst + ", so it was produced by an earlier build "
                     + "and its build hints were NOT applied.");
             System.err.println("         Rebuild the project so the cn1 process-annotations "
                     + "goal regenerates it.");
@@ -690,15 +693,22 @@ public class Simulator {
      * build the simulator runs resolves the application's own common module as a
      * dependency artifact, so its manifest has no path of its own.</p>
      */
+    /** The manifest's path inside a jar, which is its resource path with / separators. */
+    private static final String ANNOTATION_HINTS_ENTRY =
+            "META-INF/codenameone/build-hints.properties";
+
     static final class FoundManifest {
         final java.util.Properties hints;
         /** The file on disk, or null when it came out of a jar. */
         final File file;
+        /** The jar it came out of, or null when it is a file on disk. */
+        final File jar;
         final String where;
 
-        FoundManifest(java.util.Properties hints, File file, String where) {
+        FoundManifest(java.util.Properties hints, File file, File jar, String where) {
             this.hints = hints;
             this.file = file;
+            this.jar = jar;
             this.where = where;
         }
     }
@@ -707,7 +717,7 @@ public class Simulator {
                                                String expectedMain) {
         String resource = "META-INF" + File.separator + "codenameone"
                 + File.separator + "build-hints.properties";
-        String entryName = "META-INF/codenameone/build-hints.properties";
+        String entryName = ANNOTATION_HINTS_ENTRY;
         // The classpath first, because it is the output the build is ACTUALLY
         // using. Trying the conventional path first looked harmless and is not:
         // a project that moves to a configured output directory without running
@@ -738,7 +748,8 @@ public class Simulator {
                             // application's own manifest sat in a later entry.
                             String stamp = loaded.getProperty("cn1.buildHints.mainClass");
                             FoundManifest found =
-                                    new FoundManifest(loaded, candidate, candidate.toString());
+                                    new FoundManifest(loaded, candidate, null,
+                                            candidate.toString());
                             if (expectedMain == null || expectedMain.equals(stamp)) {
                                 return found;
                             }
@@ -766,7 +777,8 @@ public class Simulator {
                     java.util.Properties loaded = readJarEntry(dir, entryName);
                     if (loaded != null
                             && expectedMain.equals(loaded.getProperty("cn1.buildHints.mainClass"))) {
-                        return new FoundManifest(loaded, null, entryName + " in " + dir.getName());
+                        return new FoundManifest(loaded, null, dir,
+                                entryName + " in " + dir.getName());
                     }
                 }
             }
@@ -783,7 +795,7 @@ public class Simulator {
         }
         java.util.Properties loaded = readProperties(conventional);
         return loaded == null ? null
-                : new FoundManifest(loaded, conventional, conventional.toString());
+                : new FoundManifest(loaded, conventional, null, conventional.toString());
     }
 
     /** Loads a properties file, or null when it cannot be read. */
@@ -845,8 +857,51 @@ public class Simulator {
      * no class file for it, no readable timestamps -- so the manifest is taken at
      * face value rather than discarded on a guess.</p>
      */
-    private static File classNewerThanManifest(java.util.Properties manifest,
-                                               File manifestFile) {
+    /**
+     * As above, for a manifest read out of a jar: the two entries' own
+     * timestamps, since being in one archive proves nothing about which build
+     * wrote them.
+     *
+     * <p>Zip stores times to two-second granularity, so the comparison is
+     * deliberately strict -- a class newer by less than that reads as
+     * consistent. It only has to catch a manifest from an EARLIER build, which
+     * is not a near thing.</p>
+     */
+    static String classNewerThanManifestInJar(java.util.Properties manifest, File jar) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String classEntry = main.trim().replace('.', '/') + ".class";
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry cls = zip.getEntry(classEntry);
+            java.util.zip.ZipEntry res = zip.getEntry(ANNOTATION_HINTS_ENTRY);
+            if (cls == null || res == null) {
+                return null;
+            }
+            long classTime = cls.getTime();
+            long manifestTime = res.getTime();
+            if (classTime < 0L || manifestTime < 0L) {
+                return null;
+            }
+            return classTime > manifestTime ? classEntry : null;
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static String classNewerThanManifest(java.util.Properties manifest,
+                                                 File manifestFile) {
         String main = manifest.getProperty("cn1.buildHints.mainClass");
         if (main == null || main.trim().length() == 0) {
             return null;
@@ -869,6 +924,6 @@ public class Simulator {
         if (classTime == 0L || manifestTime == 0L) {
             return null;
         }
-        return classTime > manifestTime ? classFile : null;
+        return classTime > manifestTime ? classFile.getName() : null;
     }
 }

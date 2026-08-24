@@ -238,6 +238,75 @@ public class AnnotationBuildHintMergeTest {
     // helpers
     // ------------------------------------------------------------------
 
+    /**
+     * Accepting a manifest does not mean the processor ran THIS build. Its
+     * fingerprint covers the main class, so an annotation added to a live class
+     * beside it leaves the manifest looking entirely current -- and with the
+     * goal unbound or skipped the build succeeded having neither applied that
+     * class's hints nor said the annotation was in the wrong place.
+     */
+    @Test
+    public void aMisplacedAnnotationIsRefusedEvenWhenTheManifestIsCurrent() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+        File src = writeAnnotatedHelperSource();
+        compileInto(classes, "com.example.Helper", helperSource());
+
+        Properties target = new Properties();
+        try {
+            merge(target, classes, "MyApp", "com.example", src);
+            fail("expected the misplaced annotation to be refused");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("com.example.Helper"));
+        }
+    }
+
+    /** The main class carrying them is the whole point, so it is not a misplacement. */
+    @Test
+    public void theMainClassCarryingAnnotationsIsNotAMisplacement() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        merge(target, classes, "MyApp", "com.example", writeAnnotatedHelperSource());
+
+        assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    private static String helperSource() {
+        return "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "@Ios(pods = \"Alamofire\")\n"
+                + "public class Helper {\n}\n";
+    }
+
+    /** A source root holding Helper.java, so the class counts as live. */
+    private File writeAnnotatedHelperSource() throws Exception {
+        File src = tmp.newFolder();
+        File f = new File(src, "com/example/Helper.java");
+        f.getParentFile().mkdirs();
+        try (Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8")) {
+            w.write(helperSource());
+        }
+        return src;
+    }
+
+    private void compileInto(File classes, String binaryName, String source) throws Exception {
+        com.codename1.maven.annotations.JavaSourceCompiler.compile(
+                com.codename1.maven.annotations.JavaSourceCompiler.singleSource(
+                        binaryName, source),
+                classes,
+                Arrays.asList(new File(Class.forName("com.codename1.annotations.buildhints.Ios")
+                        .getProtectionDomain().getCodeSource().getLocation().toURI())));
+    }
+
     private File manifest(String body) throws Exception {
         File classes = tmp.newFolder();
         File out = new File(classes, RESOURCE);
@@ -268,7 +337,19 @@ public class AnnotationBuildHintMergeTest {
      */
     private void merge(Properties target, File classesDir, String mainName, String pkg)
             throws Exception {
+        merge(target, classesDir, mainName, pkg, null);
+    }
+
+    private void merge(Properties target, File classesDir, String mainName, String pkg,
+                       File sourceRoot) throws Exception {
         CN1BuildMojo mojo = new CN1BuildMojo();
+        if (sourceRoot != null) {
+            org.apache.maven.project.MavenProject p = new org.apache.maven.project.MavenProject();
+            p.addCompileSourceRoot(sourceRoot.getAbsolutePath());
+            Field proj = findField(mojo.getClass(), "project");
+            proj.setAccessible(true);
+            proj.set(mojo, p);
+        }
 
         Properties settings = new Properties();
         settings.setProperty("codename1.mainName", mainName);
