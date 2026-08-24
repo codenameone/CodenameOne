@@ -14951,9 +14951,20 @@ void cn1RegisterAccessibilityStatusObservers(void) {
         return;
     }
     done = YES;
-    NSArray *names = @[UIAccessibilityVoiceOverStatusDidChangeNotification,
-                       UIAccessibilitySwitchControlStatusDidChangeNotification,
-                       UIAccessibilityAssistiveTouchStatusDidChangeNotification];
+    // Built up rather than written as a literal: the AssistiveTouch notification
+    // is iOS 10, and ios.deployment_target lets IPhoneBuilder emit older
+    // targets, where the weakly-linked constant is nil -- and a nil inside an
+    // @[] literal raises. Same reason the running check below is guarded.
+    NSMutableArray *names = [NSMutableArray arrayWithCapacity:3];
+    if(UIAccessibilityVoiceOverStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityVoiceOverStatusDidChangeNotification];
+    }
+    if(UIAccessibilitySwitchControlStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilitySwitchControlStatusDidChangeNotification];
+    }
+    if(UIAccessibilityAssistiveTouchStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityAssistiveTouchStatusDidChangeNotification];
+    }
     for(NSString *n in names) {
         CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL,
                                         cn1AccessibilityStatusChanged,
@@ -14979,9 +14990,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     if(cn1AccessibilityEagerLatched()) {
         return JAVA_TRUE;
     }
-    return (UIAccessibilityIsVoiceOverRunning() ||
-            UIAccessibilityIsSwitchControlRunning() ||
-            UIAccessibilityIsAssistiveTouchRunning()) ? JAVA_TRUE : JAVA_FALSE;
+    if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
+        return JAVA_TRUE;
+    }
+    // iOS 10. Weakly linked, so on an older deployment target the symbol is
+    // null and calling it jumps through nothing -- test the pointer first.
+    if(UIAccessibilityIsAssistiveTouchRunning != NULL &&
+       UIAccessibilityIsAssistiveTouchRunning()) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
 #else
     return JAVA_FALSE;
 #endif

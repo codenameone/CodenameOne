@@ -329,10 +329,20 @@ static int cn1AtlasInitialDim(void) {
         _cursorX = CN1_METAL_ATLAS_PADDING;
         _shelfHeight = 0;
     }
-    if (_shelfY + gh > _textureHeight - CN1_METAL_ATLAS_PADDING) {
-        if (![self tryGrowAtlas]) return nil;
-        if (_cursorX + gw > _textureWidth - CN1_METAL_ATLAS_PADDING ||
-            _shelfY + gh > _textureHeight - CN1_METAL_ATLAS_PADDING) {
+    // Grow while the glyph fails to fit in EITHER dimension. Testing height
+    // alone was sufficient only because the atlas used to start at 1024 with
+    // glyphs capped at CN1_METAL_ATLAS_GLYPH_MAX (256), so a fresh shelf always
+    // had room across and the width test could never fire. At the smaller
+    // starting sizes cn1AtlasInitialDim now allows, a glyph can be as wide as
+    // the whole atlas -- and without a width test the slot below is handed to
+    // replaceRegion: as a region running past the texture edge.
+    //
+    // tryGrowAtlas drops every slot and resets the shelf cursor to the origin
+    // of the new, larger texture, so each iteration re-tests against it and the
+    // loop terminates either by fitting or by hitting the growth ceiling.
+    while (_cursorX + gw > _textureWidth - CN1_METAL_ATLAS_PADDING ||
+           _shelfY + gh > _textureHeight - CN1_METAL_ATLAS_PADDING) {
+        if (![self tryGrowAtlas]) {
             return nil;
         }
     }
