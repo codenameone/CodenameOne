@@ -5178,7 +5178,8 @@ public class IPhoneBuilder extends Executor {
                                         appExtensionBuildSettings(appExtension);
                                 for (String note
                                         : dropBlankBundleIdentifiers(archiveOwnSettings,
-                                                appExtension, plistContext)) {
+                                                appExtension, plistContext,
+                                                request.getPackageName())) {
                                     debug("The " + extensionName + " app extension: " + note + ".");
                                 }
                                 // Narrowed, not taken as given: an exported folder carries the
@@ -6480,6 +6481,51 @@ public class IPhoneBuilder extends Executor {
     /// and sources.tar.bz2 lets either be built later.
     private static final String[] PROJECT_CONFIGURATIONS = {"Debug", "Release"};
 
+    /// Whether an identifier this build cannot finish resolving is at least known to land under
+    /// the host.
+    ///
+    /// Being written through Xcode's own settings is not enough. PRODUCT_BUNDLE_IDENTIFIER =
+    /// $(EXECUTABLE_NAME) references nothing but a built-in, and Xcode expands it to the
+    /// extension's executable name -- an identifier with no relation to the containing app, which
+    /// the namespace refusal never sees because this build could not resolve it. What CAN be
+    /// established is the literal head: an expression that begins with the host's own identifier
+    /// lands under it whatever the references come to, and one that does not is a guess.
+    ///
+    /// @return true when the value's leading literal is the host prefix, or when there is no host
+    /// to judge against
+    static boolean startsUnderHost(String value, Map<String, String> settings, String hostPackage) {
+        if (hostPackage == null || hostPackage.length() == 0) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        // What this build can already expand, so a head written through a resolvable helper counts
+        // as the literal it comes to.
+        String head = resolveSettingsInValue(value, settings);
+        return head.startsWith(hostPackage + ".");
+    }
+
+    /// The values a key's own condition allows, out of the ones worth enumerating.
+    ///
+    /// A key that names a dimension applies to that value and no other. Enumerating the rest built
+    /// candidates that contradict themselves -- [variant=profile][variant=normal] -- and nothing
+    /// downstream rejects such a key, so a plist the extension never uses would be rewritten.
+    ///
+    /// @param condition the key's value for this dimension, or null when it names none
+    private static List<String> allowedBy(List<String> values, String condition) {
+        if (condition == null || values == null) {
+            return values;
+        }
+        List<String> out = new ArrayList<String>();
+        for (String value : values) {
+            if (value != null && matchesCondition(condition, value)) {
+                out.add(value);
+            }
+        }
+        return out;
+    }
+
     /// The architectures worth resolving a path against: this build's, and every one the archive
     /// names in a qualifier.
     ///
@@ -6564,22 +6610,26 @@ public class IPhoneBuilder extends Executor {
         // with this archive's SDK.
         ArchiveContext own = contextForCondition(key, context);
         File active = out.get(key + " = " + value);
-        // A key that names its own configuration is not enumerated across configurations -- it
-        // applies to one and says so. It can still vary along the other dimensions, though, and
-        // returning early for it skipped those.
-        List<String> configurations = conditionsOf(key).containsKey("config")
+        // Every enumerated value is filtered through the KEY's own conditions first. A key that
+        // names a dimension applies to that value and no other, and enumerating the rest produced
+        // self-contradicting candidates -- [variant=profile][variant=normal] -- which the stamper
+        // does not reject and would have rewritten a plist the extension never uses.
+        Map<String, String> constraints = conditionsOf(key);
+        List<String> configurations = constraints.containsKey("config")
                 ? java.util.Collections.singletonList(own.configuration)
                 : java.util.Arrays.asList(PROJECT_CONFIGURATIONS);
-        for (String sdk : enumerableSdks(own, declared)) {
+        for (String sdk : allowedBy(enumerableSdks(own, declared), constraints.get("sdk"))) {
             for (String configuration : configurations) {
-                for (String arch : enumerableArchs(own, declared)) {
+                for (String arch : allowedBy(enumerableArchs(own, declared),
+                        constraints.get("arch"))) {
                     // Recomputed here, not captured once: BUILD_VARIANTS can itself be qualified,
                     // so the variants of a Debug build are not necessarily this archive's. Reusing
                     // the active list meant a configuration that selects another variant never had
                     // its plist discovered at all.
                     ArchiveContext dimension = new ArchiveContext(sdk, configuration, arch, null);
-                    List<String> variants = ArchiveContext.of(sdk, configuration, arch,
-                            flattenForContext(declared, dimension)).variants;
+                    List<String> variants = allowedBy(ArchiveContext.of(sdk, configuration, arch,
+                            flattenForContext(declared, dimension)).variants,
+                            constraints.get("variant"));
                     for (String variant : variants) {
                         boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
                         boolean sameConfiguration = configuration == null
@@ -6587,7 +6637,8 @@ public class IPhoneBuilder extends Executor {
                                 : configuration.equalsIgnoreCase(own.configuration);
                         boolean sameArch = arch == null ? own.arch == null
                                 : arch.equalsIgnoreCase(own.arch);
-                        if (sameSdk && sameConfiguration && sameArch && variants.size() == 1) {
+                        if (sameSdk && sameConfiguration && sameArch && variants.size() == 1
+                                && own.variants != null && own.variants.contains(variant)) {
                             continue;
                         }
                         ArchiveContext other = new ArchiveContext(sdk, configuration, arch,
@@ -6597,10 +6648,17 @@ public class IPhoneBuilder extends Executor {
                         if (resolved == null || sameFile(resolved, active)) {
                             continue;
                         }
+                        // The variant is named whenever it is not the archive's own, not only
+                        // when several are in play: a configuration whose BUILD_VARIANTS selects a
+                        // single OTHER variant still needs saying, or the candidate's context
+                        // inherits this archive's variant and misses the target identifier Xcode
+                        // picks for it.
+                        boolean ownVariant = own.variants != null && own.variants.contains(variant);
                         String qualifier = (sameSdk ? "" : "[sdk=" + sdk + "]")
                                 + (sameConfiguration ? "" : "[config=" + configuration + "]")
                                 + (sameArch ? "" : "[arch=" + arch + "]")
-                                + (variants.size() > 1 ? "[variant=" + variant + "]" : "");
+                                + (variants.size() > 1 || !ownVariant
+                                        ? "[variant=" + variant + "]" : "");
                         out.put(key + qualifier + " = " + value, resolved);
                     }
                 }
@@ -8746,7 +8804,7 @@ public class IPhoneBuilder extends Executor {
     /// where a qualifier is involved: see the File overload.
     static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
             Map<String, String> resolution) {
-        return dropBlankBundleIdentifiers(settings, resolution, null, null);
+        return dropBlankBundleIdentifiers(settings, resolution, null, null, null);
     }
 
     /// @param extensionFolder and {@code archiveContext} let each qualified identifier be
@@ -8757,11 +8815,20 @@ public class IPhoneBuilder extends Executor {
     /// for it. The device-family handling beside this does the same thing for the same reason.
     static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
             File extensionFolder, ArchiveContext archiveContext) {
-        return dropBlankBundleIdentifiers(settings, null, extensionFolder, archiveContext);
+        return dropBlankBundleIdentifiers(settings, extensionFolder, archiveContext, null);
+    }
+
+    /// @param hostPackage the app's own identifier, so an expression whose namespace this build
+    /// cannot establish is not kept on the strength of its references being Xcode's
+    static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
+            File extensionFolder, ArchiveContext archiveContext, String hostPackage) {
+        return dropBlankBundleIdentifiers(settings, null, extensionFolder, archiveContext,
+                hostPackage);
     }
 
     private static List<String> dropBlankBundleIdentifiers(Map<String, String> settings,
-            Map<String, String> resolution, File extensionFolder, ArchiveContext archiveContext) {
+            Map<String, String> resolution, File extensionFolder, ArchiveContext archiveContext,
+            String hostPackage) {
         List<String> notes = new ArrayList<String>();
         if (settings == null) {
             return notes;
@@ -8801,7 +8868,8 @@ public class IPhoneBuilder extends Executor {
                 // and a perfectly good identifier was deleted, dropping that configuration to the
                 // base one while its plist still declares the other. Only a name nothing will
                 // define is the empty identifier this guard is for.
-                if (resolved == null && referencesOnlyXcodeSettings(value.trim(), perKey)) {
+                if (resolved == null && referencesOnlyXcodeSettings(value.trim(), perKey)
+                        && startsUnderHost(value.trim(), perKey, hostPackage)) {
                     continue;
                 }
                 if (resolved == null || resolved.trim().length() == 0) {

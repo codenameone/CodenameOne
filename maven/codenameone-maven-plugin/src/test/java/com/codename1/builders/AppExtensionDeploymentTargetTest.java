@@ -1804,4 +1804,66 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals(java.util.Arrays.asList("arm64", "x86_64"),
                 IPhoneBuilder.enumerableArchsForTest(arm, declared));
     }
+
+    @Test
+    public void anUnresolvedIdentifierMustStillStartUnderTheHost() throws Exception {
+        File dist = tmp.newFolder("dist101");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", null);
+
+        // Being written through Xcode's own settings is not enough: $(EXECUTABLE_NAME) expands to
+        // the extension's executable name, an identifier with no relation to the containing app
+        // -- and the namespace refusal never sees it, because this build cannot resolve it.
+        java.util.Map<String, String> foreign = new java.util.LinkedHashMap<String, String>();
+        foreign.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXECUTABLE_NAME)");
+        java.util.List<String> notes = IPhoneBuilder.dropBlankBundleIdentifiers(foreign, extension,
+                archive, "com.example.app");
+        assertFalse(foreign.containsKey("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals(notes.toString(), 1, notes.size());
+
+        // The literal head is what can be established: an expression beginning with the host's
+        // own identifier lands under it whatever the references come to.
+        java.util.Map<String, String> under = new java.util.LinkedHashMap<String, String>();
+        under.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.$(EXECUTABLE_NAME)");
+        assertEquals(0, IPhoneBuilder.dropBlankBundleIdentifiers(under, extension, archive,
+                "com.example.app").size());
+        assertEquals("com.example.app.$(EXECUTABLE_NAME)",
+                under.get("PRODUCT_BUNDLE_IDENTIFIER"));
+
+        // And a head written through a helper this build CAN expand counts as what it comes to.
+        java.util.Map<String, String> viaHelper = new java.util.LinkedHashMap<String, String>();
+        viaHelper.put("HOST", "com.example.app");
+        viaHelper.put("PRODUCT_BUNDLE_IDENTIFIER", "$(HOST).$(EXECUTABLE_NAME)");
+        assertEquals(0, IPhoneBuilder.dropBlankBundleIdentifiers(viaHelper, extension, archive,
+                "com.example.app").size());
+    }
+
+    @Test
+    public void anEnumeratedDimensionRespectsTheKeysOwnCondition() throws Exception {
+        File dist = tmp.newFolder("dist102");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "normal.plist"), plistWithIdentifier("com.example.app.Normal"));
+        write(new File(extension, "profile.plist"), plistWithIdentifier("com.example.app.Profile"));
+        write(new File(extension, "buildSettings.properties"),
+                "BUILD_VARIANTS = normal profile\n"
+                + "PLIST_PATH[variant\\=normal] = WalletUIExtension/normal.plist\n"
+                + "PLIST_PATH[variant\\=profile] = WalletUIExtension/profile.plist\n"
+                + "INFOPLIST_FILE[variant\\=profile] = $(PLIST_PATH)\n");
+
+        java.util.Map<String, String> declared =
+                IPhoneBuilder.appExtensionBuildSettings(extension);
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", declared));
+
+        // The key applies to profile and no other variant. Enumerating normal produced a
+        // self-contradicting [variant=profile][variant=normal] candidate that nothing downstream
+        // rejects, so a plist the extension never uses would have been rewritten.
+        for (String candidate : plists.keySet()) {
+            assertFalse(candidate, candidate.contains("[variant=profile][variant=normal]"));
+            assertFalse(candidate, candidate.contains("[variant=normal]"));
+        }
+    }
 }
