@@ -13,12 +13,16 @@ compile" but "is there a job that would have found out". It also requires a
 library that pulls a CocoaPod to pin it, because an unpinned pod moves the API
 underneath sources that are only compiled when the pod is fetched.
 
-Coverage is read from evidence rather than from a workflow's name. A file
-counts only if it stages a cn1lib's Objective-C and runs xcodebuild over it,
-and a library counts only if that workflow also triggers on its own path --
-otherwise a matrix over "lib:" in some unrelated packaging job would report a
-library as covered while nothing ever compiled it, and a library missing from
-the trigger paths would be compiled only when something else changed.
+Coverage is read from evidence rather than from a workflow's name, and per
+job rather than per file. A job counts only if it stages a cn1lib's
+Objective-C and runs xcodebuild over it, its matrix is read from that job
+alone, and the library also has to appear in the workflow's trigger paths.
+
+Each of those rules exists because dropping it lets something claim coverage
+it does not have: a matrix over "lib:" in an unrelated packaging job, a
+packaging job sitting in the same file as a real native check, or a library
+the workflow never fires for. Jobs are separated by indentation rather than
+with a YAML parser, so this keeps running wherever python3 does.
 
 The Android half needs no registry: check-cn1lib-android-api.py enumerates
 libraries from the filesystem, so it cannot miss one.
@@ -54,14 +58,42 @@ def libraries_with_ios_sources():
             yield name
 
 
-def compiles_cn1lib_natives(text):
-    """True when a workflow stages a cn1lib's Objective-C and builds it.
+JOB_START = re.compile(r'^  ([A-Za-z_][\w.\-]*):\s*$')
+
+
+def jobs(text):
+    """Yield each job's body from a workflow, split on indentation.
+
+    A YAML parser would be tidier, but PyYAML is not in the standard library
+    and this has to run in the CI container as it is.
+    """
+    lines = text.splitlines()
+    starts = []
+    in_jobs = False
+    for index, line in enumerate(lines):
+        if line.startswith('jobs:'):
+            in_jobs = True
+            continue
+        if not in_jobs:
+            continue
+        # A non-indented line ends the jobs mapping.
+        if line.strip() and not line.startswith(' ') and not line.startswith('#'):
+            break
+        if JOB_START.match(line):
+            starts.append(index)
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines)
+        yield '\n'.join(lines[start:end])
+
+
+def compiles_cn1lib_natives(body):
+    """True when a job stages a cn1lib's Objective-C and builds it.
 
     Naming a library in a matrix proves nothing on its own; these two markers
     are what separate a native check from any other job that happens to loop
-    over libraries.
+    over libraries. Applied per job, because one file can hold both.
     """
-    return 'ios/src/main/objectivec' in text and 'xcodebuild' in text
+    return 'ios/src/main/objectivec' in body and 'xcodebuild' in body
 
 
 def covered_libraries():
@@ -76,11 +108,13 @@ def covered_libraries():
             continue
         with open(os.path.join(WORKFLOWS, name), encoding='utf-8') as f:
             text = f.read()
-        if not compiles_cn1lib_natives(text):
-            continue
-        found = set(MATRIX_ENTRY.findall(text))
-        for group in MATRIX_LIST.findall(text):
-            found.update(part.strip() for part in group.split(','))
+        found = set()
+        for body in jobs(text):
+            if not compiles_cn1lib_natives(body):
+                continue
+            found.update(MATRIX_ENTRY.findall(body))
+            for group in MATRIX_LIST.findall(body):
+                found.update(part.strip() for part in group.split(','))
         for lib in found:
             if not lib.startswith('cn1-'):
                 continue
