@@ -515,12 +515,23 @@ public class AndroidNearbyBackend implements NearbyBridge {
     // Companion
     // ------------------------------------------------------------------
 
+    /// The system service, looked up on the APPLICATION context.
+    ///
+    /// Not on the current activity. CompanionDeviceManager is a system
+    /// service like any other and every context answers for it -- but keying
+    /// the lookup off an activity meant that during a recreation, or when
+    /// this process-lived bridge is reached from a service after its weak
+    /// activity reference was collected, isCompanionSupported reported
+    /// false, getAssociations answered with an empty list, and disassociation
+    /// and presence failed. All of it for a manager that was available the
+    /// whole time. An activity is needed to LAUNCH the chooser, and that is
+    /// where it is required.
     private CompanionDeviceManager manager() {
-        if (Build.VERSION.SDK_INT < 26 || currentActivity() == null) {
+        if (Build.VERSION.SDK_INT < 26 || appContext == null) {
             return null;
         }
         try {
-            return (CompanionDeviceManager) currentActivity().getSystemService(
+            return (CompanionDeviceManager) appContext.getSystemService(
                     Context.COMPANION_DEVICE_SERVICE);
         } catch (Throwable t) {
             return null;

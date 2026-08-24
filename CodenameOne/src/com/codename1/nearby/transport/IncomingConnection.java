@@ -83,7 +83,32 @@ public final class IncomingConnection {
 
     /// Whether [#accept()] or [#reject()] has already been called.
     public boolean isAnswered() {
-        return answered;
+        synchronized (this) {
+            return answered;
+        }
+    }
+
+    /// Claims the right to answer this request, once.
+    ///
+    /// The test and the assignment are ONE operation. As two, an app that
+    /// verifies its peer asynchronously -- which is what the authentication
+    /// token is FOR, so it is the expected shape rather than an exotic one --
+    /// could have two threads both read "unanswered" before either wrote,
+    /// and both go on to answer. On Android that races an acceptConnection
+    /// against a rejectConnection for one endpoint, and the connection
+    /// outcome then has nothing to do with which call the app believes won.
+    ///
+    /// #### Returns
+    ///
+    /// true for the one caller that may answer; false for every other
+    private boolean claim() {
+        synchronized (this) {
+            if (answered) {
+                return false;
+            }
+            answered = true;
+            return true;
+        }
     }
 
     /// Accepts the connection. The result arrives as
@@ -91,10 +116,9 @@ public final class IncomingConnection {
     /// [TransportListener#connectionFailed], because the far side has to
     /// accept too. Calling this twice, or after [#reject()], does nothing.
     public void accept() {
-        if (answered) {
+        if (!claim()) {
             return;
         }
-        answered = true;
         NearbyBridge b = NearbyRequests.bridge();
         if (b != null) {
             // Recorded before the call, so a port that refuses the acceptance
@@ -108,10 +132,9 @@ public final class IncomingConnection {
     /// Rejects the connection. Calling this twice, or after [#accept()],
     /// does nothing.
     public void reject() {
-        if (answered) {
+        if (!claim()) {
             return;
         }
-        answered = true;
         NearbyBridge b = NearbyRequests.bridge();
         if (b != null) {
             b.rejectConnection(endpoint.getId());

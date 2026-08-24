@@ -169,7 +169,13 @@ public final class Ranging {
     public static AsyncResource<Boolean> requestPermissions(
             NearbyPermission... permissions) {
         NearbyBridge b = NearbyRequests.bridge();
-        if (b == null) {
+        // Supported, not merely present. Every other entry point here asks
+        // both questions, and NearbyTransport.requestPermissions asks its own
+        // -- this one asked only whether a bridge existed, so an Android
+        // device without UWB went on to request UWB_RANGING, or answered
+        // true, for a capability isSupported() reports it does not have.
+        // A permission prompt for a radio the phone lacks is the worst of it.
+        if (b == null || !b.isRangingSupported()) {
             return failedBoolean();
         }
         int bits = 0;

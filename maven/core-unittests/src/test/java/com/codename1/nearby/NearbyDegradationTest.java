@@ -22,6 +22,7 @@
  */
 package com.codename1.nearby;
 
+import com.codename1.impl.nearby.LocalNearbyBridge;
 import com.codename1.impl.nearby.NearbyRequests;
 import com.codename1.nearby.companion.AssociationRequest;
 import com.codename1.nearby.companion.CompanionDevices;
@@ -64,6 +65,31 @@ class NearbyDegradationTest {
     @AfterEach
     void clear() {
         NearbyRequests.resetForTest(null);
+    }
+
+    /// A bridge that does the transport but not ranging, which is what an
+    /// ordinary Android phone without a UWB radio is.
+    private static final class NoUwbBridge extends LocalNearbyBridge {
+        @Override
+        public boolean isRangingSupported() {
+            return false;
+        }
+    }
+
+    @Test
+    void rangingPermissionsAreRefusedWhereRangingIsUnsupported() {
+        // A bridge EXISTING is not the same as ranging working. Asking only
+        // whether one was present sent PERMISSION_RANGING to a device with
+        // no UWB radio, which either prompted for a permission the hardware
+        // cannot use or answered true -- for a capability isSupported()
+        // reports it does not have.
+        NearbyRequests.resetForTest(new NoUwbBridge());
+        assertFalse(Ranging.isSupported());
+        assertFailedWith(NearbyError.NOT_SUPPORTED,
+                Ranging.requestPermissions(NearbyPermission.RANGING));
+        // The transport half of the same device still works, and asks for
+        // its own permissions through its own entry point.
+        assertTrue(NearbyTransport.isSupported());
     }
 
     @Test
