@@ -1581,6 +1581,14 @@ public class DeviceRuntimeService {
         Display.getInstance().callSeriallyAndWait(new Runnable() {
             public void run() {
                 stopLifecycleQuietly(previous);
+                // The retired program's form is now inert -- its callbacks
+                // are on their way out with the detach below -- so put the
+                // runtime's own form back before the replacement runs. A
+                // successor that shows no UI would otherwise leave the old,
+                // now-dead UI on screen and `runProgram`'s before/after
+                // comparison would see "no form change" and report the new
+                // program as a legitimate no-UI run.
+                DeviceRuntimeForm.showIt();
             }
         });
         previous.detach();
