@@ -4358,6 +4358,46 @@ class WindowTest extends UITestBase {
         }
     }
 
+    @FormTest
+    void aMovedListenerSeesTheMonitorTheWindowMovedTo() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setMonitors(java.util.Arrays.asList(
+                new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "left"),
+                new TestWindowManager.FakeMonitor(1440, 0, 1920, 1080, 2.0, 192, "right")));
+        final Window w = new Window("travelling", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        try {
+            assertEquals("left", w.getMonitor().getName(),
+                    "it starts on the first monitor");
+
+            final String[] seen = new String[1];
+            w.addWindowListener(new ActionListener<WindowEvent>() {
+                @Override
+                public void actionPerformed(WindowEvent evt) {
+                    if (evt.getType() == WindowEvent.Type.Moved && seen[0] == null) {
+                        seen[0] = w.getMonitor().getName();
+                    }
+                }
+            });
+
+            // The platform moves it to the other monitor and reports the move. The
+            // monitor-changed notification is a separate one, queued after this.
+            peer.setMonitor(1);
+            Desktop.getInstance().windowMoved(w.getWindowId());
+            DisplayTest.flushEdt();
+
+            assertEquals("right", seen[0],
+                    "a Moved listener must see the monitor the window moved to, not the "
+                            + "one it came from");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
     /// Counts pointer drags reaching a component.
     private static final class DragCountingComponent extends Component {
         private int drags;

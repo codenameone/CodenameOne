@@ -1648,6 +1648,15 @@ public class Window extends Container implements TopLevelContainer {
     /// just reports it.
     void moved() {
         rememberNativeBounds();
+        // Dropped before the event, not after it. getMonitor() answers from a lazy
+        // cache, and a move is exactly what invalidates it -- so a Moved listener
+        // asking getMonitor(), getScale() or getDensity() was told which monitor the
+        // window had been on before it moved. The cache is otherwise refreshed only by
+        // the monitor-changed notification, which the ports queue *after* this one, and
+        // nothing tells the application to ask again in between.
+        //
+        // Dropped rather than recomputed, so a move nobody asks about costs nothing.
+        currentMonitor = null;
         fireWindowEvent(WindowEvent.Type.Moved);
     }
 
