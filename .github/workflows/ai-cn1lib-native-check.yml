@@ -22,7 +22,7 @@ on:
 
 jobs:
   xcodebuild-cn1libs:
-    name: xcodebuild ${{ matrix.lib }}
+    name: xcodebuild ${{ matrix.lib }} (ARC ${{ matrix.arc }})
     # macos-14 ships Xcode 15.4 by default but also has Xcode 16.x
     # under /Applications/Xcode_16.X.app. xcodegen 2.45.4 emits
     # objectVersion=77 (Xcode 16-format) projects, so we explicitly
@@ -31,9 +31,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Each library is compiled under both memory models. The generated app
+        # target is manual-retain-release (CLANG_ENABLE_OBJC_ARC = NO in
+        # vm/ByteCodeTranslator/src/template/template.xcodeproj) and that is
+        # what compiles a cn1lib's sources today, while IPhoneBuilder can add
+        # -fobjc-arc to an individual file, so ARC is reachable too. An
+        # ARC-only check accepts code that does not build for customers.
         include:
-          - { lib: cn1-ai-whisper,            pod: ''                               }   # links static libwhisper.a
-          - { lib: cn1-ai-stablediffusion,    pod: ''                               }   # links Swift runner
+          - { lib: cn1-ai-whisper,            pod: '', arc: NO  }   # links static libwhisper.a
+          - { lib: cn1-ai-whisper,            pod: '', arc: YES }
+          - { lib: cn1-ai-stablediffusion,    pod: '', arc: NO  }   # links Swift runner
+          - { lib: cn1-ai-stablediffusion,    pod: '', arc: YES }
     steps:
       - uses: actions/checkout@v6
 
@@ -61,7 +69,7 @@ jobs:
       - name: Synthesise Xcode project via xcodegen
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           mkdir -p "$PROBE/CN1AIProbe"
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AIProbe/" 2>/dev/null || true
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AIProbe/"
@@ -87,7 +95,7 @@ jobs:
               settings:
                 base:
                   CLANG_ENABLE_MODULES: YES
-                  CLANG_ENABLE_OBJC_ARC: YES
+                  CLANG_ENABLE_OBJC_ARC: ${{ matrix.arc }}
                   CODE_SIGNING_ALLOWED: NO
           YAML
           cd "$PROBE"
@@ -101,7 +109,7 @@ jobs:
         # xcodebuild can build directly.
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           cat > Podfile <<EOF
           platform :ios, '14.0'
@@ -115,7 +123,7 @@ jobs:
       - name: xcodebuild
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           if [ -d "CN1AIProbe.xcworkspace" ]; then
               xcodebuild -workspace CN1AIProbe.xcworkspace \

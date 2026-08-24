@@ -28,16 +28,27 @@ on:
       - 'maven/cn1-admob/**'
       - 'maven/cn1-applovin/**'
       - 'maven/cn1-unity-levelplay/**'
+      - 'vm/ByteCodeTranslator/src/cn1_globals.h'
       - '.github/workflows/ad-cn1lib-ios-native-check.yml'
 
 jobs:
   compile-native-sources:
-    name: clang ${{ matrix.lib }}
+    name: clang ${{ matrix.lib }} (ARC ${{ matrix.arc }})
     runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
         lib: [cn1-admob, cn1-applovin, cn1-unity-levelplay]
+        # Both memory models, because which one applies is not ours to assume.
+        # The generated app target is manual-retain-release
+        # (CLANG_ENABLE_OBJC_ARC = NO in
+        # vm/ByteCodeTranslator/src/template/template.xcodeproj), and that is
+        # what compiles a cn1lib's sources today -- but IPhoneBuilder also adds
+        # -fobjc-arc to individual files (arcPhaseFixScript does it for
+        # CN1Vision.m, CN1Language.m and CN1Inference.m), so ARC is reachable
+        # too. Checking only one model would accept, for instance, a __bridge
+        # cast that is an error under MRR, or a missing release that ARC hides.
+        arc: [NO, YES]
     steps:
       - uses: actions/checkout@v6
 
@@ -65,7 +76,7 @@ jobs:
       - name: Stage the probe sources
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           mkdir -p "$PROBE/CN1AdProbe"
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AdProbe/" 2>/dev/null || true
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AdProbe/"
@@ -95,7 +106,10 @@ jobs:
       - name: Synthesise the Xcode project
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
+          # The heredoc is quoted so the shell leaves it alone; the matrix
+          # value below is substituted by Actions before this script runs, so
+          # the generated project carries a literal YES or NO.
           cat > "$PROBE/project.yml" <<'YML'
           name: CN1AdProbe
           options:
@@ -111,7 +125,7 @@ jobs:
               settings:
                 base:
                   CLANG_ENABLE_MODULES: YES
-                  CLANG_ENABLE_OBJC_ARC: YES
+                  CLANG_ENABLE_OBJC_ARC: ${{ matrix.arc }}
                   CODE_SIGNING_ALLOWED: NO
                   GCC_PREFIX_HEADER: CN1AdProbe-Prefix.pch
                   GCC_PRECOMPILE_PREFIX_HEADER: NO
@@ -123,7 +137,7 @@ jobs:
       - name: pod install
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           {
             echo "platform :ios, '15.0'"
@@ -142,7 +156,7 @@ jobs:
       - name: xcodebuild
         run: |
           set -euxo pipefail
-          PROBE=/tmp/probe-${{ matrix.lib }}
+          PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           cd "$PROBE"
           xcodebuild -workspace CN1AdProbe.xcworkspace \
                      -scheme CN1AdProbe \
