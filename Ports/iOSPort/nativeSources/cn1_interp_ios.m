@@ -515,11 +515,24 @@ JAVA_VOID com_codename1_impl_ios_InterpIOSNative_setFieldById___int_java_lang_Ob
            interpreter is on-device-debug only, so there is nothing to weigh
            here against correctness. */
         CN1_WRITE_BARRIER(target, refValue);
-        CN1_SATB_DELETE(slot);
         if (vol) {
+            // The slot is declared `_Atomic(JAVA_OBJECT)`, so
+            // CN1_SATB_DELETE's plain `*(JAVA_OBJECT volatile*)` load would
+            // race with the atomic accesses on it and is C11 UB. Load the
+            // old reference atomically and hand that to the SATB queue
+            // directly, so the deletion barrier still fires ahead of the
+            // release store.
+            if (__builtin_expect(gcSatbActive, 0)) {
+                JAVA_OBJECT cn1__old = atomic_load_explicit(
+                        (_Atomic(JAVA_OBJECT)*)slot, memory_order_acquire);
+                if (cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) {
+                    cn1SatbEnqueue(cn1__old);
+                }
+            }
             atomic_store_explicit((_Atomic(JAVA_OBJECT)*)slot, refValue,
                     memory_order_release);
         } else {
+            CN1_SATB_DELETE(slot);
             *(JAVA_OBJECT*)slot = refValue;
         }
         return;
