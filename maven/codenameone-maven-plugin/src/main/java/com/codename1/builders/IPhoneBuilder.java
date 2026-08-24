@@ -8022,6 +8022,24 @@ public class IPhoneBuilder extends Executor {
             notes.add(dropped + " = " + removed + " would make the extension's identifier "
                     + inThatBuild + ", which is not under " + hostPackage + ", so it was dropped "
                     + "and the value that governs the rest of the build governs it too");
+            // And whatever is left holding an expression that now resolves to nothing. Removing
+            // the foreign helper can strand its consumer: a
+            // PRODUCT_BUNDLE_IDENTIFIER[config=Debug] = $(EXTENSION_ID) whose only EXTENSION_ID
+            // was the one just dropped stays in the map, and Xcode expands it to the empty
+            // string -- overriding the valid base rather than falling back to it, which is the
+            // blank identifier the whole repair exists to avoid. Each qualified consumer goes
+            // until the context resolves again, and the base is what it resolves to.
+            for (int strand = 0; strand < MAX_SETTING_EXPANSIONS
+                    && identifierIn(settings, own) == null; strand++) {
+                String consumer = winningSettingKey(settings, "PRODUCT_BUNDLE_IDENTIFIER", own);
+                if (consumer == null || consumer.indexOf('[') < 0) {
+                    break;
+                }
+                String strandedValue = settings.remove(consumer);
+                notes.add(consumer + " = " + strandedValue + " no longer resolves to anything "
+                        + "once the setting it names is gone, and an empty identifier overrides "
+                        + "the base rather than falling back to it, so it was dropped too");
+            }
         }
         return notes;
     }

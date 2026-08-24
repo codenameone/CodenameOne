@@ -2083,10 +2083,24 @@ public class AppExtensionDeploymentTargetTest {
         // the helper the qualified form uses -- and a Debug simulator build expanded to the
         // foreign value and could not be signed.
         assertFalse(settings.toString(),
-                settings.containsKey("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]")
-                        && settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
-        assertEquals(notes.toString(), 1, notes.size());
+                settings.containsKey("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]"));
         assertEquals("com.example.app.Ext", settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
+
+        // And the consumer goes with it. Removing the foreign helper strands the qualified
+        // identifier that named it: Xcode expands the leftover expression to the empty string,
+        // which OVERRIDES the valid base rather than falling back to it -- the blank identifier
+        // the whole repair exists to avoid.
+        assertFalse(settings.toString(),
+                settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+        assertEquals(notes.toString(), 2, notes.size());
+
+        // Every configuration now lands on the base.
+        assertEquals("com.example.app.Ext", IPhoneBuilder.resolveSettingsFully(
+                IPhoneBuilder.winningSetting(settings, "PRODUCT_BUNDLE_IDENTIFIER",
+                        IPhoneBuilder.ArchiveContext.of("iphonesimulator18.0", "Debug", "arm64",
+                                settings)),
+                IPhoneBuilder.flattenForContext(settings, IPhoneBuilder.ArchiveContext.of(
+                        "iphonesimulator18.0", "Debug", "arm64", settings))));
     }
 
     @Test
