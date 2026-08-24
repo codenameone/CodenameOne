@@ -72,7 +72,12 @@
               {{- with .ports -}}
                 {{- $portAllowed = in . $port.id -}}
               {{- end -}}
-              {{- if and $portAllowed (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
+              {{- /* An empty prefix is not a match. hasPrefix answers true for
+                     every reason against "", so a code that lost its prefix to a
+                     typo would render any future skip of that test as green and
+                     documented. The contract validator refuses such an erratum,
+                     and this is the same rule on the side that draws the tick. */ -}}
+              {{- if and $portAllowed .prefix (hasPrefix $reason .prefix) -}}{{- $ok = true -}}{{- end -}}
             {{- end -}}
             {{- if not $ok -}}{{- $allMatched = false -}}{{- end -}}
           {{- end -}}

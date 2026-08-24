@@ -173,7 +173,10 @@ rather than merely predating it. The single permitted exception is a `skip` the
 suite itself emits, and the sweep checks it against
 `port_status_supplement.json` the way the page does: the erratum has to name the
 test *and*, where it lists reason codes, account for the reason that run gave
-from a port that code applies to. A port that quietly starts skipping a test
+from a port that code applies to. Every reason code needs a non-empty `prefix`
+and, if it names ports, real ones -- the validator enforces both, because every
+string starts with the empty prefix, so a code that lost that field would
+document any future skip of its test instead of the one it was written for. A port that quietly starts skipping a test
 fails the sweep by name rather than surfacing later as a failed website build.
 
 The sweep's closing assertion treats contract drift as the ordinary state it is,

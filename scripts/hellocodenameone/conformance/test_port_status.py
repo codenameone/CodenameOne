@@ -436,6 +436,37 @@ class PortStatusTest(unittest.TestCase):
             problems,
         )
 
+    def test_a_reason_code_with_no_prefix_documents_nothing(self):
+        # Both matchers ask whether the reason starts with the prefix, and every string starts
+        # with the empty one. An erratum that lost this field to a typo would therefore turn any
+        # future skip of that test green -- the exact opposite of what writing one is for.
+        supplement = {
+            "skip_reasons": [
+                {"test": "CameraApiTest", "reason_codes": [{"ports": ["android"]}]}
+            ]
+        }
+        self.assertFalse(
+            port_status.skip_is_documented(
+                supplement, "android", "CameraApiTest", ["something-entirely-unrelated"]
+            )
+        )
+        self.assertFalse(
+            port_status.skip_is_documented(
+                supplement, "android", "CameraApiTest", ["needs-runtime-permission-on-and"]
+            )
+        )
+
+    def test_validate_rejects_a_reason_code_with_no_prefix(self):
+        # And the configuration error is caught where it is made, rather than only failing to
+        # match later. Both halves matter: the matcher cannot be the only guard, because the
+        # page draws its own tick from its own copy of this rule.
+        supplement = {
+            "skip_reasons": [{"test": "CameraApiTest", "reason_codes": [{"prefix": ""}]}]
+        }
+        self.assertFalse(
+            port_status.skip_is_documented(supplement, "android", "CameraApiTest", ["anything"])
+        )
+
     def test_coverage_rejects_a_skip_carrying_no_reason(self):
         # An erratum with reason codes documents the reasons it lists, not the test. A skip
         # that names none matches nothing, which is what the page already decides.

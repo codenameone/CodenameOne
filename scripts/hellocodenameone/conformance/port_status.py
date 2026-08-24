@@ -230,6 +230,30 @@ def validate(manifest: dict) -> dict:
             problems.append(
                 "Every skip erratum needs test, reason, platform_support, and verification"
             )
+        # A reason code with no prefix documents everything. Both matchers ask
+        # whether the reason starts with it, and every string starts with the
+        # empty one -- so an erratum that lost this field by a typo would turn
+        # any future skip of that test green, on the nightly gate and on the
+        # page alike, which is the opposite of what writing an erratum is for.
+        for code in item.get("reason_codes") or []:
+            prefix = code.get("prefix")
+            if not isinstance(prefix, str) or not prefix:
+                problems.append(
+                    f"Skip erratum {item.get('test')} has a reason code with no prefix"
+                )
+            # Deliberately not named `ports`: that is the manifest's port list,
+            # in scope for the whole of validate(), and rebinding it here left
+            # the returned port count reading whichever erratum happened to be
+            # last. The counts test caught it, which is what it is for.
+            code_ports = code.get("ports")
+            if code_ports is not None and (
+                not isinstance(code_ports, list)
+                or not code_ports
+                or any(port not in port_ids for port in code_ports)
+            ):
+                problems.append(
+                    f"Skip erratum {item.get('test')} has a reason code naming unknown ports"
+                )
 
     manual_features = supplement.get("features", [])
     manual_feature_count = len(manual_features)
@@ -426,9 +450,10 @@ def skip_is_documented(supplement: dict, port_id: str, test: str, reasons: list)
             continue
         if all(
             any(
-                (not code.get("ports") or port_id in code["ports"])
+                code.get("prefix")
+                and (not code.get("ports") or port_id in code["ports"])
                 and isinstance(reason, str)
-                and reason.startswith(code.get("prefix", ""))
+                and reason.startswith(code["prefix"])
                 for code in codes
             )
             for reason in reasons
