@@ -121,9 +121,10 @@ public @interface Android {
     /// Values are joined with `\n` when the hint is written.
     String[] repositories() default {};
 
-    /// Indicates the Android SDK used to compile the Android build defaults to 21.
-    /// Notice that not all targets will work since the source might have some
-    /// limitations and not all SDK targets are installed on the build servers.
+    /// The Android SDK the build compiles against. Unset, the build server uses the
+    /// highest platform it has installed, so leaving this alone tracks the server
+    /// rather than pinning a number. Not every target works: the source may have
+    /// limitations, and not all SDK targets are installed.
     int targetSDKVersion() default 0;
 
     /// `auto`, `modern` / `material`, `hololight` (default for existing apps),

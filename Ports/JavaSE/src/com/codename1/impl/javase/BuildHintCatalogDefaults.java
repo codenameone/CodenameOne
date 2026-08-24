@@ -333,7 +333,7 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("android.targetSDKVersion")) {
         set("{{#Android#android.targetSDKVersion}}.label", "Target sDKVersion");
         set("{{#Android#android.targetSDKVersion}}.type", "TextField");
-        set("{{#Android#android.targetSDKVersion}}.description", "Indicates the Android SDK used to compile the Android build defaults to 21. Notice that not all targets will work since the source might have some limitations and not all SDK targets are installed on the build servers.");
+        set("{{#Android#android.targetSDKVersion}}.description", "The Android SDK the build compiles against. Unset, the build server uses the highest platform it has installed, so leaving this alone tracks the server rather than pinning a number. Not every target works: the source may have limitations, and not all SDK targets are installed.");
         }
         if (!handWritten.contains("and.themeMode")) {
         set("{{#Android#and.themeMode}}.label", "Theme mode");

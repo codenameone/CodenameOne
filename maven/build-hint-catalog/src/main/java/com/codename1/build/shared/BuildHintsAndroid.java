@@ -1348,9 +1348,10 @@ final class BuildHintsAndroid {
                 .type(HintType.INT)
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
-                .doc("Indicates the Android SDK used to compile the Android build defaults to 21. Notice that "
-                        + "not all targets will work since the source might have some limitations and not all SDK "
-                        + "targets are installed on the build servers."));
+                .doc("The Android SDK the build compiles against. Unset, the build server uses the "
+                        + "highest platform it has installed, so leaving this alone tracks the "
+                        + "server rather than pinning a number. Not every target works: the source "
+                        + "may have limitations, and not all SDK targets are installed."));
 
         h.add(new Hint("android.textureView")
                 .group(HintGroup.ANDROID)

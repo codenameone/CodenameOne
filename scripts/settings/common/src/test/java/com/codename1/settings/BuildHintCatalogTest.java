@@ -785,4 +785,31 @@ public class BuildHintCatalogTest {
                 "import com.codename1.annotations.buildhints.*;\n"
                         + "import com.example . other . Ios;\n", "Ios", false));
     }
+
+    /// For a hint whose value the build computes when the line is ABSENT, there
+    /// is nothing safe to seed. android.targetSDKVersion has no catalog default,
+    /// and writing 0 does not create an unset hint -- it overrides the
+    /// computation, selecting the legacy android-14 target and emitting
+    /// targetSdkVersion="0".
+    @Test
+    public void aHintWithNoDefaultHasNothingSafeToSeed() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        BuildHintMetadata target = catalog.get("android.targetSDKVersion");
+        assertNotNull(target);
+        assertTrue(target.defaultValue() == null || target.defaultValue().isEmpty(),
+                "the catalog must not invent a default the builder computes");
+
+        BuildHintMetadata facebook = catalog.get("facebook.appId");
+        assertNotNull(facebook);
+        assertTrue(facebook.defaultValue() == null || facebook.defaultValue().isEmpty(),
+                "presence is the switch, so an empty seed would enable the feature");
+    }
+
+    /// ...while a hint the builder does have a default for is seeded with it.
+    @Test
+    public void aHintWithADefaultIsSeededWithIt() {
+        assertEquals("2",
+                BuildHintCatalog.load().get("android.NotificationChannel.importance")
+                        .defaultValue());
+    }
 }

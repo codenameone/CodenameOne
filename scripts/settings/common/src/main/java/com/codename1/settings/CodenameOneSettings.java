@@ -732,12 +732,55 @@ public class CodenameOneSettings extends Lifecycle {
             controls.setUIID(uiid("SettingsHintEditor"));
             Button add = new Button("Add", uiid("SettingsOutline"));
             add.setMaterialIcon(FontImage.MATERIAL_ADD, 1.2f);
-            add.addActionListener(e -> {
-                settings.setBuildHint(meta.name(), defaultHintValue(meta));
-                renderBuildHintsList();
-                animatePage();
-            });
-            controls.add(add);
+            String seed = defaultHintValue(meta);
+            if (seed != null) {
+                add.addActionListener(e -> {
+                    settings.setBuildHint(meta.name(), seed);
+                    renderBuildHintsList();
+                    animatePage();
+                });
+                controls.add(add);
+            } else {
+                // Nothing safe to seed. The build decides this hint's value
+                // itself when the line is ABSENT -- android.targetSDKVersion is
+                // computed from the installed platforms -- so writing a
+                // placeholder does not create an unset hint, it overrides the
+                // computation with a value nobody chose. `0` there selects the
+                // legacy android-14 target and emits targetSdkVersion="0"; an
+                // empty string is no better for a hint whose presence is the
+                // switch, which is how facebook.appId=\"\" would enable Facebook
+                // with no ID.
+                //
+                // So the row asks for a value and writes nothing until it has
+                // one. Add is what reveals the field, not what saves.
+                TextField pending = new TextField("", "value");
+                pending.setUIID(uiid("SettingsField"));
+                configureHintField(pending, meta);
+                Button save = new Button("Save", uiid("SettingsOutline"));
+                save.addActionListener(e -> {
+                    String typed = pending.getText() == null ? "" : pending.getText().trim();
+                    if (typed.length() == 0) {
+                        ToastBar.showErrorMessage(meta.name()
+                                + " has no default -- enter the value you want.");
+                        return;
+                    }
+                    if (!isValidHintValue(meta, typed)) {
+                        ToastBar.showErrorMessage(typed + " is not a valid value for "
+                                + meta.name() + ".");
+                        return;
+                    }
+                    settings.setBuildHint(meta.name(), canonicalHintValue(meta, typed));
+                    renderBuildHintsList();
+                    animatePage();
+                });
+                add.addActionListener(e -> {
+                    controls.removeAll();
+                    controls.add(pending).add(save);
+                    controls.getComponentForm().revalidate();
+                    pending.startEditingAsync();
+                });
+                controls.add(add);
+            }
             Container header = new Container(new BorderLayout());
             header.add(BorderLayout.CENTER, text);
             header.add(BorderLayout.EAST, controls);
@@ -824,25 +867,29 @@ public class CodenameOneSettings extends Lifecycle {
         return remove;
     }
 
+    /// The value Add should write, or null when there is nothing safe to write.
+    ///
+    /// The builder's OWN default when the catalog records one: seeding a
+    /// type-wide placeholder instead writes a value the project did not have --
+    /// android.NotificationChannel.importance defaults to 2, and Add persisting 0
+    /// silences the channel before the user has typed anything. Adding a hint
+    /// should start from what the build already does.
+    ///
+    /// Null when it records none, because for those the ABSENCE of the line is
+    /// itself the configuration -- android.targetSDKVersion is computed from the
+    /// installed platforms when unset, and a placeholder overrides that
+    /// computation rather than leaving it alone. A boolean is the one exception:
+    /// its two values are the whole domain, so `true` is a real choice and is
+    /// what adding the hint means.
     private String defaultHintValue(BuildHintMetadata meta) {
-        // The builder's OWN default, when the catalog records one. Seeding a
-        // type-wide placeholder instead writes a value the project did not have:
-        // android.NotificationChannel.importance defaults to 2, and Add
-        // persisting 0 silences the channel before the user has typed anything.
-        // Adding a hint should start from what the build already does.
         String catalogDefault = meta.defaultValue();
         if (catalogDefault != null && catalogDefault.length() > 0) {
             return catalogDefault;
         }
         if (meta.type() == BuildHintType.BOOLEAN) {
-            // No recorded default. `true` is still the useful seed here, since
-            // adding a boolean hint is how you turn something on.
             return "true";
         }
-        if (meta.type() == BuildHintType.INTEGER) {
-            return "0";
-        }
-        return "";
+        return null;
     }
 
     private int descriptionRows(String text) {
