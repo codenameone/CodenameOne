@@ -99,6 +99,36 @@ final class BuildHintsApple {
                 .platform("mac")
                 .consumedBy("CN1BuildMojo", "IPhoneBuilder", "MacNativeBuilder"));
 
+        h.add(new Hint("macNative.entitlements.device.camera")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.BOOLEAN)
+                .platform("mac")
+                .consumedBy("MacNativeBuilder")
+                .doc("Sandboxed Mac Native builds only. Toggles "
+                        + "`com.apple.security.device.camera`. Defaults to whether the app sets "
+                        + "`ios.NSCameraUsageDescription`, so an app that asks for the camera gets "
+                        + "the entitlement without naming it twice."));
+
+        h.add(new Hint("macNative.entitlements.device.microphone")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.BOOLEAN)
+                .platform("mac")
+                .consumedBy("MacNativeBuilder")
+                .doc("Sandboxed Mac Native builds only. Toggles "
+                        + "`com.apple.security.device.microphone`. Defaults to whether the app sets "
+                        + "`ios.NSMicrophoneUsageDescription`."));
+
+        h.add(new Hint("macNative.entitlements.personalInformation.calendars")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.BOOLEAN)
+                .platform("mac")
+                .consumedBy("MacNativeBuilder")
+                .doc("Sandboxed Mac Native builds only. Toggles "
+                        + "`com.apple.security.personal-information.calendars`, which gates all "
+                        + "EventKit access. Defaults to whether the app sets any calendar or "
+                        + "reminder usage description, including the write-only and reminders-only "
+                        + "ones."));
+
         h.add(new Hint("macNative.entitlements.extra")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)

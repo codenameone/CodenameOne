@@ -232,6 +232,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             // Compiled without debug information; nothing to look for.
             return true;
         }
+        String pkg = packageOf(cls.getBinaryName());
         boolean sawARoot = false;
         for (String root : roots) {
             File dir = new File(root);
@@ -239,16 +240,30 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
-            if (containsFileNamed(dir, sourceFile, 0)) {
+            if (declaresPackage(dir, sourceFile, pkg, 0)) {
                 return true;
             }
         }
         return !sawARoot;
     }
 
-    /// Whether `name` exists anywhere under `dir`. Depth-limited, because this
-    /// runs on every annotated class and a source tree is not a search index.
-    private static boolean containsFileNamed(File dir, String name, int depth) {
+    private static String packageOf(String binaryName) {
+        int dot = binaryName.lastIndexOf('.');
+        return dot < 0 ? "" : binaryName.substring(0, dot);
+    }
+
+    /// Whether a file called `name` declaring package `pkg` exists under `dir`.
+    ///
+    /// The package matters as well as the name: moving a class to another package
+    /// without a clean leaves an orphan whose SourceFile is, say, App.java, and
+    /// the NEW App.java would otherwise answer for it -- so the stale class stays
+    /// and fails the placement check on every incremental build, which is the bug
+    /// this whole guard exists to prevent.
+    ///
+    /// The package is read from the file rather than inferred from its directory,
+    /// because Kotlin does not require the two to agree. Depth-limited: this runs
+    /// per annotated class and a source tree is not a search index.
+    private static boolean declaresPackage(File dir, String name, String pkg, int depth) {
         if (depth > 24) {
             return false;
         }
@@ -258,14 +273,55 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for (File f : children) {
             if (f.isFile()) {
-                if (f.getName().equals(name)) {
+                if (f.getName().equals(name) && pkg.equals(declaredPackage(f))) {
                     return true;
                 }
-            } else if (f.isDirectory() && containsFileNamed(f, name, depth + 1)) {
+            } else if (f.isDirectory() && declaresPackage(f, name, pkg, depth + 1)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /// The package a source file declares, or "" for the default package.
+    ///
+    /// Read from the head of the file only -- a package declaration cannot appear
+    /// after the first type -- and "" on any read failure, which errs towards
+    /// treating the file as a match and so towards keeping a class.
+    private static String declaredPackage(File f) {
+        BufferedReader r = null;
+        try {
+            r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+            String line;
+            int read = 0;
+            while ((line = r.readLine()) != null && read++ < 200) {
+                String t = line.trim();
+                if (!t.startsWith("package")) {
+                    continue;
+                }
+                String rest = t.substring("package".length());
+                if (rest.length() == 0 || Character.isJavaIdentifierPart(rest.charAt(0))) {
+                    continue;
+                }
+                rest = rest.trim();
+                int end = rest.indexOf(';');
+                if (end >= 0) {
+                    rest = rest.substring(0, end);
+                }
+                return rest.trim();
+            }
+            return "";
+        } catch (IOException ex) {
+            return "";
+        } finally {
+            if (r != null) {
+                try {
+                    r.close();
+                } catch (IOException ignored) {
+                    // read-only stream
+                }
+            }
+        }
     }
 
     /// Build hints configure the application, so they belong on the class the    /// Build hints configure the application, so they belong on the class the

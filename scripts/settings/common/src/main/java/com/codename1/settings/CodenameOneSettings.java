@@ -2191,10 +2191,118 @@ public class CodenameOneSettings extends Lifecycle {
                 return out;
             }
         }
-        // No source file found. Distinct from "found and declares nothing", and
+        // Those three roots are a convention, not the truth: a module can add a
+        // source root, and Kotlin does not require a file to be named after the
+        // class it declares. Falling straight through to null here let the caller
+        // trust a stale manifest -- which is the bug the source scan was added to
+        // fix, reappearing for anyone whose layout is merely unusual. So look
+        // properly before giving up.
+        String found = findMainClassSource(binding.projectDir(), main, pkg);
+        if (found != null) {
+            collectAnnotationOwnedHints(found, out, lastSourceWasKotlin);
+            return out;
+        }
+        // Genuinely no source. Distinct from "found and declares nothing", and
         // the caller has to tell them apart before letting the source overrule
         // the manifest.
         return null;
+    }
+
+    /// Set by findMainClassSource, since it decides the language by what it finds.
+    private boolean lastSourceWasKotlin;
+
+    /// The text of the file declaring `main` in `pkg`, found by searching, or null.
+    ///
+    /// Walks the project for a `.java` or `.kt` file that declares the class, so
+    /// a configured source root or a Kotlin file whose name differs from its
+    /// class is found anyway. Bounded in depth and in how many files it will
+    /// open, because this runs when Settings opens a project and a source tree is
+    /// not a search index.
+    private String findMainClassSource(String projectDir, String main, String pkg) {
+        if (projectDir == null || main == null || main.isEmpty()) {
+            return null;
+        }
+        java.util.List<String> queue = new java.util.ArrayList<>();
+        queue.add(projectDir);
+        int opened = 0;
+        for (int i = 0; i < queue.size() && i < 4000; i++) {
+            String dir = queue.get(i);
+            String[] children;
+            try {
+                children = FileSystemStorage.getInstance().listFiles(ProjectIO.fsUrl(dir));
+            } catch (Exception ex) {
+                continue;
+            }
+            if (children == null) {
+                continue;
+            }
+            for (String child : children) {
+                String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
+                String path = dir + "/" + name;
+                if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
+                    // target/ holds compiled copies of these same sources; walking
+                    // it would find a generated stub and call it the main class.
+                    if (!"target".equals(name) && !"build".equals(name) && !name.startsWith(".")) {
+                        queue.add(path);
+                    }
+                    continue;
+                }
+                boolean kotlin = name.endsWith(".kt");
+                if (!kotlin && !name.endsWith(".java")) {
+                    continue;
+                }
+                // Cheap filter first: a file declaring the class almost always
+                // carries its name.
+                if (!name.equals(main + (kotlin ? ".kt" : ".java")) && opened > 200) {
+                    continue;
+                }
+                String text = readIfPresent(path);
+                opened++;
+                if (text == null || !declaresClass(text, main, pkg)) {
+                    continue;
+                }
+                lastSourceWasKotlin = kotlin;
+                return text;
+            }
+        }
+        return null;
+    }
+
+    /// Whether `text` declares `main` in `pkg`, judged by the package statement
+    /// and a `class`/`object` declaration rather than by where the file sits.
+    static boolean declaresClass(String text, String main, String pkg) {
+        String declaredPkg = "";
+        for (String line : com.codename1.util.StringUtil.tokenize(text, "\n")) {
+            String t = line.trim();
+            if (t.startsWith("package") && t.length() > 7
+                    && !continuesAName(t.charAt(7))) {
+                declaredPkg = t.substring(7).trim();
+                int semi = declaredPkg.indexOf(';');
+                if (semi >= 0) {
+                    declaredPkg = declaredPkg.substring(0, semi);
+                }
+                declaredPkg = declaredPkg.trim();
+                break;
+            }
+        }
+        if (!(pkg == null || pkg.isEmpty() ? "" : pkg).equals(declaredPkg)) {
+            return false;
+        }
+        for (String keyword : new String[]{"class ", "object "}) {
+            int at = text.indexOf(keyword);
+            while (at >= 0) {
+                int start = at + keyword.length();
+                int end = start;
+                while (end < text.length() && continuesAName(text.charAt(end))) {
+                    end++;
+                }
+                if (text.substring(start, end).equals(main)) {
+                    return true;
+                }
+                at = text.indexOf(keyword, start);
+            }
+        }
+        return false;
     }
 
     private String readIfPresent(String path) {

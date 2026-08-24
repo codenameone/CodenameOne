@@ -47,6 +47,49 @@ COMPUTED_OPENER = re.compile(
 CONST_DECL = re.compile(
     r'\bstatic\s+final\s+String\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"((?:[^"\\]|\\.)*)"\s*;')
 
+# A method declaration, so a helper that forwards one of its own parameters to an
+# accessor can be recognised and its CALLERS mined instead. MacNativeBuilder's
+# parseEntitlementBool(request, hint, def) is the shape: every caller passes a
+# literal, none of them is a getArg, and the hints were invisible to a literal
+# search of accessor calls alone.
+METHOD_DECL = re.compile(
+    r'\b(?:public|private|protected|static|final|synchronized|\s)+'
+    r'[A-Za-z_][A-Za-z0-9_<>\[\], .?]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*'
+    r'(?:throws [A-Za-z0-9_., ]+)?\{')
+
+FORWARDS = re.compile(r'\b(?:getArg|booleanArg)\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,'
+                      r'|(?<![A-Za-z0-9_.])arg\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,')
+
+
+def accessor_wrappers(text):
+    """{method name: index of the parameter it forwards to an accessor}.
+
+    Same file only. A private helper's name is not unique across the tree, and
+    mining calls to a same-named method of some unrelated class would invent
+    hints rather than find them.
+    """
+    out = {}
+    for m in METHOD_DECL.finditer(text):
+        name, params = m.group(1), m.group(2)
+        if name in ("getArg", "arg", "booleanArg") or not params.strip():
+            continue
+        names = []
+        for part in params.split(','):
+            part = part.strip()
+            if part:
+                names.append(part.split()[-1].strip())
+        # Body: to the next method declaration, or 4k, whichever comes first.
+        body = text[m.end():m.end() + 4000]
+        nxt = METHOD_DECL.search(body)
+        if nxt:
+            body = body[:nxt.start()]
+        for f in FORWARDS.finditer(body):
+            forwarded = f.group(1) or f.group(2)
+            if forwarded in names:
+                out[name] = names.index(forwarded)
+                break
+    return out
+
 
 def read_literal(text, i):
     """Read a Java string literal starting just after the opening quote.
@@ -169,6 +212,20 @@ for dirpath, _, files in os.walk(SRC):
             # wrapper, or the declaration of getArg itself -- whose caller passes a
             # literal that the literal pass already mines. Reporting those would bury
             # the handful of sites that genuinely compute a name.
+        # Literals that only ever reach an accessor through a helper.
+        for wrapper, index in sorted(accessor_wrappers(text).items()):
+            for m in re.finditer(r'(?<![A-Za-z0-9_.])' + re.escape(wrapper) + r'\s*\(', text):
+                args = split_args(text, m.end())
+                if len(args) <= index:
+                    continue
+                arg = args[index].strip()
+                if not (len(arg) >= 2 and arg.startswith('"') and arg.endswith('"')):
+                    continue
+                key, _ = read_literal(arg, 1)
+                if key is None or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_.!]*', key):
+                    continue
+                line = text.count("\n", 0, m.start()) + 1
+                hits[key].append(("<expr>", rel, line))
         for pat, prefixed in OPENERS:
             for m in pat.finditer(text):
                 # position of the char just after the opening quote of arg 1

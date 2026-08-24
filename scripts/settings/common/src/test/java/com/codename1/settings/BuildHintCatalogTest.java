@@ -539,4 +539,39 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
+
+    /// Kotlin does not require a file to be named after the class it declares, so
+    /// the declaration is what identifies the main class -- not the filename and
+    /// not the directory.
+    @Test
+    public void aClassIsIdentifiedByItsDeclarationNotItsFile() {
+        String kt = "package com.example\n\nclass Helper\n\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example"));
+        assertTrue(CodenameOneSettings.declaresClass(kt, "Helper", "com.example"));
+        assertFalse(CodenameOneSettings.declaresClass(kt, "Other", "com.example"));
+    }
+
+    /// A same-named class in another package is a different class. Accepting it
+    /// is how a moved class makes its own orphan look alive.
+    @Test
+    public void thePackageIsPartOfTheIdentity() {
+        String src = "package com.example.moved;\npublic class MyApp {}\n";
+        assertFalse(CodenameOneSettings.declaresClass(src, "MyApp", "com.example"));
+        assertTrue(CodenameOneSettings.declaresClass(src, "MyApp", "com.example.moved"));
+    }
+
+    /// A Kotlin `object` declares a type too.
+    @Test
+    public void anObjectDeclarationCounts() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nobject MyApp\n", "MyApp", "com.example"));
+    }
+
+    /// The default package is "" on both sides rather than null on one.
+    @Test
+    public void theDefaultPackageMatches() {
+        assertTrue(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", null));
+        assertTrue(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", ""));
+        assertFalse(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", "com.x"));
+    }
 }
