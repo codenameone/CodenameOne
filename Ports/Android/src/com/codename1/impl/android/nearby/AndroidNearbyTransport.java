@@ -490,6 +490,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
         // broadcasting and scanning -- burning the radio and still taking
         // endpoint and connection callbacks -- while the public stop()
         // documents exactly the opposite.
+        // The generations go up here too. stopAdvertising() and
+        // stopDiscovery() bump them so a start still in flight cannot come
+        // back and report success into a stop that already returned -- and
+        // this method, which is what the public stop() calls, went straight
+        // to the client and left them alone. A start pending across it
+        // therefore passed its check and resolved as though it had survived
+        // the stop.
+        advertiseGeneration++;
+        discoverGeneration++;
         client().stopAdvertising();
         client().stopDiscovery();
         client().stopAllEndpoints();
@@ -507,8 +516,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
             for (String id : discoveredOnly) {
                 endpointNames.remove(id);
                 endpointServices.remove(id);
-                discoveredEndpoints.remove(id);
             }
+            // Discovery visibility goes for EVERYTHING, connected or not.
+            // Discovery has stopped, so no onEndpointLost is coming for any
+            // of these -- and onDisconnected only clears an endpoint's
+            // metadata when discovery is no longer watching it. Leaving a
+            // connected endpoint in this set made that check answer "still
+            // discovered" forever, so its name and service survived the stop
+            // and a later reuse of the same endpoint id inherited them.
+            discoveredEndpoints.clear();
         }
         // The transfer maps are NOT cleared here either. stopAllEndpoints
         // produces terminal payload callbacks asynchronously, and those

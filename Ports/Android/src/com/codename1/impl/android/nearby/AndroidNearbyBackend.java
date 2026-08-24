@@ -380,18 +380,56 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // this indistinguishable from the port's other permission requests.
         activity.requestPermissions(
                 missing.toArray(new String[missing.size()]), 1);
+        final List<String> requested = missing;
+        final Context checkAgainst = activity.getApplicationContext() != null
+                ? activity.getApplicationContext() : (Context) activity;
         Display.getInstance().invokeAndBlock(new Runnable() {
             @Override
             public void run() {
-                while (host.isRequestForPermission()) {
-                    // The flag is cleared by the activity the result is
-                    // delivered TO, and Android delivers it to whichever
-                    // activity is alive when the dialog closes. If this one
-                    // was recreated while the dialog was open its flag is
-                    // never cleared again -- so this loop spun for the life
-                    // of the process, holding the invokeAndBlock worker and
-                    // leaving the permission request unresolved for good.
-                    if (isGone(host)) {
+                // The flag is instance state, cleared by the activity the
+                // result is delivered TO -- and Android delivers it to
+                // whichever activity is alive when the dialog closes. So a
+                // recreation while the dialog is open leaves THIS instance's
+                // flag set for good, and waiting on it alone spun for the
+                // life of the process, holding the invokeAndBlock worker and
+                // leaving the request unresolved.
+                //
+                // The wait is handed to the replacement rather than
+                // abandoned. Abandoning it answered "not granted" the moment
+                // the new activity appeared -- while the dialog was still on
+                // screen and the user had not touched it yet, so an app that
+                // rotated its screen at the wrong moment was told the user
+                // had refused.
+                CodenameOneActivity waiting = host;
+                long deadline = 0;
+                while (waiting.isRequestForPermission()) {
+                    // The grant itself, which any context can answer and
+                    // which no recreation can hide. This is what ends the
+                    // wait when the result reached the replacement before
+                    // the swap was noticed and its flag could be set.
+                    if (allGranted(checkAgainst, requested)) {
+                        return;
+                    }
+                    Activity current = AndroidImplementation.getActivity();
+                    if (current != waiting) {
+                        if (!(current instanceof CodenameOneActivity)) {
+                            // No CodenameOne activity at all: nothing will
+                            // receive the result, so nothing will end this.
+                            return;
+                        }
+                        waiting = (CodenameOneActivity) current;
+                        waiting.setRequestForPermission(true);
+                        waiting.setWaitingForPermissionResult(true);
+                        // Bounded from the swap onwards. If the answer was
+                        // delivered before the flag above was set, nothing
+                        // will ever clear it -- and a denial is invisible to
+                        // the grant check, so only a deadline ends that. It
+                        // is generous because the person is being asked a
+                        // question; the caller can ask again.
+                        deadline = System.currentTimeMillis() + 120000L;
+                    }
+                    if (deadline != 0
+                            && System.currentTimeMillis() > deadline) {
                         return;
                     }
                     try {
@@ -421,20 +459,15 @@ public class AndroidNearbyBackend implements NearbyBridge {
         return true;
     }
 
-    /// True when waiting on this activity can no longer end.
-    ///
-    /// Either it has been destroyed, or the port has moved on to another one
-    /// -- in both cases the permission result is going somewhere else and
-    /// this activity's flag stays set for good.
-    private static boolean isGone(Activity host) {
-        if (host.isFinishing()) {
-            return true;
+    /// Whether every one of these permissions is granted right now.
+    private static boolean allGranted(Context ctx, List<String> perms) {
+        for (int i = 0; i < perms.size(); i++) {
+            if (ctx.checkSelfPermission(perms.get(i))
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
         }
-        if (Build.VERSION.SDK_INT >= 17 && host.isDestroyed()) {
-            return true;
-        }
-        Activity current = AndroidImplementation.getActivity();
-        return current != null && current != host;
+        return true;
     }
 
     // ------------------------------------------------------------------
