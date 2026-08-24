@@ -978,7 +978,19 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if ([WCSession isSupported]) {
         WCSession *s = [WCSession defaultSession];
         s.delegate = self;
-        [s activate];
+        // activateSession, not activate: `activate` is the name Swift renames this to, and the
+        // Objective-C selector has never existed. iOS answers it anyway, so the phone worked and
+        // hid the mistake; watchOS does not, and the watch app died at launch with
+        // "-[WCSession activate]: unrecognized selector".
+        //
+        // The compiler had nothing to say because this class declares an -activate of its own, so
+        // the selector is known to the translation unit and the typed receiver only earns a
+        // warning rather than an error.
+        //
+        // Still asynchronous, which is what the callers below assume: the header makes
+        // activateSession asynchronous exactly when the delegate implements
+        // session:activationDidCompleteWithState:error:, and this one does.
+        [s activateSession];
     }
 #if !TARGET_OS_WATCH
     // Anything that was still waiting its turn when the process last ended. Only the head of the
@@ -1749,7 +1761,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 
 - (void)sessionDidDeactivate:(WCSession *)session {
     // The user switched to a different watch. Re-activating is what keeps the link alive.
-    [session activate];
+    // activateSession for the reason given in -activate above. iOS-only code, so this one was
+    // not crashing -- but it was calling a selector no header declares.
+    [session activateSession];
     cn1_wearable_notifyStateChanged();
 }
 
