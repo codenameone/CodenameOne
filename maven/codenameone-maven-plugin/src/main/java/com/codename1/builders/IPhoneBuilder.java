@@ -4701,8 +4701,15 @@ public class IPhoneBuilder extends Executor {
                     // finds no peers and says nothing about why. Refused here,
                     // before the cloud slot is spent, the way the Matter flow
                     // refuses a build it knows cannot work.
-                    String localNetwork = request.getArg(
-                            "ios.NSLocalNetworkUsageDescription", "");
+                    // The EFFECTIVE value, not the hint. ios.plistInject
+                    // wins over the hint in the renderer, so a fragment
+                    // declaring this key as <false/> or as a blank string
+                    // left the catalog's perfectly good default sitting in
+                    // the hint, unread -- and the validator that was meant
+                    // to catch exactly that passed it. effectivePurposeString
+                    // resolves what the plist will actually carry.
+                    String localNetwork = effectivePurposeString(request,
+                            "ios.NSLocalNetworkUsageDescription");
                     if (localNetwork == null
                             || localNetwork.trim().length() == 0
                             || "false".equalsIgnoreCase(localNetwork.trim())) {
