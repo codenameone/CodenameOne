@@ -272,7 +272,7 @@ public class BuildHintCatalogTest {
                 + "@BuildIos(teamId = \"ABCDE12345\")\n"
                 + "class MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
-        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
 
@@ -281,7 +281,7 @@ public class BuildHintCatalogTest {
     public void aPlainImportIsNotReadAsAnAlias() {
         String src = "import com.codename1.annotations.buildhints.Ios\n"
                 + "@Ios(teamId = \"ABCDE12345\")\n";
-        assertNull(CodenameOneSettings.kotlinImportAlias(src, "Ios"));
+        assertNull(CodenameOneSettings.kotlinImportAlias(src, "Ios", true));
     }
 
     /// A commented-out annotation is not an annotation. Reading it as one made
@@ -332,10 +332,10 @@ public class BuildHintCatalogTest {
                 + "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
                 + "@BuildIos(teamId = \"ABCDE12345\")\n"
                 + "class MyApp\n";
-        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(src, "Ios"));
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(src, "Ios", true));
 
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
-        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
 
@@ -343,7 +343,7 @@ public class BuildHintCatalogTest {
     @Test
     public void aMentionThatIsNotAnImportIsNotAnAlias() {
         assertNull(CodenameOneSettings.kotlinImportAlias(
-                "val doc = com.codename1.annotations.buildhints.Ios as Whatever", "Ios"));
+                "val doc = com.codename1.annotations.buildhints.Ios as Whatever", "Ios", true));
     }
 
     /// Parentheses are optional on an annotation, so searching forward for the
@@ -390,7 +390,7 @@ public class BuildHintCatalogTest {
                 + "@Ios(teamId = \"ABCDE12345\")\n"
                 + "class MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
-        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
 
@@ -399,7 +399,36 @@ public class BuildHintCatalogTest {
     public void anAnnotationInsideATripleQuotedStringIsNotOwnership() {
         String src = "val doc = \"\"\"@Ios(teamId = \"x\")\"\"\"\nclass MyApp\n";
         java.util.Map<String, String> out = new java.util.HashMap<String, String>();
-        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
         assertNull(out.get("ios.teamId"));
+    }
+
+    /// Java text blocks DO process escapes, so `\\"""` is an escaped quote and
+    /// two more -- not the closing delimiter. Reading it as one made the scanner
+    /// treat the REAL delimiter as a new text block and run past the annotation
+    /// after it.
+    @Test
+    public void anEscapedQuoteRunDoesNotCloseAJavaTextBlock() {
+        String src = "String doc = \"\"\"\n"
+                + "  a \\\"\"\" b\n"
+                + "  \"\"\";\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, false);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// Kotlin does NOT process escapes in a raw string, and a run of four quotes
+    /// closes at the last three -- the extra one belongs to the value. Applying
+    /// Java's rule here would keep scanning and swallow the annotation.
+    @Test
+    public void aQuoteRunClosesAKotlinRawStringAtItsLastThree() {
+        String src = "val doc = \"\"\"a\"\"\"\"\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
     }
 }

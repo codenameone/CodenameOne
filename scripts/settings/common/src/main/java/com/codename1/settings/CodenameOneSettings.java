@@ -2106,10 +2106,16 @@ public class CodenameOneSettings extends Lifecycle {
             // the newly annotated hint looking unowned, and Add then wrote the
             // duplicate declaration the next build refuses.
             //
-            // The manifest is merged in on top for its origins; the union is the
-            // safe direction, since over-reporting ownership only withholds an
-            // editor, while under-reporting breaks the build.
-            out.putAll(annotationOwnedHintsFromSource());
+            // The manifest supplies origins, but it cannot ADD ownership the
+            // source does not show. An attribute deleted from the main class and
+            // not yet rebuilt is exactly that case: the source is right, the
+            // manifest is a build old, and taking the union kept Add and the
+            // editor hidden for a hint nothing owns any more -- until the user
+            // happened to rebuild, with nothing to suggest that was the fix.
+            java.util.Map<String, String> fromSource = annotationOwnedHintsFromSource();
+            if (fromSource != null) {
+                out.putAll(fromSource);
+            }
 
             String url = ProjectIO.fsUrl(path);
             FileSystemStorage fs = FileSystemStorage.getInstance();
@@ -2127,8 +2133,14 @@ public class CodenameOneSettings extends Lifecycle {
                 int eq = t.indexOf('=');
                 if (eq > originPrefix.length()) {
                     String hint = t.substring(originPrefix.length(), eq).trim();
-                    out.put(com.codename1.build.shared.BuildHints.canonicalName(hint),
-                            t.substring(eq + 1).trim());
+                    String canonical =
+                            com.codename1.build.shared.BuildHints.canonicalName(hint);
+                    // Only for a hint the source still declares -- unless there
+                    // was no source to read, where the manifest is all there is
+                    // and is better than nothing.
+                    if (fromSource == null || fromSource.containsKey(canonical)) {
+                        out.put(canonical, t.substring(eq + 1).trim());
+                    }
                 }
             }
         } catch (Exception ex) {
@@ -2147,6 +2159,8 @@ public class CodenameOneSettings extends Lifecycle {
     /// annotation's parentheses and maps those to hint names through the catalog.
     /// Values are skipped wholesale, so a comma or bracket inside a string cannot
     /// confuse it.
+    /// The hints the main class's SOURCE declares, or null when no source file
+    /// for it could be read at all.
     private java.util.Map<String, String> annotationOwnedHintsFromSource() {
         java.util.Map<String, String> out = new java.util.HashMap<>();
         String main = settings == null ? null : settings.get("codename1.mainName");
@@ -2162,11 +2176,14 @@ public class CodenameOneSettings extends Lifecycle {
                 if (text == null) {
                     continue;
                 }
-                collectAnnotationOwnedHints(text, out);
+                collectAnnotationOwnedHints(text, out, ext.equals(".kt"));
                 return out;
             }
         }
-        return out;
+        // No source file found. Distinct from "found and declares nothing", and
+        // the caller has to tell them apart before letting the source overrule
+        // the manifest.
+        return null;
     }
 
     private String readIfPresent(String path) {
@@ -2194,18 +2211,18 @@ public class CodenameOneSettings extends Lifecycle {
     /// hint as unowned, so Settings offers it for Add, writes the properties
     /// line, and the next `process-annotations` fails on the duplicate the tool
     /// itself created.
-    static String kotlinImportAlias(String source, String simple) {
+    static String kotlinImportAlias(String source, String simple, boolean kotlin) {
         String needle = "com.codename1.annotations.buildhints." + simple;
         // Same comment-aware walk the marker search uses, and the occurrence has
         // to be a live `import` directive. A commented-out earlier alias --
         // `// import ...Ios as Old` above the real `import ...Ios as BuildIos` --
         // otherwise won, the live `@BuildIos` was never looked for, and the hint
         // read as unowned again: the exact bug the alias support was added for.
-        int at = nextMarker(source, needle, 0);
+        int at = nextMarker(source, needle, 0, kotlin);
         while (at >= 0) {
             int after = at + needle.length();
             if (!precededByImport(source, at)) {
-                at = nextMarker(source, needle, after);
+                at = nextMarker(source, needle, after, kotlin);
                 continue;
             }
             if (after >= source.length() || !continuesAName(source.charAt(after))) {
@@ -2230,7 +2247,7 @@ public class CodenameOneSettings extends Lifecycle {
                     }
                 }
             }
-            at = nextMarker(source, needle, after);
+            at = nextMarker(source, needle, after, kotlin);
         }
         return null;
     }
@@ -2255,7 +2272,13 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.
+    /// Java rules for the source text; see the three-argument form.
     static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out) {
+        collectAnnotationOwnedHints(source, out, false);
+    }
+
+    static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
+                                            boolean kotlin) {
         for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
             if (!h.isAnnotated()) {
                 continue;
@@ -2265,7 +2288,7 @@ public class CodenameOneSettings extends Lifecycle {
             // qualified one, which needs no import, and a Kotlin alias, under
             // which the annotation's own name appears nowhere. Missing any of
             // them leaves the hint editable and Add writes the duplicate.
-            String alias = kotlinImportAlias(source, simple);
+            String alias = kotlinImportAlias(source, simple, kotlin);
             String[] markers = alias == null
                 ? new String[] {
                     "@" + simple,
@@ -2284,13 +2307,13 @@ public class CodenameOneSettings extends Lifecycle {
                 // notice: a `// @Ios(teamId = "old")` left behind made Settings
                 // treat the hint as annotation-owned and withhold Add and the
                 // editor, for a hint the processor never emits.
-                int at = nextMarker(source, markers[m], 0);
+                int at = nextMarker(source, markers[m], 0, kotlin);
                 while (at >= 0) {
                     // "@Ios" must not match "@IosPrivacy": the next character has
                     // to end the name.
                     int after = at + markers[m].length();
                     if (after < source.length() && continuesAName(source.charAt(after))) {
-                        at = nextMarker(source, markers[m], after);
+                        at = nextMarker(source, markers[m], after, kotlin);
                         continue;
                     }
                     // The annotation's OWN argument list, not the next one in
@@ -2299,19 +2322,19 @@ public class CodenameOneSettings extends Lifecycle {
                     // came next, so `@Ios` above a `configure(teamId = "...")`
                     // read as owning ios.teamId and Settings withheld controls
                     // for a hint the processor never emits.
-                    int open = nextLiveChar(source, after);
+                    int open = nextLiveChar(source, after, kotlin);
                     if (open < 0 || source.charAt(open) != '(') {
-                        at = nextMarker(source, markers[m], after);
+                        at = nextMarker(source, markers[m], after, kotlin);
                         continue;
                     }
-                    String args = balancedArgs(source, open);
-                    if (args != null && declaresAttribute(args, h.attr())) {
+                    String args = balancedArgs(source, open, kotlin);
+                    if (args != null && declaresAttribute(args, h.attr(), kotlin)) {
                         out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
                                 "@" + simple + "(" + h.attr() + ")");
                         found = true;
                         break;
                     }
-                    at = nextMarker(source, markers[m], after);
+                    at = nextMarker(source, markers[m], after, kotlin);
                 }
             }
         }
@@ -2323,10 +2346,10 @@ public class CodenameOneSettings extends Lifecycle {
     /// annotation can carry an unmatched delimiter --
     /// `@Ios(/* required for issue ( */ teamId = "x")` -- and counting it as
     /// syntax loses the annotation's boundary, leaving an owned hint editable.
-    private static String balancedArgs(String source, int open) {
+    private static String balancedArgs(String source, int open, boolean kotlin) {
         int depth = 0;
         for (int i = open; i < source.length(); i++) {
-            int skipped = skipNonCode(source, i);
+            int skipped = skipNonCode(source, i, kotlin);
             if (skipped > i) {
                 i = skipped - 1;
                 continue;
@@ -2346,11 +2369,11 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// Whether `args` assigns `attr` at the top level, ignoring anything inside a
     /// nested value, a string, a character literal or a comment.
-    private static boolean declaresAttribute(String args, String attr) {
+    private static boolean declaresAttribute(String args, String attr, boolean kotlin) {
         int depth = 0;
         StringBuilder word = new StringBuilder();
         for (int i = 0; i < args.length(); i++) {
-            int skipped = skipNonCode(args, i);
+            int skipped = skipNonCode(args, i, kotlin);
             if (skipped > i) {
                 i = skipped - 1;
                 continue;
@@ -2386,7 +2409,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// The index of the next character that is neither whitespace nor part of a
     /// comment, starting at `from`; -1 when the source ends first.
-    static int nextLiveChar(String source, int from) {
+    static int nextLiveChar(String source, int from, boolean kotlin) {
         int i = from;
         while (i < source.length()) {
             char c = source.charAt(i);
@@ -2395,7 +2418,7 @@ public class CodenameOneSettings extends Lifecycle {
                 continue;
             }
             if (c == '/') {
-                int skipped = skipNonCode(source, i);
+                int skipped = skipNonCode(source, i, kotlin);
                 if (skipped > i) {
                     i = skipped;
                     continue;
@@ -2411,12 +2434,12 @@ public class CodenameOneSettings extends Lifecycle {
     /// Comments and string literals are stepped over with the same scanner the
     /// argument reader uses, so what counts as code is one answer rather than
     /// two that can disagree.
-    static int nextMarker(String source, String marker, int from) {
+    static int nextMarker(String source, String marker, int from, boolean kotlin) {
         int i = from;
         while (i < source.length()) {
             char c = source.charAt(i);
             if (c == '"' || c == '\'' || c == '/') {
-                int skipped = skipNonCode(source, i);
+                int skipped = skipNonCode(source, i, kotlin);
                 if (skipped > i) {
                     i = skipped;
                     continue;
@@ -2432,15 +2455,60 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// If a string, character literal or comment starts at `i`, the index just
     /// past it; otherwise `i`.
-    private static int skipNonCode(String s, int i) {
+    /// Index just past a Java text block opening at `i`. Escapes apply, so a
+    /// backslash consumes the character after it and cannot start a delimiter.
+    private static int endOfJavaTextBlock(String s, int i) {
+        int j = i + 3;
+        while (j < s.length()) {
+            char c = s.charAt(j);
+            if (c == '\\') {
+                j += 2;
+                continue;
+            }
+            if (c == '"' && s.startsWith("\"\"\"", j)) {
+                return j + 3;
+            }
+            j++;
+        }
+        return s.length();
+    }
+
+    /// Index just past a Kotlin raw string opening at `i`. No escapes, and a run
+    /// of quotes closes at its last three, so the extra ones belong to the value.
+    private static int endOfKotlinRawString(String s, int i) {
+        int j = i + 3;
+        while (j < s.length()) {
+            if (s.charAt(j) != '"') {
+                j++;
+                continue;
+            }
+            int run = j;
+            while (run < s.length() && s.charAt(run) == '"') {
+                run++;
+            }
+            if (run - j >= 3) {
+                return run;
+            }
+            j = run;
+        }
+        return s.length();
+    }
+
+    private static int skipNonCode(String s, int i, boolean kotlin) {
         char c = s.charAt(i);
         // A Kotlin raw string or a Java text block, which the ordinary rule reads
         // as an empty string followed by a new one -- and then an embedded quote
-        // inside it opens a literal that swallows the annotation after it. No
-        // escapes apply inside either form; the literal ends at the next """.
+        // inside it opens a literal that swallows the annotation after it.
+        //
+        // The two languages close it differently, and taking the shorter reading
+        // in either direction over-consumes past a live annotation:
+        //
+        //   Java   escape sequences DO apply, so \" is one quote and the run
+        //          \""" is an escaped quote followed by two, not a delimiter.
+        //   Kotlin escapes do NOT apply, and a run of four or more quotes ends
+        //          the literal at its LAST three -- """a"""" holds a" .
         if (c == '"' && s.startsWith("\"\"\"", i)) {
-            int close = s.indexOf("\"\"\"", i + 3);
-            return close < 0 ? s.length() : close + 3;
+            return kotlin ? endOfKotlinRawString(s, i) : endOfJavaTextBlock(s, i);
         }
         if (c == '"') {
             for (int j = i + 1; j < s.length(); j++) {
