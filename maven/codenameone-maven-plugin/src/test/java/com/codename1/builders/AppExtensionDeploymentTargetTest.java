@@ -1723,4 +1723,20 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("14.0", settings.get("IPHONEOS_DEPLOYMENT_TARGET[sdk=iphoneos*]"));
         assertEquals(notes.toString(), 1, notes.size());
     }
+
+    @Test
+    public void theContextFreeOverloadSurvivesAQualifiedIdentifier() throws Exception {
+        File dist = tmp.newFolder("dist99");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "buildSettings.properties"),
+                "PRODUCT_BUNDLE_IDENTIFIER[config\\=Debug] = com.example.app.Debug\n");
+
+        // The two-argument form asks "what identifier, in no particular context" -- callers that
+        // have no archive in hand. Selecting the winner needs a context to match conditions
+        // against, and a genuine null one is dereferenced: an unconstrained context is what
+        // "cannot tell" means everywhere else here, and it counts every condition.
+        assertEquals("com.example.app.Debug",
+                IPhoneBuilder.appExtensionBundleId(extension, "com.example.app.Fallback"));
+    }
 }

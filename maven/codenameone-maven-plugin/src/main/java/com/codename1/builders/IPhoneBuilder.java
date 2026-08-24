@@ -8048,9 +8048,13 @@ public class IPhoneBuilder extends Executor {
     }
 
     static boolean conditionApplies(String key, ArchiveContext context) {
-        String sdk = context.sdk;
-        String configuration = context.configuration;
-        String arch = context.arch;
+        // A null context is "no archive in hand" -- the two-argument appExtensionBundleId asks
+        // exactly that -- and it means the same thing here as a context whose fields are null:
+        // this build cannot tell, so every condition counts. Dereferencing it instead threw on
+        // the first qualified key, which is a crash where the answer was simply unknown.
+        String sdk = context == null ? null : context.sdk;
+        String configuration = context == null ? null : context.configuration;
+        String arch = context == null ? null : context.arch;
         int open = key.indexOf('[');
         if (open < 0) {
             return true;
@@ -8077,9 +8081,15 @@ public class IPhoneBuilder extends Executor {
             // archive declaring profile really is built as profile and its [variant=profile]
             // settings are the ones Xcode applies.
             if ("variant".equals(name)) {
-                boolean matches = false;
-                for (String variant : context.variants) {
-                    matches |= matchesCondition(value, variant);
+                // Same rule as the three above when there is no context to match against: unknown
+                // is not "does not apply".
+                List<String> against = context == null || context.variants == null
+                        ? null : context.variants;
+                boolean matches = against == null;
+                if (against != null) {
+                    for (String variant : against) {
+                        matches |= matchesCondition(value, variant);
+                    }
                 }
                 if (!matches) {
                     return false;
