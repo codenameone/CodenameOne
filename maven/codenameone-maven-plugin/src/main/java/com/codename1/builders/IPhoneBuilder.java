@@ -5082,9 +5082,16 @@ public class IPhoneBuilder extends Executor {
                                 // setting would have Xcode build the configuration under one
                                 // identifier while preflight, the profile check and the export
                                 // options all used the explicit one.
-                                if (winningSetting(declaredSettings, "PRODUCT_BUNDLE_IDENTIFIER",
+                                // NON-BLANK, because a blank one is not a statement about
+                                // anything: dropBlankBundleIdentifiers removes it before the
+                                // merge, so treating it as governing suppressed the plist
+                                // identifier and left that configuration on the base identifier
+                                // while its own bundle declares the literal stamping preserved.
+                                String governing = winningSetting(declaredSettings,
+                                        "PRODUCT_BUNDLE_IDENTIFIER",
                                         contextForCondition(perConfiguration.getKey(),
-                                                plistContext)) != null) {
+                                                plistContext));
+                                if (governing != null && governing.trim().length() > 0) {
                                     continue;
                                 }
                                 buildSettingsMap.put(perConfiguration.getKey(),
@@ -5177,8 +5184,16 @@ public class IPhoneBuilder extends Executor {
                                         // extension inside a universal app. A reference this build
                                         // cannot resolve is left exactly as written, as everywhere
                                         // else here: Xcode resolves it, and we do not get to guess.
+                                        // And in the KEY's own context: a helper can be
+                                        // conditional too, and resolving against the raw map
+                                        // read EXTENSION_FAMILIES's base 1,2 for a
+                                        // TARGETED_DEVICE_FAMILY[config=Debug] that Xcode expands
+                                        // to the Debug helper's 1 -- broadening the very
+                                        // extension the author narrowed.
                                         String declaredFamily = resolveSettingsFully(
-                                                archiveOwnSettings.get(key), archiveOwnSettings);
+                                                archiveOwnSettings.get(key),
+                                                flattenForContext(archiveOwnSettings,
+                                                        contextForCondition(key, plistContext)));
                                         if (declaredFamily == null) {
                                             continue;
                                         }

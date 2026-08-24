@@ -1362,4 +1362,41 @@ public class AppExtensionDeploymentTargetTest {
         assertNull(IPhoneBuilder.resolveSettingsFully(settings.get("TARGETED_DEVICE_FAMILY"),
                 settings));
     }
+
+    @Test
+    public void aBlankQualifiedIdentifierDoesNotGovern() throws Exception {
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]", "");
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", declared);
+
+        // winningSetting answers with the empty string, which is a declaration of nothing:
+        // dropBlankBundleIdentifiers removes it before the merge, so treating it as governing
+        // suppressed the plist's identifier for that configuration and left it on the base one
+        // while its own bundle declares the literal stamping preserved.
+        String governing = IPhoneBuilder.winningSetting(declared, "PRODUCT_BUNDLE_IDENTIFIER",
+                IPhoneBuilder.contextForCondition("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]",
+                        archive));
+        assertEquals("", governing);
+        assertTrue(governing.trim().length() == 0);
+    }
+
+    @Test
+    public void aConditionalFamilyHelperResolvesInItsOwnContext() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_FAMILIES", "1,2");
+        settings.put("EXTENSION_FAMILIES[config=Debug]", "1");
+        settings.put("TARGETED_DEVICE_FAMILY[config=Debug]", "$(EXTENSION_FAMILIES)");
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        // Against the raw map the helper answers with its base 1,2, so a Debug entry Xcode
+        // expands to 1 was rewritten wider than the author asked for.
+        assertEquals("1", IPhoneBuilder.resolveSettingsFully(
+                settings.get("TARGETED_DEVICE_FAMILY[config=Debug]"),
+                IPhoneBuilder.flattenForContext(settings, IPhoneBuilder.contextForCondition(
+                        "TARGETED_DEVICE_FAMILY[config=Debug]", archive))));
+        assertEquals("1,2", IPhoneBuilder.resolveSettingsFully(
+                settings.get("TARGETED_DEVICE_FAMILY[config=Debug]"), settings));
+    }
 }
