@@ -5268,13 +5268,15 @@ public class IPhoneBuilder extends Executor {
                                     buildSettingsMap.get("IPHONEOS_DEPLOYMENT_TARGET"),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
-                                    appExtension, buildSettingsMap, buildContext);
+                                    appExtension, buildSettingsMap, buildContext,
+                                    getDeploymentTarget(request));
                             String archiveDeploymentTarget = appExtensionDeploymentTarget(
                                     winningSetting(buildSettingsMap, "IPHONEOS_DEPLOYMENT_TARGET",
                                             buildContext),
                                     signingEntitlements,
                                     request.getArg("ios.deployment_target", null),
-                                    appExtension, buildSettingsMap, buildContext);
+                                    appExtension, buildSettingsMap, buildContext,
+                                    getDeploymentTarget(request));
                             buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET", extDeploymentTarget);
                             for (String note : repairQualifiedExtensionSettings(buildSettingsMap,
                                     request.getPackageName(),
@@ -6478,6 +6480,37 @@ public class IPhoneBuilder extends Executor {
     /// and sources.tar.bz2 lets either be built later.
     private static final String[] PROJECT_CONFIGURATIONS = {"Debug", "Release"};
 
+    /// The architectures worth resolving a path against: this build's, and every one the archive
+    /// names in a qualifier.
+    ///
+    /// Same rule as {@link #enumerableSdks}, and the same reason: an arm64 archive that never
+    /// looked at an [arch=x86_64] helper left the Intel simulator's plist undiscovered, so a
+    /// later build of it carried the arm64 identifier while its own plist declared another.
+    /// Nothing is invented here either -- only architectures the archive wrote down.
+    /// Visible for the test that pins which architectures are enumerated and which are not.
+    static List<String> enumerableArchsForTest(ArchiveContext own, Map<String, String> declared) {
+        return enumerableArchs(own, declared);
+    }
+
+    private static List<String> enumerableArchs(ArchiveContext own, Map<String, String> declared) {
+        List<String> out = new ArrayList<String>();
+        if (own != null && own.arch != null && own.arch.length() > 0) {
+            out.add(own.arch);
+        }
+        if (declared != null) {
+            for (String key : declared.keySet()) {
+                String arch = conditionsOf(key).get("arch");
+                if (arch != null && arch.length() > 0 && !out.contains(arch)) {
+                    out.add(arch);
+                }
+            }
+        }
+        if (out.isEmpty()) {
+            out.add(own == null ? null : own.arch);
+        }
+        return out;
+    }
+
     /// The SDKs worth resolving a path against: this build's, and every one the archive itself
     /// names in a qualifier.
     ///
@@ -6531,41 +6564,45 @@ public class IPhoneBuilder extends Executor {
         // with this archive's SDK.
         ArchiveContext own = contextForCondition(key, context);
         File active = out.get(key + " = " + value);
-        // One variant at a time, not the whole list: [variant=normal] and [variant=profile] are
-        // equally specific, so carrying both into a context reduced them by map order and only
-        // one variant's plist was ever discovered -- the other keeping a stale identity for a
-        // build Xcode really makes. The entitlements walk splits them for the same reason.
-        List<String> variants = own.variants == null || own.variants.isEmpty()
-                ? java.util.Collections.singletonList("normal") : own.variants;
         // A key that names its own configuration is not enumerated across configurations -- it
         // applies to one and says so. It can still vary along the other dimensions, though, and
-        // returning early for it skipped those: an INFOPLIST_FILE[config=Release] written through
-        // variant-qualified helpers had one variant's plist chosen by map order, and the other
-        // variant of that same Release archive kept an unstamped identity.
+        // returning early for it skipped those.
         List<String> configurations = conditionsOf(key).containsKey("config")
                 ? java.util.Collections.singletonList(own.configuration)
                 : java.util.Arrays.asList(PROJECT_CONFIGURATIONS);
         for (String sdk : enumerableSdks(own, declared)) {
             for (String configuration : configurations) {
-                for (String variant : variants) {
-                    boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
-                    boolean sameConfiguration = configuration == null
-                            ? own.configuration == null
-                            : configuration.equalsIgnoreCase(own.configuration);
-                    if (sameSdk && sameConfiguration && variants.size() == 1) {
-                        continue;
+                for (String arch : enumerableArchs(own, declared)) {
+                    // Recomputed here, not captured once: BUILD_VARIANTS can itself be qualified,
+                    // so the variants of a Debug build are not necessarily this archive's. Reusing
+                    // the active list meant a configuration that selects another variant never had
+                    // its plist discovered at all.
+                    ArchiveContext dimension = new ArchiveContext(sdk, configuration, arch, null);
+                    List<String> variants = ArchiveContext.of(sdk, configuration, arch,
+                            flattenForContext(declared, dimension)).variants;
+                    for (String variant : variants) {
+                        boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
+                        boolean sameConfiguration = configuration == null
+                                ? own.configuration == null
+                                : configuration.equalsIgnoreCase(own.configuration);
+                        boolean sameArch = arch == null ? own.arch == null
+                                : arch.equalsIgnoreCase(own.arch);
+                        if (sameSdk && sameConfiguration && sameArch && variants.size() == 1) {
+                            continue;
+                        }
+                        ArchiveContext other = new ArchiveContext(sdk, configuration, arch,
+                                java.util.Collections.singletonList(variant));
+                        File resolved = resolveInfoPlistPath(value, extensionFolder,
+                                extensionSettingsWithBuiltIns(extensionFolder, declared, other));
+                        if (resolved == null || sameFile(resolved, active)) {
+                            continue;
+                        }
+                        String qualifier = (sameSdk ? "" : "[sdk=" + sdk + "]")
+                                + (sameConfiguration ? "" : "[config=" + configuration + "]")
+                                + (sameArch ? "" : "[arch=" + arch + "]")
+                                + (variants.size() > 1 ? "[variant=" + variant + "]" : "");
+                        out.put(key + qualifier + " = " + value, resolved);
                     }
-                    ArchiveContext other = new ArchiveContext(sdk, configuration, own.arch,
-                            java.util.Collections.singletonList(variant));
-                    File resolved = resolveInfoPlistPath(value, extensionFolder,
-                            extensionSettingsWithBuiltIns(extensionFolder, declared, other));
-                    if (resolved == null || sameFile(resolved, active)) {
-                        continue;
-                    }
-                    String qualifier = (sameSdk ? "" : "[sdk=" + sdk + "]")
-                            + (sameConfiguration ? "" : "[config=" + configuration + "]")
-                            + (variants.size() > 1 ? "[variant=" + variant + "]" : "");
-                    out.put(key + qualifier + " = " + value, resolved);
                 }
             }
         }
@@ -7554,6 +7591,11 @@ public class IPhoneBuilder extends Executor {
     /// The floor for an extension that may be signed with any of these: the highest any of them
     /// asks for. An extension whose DEVICE entitlements need iOS 14 needs iOS 14.
     static String appExtensionDeploymentFloor(List<File> entitlements) {
+        // No entitlements is the 12.0 floor, not a crash: the File overload beside this one has
+        // always taken null to mean "signed with nothing", and the two should answer alike.
+        if (entitlements == null) {
+            return "12.0";
+        }
         for (File file : entitlements) {
             if (entitlementIsTrue(file, PAYMENT_PASS_PROVISIONING)) {
                 return "14.0";
@@ -8228,6 +8270,19 @@ public class IPhoneBuilder extends Executor {
     static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
             String appTarget, File extensionFolder, Map<String, String> settings,
             ArchiveContext context) {
+        return appExtensionDeploymentTarget(declared, entitlements, appTarget, extensionFolder,
+                settings, context, null);
+    }
+
+    /// @param inheritedTarget what the generated PROJECT carries, which is what $(inherited)
+    /// lands on. Not the same thing as {@code appTarget}: that one is the ios.deployment_target
+    /// hint and is absent unless the developer set it, while the project always has a target --
+    /// this builder computes it from the app's own floors. Passing only the hint meant an
+    /// extension inheriting the project's minimum was written down to the extension floor
+    /// whenever the hint was unset, which is the default case.
+    static String appExtensionDeploymentTarget(String declared, List<File> entitlements,
+            String appTarget, File extensionFolder, Map<String, String> settings,
+            ArchiveContext context, String inheritedTarget) {
         // The floor is a floor, not a default. An archive exported from an old project may carry
         // IPHONEOS_DEPLOYMENT_TARGET = 10.0 of its own, and honouring that unconditionally would
         // reproduce the very rejection this exists to prevent -- 10.0 does not even build against
@@ -8242,9 +8297,11 @@ public class IPhoneBuilder extends Executor {
             // and the floor replaced it, so an extension inheriting iOS 16 was written down to 12
             // or 14 and its code lost the availability the newer APIs need. Substituted first,
             // and only when this build knows what it inherits.
-            if (appTarget != null && appTarget.trim().length() > 0) {
-                chosen = chosen.replace("$(inherited)", appTarget.trim())
-                        .replace("${inherited}", appTarget.trim());
+            String inherits = inheritedTarget != null && inheritedTarget.trim().length() > 0
+                    ? inheritedTarget.trim() : appTarget;
+            if (inherits != null && inherits.trim().length() > 0) {
+                chosen = chosen.replace("$(inherited)", inherits.trim())
+                        .replace("${inherited}", inherits.trim());
                 if (chosen.indexOf('$') < 0) {
                     return isDeploymentTargetBelow(chosen, floor) ? floor
                             : normalizeVersion(chosen.trim());

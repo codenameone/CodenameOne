@@ -1757,4 +1757,39 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals("com.example.app.Debug",
                 IPhoneBuilder.appExtensionBundleId(extension, "com.example.app.Fallback"));
     }
+
+    @Test
+    public void inheritanceUsesTheProjectsTargetNotTheOptionalHint() throws Exception {
+        File dist = tmp.newFolder("dist100");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        // ios.deployment_target is absent unless the developer set it, which is the default case;
+        // the generated PROJECT always has a target. Passing only the hint wrote an extension that
+        // inherits the project minimum down to the extension floor.
+        assertEquals("16.0", IPhoneBuilder.appExtensionDeploymentTarget("$(inherited)",
+                (java.util.List<File>) null, null, extension, settings, archive, "16.0"));
+
+        // The hint still answers when there is nothing better.
+        assertEquals("15.0", IPhoneBuilder.appExtensionDeploymentTarget("$(inherited)",
+                (java.util.List<File>) null, "15.0", extension, settings, archive, null));
+    }
+
+    @Test
+    public void anArchQualifiedHelperIsEnumerated() throws Exception {
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("PLIST_PATH[arch=x86_64]", "WalletUIExtension/intel.plist");
+        IPhoneBuilder.ArchiveContext arm = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", declared);
+
+        // An arm64 archive that never looked at an [arch=x86_64] helper left the Intel
+        // simulator's plist undiscovered, so a later build of it carried the arm64 identifier
+        // while its own plist declared another. Only architectures the archive wrote down are
+        // enumerated -- nothing is invented.
+        assertEquals(java.util.Arrays.asList("arm64", "x86_64"),
+                IPhoneBuilder.enumerableArchsForTest(arm, declared));
+    }
 }
