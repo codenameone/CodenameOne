@@ -245,4 +245,52 @@ public class AppExtensionInfoPlistPathTest {
         assertTrue(stamped, stamped.contains("<key>CFBundleShortVersionString</key>\n\t<string>5.4</string>"));
         assertFalse(stamped, stamped.contains("$(MARKETING_VERSION)"));
     }
+
+    @Test
+    public void eachConfigurationsPlistKeepsItsOwnIdentifier() throws Exception {
+        File dist = tmp.newFolder("per-config-id");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File release = new File(extension, "release.plist");
+        File debug = new File(extension, "debug.plist");
+        write(release, identityPlist("com.example.app.Release"));
+        write(debug, identityPlist("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/release.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/debug.plist\n");
+
+        BuildRequest request = new BuildRequest();
+        request.setMainClass("MyApp");
+        request.setPackageName("com.example.app");
+        request.setVersion("5.4");
+        new IPhoneBuilder().stampAppExtensionInfoPlist(extension, request,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // Judged against the ARCHIVE's identifier, the Debug plist's own literal read as
+        // disagreeing and was replaced with $(PRODUCT_BUNDLE_IDENTIFIER) -- and the
+        // per-configuration discovery that follows records literals and ignores references, so
+        // the Debug identity was silently lost and that configuration fell back to the Release
+        // identifier, to be signed with a profile issued for another bundle.
+        String debugText = new String(Files.readAllBytes(debug.toPath()), "UTF-8");
+        assertTrue(debugText, debugText.contains("<string>com.example.app.Debug</string>"));
+
+        String releaseText = new String(Files.readAllBytes(release.toPath()), "UTF-8");
+        assertTrue(releaseText, releaseText.contains("<string>com.example.app.Release</string>"));
+
+        // And both survive into the settings the target is configured with.
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64",
+                        null), "com.example.app");
+        assertEquals("com.example.app.Release", identifiers.get("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals("com.example.app.Debug",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+    }
+
+    private static String identityPlist(String identifier) {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n<dict>\n"
+                + "\t<key>CFBundleIdentifier</key>\n\t<string>" + identifier + "</string>\n"
+                + "\t<key>CFBundleShortVersionString</key>\n\t<string>5.4</string>\n"
+                + "\t<key>CFBundleVersion</key>\n\t<string>5.4</string>\n"
+                + "</dict>\n</plist>\n";
+    }
 }

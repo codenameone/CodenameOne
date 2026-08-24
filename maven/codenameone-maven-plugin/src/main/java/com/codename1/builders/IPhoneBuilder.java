@@ -6135,9 +6135,17 @@ public class IPhoneBuilder extends Executor {
             // The settings the TARGET will carry, so a $(PRODUCT_BUNDLE_IDENTIFIER) in the plist
             // is judged by the identifier it will actually resolve to -- the archive's override
             // included, which is where an identifier from another project comes in.
+            // In the CANDIDATE's configuration, not the archive's. Judged against the archive's,
+            // the Debug plist's own literal read as disagreeing with the Release identifier and
+            // was replaced with $(PRODUCT_BUNDLE_IDENTIFIER) -- and since the per-configuration
+            // discovery that follows records literals and ignores references, the Debug identity
+            // was then gone: that configuration fell back to the Release identifier and a Debug
+            // build would be signed with a profile issued for a different bundle. Each plist is
+            // judged against the identifier ITS configuration gets, which is the one Xcode
+            // resolves in it.
             Map<String, String> settings = appExtensionBuildSettings(appExtension);
             settings.put("PRODUCT_BUNDLE_IDENTIFIER", appExtensionBundleId(appExtension,
-                    request.getPackageName() + "." + appExtension.getName(), context,
+                    request.getPackageName() + "." + appExtension.getName(), candidateContext,
                     request.getPackageName()));
             // In the candidate's OWN context, not this archive's. Every candidate is stamped,
             // because the generated project keeps them all and a later Debug build off
