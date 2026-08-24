@@ -11723,6 +11723,7 @@ public class IPhoneBuilder extends Executor {
         if (plist == null) {
             return null;
         }
+        plist = plistWithExpandedDict(plist, 0);
         int[] root = plistRootDictBody(plist);
         if (root == null) {
             return plist;
@@ -11735,6 +11736,37 @@ public class IPhoneBuilder extends Executor {
         updated = plistWithMultipleScenes(updated);
         updated = plistWithWindowRole(updated);
         return plist.substring(0, manifest[0]) + updated + plist.substring(manifest[1]);
+    }
+
+    /// The same text with the dictionary element at or after `from` expanded from the
+    /// self-closing spelling to an empty pair, so members can be added to it.
+    ///
+    /// `<dict/>` is a valid empty dictionary and an application is free to write one.
+    /// Everything that reads a plist here copes with it, but nothing can add a member
+    /// to it: there is no closing tag to insert before. Expanding it first is what
+    /// lets the Mac slice give an empty manifest, or empty scene configurations, the
+    /// content it needs -- without it the copy was returned unchanged and windows
+    /// stayed unsupported on the device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to normalize
+    ///
+    /// - `from`: where to look for the dictionary
+    ///
+    /// #### Returns
+    ///
+    /// the text, with that dictionary expanded if it needed it
+    private static String plistWithExpandedDict(String text, int from) {
+        int open = plistElementIndex(text, "dict", from);
+        if (open < 0) {
+            return text;
+        }
+        int gt = text.indexOf('>', open);
+        if (gt <= open || text.charAt(gt - 1) != '/') {
+            return text;
+        }
+        return text.substring(0, gt - 1) + "></dict>" + text.substring(gt + 1);
     }
 
     /// The `{start, end}` offsets of the root dictionary's body -- just inside its
@@ -11768,7 +11800,8 @@ public class IPhoneBuilder extends Executor {
 
     /// The same manifest with `UIApplicationSupportsMultipleScenes` true, adding the
     /// member when it is absent.
-    private static String plistWithMultipleScenes(String manifest) {
+    private static String plistWithMultipleScenes(String manifestElement) {
+        String manifest = plistWithExpandedDict(manifestElement, 0);
         int[] body = plistRootDictBody(manifest);
         if (body == null) {
             return manifest;
@@ -11789,7 +11822,8 @@ public class IPhoneBuilder extends Executor {
     /// Left alone when a window role is already there, whatever it names: rewriting a
     /// role the application wrote would silently replace its choice, and the caller
     /// refuses that case rather than overruling it.
-    private static String plistWithWindowRole(String manifest) {
+    private static String plistWithWindowRole(String manifestElement) {
+        String manifest = plistWithExpandedDict(manifestElement, 0);
         int[] body = plistRootDictBody(manifest);
         if (body == null) {
             return manifest;
@@ -11803,7 +11837,8 @@ public class IPhoneBuilder extends Executor {
                     + "    </dict>\n"
                     + manifest.substring(body[1]);
         }
-        String dict = manifest.substring(configurations[0], configurations[1]);
+        String dict = plistWithExpandedDict(
+                manifest.substring(configurations[0], configurations[1]), 0);
         int[] dictBody = plistRootDictBody(dict);
         if (dictBody == null) {
             return manifest;

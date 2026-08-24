@@ -363,6 +363,43 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aSelfClosingManifestStillGetsItsContentOnTheMacSlice() {
+        // "<dict/>" is a valid empty dictionary and an application may well write one.
+        // Nothing can add a member to it as written -- there is no closing tag to
+        // insert before -- so it has to be expanded first, or the Mac copy comes back
+        // unchanged and windows stay unsupported on the device.
+        String shared = document("    <key>UIApplicationSceneManifest</key>\n    <dict/>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)),
+                "an empty manifest still has to gain multiple-scene support");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "and the window role");
+    }
+
+    @Test
+    void selfClosingSceneConfigurationsStillGainTheWindowRole() {
+        String shared = document(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict/>\n"));
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(rootBody(mac)));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "empty scene configurations still have to gain the window role");
+    }
+
+    @Test
+    void aSelfClosingDictionaryElsewhereIsLeftAlone() {
+        // Only the dictionary being added to is expanded; an unrelated one keeps the
+        // spelling the application chose.
+        String shared = document("    <key>CN1Metadata</key>\n    <dict/>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(mac.contains("<key>CN1Metadata</key>\n    <dict/>"),
+                "an unrelated empty dictionary is not rewritten");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "and the manifest is still added");
+    }
+
+    @Test
     void aKeySetToFalseIsNotAcceptedAsTrue() {
         assertFalse(IPhoneBuilder.plistKeyIsTrue(
                 "<key>UIApplicationSupportsMultipleScenes</key><false/>",
