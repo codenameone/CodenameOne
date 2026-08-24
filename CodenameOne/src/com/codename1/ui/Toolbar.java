@@ -526,7 +526,7 @@ public class Toolbar extends Container {
     public void closeLeftSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (sidemenuDialog != null && sidemenuDialog.isShowing()) {
-                final Container cnt = toolbarLayeredPane();
+                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
                 Runnable onDisposed = new Runnable() {
                     @Override
                     public void run() {
@@ -570,7 +570,7 @@ public class Toolbar extends Container {
     public void closeRightSideMenu(final Runnable onFinish) {
         if (onTopSideMenu) {
             if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
-                final Container cnt = toolbarLayeredPane();
+                final Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
                 Runnable onDisposed = new Runnable() {
                     @Override
                     public void run() {
@@ -613,11 +613,9 @@ public class Toolbar extends Container {
         if (rightSidemenuDialog != null && rightSidemenuDialog.isShowing()) {
             return;
         }
-        // Capture the host before remove() detaches cnt -- afterwards cnt no longer
-        // resolves one. Through the top level rather than the form: a toolbar in a
-        // Window has no form, so the repaint below was skipped and the shaded pixels
-        // stayed on screen until something unrelated forced a redraw.
-        TopLevelContainer host = cnt.getTopLevelContainer();
+        // Capture the host form before remove() detaches cnt -- after
+        // remove() cnt.getComponentForm() returns null.
+        Form host = cnt.getComponentForm();
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency(0);
         cnt.remove();
@@ -627,7 +625,7 @@ public class Toolbar extends Container {
         // something else forces a redraw. revalidateLater queues a
         // single relayout/repaint pass for the next paint cycle.
         if (host != null) {
-            host.asContainer().revalidateLater();
+            host.revalidateLater();
         }
     }
 
@@ -737,13 +735,7 @@ public class Toolbar extends Container {
         if (iconSize < 0) {
             iconSize = 3;
         }
-        // Form only: the back command is Form navigation ("pop to the previous form"),
-        // which a Window has no notion of. The visible back button added below by the
-        // policy still works there -- it is an ordinary command in the left bar.
-        Form backHost = getComponentForm();
-        if (backHost != null) {
-            backHost.setBackCommand(cmd);
-        }
+        getComponentForm().setBackCommand(cmd);
         switch (policy) {
             case ALWAYS:
                 if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
@@ -909,36 +901,14 @@ public class Toolbar extends Container {
     /// - `callback`: gets the search string callbacks
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
         SearchBar s = new CallbackSearchBar(this, callback);
-        // Through the top level: getComponentForm() is null by design inside a Window,
-        // so activating the search command there threw on the very next line.
-        TopLevelContainer f = getTopLevelContainer();
-        if (f == null) {
-            return;
-        }
+        Form f = getComponentForm();
         setHidden(true);
-        if (f instanceof Form) {
-            // A Form hangs the toolbar off its own children and swaps the menu bar
-            // with it, so the outgoing one has to be detached first.
-            ((Form) f).removeComponentFromForm(this);
-        }
-        // A Window's setToolbar clears its title area and installs the replacement, so
-        // there is nothing to detach separately.
+        f.removeComponentFromForm(this);
         f.setToolbar(s);
         s.initSearchBar();
-        if (isOnDisplayedTopLevel(f)) {
-            f.asContainer().animateLayout(100);
+        if (f == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
+            f.animateLayout(100);
         }
-    }
-
-    /// True when the given top level is the surface currently on screen.
-    ///
-    /// `Display#getCurrent()` only ever names a `Form`, so comparing a `Window`
-    /// against it is false however visible the window is.
-    private static boolean isOnDisplayedTopLevel(TopLevelContainer top) {
-        if (top instanceof Window) {
-            return ((Window) top).isWindowShowing();
-        }
-        return Display.INSTANCE.getCurrent() == top; //NOPMD CompareObjectsWithEquals
     }
 
     /// Removes a previously installed search command
@@ -1562,20 +1532,13 @@ public class Toolbar extends Container {
     private void constructPermanentSideMenu() {
         if (permanentSideMenuContainer == null) {
             permanentSideMenuContainer = constructSideNavigationComponent();
-            // Through the top level: markInstalledOnWindow lets a toolbar in a Window
-            // past checkIfInitialized, so this is reachable there, and
-            // getComponentForm() is null by design in a Window.
-            TopLevelContainer parent = getTopLevelContainer();
-            if (parent == null) {
-                return;
-            }
+            Form parent = getComponentForm();
             if (sidemenuSouthComponent != null) {
                 Container c = BorderLayout.center(permanentSideMenuContainer);
                 c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST, c);
+                parent.addComponentToForm(BorderLayout.WEST, c);
             } else {
-                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST,
-                        permanentSideMenuContainer);
+                parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);
             }
         }
     }
@@ -1583,73 +1546,15 @@ public class Toolbar extends Container {
     private void constructPermanentRightSideMenu() {
         if (permanentRightSideMenuContainer == null) {
             permanentRightSideMenuContainer = constructRightSideNavigationComponent();
-            TopLevelContainer parent = getTopLevelContainer();
-            if (parent == null) {
-                return;
-            }
+            Form parent = getComponentForm();
             if (rightSidemenuSouthComponent != null) {
                 Container c = BorderLayout.center(permanentRightSideMenuContainer);
                 c.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);
-                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST, c);
+                parent.addComponentToForm(BorderLayout.EAST, c);
             } else {
-                TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST,
-                        permanentRightSideMenuContainer);
+                parent.addComponentToForm(BorderLayout.EAST, permanentRightSideMenuContainer);
             }
         }
-    }
-
-    /// The width of the surface this toolbar's side menu covers.
-    ///
-    /// For a toolbar in a `com.codename1.ui.Window` that is the window, which on a
-    /// desktop is neither the size nor the shape of the main display: a right-edge
-    /// swipe was being compared against the display's right edge and so could never
-    /// activate in a narrow window, and landscape menu margins could exceed the host.
-    /// A toolbar in a `Form` keeps answering from `Display` exactly as before.
-    ///
-    /// #### Returns
-    ///
-    /// the host width in pixels
-    private int hostWidth() {
-        TopLevelContainer top = getTopLevelContainer();
-        if (top instanceof Window) {
-            int w = top.asContainer().getWidth();
-            if (w > 0) {
-                return w;
-            }
-        }
-        return Display.getInstance().getDisplayWidth();
-    }
-
-    /// The height of the surface this toolbar's side menu covers. See
-    /// `#hostWidth()`.
-    ///
-    /// #### Returns
-    ///
-    /// the host height in pixels
-    private int hostHeight() {
-        TopLevelContainer top = getTopLevelContainer();
-        if (top instanceof Window) {
-            int h = top.asContainer().getHeight();
-            if (h > 0) {
-                return h;
-            }
-        }
-        return Display.getInstance().getDisplayHeight();
-    }
-
-    /// Whether the surface this toolbar sits on is taller than it is wide.
-    ///
-    /// A window has no device orientation, so its shape is the only meaningful
-    /// answer; a `Form` keeps using the device orientation it always did.
-    ///
-    /// #### Returns
-    ///
-    /// true when the host is portrait shaped
-    private boolean hostPortrait() {
-        if (getTopLevelContainer() instanceof Window) {
-            return hostHeight() >= hostWidth();
-        }
-        return Display.getInstance().isPortrait();
     }
 
     private void constructOnTopSideMenu(boolean isLeft) {
@@ -1661,13 +1566,7 @@ public class Toolbar extends Container {
                 permanentRightSideMenuContainer = constructRightSideNavigationComponent();
             }
 
-            // As above, reachable for a toolbar installed in a Window. Every member
-            // used below is on Container, so the top level's container is enough.
-            TopLevelContainer topLevel = getTopLevelContainer();
-            if (topLevel == null) {
-                return;
-            }
-            final Container parent = topLevel.asContainer();
+            final Form parent = getComponentForm();
             if (!isPointerPressedListenerAdded) {
                 parent.addPointerPressedListener(new ActionListener() {
                     @Override
@@ -1690,7 +1589,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = hostWidth();
+                                int displayWidth = Display.getInstance().getDisplayWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
@@ -1703,12 +1602,12 @@ public class Toolbar extends Container {
                         }
                         if (sidemenuDialog != null && isRTL()) {
                             if (sidemenuDialog.isShowing()) {
-                                if (evt.getX() < hostWidth() - sidemenuDialog.getWidth()) {
+                                if (evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
                                     //parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     //closeSideMenu();
                                     evt.consume();
                                 } else {
-                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < hostWidth() - sidemenuDialog.getWidth()) {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {
                                         parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
                                     } else {
                                         parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
@@ -1718,7 +1617,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = hostWidth();
+                                int displayWidth = Display.getInstance().getDisplayWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
@@ -1731,12 +1630,12 @@ public class Toolbar extends Container {
                         }
                         if (rightSidemenuDialog != null && !isRTL()) {
                             if (rightSidemenuDialog.isShowing()) {
-                                if (evt.getX() < hostWidth() - rightSidemenuDialog.getWidth()) {
+                                if (evt.getX() < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
                                     closeRightSideMenu();
                                     evt.consume();
                                 } else {
-                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < hostWidth() - rightSidemenuDialog.getWidth()) {
+                                    if (evt.getX() - Display.getInstance().convertToPixels(8) < Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {
                                         parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
                                     } else {
                                         parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.FALSE);
@@ -1746,7 +1645,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = hostWidth();
+                                int displayWidth = Display.getInstance().getDisplayWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() > displayWidth - sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
@@ -1774,7 +1673,7 @@ public class Toolbar extends Container {
                                     }
                                 }
                             } else {
-                                int displayWidth = hostWidth();
+                                int displayWidth = Display.getInstance().getDisplayWidth();
                                 final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                                 if (evt.getX() < sensitiveSection) {
                                     parent.putClientProperty("cn1$rightSidemenuCharged", Boolean.TRUE);
@@ -1793,7 +1692,7 @@ public class Toolbar extends Container {
                 parent.addPointerDraggedListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
-                        TopLevelContainer f = getTopLevelContainer();
+                        Form f = getComponentForm();
                         if (f == null || Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || f.findCurrentlyEditingComponent() != null || f.isEditing()) {
                             return;
                         }
@@ -1804,7 +1703,7 @@ public class Toolbar extends Container {
                                 if (!isRTL()) {
                                     showOnTopSidemenu(evt.getX(), false);
                                 } else {
-                                    showOnTopSidemenu(hostWidth() - evt.getX(), false);
+                                    showOnTopSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
                                 }
                             } else {
                                 if (sidemenuDialog.isShowing()) {
@@ -1817,7 +1716,7 @@ public class Toolbar extends Container {
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", Boolean.TRUE);
                                 if (!isRTL()) {
-                                    showOnTopRightSidemenu(hostWidth() - evt.getX(), false);
+                                    showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);
                                 } else {
                                     showOnTopRightSidemenu(evt.getX(), false);
                                 }
@@ -1840,7 +1739,7 @@ public class Toolbar extends Container {
                             return;
                         }
                         if (sidemenuDialog != null) {
-                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < hostWidth() - sidemenuDialog.getWidth())) {
+                            if ((!isRTL() && evt.getX() > sidemenuDialog.getWidth()) || (isRTL() && evt.getX() < Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth())) {
                                 if (sidemenuDialog.isShowing() && !isRTL()) {
                                     parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                                     evt.consume();
@@ -1851,7 +1750,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$sidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$sidemenuActivated", null);
-                                if ((evt.getX() < parent.getWidth() / 4 && !isRTL()) || (evt.getX() > hostWidth() - (parent.getWidth() / 4) && isRTL())) {
+                                if ((evt.getX() < parent.getWidth() / 4 && !isRTL()) || (evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && isRTL())) {
                                     closeSideMenu();
                                 } else {
                                     showOnTopSidemenu(-1, true);
@@ -1867,7 +1766,7 @@ public class Toolbar extends Container {
                             Boolean b = (Boolean) parent.getClientProperty("cn1$rightSidemenuActivated");
                             if (b != null && b.booleanValue()) {
                                 parent.putClientProperty("cn1$rightSidemenuActivated", null);
-                                if ((evt.getX() > hostWidth() - (parent.getWidth() / 4) && !isRTL()) || (evt.getX() < parent.getWidth() / 4 && isRTL())) {
+                                if ((evt.getX() > Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) && !isRTL()) || (evt.getX() < parent.getWidth() / 4 && isRTL())) {
                                     closeRightSideMenu();
                                 } else {
                                     showOnTopRightSidemenu(-1, true);
@@ -2023,14 +1922,7 @@ public class Toolbar extends Container {
     }
 
     void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
-        // The toolbar's own top level, not the current form. A side menu opened while
-        // a field in the same Window was being edited left that window's native editor
-        // active above the menu and still taking input, because the search and the
-        // stop below were aimed at the unrelated main form.
-        TopLevelContainer f = getTopLevelContainer();
-        if (f == null) {
-            f = Display.getInstance().getCurrent();
-        }
+        Form f = Display.getInstance().getCurrent();
         if (f != null) {
             Component currEditing = f.findCurrentlyEditingComponent();
             if (currEditing != null) {
@@ -2072,8 +1964,8 @@ public class Toolbar extends Container {
 
     void showOnTopSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
-        int dw = hostWidth();
-        if (hostPortrait()) {
+        int dw = Display.getInstance().getDisplayWidth();
+        if (Display.getInstance().isPortrait()) {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
@@ -2120,11 +2012,9 @@ public class Toolbar extends Container {
             sidemenuDialog.setAnimateShow(false);
             sidemenuDialog.setVisible(false);
             if (!isRTL()) {
-                sidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 sidemenuDialog.show(0, 0, 0, dw - v);
                 sidemenuDialog.disposeToTheLeft();
             } else {
-                sidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 sidemenuDialog.show(0, 0, dw - v, 0);
                 sidemenuDialog.disposeToTheRight();
             }
@@ -2132,13 +2022,13 @@ public class Toolbar extends Container {
             sidemenuDialog.putClientProperty("cn1$firstShow", Boolean.TRUE);
             sidemenuDialog.setAnimateShow(draggedX < 1);
         }
-        sidemenuDialog.setHeight(hostHeight());
+        sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
         sidemenuDialog.setWidth(v);
         if (!fromCurrent) {
             if (!isRTL()) {
                 sidemenuDialog.setX(-v);
             } else {
-                sidemenuDialog.setX(hostWidth() + v);
+                sidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
             }
         }
         sidemenuDialog.setRepositionAnimation(false);
@@ -2148,12 +2038,11 @@ public class Toolbar extends Container {
         }
 
         float f = ((float) v) / ((float) dw) * 80.0f;
-        Container cnt = toolbarLayeredPane();
+        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int) f);
         s.setBgColor(0);
 
-        sidemenuDialog.setTopLevelHost(getTopLevelContainer());
         sidemenuDialog.show(0, 0, 0, dw - actualV);
         if (!isRTL()) {
             if (draggedX > 0) {
@@ -2167,14 +2056,7 @@ public class Toolbar extends Container {
     }
 
     void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
-        // The toolbar's own top level, not the current form. A side menu opened while
-        // a field in the same Window was being edited left that window's native editor
-        // active above the menu and still taking input, because the search and the
-        // stop below were aimed at the unrelated main form.
-        TopLevelContainer f = getTopLevelContainer();
-        if (f == null) {
-            f = Display.getInstance().getCurrent();
-        }
+        Form f = Display.getInstance().getCurrent();
         if (f != null) {
             Component currEditing = f.findCurrentlyEditingComponent();
             if (currEditing != null) {
@@ -2217,8 +2099,8 @@ public class Toolbar extends Container {
 
     void showOnTopRightSidemenuImpl(int draggedX, boolean fromCurrent) {
         int v = 0;
-        int dw = hostWidth();
-        if (hostPortrait()) {
+        int dw = Display.getInstance().getDisplayWidth();
+        if (Display.getInstance().isPortrait()) {
             if (Display.getInstance().isTablet()) {
                 v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
                 if (v < 0) {
@@ -2265,11 +2147,9 @@ public class Toolbar extends Container {
             rightSidemenuDialog.setAnimateShow(false);
             rightSidemenuDialog.setVisible(false);
             if (!isRTL()) {
-                rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 rightSidemenuDialog.show(0, 0, dw - v, 0);
                 rightSidemenuDialog.disposeToTheRight();
             } else {
-                rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
                 rightSidemenuDialog.show(0, 0, 0, dw - v);
                 rightSidemenuDialog.disposeToTheLeft();
             }
@@ -2277,11 +2157,11 @@ public class Toolbar extends Container {
             rightSidemenuDialog.putClientProperty("cn1$firstRightShow", Boolean.TRUE);
             rightSidemenuDialog.setAnimateShow(draggedX < 1);
         }
-        rightSidemenuDialog.setHeight(hostHeight());
+        rightSidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
         rightSidemenuDialog.setWidth(v);
         if (!fromCurrent) {
             if (!isRTL()) {
-                rightSidemenuDialog.setX(hostWidth() + v);
+                rightSidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);
             } else {
                 rightSidemenuDialog.setX(-v);
             }
@@ -2293,12 +2173,11 @@ public class Toolbar extends Container {
         }
 
         float f = ((float) v) / ((float) dw) * 80.0f;
-        Container cnt = toolbarLayeredPane();
+        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
         Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int) f);
         s.setBgColor(0);
 
-        rightSidemenuDialog.setTopLevelHost(getTopLevelContainer());
         rightSidemenuDialog.show(0, 0, dw - actualV, 0);
         if (!isRTL()) {
             if (draggedX > 0) {
@@ -2331,14 +2210,11 @@ public class Toolbar extends Container {
                 sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
             } else {
                 if (permanentSideMenu && permanentSideMenuContainer != null) {
-                    TopLevelContainer parent = getTopLevelContainer();
-                    if (parent == null) {
-                        return;
-                    }
-                    TopLevelSupport.removeComponentFromTopLevel(parent, permanentSideMenuContainer);
+                    Form parent = getComponentForm();
+                    parent.removeComponentFromForm(permanentSideMenuContainer);
                     Container c = BorderLayout.center(permanentSideMenuContainer);
                     c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                    TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.WEST, c);
+                    parent.addComponentToForm(BorderLayout.WEST, c);
                 }
             }
         }
@@ -2364,14 +2240,11 @@ public class Toolbar extends Container {
                 rightSidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
             } else {
                 if (permanentSideMenu && permanentSideMenuContainer != null) {
-                    TopLevelContainer parent = getTopLevelContainer();
-                    if (parent == null) {
-                        return;
-                    }
-                    TopLevelSupport.removeComponentFromTopLevel(parent, permanentRightSideMenuContainer);
+                    Form parent = getComponentForm();
+                    parent.removeComponentFromForm(permanentRightSideMenuContainer);
                     Container c = BorderLayout.center(permanentRightSideMenuContainer);
                     c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
-                    TopLevelSupport.addComponentToTopLevel(parent, BorderLayout.EAST, c);
+                    parent.addComponentToForm(BorderLayout.EAST, c);
                 }
             }
         }
@@ -2857,14 +2730,6 @@ public class Toolbar extends Container {
     /// Adds a status bar space to the north of the Component, subclasses can
     /// override this default behavior.
     protected void initTitleBarStatus() {
-        // markInstalledOnWindow calls this, so it runs for a toolbar in a Window too.
-        // A desktop window has no device status bar to leave room for -- the OS draws
-        // its own title bar outside the Codename One surface -- so it takes the same
-        // path as a Form that does not paint one.
-        if (getTopLevelContainer() instanceof Window) {
-            setSafeArea(true);
-            return;
-        }
         Form f = getComponentForm();
         if (f != null && !f.shouldPaintStatusBar()) {
             setSafeArea(true);
@@ -2937,23 +2802,6 @@ public class Toolbar extends Container {
         allStyles.setMarginBottom(0);
     }
 
-    /// Marks this toolbar as attached to a top level, so the guarded API stops
-    /// refusing.
-    ///
-    /// The flag was only ever raised from `initMenuBar`, which a `Window` never runs --
-    /// it has no `MenuBar` and installs the toolbar in its title area instead. Every
-    /// guarded method therefore threw "Need to call Form#setToolBar" for a toolbar in a
-    /// window, including the one the search bar needs.
-    ///
-    /// #### Parameters
-    ///
-    /// - `title`: the title to adopt from the owning top level
-    void markInstalledOnWindow(String title) {
-        initialized = true;
-        setTitle(title);
-        initTitleBarStatus();
-    }
-
     private void checkIfInitialized() {
         if (!initialized) {
             throw new IllegalStateException("Need to call "
@@ -2975,104 +2823,44 @@ public class Toolbar extends Container {
         this.scrollOff = scrollOff;
     }
 
-    /// The layered pane this toolbar's overlays live in, resolved from its own top
-    /// level. `getFormLayeredPane` is on `TopLevelContainer`, so this works in a
-    /// `Window` -- where `getComponentForm()` is null and these overlays threw.
-    ///
-    /// #### Returns
-    ///
-    /// the layered pane, or null when this toolbar is not in a hierarchy
-    private Container toolbarLayeredPane() {
-        TopLevelContainer top = getTopLevelContainer();
-        return top == null ? null : top.getFormLayeredPane(Toolbar.class, false);
-    }
-
     /// Hide the Toolbar if it is currently showing
     public void hideToolbar() {
         showing = false;
-        // Resolved against this toolbar's own top level. Comparing the current Form
-        // with getComponentForm() took the early return for every toolbar in a Window,
-        // where that form is null by design -- so the animated hide never ran, and the
-        // matching show then went down its own hidden branch and threw.
-        TopLevelContainer top = getTopLevelContainer();
-        // Identity, not equality: the question is whether the surface on screen is
-        // this very toolbar's own top level.
-        boolean onScreen;
-        if (top instanceof Window) {
-            onScreen = ((Window) top).isWindowShowing();
-        } else {
-            onScreen = Display.INSTANCE.getCurrent() == top; //NOPMD CompareObjectsWithEquals
-        }
-        if (!onScreen) {
+        if (Display.INSTANCE.getCurrent() != getComponentForm()) { //NOPMD CompareObjectsWithEquals
             setVisible(false);
             setHidden(true);
             return;
         }
         if (actualPaneInitialH == 0) {
-            Container actual = TopLevelSupport.actualPaneOf(top);
-            if (actual != null) {
-                initVars(actual);
+            Form f = getComponentForm();
+            if (f != null) {
+                initVars(f.getActualPane());
             }
         }
         hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);
-        hideShowHost = top;
-        top.registerAnimated(this);
+        getComponentForm().registerAnimated(this);
         hideShowMotion.start();
     }
 
     /// Show the Toolbar if it is currently not showing
     public void showToolbar() {
         showing = true;
-        TopLevelContainer top = getTopLevelContainer();
-        if (top == null) {
-            // Not in a hierarchy: there is nothing to animate against, and the old
-            // code dereferenced a null form here.
-            setVisible(true);
-            setHidden(false);
-            return;
-        }
         if (!isVisible()) {
             setVisible(true);
             setHidden(false);
-            top.asContainer().animateLayout(200);
+            getComponentForm().animateLayout(200);
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
-        hideShowHost = top;
-        top.registerAnimated(this);
+        getComponentForm().registerAnimated(this);
         hideShowMotion.start();
-    }
-
-    /// The top level the hide/show animation was registered on.
-    ///
-    /// Resolved again at cleanup, a toolbar removed or reparented mid-animation
-    /// answered null or named a different surface, so the one holding the animation
-    /// never gave it up -- its hasAnimations() stays true, the event dispatch thread
-    /// never sleeps, and this method runs on every frame.
-    private TopLevelContainer hideShowHost;
-
-    /// Releases the hide/show animation from whichever top level took it.
-    private void releaseHideShowRegistration() {
-        if (hideShowHost != null) {
-            hideShowHost.deregisterAnimated(this);
-            hideShowHost = null;
-        }
     }
 
     @Override
     public boolean animate() {
         if (hideShowMotion != null) {
-            TopLevelContainer top = getTopLevelContainer();
-            final Container actualPane = TopLevelSupport.actualPaneOf(top);
-            if (actualPane == null) {
-                // Removed from its hierarchy mid-animation. Nothing left to move, and
-                // dereferencing the top level here is what used to throw. The
-                // registration still has to be released, or the top level that took it
-                // keeps the toolbar in its animation list for good.
-                releaseHideShowRegistration();
-                hideShowMotion = null;
-                return false;
-            }
+            Form f = getComponentForm();
+            final Container actualPane = f.getActualPane();
             int val = hideShowMotion.getValue();
             setY(val);
             if (!layered) {
@@ -3080,10 +2868,10 @@ public class Toolbar extends Container {
                 actualPane.setHeight(actualPaneInitialH - val);
                 actualPane.doLayout();
             }
-            top.asContainer().repaint();
+            f.repaint();
             boolean finished = hideShowMotion.isFinished();
             if (finished) {
-                releaseHideShowRegistration();
+                f.deregisterAnimated(this);
                 hideShowMotion = null;
             }
             return !finished;
@@ -3098,9 +2886,9 @@ public class Toolbar extends Container {
     }
 
     private void bindScrollListener(boolean bind) {
-        final TopLevelContainer f = getTopLevelContainer();
+        final Form f = getComponentForm();
         if (f != null) {
-            final Container actualPane = TopLevelSupport.actualPaneOf(f);
+            final Container actualPane = f.getActualPane();
             final Container contentPane = f.getContentPane();
             if (bind) {
                 initVars(actualPane);
@@ -3138,11 +2926,11 @@ public class Toolbar extends Container {
                                     actualPane.setSmoothScrolling(false);
                                     actualPane.setScrollY(scrollY - oldY + actualPane.getY());
                                     actualPane.setSmoothScrolling(smooth);
-                                    actualPane.setHeight(f.asContainer().getHeight() - getHeight() - getY());
+                                    actualPane.setHeight(f.getHeight() - getHeight() - getY());
 
                                     actualPane.doLayout();
                                 }
-                                f.asContainer().repaint();
+                                f.repaint();
                             }
                         } finally {
                             entered = false;
@@ -3164,7 +2952,7 @@ public class Toolbar extends Container {
                                 hideToolbar();
                             }
                         }
-                        f.asContainer().repaint();
+                        f.repaint();
                     }
                 };
                 contentPane.addPointerReleasedListener(releasedListener);
@@ -3242,13 +3030,7 @@ public class Toolbar extends Container {
             }
             return cmds;
         }
-        // Through the top level: a Window has commands of its own, and this
-        // dereference was unguarded, so asking a window's toolbar for its side menu
-        // commands threw.
-        TopLevelContainer f = getTopLevelContainer();
-        if (f == null) {
-            return cmds;
-        }
+        Form f = getComponentForm();
         int commands = f.getCommandCount();
         for (int iter = 0; iter < commands; iter++) {
             cmds.add(f.getCommand(iter));

@@ -387,7 +387,6 @@ public final class Display extends CN1Constants {
     // huge false positive from PMD...
     /// Ids of the windows with a pointer press in flight, paired with
     /// `#pointerPressTargets` by index.
-    private final int[] pointerPressWindows = new int[TRACKED_KEY_PRESSES];
 
     /// The top level that received each in-flight pointer press.
     ///
@@ -396,7 +395,8 @@ public final class Display extends CN1Constants {
     /// at once -- the Linux handlers deliberately track a sequence per window -- and
     /// a single field made the second press erase the first, so both releases were
     /// dropped and both components stayed latched down.
-    private final Container[] pointerPressTargets = new Container[TRACKED_KEY_PRESSES];
+    /// The main surface's pending press target; a window keeps its own.
+    private Container mainPointerPressTarget;
 
     /// Guards `#monitorsChangedPending`, which is set from the port's native event
     /// thread and cleared on the event dispatch thread.
@@ -3620,43 +3620,34 @@ public final class Display extends CN1Constants {
 
     /// Records which top level saw a pointer press in the given window.
     private void rememberPointerPress(int windowId, Container target) {
-        int free = -1;
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
-                pointerPressTargets[iter] = target;
-                return;
-            }
-            if (free < 0 && pointerPressTargets[iter] == null) {
-                free = iter;
-            }
+        if (windowId == 0) {
+            mainPointerPressTarget = target;
+            return;
         }
-        if (free >= 0) {
-            pointerPressWindows[free] = windowId;
-            pointerPressTargets[free] = target;
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.rememberPointerPress(target);
         }
     }
 
     /// Returns and forgets the top level that saw this window's pointer press.
     private Container takePointerPressTarget(int windowId) {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
-                Container out = pointerPressTargets[iter];
-                pointerPressTargets[iter] = null;
-                pointerPressWindows[iter] = 0;
-                return out;
-            }
+        if (windowId == 0) {
+            Container out = mainPointerPressTarget;
+            mainPointerPressTarget = null;
+            return out;
         }
-        return null;
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w == null ? null : w.takePointerPressTarget();
     }
 
     /// Whether a pointer press is recorded for the window, without consuming it.
     private boolean hasPointerPressTarget(int windowId) {
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
-                return true;
-            }
+        if (windowId == 0) {
+            return mainPointerPressTarget != null;
         }
-        return false;
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasPointerPressTarget();
     }
 
     /// Records which top level saw a key press, so its release can be matched to it.
@@ -3688,6 +3679,18 @@ public final class Display extends CN1Constants {
             keyPressTargets[free] = target;
         }
         return target;
+    }
+
+    /// Forgets every key this window saw go down. Keyed by key code because several
+    /// keys can be held at once, which is why this one table is not per window and
+    /// still needs clearing when a window leaves.
+    private void forgetKeyPressesFor(Container w) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+            }
+        }
     }
 
     /// Returns and forgets the top level that saw this key's press, or null when
@@ -4576,33 +4579,16 @@ public final class Display extends CN1Constants {
         // The implementation holds its own per-window input state -- the drag
         // activation slot -- which these records cannot reach.
         impl.releaseWindowInputState(id);
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
-                keyPressTargets[iter] = null;
-                keyPressCodes[iter] = 0;
-            }
-            if (pointerPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
-                pointerPressTargets[iter] = null;
-                pointerPressWindows[iter] = 0;
-            }
-        }
+        // The key table is keyed by key code rather than by window -- several keys can
+        // be held at once -- so a departing window's entries still have to be cleared
+        // here. Its pointer press target went with the window itself.
+        forgetKeyPressesFor(w);
     }
 
     void windowDisposed(Window w) {
         modalWindows.remove(w);
         syncNativeModalBlocking();
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (pointerPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
-                pointerPressTargets[iter] = null;
-                pointerPressWindows[iter] = 0;
-            }
-        }
-        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
-            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
-                keyPressTargets[iter] = null;
-                keyPressCodes[iter] = 0;
-            }
-        }
+        forgetKeyPressesFor(w);
         cancelKeyRepeat(w.getWindowId());
         cancelLongPress(w.getWindowId());
         // As above: a window disposed mid-press never delivers a release, and its

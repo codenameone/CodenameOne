@@ -103,13 +103,13 @@ class SearchBar extends Toolbar {
                         f.getAnimationManager().flushAnimation(new Runnable() {
                             @Override
                             public void run() {
-                                if (f instanceof Form) {
-                                    // A Form hangs the toolbar off its own children, so
-                                    // the outgoing one has to be detached first; a
-                                    // Window's setToolbar replaces its title area.
-                                    ((Form) f).removeComponentFromForm(SearchBar.this);
+                                if (!(f instanceof Form)) {
+                                    // A search bar lives in a Toolbar, and only a Form
+                                    // has one.
+                                    return;
                                 }
-                                f.setToolbar(parent);
+                                ((Form) f).removeComponentFromForm(SearchBar.this);
+                                ((Form) f).setToolbar(parent);
                                 parent.setHidden(false);
                                 f.asContainer().animateLayout(100);
                             }

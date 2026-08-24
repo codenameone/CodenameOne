@@ -1036,34 +1036,6 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
-    void aPressInTheTitleAreaReachesIt() {
-        implementation.setMultiWindowSupported(true);
-        Window w = new Window("titled", new BorderLayout());
-        w.add(BorderLayout.CENTER, new Label("content"));
-        final AtomicInteger pressed = new AtomicInteger();
-        Button chrome = new Button("close");
-        chrome.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                pressed.incrementAndGet();
-            }
-        });
-        w.getTitleArea().add(BorderLayout.EAST, chrome);
-        w.show();
-        w.revalidate();
-
-        // The title area is a sibling of the content pane, so hit testing that always
-        // started at the content pane could never reach a button drawn as chrome.
-        int x = chrome.getAbsoluteX() + chrome.getWidth() / 2;
-        int y = chrome.getAbsoluteY() + chrome.getHeight() / 2;
-        w.pointerPressed(x, y);
-        w.pointerReleased(x, y);
-        assertEquals(1, pressed.get(),
-                "a component in the title area has to receive presses");
-        w.dispose();
-    }
-
-    @FormTest
     void anUnownedWindowModalBlocksNothing() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("unowned modal");
@@ -1552,8 +1524,12 @@ class WindowTest extends UITestBase {
         // press through its awaiting-release list; the window never consumed that list
         // because Button registered through getComponentForm(), which is null here.
         w.pointerPressed(150, 120);
-        w.pointerDragged(2, 2);
-        w.pointerReleased(2, 2);
+        // Outside the window, not merely near its top left. A window has no title area
+        // any more -- its title is native chrome -- so the content pane fills it and a
+        // centred button covers every in-window point, including the (2,2) this used to
+        // treat as outside.
+        w.pointerDragged(-20, -20);
+        w.pointerReleased(-20, -20);
         int firedCount = fired[0];
         w.dispose();
 
@@ -2612,28 +2588,10 @@ class WindowTest extends UITestBase {
         assertEquals(before, sw.isValue(),
                 "the value flips when the animation finishes, not on release");
 
-        // The guard around a registration matters as much as the registration. Several
-        // of these sites sat inside an `if (getComponentForm() != null)`, so migrating
-        // only the call left it unreachable in a Window -- a fix that changed nothing.
-        // Toolbar was the worst of them: hideToolbar() compared the current Form with a
-        // null one and took its early return, and the following showToolbar() then went
-        // down its hidden branch and dereferenced that null form.
-        // Hidden on a window that is not on screen, which is the path that used to
-        // strand the toolbar: hideToolbar() took its early return and marked the
-        // toolbar invisible, and showToolbar() then went down its hidden branch and
-        // dereferenced the null form.
-        Window off = new Window("offscreen", new BorderLayout());
-        off.setWindowSize(400, 300);
-        Toolbar tb = new Toolbar();
-        off.setToolbar(tb);
-        off.revalidate();
-        tb.hideToolbar();
-        assertFalse(tb.isVisible(),
-                "a toolbar hidden while its window is off screen is hidden outright");
-        tb.showToolbar();
-        assertTrue(tb.isVisible(),
-                "and showing it again must bring it back rather than throw");
-        off.dispose();
+        // The guard around a registration matters as much as the registration: several
+        // of these sites sat inside an `if (getComponentForm() != null)`, so moving only
+        // the call left it unreachable in a Window -- a fix that changed nothing. That
+        // is now Component.registerForAnimation()'s problem rather than each caller's.
 
         // ImageViewer registers the same way from its animated setZoom path, which is
         // an ordinary operation rather than an edge case.
@@ -3069,61 +3027,6 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
-    void showingTheToolbarSearchBarInsideAWindowSwapsTheToolbar() {
-        implementation.setMultiWindowSupported(true);
-        Window w = new Window("search", new BorderLayout());
-        w.setWindowSize(400, 300);
-        Toolbar tb = new Toolbar();
-        w.setToolbar(tb);
-        w.show();
-        w.revalidate();
-        assertSame(tb, w.getToolbar());
-
-        // showSearchBar() assigned getComponentForm() and immediately called
-        // removeComponentFromForm on it, so activating the search command in a window
-        // threw. A Window installs its toolbar in the title area, so the outgoing one
-        // needs no separate detach -- only a Form does.
-        tb.showSearchBar(new com.codename1.ui.events.ActionListener() {
-            @Override
-            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-            }
-        });
-        flushSerialCalls();
-
-        assertNotSame(tb, w.getToolbar(),
-                "showing the search bar must swap the window's toolbar for it");
-        assertNotNull(w.getToolbar());
-
-        w.dispose();
-    }
-
-    @FormTest
-    void aTitleSetAfterAToolbarIsInstalledReachesIt() {
-        TestWindowManager wm = implementation.setMultiWindowSupported(true);
-        Window w = new Window("first", new BorderLayout());
-        w.setWindowSize(400, 300);
-        Toolbar tb = new Toolbar();
-        w.setToolbar(tb);
-        w.show();
-        TestWindowManager.FakeWindow peer = wm.getLastWindow();
-
-        // Once a toolbar is installed it draws the title, and the label setTitle used
-        // to update is no longer in the hierarchy -- so the change was invisible.
-        w.setTitle("second");
-
-        Component shown = tb.getTitleComponent();
-        assertTrue(shown instanceof Label, "the toolbar shows its title in a label");
-        assertEquals("second", ((Label) shown).getText(),
-                "an installed toolbar must show the window's new title");
-        assertEquals("second", w.getTitle(),
-                "and getTitle must read it back from the toolbar");
-        assertEquals("second", peer.getTitle(),
-                "while the native window title still follows too");
-
-        w.dispose();
-    }
-
-    @FormTest
     void centeringOnAFormUsesTheMainWindowNotTheWorkArea() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         // The main window deliberately does not fill the work area, which is the case
@@ -3186,38 +3089,6 @@ class WindowTest extends UITestBase {
         assertEquals(1, commandRuns[0], "the command runs exactly once");
         assertEquals(1, listenerSaw[0],
                 "and the window's command listeners must be notified once");
-
-        w.dispose();
-    }
-
-    @FormTest
-    void installingAToolbarKeepsTheWindowsExistingTitle() {
-        TestWindowManager wm = implementation.setMultiWindowSupported(true);
-        Window w = new Window("original", new BorderLayout());
-        w.setWindowSize(400, 300);
-        w.show();
-        TestWindowManager.FakeWindow peer = wm.getLastWindow();
-
-        // getTitle() answers from the installed toolbar once there is one, so reading
-        // it after this.toolbar has been replaced returns the incoming toolbar's empty
-        // title -- which was then handed straight back to it, blanking the visible
-        // title while the native window title still showed the real one.
-        Toolbar first = new Toolbar();
-        w.setToolbar(first);
-        assertEquals("original", titleTextOf(first),
-                "installing a toolbar must keep the window's existing title");
-        assertEquals("original", w.getTitle());
-        assertEquals("original", peer.getTitle(),
-                "and the native title is unchanged");
-
-        // Replacing one toolbar with another carries the title across too -- the same
-        // read-before-assign, one step further on.
-        w.setTitle("renamed");
-        Toolbar second = new Toolbar();
-        w.setToolbar(second);
-        assertEquals("renamed", titleTextOf(second),
-                "replacing a toolbar must carry the current title across");
-        assertEquals("renamed", w.getTitle());
 
         w.dispose();
     }
@@ -3375,107 +3246,6 @@ class WindowTest extends UITestBase {
         }
     }
 
-    @FormTest
-    void dismissingTheSearchBarInsideAWindowRestoresTheToolbar() {
-        implementation.setMultiWindowSupported(true);
-        Window w = new Window("search", new BorderLayout());
-        w.setWindowSize(400, 300);
-        Toolbar tb = new Toolbar();
-        w.setToolbar(tb);
-        w.show();
-        w.revalidate();
-
-        tb.showSearchBar(new com.codename1.ui.events.ActionListener() {
-            @Override
-            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
-            }
-        });
-        flushSerialCalls();
-        Toolbar search = w.getToolbar();
-        assertNotSame(tb, search, "the search bar should be installed at this point");
-
-        try {
-            // The search bar's back command resolved its host by casting getParent()
-            // to Form. Inside a Window the toolbar hangs off the title area, so that
-            // named the wrong type -- and because ParparVM does not check CHECKCAST,
-            // on Mac Catalyst it was a native crash rather than a catchable one.
-            Button back = findFirstCommandButton(search);
-            assertNotNull(back, "the search bar installs a back command");
-            back.getCommand().actionPerformed(
-                    new com.codename1.ui.events.ActionEvent(back.getCommand()));
-            flushSerialCalls();
-            // Showing the search bar animates the layout, so the restore is queued
-            // behind that animation rather than running inline.
-            pumpAnimations(w);
-
-            assertSame(tb, w.getToolbar(),
-                    "dismissing the search bar must put the original toolbar back");
-            assertFalse(tb.isHidden(),
-                    "the restored toolbar must be visible again");
-        } finally {
-            w.dispose();
-        }
-    }
-
-
-    @FormTest
-    void addingAPermanentSideMenuCommandInsideAWindowWorks() {
-        implementation.setMultiWindowSupported(true);
-        boolean oldPermanent = Toolbar.isPermanentSideMenu();
-        Toolbar.setPermanentSideMenu(true);
-        Window w = new Window("menu", new BorderLayout());
-        try {
-            w.setWindowSize(400, 300);
-            Toolbar tb = new Toolbar();
-            w.setToolbar(tb);
-            w.show();
-            w.revalidate();
-
-            // markInstalledOnWindow raises the initialized flag, so this call gets past
-            // checkIfInitialized -- and then constructPermanentSideMenu assigned
-            // getComponentForm() to a local and dereferenced it, which is null here.
-            Command item = new Command("Item");
-            tb.addCommandToLeftSideMenu(item);
-            w.revalidate();
-
-            assertNotNull(findButtonForCommand(w, item),
-                    "the side menu command must end up in the window's own hierarchy");
-        } finally {
-            Toolbar.setPermanentSideMenu(oldPermanent);
-            w.dispose();
-        }
-    }
-
-    @FormTest
-    void sideMenuCommandsOfAWindowToolbarReadTheWindowsCommands() {
-        implementation.setMultiWindowSupported(true);
-        boolean oldPermanent = Toolbar.isPermanentSideMenu();
-        boolean oldOnTop = Toolbar.isOnTopSideMenu();
-        Toolbar.setPermanentSideMenu(false);
-        Toolbar.setOnTopSideMenu(false);
-        Window w = new Window("menu", new BorderLayout());
-        try {
-            w.setWindowSize(400, 300);
-            Toolbar tb = new Toolbar();
-            w.setToolbar(tb);
-            w.show();
-            Command item = new Command("Item");
-            w.addCommand(item);
-
-            // Without a side menu container this read the command list off
-            // getComponentForm() with no null check at all.
-            ArrayList<Command> found = new ArrayList<Command>();
-            for (Command c : tb.getSideMenuCommands()) {
-                found.add(c);
-            }
-            assertTrue(found.contains(item),
-                    "a window toolbar's side menu commands are the window's commands");
-        } finally {
-            Toolbar.setPermanentSideMenu(oldPermanent);
-            Toolbar.setOnTopSideMenu(oldOnTop);
-            w.dispose();
-        }
-    }
 
     @FormTest
     void movingAShownWindowInvalidatesItsCachedMonitor() {
@@ -3646,47 +3416,6 @@ class WindowTest extends UITestBase {
                     "an unhosted dialog must still land on the current form");
         } finally {
             dlg.dispose();
-        }
-    }
-
-    @FormTest
-    void sideMenuGeometryComesFromTheHostWindowNotTheDisplay() throws Exception {
-        implementation.setMultiWindowSupported(true);
-        Form main = new Form("main", new BorderLayout());
-        main.show();
-        flushSerialCalls();
-
-        Window w = new Window("host", new BorderLayout());
-        w.setWindowSize(500, 400);
-        Toolbar tb = new Toolbar();
-        w.setToolbar(tb);
-        w.show();
-        w.revalidate();
-
-        Toolbar formToolbar = new Toolbar();
-        main.setToolbar(formToolbar);
-        main.revalidate();
-        try {
-            int displayWidth = Display.getInstance().getDisplayWidth();
-            int displayHeight = Display.getInstance().getDisplayHeight();
-            assertNotEquals(displayHeight, w.getHeight(),
-                    "the window and the display have to differ or this proves nothing");
-
-            // The side menu covers the surface its toolbar sits on, and every gesture
-            // threshold is measured against that surface. Taken from Display, a
-            // right-edge swipe in a narrow window was compared with the display's right
-            // edge and could never activate, and landscape margins could exceed the
-            // host width.
-            assertEquals(w.getWidth(), invokeHostGeometry(tb, "hostWidth"),
-                    "a toolbar in a window measures the window");
-            assertEquals(w.getHeight(), invokeHostGeometry(tb, "hostHeight"));
-
-            // The Form path has to stay exactly as it was.
-            assertEquals(displayWidth, invokeHostGeometry(formToolbar, "hostWidth"),
-                    "a toolbar in a form still measures the display");
-            assertEquals(displayHeight, invokeHostGeometry(formToolbar, "hostHeight"));
-        } finally {
-            w.dispose();
         }
     }
 

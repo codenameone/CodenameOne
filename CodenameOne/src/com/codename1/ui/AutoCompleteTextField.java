@@ -571,12 +571,12 @@ public class AutoCompleteTextField extends TextField {
         }
         int listHeight = items * l.getElementSize(false, true).getHeight();
         if (popupPosition == POPUP_POSITION_UNDER || popupPosition == POPUP_POSITION_AUTO && y < f.getContentPane().getHeight() / 2) {
-            topMargin = y - f.getTitleArea().getHeight() + getHeight();
+            topMargin = y - titleAreaHeight(f) + getHeight();
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight() / 2);
         } else {
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight() / 2);
-            popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
-            topMargin = y - f.getTitleArea().getHeight() - popupHeight;
+            popupHeight = Math.min(popupHeight, y - titleAreaHeight(f));
+            topMargin = y - titleAreaHeight(f) - popupHeight;
         }
         popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));
         popup.setPreferredH(popupHeight);
@@ -748,4 +748,10 @@ public class AutoCompleteTextField extends TextField {
             }
         }
     }
+    /// The height of the top level's title area, which only a Form has: a window's
+    /// title is drawn by the platform outside the content, so it takes no space here.
+    private static int titleAreaHeight(TopLevelContainer f) {
+        return f instanceof Form ? ((Form) f).getTitleArea().getHeight() : 0;
+    }
+
 }

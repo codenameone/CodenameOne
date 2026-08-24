@@ -827,7 +827,6 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// @deprecated this method was exposed to allow some hacks, you are advised not to use it.
     /// There are some alternatives such as command behavior (thru Display or the theme constants)
-    @Override
     public Container getTitleArea() {
         if (toolbar != null && toolbar.getParent() != null) {
             return toolbar;
@@ -4840,7 +4839,6 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the Toolbar instance or null if does not exists.
-    @Override
     public Toolbar getToolbar() {
         return toolbar;
     }
@@ -4850,7 +4848,6 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `toolbar`
-    @Override
     public void setToolbar(Toolbar toolbar) {
         this.toolbar = toolbar;
         setMenuBar(toolbar.getMenuBar());

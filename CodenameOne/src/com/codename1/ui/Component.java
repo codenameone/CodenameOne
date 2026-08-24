@@ -4505,6 +4505,38 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// the animation manager instance
+    /// The top level this component is currently registered with for animation.
+    ///
+    /// Kept so that deregistering goes back to the same place registering went. That
+    /// used to be each caller's problem, and it was a recurring defect: the component
+    /// registered against the top level it was in, then something moved or detached it,
+    /// and deregistering resolved a *different* top level -- or none -- so the old one
+    /// went on animating a component that had left it. It was patched separately in a
+    /// dozen classes; holding the answer here fixes the shape rather than the instances.
+    private TopLevelContainer animationRegisteredWith;
+
+    /// Registers this component to be animated by the top level it currently sits in.
+    /// Named apart from registerAnimatedInternal, which is the separate internal
+    /// animation registry Container keeps.
+    protected void registerForAnimation() {
+        TopLevelContainer f = getTopLevelContainer();
+        if (f != null) {
+            animationRegisteredWith = f;
+            f.registerAnimated(this);
+        }
+    }
+
+    /// Stops this component being animated, by the top level it registered with rather
+    /// than whichever one it can resolve now.
+    protected void deregisterFromAnimation() {
+        TopLevelContainer f = animationRegisteredWith != null
+                ? animationRegisteredWith : getTopLevelContainer();
+        animationRegisteredWith = null;
+        if (f != null) {
+            f.deregisterAnimated(this);
+        }
+    }
+
     public AnimationManager getAnimationManager() {
         TopLevelContainer f = getTopLevelContainer();
         if (f == null) {

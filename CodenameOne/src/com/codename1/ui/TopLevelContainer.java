@@ -83,13 +83,6 @@ public interface TopLevelContainer {
     /// the content pane
     Container getContentPane();
 
-    /// Returns the area reserved for the title and its surrounding chrome.
-    ///
-    /// #### Returns
-    ///
-    /// the title area container
-    Container getTitleArea();
-
     /// Returns the layered pane covering the content area, creating it if needed.
     ///
     /// #### Returns
@@ -170,20 +163,6 @@ public interface TopLevelContainer {
     void setTitle(String title);
 
     // ---- toolbar and commands --------------------------------------------------
-
-    /// Returns the toolbar installed in this top level.
-    ///
-    /// #### Returns
-    ///
-    /// the toolbar, or null when none is installed
-    Toolbar getToolbar();
-
-    /// Installs a toolbar in this top level.
-    ///
-    /// #### Parameters
-    ///
-    /// - `toolbar`: the toolbar to install
-    void setToolbar(Toolbar toolbar);
 
     /// Adds a command to this top level.
     ///

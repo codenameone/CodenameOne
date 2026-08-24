@@ -367,20 +367,7 @@ public class ImageViewer extends Component {
             image.lock();
         }
         if (image.isAnimation()) {
-            // The top level rather than the form: getComponentForm() is null
-            // by design inside a Window, so this both threw and left the
-            // animation unregistered there.
-            TopLevelContainer topLevel = getTopLevelContainer();
-            if (topLevel != null) {
-                // Remembered, so the animation comes off the top level that took it
-                // rather than off whatever this viewer resolves to when the motion
-                // ends. A viewer removed or reparented mid-zoom resolves to null or to
-                // somewhere else, and the original keeps the animation for good: its
-                // hasAnimations() stays true, so the event dispatch thread never
-                // sleeps and the finished branch runs every frame.
-                zoomAnimationHost = topLevel;
-                topLevel.registerAnimated(this);
-            }
+            registerForAnimation();
         }
         eagerLock();
     }
@@ -858,10 +845,7 @@ public class ImageViewer extends Component {
             if (motion.isFinished()) {
                 zooming = false;
                 if (!result) {
-                    if (zoomAnimationHost != null) {
-                        zoomAnimationHost.deregisterAnimated(this);
-                        zoomAnimationHost = null;
-                    }
+                    deregisterFromAnimation();
                 }
             }
             repaint();
@@ -1303,17 +1287,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            // The top level rather than the form: getComponentForm() is null
-            // by design inside a Window, so this both threw and left the
-            // animation unregistered there.
-            TopLevelContainer topLevel = getTopLevelContainer();
-            if (topLevel != null) {
-                // Recorded at every registration, not only the one in initComponent:
-                // the deregistration goes through this field, so a zoom that registers
-                // without setting it never comes off the animation list at all.
-                zoomAnimationHost = topLevel;
-                topLevel.registerAnimated(this);
-            }
+            registerForAnimation();
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -1350,17 +1324,7 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            // The top level rather than the form: getComponentForm() is null
-            // by design inside a Window, so this both threw and left the
-            // animation unregistered there.
-            TopLevelContainer topLevel = getTopLevelContainer();
-            if (topLevel != null) {
-                // Recorded at every registration, not only the one in initComponent:
-                // the deregistration goes through this field, so a zoom that registers
-                // without setting it never comes off the animation list at all.
-                zoomAnimationHost = topLevel;
-                topLevel.registerAnimated(this);
-            }
+            registerForAnimation();
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -1549,8 +1513,6 @@ public class ImageViewer extends Component {
 
     }
 
-    /// The top level this viewer's zoom animation was registered on.
-    private TopLevelContainer zoomAnimationHost;
 
     class AnimatePanX implements Animation {
         /// The top level this animation was registered on, so it is removed from that

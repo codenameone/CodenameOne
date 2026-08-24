@@ -126,12 +126,9 @@ public class Window extends Container implements TopLevelContainer {
     private int tactileTouchDuration = -1;
 
     private final Container contentPane;
-    private final Container titleArea = new Container(new BorderLayout());
-    private final Label title = new Label("", "Title");
     private Container layeredPane;
     private Container windowLayeredPane;
     private Painter glassPane;
-    private Toolbar toolbar;
 
     private ArrayList<Component> componentsAwaitingRelease;
     private Component focused;
@@ -252,9 +249,10 @@ public class Window extends Container implements TopLevelContainer {
         // knew to opt in. A BorderLayout content pane ignores this, as it does on a
         // Form -- setScrollableY forces false for one.
         contentPane.setScrollableY(true);
-        titleArea.setUIID("TitleArea");
-        titleArea.addComponent(BorderLayout.CENTER, this.title);
-        super.addComponent(BorderLayout.NORTH, titleArea);
+        // No title area and no toolbar. A window's title is its native chrome, drawn
+        // by the platform, so a second one inside the content would be a mobile idiom
+        // in a desktop window -- and it would eat content space to duplicate what the
+        // title bar already says.
         super.addComponent(BorderLayout.CENTER, contentPane);
         if (title != null) {
             setTitle(title);
@@ -325,12 +323,6 @@ public class Window extends Container implements TopLevelContainer {
     @Override
     public Container getContentPane() {
         return contentPane;
-    }
-
-    /// {@inheritDoc}
-    @Override
-    public Container getTitleArea() {
-        return titleArea;
     }
 
     /// {@inheritDoc}
@@ -435,65 +427,16 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public String getTitle() {
-        // The toolbar owns the visible title once one is installed, exactly as on a
-        // Form. Reading the detached label instead reported whatever it held before
-        // the toolbar took over.
-        if (toolbar != null) {
-            // Read the same way Form does: Toolbar has no getTitle, the title is
-            // whatever component it is currently showing.
-            Component cmp = toolbar.getTitleComponent();
-            return cmp instanceof Label ? ((Label) cmp).getText() : null;
-        }
-        return title.getText();
+        return pendingTitle;
     }
 
-    /// {@inheritDoc}
-    ///
-    /// Sets both the Codename One title component and the native window title.
     @Override
     public void setTitle(String title) {
-        // An installed toolbar draws the title, and the label this used to update is
-        // no longer in the hierarchy -- so a title set after the toolbar was installed
-        // changed nothing on screen. Form does the same forwarding.
-        if (toolbar != null) {
-            toolbar.setTitle(title);
-        } else {
-            this.title.setText(title);
-        }
-        // The native window title is set either way: it is the OS chrome's, not the
-        // toolbar's, and an undecorated window supplying its own chrome still wants
-        // the platform to know what the window is called.
+        // Straight to the platform. The window's title is the one the OS draws in its
+        // title bar; there is no in-content label to keep in step with it.
         pendingTitle = title;
         if (nativePeer != null) {
             manager().setTitle(nativePeer, title);
-        }
-    }
-
-    /// {@inheritDoc}
-    @Override
-    public Toolbar getToolbar() {
-        return toolbar;
-    }
-
-    /// {@inheritDoc}
-    @Override
-    public void setToolbar(Toolbar toolbar) {
-        // Read before the assignment. getTitle() answers from the installed toolbar
-        // once there is one, so asking after this.toolbar has been replaced reads the
-        // *incoming* toolbar's empty title and hands that straight back to it --
-        // blanking the visible title while the native window title still showed the
-        // real one.
-        String currentTitle = getTitle();
-        this.toolbar = toolbar;
-        titleArea.removeAll();
-        titleArea.setLayout(new BorderLayout());
-        titleArea.addComponent(BorderLayout.CENTER, toolbar);
-        if (toolbar != null) {
-            // A Form raises the toolbar's initialized flag from initMenuBar, which a
-            // Window never runs -- it has no MenuBar. Without this every guarded
-            // Toolbar method refused with "Need to call Form#setToolBar" for a toolbar
-            // that was in fact installed.
-            toolbar.markInstalledOnWindow(currentTitle);
         }
     }
 
@@ -1092,9 +1035,11 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     public int getDragRegionStatus(int x, int y) {
-        if (toolbar != null && !decorated) {
-            return Component.DRAG_REGION_LIKELY_DRAG_XY;
-        }
+        // A decorated window is dragged by its native title bar, and an undecorated one
+        // draws whatever chrome it wants inside its own content -- so nothing here is
+        // a drag handle by default. This used to answer "draggable" whenever a toolbar
+        // was installed, which was the mobile title bar standing in for a title bar the
+        // platform already provides.
         return Component.DRAG_REGION_NOT_DRAGGABLE;
     }
 
@@ -2444,13 +2389,6 @@ public class Window extends Container implements TopLevelContainer {
         if (windowLayeredPane != null && windowLayeredPane.getResponderAt(x, y) != null) {
             return windowLayeredPane;
         }
-        // The title area is a sibling of the content pane, not inside it, so a point
-        // in the north region resolves to nothing without this -- and a Toolbar or a
-        // button placed there, which is exactly how an undecorated window draws its
-        // own chrome, would never receive a press.
-        if (titleArea.contains(x, y) && titleArea.getComponentCount() > 0) {
-            return titleArea;
-        }
         return getActualPane();
     }
 
@@ -2798,6 +2736,26 @@ public class Window extends Container implements TopLevelContainer {
     private int longPointerX;
     private int longPointerY;
     private long longPointerStart;
+
+    /// The container in this window that accepted the current press, so its release
+    /// reaches the same place. A field rather than an entry in a table keyed by window,
+    /// for the same reason as everything else here.
+    private Container pointerPressTarget;
+
+    void rememberPointerPress(Container target) {
+        pointerPressTarget = target;
+    }
+
+    /// Returns the pending press target and clears it, so a release consumes it.
+    Container takePointerPressTarget() {
+        Container out = pointerPressTarget;
+        pointerPressTarget = null;
+        return out;
+    }
+
+    boolean hasPointerPressTarget() {
+        return pointerPressTarget != null;
+    }
 
     /// Arms key repeat and long key press for a press this window accepted.
     void chargeKeyRepeat(int keyCode, boolean armed, long now, long firstRepeatAt) {
