@@ -63,6 +63,7 @@ import com.codename1.push.PushCallback;
 import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -13088,6 +13089,36 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Turning VoiceOver on mid-session is picked up on the next invalidation --
     /// the flag is read per call, and any mutation after that point projects
     /// normally.
+    /// Invoked from native when an assistive-technology status notification fires.
+    ///
+    /// The status flip itself is not a component mutation, so without this nothing
+    /// would schedule the projection a newly-started technology needs and the
+    /// native tree would stay empty until some unrelated UI change happened to
+    /// invalidate a component. Marks the whole current form dirty so the very next
+    /// pass rebuilds and pushes the tree.
+    public static void assistiveTechnologyStatusChanged() {
+        final IOSImplementation impl = instance;
+        if (impl == null) {
+            return;
+        }
+        Display d = Display.getInstance();
+        if (d == null) {
+            return;
+        }
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    AccessibilityManager.getInstance().invalidate(f,
+                            AccessibilityManager.CHANGE_STRUCTURE
+                                    | AccessibilityManager.CHANGE_CONTENT
+                                    | AccessibilityManager.CHANGE_STATE);
+                }
+            }
+        });
+    }
+
     @Override
     public boolean isAccessibilityTreeUpdateRequired() {
         try {

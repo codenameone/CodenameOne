@@ -33,6 +33,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+#endif
 
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -1480,6 +1483,30 @@ JAVA_DOUBLE java_lang_Math_atan___double_R_double(CODENAME_ONE_THREAD_STATE, JAV
     return atan(a);
 }
 
+JAVA_DOUBLE java_lang_Math_acos___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return acos(a);
+}
+
+JAVA_DOUBLE java_lang_Math_asin___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return asin(a);
+}
+
+JAVA_DOUBLE java_lang_Math_atan2___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE y, JAVA_DOUBLE x) {
+    return atan2(y, x);
+}
+
+JAVA_DOUBLE java_lang_Math_exp___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return exp(a);
+}
+
+JAVA_DOUBLE java_lang_Math_log___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return log(a);
+}
+
+JAVA_DOUBLE java_lang_Math_log10___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return log10(a);
+}
+
 JAVA_BOOLEAN isClassNameEqual(const char * clsName, JAVA_ARRAY_CHAR* chrs, int length) {
     for(int i = 0 ; i < length ; i++) {
         if(clsName[i] != chrs[i]) return JAVA_FALSE;
@@ -1520,9 +1547,17 @@ JAVA_BOOLEAN java_lang_Class_isArray___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA
     return clz->isArray;
 }
 
+// NOTE on instanceofFunction's argument order: despite its parameter names, it
+// is called as instanceofFunction(TARGET_TYPE, OBJECT_CLASS) — see BC_INSTANCEOF,
+// which passes the bytecode's type operand first and GET_CLASS_ID(obj) second.
+// It then indexes classInstanceOf[] by the OBJECT's class (whose table lists that
+// class's supertypes) and searches it for the target. Both helpers below must
+// therefore pass the receiver Class first.
+
 JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT cls2) {
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)cls2;
+    // A.isAssignableFrom(B): target is A, the class under test is B.
     return instanceofFunction(clz1->classId, clz2->classId);
 }
 
@@ -1530,7 +1565,17 @@ JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ON
     if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
     struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
-    return instanceofFunction(clz2->classId, clz1->classId);
+    // A.isInstance(o): target is A, the class under test is o's class. These were
+    // reversed, so isInstance searched the TARGET's supertype table for the
+    // object's class and answered false for every subclass — every
+    // Class.isInstance in a native build was wrong unless the types were equal.
+    return instanceofFunction(clz1->classId, clz2->classId);
+}
+
+JAVA_OBJECT java_lang_Class_getSuperclass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
+    struct clazz* clz = (struct clazz*)cls;
+    // Object, interfaces, primitives and void have no superclass.
+    return (JAVA_OBJECT)clz->baseClass;
 }
 
 JAVA_BOOLEAN java_lang_Class_isInterface___R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
@@ -1873,6 +1918,33 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         }
     }
 #endif
+#ifdef CN1_HEAP_HISTOGRAM
+    {
+        // Once, on the third cycle: the first two run while the first screen is
+        // still being built, and a census of a half-built heap names the wrong
+        // things.
+        extern void cn1HeapHistogramPublic(void);
+        static int cn1HistCycle = 0;
+        if(++cn1HistCycle == 3) {
+            cn1HeapHistogramPublic();
+        }
+    }
+#endif
+    // No call reclaims the emptied pages. A sweep frees objects with free(),
+    // and libmalloc keeps most of the emptied pages in its zone rather than
+    // returning them to the kernel -- they stay counted against the process.
+    // malloc_zone_pressure_relief looks like the answer and is not: measured on
+    // macOS 26, a program that mallocs 200,000 x 500 bytes, touches them and
+    // frees every one sits at 52.9MB of physical footprint, and stays at
+    // exactly 52.9MB after malloc_zone_pressure_relief(NULL, 0) AND after
+    // calling it on every zone from malloc_get_all_zones. Three revisions of
+    // this file called it here on a countdown (every sixteenth cycle, every
+    // eighth, then every cycle) and the idle remainder never moved: 45.8MB of
+    // "MALLOC_SMALL (empty)" against 0.8MB for the same application built with
+    // a competing toolchain. The retained pages are a function of how many
+    // small blocks were ever live at once, so the only lever is allocating
+    // fewer of them -- see the object allocator, which keeps Java objects out
+    // of malloc entirely for exactly this reason.
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
 }

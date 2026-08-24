@@ -14894,14 +14894,72 @@ static void cn1_resetContext(void) {
 }
 #endif // !TARGET_OS_TV
 
+#if !TARGET_OS_WATCH
+BOOL cn1AccessibilityEagerLatched(void);
+void cn1RegisterAccessibilityStatusObservers(void);
+
+// A technology STARTING is not a component mutation, so nothing in the portable
+// layer would schedule the projection it needs and the native tree would stay
+// empty until some unrelated UI change happened to invalidate something. These
+// notifications are the trigger for that transition.
+//
+// They also cover the technologies whose running state UIKit will not report:
+// enabling Voice Control or Full Keyboard Access flips VoiceOver/AssistiveTouch
+// often enough in practice, but not always -- so once ANY of these fires we
+// latch eager projection on for the rest of the process rather than trusting a
+// flag that has no way to describe them. Paying one process's worth of eager
+// projection is the right side to err on for an accessibility feature.
+static BOOL cn1A11yLatched = NO;
+
+BOOL cn1AccessibilityEagerLatched(void) {
+    return cn1A11yLatched;
+}
+
+static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
+                                          CFStringRef name, const void *object,
+                                          CFDictionaryRef userInfo) {
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void cn1RegisterAccessibilityStatusObservers(void) {
+    static BOOL done = NO;
+    if(done) {
+        return;
+    }
+    done = YES;
+    NSArray *names = @[UIAccessibilityVoiceOverStatusDidChangeNotification,
+                       UIAccessibilitySwitchControlStatusDidChangeNotification,
+                       UIAccessibilityAssistiveTouchStatusDidChangeNotification];
+    for(NSString *n in names) {
+        CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL,
+                                        cn1AccessibilityStatusChanged,
+                                        (__bridge CFStringRef)n, NULL,
+                                        CFNotificationSuspensionBehaviorDeliverImmediately);
+    }
+}
+#endif
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     // CN1_EAGER_A11Y=1 restores the old always-project behaviour for an A/B.
     if(getenv("CN1_EAGER_A11Y") != NULL) {
         return JAVA_TRUE;
     }
 #if !TARGET_OS_WATCH
+    // These three are the ENTIRE public surface for "is an assistive technology
+    // running": UIKit exposes IsVoiceOverRunning, IsSwitchControlRunning and
+    // IsAssistiveTouchRunning and nothing else. In particular there is no
+    // public running flag for Voice Control or Full Keyboard Access, so this
+    // cannot detect them -- see cn1AccessibilityStatusChanged for how that gap
+    // is covered rather than ignored.
+    cn1RegisterAccessibilityStatusObservers();
+    if(cn1AccessibilityEagerLatched()) {
+        return JAVA_TRUE;
+    }
     return (UIAccessibilityIsVoiceOverRunning() ||
-            UIAccessibilityIsSwitchControlRunning()) ? JAVA_TRUE : JAVA_FALSE;
+            UIAccessibilityIsSwitchControlRunning() ||
+            UIAccessibilityIsAssistiveTouchRunning()) ? JAVA_TRUE : JAVA_FALSE;
 #else
     return JAVA_FALSE;
 #endif

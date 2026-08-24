@@ -425,7 +425,13 @@ static MTLStorageMode cn1StencilStorageMode(id<MTLDevice> device) {
     if(forcePrivate < 0) {
         forcePrivate = getenv("CN1_STENCIL_PRIVATE") != NULL ? 1 : 0;
     }
-    if(!forcePrivate && device != nil && [device supportsFamily:MTLGPUFamilyApple1]) {
+    // supportsFamily: is iOS 13 / macOS 10.15. ios.deployment_target is a build
+    // hint and IPhoneBuilder will happily emit a target below that, where this
+    // selector does not exist and the message would terminate the app during
+    // view initialisation. Probe before sending, and fall back to Private.
+    if(!forcePrivate && device != nil &&
+       [device respondsToSelector:@selector(supportsFamily:)] &&
+       [device supportsFamily:MTLGPUFamilyApple1]) {
         return MTLStorageModeMemoryless;
     }
     return MTLStorageModePrivate;
@@ -649,6 +655,24 @@ int cn1DirectToDrawableEnabled(void) {
 }
 
 
+// The polygon-clip stencil (#3921) is needed by both render paths, so it is
+// factored out of updateFrameBufferSize: -- direct mode returns early, before
+// the screen-texture initialisation it has no texture to do.
+- (void)buildStencilTextureForWidth:(int)pw height:(int)ph layer:(CAMetalLayer *)layer {
+    // Storage mode is chosen at runtime -- see cn1StencilStorageMode.
+    MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
+        width:pw height:ph mipmapped:NO];
+    stencilDesc.usage = MTLTextureUsageRenderTarget;
+    stencilDesc.storageMode = cn1StencilStorageMode(layer.device);
+    id<MTLTexture> newStencil = [layer.device newTextureWithDescriptor:stencilDesc];
+    CN1_TEX_NOTE("stencilTexture", newStencil);
+    self.stencilTexture = newStencil;
+#ifndef CN1_USE_ARC
+    [newStencil release];
+#endif
+}
+
 -(void)updateFrameBufferSize:(int)w h:(int)h {
     // Trust caller-supplied physical-pixel dimensions; fall back to bounds
     // only if the caller passes 0. Reading self.bounds alone is unsafe
@@ -756,6 +780,17 @@ int cn1DirectToDrawableEnabled(void) {
     // exists we scale-blit it in (preserving the last visible content across
     // the resize -- see the oldScreen capture above); otherwise we just clear
     // to opaque black.
+    // Direct mode has no screenTexture to initialise, and a render pass with a
+    // nil colour attachment and no explicit renderTargetWidth/Height is invalid
+    // -- it survives today only because the encoder comes back nil and every
+    // message to it is a no-op, which is not something to rely on.
+    if (self.screenTexture == nil) {
+        [self buildStencilTextureForWidth:pw height:ph layer:layer];
+#ifndef CN1_USE_ARC
+        [oldScreen release];
+#endif
+        return;
+    }
     id<MTLCommandBuffer> clearCb = [self.commandQueue commandBuffer];
     MTLRenderPassDescriptor *clearPass = [MTLRenderPassDescriptor renderPassDescriptor];
     clearPass.colorAttachments[0].texture = self.screenTexture;
@@ -810,19 +845,7 @@ int cn1DirectToDrawableEnabled(void) {
     [clearEnc endEncoding];
     [clearCb commit];
 
-    // Build a matching Stencil8 attachment for polygon-shape clipping (#3921).
-    // Storage mode is chosen at runtime -- see cn1StencilStorageMode.
-    MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
-        width:pw height:ph mipmapped:NO];
-    stencilDesc.usage = MTLTextureUsageRenderTarget;
-    stencilDesc.storageMode = cn1StencilStorageMode(layer.device);
-    id<MTLTexture> newStencil = [layer.device newTextureWithDescriptor:stencilDesc];
-    CN1_TEX_NOTE("stencilTexture", newStencil);
-    self.stencilTexture = newStencil;
-#ifndef CN1_USE_ARC
-    [newStencil release];
-#endif
+    [self buildStencilTextureForWidth:pw height:ph layer:layer];
 
     // Push the preserved frame onto the layer so the rotation never shows
     // black (#5162) -- but NOT synchronously here. updateFrameBufferSize: runs

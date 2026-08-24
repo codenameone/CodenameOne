@@ -757,8 +757,28 @@ extern JAVA_OBJECT* constantPoolObjects;
 extern int classListSize;
 extern struct clazz* classesList[];
 
-// this needs to be fixed to actually return a JAVA_OBJECT...
-#define STRING_FROM_CONSTANT_POOL_OFFSET(off) constantPoolObjects[off]
+/**
+ * The String object for a literal, materialised on FIRST USE.
+ *
+ * initConstantPool used to build every literal in the application before main
+ * ran. On a large transpiled application that was 38,238 java.lang.String
+ * objects and their backing arrays -- 61% of every live object in the process --
+ * for an application that touches a few thousand of them: every localisation of
+ * every string for every locale, every UIID, every demo description, all
+ * allocated, all pinned by the pool's own GC root, none of them ever read.
+ *
+ * The fast path is a load and a predicted-taken branch, which is what the old
+ * macro compiled to anyway. Literal IDENTITY is preserved -- the slow path is
+ * serialised and double-checked, so "x" == "x" stays true, which Java requires
+ * and generated code relies on.
+ */
+extern JAVA_OBJECT cn1MaterializeConstantPoolString(int off);
+/// Start-up attribution probe; prints elapsed-since-process-start when
+/// CN1_STARTUP_PHASES is set, and costs one cached getenv otherwise.
+extern void cn1StartupPhase(const char* name);
+#define STRING_FROM_CONSTANT_POOL_OFFSET(off) \
+    (__builtin_expect(constantPoolObjects[off] != JAVA_NULL, 1) \
+        ? constantPoolObjects[off] : cn1MaterializeConstantPoolString(off))
 
 #define BC_IINC(val, num) ilocals_##val##_ += num;
 
