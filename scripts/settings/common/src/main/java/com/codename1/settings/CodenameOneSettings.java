@@ -2427,82 +2427,94 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// One import directive: the dotted name it introduces and its alias, if any.
+    static final class Imported {
+        final String name;
+        final String alias;
+
+        Imported(String name, String alias) {
+            this.name = name;
+            this.alias = alias;
+        }
+    }
+
+    /// Every live `import` in `source`, read FORWARDS.
+    ///
+    /// Forwards rather than by backing up from a name, because backing up has to
+    /// step over comments in reverse -- and
+    /// `import /* build hints */ com.codename1.annotations.buildhints.Ios;` is
+    /// legal, so a backward walk that skipped only spaces missed the import and
+    /// the live @Ios was read as somebody else's.
+    static java.util.List<Imported> importsIn(String source, boolean kotlin) {
+        java.util.List<Imported> out = new java.util.ArrayList<>();
+        int at = nextMarker(source, "import", 0, kotlin);
+        while (at >= 0) {
+            int after = at + "import".length();
+            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
+                    && after < source.length() && !continuesAName(source.charAt(after));
+            if (!whole) {
+                at = nextMarker(source, "import", after, kotlin);
+                continue;
+            }
+            int i = nextLiveChar(source, after, kotlin);
+            if (i < 0) {
+                return out;
+            }
+            StringBuilder name = new StringBuilder();
+            while (i < source.length()
+                    && (continuesAName(source.charAt(i)) || source.charAt(i) == '.'
+                        || source.charAt(i) == '*')) {
+                name.append(source.charAt(i));
+                i++;
+            }
+            String alias = null;
+            int a = nextLiveChar(source, i, kotlin);
+            if (a >= 0 && source.regionMatches(a, "as", 0, 2)
+                    && a + 2 < source.length() && !continuesAName(source.charAt(a + 2))) {
+                int n = nextLiveChar(source, a + 2, kotlin);
+                if (n >= 0) {
+                    int nameEnd = n;
+                    while (nameEnd < source.length()
+                            && continuesAName(source.charAt(nameEnd))) {
+                        nameEnd++;
+                    }
+                    if (nameEnd > n) {
+                        alias = source.substring(n, nameEnd);
+                    }
+                }
+            }
+            if (name.length() > 0) {
+                out.add(new Imported(name.toString(), alias));
+            }
+            at = nextMarker(source, "import", i, kotlin);
+        }
+        return out;
+    }
+
     /// Whether a live import brings `simple` in from the build hints package.
     ///
-    /// Either the type by name or the package on demand. Without this the bare
-    /// `@Build` of some other library counts as ours.
+    /// Either the type by name or the package on demand, and neither if some
+    /// other library's type of that name is imported explicitly: a single-type
+    /// import shadows an on-demand one, so their `Ios` beats our wildcard. That
+    /// is the language's rule, not a preference.
     static boolean importsAnnotation(String source, String simple, boolean kotlin) {
         String pkg = "com.codename1.annotations.buildhints.";
-        // An explicit single-type import of the same simple name, from anywhere
-        // else, wins over our wildcard -- that is the language rule, not a
-        // preference. Without it a file importing our package on demand AND some
-        // other library's Ios by name had its @Ios read as ours, so Settings hid
-        // the editor for a hint the processor never emits.
-        if (importsOtherTypeNamed(source, simple, pkg, kotlin)) {
-            return false;
-        }
-        for (String needle : new String[] {pkg + simple, pkg + "*"}) {
-            int at = nextMarker(source, needle, 0, kotlin);
-            while (at >= 0) {
-                int after = at + needle.length();
-                boolean whole = needle.endsWith("*")
-                        || after >= source.length() || !continuesAName(source.charAt(after));
-                // `import ...Ios as BuildIos` does NOT put Ios in scope -- it puts
-                // BuildIos there, and the file is then free to import someone
-                // else's Ios. Counting the aliased import as a simple-name import
-                // attributed that other annotation to us.
-                if (whole && precededByImport(source, at) && !hasAsClause(source, after)) {
-                    return true;
-                }
-                at = nextMarker(source, needle, after, kotlin);
+        boolean ours = false;
+        for (Imported imported : importsIn(source, kotlin)) {
+            if (imported.alias != null) {
+                // Introduces its alias, not this name, so it neither grants the
+                // simple spelling nor shadows it.
+                continue;
+            }
+            if (imported.name.equals(pkg + simple) || imported.name.equals(pkg + "*")) {
+                ours = true;
+            } else if (imported.name.endsWith("." + simple)) {
+                return false;
             }
         }
-        return false;
+        return ours;
     }
 
-    /// Whether a live import brings a DIFFERENT type of this simple name into
-    /// scope by name.
-    ///
-    /// A single-type import shadows an on-demand one, so ours loses. An aliased
-    /// Kotlin import is not one of these: it introduces its alias, not `simple`.
-    static boolean importsOtherTypeNamed(String source, String simple, String ourPkg,
-                                         boolean kotlin) {
-        int at = nextMarker(source, simple, 0, kotlin);
-        while (at >= 0) {
-            int after = at + simple.length();
-            boolean whole = (at == 0 || !continuesAName(source.charAt(at - 1)))
-                    && (after >= source.length() || !continuesAName(source.charAt(after)));
-            if (whole && precededByQualifiedImport(source, at)
-                    && !hasAsClause(source, after)
-                    && !source.startsWith(ourPkg + simple, at - ourPkg.length() < 0
-                            ? 0 : at - ourPkg.length())) {
-                return true;
-            }
-            at = nextMarker(source, simple, after, kotlin);
-        }
-        return false;
-    }
-
-    /// Whether the token at `at` ends a dotted name that an `import` introduces.
-    private static boolean precededByQualifiedImport(String source, int at) {
-        int i = at - 1;
-        while (i >= 0 && (continuesAName(source.charAt(i)) || source.charAt(i) == '.')) {
-            i--;
-        }
-        return precededByImport(source, i + 1) && i >= 0 && at > 0
-                && source.charAt(at - 1) == '.';
-    }
-
-    /// Whether an `as` rename follows the import target at `after`.    /// Whether an `as` rename follows the import target at `after`.
-    private static boolean hasAsClause(String source, int after) {
-        int i = after;
-        while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
-            i++;
-        }
-        return source.regionMatches(i, "as", 0, 2)
-                && i + 2 < source.length()
-                && !continuesAName(source.charAt(i + 2));
-    }
 
     /// The name a Kotlin `import ... as Alias` gives an annotation, or null.    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
     ///
@@ -2513,62 +2525,12 @@ public class CodenameOneSettings extends Lifecycle {
     /// itself created.
     static String kotlinImportAlias(String source, String simple, boolean kotlin) {
         String needle = "com.codename1.annotations.buildhints." + simple;
-        // Same comment-aware walk the marker search uses, and the occurrence has
-        // to be a live `import` directive. A commented-out earlier alias --
-        // `// import ...Ios as Old` above the real `import ...Ios as BuildIos` --
-        // otherwise won, the live `@BuildIos` was never looked for, and the hint
-        // read as unowned again: the exact bug the alias support was added for.
-        int at = nextMarker(source, needle, 0, kotlin);
-        while (at >= 0) {
-            int after = at + needle.length();
-            if (!precededByImport(source, at)) {
-                at = nextMarker(source, needle, after, kotlin);
-                continue;
+        for (Imported imported : importsIn(source, kotlin)) {
+            if (imported.alias != null && needle.equals(imported.name)) {
+                return imported.alias;
             }
-            if (after >= source.length() || !continuesAName(source.charAt(after))) {
-                int i = after;
-                while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
-                    i++;
-                }
-                if (source.regionMatches(i, "as", 0, 2)
-                        && i + 2 < source.length()
-                        && !continuesAName(source.charAt(i + 2))) {
-                    i += 2;
-                    while (i < source.length()
-                            && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
-                        i++;
-                    }
-                    int start = i;
-                    while (i < source.length() && continuesAName(source.charAt(i))) {
-                        i++;
-                    }
-                    if (i > start) {
-                        return source.substring(start, i);
-                    }
-                }
-            }
-            at = nextMarker(source, needle, after, kotlin);
         }
         return null;
-    }
-
-    /// Whether the token at `at` is the target of an `import` on the same line.
-    ///
-    /// Without this a mention of the package in code or in a doc string would be
-    /// read as an import directive.
-    private static boolean precededByImport(String source, int at) {
-        int i = at - 1;
-        while (i >= 0 && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
-            i--;
-        }
-        if (i < 5) {
-            return false;
-        }
-        if (!source.regionMatches(i - 5, "import", 0, 6)) {
-            return false;
-        }
-        int before = i - 6;
-        return before < 0 || !continuesAName(source.charAt(before));
     }
 
     /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.

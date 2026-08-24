@@ -684,4 +684,28 @@ public class BuildHintCatalogTest {
         assertEquals("internalOnly", h.canonicalValue("internalOnly"));
         assertNull(h.canonicalValue("nowhere"));
     }
+
+    /// `import /* build hints */ com.codename1...Ios;` is legal. Backing up from
+    /// the name over spaces only missed it, so the live @Ios was read as somebody
+    /// else's and Add offered a hint that is already annotated.
+    @Test
+    public void anImportSeparatedByCommentsOrNewlinesIsRecognised() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import /* build hints */ com.codename1.annotations.buildhints.Ios;\n",
+                "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import\n    com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(
+                "import  com.codename1.annotations.buildhints.Ios  as  BuildIos\n",
+                "Ios", true));
+    }
+
+    /// ...and a mention that is not an import still does not count.
+    @Test
+    public void aNonImportMentionIsStillNotAnImport() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "val t = com.codename1.annotations.buildhints.Ios::class\n", "Ios", true));
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "// import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+    }
 }

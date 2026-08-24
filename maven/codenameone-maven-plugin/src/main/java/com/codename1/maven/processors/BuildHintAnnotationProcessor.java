@@ -317,7 +317,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             // thing this decides is whether to IGNORE an annotated class.
             return true;
         }
-        if (!pkg.equals(declaredPackageIn(text)) || !declaresType(text, simple)) {
+        // The file names its own language, and a triple-quoted literal is read
+        // differently in each.
+        boolean kotlin = f.getName().endsWith(".kt");
+        if (!pkg.equals(declaredPackageIn(text, kotlin))
+                || !declaresType(text, simple, kotlin)) {
             return false;
         }
         // The whole nesting PATH has to be there, in order. Checking only the
@@ -325,7 +329,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // Main.A.Wrong, so the orphan stayed and failed the placement check on
         // every incremental build. Checking only the outer class was the same bug
         // one level out.
-        return nested == null || declaresNestedPath(text, nested);
+        return nested == null || declaresNestedPath(text, nested, kotlin);
     }
 
     /// Whether `text` declares the chain `path` -- {"Main", "A", "Wrong"} -- each
@@ -335,7 +339,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// literal is already spaces, so a brace inside either cannot throw the
     /// nesting off.
     static boolean declaresNestedPath(String text, String[] path) {
-        String code = blankNonCode(text);
+        return declaresNestedPath(text, path, false);
+    }
+
+    static boolean declaresNestedPath(String text, String[] path, boolean kotlin) {
+        String code = blankNonCode(text, kotlin);
         int from = 0;
         int end = code.length();
         for (String segment : path) {
@@ -470,7 +478,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// `// class Wrong` left behind by the very edit that deleted the type would
     /// otherwise vouch for its own orphan.
     public static boolean declaresType(String text, String simple) {
-        String code = blankNonCode(text);
+        return declaresType(text, simple, false);
+    }
+
+    /// As above, reading the source by `kotlin`'s rules.
+    public static boolean declaresType(String text, String simple, boolean kotlin) {
+        String code = blankNonCode(text, kotlin);
         return declarationOf(code, simple, 0, code.length(), false) >= 0;
     }
 
@@ -478,6 +491,18 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// declaration can be looked for without a quoted or commented mention of one
     /// answering for it. Lengths and line breaks are preserved.
     public static String blankNonCode(String text) {
+        return blankNonCode(text, false);
+    }
+
+    /// As above, reading triple-quoted literals by the rules of `kotlin`'s
+    /// language.
+    ///
+    /// The two differ and reading one as the other over-consumes: a Kotlin raw
+    /// string ends at the LAST three quotes of a run, while a Java text block
+    /// processes escapes so `\"""` is not a delimiter. Getting it wrong blanks
+    /// the declaration that follows, so a live class reads as an orphan and its
+    /// misplaced annotation is never reported.
+    public static String blankNonCode(String text, boolean kotlin) {
         char[] out = text.toCharArray();
         int i = 0;
         while (i < out.length) {
@@ -522,35 +547,74 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                         break;
                     }
                 }
-            } else if (c == '"') {
-                boolean triple = i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"';
-                int quotes = triple ? 3 : 1;
-                for (int q = 0; q < quotes && i < out.length; q++) {
-                    out[i++] = ' ';
-                }
-                while (i < out.length) {
-                    if (!triple && out[i] == '\\' && i + 1 < out.length) {
-                        out[i++] = ' ';
-                        out[i++] = ' ';
-                        continue;
-                    }
-                    if (out[i] == '"' && (!triple
-                            || (i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"'))) {
-                        for (int q = 0; q < quotes && i < out.length; q++) {
-                            out[i++] = ' ';
-                        }
-                        break;
-                    }
+            } else if (c == '"' && i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"') {
+                int close = kotlin ? endOfKotlinRawString(out, i) : endOfJavaTextBlock(out, i);
+                while (i < close && i < out.length) {
                     if (out[i] != '\n') {
                         out[i] = ' ';
                     }
                     i++;
+                }
+            } else if (c == '"') {
+                out[i++] = ' ';
+                while (i < out.length) {
+                    if (out[i] == '\\' && i + 1 < out.length) {
+                        out[i++] = ' ';
+                        out[i++] = ' ';
+                        continue;
+                    }
+                    boolean closing = out[i] == '"';
+                    if (out[i] != '\n') {
+                        out[i] = ' ';
+                    }
+                    i++;
+                    if (closing) {
+                        break;
+                    }
                 }
             } else {
                 i++;
             }
         }
         return new String(out);
+    }
+
+    /// Index just past a Java text block opening at `i`. Escapes apply, so a
+    /// backslash consumes the next character and cannot start the delimiter.
+    private static int endOfJavaTextBlock(char[] c, int i) {
+        int j = i + 3;
+        while (j < c.length) {
+            if (c[j] == '\\') {
+                j += 2;
+                continue;
+            }
+            if (c[j] == '"' && j + 2 < c.length && c[j + 1] == '"' && c[j + 2] == '"') {
+                return j + 3;
+            }
+            j++;
+        }
+        return c.length;
+    }
+
+    /// Index just past a Kotlin raw string opening at `i`. No escapes, and a run
+    /// of quotes closes at its LAST three, so the extra ones belong to the value.
+    private static int endOfKotlinRawString(char[] c, int i) {
+        int j = i + 3;
+        while (j < c.length) {
+            if (c[j] != '"') {
+                j++;
+                continue;
+            }
+            int run = j;
+            while (run < c.length && c[run] == '"') {
+                run++;
+            }
+            if (run - j >= 3) {
+                return run;
+            }
+            j = run;
+        }
+        return c.length;
     }
 
     /// The whole of `f`, or null when it cannot be read or is implausibly large.
@@ -593,6 +657,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// The package `text` declares, or "" for the default package.
     public static String declaredPackageIn(String text) {
+        return declaredPackageIn(text, false);
+    }
+
+    /// As above, reading the source by `kotlin`'s rules.
+    public static String declaredPackageIn(String text, boolean kotlin) {
         // Tokens, not lines. `package\ncom.example;` is valid Java, and reading
         // one physical line saw an empty remainder and reported the default
         // package -- so a live class looked like it belonged somewhere else, read

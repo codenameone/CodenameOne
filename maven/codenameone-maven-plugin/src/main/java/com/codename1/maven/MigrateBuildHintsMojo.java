@@ -644,18 +644,22 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 if (sep == null || sep.length() == 0) {
                     return quoteFor(v, kotlin);
                 }
+                // Verbatim, and every element kept. Trimming and dropping empties
+                // looked tidy and is a rewrite: android.xgradle is newline
+                // delimited raw Groovy that AndroidGradleBuilder appends as it
+                // stands, so the indentation inside a multiline string is part of
+                // the value. Splitting on the separator and joining the elements
+                // back with it now reproduces the original string exactly, which
+                // is the only property that makes this migration lossless -- the
+                // verification cannot see it, since it checks that the hint came
+                // back and not what it holds.
                 String[] parts = v.split(java.util.regex.Pattern.quote(sep), -1);
                 StringBuilder sb = new StringBuilder(kotlin ? "[" : "{");
-                int written = 0;
-                for (String part : parts) {
-                    String t = part.trim();
-                    if (t.length() == 0) {
-                        continue;
-                    }
-                    if (written++ > 0) {
+                for (int i = 0; i < parts.length; i++) {
+                    if (i > 0) {
                         sb.append(", ");
                     }
-                    sb.append(quoteFor(t, kotlin));
+                    sb.append(quoteFor(parts[i], kotlin));
                 }
                 return sb.append(kotlin ? ']' : '}').toString();
             }
@@ -819,10 +823,11 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         } catch (IOException ex) {
             return false;
         }
+        boolean kotlin = f.getName().endsWith(".kt");
         return pkg.equals(com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaredPackageIn(text))
+                        .declaredPackageIn(text, kotlin))
                 && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaresType(text, simple);
+                        .declaresType(text, simple, kotlin);
     }
 
     /**
@@ -872,7 +877,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // language. The verification build then failed and rolled a correct
             // migration back.
             int anchor = pkg >= 0 ? head.indexOf('\n', pkg) + 1
-                    : startOfLeadingAnnotations(head);
+                    : startOfLeadingAnnotations(head, kotlin);
             head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
@@ -901,8 +906,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// walk stranded in the middle of a literal. Positions are preserved by the
     /// blanking, so the index returned indexes the original text.
     static int startOfLeadingAnnotations(String original) {
+        return startOfLeadingAnnotations(original, false);
+    }
+
+    static int startOfLeadingAnnotations(String original, boolean kotlin) {
         String head = com.codename1.maven.processors.BuildHintAnnotationProcessor
-                .blankNonCode(original);
+                .blankNonCode(original, kotlin);
         int at = head.length();
         while (true) {
             int i = at - 1;
@@ -951,7 +960,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // the class declaration" on a project whose source it had just accepted
         // through the token-aware lookup.
         String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
-                .blankNonCode(text);
+                .blankNonCode(text, kotlin);
         int first = -1;
         int depth = 0;
         int i = 0;
