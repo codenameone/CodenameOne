@@ -1571,4 +1571,46 @@ public class AppExtensionDeploymentTargetTest {
         // Nothing left to expand is not "only Xcode's".
         assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings("com.example.app.Ext", none));
     }
+
+    @Test
+    public void aMatchingWildcardVariantKeepsTheArchivesOwn() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("BUILD_VARIANTS", "profile");
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", settings);
+
+        IPhoneBuilder.ArchiveContext own = IPhoneBuilder.contextForCondition(
+                "PRODUCT_BUNDLE_IDENTIFIER[variant=prof*]", archive);
+
+        // Falling through to the stem put "prof" in place of "profile", so an
+        // EXTENSION_ID[variant=profile] matched nothing and the identifier read as unresolvable.
+        // A family that describes this build leaves the archive's own variants alone, which is
+        // what the sdk, config and arch conditions beside it already do.
+        assertEquals(java.util.Collections.singletonList("profile"), own.variants);
+
+        // A family that describes some OTHER build is kept whole -- star and all -- as every
+        // other inactive pattern is, so nothing is resolved against a stem that names no variant.
+        assertEquals(java.util.Collections.singletonList("deb*"), IPhoneBuilder.contextForCondition(
+                "PRODUCT_BUNDLE_IDENTIFIER[variant=deb*]", archive).variants);
+    }
+
+    @Test
+    public void aNarrowerOverrideDoesNotSuppressABroaderPlistIdentifier() {
+        java.util.Map<String, String> declared = new java.util.LinkedHashMap<String, String>();
+        declared.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]", "com.example.app.Exact");
+        IPhoneBuilder.ArchiveContext archive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Release", "arm64", declared);
+
+        // The explicit override governs THIS archive...
+        String governingKey = IPhoneBuilder.winningSettingKey(declared,
+                "PRODUCT_BUNDLE_IDENTIFIER", IPhoneBuilder.contextForCondition(
+                        "PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]", archive));
+        assertEquals("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos14.4]", governingKey);
+
+        // ...and nothing else, so it must not suppress the wildcard plist entry: every other
+        // device SDK would be left with neither and fall back to the generated base while its own
+        // plist declares something else.
+        assertTrue(IPhoneBuilder.conditionSpecificity(governingKey)
+                > IPhoneBuilder.conditionSpecificity("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]"));
+    }
 }

@@ -5087,11 +5087,22 @@ public class IPhoneBuilder extends Executor {
                                 // merge, so treating it as governing suppressed the plist
                                 // identifier and left that configuration on the base identifier
                                 // while its own bundle declares the literal stamping preserved.
-                                String governing = winningSetting(declaredSettings,
+                                String governingKey = winningSettingKey(declaredSettings,
                                         "PRODUCT_BUNDLE_IDENTIFIER",
                                         contextForCondition(perConfiguration.getKey(),
                                                 plistContext));
-                                if (governing != null && governing.trim().length() > 0) {
+                                String governing = governingKey == null ? null
+                                        : declaredSettings.get(governingKey);
+                                // And only where that override actually reaches. An explicit
+                                // [sdk=iphoneos14.4] identifier beside a plist named
+                                // [sdk=iphoneos*] governs THIS archive and nothing else, so
+                                // suppressing the plist entry outright left every other device SDK
+                                // with neither -- falling back to the generated base while its own
+                                // plist declares something else. The plist entry is kept whenever the
+                                // override is the narrower of the two.
+                                if (governing != null && governing.trim().length() > 0
+                                        && conditionSpecificity(governingKey)
+                                                <= conditionSpecificity(perConfiguration.getKey())) {
                                     continue;
                                 }
                                 buildSettingsMap.put(perConfiguration.getKey(),
@@ -7711,6 +7722,24 @@ public class IPhoneBuilder extends Executor {
                 if (archiveValue != null && matchesCondition(value, archiveValue)) {
                     continue;
                 }
+                // The variant is a LIST, so it is asked the same question a different way: if one
+                // of this archive's variants is in the family, the family describes this build
+                // and the archive's own variants are what Xcode expands [variant=...] helpers
+                // against. Falling through to the stem put "prof" in place of "profile", and an
+                // EXTENSION_ID[variant=profile] then matched nothing -- the identifier read as
+                // unresolvable and was dropped.
+                if ("variant".equals(name) && context != null && context.variants != null) {
+                    boolean familyDescribesThisBuild = false;
+                    for (String own : context.variants) {
+                        if (matchesCondition(value, own)) {
+                            familyDescribesThisBuild = true;
+                            break;
+                        }
+                    }
+                    if (familyDescribesThisBuild) {
+                        continue;
+                    }
+                }
                 // The pattern is kept whole, star and all. Stripped to its stem it read as a
                 // concrete value and was expanded as one: [sdk=iphonesimulator*] with
                 // Wallet/$(SDK_NAME)/Info.plist went looking for Wallet/iphonesimulator, while
@@ -7823,6 +7852,14 @@ public class IPhoneBuilder extends Executor {
 
     static String winningSetting(Map<String, String> settings, String name,
             ArchiveContext context) {
+        String key = winningSettingKey(settings, name, context);
+        return key == null ? null : settings.get(key);
+    }
+
+    /// The KEY of the winning setting, for callers that need to know how specific the winner was
+    /// rather than only what it said.
+    static String winningSettingKey(Map<String, String> settings, String name,
+            ArchiveContext context) {
         if (settings == null) {
             return null;
         }
@@ -7840,7 +7877,7 @@ public class IPhoneBuilder extends Executor {
             long specificity = qualified ? conditionSpecificity(key) : 0;
             if (specificity > winningSpecificity) {
                 winningSpecificity = specificity;
-                winner = setting.getValue();
+                winner = key;
             }
         }
         return winner;
