@@ -6737,6 +6737,14 @@ public class AndroidGradleBuilder extends Executor {
             // manifest attribute the transport's permissions carry whatever
             // the app targets; AAPT rejects an attribute the compile SDK has
             // never heard of, which failed the build even earlier.
+            //
+            // 33 is enough for every companion PROFILE too, including
+            // glasses, which is an API 34 constant. AndroidNearbyBackend
+            // never names AssociationRequest.DEVICE_PROFILE_GLASSES: it
+            // writes the role name that constant inlines to, guarded by a
+            // runtime SDK_INT check, exactly so this floor does not have to
+            // move for a hint that costs the app nothing at compile time.
+            // Raising it to 34 would raise it for every companion build.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, "33");
         }
