@@ -315,14 +315,34 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // already there: with processing now skipped or unbound the nested build
         // leaves it untouched, the check passes, the properties are deleted, and
         // the next clean build removes the stale artifact and the hints with it.
-        File emitted = new File(projectDir, "target/classes/" + ANNOTATION_HINTS_RESOURCE);
+        // Where the processor will actually write, which is not always
+        // target/classes: a module is free to configure build/outputDirectory,
+        // and looking in the wrong place would report a successful build as
+        // having produced nothing and roll a correct migration back.
+        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
+        File outputDir = configuredOutputDirectory(owner, projectDir);
+        File emitted = new File(outputDir, ANNOTATION_HINTS_RESOURCE);
         if (emitted.isFile() && !emitted.delete()) {
             return "Could not remove the previous " + ANNOTATION_HINTS_RESOURCE
                     + ", so this build's output could not be told apart from it.";
         }
-        File pom = new File(projectDir, "pom.xml");
+        // Run the REACTOR and select the owning module, rather than pointing
+        // Maven at that module's own POM. A module POM on its own resolves its
+        // siblings from the local repository, so a project whose main module
+        // depends on another module of the same build -- normal, and not
+        // necessarily installed -- fails to resolve here and the migration rolls
+        // back over a build that a plain `mvn package` performs happily.
+        File modulePom = new File(projectDir, "pom.xml");
+        File reactorPom = new File(project.getBasedir(), "pom.xml");
         InvocationRequest request = new DefaultInvocationRequest();
-        request.setPomFile(pom.isFile() ? pom : new File(project.getBasedir(), "pom.xml"));
+        if (reactorPom.isFile() && owner != null) {
+            request.setPomFile(reactorPom);
+            request.setProjects(Collections.singletonList(
+                    owner.getGroupId() + ":" + owner.getArtifactId()));
+            request.setAlsoMake(true);
+        } else {
+            request.setPomFile(modulePom.isFile() ? modulePom : reactorPom);
+        }
         request.setGoals(Collections.singletonList("process-classes"));
         Properties props = new Properties();
         props.setProperty("skipTests", "true");
@@ -340,8 +360,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
 
         if (!emitted.isFile()) {
-            return "No " + ANNOTATION_HINTS_RESOURCE + " was written under "
-                    + projectDir.getName() + "/target/classes.";
+            return "No " + ANNOTATION_HINTS_RESOURCE + " was written under " + outputDir + ".";
         }
         Properties produced = new Properties();
         try (FileInputStream in = new FileInputStream(emitted)) {
@@ -361,7 +380,46 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return null;
     }
 
-    /** Name of the resource the annotation processor emits into target/classes. */
+    /** The reactor module whose basedir is {@code dir}, or null when none is. */
+    private org.apache.maven.project.MavenProject moduleAt(File dir) {
+        if (reactorProjects == null || dir == null) {
+            return null;
+        }
+        File wanted = canonical(dir);
+        for (org.apache.maven.project.MavenProject p : reactorProjects) {
+            if (p.getBasedir() != null && canonical(p.getBasedir()).equals(wanted)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The directory {@code process-classes} writes compiled output to.
+     *
+     * <p>Read off the module rather than assumed, since a POM may configure it.
+     * Falls back to the conventional path when the directory is not a reactor
+     * module at all -- an Ant-layout project, for instance.</p>
+     */
+    private static File configuredOutputDirectory(org.apache.maven.project.MavenProject owner,
+                                                  File projectDir) {
+        if (owner != null && owner.getBuild() != null
+                && owner.getBuild().getOutputDirectory() != null
+                && owner.getBuild().getOutputDirectory().length() > 0) {
+            return new File(owner.getBuild().getOutputDirectory());
+        }
+        return new File(projectDir, "target" + File.separator + "classes");
+    }
+
+    private static File canonical(File f) {
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException ex) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /** Name of the resource the annotation processor emits into target/classes. */    /** Name of the resource the annotation processor emits into target/classes. */
     private static final String ANNOTATION_HINTS_RESOURCE =
             "META-INF/codenameone/build-hints.properties";
 
