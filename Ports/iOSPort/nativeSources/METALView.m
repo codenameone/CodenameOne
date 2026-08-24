@@ -997,6 +997,9 @@ int cn1DirectToDrawableEnabled(void) {
         if (self.drawable == nil) {
             CAMetalLayer *layer = (CAMetalLayer*)self.layer;
             self.drawable = [layer nextDrawable];
+            // A freshly vended buffer holds a frame from two or three presents
+            // ago, so it has to be cleared once -- but only once per frame.
+            directFrameCleared = NO;
         }
         target = self.drawable.texture;
     }
@@ -1013,12 +1016,22 @@ int cn1DirectToDrawableEnabled(void) {
     // per frame; the OpenGL path relies on its renderbuffer persisting.
     colorAttachment.texture = target;
     if (cn1DirectToDrawable()) {
-        // Never Load: this buffer holds a frame from two or three presents ago.
-        // The Form repaints in full every frame (IOSImplementation.paintDirty),
-        // so there is nothing worth preserving and Clear is also the cheaper
-        // load action on a tile GPU.
-        colorAttachment.loadAction = MTLLoadActionClear;
-        colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+        if (!directFrameCleared) {
+            // First pass of the frame. The buffer holds a frame from two or
+            // three presents ago, so Load would be meaningless; the Form
+            // repaints in full every frame (IOSImplementation.paintDirty) and
+            // Clear is the cheaper load action on a tile GPU anyway.
+            colorAttachment.loadAction = MTLLoadActionClear;
+            colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+            directFrameCleared = YES;
+        } else {
+            // Mid-frame restart: blurScreenRegionX / glassScreenRegionX /
+            // lensScreenRegionX end the encoder and reopen one on the SAME
+            // drawable. Clearing again here would wipe everything painted
+            // before the effect and present only the effect and whatever
+            // followed it.
+            colorAttachment.loadAction = MTLLoadActionLoad;
+        }
         clearRetainedFramebufferOnNextFrame = NO;
     } else if (clearRetainedFramebufferOnNextFrame) {
         colorAttachment.loadAction = MTLLoadActionClear;

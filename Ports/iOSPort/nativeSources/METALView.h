@@ -56,6 +56,12 @@
     // partial dirty-region flushes. Mark it invalid on foreground; the first
     // full-screen repaint clears it before drawing fresh content.
     BOOL retainedFramebufferInvalid;
+
+    /// Direct-to-drawable only: whether THIS frame has already cleared its
+    /// drawable. The blur/glass/lens ops end the frame's encoder and open
+    /// another on the same drawable, and a second clear would erase everything
+    /// painted before the effect -- so only the first pass of a frame clears.
+    BOOL directFrameCleared;
     BOOL clearRetainedFramebufferOnNextFrame;
 }
 @property (nonatomic, retain) id<MTLCommandQueue> commandQueue;
