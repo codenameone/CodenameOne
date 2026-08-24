@@ -1588,6 +1588,18 @@ public class AppExtensionDeploymentTargetTest {
                 "com.example.app.$(EXECUTABLE_PREFIX)", none));
         assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
                 "com.example.app.$(EXECUTABLE_SUFFIX)", none));
+
+        // And a setting whose value cannot be part of an identifier at all: these expand to
+        // filesystem paths and to a space-separated list, so preserving the expression only ships
+        // an invalid identifier instead of the valid derived one.
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(BUILT_PRODUCTS_DIR)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(TARGET_BUILD_DIR)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(SRCROOT)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(ARCHS)", none));
     }
 
     @Test

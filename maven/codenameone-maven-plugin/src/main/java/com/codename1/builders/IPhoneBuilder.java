@@ -8452,8 +8452,15 @@ public class IPhoneBuilder extends Executor {
     /// "com.example.app." -- the malformed identifier this guard exists to prevent, waved through
     /// by the guard itself.
     ///
-    /// So membership is "Xcode always supplies this, and it is never empty". Anything else is
-    /// dropped, and the derived default -- which is always valid -- stands instead.
+    /// A third disqualifies a name: a value that cannot be part of a bundle identifier at all.
+    /// SRCROOT, PROJECT_DIR, BUILT_PRODUCTS_DIR and TARGET_BUILD_DIR expand to filesystem paths
+    /// full of slashes, and ARCHS to a space-separated list -- an identifier built from one is
+    /// invalid however faithfully Xcode expands it, so preserving the expression only ships the
+    /// invalid identifier instead of the valid derived one.
+    ///
+    /// So membership is "Xcode always supplies this, it is never empty, and it can be part of an
+    /// identifier". Anything else is dropped, and the derived default -- which is always valid --
+    /// stands instead.
     ///
     /// Not a complete list of Xcode's settings, and it does not need to be: only the ones that
     /// plausibly appear in a bundle identifier.
@@ -8461,8 +8468,7 @@ public class IPhoneBuilder extends Executor {
             new java.util.HashSet<String>(java.util.Arrays.asList(
                     "EXECUTABLE_NAME", "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME",
                     "PROJECT_NAME", "CONFIGURATION", "SDK_NAME", "SDK_VERSION", "PLATFORM_NAME",
-                    "CURRENT_ARCH", "ARCHS", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME",
-                    "SRCROOT", "PROJECT_DIR", "BUILT_PRODUCTS_DIR", "TARGET_BUILD_DIR"));
+                    "CURRENT_ARCH", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME"));
 
     /// Whether every reference still left in {@code value} names a setting Xcode supplies itself.
     ///
