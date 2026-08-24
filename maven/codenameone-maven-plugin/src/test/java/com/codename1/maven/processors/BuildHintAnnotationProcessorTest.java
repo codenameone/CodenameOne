@@ -677,6 +677,47 @@ public class BuildHintAnnotationProcessorTest {
                 "package com.example\n\nfun `package helper`() {}\n", true));
     }
 
+    /// Running out of search budget is "cannot tell", not "no such source".
+    /// Answering no dropped a live annotated class silently, with its placement
+    /// error lost, for the sake of a bound -- which is the wrong way round:
+    /// everywhere else in this walk an unanswerable question keeps the class.
+    @Test
+    public void aDeepSourceTreeIsNotProofOfAnOrphan() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Deep",
+                        "package com.example;\npublic class Deep {\n}\n"),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        AnnotatedClass cls = ClassScanner.scan(classes).get("com/example/Deep");
+        assertTrue("the class under test must have been compiled", cls != null);
+
+        // Deeper than the old cutoff, and the file is genuinely there.
+        assertTrue(BuildHintAnnotationProcessor.hasBackingSource(cls,
+                java.util.Collections.singletonList(nest(30).getAbsolutePath())));
+
+        // Deeper than the budget: unanswerable, so the class is kept.
+        assertTrue(BuildHintAnnotationProcessor.hasBackingSource(cls,
+                java.util.Collections.singletonList(nest(70).getAbsolutePath())));
+    }
+
+    /// A source root with Deep.java `levels` directories down.
+    private File nest(int levels) throws Exception {
+        File root = tmp.newFolder();
+        File at = root;
+        for (int i = 0; i < levels; i++) {
+            at = new File(at, "d" + i);
+        }
+        at.mkdirs();
+        java.io.Writer w = new java.io.OutputStreamWriter(
+                new java.io.FileOutputStream(new File(at, "Deep.java")), "UTF-8");
+        try {
+            w.write("package com.example;\npublic class Deep {\n}\n");
+        } finally {
+            w.close();
+        }
+        return root;
+    }
+
     /// javac processes `\\uXXXX` before it tokenizes anything, so
     /// `package com.ex\\u0061mple;` really declares com.example -- and it
     /// rejects an ill-formed one in a comment too, which is why the sequences

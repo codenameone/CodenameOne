@@ -1099,6 +1099,22 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             if (i < 0) {
                 return at;
             }
+            // A MODIFIER may sit between the annotations and the keyword, or
+            // before them: `public @Deprecated final class Main` is legal, and
+            // the modifier walk from the keyword stops at the annotation. Backing
+            // up only over the annotation run left `public` above the insertion
+            // point, so the import went between it and the rest of its own
+            // declaration and verification rolled the migration back.
+            int wordStart = i + 1;
+            while (wordStart > 0 && (Character.isJavaIdentifierPart(head.charAt(wordStart - 1))
+                    || head.charAt(wordStart - 1) == '-')) {
+                wordStart--;
+            }
+            if (wordStart <= i && (wordStart == 0 || head.charAt(wordStart - 1) != '@')
+                    && isModifier(head.substring(wordStart, i + 1))) {
+                at = wordStart;
+                continue;
+            }
             if (head.charAt(i) == ')') {
                 int depth = 0;
                 while (i >= 0) {

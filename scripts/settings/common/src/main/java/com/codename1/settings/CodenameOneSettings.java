@@ -2751,8 +2751,18 @@ public class CodenameOneSettings extends Lifecycle {
     /// One level: an alias of an alias is not followed, because the first is
     /// what a file that renames our annotation actually writes.
     static String kotlinTypeAlias(String source, String simple, boolean kotlin) {
+        java.util.List<String> all = kotlinTypeAliases(source, simple, kotlin);
+        return all.isEmpty() ? null : all.get(0);
+    }
+
+    /// EVERY such name, for the same reason the import form collects them all:
+    /// a file may declare `typealias First = Ios` and `typealias AppIos = Ios`
+    /// and use only the second.
+    static java.util.List<String> kotlinTypeAliases(String source, String simple,
+                                                    boolean kotlin) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
         if (!kotlin) {
-            return null;
+            return out;
         }
         String qualified = "com.codename1.annotations.buildhints." + simple;
         boolean imported = importsAnnotation(source, simple, kotlin);
@@ -2771,7 +2781,7 @@ public class CodenameOneSettings extends Lifecycle {
                         if (eq >= 0 && source.charAt(eq) == '=') {
                             String target = qualifiedNameAt(source, eq + 1, kotlin);
                             if (target.equals(qualified) || (imported && target.equals(simple))) {
-                                return name;
+                                out.add(name);
                             }
                         }
                     }
@@ -2779,7 +2789,7 @@ public class CodenameOneSettings extends Lifecycle {
             }
             at = nextMarker(source, "typealias", after, kotlin);
         }
-        return null;
+        return out;
     }
 
     /// The name a Kotlin `import ... as Alias` gives an annotation, or null.
@@ -2790,13 +2800,24 @@ public class CodenameOneSettings extends Lifecycle {
     /// line, and the next `process-annotations` fails on the duplicate the tool
     /// itself created.
     static String kotlinImportAlias(String source, String simple, boolean kotlin) {
+        java.util.List<String> all = kotlinImportAliases(source, simple, kotlin);
+        return all.isEmpty() ? null : all.get(0);
+    }
+
+    /// EVERY such name. A file may import the same annotation twice under
+    /// different aliases, and answering with the first left the other
+    /// unrecognised -- so the hint read as unowned, Settings offered Add, and
+    /// the next build failed on the duplicate the tool had just written.
+    static java.util.List<String> kotlinImportAliases(String source, String simple,
+                                                      boolean kotlin) {
         String needle = "com.codename1.annotations.buildhints." + simple;
+        java.util.List<String> out = new java.util.ArrayList<String>();
         for (Imported imported : importsIn(source, kotlin)) {
             if (imported.alias != null && needle.equals(imported.name)) {
-                return imported.alias;
+                out.add(imported.alias);
             }
         }
-        return null;
+        return out;
     }
 
     /// Maps every `@Group(attr = ...)` on the main class to the hints it sets.
@@ -2816,12 +2837,12 @@ public class CodenameOneSettings extends Lifecycle {
             // qualified one, which needs no import, and a Kotlin alias, under
             // which the annotation's own name appears nowhere. Missing any of
             // them leaves the hint editable and Add writes the duplicate.
-            String alias = kotlinImportAlias(source, simple, kotlin);
+            java.util.List<String> aliases = kotlinImportAliases(source, simple, kotlin);
             // A fourth: Kotlin can rename a type in the FILE, with no import
             // involved -- `typealias AppIos = Ios` and then `@AppIos(...)`. The
             // compiled annotation is still ours, so missing it left the hint
             // editable and Add wrote the duplicate the next build refuses.
-            String typeAlias = kotlinTypeAlias(source, simple, kotlin);
+            aliases.addAll(kotlinTypeAliases(source, simple, kotlin));
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as
@@ -2843,8 +2864,7 @@ public class CodenameOneSettings extends Lifecycle {
                 int after = qualifiedNameEnd(source, at + 1, kotlin);
                 boolean ours = (imported && name.equals(simple))
                         || name.equals(qualified)
-                        || (alias != null && name.equals(alias))
-                        || (typeAlias != null && name.equals(typeAlias));
+                        || aliases.contains(name);
                 if (ours) {
                     int open = nextLiveChar(source, after, kotlin);
                     if (open >= 0 && source.charAt(open) == '(') {

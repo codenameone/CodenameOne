@@ -241,6 +241,26 @@ public class MigrateBuildHintsPropertyParsingTest {
                 MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
     }
 
+    /// Modifiers and annotations may INTERLEAVE: `public @Deprecated final
+    /// class Main` is legal. The modifier walk from the keyword stops at the
+    /// annotation, so backing up only over the annotation run left `public`
+    /// above the insertion point -- the import went between it and the rest of
+    /// its own declaration, and verification rolled the migration back.
+    @Test
+    public void theAnchorClearsModifiersInterleavedWithAnnotations() {
+        String head = "public @Deprecated ";
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+
+        // A modifier alone, with no annotation at all.
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations("public "));
+
+        // A word that is NOT a modifier still ends the walk, or the anchor would
+        // climb out of the declaration and into whatever precedes it.
+        String other = "int x = 1;\n@Deprecated\n";
+        assertEquals(other.indexOf("@Deprecated"),
+                MigrateBuildHintsMojo.startOfLeadingAnnotations(other));
+    }
+
     /// A Kotlin annotation may have an ESCAPED name, and a backtick is not an
     /// identifier character -- so the backward walk stopped on it, read no name,
     /// and left `@`when`` out of the leading run. The generated import then went

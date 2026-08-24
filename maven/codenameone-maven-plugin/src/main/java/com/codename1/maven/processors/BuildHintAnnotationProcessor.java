@@ -300,6 +300,13 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return nested < 0 ? simple : simple.substring(0, nested);
     }
 
+    /// How deep the source tree is walked before the answer is given up on.
+    ///
+    /// Generous rather than tight: a package with this many components is not
+    /// something anyone writes, and the cost of guessing wrong is a live class
+    /// dropped without a word.
+    private static final int MAX_SOURCE_TREE_DEPTH = 64;
+
     /// Whether a file called `name` declaring package `pkg` exists under `dir`.
     ///
     /// The package matters as well as the name: moving a class to another package
@@ -313,8 +320,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// per annotated class and a source tree is not a search index.
     private static boolean declaresPackage(File dir, String name, String pkg, String simple,
                                            String[] nested, String whole, int depth) {
-        if (depth > 24) {
-            return false;
+        if (depth > MAX_SOURCE_TREE_DEPTH) {
+            // Out of budget is "cannot tell", not "no such source". Answering no
+            // here dropped a live annotated class -- silently, and with its
+            // placement error lost -- for the sake of a search bound, which is
+            // the wrong way round: everywhere else in this walk an unanswerable
+            // question keeps the class, because the only thing it decides is
+            // whether to IGNORE an annotation.
+            return true;
         }
         File[] children = dir.listFiles();
         if (children == null) {

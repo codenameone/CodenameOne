@@ -970,4 +970,29 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned, false);
         assertNull(owned.get("ios.teamId"));
     }
+
+    /// A file may name the same annotation twice. Answering with the first
+    /// alias left the one actually used unrecognised, so the hint read as
+    /// unowned and Add wrote the duplicate the next build refuses.
+    @Test
+    public void everyKotlinAliasCounts() {
+        String twoTypeAliases = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias First = Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(twoTypeAliases, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        String twoImportAliases = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as First\n"
+                + "import com.codename1.annotations.buildhints.Ios as AppIos\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(twoImportAliases, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
 }
