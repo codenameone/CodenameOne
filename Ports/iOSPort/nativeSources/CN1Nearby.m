@@ -1586,7 +1586,24 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if (requestId != 0) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
                     [error localizedDescription]);
+            return;
         }
+        // Too late to fail the caller, so at least stop pretending.
+        //
+        // MultipeerConnectivity promises no deadline for this callback, and
+        // the grace period that answers a start is a heuristic: nothing else
+        // reports success, so waiting a moment for the refusal that does not
+        // come is the only positive signal there is. A refusal arriving
+        // after that cannot un-resolve the AsyncResource -- the SPI has one
+        // channel per request and it has been used.
+        //
+        // What it must not do is leave this advertiser installed. Nothing
+        // was advertising, and an object that says otherwise makes the next
+        // startAdvertising think it is replacing a live operation and every
+        // later stop think it has something to stop.
+        [self.advertiser stopAdvertisingPeer];
+        self.advertiser.delegate = nil;
+        self.advertiser = nil;
     }
 }
 
@@ -1644,7 +1661,14 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         if (requestId != 0) {
             cn1nbFailTransport(requestId, CN1_NEARBY_ERR_SESSION_FAILED,
                     [error localizedDescription]);
+            return;
         }
+        // Torn down for the reason the advertising twin is: too late to fail
+        // the caller, and a browser that says it is browsing when nothing
+        // is misleads every call after it.
+        [self.browser stopBrowsingForPeers];
+        self.browser.delegate = nil;
+        self.browser = nil;
     }
 }
 

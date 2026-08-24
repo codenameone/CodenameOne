@@ -89,6 +89,17 @@ public class AndroidNearbyTransport implements NearbyBridge {
     private final Map<Long, Integer> payloadRecipients =
             Collections.synchronizedMap(new HashMap<Long, Integer>());
 
+    /// The service each endpoint was NEGOTIATED through, when connected.
+    ///
+    /// Separate from endpointServices, which is what discovery saw. One map
+    /// could not be both: an inbound connection through the advertised
+    /// service has to label its own events with that service, and writing it
+    /// over the discovery entry destroyed the pairing discovery owes its
+    /// listener -- endpointFound reported A and the later endpointLost, after
+    /// the connection had closed, reported B.
+    private final Map<String, String> connectionServices =
+            Collections.synchronizedMap(new HashMap<String, String>());
+
     /// The service each endpoint was found under.
     ///
     /// One shared field was wrong: an app advertising service B while
@@ -162,14 +173,36 @@ public class AndroidNearbyTransport implements NearbyBridge {
     /// A newer start owns the operation: leave the radio alone.
     private static final int START_SUPERSEDED = 2;
 
-    /// Claims a generation for a start that is about to be issued.
+    /// Claims a generation for a start that is about to be issued, replacing
+    /// whatever was running.
+    ///
+    /// The stop is the point. Nearby has ONE advertiser and one discoverer
+    /// per client and refuses a second start as "already advertising", so a
+    /// start issued while an earlier one was live was rejected -- and the
+    /// earlier one went on broadcasting the service the app had moved off.
+    /// The generation guards could not save it either: the earlier start had
+    /// already been answered, so nothing was left marked unowned for a
+    /// failure to clean up. The simulated bridge and the iOS port both
+    /// replace an existing start; this is Android doing the same.
     private int beginStart(boolean advertising) {
         synchronized (transportLock) {
+            boolean live = advertising
+                    ? (advertisingWanted || unownedAdvertising)
+                    : (discoveringWanted || unownedDiscovering);
+            if (live) {
+                if (advertising) {
+                    client().stopAdvertising();
+                } else {
+                    client().stopDiscovery();
+                }
+            }
             if (advertising) {
                 advertisingWanted = true;
+                unownedAdvertising = false;
                 return ++advertiseGeneration;
             }
             discoveringWanted = true;
+            unownedDiscovering = false;
             return ++discoverGeneration;
         }
     }
@@ -695,6 +728,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
             for (String id : discoveredOnly) {
                 endpointNames.remove(id);
                 endpointServices.remove(id);
+                connectionServices.remove(id);
             }
             // Discovery visibility goes for EVERYTHING, connected or not.
             // Discovery has stopped, so no onEndpointLost is coming for any
@@ -734,13 +768,18 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 endpointNames.put(endpointId, info.getEndpointName());
                 endpointServices.put(endpointId, serviceId);
                 NearbyTransport.deliverEndpointFound(
-                        encode(endpointId, info.getEndpointName()), true);
+                        encodeDiscovered(endpointId,
+                                info.getEndpointName()), true);
             }
 
             @Override
             public void onEndpointLost(String endpointId) {
+                // The DISCOVERY service, so this names the same one the
+                // endpointFound for it did -- even where a connection
+                // through another service came and went in between.
                 NearbyTransport.deliverEndpointFound(
-                        encode(endpointId, nameOf(endpointId)), false);
+                        encodeDiscovered(endpointId, nameOf(endpointId)),
+                        false);
                 discoveredEndpoints.remove(endpointId);
                 if (connectedEndpoints.contains(endpointId)) {
                     // Still connected, so the metadata has to stay: payload
@@ -757,6 +796,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 // different service -- and onConnectionInitiated leaves an
                 // existing entry alone, so it kept reporting the old one.
                 endpointServices.remove(endpointId);
+                connectionServices.remove(endpointId);
             }
         };
     }
@@ -784,8 +824,11 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 // OUTGOING keeps the mapping discovery recorded, because
                 // this callback carries the discoveryServiceId FIELD, which
                 // may have moved on since the endpoint was found.
-                if (info.isIncomingConnection()
-                        || !endpointServices.containsKey(endpointId)) {
+                connectionServices.put(endpointId, serviceId);
+                if (!endpointServices.containsKey(endpointId)) {
+                    // Never discovered, so this is also the only service
+                    // anything knows it by -- which is what an endpointLost
+                    // for it would have to report.
                     endpointServices.put(endpointId, serviceId);
                 }
                 NearbyTransport.deliverConnectionRequested(
@@ -823,6 +866,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                     // came back under another advertised service.
                     endpointNames.remove(endpointId);
                     endpointServices.remove(endpointId);
+                    connectionServices.remove(endpointId);
                 }
             }
 
@@ -831,6 +875,9 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 NearbyTransport.deliverDisconnected(
                         encode(endpointId, nameOf(endpointId)));
                 connectedEndpoints.remove(endpointId);
+                // The negotiated service goes with the connection that had
+                // it; discovery's own entry is a separate question below.
+                connectionServices.remove(endpointId);
                 // Only when discovery has ALSO lost sight of it. A connection
                 // can close while the peer is still being advertised and
                 // still in the discovered set -- the app disconnects, or the
@@ -1043,7 +1090,26 @@ public class AndroidNearbyTransport implements NearbyBridge {
         return name == null ? "" : name;
     }
 
+    /// Encodes an endpoint for a CONNECTION or payload event.
+    ///
+    /// The negotiated service wins where there is one: that is the service
+    /// this connection belongs to, whatever discovery happened to see the
+    /// peer under first.
     private String encode(String endpointId, String name) {
+        String service = connectionServices.get(endpointId);
+        if (service == null) {
+            service = endpointServices.get(endpointId);
+        }
+        return sanitize(endpointId) + '\t' + sanitize(name) + '\t'
+                + sanitize(service == null ? "" : service);
+    }
+
+    /// Encodes an endpoint for a DISCOVERY event.
+    ///
+    /// Always the service discovery saw, so found and lost name the same one
+    /// even when a connection through another service came and went in
+    /// between.
+    private String encodeDiscovered(String endpointId, String name) {
         String service = endpointServices.get(endpointId);
         return sanitize(endpointId) + '\t' + sanitize(name) + '\t'
                 + sanitize(service == null ? "" : service);
