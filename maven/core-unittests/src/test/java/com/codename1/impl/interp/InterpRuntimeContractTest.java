@@ -374,6 +374,60 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * Field resolution has the same three-part identity as method resolution.
+     * Binding a pushed <code>Ljava/lang/String;</code> read against an
+     * installed <code>Object</code> field returns storage of the wrong shape
+     * -- and where the change crosses the primitive/reference line the caller
+     * reads a raw slot as an object reference. The linker skips a candidate
+     * whose declared type does not match the descriptor.
+     */
+    @Test
+    @DisplayName("field resolution refuses a candidate whose type differs")
+    void fieldResolutionRefusesADifferentType() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.getStatic(
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$FieldBroadener",
+                    "x", "Ljava/lang/String;");
+            throw new AssertionError("bind against String field should have been refused");
+        } catch (NoSuchFieldException expected) {
+            // The declared type is Object, not String -- JVMS 5.4.3.2 refuses.
+        }
+    }
+
+    static class FieldBroadener {
+        @SuppressWarnings("unused")
+        public static Object x = "installed";
+    }
+
+    /**
+     * If a host method changed from instance to static between the bundle's
+     * compile and the installed framework, <code>Method.invoke(target, ...)</code>
+     * would ignore the receiver and quietly run it as a class-level call. The
+     * JVM raises <code>IncompatibleClassChangeError</code>; the linker mirrors
+     * that at both <code>invokevirtual</code> and <code>invokespecial</code>
+     * sites (and already refuses the opposite at <code>invokestatic</code>).
+     */
+    @Test
+    @DisplayName("virtual invocation refuses a method that became static")
+    void virtualInvocationRefusesAMethodThatBecameStatic() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.invokeVirtual(new NowStatic(),
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$NowStatic",
+                    "run", "()V", new Object[0]);
+            throw new AssertionError("virtual bind to a static should have been refused");
+        } catch (IncompatibleClassChangeError expected) {
+            // JVMS 5.4.3.3 -- invokevirtual against a static is an ICCE.
+        }
+    }
+
+    static class NowStatic {
+        public static void run() {
+        }
+    }
+
+    /**
      * A pushed program that never returns has to be stoppable, or the Stop
      * button is decoration and the only recovery is killing the app. The
      * existing BeanShell playground has no such check.

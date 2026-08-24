@@ -347,15 +347,21 @@ public class InterpAndroidLinker implements InterpLinker {
         }
     }
 
-    private Field lookupField(String owner, String name)
+    private Field lookupField(String owner, String name, String descriptor)
             throws ClassNotFoundException, NoSuchFieldException {
-        String key = owner + '#' + name;
+        String key = owner + '#' + name + '#' + descriptor;
         Field f = fieldCache.get(key);
         if (f != null) {
             return f;
         }
         Class c = resolve(owner);
-        f = resolveField(c, name);
+        // Name alone is not enough: a bundle compiled against `String x` would
+        // otherwise bind to a rebuilt host's `Object x` and the caller would
+        // read the wrong slot -- for a primitive/reference change that means
+        // reading a long as an object reference. Match on the descriptor's
+        // Class too, so a type change becomes NoSuchFieldError.
+        Class expected = resolve(descriptor);
+        f = resolveField(c, name, expected);
         if (f == null) {
             throw new NoSuchFieldException(key);
         }
@@ -367,21 +373,24 @@ public class InterpAndroidLinker implements InterpLinker {
     // JVMS 5.4.3.2: at each level, declared field wins over a superinterface's,
     // and a superinterface's wins over the superclass's -- so a private field in
     // A never masks a public field the subclass exposes via an interface.
-    private Field resolveField(Class c, String name) {
+    private Field resolveField(Class c, String name, Class expected) {
         if (c == null) {
             return null;
         }
         try {
-            return c.getDeclaredField(name);
+            Field candidate = c.getDeclaredField(name);
+            if (candidate.getType().equals(expected)) {
+                return candidate;
+            }
         } catch (NoSuchFieldException ignore) {
         }
         for (Class iface : c.getInterfaces()) {
-            Field f = resolveField(iface, name);
+            Field f = resolveField(iface, name, expected);
             if (f != null) {
                 return f;
             }
         }
-        return resolveField(c.getSuperclass(), name);
+        return resolveField(c.getSuperclass(), name, expected);
     }
 
     public Object construct(Object hostClass, String descriptor, Object[] args) throws Throwable {
@@ -412,6 +421,14 @@ public class InterpAndroidLinker implements InterpLinker {
         // where setAccessible now throws InaccessibleObjectException because
         // java.base does not open java.util to an unnamed module.
         Method m = lookupMethod(owner, name, descriptor);
+        // A host method that changed from instance to static between the
+        // bundle's compile and the installed framework must not bind here:
+        // Method.invoke would ignore the receiver and run it as a static,
+        // silently executing a different API shape. The JVM raises
+        // IncompatibleClassChangeError; mirror that.
+        if (Modifier.isStatic(m.getModifiers())) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is static");
+        }
         try {
             return m.invoke(target, args);
         } catch (InvocationTargetException e) {
@@ -422,6 +439,9 @@ public class InterpAndroidLinker implements InterpLinker {
     public Object invokeSpecial(Object target, String owner, String name, String descriptor,
                                 Object[] args) throws Throwable {
         Method m = lookupMethod(owner, name, descriptor);
+        if (Modifier.isStatic(m.getModifiers())) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is static");
+        }
         try {
             return m.invoke(target, args);
         } catch (InvocationTargetException e) {
@@ -455,12 +475,12 @@ public class InterpAndroidLinker implements InterpLinker {
     }
 
     public Object getStatic(String owner, String name, String descriptor) throws Throwable {
-        return lookupField(owner, name).get(null);
+        return lookupField(owner, name, descriptor).get(null);
     }
 
     public void setStatic(String owner, String name, String descriptor, Object value)
             throws Throwable {
-        lookupField(owner, name).set(null, value);
+        lookupField(owner, name, descriptor).set(null, value);
     }
 
     public Object getField(Object target, String owner, String name, String descriptor)
@@ -468,7 +488,7 @@ public class InterpAndroidLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        return lookupField(owner, name).get(target);
+        return lookupField(owner, name, descriptor).get(target);
     }
 
     public void setField(Object target, String owner, String name, String descriptor, Object value)
@@ -476,7 +496,7 @@ public class InterpAndroidLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        lookupField(owner, name).set(target, value);
+        lookupField(owner, name, descriptor).set(target, value);
     }
 
     public boolean isInstance(Object hostClass, Object value) {

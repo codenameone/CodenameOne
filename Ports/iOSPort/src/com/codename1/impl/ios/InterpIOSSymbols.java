@@ -58,6 +58,16 @@ class InterpIOSSymbols {
      */
     private final Hashtable interfaceIneligible = new Hashtable();
 
+    /**
+     * Method ids the sidecar marked as static.
+     *
+     * <p>An instance invocation site (invokevirtual, invokespecial) has to
+     * refuse a static method or Method.invoke would ignore the receiver and
+     * silently run it as a class-level call. The JVM raises
+     * IncompatibleClassChangeError; the linker consults this to do the same.</p>
+     */
+    private final Hashtable staticMethods = new Hashtable();
+
     /** "owner#name" -> instance field id. */
     private final Hashtable fieldIds = new Hashtable();
 
@@ -190,6 +200,9 @@ class InterpIOSSymbols {
                     if (staticFlag || privateFlag) {
                         interfaceIneligible.put(methodId, Boolean.TRUE);
                     }
+                    if (staticFlag) {
+                        staticMethods.put(methodId, Boolean.TRUE);
+                    }
                 }
             }
         } else if (table.charAt(start) == 'f' && table.startsWith("field\t", start)) {
@@ -197,7 +210,11 @@ class InterpIOSSymbols {
             if (p.length >= 5) {
                 String ownerName = (String)classNames.get(Integer.valueOf(p[1]));
                 if (ownerName != null) {
-                    fieldIds.put(ownerName + "#" + p[3], Integer.valueOf(p[2]));
+                    // Descriptor in the key. A rebuilt host that changed a
+                    // field's type but kept the name would otherwise bind and
+                    // the caller would read a primitive slot as an object
+                    // reference (or the other way).
+                    fieldIds.put(ownerName + "#" + p[3] + "#" + p[4], Integer.valueOf(p[2]));
                 }
             }
         } else if (table.charAt(start) == 's' && table.startsWith("sfield\t", start)) {
@@ -205,7 +222,7 @@ class InterpIOSSymbols {
             if (p.length >= 5) {
                 String ownerName = (String)classNames.get(Integer.valueOf(p[1]));
                 if (ownerName != null) {
-                    staticFieldIds.put(ownerName + "#" + p[3], Integer.valueOf(p[2]));
+                    staticFieldIds.put(ownerName + "#" + p[3] + "#" + p[4], Integer.valueOf(p[2]));
                     if (oneStaticField.get(ownerName) == null) {
                         oneStaticField.put(ownerName, p[2] + "|" + p[4]);
                     }
@@ -481,6 +498,11 @@ class InterpIOSSymbols {
         return id == null ? -1 : id.intValue();
     }
 
+    /** True when the sidecar marked this id as a static method. */
+    boolean isStaticMethod(int id) {
+        return staticMethods.get(Integer.valueOf(id)) != null;
+    }
+
     /**
      * "id|descriptor" for one static field this class declares, or null.
      *
@@ -492,8 +514,8 @@ class InterpIOSSymbols {
     }
 
     /** The instance field id for an access, searching up the superclass chain. */
-    int fieldId(String owner, String name) {
-        return lookupField(fieldIds, owner, name);
+    int fieldId(String owner, String name, String descriptor) {
+        return lookupField(fieldIds, owner, name, descriptor);
     }
 
     /**
@@ -503,17 +525,18 @@ class InterpIOSSymbols {
      * may read {@code SomeSubclass.SOME_CONSTANT} where only the superclass
      * declares it.</p>
      */
-    int staticFieldId(String owner, String name) {
-        return lookupField(staticFieldIds, owner, name);
+    int staticFieldId(String owner, String name, String descriptor) {
+        return lookupField(staticFieldIds, owner, name, descriptor);
     }
 
-    private int lookupField(Hashtable table, String owner, String name) {
+    private int lookupField(Hashtable table, String owner, String name, String descriptor) {
         String currentOwner = owner;
+        String suffix = "#" + name + "#" + descriptor;
         // See methodId: the walk ends because the chain does, not at a count.
         Hashtable seen = new Hashtable();
         while (currentOwner != null && seen.get(currentOwner) == null) {
             seen.put(currentOwner, Boolean.TRUE);
-            Integer id = (Integer)table.get(currentOwner + "#" + name);
+            Integer id = (Integer)table.get(currentOwner + suffix);
             if (id != null) {
                 return id.intValue();
             }
@@ -521,7 +544,7 @@ class InterpIOSSymbols {
             // interface is read through whatever implements it, and an
             // interface reached through another interface is ordinary Java.
             // A superclass-only walk answers -1 for a field the app has.
-            int fromInterface = interfaceFieldId(table, currentOwner, name, new Hashtable());
+            int fromInterface = interfaceFieldId(table, currentOwner, suffix, new Hashtable());
             if (fromInterface >= 0) {
                 return fromInterface;
             }
@@ -531,7 +554,7 @@ class InterpIOSSymbols {
     }
 
     /** Searches a class's interfaces, and theirs, for a field. */
-    private int interfaceFieldId(Hashtable table, String owner, String name,
+    private int interfaceFieldId(Hashtable table, String owner, String suffix,
                                  Hashtable visited) {
         // As with methods: a visited set terminates without inventing a maximum
         // depth for somebody else's interface hierarchy.
@@ -552,11 +575,11 @@ class InterpIOSSymbols {
             if (ifaceName == null) {
                 continue;
             }
-            Integer id = (Integer)table.get(ifaceName + "#" + name);
+            Integer id = (Integer)table.get(ifaceName + suffix);
             if (id != null) {
                 return id.intValue();
             }
-            int deeper = interfaceFieldId(table, ifaceName, name, visited);
+            int deeper = interfaceFieldId(table, ifaceName, suffix, visited);
             if (deeper >= 0) {
                 return deeper;
             }

@@ -222,7 +222,7 @@ public class InterpIOSLinker implements InterpLinker {
         // interpreted code failed while Form.show(), whose call site names the
         // receiver's own class, worked. There is no vtable to consult from
         // here, so the walk up from the real class is the dispatch.
-        return invoke(receiverClass(target, owner), name, descriptor, target, args,
+        return invokeInstance(receiverClass(target, owner), name, descriptor, target, args,
                 kindOf(InterpValuesAccess.returnType(descriptor)));
     }
 
@@ -238,27 +238,43 @@ public class InterpIOSLinker implements InterpLinker {
 
     public Object invokeSpecial(Object target, String owner, String name, String descriptor,
                                 Object[] args) throws Throwable {
-        return invoke(owner, name, descriptor, target, args,
+        return invokeInstance(owner, name, descriptor, target, args,
                 kindOf(InterpValuesAccess.returnType(descriptor)));
     }
 
     public Object invokeStatic(String owner, String name, String descriptor, Object[] args)
             throws Throwable {
-        return invoke(owner, name, descriptor, null, args,
-                kindOf(InterpValuesAccess.returnType(descriptor)));
-    }
-
-    private Object invoke(String owner, String name, String descriptor, Object target,
-                          Object[] args, int returnKind) throws Throwable {
         int id = methodId(owner, name, descriptor);
         if (id < 0) {
             throw new NoSuchMethodError(owner + "." + name + descriptor
                     + " is not present in the installed app");
         }
+        if (!symbols.isStaticMethod(id)) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is not static");
+        }
+        return invokeWithId(id, descriptor, null, args,
+                kindOf(InterpValuesAccess.returnType(descriptor)));
+    }
+
+    // A host method that changed from instance to static between the bundle's
+    // compile and the installed framework must not bind here: the native
+    // dispatcher would ignore the receiver and run it as a static, silently
+    // executing a different API shape. The JVM raises
+    // IncompatibleClassChangeError; mirror that.
+    private Object invokeInstance(String owner, String name, String descriptor, Object target,
+                                  Object[] args, int returnKind) throws Throwable {
+        int id = methodId(owner, name, descriptor);
+        if (id < 0) {
+            throw new NoSuchMethodError(owner + "." + name + descriptor
+                    + " is not present in the installed app");
+        }
+        if (symbols.isStaticMethod(id)) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is static");
+        }
         return invokeWithId(id, descriptor, target, args, returnKind);
     }
 
-    /// The marshalling half of {@link #invoke}, split out so a caller that
+    /// The marshalling half of {@link #invokeInstance}, split out so a caller that
     /// resolved the id another way (constructor: exact-owner lookup) can
     /// dispatch without going back through the generic resolver.
     private Object invokeWithId(int id, String descriptor, Object target,
@@ -297,7 +313,7 @@ public class InterpIOSLinker implements InterpLinker {
      * which is what a compiled GETSTATIC does.</p>
      */
     public Object getStatic(String owner, String name, String descriptor) throws Throwable {
-        int fieldId = symbols.staticFieldId(owner, name);
+        int fieldId = symbols.staticFieldId(owner, name, descriptor);
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name
                     + " is not present in the installed app");
@@ -310,7 +326,7 @@ public class InterpIOSLinker implements InterpLinker {
 
     public void setStatic(String owner, String name, String descriptor, Object value)
             throws Throwable {
-        int fieldId = symbols.staticFieldId(owner, name);
+        int fieldId = symbols.staticFieldId(owner, name, descriptor);
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name
                     + " is not present in the installed app");
@@ -326,7 +342,7 @@ public class InterpIOSLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        int fieldId = symbols.fieldId(owner, name);
+        int fieldId = symbols.fieldId(owner, name, descriptor);
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name);
         }
@@ -341,7 +357,7 @@ public class InterpIOSLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        int fieldId = symbols.fieldId(owner, name);
+        int fieldId = symbols.fieldId(owner, name, descriptor);
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name);
         }
