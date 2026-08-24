@@ -1868,6 +1868,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public void flushGraphics(int x, int y, int width, int height) {
+        if (isDirectToDrawable()) {
+            // The flush region is not just a hint here: CodenameOne_GLViewController
+            // hands it to ClipRect.setDrawRect and the Metal path clamps every
+            // screen op to it. The superclass derives it from the queued
+            // components alone, so with a partially dirty Component in the queue
+            // it would be that component's rect -- while direct mode has already
+            // cleared the ENTIRE drawable and repainted the whole Form (see
+            // paintDirty). Everything the Form drew outside that rect would be
+            // clipped away and the rest of the frame would present black.
+            x = 0;
+            y = 0;
+            width = getDisplayWidth();
+            height = getDisplayHeight();
+        }
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
         if (isDesktop()) {
