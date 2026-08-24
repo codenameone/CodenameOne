@@ -488,6 +488,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
+        recordThread("setModal");
         FakeWindow w = win(peer);
         if (w != null) {
             w.modal = modal;

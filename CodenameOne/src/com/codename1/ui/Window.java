@@ -1947,12 +1947,12 @@ public class Window extends Container implements TopLevelContainer {
         // already over and return before it ever appeared. Wait for the show to
         // actually happen first.
         if (Display.getInstance().isEdt()) {
-            show();
+            showAndBlock();
         } else {
             Display.getInstance().callSeriallyAndWait(new Runnable() {
                 @Override
                 public void run() {
-                    show();
+                    showAndBlock();
                 }
             });
         }
@@ -1991,6 +1991,28 @@ public class Window extends Container implements TopLevelContainer {
                 releaseModal();
             }
         }
+    }
+
+    /// Shows this window and makes sure its modal blocker is in place, on the event
+    /// dispatch thread.
+    ///
+    /// `show()` is a no-op for a window that is already on screen, and taking the
+    /// blocker is one of the things it would otherwise have done -- so a `showModal()`
+    /// on a window shown earlier parked its caller against a window that was in
+    /// nobody's modal stack and that no port had been told to block behind. The
+    /// application waited while the user carried on using the windows underneath.
+    ///
+    /// Idempotent when `show()` did run: `acquireModal()` returns immediately once the
+    /// blocker is registered.
+    ///
+    /// Both steps happen in the same hop so no input can be dispatched between the
+    /// window appearing and the block taking effect.
+    private void showAndBlock() {
+        show();
+        acquireModal();
+        // The windows this one blocks have to be told as well, which acquireModal()
+        // only does for this window's own peer.
+        Desktop.getInstance().syncNativeModalBlocking();
     }
 
     /// True once a modal window has stopped being modal, either because it was
@@ -2052,7 +2074,23 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `type`: one of `#MODALITY_NONE`, `#MODALITY_WINDOW` or `#MODALITY_APPLICATION`
-    public void setModalityType(int type) {
+    public void setModalityType(final int type) {
+        // On the event dispatch thread, whole. The steps below release and take
+        // blockers, which mutate Desktop's modal stack and call the port -- and unlike
+        // the plain attribute setters the field itself is part of that protocol, read
+        // by the release to decide which scope to undo. Assigning it on the calling
+        // thread and deferring only the platform calls would hand the release the new
+        // scope, which is the bug the comment below describes. So a background caller
+        // sees getModalityType() change after the hop rather than immediately.
+        if (!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    setModalityType(type);
+                }
+            });
+            return;
+        }
         // Released under the *old* scope before the type changes, because that is the
         // scope the port was told about. Releasing afterwards would hand the port the
         // new one and undo the wrong block -- on Windows, switching an application

@@ -370,14 +370,20 @@ window. Components inside a window should size against their own top level.
 operating-system window is simply not in it. `Window.capture()` exists for that and
 returns an image of the window itself.
 
-Where the platform can read a window's own pixels back, that's what you get: the
-JavaSE simulator, Mac Catalyst and native Linux all return the window's real raster.
-On native Windows a desktop window renders into a Direct2D `HWND` target, which has no
-readable bitmap behind it, so `capture()` re-renders the component tree at the window's
-current size instead. The image is the content the window is showing, which is what
-almost every caller wants -- but it's a re-render rather than a readback, so it can't
-reveal a disagreement between the window's raster and its component hierarchy. The main
-window's own capture has the same limitation on that platform for the same reason.
+Every desktop port reads the window's own pixels back, so what you get is what the
+window is showing -- native peers and editors included. The JavaSE simulator, Mac
+Catalyst and native Linux read their rasters directly. Native Windows takes a different
+route to the same place: a secondary window renders into a Direct2D `HWND` target,
+which Direct2D gives no readback for, so the port asks the window to render itself into
+a device context with `PrintWindow`. That's a real readback of the client area rather
+than a re-render of the hierarchy.
+
+`Window.capture()` falls back to re-rendering the component tree if a port returns
+nothing. That fallback draws what the window *should* be showing: it never contains a
+peer or a native editor, and it can't reveal a disagreement between a window's raster
+and its component hierarchy. Because a plausible image of the right size is exactly
+what a silent fallback looks like, the Windows port logs when it happens rather than
+letting a re-render pass for a readback.
 
 [[mac-catalyst-windows]]
 === Mac Catalyst

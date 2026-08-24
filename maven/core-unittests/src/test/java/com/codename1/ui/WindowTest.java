@@ -2494,6 +2494,73 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void showModalOnAWindowAlreadyUpStillBlocks() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("late modal", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                "it starts non-modal, which is what makes this the interesting case");
+
+        // showModal() on a window shown earlier. show() is a no-op for a window
+        // already on screen, so the blocker it would have taken has to come from
+        // somewhere -- without it the caller waits while the user carries on using
+        // everything underneath.
+        final Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        });
+        caller.start();
+        for (int iter = 0; iter < 100 && !Desktop.getInstance().isWindowInputBlocked(0); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        try {
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "a window made modal after it was shown still has to block");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
+        assertFalse(caller.isAlive(), "and disposing it releases the caller");
+    }
+
+    @FormTest
+    void modalityChangedOffTheEdtReachesThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("modality", new BorderLayout());
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // The release and the acquire mutate Desktop's modal stack and call the
+            // port, so they belong on the same thread as everything else that does.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setModalityType(Window.MODALITY_APPLICATION);
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "a modality change has to reach the port on the event dispatch "
+                            + "thread, however it was made");
+            assertEquals(Window.MODALITY_APPLICATION, w.getModalityType(),
+                    "and it takes effect once the hop has run");
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "the blocker is taken, not merely recorded");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
     void showingAWindowThatIsAlreadyUpFiresNothing() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("already up", new BorderLayout());
