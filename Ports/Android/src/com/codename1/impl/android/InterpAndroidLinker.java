@@ -336,42 +336,33 @@ public class InterpAndroidLinker implements InterpLinker {
             return f;
         }
         Class c = resolve(owner);
-        NoSuchFieldException last = null;
-        for (Class k = c; k != null; k = k.getSuperclass()) {
-            try {
-                f = k.getDeclaredField(name);
-                break;
-            } catch (NoSuchFieldException e) {
-                last = e;
-            }
-        }
+        f = resolveField(c, name);
         if (f == null) {
-            f = findFieldInInterfaces(c, name);
-        }
-        if (f == null) {
-            throw last != null ? last : new NoSuchFieldException(key);
+            throw new NoSuchFieldException(key);
         }
         f.setAccessible(true);
         fieldCache.put(key, f);
         return f;
     }
 
-    private Field findFieldInInterfaces(Class c, String name) {
+    // JVMS 5.4.3.2: at each level, declared field wins over a superinterface's,
+    // and a superinterface's wins over the superclass's -- so a private field in
+    // A never masks a public field the subclass exposes via an interface.
+    private Field resolveField(Class c, String name) {
         if (c == null) {
             return null;
         }
-        Class[] ifaces = c.getInterfaces();
-        for (int i = 0; i < ifaces.length; i++) {
-            try {
-                return ifaces[i].getDeclaredField(name);
-            } catch (NoSuchFieldException ignore) {
-                Field f = findFieldInInterfaces(ifaces[i], name);
-                if (f != null) {
-                    return f;
-                }
+        try {
+            return c.getDeclaredField(name);
+        } catch (NoSuchFieldException ignore) {
+        }
+        for (Class iface : c.getInterfaces()) {
+            Field f = resolveField(iface, name);
+            if (f != null) {
+                return f;
             }
         }
-        return findFieldInInterfaces(c.getSuperclass(), name);
+        return resolveField(c.getSuperclass(), name);
     }
 
     public Object construct(Object hostClass, String descriptor, Object[] args) throws Throwable {

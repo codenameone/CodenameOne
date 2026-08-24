@@ -317,6 +317,37 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * JVMS 5.4.3.2 selects a superinterface's field ahead of a superclass's,
+     * so <code>B extends A implements I</code> with private static
+     * <code>A.X</code> and public static <code>I.X</code> resolves
+     * <code>B.X</code> as <code>I.X</code>. The linker used to walk the
+     * superclass chain first, find <code>A.X</code>, and answer with it via
+     * <code>setAccessible</code> -- a value valid Java can never observe.
+     */
+    @Test
+    @DisplayName("field resolution prefers a superinterface's field over the superclass's")
+    void fieldResolutionPrefersSuperinterfaceOverSuperclass() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        Object value = linker.getStatic(
+                "com/codename1/impl/interp/InterpRuntimeContractTest$FieldSubject",
+                "X", "I");
+        assertEquals(9, ((Integer) value).intValue(),
+                "resolution should have selected I.X, not the private A.X");
+    }
+
+    static class FieldBase {
+        @SuppressWarnings("unused")
+        private static int X = 3;
+    }
+
+    interface FieldMixin {
+        int X = 9;
+    }
+
+    static class FieldSubject extends FieldBase implements FieldMixin {
+    }
+
+    /**
      * A pushed program that never returns has to be stoppable, or the Stop
      * button is decoration and the only recovery is killing the app. The
      * existing BeanShell playground has no such check.
