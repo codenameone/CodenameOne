@@ -78,8 +78,20 @@ jobs:
           set -euxo pipefail
           PROBE=/tmp/probe-${{ matrix.lib }}-arc${{ matrix.arc }}
           mkdir -p "$PROBE/CN1AdProbe"
+          # Objective-C and Objective-C++ alike. check-cn1lib-native-coverage.py
+          # counts a .mm file as an iOS native source, so staging only .m would
+          # let a broken Objective-C++ bridge be reported as covered while
+          # nothing ever compiled it.
           cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.h "$PROBE/CN1AdProbe/" 2>/dev/null || true
-          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AdProbe/"
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.m "$PROBE/CN1AdProbe/" 2>/dev/null || true
+          cp maven/${{ matrix.lib }}/ios/src/main/objectivec/*.mm "$PROBE/CN1AdProbe/" 2>/dev/null || true
+          # An empty probe would build green and check nothing. find is used
+          # rather than ls because ls reports failure when either glob is
+          # unmatched, which is the normal case for a library with no .mm.
+          staged=$(find "$PROBE/CN1AdProbe" -maxdepth 1 \( -name '*.m' -o -name '*.mm' \) | wc -l)
+          if [ "$staged" -eq 0 ]; then
+              echo "::error::No Objective-C sources staged for ${{ matrix.lib }}"; exit 1
+          fi
 
           # These sources call back into Java through the generated entry point
           # and use JAVA_INT / JAVA_OBJECT / fromNSString without importing

@@ -27,6 +27,15 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # Same reasoning for the cn1lib native gates: they run from this workflow
+      # and nowhere else, and the stubs are the API surface their Android check
+      # compiles against, so excluding scripts/ wholesale would let a change to
+      # any of them merge without the gate it belongs to ever running.
+      - 'scripts/check-native-peer-returns.py'
+      - 'scripts/check-cn1lib-android-api.py'
+      - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/check-cn1lib-native-sources.py'
+      - 'scripts/cn1lib-api-check/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -59,6 +68,15 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # Same reasoning for the cn1lib native gates: they run from this workflow
+      # and nowhere else, and the stubs are the API surface their Android check
+      # compiles against, so excluding scripts/ wholesale would let a change to
+      # any of them merge without the gate it belongs to ever running.
+      - 'scripts/check-native-peer-returns.py'
+      - 'scripts/check-cn1lib-android-api.py'
+      - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/check-cn1lib-native-sources.py'
+      - 'scripts/cn1lib-api-check/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
