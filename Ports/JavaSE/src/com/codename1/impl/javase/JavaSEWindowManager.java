@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.ui.Desktop;
 import com.codename1.impl.WindowManager;
 import com.codename1.ui.Display;
 
@@ -113,7 +114,7 @@ public class JavaSEWindowManager extends WindowManager {
                 }
                 if (!now.equals(last)) {
                     last = now;
-                    Display.getInstance().monitorsChanged();
+                    Desktop.getInstance().monitorsChanged();
                 }
             }
         }, MONITOR_POLL_MS, MONITOR_POLL_MS);
@@ -269,27 +270,27 @@ public class JavaSEWindowManager extends WindowManager {
                 frame.addWindowListener(new WindowAdapter() {
                     @Override
                     public void windowClosing(WindowEvent e) {
-                        Display.getInstance().windowCloseRequested(windowId);
+                        Desktop.getInstance().windowCloseRequested(windowId);
                     }
 
                     @Override
                     public void windowActivated(WindowEvent e) {
-                        Display.getInstance().windowFocusChanged(windowId, true);
+                        Desktop.getInstance().windowFocusChanged(windowId, true);
                     }
 
                     @Override
                     public void windowDeactivated(WindowEvent e) {
-                        Display.getInstance().windowFocusChanged(windowId, false);
+                        Desktop.getInstance().windowFocusChanged(windowId, false);
                     }
 
                     @Override
                     public void windowIconified(WindowEvent e) {
-                        Display.getInstance().windowHideNotify(windowId);
+                        Desktop.getInstance().windowHideNotify(windowId);
                     }
 
                     @Override
                     public void windowDeiconified(WindowEvent e) {
-                        Display.getInstance().windowShowNotify(windowId);
+                        Desktop.getInstance().windowShowNotify(windowId);
                     }
                 });
                 frame.addComponentListener(new ComponentAdapter() {
@@ -311,7 +312,7 @@ public class JavaSEWindowManager extends WindowManager {
                         if (p.reconfiguring) {
                             return;
                         }
-                        Display.getInstance().windowHideNotify(windowId);
+                        Desktop.getInstance().windowHideNotify(windowId);
                     }
 
                     @Override
@@ -319,18 +320,18 @@ public class JavaSEWindowManager extends WindowManager {
                         if (p.reconfiguring) {
                             return;
                         }
-                        Display.getInstance().windowShowNotify(windowId);
+                        Desktop.getInstance().windowShowNotify(windowId);
                     }
 
                     @Override
                     public void componentResized(ComponentEvent e) {
-                        Display.getInstance().windowSizeChanged(windowId,
+                        Desktop.getInstance().windowSizeChanged(windowId,
                                 scaled(p, p.canvas.getWidth()), scaled(p, p.canvas.getHeight()));
                     }
 
                     @Override
                     public void componentMoved(ComponentEvent e) {
-                        Display.getInstance().windowMoved(windowId);
+                        Desktop.getInstance().windowMoved(windowId);
                         // A move can also carry the window onto a different display,
                         // and a different display can mean a different backing scale,
                         // which invalidates every preferred size computed at the old
@@ -342,7 +343,7 @@ public class JavaSEWindowManager extends WindowManager {
                             // constraint means something different on a display with
                             // another backing scale and has to be re-converted.
                             applyMinimumSize(p);
-                            Display.getInstance().windowMonitorChanged(windowId);
+                            Desktop.getInstance().windowMonitorChanged(windowId);
                             // The Swing editor is placed by dividing by the canvas's
                             // backing scale, so a move to a display with another one
                             // leaves it offset and mis-sized over its field. The

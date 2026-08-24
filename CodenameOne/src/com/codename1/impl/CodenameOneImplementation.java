@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.ui.Desktop;
 import com.codename1.annotations.Concrete;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -3510,7 +3511,7 @@ public abstract class CodenameOneImplementation {
         }
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
-        Display.getInstance().windowPointerPressed(windowId, xPointerEvent, yPointerEvent);
+        Desktop.getInstance().windowPointerPressed(windowId, xPointerEvent, yPointerEvent);
     }
 
     /// Delivers a pointer release that happened in one of the additional native
@@ -3533,7 +3534,7 @@ public abstract class CodenameOneImplementation {
         }
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
-        Display.getInstance().windowPointerReleased(windowId, xPointerEvent, yPointerEvent);
+        Desktop.getInstance().windowPointerReleased(windowId, xPointerEvent, yPointerEvent);
     }
 
     /// Delivers a pointer drag that happened in one of the additional native windows.
@@ -3567,7 +3568,7 @@ public abstract class CodenameOneImplementation {
             if (slot < 0) {
                 // More windows dragging at once than there are slots. Filtering is a
                 // refinement, so let the gesture through rather than swallow it.
-                Display.getInstance().windowPointerDragged(windowId, x, y);
+                Desktop.getInstance().windowPointerDragged(windowId, x, y);
                 return;
             }
             boolean started = false;
@@ -3582,7 +3583,7 @@ public abstract class CodenameOneImplementation {
             }
             if (windowDragStarted[slot] || started) {
                 windowDragStarted[slot] = true;
-                Display.getInstance().windowPointerDragged(windowId, x, y);
+                Desktop.getInstance().windowPointerDragged(windowId, x, y);
             }
             return;
         }
@@ -3613,7 +3614,7 @@ public abstract class CodenameOneImplementation {
             keyPressed(keyCode);
             return;
         }
-        Display.getInstance().windowKeyPressed(windowId, keyCode);
+        Desktop.getInstance().windowKeyPressed(windowId, keyCode);
     }
 
     /// Delivers a key release that happened in one of the additional native windows.
@@ -3752,7 +3753,7 @@ public abstract class CodenameOneImplementation {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         if (windowId > 0) {
-            Display.getInstance().windowPointerHover(windowId, xPointerEvent, yPointerEvent);
+            Desktop.getInstance().windowPointerHover(windowId, xPointerEvent, yPointerEvent);
         } else {
             pointerHover(xPointerEvent, yPointerEvent);
         }
@@ -3863,8 +3864,8 @@ public abstract class CodenameOneImplementation {
     protected boolean hasWindowDragStarted(final int windowId, final int slot,
             final int x, final int y) {
         Display d = Display.getInstance();
-        int surfaceWidth = d.windowWidth(windowId);
-        int surfaceHeight = d.windowHeight(windowId);
+        int surfaceWidth = com.codename1.ui.Desktop.getInstance().windowWidth(windowId);
+        int surfaceHeight = com.codename1.ui.Desktop.getInstance().windowHeight(windowId);
         if (surfaceWidth <= 0 || surfaceHeight <= 0) {
             return false;
         }
@@ -3875,7 +3876,7 @@ public abstract class CodenameOneImplementation {
             return false;
         }
         windowDragActivationCounter[slot]++;
-        if (dragPassedThreshold(d.windowDragRegionStatus(windowId, x, y),
+        if (dragPassedThreshold(com.codename1.ui.Desktop.getInstance().windowDragRegionStatus(windowId, x, y),
                 surfaceWidth, surfaceHeight,
                 windowDragActivationX[slot], windowDragActivationY[slot],
                 windowDragActivationCounter[slot], x, y)) {

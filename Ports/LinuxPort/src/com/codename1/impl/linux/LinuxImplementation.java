@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.linux;
 
+import com.codename1.ui.Desktop;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.WebSocketImpl;
 import com.codename1.io.Util;
@@ -764,30 +765,30 @@ public class LinuxImplementation extends CodenameOneImplementation {
             int windowId = eventScratch[4];
             switch (type) {
                 case EVENT_WINDOW_CLOSE:
-                    Display.getInstance().windowCloseRequested(windowId);
+                    Desktop.getInstance().windowCloseRequested(windowId);
                     break;
                 case EVENT_WINDOW_FOCUS:
-                    Display.getInstance().windowFocusChanged(windowId, key != 0);
+                    Desktop.getInstance().windowFocusChanged(windowId, key != 0);
                     break;
                 case EVENT_WINDOW_MONITOR:
-                    Display.getInstance().windowMonitorChanged(windowId);
+                    Desktop.getInstance().windowMonitorChanged(windowId);
                     break;
                 case EVENT_WINDOW_SHOWN:
-                    Display.getInstance().windowShowNotify(windowId);
+                    Desktop.getInstance().windowShowNotify(windowId);
                     // The window manager keeps its own record of what is on screen to
                     // decide what an owner may take down and bring back. This change
                     // did not go through it, so it has to be told.
                     LinuxWindowManager.windowVisibilityChanged(windowId, true);
                     break;
                 case EVENT_WINDOW_HIDDEN:
-                    Display.getInstance().windowHideNotify(windowId);
+                    Desktop.getInstance().windowHideNotify(windowId);
                     LinuxWindowManager.windowVisibilityChanged(windowId, false);
                     break;
                 case EVENT_WINDOW_MOVED:
-                    Display.getInstance().windowMoved(windowId);
+                    Desktop.getInstance().windowMoved(windowId);
                     break;
                 case EVENT_MONITORS_CHANGED:
-                    Display.getInstance().monitorsChanged();
+                    Desktop.getInstance().monitorsChanged();
                     break;
                 case EVENT_POINTER_PRESSED:
                     markPointer(key);
@@ -811,7 +812,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     if (windowId == 0) {
                         sizeChanged(x, y);
                     } else {
-                        Display.getInstance().windowSizeChanged(windowId, x, y);
+                        Desktop.getInstance().windowSizeChanged(windowId, x, y);
                     }
                     break;
                 case EVENT_MOUSE_WHEEL:

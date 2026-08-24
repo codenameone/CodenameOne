@@ -315,11 +315,11 @@ public class MacWindowManager extends WindowManager {
                 // the window is still up: it keeps painting it and fires no lifecycle
                 // event. macWindowShow reports nothing back, so report it here.
                 if (shown) {
-                    com.codename1.ui.Display.getInstance().windowShowNotify(child.windowId);
+                    com.codename1.ui.Desktop.getInstance().windowShowNotify(child.windowId);
                 } else if (activationFailed) {
-                    com.codename1.ui.Display.getInstance().windowActivationFailed(child.windowId);
+                    com.codename1.ui.Desktop.getInstance().windowActivationFailed(child.windowId);
                 } else {
-                    com.codename1.ui.Display.getInstance().windowHideNotify(child.windowId);
+                    com.codename1.ui.Desktop.getInstance().windowHideNotify(child.windowId);
                 }
             }
             // Going down, a descendant has to follow even when its own parent was

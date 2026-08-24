@@ -398,14 +398,6 @@ public final class Display extends CN1Constants {
     /// The main surface's pending press target; a window keeps its own.
     private Container mainPointerPressTarget;
 
-    /// Guards `#monitorsChangedPending`, which is set from the port's native event
-    /// thread and cleared on the event dispatch thread.
-    private final Object monitorsChangedLock = new Object();
-
-    /// Whether a monitor-topology notification is already queued. See
-    /// `#monitorsChanged()`.
-    private boolean monitorsChangedPending;
-
     /// How many entries the per-key and per-window input tables hold.
     ///
     /// CN1_MAX_DESKTOP_WINDOWS in the native ports, *plus one* for the application's
@@ -2342,69 +2334,6 @@ public final class Display extends CN1Constants {
         return windowMouseWheelEvent(0, x, y, scrollX, scrollY, precise, modifiers);
     }
 
-    /// Same as `#fireMouseWheelEvent(int, int, int, int, boolean, int)`, for a wheel
-    /// event that arrived over a specific native window.
-    ///
-    /// A port with desktop windows has to route the wheel explicitly: the main form
-    /// version resolves the component from `#getCurrent()`, so a wheel over a second
-    /// window would either do nothing or scroll the main form's content instead.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created, or 0 for
-    ///   the application's main surface
-    ///
-    /// - `x`: the pointer x position in window pixels
-    ///
-    /// - `y`: the pointer y position in window pixels
-    ///
-    /// - `scrollX`: the horizontal scroll amount in display pixels
-    ///
-    /// - `scrollY`: the vertical scroll amount in display pixels
-    ///
-    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
-    ///
-    /// - `modifiers`: bitmask of the held keyboard modifiers
-    ///
-    /// #### Returns
-    ///
-    /// true if a listener consumed the wheel event
-    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
-            boolean precise, int modifiers) {
-        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
-            return true;
-        }
-        Container root;
-        if (windowId > 0) {
-            Window w = Desktop.getInstance().windowById(windowId);
-            // The same hidden check the packed input path applies. A wheel callback
-            // queued before its window was hidden still finds the window registered,
-            // and would dispatch into an invisible tree -- an unconsumed listener that
-            // hides its own window is the immediate case, since the synthetic press,
-            // drag and release queued after it start against a window that is gone.
-            if (w == null || !w.isWindowShowing()) {
-                return false;
-            }
-            root = w;
-        } else {
-            root = getCurrent();
-        }
-        if (root == null) {
-            return false;
-        }
-        Component cmp;
-        try {
-            cmp = root.getComponentAt(x, y);
-        } catch (Throwable t) {
-            cmp = null;
-        }
-        if (cmp == null) {
-            return false;
-        }
-        com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
-        return cmp.fireMouseWheelEvent(we);
-    }
-
     /// Dispatches a magnify (pinch) gesture to the component under the given coordinates, walking up
     /// the hierarchy until a component handles it. Invoked by the implementation for native
     /// trackpad / multi touch magnify gestures; routes to `com.codename1.ui.Component#pinch(float)`.
@@ -2420,37 +2349,6 @@ public final class Display extends CN1Constants {
         windowMagnifyGesture(0, x, y, scale);
     }
 
-    /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
-    /// implementation for a gesture that arrived over a secondary window; window 0 is
-    /// the application's main surface, which is what `#fireMagnifyGesture(int, int, float)`
-    /// reports.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the gesture x position in pixels, relative to that window
-    ///
-    /// - `y`: the gesture y position in pixels, relative to that window
-    ///
-    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
-    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
-        Container f = gestureRoot(windowId);
-        if (f == null) {
-            return;
-        }
-        Component cmp = gestureComponentAt(f, x, y);
-        if (cmp == null) {
-            cmp = f;
-        }
-        while (cmp != null) {
-            if (cmp.pinch(scale)) {
-                return;
-            }
-            cmp = cmp.getParent();
-        }
-    }
-
     /// Dispatches a rotation (twist) gesture to the component under the given coordinates, walking
     /// up the hierarchy until a component handles it. Invoked by the implementation for native
     /// trackpad / multi touch rotation gestures; routes to `com.codename1.ui.Component#rotation(float)`.
@@ -2464,34 +2362,6 @@ public final class Display extends CN1Constants {
     /// - `radians`: the incremental rotation in radians, positive is clockwise
     public void fireRotationGesture(int x, int y, float radians) {
         windowRotationGesture(0, x, y, radians);
-    }
-
-    /// Dispatches a rotation (twist) gesture aimed at one native window. Invoked by the
-    /// implementation for a gesture that arrived over a secondary window; window 0 is
-    /// the application's main surface, which is what `#fireRotationGesture(int, int, float)`
-    /// reports.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the gesture x position in pixels, relative to that window
-    ///
-    /// - `y`: the gesture y position in pixels, relative to that window
-    ///
-    /// - `radians`: the incremental rotation in radians, positive is clockwise
-    public void windowRotationGesture(int windowId, int x, int y, float radians) {
-        Container f = gestureRoot(windowId);
-        if (f == null) {
-            return;
-        }
-        Component cmp = gestureComponentAt(f, x, y);
-        while (cmp != null) {
-            if (cmp.rotation(radians)) {
-                return;
-            }
-            cmp = cmp.getParent();
-        }
     }
 
     /// The top level a gesture was aimed at, or null when it is gone or currently
@@ -2533,21 +2403,7 @@ public final class Display extends CN1Constants {
         keyPressedImpl(0, keyCode);
     }
 
-    /// Pushes a key press event aimed at one native window into Codename One.
-    /// Invoked by the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `keyCode`: keycode of the key event
-    public void windowKeyPressed(int windowId, int keyCode) {
-        if (windowId > 0) {
-            keyPressedImpl(windowId, keyCode);
-        }
-    }
-
-    private void keyPressedImpl(int windowId, final int keyCode) {
+    void keyPressedImpl(int windowId, final int keyCode) {
         if (!addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode)) {
             // The press was not accepted, so nothing may be armed off it. The repeat
             // and long-press timers fire straight into the top level, so a component
@@ -2751,23 +2607,7 @@ public final class Display extends CN1Constants {
         pointerDraggedImpl(0, x, y);
     }
 
-    /// Pushes a pointer drag aimed at one native window into Codename One.
-    /// Invoked by the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x positions of the pointer
-    ///
-    /// - `y`: the y positions of the pointer
-    public void windowPointerDragged(int windowId, int[] x, int[] y) {
-        if (windowId > 0) {
-            pointerDraggedImpl(windowId, x, y);
-        }
-    }
-
-    private void pointerDraggedImpl(int windowId, final int[] x, final int[] y) {
+    void pointerDraggedImpl(int windowId, final int[] x, final int[] y) {
         if (x.length == 0) {
             // Native ports have been observed to deliver zero-length pointer arrays
             return;
@@ -2791,27 +2631,7 @@ public final class Display extends CN1Constants {
         pointerHoverImpl(0, x, y);
     }
 
-    /// Pushes a pointer hover event that arrived over a specific native window.
-    ///
-    /// A port with desktop windows has to say which window the pointer was over, or
-    /// hovering a second window sends the event to whatever the main form has at the
-    /// same coordinates -- so the window gets no tooltips and the main form gets
-    /// spurious ones.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x position of the pointer, in window coordinates
-    ///
-    /// - `y`: the y position of the pointer, in window coordinates
-    public void windowPointerHover(int windowId, final int[] x, final int[] y) {
-        if (windowId > 0) {
-            pointerHoverImpl(windowId, x, y);
-        }
-    }
-
-    private void pointerHoverImpl(int windowId, final int[] x, final int[] y) {
+    void pointerHoverImpl(int windowId, final int[] x, final int[] y) {
         if (windowId == 0 && impl.getCurrentForm() == null) {
             return;
         }
@@ -2853,38 +2673,6 @@ public final class Display extends CN1Constants {
         addPointerEvent(POINTER_HOVER_RELEASED, x[0], y[0]);
     }
 
-    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
-    /// the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x position of the pointer, in window coordinates
-    ///
-    /// - `y`: the y position of the pointer, in window coordinates
-    public void windowPointerHoverPressed(int windowId, final int[] x, final int[] y) {
-        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
-            addPointerEvent(POINTER_HOVER_PRESSED | (windowId << 8), x[0], y[0]);
-        }
-    }
-
-    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
-    /// the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x position of the pointer, in window coordinates
-    ///
-    /// - `y`: the y position of the pointer, in window coordinates
-    public void windowPointerHoverReleased(int windowId, final int[] x, final int[] y) {
-        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
-            addPointerEvent(POINTER_HOVER_RELEASED | (windowId << 8), x[0], y[0]);
-        }
-    }
-
     /// Pushes a pointer press event with the given coordinates into Codename One
     ///
     /// #### Parameters
@@ -2897,21 +2685,6 @@ public final class Display extends CN1Constants {
             return;
         }
         pointerPressedImpl(0, x, y);
-    }
-
-    /// Pushes a key release aimed at one native window into Codename One.
-    /// Invoked by the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `keyCode`: keycode of the key event
-    public void windowKeyReleased(int windowId, int keyCode) {
-        if (windowId > 0) {
-            cancelKeyRepeatForCode(keyCode);
-            addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
-        }
     }
 
     /// Returns the native window peer owning the given component, or null when it
@@ -2936,23 +2709,7 @@ public final class Display extends CN1Constants {
         return null;
     }
 
-    /// Pushes a pointer press aimed at one native window into Codename One.
-    /// Invoked by the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x positions of the pointer
-    ///
-    /// - `y`: the y positions of the pointer
-    public void windowPointerPressed(int windowId, int[] x, int[] y) {
-        if (windowId > 0) {
-            pointerPressedImpl(windowId, x, y);
-        }
-    }
-
-    private void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
+    void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
         boolean accepted;
         if (x.length == 1) {
             accepted = addPointerEvent(POINTER_PRESSED | (windowId << 8), x[0], y[0]);
@@ -2989,24 +2746,10 @@ public final class Display extends CN1Constants {
         pointerReleasedImpl(0, x, y);
     }
 
-    /// Pushes a pointer release aimed at one native window into Codename One.
-    /// Invoked by the implementation, off the event dispatch thread.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `x`: the x positions of the pointer
-    ///
-    /// - `y`: the y positions of the pointer
-    public void windowPointerReleased(int windowId, int[] x, int[] y) {
-        if (windowId > 0) {
-            cancelLongPress(windowId);
-            pointerReleasedImpl(windowId, x, y);
-        }
-    }
-
-    private void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
+    void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
+        // Cancelled here rather than by each caller: a release ends the gesture, so
+        // the long-press timer it armed must not outlive it.
+        cancelLongPress(windowId);
         if (x.length == 1) {
             addPointerEvent(POINTER_RELEASED | (windowId << 8), x[0], y[0]);
         } else {
@@ -3071,222 +2814,8 @@ public final class Display extends CN1Constants {
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
-    /// Notifies Codename One that a native window changed size. Invoked by the
-    /// implementation.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `w`: the new drawable width
-    ///
-    /// - `h`: the new drawable height
-    public void windowSizeChanged(int windowId, int w, int h) {
-        if (windowId <= 0) {
-            return;
-        }
-        // Coalesced onto the event dispatch thread rather than queued as a packet.
-        // The packed stack drops when it is full, which live resizing does easily, and
-        // the dropped packet can be the *final* size -- the native surface has already
-        // adopted it, so the hierarchy stays laid out for an earlier one with nothing
-        // guaranteed to correct it, leaving painting and hit testing misaligned.
-        //
-        // Coalescing is what makes a non-droppable path affordable here: only one
-        // notification per window is ever outstanding, and it carries whatever the
-        // latest dimensions are when it runs, so a drag that produces hundreds of
-        // resizes still costs one queued runnable at a time.
-        final Integer key = Integer.valueOf(windowId);
-        boolean queue;
-        synchronized (pendingWindowSizes) {
-            int[] latest = (int[]) pendingWindowSizes.get(key);
-            if (latest == null) {
-                latest = new int[2];
-                pendingWindowSizes.put(key, latest);
-                queue = true;
-            } else {
-                queue = false;
-            }
-            latest[0] = w;
-            latest[1] = h;
-        }
-        if (!queue) {
-            return;
-        }
-        final int id = windowId;
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                int width;
-                int height;
-                synchronized (pendingWindowSizes) {
-                    int[] latest = (int[]) pendingWindowSizes.remove(key);
-                    if (latest == null) {
-                        return;
-                    }
-                    width = latest[0];
-                    height = latest[1];
-                }
-                Window w = Desktop.getInstance().windowById(id);
-                if (w != null) {
-                    w.sizeChangedInternal(width, height);
-                }
-            }
-        });
-    }
-
     /// The most recent size reported for each open window that has not been delivered
     /// yet. See `#windowSizeChanged(int, int, int)`.
-    private final Hashtable pendingWindowSizes = new Hashtable();
-
-    /// Notifies Codename One that a native window became visible.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowShowNotify(int windowId) {
-        if (windowId > 0) {
-            // Deliberately not the packed input queue. That queue drops events when it
-            // is full and while invokeAndBlock is running in drop mode, and nothing
-            // reconciles a lost one afterwards: a dropped show leaves a visible window
-            // the framework believes is iconified and never paints again, and a
-            // dropped hide leaves a hidden window painting and keeping the event
-            // dispatch thread awake. Lifecycle notifications are not droppable.
-            callSerially(new WindowCallback(windowId, WindowCallback.SHOWN));
-        }
-    }
-
-    /// Notifies Codename One that the platform refused to create a window's native
-    /// surface, so the window will never appear.
-    ///
-    /// Separate from `#windowHideNotify(int)` because that one means "minimized",
-    /// which keeps a modal window's registration: a modal that never appeared would
-    /// otherwise block input to every other window while `showModal()` waited for it.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the window whose native surface could not be created
-    public void windowActivationFailed(int windowId) {
-        if (windowId > 0) {
-            WindowCallback failure = new WindowCallback(windowId,
-                    WindowCallback.ACTIVATION_FAILED);
-            if (isEdt()) {
-                // Applied in the caller's own turn when it is already on the event
-                // dispatch thread. A port validates this failure against the request
-                // token it belongs to and then reports it, and queueing again splits
-                // those two steps across turns: a retrying show() can run in between,
-                // start a new request, and be marked hidden and stripped of its
-                // modality by a failure that no longer applies to it. Running here
-                // keeps the check and its consequence in one unit, which is what the
-                // check is for.
-                failure.run();
-                return;
-            }
-            // Not droppable, for the same reason as the other lifecycle notifications.
-            callSerially(failure);
-        }
-    }
-
-    /// Notifies Codename One that a native window stopped being visible.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowHideNotify(int windowId) {
-        if (windowId > 0) {
-            // See windowShowNotify: not droppable.
-            callSerially(new WindowCallback(windowId, WindowCallback.HIDDEN));
-        }
-    }
-
-    /// Notifies Codename One that a native window gained or lost keyboard focus.
-    /// Marshalled onto the event dispatch thread, since it runs application code.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    ///
-    /// - `gained`: true when the window gained focus
-    public void windowFocusChanged(int windowId, boolean gained) {
-        callSerially(new WindowCallback(windowId,
-                gained ? WindowCallback.FOCUS_GAINED : WindowCallback.FOCUS_LOST));
-    }
-
-    /// Notifies Codename One that the user activated a native window's close control.
-    /// Marshalled onto the event dispatch thread, since it runs application code and
-    /// may dispose the window.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowCloseRequested(int windowId) {
-        // Queued first, and the modality check made on the event dispatch thread inside
-        // the callback. The modal stack is mutated there by show, hide and dispose, so
-        // testing it from the port's callback thread raced: isBlockedByModal takes the
-        // stack's size and then indexes it, which a concurrent removal turns into an
-        // exception, and a stale read could let a blocked window's close through.
-        callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));
-    }
-
-    /// Notifies Codename One that the platform has already destroyed a window's
-    /// native surface, so the window is gone whatever the application would prefer.
-    ///
-    /// Distinct from `#windowCloseRequested(int)`, which asks. Some platforms do not
-    /// offer the close control as a question: a Mac Catalyst scene is disconnected
-    /// after the fact, with nothing left to veto. Reporting that as a request would
-    /// let `DO_NOTHING_ON_CLOSE` leave a registered window painting into a surface
-    /// that no longer exists, so it is reported as what it is and the window is
-    /// disposed.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowClosedNatively(int windowId) {
-        callSerially(new WindowCallback(windowId, WindowCallback.CLOSED_NATIVELY));
-    }
-
-    /// Notifies Codename One that a native window moved to a monitor with different
-    /// characteristics, so that its scale and layout are recomputed.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowMonitorChanged(int windowId) {
-        callSerially(new WindowCallback(windowId, WindowCallback.MONITOR_CHANGED));
-    }
-
-    /// Notifies Codename One that the user moved a native window.
-    ///
-    /// Separate from `#windowMonitorChanged(int)`, which is only for a move that
-    /// carried the window onto a different display: an ordinary move within one
-    /// monitor still has to reach the listeners, or nothing can persist a window's
-    /// position.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the id the port was given when the window was created
-    public void windowMoved(int windowId) {
-        if (windowId > 0) {
-            callSerially(new WindowCallback(windowId, WindowCallback.MOVED));
-        }
-    }
-
-    /// Notifies Codename One that the set of attached monitors changed.
-    public void monitorsChanged() {
-        synchronized (monitorsChangedLock) {
-            // Genuinely coalesced rather than merely documented as such. One physical
-            // display change is reported many times over: Windows broadcasts
-            // WM_DISPLAYCHANGE to every top level window, and GTK fires geometry,
-            // work-area and scale-factor notifications separately for each monitor.
-            // Each notification relays out every open window and fires every monitor
-            // listener, so without this a single resolution change did that work N
-            // times. A change arriving while one is queued is already covered by it.
-            if (monitorsChangedPending) {
-                return;
-            }
-            monitorsChangedPending = true;
-        }
-        callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
-    }
 
     /// Whether this release finishes a press the framework already accepted.
     ///
@@ -3705,142 +3234,6 @@ public final class Display extends CN1Constants {
             }
         }
         return null;
-    }
-
-    /// Lets the queued notification re-arm the coalescing guard. See
-    /// `#monitorsChanged()`.
-    void clearMonitorsChangedPending() {
-        synchronized (monitorsChangedLock) {
-            monitorsChangedPending = false;
-        }
-    }
-
-    /// Marshals a window notification that arrived on the platform's own thread onto
-    /// the event dispatch thread. A named static class rather than an anonymous one so
-    /// it does not retain the `Display` it was created from.
-    private static final class WindowCallback implements Runnable {
-        private static final int FOCUS_GAINED = 0;
-        private static final int FOCUS_LOST = 1;
-        private static final int CLOSE_REQUESTED = 2;
-        private static final int MONITOR_CHANGED = 3;
-        private static final int MONITORS_CHANGED = 4;
-        private static final int MOVED = 5;
-        private static final int CLOSED_NATIVELY = 6;
-        private static final int SHOWN = 7;
-        private static final int HIDDEN = 8;
-        private static final int ACTIVATION_FAILED = 9;
-
-        private final int windowId;
-        private final int kind;
-
-        WindowCallback(int windowId, int kind) {
-            this.windowId = windowId;
-            this.kind = kind;
-        }
-
-        @Override
-        public void run() {
-            Desktop desktop = Desktop.getInstance();
-            Window w = desktop.windowById(windowId);
-            switch (kind) {
-                case FOCUS_GAINED:
-                    desktop.setFocusedWindow(w);
-                    break;
-                case FOCUS_LOST:
-                    if (desktop.getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals
-                        desktop.setFocusedWindow(null);
-                    }
-                    if (w != null) {
-                        // The fifth way a window stops being reachable, after hide,
-                        // minimize, dispose and modal blocking. The physical key-up
-                        // goes to whatever has focus now, so without this a held key
-                        // repeats into this window for as long as it stays open and
-                        // a pressed component stays latched.
-                        w.cancelPendingInput();
-                    }
-                    break;
-                case CLOSE_REQUESTED:
-                    // A close arrives outside the packed input queue, so it bypasses the
-                    // modality filter that guards every other event. A port that cannot
-                    // disable a blocked window natively -- Catalyst has no such control
-                    // -- would otherwise let the user close a window an application
-                    // modal is supposed to be blocking. Checked here rather than at the
-                    // callback, so the modal stack is only ever read on this thread.
-                    if (w != null && !Desktop.getInstance().isWindowInputBlocked(windowId)) {
-                        w.closeRequested();
-                    }
-                    break;
-                case MONITOR_CHANGED:
-                    // One window moved to another display. Deliberately not
-                    // desktop.fireMonitorChanged(): Desktop.addMonitorListener is
-                    // documented for a monitor being attached, removed or
-                    // reconfigured, and firing it for every drag across a mixed-DPI
-                    // desktop turned an ordinary window move into a topology event --
-                    // repeatedly re-running whatever display reconfiguration work the
-                    // application does there. The window itself re-reads its scale and
-                    // lays out below, and an application that wants to follow one
-                    // window across displays sees it through that window's Moved
-                    // event plus getMonitor().
-                    if (w != null) {
-                        w.monitorChanged();
-                    }
-                    break;
-                case MONITORS_CHANGED:
-                    // Cleared before the work, not after: a display change that
-                    // happens while this runs describes a topology this pass has not
-                    // read yet, so it has to queue another one rather than be
-                    // swallowed as a duplicate.
-                    Display.getInstance().clearMonitorsChangedPending();
-                    for (Window each : desktop.getWindows()) {
-                        each.monitorChanged();
-                    }
-                    desktop.fireMonitorChanged();
-                    break;
-                case MOVED:
-                    if (w != null) {
-                        w.moved();
-                    }
-                    break;
-                case SHOWN:
-                    if (w != null) {
-                        w.showNotify();
-                        // A visibility change can change what is blocked: a modal whose
-                        // owner went away stops blocking, and blocks again when the
-                        // owner returns. Only push, pop and dispose re-synced the native
-                        // flags, so the framework and the platform disagreed for as long
-                        // as the window stayed hidden -- the platform kept the main
-                        // surface disabled with no modal on screen to release it.
-                        Desktop.getInstance().syncNativeModalBlocking();
-                    }
-                    break;
-                case HIDDEN:
-                    if (w != null) {
-                        w.hideNotify();
-                        Desktop.getInstance().syncNativeModalBlocking();
-                    }
-                    break;
-                case ACTIVATION_FAILED:
-                    if (w != null) {
-                        w.activationFailed();
-                    }
-                    break;
-                case CLOSED_NATIVELY:
-                    if (w != null) {
-                        // A window a modal is blocking must not be closable. Where the
-                        // platform's close control cannot be disabled the close has
-                        // already happened, so the only way to honour the contract is
-                        // to put the window back; a port that cannot returns false and
-                        // the window is disposed, because the surface is genuinely gone.
-                        if (!Desktop.getInstance().isWindowInputBlocked(windowId)
-                                || !w.reopenNativeSurface()) {
-                            w.dispose();
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
     }
 
     private void addNotifyEvent(int type) {
@@ -4528,85 +3921,6 @@ public final class Display extends CN1Constants {
         synchronized (lock) {
             lock.notifyAll();
         }
-    }
-
-    /// Cancels every input timer and recorded press for a window that is no longer
-    /// reachable, without deregistering it. Called when a window is hidden: it stays
-    /// registered, so a repeat armed before it went away would keep firing into a
-    /// component tree the user cannot see.
-    void windowInputCancelled(Window w) {
-        int id = w.getWindowId();
-        cancelKeyRepeat(id);
-        cancelLongPress(id);
-        // The implementation holds its own per-window input state -- the drag
-        // activation slot -- which these records cannot reach.
-        impl.releaseWindowInputState(id);
-        // The key table is keyed by key code rather than by window -- several keys can
-        // be held at once -- so a departing window's entries still have to be cleared
-        // here. Its pointer press target went with the window itself.
-        forgetKeyPressesFor(w);
-    }
-
-    void windowDisposed(Window w) {
-        Desktop.getInstance().forgetModal(w);
-        forgetKeyPressesFor(w);
-        cancelKeyRepeat(w.getWindowId());
-        cancelLongPress(w.getWindowId());
-        // As above: a window disposed mid-press never delivers a release, and its
-        // drag slot would be held by an id that can never come back.
-        impl.releaseWindowInputState(w.getWindowId());
-    }
-
-    /// Indicates whether input aimed at the given window is currently blocked by a
-    /// modal window above it.
-    /// The drag-region status at a point inside one of the additional native windows,
-    /// used by the implementation's drag activation filter.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the window to ask
-    ///
-    /// - `x`: x in the window's coordinates
-    ///
-    /// - `y`: y in the window's coordinates
-    ///
-    /// #### Returns
-    ///
-    /// the drag region status, or `Component#DRAG_REGION_NOT_DRAGGABLE` when there is
-    /// no such window
-    public int windowDragRegionStatus(int windowId, int x, int y) {
-        Window w = Desktop.getInstance().windowById(windowId);
-        return w == null ? Component.DRAG_REGION_NOT_DRAGGABLE : w.getDragRegionStatus(x, y);
-    }
-
-    /// The width of one of the additional native windows, or 0 when there is no such
-    /// window.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the window to ask
-    ///
-    /// #### Returns
-    ///
-    /// the window's width in Codename One coordinates
-    public int windowWidth(int windowId) {
-        Window w = Desktop.getInstance().windowById(windowId);
-        return w == null ? 0 : w.getWidth();
-    }
-
-    /// The height of one of the additional native windows, or 0 when there is no such
-    /// window.
-    ///
-    /// #### Parameters
-    ///
-    /// - `windowId`: the window to ask
-    ///
-    /// #### Returns
-    ///
-    /// the window's height in Codename One coordinates
-    public int windowHeight(int windowId) {
-        Window w = Desktop.getInstance().windowById(windowId);
-        return w == null ? 0 : w.getHeight();
     }
 
     /// Paints every open window after the main surface. Iterates by index and
@@ -9215,6 +8529,204 @@ public final class Display extends CN1Constants {
             }
         }
 
+    }
+
+
+    /// Cancels every input timer and recorded press for a window that is no longer
+    /// reachable, without deregistering it. Called when a window is hidden: it stays
+    /// registered, so a repeat armed before it went away would keep firing into a
+    /// component tree the user cannot see.
+    void windowInputCancelled(Window w) {
+        int id = w.getWindowId();
+        cancelKeyRepeat(id);
+        cancelLongPress(id);
+        // The implementation holds its own per-window input state -- the drag
+        // activation slot -- which these records cannot reach.
+        Display.impl.releaseWindowInputState(id);
+        // The key table is keyed by key code rather than by window -- several keys can
+        // be held at once -- so a departing window's entries still have to be cleared
+        // here. Its pointer press target went with the window itself.
+        forgetKeyPressesFor(w);
+    }
+
+    void windowDisposed(Window w) {
+        Desktop.getInstance().forgetModal(w);
+        forgetKeyPressesFor(w);
+        cancelKeyRepeat(w.getWindowId());
+        cancelLongPress(w.getWindowId());
+        // As above: a window disposed mid-press never delivers a release, and its
+        // drag slot would be held by an id that can never come back.
+        Display.impl.releaseWindowInputState(w.getWindowId());
+    }
+
+    /// Same as `#fireMouseWheelEvent(int, int, int, int, boolean, int)`, for a wheel
+    /// event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to route the wheel explicitly: the main form
+    /// version resolves the component from `#getCurrent()`, so a wheel over a second
+    /// window would either do nothing or scroll the main form's content instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return true;
+        }
+        Container root;
+        if (windowId > 0) {
+            Window w = Desktop.getInstance().windowById(windowId);
+            // The same hidden check the packed input path applies. A wheel callback
+            // queued before its window was hidden still finds the window registered,
+            // and would dispatch into an invisible tree -- an unconsumed listener that
+            // hides its own window is the immediate case, since the synthetic press,
+            // drag and release queued after it start against a window that is gone.
+            if (w == null || !w.isWindowShowing()) {
+                return false;
+            }
+            root = w;
+        } else {
+            root = getCurrent();
+        }
+        if (root == null) {
+            return false;
+        }
+        Component cmp;
+        try {
+            cmp = root.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        if (cmp == null) {
+            return false;
+        }
+        com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
+        return cmp.fireMouseWheelEvent(we);
+    }
+
+    /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireMagnifyGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
+    public void windowMagnifyGesture(int windowId, int x, int y, float scale) {
+        Container f = gestureRoot(windowId);
+        if (f == null) {
+            return;
+        }
+        Component cmp = gestureComponentAt(f, x, y);
+        if (cmp == null) {
+            cmp = f;
+        }
+        while (cmp != null) {
+            if (cmp.pinch(scale)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+    /// Dispatches a rotation (twist) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireRotationGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    public void windowRotationGesture(int windowId, int x, int y, float radians) {
+        Container f = gestureRoot(windowId);
+        if (f == null) {
+            return;
+        }
+        Component cmp = gestureComponentAt(f, x, y);
+        while (cmp != null) {
+            if (cmp.rotation(radians)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+
+    /// Pushes a key release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyReleased(int windowId, int keyCode) {
+        if (windowId > 0) {
+            cancelKeyRepeatForCode(keyCode);
+            addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
+        }
+    }
+
+    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverPressed(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_PRESSED | (windowId << 8), x[0], y[0]);
+        }
+    }
+
+    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverReleased(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_RELEASED | (windowId << 8), x[0], y[0]);
+        }
     }
 
 }

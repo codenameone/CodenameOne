@@ -2477,7 +2477,7 @@ public class Window extends Container implements TopLevelContainer {
             // Re-entered through this window rather than Display.pointerDragged(), which
             // Form uses: that one is the main surface's path and would deliver the drag
             // to the current Form instead of here.
-            Display.getInstance().windowPointerDragged(getWindowId(),
+            Desktop.getInstance().windowPointerDragged(getWindowId(),
                     new int[] { x }, new int[] { y });
             return;
         }

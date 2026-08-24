@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.windows;
 
+import com.codename1.ui.Desktop;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.WebSocketImpl;
 import com.codename1.io.Util;
@@ -784,29 +785,29 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     if (windowId == 0) {
                         sizeChanged(x, y);
                     } else {
-                        Display.getInstance().windowSizeChanged(windowId, x, y);
+                        Desktop.getInstance().windowSizeChanged(windowId, x, y);
                     }
                     break;
                 case EVENT_WINDOW_CLOSE:
-                    Display.getInstance().windowCloseRequested(windowId);
+                    Desktop.getInstance().windowCloseRequested(windowId);
                     break;
                 case EVENT_WINDOW_FOCUS:
-                    Display.getInstance().windowFocusChanged(windowId, key != 0);
+                    Desktop.getInstance().windowFocusChanged(windowId, key != 0);
                     break;
                 case EVENT_WINDOW_MONITOR:
-                    Display.getInstance().windowMonitorChanged(windowId);
+                    Desktop.getInstance().windowMonitorChanged(windowId);
                     break;
                 case EVENT_WINDOW_SHOWN:
-                    Display.getInstance().windowShowNotify(windowId);
+                    Desktop.getInstance().windowShowNotify(windowId);
                     break;
                 case EVENT_WINDOW_HIDDEN:
-                    Display.getInstance().windowHideNotify(windowId);
+                    Desktop.getInstance().windowHideNotify(windowId);
                     break;
                 case EVENT_WINDOW_MOVED:
-                    Display.getInstance().windowMoved(windowId);
+                    Desktop.getInstance().windowMoved(windowId);
                     break;
                 case EVENT_MONITORS_CHANGED:
-                    Display.getInstance().monitorsChanged();
+                    Desktop.getInstance().monitorsChanged();
                     break;
                 case EVENT_MOUSE_WHEEL:
                     // key carries the signed wheel delta (multiple of WHEEL_DELTA).

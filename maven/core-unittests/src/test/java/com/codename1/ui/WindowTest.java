@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.Desktop;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestWindowManager;
@@ -301,7 +302,7 @@ class WindowTest extends UITestBase {
         TestWindowManager.FakeWindow peer = wm.getLastWindow();
         assertTrue(peer.isModal(), "it starts this blocking");
 
-        Display.getInstance().windowActivationFailed(w.getWindowId());
+        Desktop.getInstance().windowActivationFailed(w.getWindowId());
         DisplayTest.flushEdt();
 
         // Not the minimize path: that keeps the modal registration on purpose, because
@@ -973,7 +974,7 @@ class WindowTest extends UITestBase {
 
         // Only a monitor change was reported before, so an ordinary move within one
         // display never reached a listener and nothing could persist a position.
-        Display.getInstance().windowMoved(w.getWindowId());
+        Desktop.getInstance().windowMoved(w.getWindowId());
         flushSerialCalls();
         assertEquals(1, moves.get());
         w.dispose();
@@ -1328,8 +1329,8 @@ class WindowTest extends UITestBase {
         Display.getInstance().keyPressed(-90);
         int[] px = new int[]{150};
         int[] py = new int[]{120};
-        Display.getInstance().windowPointerPressed(w.getWindowId(), px, py);
-        Display.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(w.getWindowId(), px, py);
         Display.getInstance().keyReleased(-90);
         DisplayTest.flushEdt();
         w.dispose();
@@ -1376,13 +1377,13 @@ class WindowTest extends UITestBase {
         // broadcasts WM_DISPLAYCHANGE to every top level window, and GTK fires
         // geometry, work-area and scale-factor notifications separately per monitor.
         for (int iter = 0; iter < 5; iter++) {
-            Display.getInstance().monitorsChanged();
+            Desktop.getInstance().monitorsChanged();
         }
         DisplayTest.flushEdt();
         assertEquals(1, fired[0], "five reports of one change must notify once");
 
         // A later change is a new change, not a duplicate of the one already drained.
-        Display.getInstance().monitorsChanged();
+        Desktop.getInstance().monitorsChanged();
         DisplayTest.flushEdt();
         assertEquals(2, fired[0]);
     }
@@ -1409,7 +1410,7 @@ class WindowTest extends UITestBase {
         // nothing and cleared the field, and the second release then matched nothing
         // either -- latching a component in each window.
         Display.getInstance().keyPressed(-91);
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -92);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -92);
         Display.getInstance().keyReleased(-91);
         Display.getInstance().windowKeyReleased(w.getWindowId(), -92);
         DisplayTest.flushEdt();
@@ -1547,7 +1548,7 @@ class WindowTest extends UITestBase {
         w.show();
         w.setFocused(keys);
 
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -94);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -94);
         DisplayTest.flushEdt();
 
         // The press handler opens an application modal, so the release arrives with
@@ -1564,7 +1565,7 @@ class WindowTest extends UITestBase {
         int released = keys.released;
 
         // A press that never happened stays blocked: this one leaves no record.
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -95);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -95);
         DisplayTest.flushEdt();
         int pressedWhileBlocked = keys.pressed;
 
@@ -1706,10 +1707,10 @@ class WindowTest extends UITestBase {
         // tracks a touch sequence per window, so this is reachable on a touchscreen.
         // A single shared target let B's press erase A's, after which both releases
         // were dropped and both components stayed latched.
-        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
-        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
-        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py);
-        Display.getInstance().windowPointerReleased(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(b.getWindowId(), px, py);
         DisplayTest.flushEdt();
         int ra = ca.released;
         int rb = cb.released;
@@ -1747,9 +1748,9 @@ class WindowTest extends UITestBase {
         // Press in A, then in B. The long-press timer was a single set of fields, so
         // B's press replaced A's coordinates and clock, and releasing either one
         // cancelled the other's pending long press.
-        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
-        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
-        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py);
         DisplayTest.flushEdt();
 
         boolean bStillArmed = longPressArmedFor(b.getWindowId());
@@ -1791,7 +1792,7 @@ class WindowTest extends UITestBase {
         // say, and the event dispatch thread fires longPointerPress directly without
         // re-checking -- so a context menu could open behind the modal for a press
         // the component never received.
-        Display.getInstance().windowPointerPressed(blocked.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(blocked.getWindowId(), px, py);
         DisplayTest.flushEdt();
         boolean armed = longPressArmedFor(blocked.getWindowId());
 
@@ -1862,15 +1863,15 @@ class WindowTest extends UITestBase {
         int[] px = new int[]{150};
         int[] py = new int[]{120};
         int[] py2 = new int[]{160};
-        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
-        Display.getInstance().windowPointerDragged(a.getWindowId(), px, py2);
+        Desktop.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerDragged(a.getWindowId(), px, py2);
         DisplayTest.flushEdt();
         // B's press cleared the global flag after A had already dragged, so releasing
         // A made List and friends read hasDragOccured() as false and treat a
         // completed drag as a click.
-        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(b.getWindowId(), px, py);
         DisplayTest.flushEdt();
-        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py2);
+        Desktop.getInstance().windowPointerReleased(a.getWindowId(), px, py2);
         DisplayTest.flushEdt();
         b.dispose();
         a.dispose();
@@ -1965,8 +1966,8 @@ class WindowTest extends UITestBase {
                 windows[iter].show();
                 int[] px = new int[] { 150 };
                 int[] py = new int[] { 120 };
-                Display.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
-                Display.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
+                Desktop.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
+                Desktop.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
                 DisplayTest.flushEdt();
             }
 
@@ -2077,7 +2078,7 @@ class WindowTest extends UITestBase {
         // A positive key code, because the timers are only armed for a code that can
         // repeat -- with a negative one the test would pass without testing anything,
         // which is what the first version of it did.
-        Display.getInstance().windowKeyPressed(blocked.getWindowId(), 65);
+        Desktop.getInstance().windowKeyPressed(blocked.getWindowId(), 65);
         DisplayTest.flushEdt();
         boolean armed = keyRepeatArmedFor(blocked.getWindowId());
 
@@ -2117,7 +2118,7 @@ class WindowTest extends UITestBase {
         Display.getInstance().keyPressed(-97);
         // The native ports forward every autorepeat as another press; this one
         // arrives while the other window has focus.
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -97);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -97);
         Display.getInstance().keyReleased(-97);
         DisplayTest.flushEdt();
         int released = mainKeys.released;
@@ -2232,7 +2233,7 @@ class WindowTest extends UITestBase {
                     // during which the physical release is processed.
                     int[] px = new int[]{150};
                     int[] py = new int[]{120};
-                    Display.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+                    Desktop.getInstance().windowPointerReleased(w.getWindowId(), px, py);
                     DisplayTest.flushEdt();
                 }
             }
@@ -2249,7 +2250,7 @@ class WindowTest extends UITestBase {
 
         int[] px = new int[]{150};
         int[] py = new int[]{120};
-        Display.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(), px, py);
         DisplayTest.flushEdt();
         int count = released[0];
         w.dispose();
@@ -2271,7 +2272,7 @@ class WindowTest extends UITestBase {
         // repeat armed by the press that got us here would keep firing into a tree
         // the user cannot see -- and the key-up may never arrive once the native
         // window has lost focus.
-        Display.getInstance().windowKeyPressed(w.getWindowId(), 67);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 67);
         DisplayTest.flushEdt();
         w.hide();
         boolean armed = keyRepeatArmedFor(w.getWindowId());
@@ -2332,7 +2333,7 @@ class WindowTest extends UITestBase {
         w.setWindowSize(300, 200);
         w.show();
 
-        Display.getInstance().windowKeyPressed(w.getWindowId(), 68);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 68);
         DisplayTest.flushEdt();
         // Native minimization arrives through hideNotify, not hide(), and bypassed
         // the cleanup entirely -- the window stays registered either way.
@@ -2376,12 +2377,12 @@ class WindowTest extends UITestBase {
         w.setWindowSize(300, 200);
         w.show();
 
-        Display.getInstance().windowKeyPressed(w.getWindowId(), 69);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), 69);
         DisplayTest.flushEdt();
         // The user switches to another application while holding the key. The
         // key-up goes to whoever has focus now, so nothing else would ever stop
         // this window repeating.
-        Display.getInstance().windowFocusChanged(w.getWindowId(), false);
+        Desktop.getInstance().windowFocusChanged(w.getWindowId(), false);
         DisplayTest.flushEdt();
         boolean armed = keyRepeatArmedFor(w.getWindowId());
         w.dispose();
@@ -2402,7 +2403,7 @@ class WindowTest extends UITestBase {
         // it. Dispatching the press re-latches the component the hide just
         // unlatched, with no release coming -- the timer is armed at queue time, so
         // the observable damage is the component's state rather than the timer's.
-        Display.getInstance().windowPointerPressed(w.getWindowId(),
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(),
                 new int[]{150}, new int[]{120});
         w.hide();
         DisplayTest.flushEdt();
@@ -2776,7 +2777,7 @@ class WindowTest extends UITestBase {
 
         // Tagged with the window's id: the untagged entry point is window 0, the main
         // surface, and the press would never reach this window at all.
-        Display.getInstance().windowPointerPressed(w.getWindowId(),
+        Desktop.getInstance().windowPointerPressed(w.getWindowId(),
                 new int[]{other.getAbsoluteX() + 2},
                 new int[]{other.getAbsoluteY() + 2});
         flushSerialCalls();
@@ -2947,7 +2948,7 @@ class WindowTest extends UITestBase {
         // filter that guards every other event. The check moved onto the event dispatch
         // thread -- the modal stack is mutated there, so reading it from the port's
         // callback thread raced -- and this asserts the move kept the behaviour.
-        Display.getInstance().windowCloseRequested(owner.getWindowId());
+        Desktop.getInstance().windowCloseRequested(owner.getWindowId());
         flushSerialCalls();
         assertEquals(0, closes[0],
                 "a window blocked by an application modal must not close");
@@ -2955,7 +2956,7 @@ class WindowTest extends UITestBase {
         modal.dispose();
         flushSerialCalls();
 
-        Display.getInstance().windowCloseRequested(owner.getWindowId());
+        Desktop.getInstance().windowCloseRequested(owner.getWindowId());
         flushSerialCalls();
         assertEquals(1, closes[0],
                 "and must close again once the modal is gone");
@@ -3310,7 +3311,7 @@ class WindowTest extends UITestBase {
         // re-run whatever display reconfiguration work the application does.
         try {
             peer.setMonitor(1);
-            Display.getInstance().windowMonitorChanged(w.getWindowId());
+            Desktop.getInstance().windowMonitorChanged(w.getWindowId());
             DisplayTest.flushEdt();
 
             assertEquals(0, fired[0],
@@ -3320,7 +3321,7 @@ class WindowTest extends UITestBase {
             assertEquals(2.0, w.getScale(), 0.0001);
 
             // A real topology change still notifies.
-            Display.getInstance().monitorsChanged();
+            Desktop.getInstance().monitorsChanged();
             DisplayTest.flushEdt();
             assertEquals(1, fired[0], "an attach, removal or reconfiguration still notifies");
         } finally {
@@ -3832,7 +3833,7 @@ class WindowTest extends UITestBase {
             // holds, and the one it drops can be the last -- leaving the hierarchy
             // laid out for a size the native surface has already moved past.
             for (int iter = 0; iter < 500; iter++) {
-                Display.getInstance().windowSizeChanged(w.getWindowId(), 500 + iter, 400 + iter);
+                Desktop.getInstance().windowSizeChanged(w.getWindowId(), 500 + iter, 400 + iter);
             }
             flushSerialCalls();
 
@@ -3903,8 +3904,8 @@ class WindowTest extends UITestBase {
         // window, which is what happens when focus moves while the key is still down --
         // the platform sends every repeat to whatever is focused now.
         Display.getInstance().keyPressed(-93);
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -93);
-        Display.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -93);
+        Desktop.getInstance().windowKeyPressed(w.getWindowId(), -93);
         DisplayTest.flushEdt();
 
         assertEquals(3, mainKeys.pressed,
@@ -3991,7 +3992,7 @@ class WindowTest extends UITestBase {
         // reports it. Queueing the framework half into a later turn lets a retrying
         // show() run in between and be undone by a failure that no longer applies to
         // it, so the report has to take effect in the turn that validated it.
-        Display.getInstance().windowActivationFailed(w.getWindowId());
+        Desktop.getInstance().windowActivationFailed(w.getWindowId());
 
         assertFalse(w.isWindowShowing(),
                 "the failure has to take effect in the caller's own turn, not a later "
@@ -4030,7 +4031,7 @@ class WindowTest extends UITestBase {
             // children it owns and reports them through windowHideNotify, which is the
             // minimize path -- so the child keeps its modal registration on purpose.
             owner.hide();
-            d.windowHideNotify(modal.getWindowId());
+            Desktop.getInstance().windowHideNotify(modal.getWindowId());
             DisplayTest.flushEdt();
 
             assertTrue(bystanderPeer.isInputEnabled(),
@@ -4041,7 +4042,7 @@ class WindowTest extends UITestBase {
             // And it takes the block back when the owner returns, rather than being
             // permanently disarmed.
             owner.show();
-            d.windowShowNotify(modal.getWindowId());
+            Desktop.getInstance().windowShowNotify(modal.getWindowId());
             DisplayTest.flushEdt();
             assertFalse(bystanderPeer.isInputEnabled(),
                     "the modal blocks again once its owner is back on screen");

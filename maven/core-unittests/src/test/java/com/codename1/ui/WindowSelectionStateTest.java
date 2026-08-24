@@ -93,15 +93,15 @@ class WindowSelectionStateTest extends UITestBase {
             Component inB = content(b);
 
             // A contact goes down on the component in A and stays down.
-            d.windowPointerPressed(a.getWindowId(), insideX(inA), insideY(inA));
+            com.codename1.ui.Desktop.getInstance().windowPointerPressed(a.getWindowId(), insideX(inA), insideY(inA));
             DisplayTest.flushEdt();
             assertTrue(d.shouldRenderSelection(inA),
                     "the component under the held contact must show its selection");
 
             // A whole press/release cycle happens in B while A is still held.
-            d.windowPointerPressed(b.getWindowId(), insideX(inB), insideY(inB));
+            com.codename1.ui.Desktop.getInstance().windowPointerPressed(b.getWindowId(), insideX(inB), insideY(inB));
             DisplayTest.flushEdt();
-            d.windowPointerReleased(b.getWindowId(), insideX(inB), insideY(inB));
+            com.codename1.ui.Desktop.getInstance().windowPointerReleased(b.getWindowId(), insideX(inB), insideY(inB));
             DisplayTest.flushEdt();
 
             assertFalse(d.shouldRenderSelection(inB),
@@ -130,7 +130,7 @@ class WindowSelectionStateTest extends UITestBase {
             b.setWindowSize(900, 700);
             Component inB = content(b);
 
-            d.windowPointerPressed(a.getWindowId(), insideX(inA), insideY(inA));
+            com.codename1.ui.Desktop.getInstance().windowPointerPressed(a.getWindowId(), insideX(inA), insideY(inA));
             DisplayTest.flushEdt();
             assertTrue(d.shouldRenderSelection(inA), "held in A, inside its component");
 
@@ -138,7 +138,7 @@ class WindowSelectionStateTest extends UITestBase {
             int by = insideY(inB)[0];
             assertFalse(inA.contains(bx, by),
                     "the test is only meaningful if B's press point is outside A's component");
-            d.windowPointerPressed(b.getWindowId(), new int[] { bx }, new int[] { by });
+            com.codename1.ui.Desktop.getInstance().windowPointerPressed(b.getWindowId(), new int[] { bx }, new int[] { by });
             DisplayTest.flushEdt();
 
             assertTrue(d.shouldRenderSelection(inA),

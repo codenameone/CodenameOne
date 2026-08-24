@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.ui.Desktop;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -1894,7 +1895,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked when the user activates a window's close control.
     public static void windowCloseCallback(int windowId) {
-        Display.getInstance().windowCloseRequested(windowId);
+        Desktop.getInstance().windowCloseRequested(windowId);
     }
 
     /// Invoked when the platform refuses to give a window a scene, so it will never
@@ -1913,7 +1914,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (!MacWindowManager.activationFailed(windowId, requestSeq)) {
                     return;
                 }
-                Display.getInstance().windowActivationFailed(windowId);
+                Desktop.getInstance().windowActivationFailed(windowId);
             }
         });
     }
@@ -1921,12 +1922,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked once the platform has destroyed a window's scene. Catalyst hands the
     /// disconnect over after the fact, so there is nothing left to veto.
     public static void windowClosedNativelyCallback(int windowId) {
-        Display.getInstance().windowClosedNatively(windowId);
+        Desktop.getInstance().windowClosedNatively(windowId);
     }
 
     /// Invoked when a display is attached, removed or changes mode.
     public static void monitorsChangedCallback() {
-        Display.getInstance().monitorsChanged();
+        Desktop.getInstance().monitorsChanged();
     }
 
     /// Invoked for a mouse or trackpad hover over a secondary window. Catalyst
@@ -1946,7 +1947,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().windowPointerHoverReleased(windowId, xs, ys);
                 break;
             default:
-                Display.getInstance().windowPointerHover(windowId, xs, ys);
+                Desktop.getInstance().windowPointerHover(windowId, xs, ys);
                 break;
         }
     }
@@ -1990,7 +1991,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked when a window gains or loses keyboard focus.
     public static void windowFocusCallback(int windowId, boolean gained) {
-        Display.getInstance().windowFocusChanged(windowId, gained);
+        Desktop.getInstance().windowFocusChanged(windowId, gained);
     }
 
     /// Invoked when a window's scene enters or leaves the background, which on Mac
@@ -2060,9 +2061,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // and a child listener asking whether its owner is showing would read
                 // stale state.
                 if (shown) {
-                    Display.getInstance().windowShowNotify(windowId);
+                    Desktop.getInstance().windowShowNotify(windowId);
                 } else {
-                    Display.getInstance().windowHideNotify(windowId);
+                    Desktop.getInstance().windowHideNotify(windowId);
                 }
                 MacWindowManager.windowVisibilityChanged(windowId, shown);
             }
@@ -2071,7 +2072,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked when a window's drawable area changes size.
     public static void windowSizeCallback(int windowId, int width, int height) {
-        Display.getInstance().windowSizeChanged(windowId, width, height);
+        Desktop.getInstance().windowSizeChanged(windowId, width, height);
     }
 
     /// Invoked for a pointer event inside a window. The type is 1 for a press,
@@ -2084,13 +2085,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] ys = new int[]{y};
         switch (type) {
             case 1:
-                Display.getInstance().windowPointerPressed(windowId, xs, ys);
+                Desktop.getInstance().windowPointerPressed(windowId, xs, ys);
                 break;
             case 2:
-                Display.getInstance().windowPointerReleased(windowId, xs, ys);
+                Desktop.getInstance().windowPointerReleased(windowId, xs, ys);
                 break;
             default:
-                Display.getInstance().windowPointerDragged(windowId, xs, ys);
+                Desktop.getInstance().windowPointerDragged(windowId, xs, ys);
                 break;
         }
     }
@@ -2102,7 +2103,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         if (pressed) {
-            Display.getInstance().windowKeyPressed(windowId, keyCode);
+            Desktop.getInstance().windowKeyPressed(windowId, keyCode);
         } else {
             Display.getInstance().windowKeyReleased(windowId, keyCode);
         }

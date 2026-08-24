@@ -117,9 +117,9 @@ public class LinuxWindowManager extends WindowManager {
                 // is up: it keeps painting and animating it and fires no lifecycle
                 // event.
                 if (shown) {
-                    com.codename1.ui.Display.getInstance().windowShowNotify(child.windowId);
+                    com.codename1.ui.Desktop.getInstance().windowShowNotify(child.windowId);
                 } else {
-                    com.codename1.ui.Display.getInstance().windowHideNotify(child.windowId);
+                    com.codename1.ui.Desktop.getInstance().windowHideNotify(child.windowId);
                 }
             }
             // Going down, a descendant follows even when its own parent was already
