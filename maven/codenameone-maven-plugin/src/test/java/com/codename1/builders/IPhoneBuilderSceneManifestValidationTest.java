@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -141,7 +142,7 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "    <key>UISceneConfigurations</key>\n    <dict>\n"
                 + WINDOW_ROLE
                 + "    </dict>\n");
-        String mac = IPhoneBuilder.plistWithMultipleScenesEnabled(shared);
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
         assertFalse(IPhoneBuilder.plistManifestSupportsMultipleScenes(shared),
                 "the shared plist the iOS slice reads must stay false");
         assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac),
@@ -158,7 +159,7 @@ class IPhoneBuilderSceneManifestValidationTest {
                 + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
                 + "</dict>\n"
                 + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n");
-        String mac = IPhoneBuilder.plistWithMultipleScenesEnabled(plist);
+        String mac = IPhoneBuilder.plistForMacSlice(plist);
         assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac));
         assertTrue(mac.startsWith("<key>CN1Metadata</key>\n<dict>\n"
                         + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
@@ -169,14 +170,108 @@ class IPhoneBuilderSceneManifestValidationTest {
     @Test
     void aPlistWithNoSceneManifestIsReturnedUnchanged() {
         String plist = "<key>CFBundleName</key><string>x</string>";
-        assertTrue(plist.equals(IPhoneBuilder.plistWithMultipleScenesEnabled(plist)));
+        assertTrue(plist.equals(IPhoneBuilder.plistForMacSlice(plist)));
     }
 
     @Test
     void theFlipIsIdempotent() {
-        String once = IPhoneBuilder.plistWithMultipleScenesEnabled(wellFormedManifest());
-        assertTrue(once.equals(IPhoneBuilder.plistWithMultipleScenesEnabled(once)),
+        String once = IPhoneBuilder.plistForMacSlice(wellFormedManifest());
+        assertTrue(once.equals(IPhoneBuilder.plistForMacSlice(once)),
                 "a manifest that already says true needs no second copy");
+    }
+
+    @Test
+    void aPlistWithNoManifestGetsAWholeOneForTheMacSlice() {
+        // The default Catalyst build: ios.uiscene is off and there is no CarPlay, so
+        // the shared plist carries no manifest at all -- declaring one there would
+        // activate the UIScene lifecycle for the iPhone/iPad artifact while it still
+        // carries its main NIB, which FrontBoard terminates at launch. The manifest
+        // has to appear only in the Mac slice's copy.
+        String shared = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<plist version=\"1.0\">\n<dict>\n"
+                + "    <key>CFBundleName</key>\n    <string>Demo</string>\n"
+                + "</dict>\n</plist>\n";
+        assertFalse(IPhoneBuilder.plistDeclaresKey(shared, "UIApplicationSceneManifest"),
+                "the shared plist must stay free of a scene manifest");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistDeclaresKey(mac, "UIApplicationSceneManifest"),
+                "the Mac copy is where the manifest appears");
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(mac));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(mac));
+        assertTrue(mac.contains("<key>CFBundleName</key>"),
+                "and everything the build already put there is kept");
+        assertTrue(mac.trim().endsWith("</plist>"),
+                "the manifest goes inside the root dictionary, not after it");
+    }
+
+    @Test
+    void theWindowRoleHasToBeAnArrayOfConfigurations() {
+        // A role written as a dictionary rather than an array of configuration
+        // dictionaries describes no window UIKit can create.
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                + "        <dict>\n"
+                + "            <key>UISceneDelegateClassName</key>\n"
+                + "            <string>CodenameOne_GLSceneDelegate</string>\n"
+                + "        </dict>\n"
+                + "    </dict>\n");
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(plist),
+                "the role's value has to be an array of configurations");
+    }
+
+    @Test
+    void theDelegateHasToBeOwnedByAConfigurationNotBuriedUnderIt() {
+        // The delegate key sits in a metadata dictionary inside the configuration, so
+        // the configuration itself names no delegate.
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                + "        <array>\n"
+                + "            <dict>\n"
+                + "                <key>CN1Metadata</key>\n"
+                + "                <dict>\n"
+                + "                    <key>UISceneDelegateClassName</key>\n"
+                + "                    <string>CodenameOne_GLSceneDelegate</string>\n"
+                + "                </dict>\n"
+                + "            </dict>\n"
+                + "        </array>\n"
+                + "    </dict>\n");
+        assertFalse(IPhoneBuilder.plistManifestWiresWindowScene(plist),
+                "a configuration that does not itself name the delegate wires nothing");
+    }
+
+    @Test
+    void oneValidConfigurationAmongSeveralIsEnough() {
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                + "        <array>\n"
+                + "            <dict>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string>SomebodyElse</string>\n"
+                + "            </dict>\n"
+                + "            <dict>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+                + "            </dict>\n"
+                + "        </array>\n"
+                + "    </dict>\n");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(plist));
+    }
+
+    @Test
+    void anArraysMembersAreItsOwnElements() {
+        java.util.List<String> members = IPhoneBuilder.plistArrayMembers(
+                "<array>\n  <string>a</string>\n  <array>\n    <string>b</string>\n"
+                + "  </array>\n  <dict>\n    <key>k</key><string>v</string>\n  </dict>\n"
+                + "</array>");
+        assertEquals(3, members.size(), "a nested array is one member, not its contents");
+        assertTrue(members.get(1).contains("<string>b</string>"));
+        assertTrue(members.get(2).startsWith("<dict>"));
     }
 
     @Test

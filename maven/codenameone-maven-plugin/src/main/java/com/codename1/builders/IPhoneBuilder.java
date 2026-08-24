@@ -11694,34 +11694,16 @@ public class IPhoneBuilder extends Executor {
     /// #### Returns
     ///
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
-    /// The app target's finished Info.plist, resolved the way
-    /// `#injectToPlist(File, File, BuildRequest)` resolves it.
+    /// The Mac slice's version of a finished plist.
     ///
-    /// #### Parameters
+    /// The shared plist is left exactly as the iOS slice needs it, which for a default
+    /// Catalyst build means it carries no scene manifest at all: declaring one
+    /// activates the UIScene lifecycle, and the iPhone/iPad artifact still carries its
+    /// main NIB, which is a window with no scene and a launch FrontBoard terminates.
+    /// So this either flips an existing manifest's support key or, when there is no
+    /// manifest, adds a whole one -- and only the Mac slice ever reads the result.
     ///
-    /// - `tmpFile`: the build's working directory
-    ///
-    /// - `mainClass`: the application's main class, which names the file
-    ///
-    /// #### Returns
-    ///
-    /// the plist the app target reads
-    static File hostAppInfoPlist(File tmpFile, String mainClass) {
-        File infoPlist = new File(tmpFile, "build/xcode/sys/" + mainClass + "-Info.plist");
-        if (!infoPlist.exists()) {
-            infoPlist = new File(tmpFile, "dist/" + mainClass + "-src/" + mainClass + "-Info.plist");
-        }
-        return infoPlist;
-    }
-
-    /// The same plist with `UIApplicationSupportsMultipleScenes` set true, for the Mac
-    /// Catalyst slice. The key is replaced where it is a member of the scene manifest,
-    /// so a key of that name inside some other dictionary is left alone.
-    ///
-    /// Returns the input unchanged when there is no such member to flip: the only
-    /// build that asks for this has just had its manifest emitted or validated, so a
-    /// missing member means the application supplied a manifest that already says what
-    /// it wants.
+    /// Returns the input unchanged when there is nothing to do.
     ///
     /// #### Parameters
     ///
@@ -11730,10 +11712,10 @@ public class IPhoneBuilder extends Executor {
     /// #### Returns
     ///
     /// the plist text for the Mac slice
-    static String plistWithMultipleScenesEnabled(String plist) {
+    static String plistForMacSlice(String plist) {
         int manifestKey = plistKeyIndex(plist, "UIApplicationSceneManifest");
         if (manifestKey < 0) {
-            return plist;
+            return plistWithSceneManifest(plist);
         }
         int manifestStart = plistKeyEnd(plist, manifestKey);
         if (manifestStart < 0) {
@@ -11751,6 +11733,35 @@ public class IPhoneBuilder extends Executor {
         return plist.substring(0, manifestStart + range[0])
                 + "<true/>"
                 + plist.substring(manifestStart + range[1]);
+    }
+
+    /// Adds a whole scene manifest to a plist that has none, as the last member of the
+    /// root dictionary.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the finished plist text
+    ///
+    /// #### Returns
+    ///
+    /// the plist with a manifest, or the input when the root cannot be found
+    private static String plistWithSceneManifest(String plist) {
+        int root = plistElementIndex(plist, "dict", 0);
+        if (root < 0) {
+            return plist;
+        }
+        int end = plistValueElementEnd(plist, root);
+        if (end < 0) {
+            return plist;
+        }
+        // `end` is just past the root's own closing tag, so the last "</dict" at or
+        // before it is that tag -- not a nested one, and not one inside a comment,
+        // since plistValueElementEnd already walked past those.
+        int close = plist.lastIndexOf("</dict", end);
+        if (close < 0) {
+            return plist;
+        }
+        return plist.substring(0, close) + MAC_SCENE_MANIFEST + plist.substring(close);
     }
 
     /// The value element of `key` when it is an immediate member of `dict`, which is
@@ -11869,8 +11880,74 @@ public class IPhoneBuilder extends Executor {
         String manifest = plistManifestScope(plist);
         String configurations = plistDictMember(manifest, "UISceneConfigurations");
         String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
-        return role != null && plistWiresWindowSceneDelegate(
-                "<key>UIWindowSceneSessionRoleApplication</key>" + role);
+        // The shape UIKit requires, not merely the names it uses. The role's value is
+        // an array of configuration dictionaries; a role written as a dictionary, or
+        // one whose delegate key is buried in a nested dictionary rather than owned by
+        // a configuration, describes no window UIKit can create -- and accepting it
+        // passes the build and leaves Window unsupported on the device, which is what
+        // this check exists to prevent.
+        for (String configuration : plistArrayMembers(role)) {
+            if (!"dict".equals(nextElementName(configuration, 0))) {
+                continue;
+            }
+            String delegate = plistDictMember(configuration, "UISceneDelegateClassName");
+            if (delegate != null && "string".equals(nextElementName(delegate, 0))
+                    && "CodenameOne_GLSceneDelegate".equals(
+                            plistStringValueAfter(delegate, 0))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The immediate members of an `<array>` element, in order, or an empty list when
+    /// this is not an array.
+    ///
+    /// Each member's own element is skipped whole, so a nested array or dictionary
+    /// contributes one member rather than its contents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: an `<array>` element
+    ///
+    /// #### Returns
+    ///
+    /// the member elements
+    static java.util.List<String> plistArrayMembers(String array) {
+        java.util.List<String> members = new java.util.ArrayList<String>();
+        if (array == null || !"array".equals(nextElementName(array, 0))) {
+            return members;
+        }
+        int open = plistElementIndex(array, "array", 0);
+        if (open < 0) {
+            return members;
+        }
+        int at = plistOpenTagEnd(array, open);
+        if (at < 0) {
+            return members;
+        }
+        int end = plistValueElementEnd(array, 0);
+        if (end < 0) {
+            end = array.length();
+        }
+        while (at < end) {
+            String name = nextElementName(array, at);
+            if (name == null) {
+                break;
+            }
+            int start = plistElementIndex(array, name, at);
+            // Past the array's own close, so nextElementName found something after it.
+            if (start < 0 || start >= end) {
+                break;
+            }
+            int memberEnd = plistValueElementEnd(array, start);
+            if (memberEnd < 0 || memberEnd > end) {
+                break;
+            }
+            members.add(array.substring(start, memberEnd));
+            at = memberEnd;
+        }
+        return members;
     }
 
     static boolean plistWiresWindowSceneDelegate(String plist) {
@@ -12303,7 +12380,15 @@ public class IPhoneBuilder extends Executor {
                         + "ios.plistInject and let the build emit one.");
             }
         }
-        if ((useUISceneManifest || usesCar || multiWindow)
+        // multiWindow is deliberately NOT in this condition. Declaring
+        // UIApplicationSceneManifest activates the UIScene lifecycle, and the
+        // NSMainNibFile removal above runs only under ios.uiscene -- so putting a
+        // manifest in the shared plist for a Catalyst build would hand the iPhone/iPad
+        // artifact a scene lifecycle while it still carries its main NIB, which is a
+        // window with no scene and a launch FrontBoard terminates on iOS 26. The Mac
+        // slice's copy is where a manifest appears for windows; see
+        // plistForMacSlice.
+        if ((useUISceneManifest || usesCar)
                 && !plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             String carPlayScene = usesCar
                     ? "        <key>CPTemplateApplicationSceneSessionRoleApplication</key>\n"
@@ -12316,21 +12401,7 @@ public class IPhoneBuilder extends Executor {
                     + "            </dict>\n"
                     + "        </array>\n"
                     : "";
-            // A window is a second scene of the app role, so it needs the role declared
-            // and the delegate wired even where the application asked for the legacy
-            // lifecycle: without this the manifest would say multiple scenes are
-            // supported and then describe no configuration to create them with.
-            String windowScene = (useUISceneManifest || multiWindow)
-                    ? "        <key>UIWindowSceneSessionRoleApplication</key>\n"
-                    + "        <array>\n"
-                    + "            <dict>\n"
-                    + "                <key>UISceneConfigurationName</key>\n"
-                    + "                <string>Default Configuration</string>\n"
-                    + "                <key>UISceneDelegateClassName</key>\n"
-                    + "                <string>CodenameOne_GLSceneDelegate</string>\n"
-                    + "            </dict>\n"
-                    + "        </array>\n"
-                    : "";
+            String windowScene = useUISceneManifest ? WINDOW_SCENE_ROLE : "";
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
@@ -12744,6 +12815,87 @@ public class IPhoneBuilder extends Executor {
         
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        if (macNativeBuilder.isEnabled()) {
+            writeCatalystInfoPlist(tmpFile, request.getMainClass(), b.toString());
+        }
+    }
+
+    /// The window scene role, wired to Codename One's scene delegate. A
+    /// `com.codename1.ui.Window` is a second scene of the app role, so this is the
+    /// configuration UIKit creates one from; without it a manifest can say multiple
+    /// scenes are supported and still describe nothing to create them with.
+    static final String WINDOW_SCENE_ROLE =
+            "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+            + "        <array>\n"
+            + "            <dict>\n"
+            + "                <key>UISceneConfigurationName</key>\n"
+            + "                <string>Default Configuration</string>\n"
+            + "                <key>UISceneDelegateClassName</key>\n"
+            + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+            + "            </dict>\n"
+            + "        </array>\n";
+
+    /// The whole scene manifest a Mac slice needs: multiple scenes supported, and the
+    /// window role to create them with.
+    static final String MAC_SCENE_MANIFEST =
+            "<key>UIApplicationSceneManifest</key>\n"
+            + "<dict>\n"
+            + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
+            + "    <true/>\n"
+            + "    <key>UISceneConfigurations</key>\n"
+            + "    <dict>\n"
+            + WINDOW_SCENE_ROLE
+            + "    </dict>\n"
+            + "</dict>\n";
+
+    /// The Mac slice's Info.plist, relative to the Xcode project directory, which is
+    /// the form `INFOPLIST_FILE` is resolved against and the one the generated project
+    /// already uses.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mainClass`: the application's main class, which names the file
+    ///
+    /// #### Returns
+    ///
+    /// the project-relative path
+    static String catalystInfoPlistRelativePath(String mainClass) {
+        return mainClass + "-src/" + mainClass + "-MacCatalyst-Info.plist";
+    }
+
+    /// Writes the Mac slice its own Info.plist: the finished one with
+    /// `UIApplicationSupportsMultipleScenes` set true, which
+    /// `com.codename1.ui.Window` needs and the iOS slice must not have.
+    ///
+    /// This exists because a Mac build is one target with `SUPPORTS_MACCATALYST=YES`
+    /// and still ships the iPhone/iPad slice, so both destinations read one plist.
+    /// `INFOPLIST_FILE[sdk=macosx*]` is the only place they can be told apart.
+    ///
+    /// Written for every Mac build, not only the ones that need the key changed.
+    /// `MacNativeBuilder` selects this file before the plist exists in one of the two
+    /// builders that share this code, so it cannot decide by looking; a build whose
+    /// application already asked for multiple scenes simply gets an identical copy.
+    ///
+    /// Generated from the finished text rather than maintained beside it, so it
+    /// carries everything the build put there and cannot drift.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tmpFile`: the build's working directory
+    ///
+    /// - `mainClass`: the application's main class, which names the file
+    ///
+    /// - `plist`: the finished plist text
+    private void writeCatalystInfoPlist(File tmpFile, String mainClass, String plist)
+            throws IOException {
+        File distSrc = new File(new File(tmpFile, "dist"), mainClass + "-src");
+        if (!distSrc.isDirectory()) {
+            return;
+        }
+        File target = new File(distSrc, mainClass + "-MacCatalyst-Info.plist");
+        try (FileOutputStream fo = new FileOutputStream(target)) {
+            fo.write(plistForMacSlice(plist).getBytes(StandardCharsets.UTF_8));
         }
     }
 
