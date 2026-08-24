@@ -451,13 +451,16 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     @Override
-    public void setTitle(String title) {
+    public void setTitle(final String title) {
         // Straight to the platform. The window's title is the one the OS draws in its
         // title bar; there is no in-content label to keep in step with it.
         pendingTitle = title;
-        if (nativePeer != null) {
-            manager().setTitle(nativePeer, title);
-        }
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setTitle(nativePeer, title);
+            }
+        });
     }
 
     /// {@inheritDoc}
@@ -1122,23 +1125,43 @@ public class Window extends Container implements TopLevelContainer {
     /// - `resizable`: true to allow resizing
     public void setResizable(final boolean resizable) {
         this.resizable = resizable;
-        if (nativePeer != null) {
-            // The field is set above on the calling thread so a getter stays
-            // consistent, but the SPI call is marshalled: the ports resolve the peer to
-            // a slot on whatever thread calls them, which races an EDT disposal.
-            if (Display.getInstance().isEdt()) {
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
                 manager().setResizable(nativePeer, resizable);
-            } else {
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (nativePeer != null) {
-                            manager().setResizable(nativePeer, resizable);
-                        }
-                    }
-                });
             }
+        });
+    }
+
+    /// Runs an operation against this window's native peer on the event dispatch
+    /// thread, checking the peer is still there when it gets there.
+    ///
+    /// Every attribute setter needs this. The ports resolve a peer to a slot in a
+    /// native table on whatever thread calls them, and a slot is reused once its
+    /// window is disposed -- so a setter called from a background thread can land on
+    /// whichever window took the slot, or race the teardown freeing it. The field each
+    /// setter keeps is assigned on the calling thread, so its getter stays consistent
+    /// with what the caller asked for; only the platform call is deferred.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op`: the platform call, which may assume a non-null peer
+    private void onPeer(final Runnable op) {
+        if (nativePeer == null) {
+            return;
         }
+        if (Display.getInstance().isEdt()) {
+            op.run();
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (nativePeer != null) {
+                    op.run();
+                }
+            }
+        });
     }
 
     /// Indicates whether the user may resize this window.
@@ -1158,11 +1181,14 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `decorated`: true for native decorations
-    public void setDecorated(boolean decorated) {
+    public void setDecorated(final boolean decorated) {
         this.decorated = decorated;
-        if (nativePeer != null) {
-            manager().setDecorated(nativePeer, decorated);
-        }
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setDecorated(nativePeer, decorated);
+            }
+        });
     }
 
     /// Indicates whether the platform draws this window's chrome.
@@ -1215,11 +1241,14 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `utility`: true for a utility window
-    public void setUtilityWindow(boolean utility) {
+    public void setUtilityWindow(final boolean utility) {
         this.utilityWindow = utility;
-        if (nativePeer != null) {
-            manager().setUtilityWindow(nativePeer, utility);
-        }
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setUtilityWindow(nativePeer, utility);
+            }
+        });
     }
 
     /// Indicates whether this is a utility window.
@@ -1236,11 +1265,14 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `icon`: the icon to display
-    public void setWindowIcon(Image icon) {
+    public void setWindowIcon(final Image icon) {
         this.windowIcon = icon;
-        if (nativePeer != null) {
-            manager().setIcon(nativePeer, icon);
-        }
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setIcon(nativePeer, icon);
+            }
+        });
     }
 
     /// Returns the icon the platform shows for this window.
@@ -1375,12 +1407,15 @@ public class Window extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `d`: the minimum size
-    public void setMinimumWindowSize(Dimension d) {
+    public void setMinimumWindowSize(final Dimension d) {
         minimumWindowSize = d;
-        if (nativePeer != null) {
-            manager().setMinimumSize(nativePeer,
-                    d == null ? 0 : d.getWidth(), d == null ? 0 : d.getHeight());
-        }
+        onPeer(new Runnable() {
+            @Override
+            public void run() {
+                manager().setMinimumSize(nativePeer,
+                        d == null ? 0 : d.getWidth(), d == null ? 0 : d.getHeight());
+            }
+        });
     }
 
     /// Returns the smallest size the user may resize this window to.
@@ -1774,6 +1809,17 @@ public class Window extends Container implements TopLevelContainer {
                     show();
                 }
             });
+            return;
+        }
+        if (nativePeer != null && nativeVisible) {
+            // Already on screen. Everything below is a transition -- taking the modal
+            // blocker, mapping the peer, firing Shown -- and repeating it for a window
+            // that never left fires a second Shown at listeners doing initialization or
+            // persistence, which is one showing as far as the user is concerned.
+            //
+            // showModal() calls this before its wait, so a window shown this way and
+            // then made modal still parks its caller: the wait is the caller's, not
+            // something this method does.
             return;
         }
         WindowManager wm = manager();

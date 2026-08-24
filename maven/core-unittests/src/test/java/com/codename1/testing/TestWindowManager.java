@@ -418,6 +418,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setTitle(Object peer, String title) {
+        recordThread("setTitle");
         FakeWindow w = win(peer);
         if (w != null) {
             w.title = title;
@@ -461,6 +462,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setResizable(Object peer, boolean resizable) {
+        recordThread("setResizable");
         FakeWindow w = win(peer);
         if (w != null) {
             w.resizable = resizable;
@@ -469,6 +471,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setDecorated(Object peer, boolean decorated) {
+        recordThread("setDecorated");
         FakeWindow w = win(peer);
         if (w != null) {
             w.decorated = decorated;
@@ -516,6 +519,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setUtilityWindow(Object peer, boolean utility) {
+        recordThread("setUtilityWindow");
         FakeWindow w = win(peer);
         if (w != null) {
             w.utility = utility;
@@ -524,6 +528,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setMinimumSize(Object peer, int width, int height) {
+        recordThread("setMinimumSize");
         FakeWindow w = win(peer);
         if (w != null) {
             w.minimumWidth = width;
@@ -533,6 +538,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public void setIcon(Object peer, Image icon) {
+        recordThread("setIcon");
     }
 
     /// Names of window-manager calls that arrived on a thread other than the event

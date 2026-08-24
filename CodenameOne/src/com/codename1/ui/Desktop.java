@@ -899,6 +899,16 @@ public final class Desktop {
                         // repeats into this window for as long as it stays open and
                         // a pressed component stays latched.
                         w.cancelPendingInput();
+                    } else if (windowId == 0) {
+                        // Window zero is the application's main surface, which
+                        // windowById() cannot answer for: it is not a registered
+                        // Window. Its held keys are armed in Display's own fields, so
+                        // the guard above skipped them -- and activating a secondary
+                        // window reports only that window's focus gain, so nothing else
+                        // told the main surface it had lost the keyboard. A key-up
+                        // delivered to another application then left the main form
+                        // repeating for as long as it stayed open.
+                        Display.getInstance().mainSurfaceInputCancelled();
                     }
                     break;
                 case CLOSE_REQUESTED:

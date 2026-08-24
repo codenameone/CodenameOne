@@ -2494,6 +2494,67 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void showingAWindowThatIsAlreadyUpFiresNothing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("already up", new BorderLayout());
+        final int[] shown = new int[1];
+        w.addWindowListener(new ActionListener<WindowEvent>() {
+            @Override
+            public void actionPerformed(WindowEvent evt) {
+                if (evt.getType() == WindowEvent.Type.Shown) {
+                    shown[0]++;
+                }
+            }
+        });
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, shown[0], "showing it once is one showing");
+
+        // Nothing about the window changed, so nothing happened: repeating the
+        // transition tells listeners doing initialization or persistence to do it
+        // again for what the user sees as a single showing.
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(1, shown[0], "showing it again while it is up is not a second showing");
+
+        // And a real transition still counts.
+        w.hide();
+        DisplayTest.flushEdt();
+        w.show();
+        DisplayTest.flushEdt();
+        assertEquals(2, shown[0], "hiding and showing it again is a second showing");
+        w.dispose();
+    }
+
+    @FormTest
+    void focusLeavingTheMainSurfaceDisarmsItsHeldKeys() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        KeyCountingComponent c = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, c);
+        main.show();
+        DisplayTest.flushEdt();
+        main.setFocused(c);
+
+        // A key held down on the main form, and then focus moves away -- to a secondary
+        // window, or to another application. The key-up goes wherever focus went, so
+        // nothing else disarms the repeat.
+        Display.getInstance().keyPressed(70);
+        DisplayTest.flushEdt();
+        assertTrue(keyRepeatArmedFor(0),
+                "the press arms the repeat, which is the state under test");
+
+        Desktop.getInstance().windowFocusChanged(0, false);
+        DisplayTest.flushEdt();
+        assertFalse(keyRepeatArmedFor(0),
+                "focus leaving the main surface has to disarm its held keys; window "
+                        + "zero is not a registered Window, so the window-keyed path "
+                        + "skipped it and the form repeated for as long as it stayed open");
+        Display.getInstance().keyReleased(70);
+        DisplayTest.flushEdt();
+    }
+
+    @FormTest
     void arrowKeysMoveFocusBetweenAWindowsControls() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("keyboard", new BoxLayout(BoxLayout.Y_AXIS));
@@ -4456,6 +4517,47 @@ class WindowTest extends UITestBase {
                             + "painting while the main form transitions; it painted "
                             + before + " times before and " + peer.getPaintCount()
                             + " after");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    @FormTest
+    void windowAttributesSetOffTheEdtReachThePortOnIt() throws Exception {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("attributes", new BorderLayout());
+        w.setWindowSize(400, 300);
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            // Same reason as the window controls: the Linux and Windows ports resolve a
+            // peer to a slot in a native table on whatever thread calls them, and a
+            // slot is reused once its window is disposed -- so an attribute set from a
+            // background thread can land on whichever window took the slot, or race the
+            // teardown freeing it.
+            Thread background = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.setDecorated(false);
+                    w.setTitle("renamed");
+                    w.setUtilityWindow(true);
+                    w.setWindowIcon(null);
+                    w.setMinimumWindowSize(new com.codename1.ui.geom.Dimension(120, 90));
+                    w.setResizable(false);
+                }
+            });
+            background.start();
+            background.join();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Collections.emptyList(), wm.getOffEdtCalls(),
+                    "every window attribute has to reach the port on the event dispatch "
+                            + "thread, however it was set");
+            // The field is assigned on the calling thread, so the getter answers what
+            // the caller asked for whether or not the platform has caught up.
+            assertEquals("renamed", w.getTitle(),
+                    "the getter stays consistent with the call that set it");
         } finally {
             w.dispose();
             DisplayTest.flushEdt();

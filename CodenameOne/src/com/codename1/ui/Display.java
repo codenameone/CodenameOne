@@ -8439,6 +8439,25 @@ public final class Display extends CN1Constants {
     /// reachable, without deregistering it. Called when a window is hidden: it stays
     /// registered, so a repeat armed before it went away would keep firing into a
     /// component tree the user cannot see.
+    /// Drops the input the application's main surface is holding, the way
+    /// `#windowInputCancelled(Window)` does for a window.
+    ///
+    /// The main surface is window zero and is not a registered `Window`, so the
+    /// window-keyed paths cannot reach it: its repeat and long-press timers are fields
+    /// here. Called when the platform reports that focus has left it -- activating a
+    /// secondary window, or another application -- because the key-up is then
+    /// delivered somewhere else and never disarms them.
+    void mainSurfaceInputCancelled() {
+        cancelKeyRepeat(0);
+        cancelLongPress(0);
+        // Keyed by key code rather than by surface, so entries pressed on the main
+        // form outlive the focus change unless they are cleared here.
+        Form current = getCurrent();
+        if (current != null) {
+            forgetKeyPressesFor(current);
+        }
+    }
+
     void windowInputCancelled(Window w) {
         int id = w.getWindowId();
         cancelKeyRepeat(id);
