@@ -832,6 +832,79 @@ class LocalNearbyTest {
         assertEquals(1, connected.size());
     }
 
+    @Test
+    void disconnectingBeforeTheAcceptanceCancelsIt() {
+        // The acceptance is queued behind the disconnect, and the request
+        // itself has already been answered -- so without the reservation
+        // check what arrives afterwards is a connection the app explicitly
+        // dropped. The simulator was the one place a disconnect could be
+        // undone by the connection it was cancelling.
+        final List<Endpoint> connected = new ArrayList<Endpoint>();
+        final List<Endpoint> disconnected = new ArrayList<Endpoint>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void connected(Endpoint e) {
+                connected.add(e);
+            }
+
+            @Override
+            public void disconnected(Endpoint e) {
+                disconnected.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+        assertNotNull(e);
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        NearbyTransport.requestConnection(e, "me");
+        NearbyTransport.disconnect(e);
+        drain(queue);
+
+        assertTrue(connected.isEmpty(),
+                "a disconnected endpoint must not connect afterwards: "
+                + connected);
+        assertTrue(disconnected.isEmpty(),
+                "nothing was connected, so nothing was disconnected: "
+                + disconnected);
+    }
+
+    @Test
+    void disconnectingAfterTheAcceptanceStillDisconnects() {
+        // The other side of the same guard: taking the reservation must not
+        // cost a connected endpoint its ordinary disconnect.
+        final List<Endpoint> disconnected = new ArrayList<Endpoint>();
+        final AtomicReference<Endpoint> found = new AtomicReference<Endpoint>();
+        NearbyTransport.addTransportListener(new TransportAdapter() {
+            @Override
+            public void endpointFound(Endpoint e) {
+                found.compareAndSet(null, e);
+            }
+
+            @Override
+            public void disconnected(Endpoint e) {
+                disconnected.add(e);
+            }
+        });
+        value(NearbyTransport.startDiscovery("chat", TransportStrategy.STAR));
+        Endpoint e = found.get();
+
+        List<Runnable> queue = new ArrayList<Runnable>();
+        bridge.deferForTest(queue);
+        NearbyTransport.requestConnection(e, "me");
+        drain(queue);
+        NearbyTransport.disconnect(e);
+        assertEquals(1, disconnected.size(),
+                "a connected endpoint still reports its disconnection");
+    }
+
     /// Runs every parked delivery, including any the deliveries themselves
     /// park, until nothing is left.
     private static void drain(List<Runnable> queue) {

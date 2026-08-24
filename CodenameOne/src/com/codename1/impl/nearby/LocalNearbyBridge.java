@@ -644,8 +644,16 @@ public class LocalNearbyBridge implements NearbyBridge {
                         // adding the endpoint then reported a connection on
                         // a transport that had been stopped and never
                         // restarted.
-                        connecting.remove(endpointId);
-                        if (generation != transportGeneration) {
+                        //
+                        // The reservation is also the claim on this
+                        // acceptance. disconnect() takes it away, and
+                        // without that check the acceptance went on to
+                        // connect an endpoint the app had explicitly
+                        // disconnected -- so the simulator was the one place
+                        // a disconnect could be undone by the connection it
+                        // was cancelling.
+                        boolean reserved = connecting.remove(endpointId);
+                        if (!reserved || generation != transportGeneration) {
                             return;
                         }
                         connected.add(endpointId);
@@ -807,6 +815,22 @@ public class LocalNearbyBridge implements NearbyBridge {
             SimEndpoint e = findEndpoint(endpointId);
             if (e != null) {
                 NearbyTransport.deliverDisconnected(e.encode());
+            }
+            return;
+        }
+        // Not connected YET. The acceptance is queued behind this call, and
+        // taking its reservation is what stops it: the request itself has
+        // already been answered, so what would otherwise arrive is a
+        // connection the app asked to drop.
+        if (connecting.remove(endpointId)) {
+            SimEndpoint e = findEndpoint(endpointId);
+            if (e != null) {
+                // Answered rather than dropped, so nothing waiting on the
+                // connection outcome waits for good.
+                NearbyTransport.deliverConnectionResult(e.encode(), false,
+                        NearbyError.SESSION_INVALIDATED.ordinal(),
+                        "the connection was disconnected before it"
+                        + " completed");
             }
         }
     }

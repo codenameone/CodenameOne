@@ -1859,19 +1859,36 @@ static NSString *cn1nbAccessoryId(ASAccessory *accessory)
         handler(YES);
         return;
     }
+    void (^queued)(BOOL) = [[handler copy] autorelease];
     @synchronized (self) {
         if (self.activationWaiters == nil) {
             self.activationWaiters = [NSMutableArray array];
         }
-        [self.activationWaiters addObject:[[handler copy] autorelease]];
+        [self.activationWaiters addObject:queued];
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                     (int64_t)(2ull * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
         @autoreleasepool {
-            // Drains whatever is still queued, which is nothing at all in the
-            // ordinary case: activation got there first and took them.
-            [self drainWaiters:self.active];
+            // THIS waiter and no other. Draining the whole array here meant
+            // an older waiter's timer settled a request queued moments
+            // before it fired -- so a second association could fail
+            // RADIO_UNAVAILABLE a fraction of a second after it was made,
+            // and even after activation went on to succeed well inside its
+            // own two seconds. Ordinarily this finds nothing: activation got
+            // there first and took every waiter with it.
+            BOOL mine = NO;
+            @synchronized (self) {
+                NSUInteger at = [self.activationWaiters
+                        indexOfObjectIdenticalTo:queued];
+                if (at != NSNotFound) {
+                    [self.activationWaiters removeObjectAtIndex:at];
+                    mine = YES;
+                }
+            }
+            if (mine) {
+                queued(self.active);
+            }
         }
     });
 }
@@ -2876,6 +2893,17 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
             // had nothing to report but zero.
             NSString *sentName = [NSString stringWithFormat:@"cn1id-%d-%@",
                     (int)payloadId, [p lastPathComponent]];
+            // Read once, here, so the terminal update can report the size
+            // the transfer moved. MultipeerConnectivity's completion handler
+            // carries an error and nothing else, and reporting zero moved
+            // and no total contradicted every progress update before it --
+            // so a listener that finalises its display from the terminal
+            // event recorded a finished file as having transferred nothing.
+            NSNumber *fileSize = [[[NSFileManager defaultManager]
+                    attributesOfItemAtPath:p error:NULL]
+                    objectForKey:NSFileSize];
+            JAVA_LONG fileBytes = fileSize == nil
+                    ? -1 : (JAVA_LONG)[fileSize longLongValue];
             NSUInteger started = 0;
             for (NSUInteger i = 0; i < [peers count]; i++) {
                 MCPeerID *peer = [peers objectAtIndex:i];
@@ -2902,9 +2930,20 @@ void com_codename1_impl_ios_IOSNative_nearbySendPayload___int_java_lang_String_i
                                     ? CN1_NEARBY_PAYLOAD_CANCELED
                                     : CN1_NEARBY_PAYLOAD_FAILURE;
                         }
+                        // SUCCESS means the whole file arrived, so it reports
+                        // the whole file. A transfer that stopped short
+                        // reports what its progress had reached, which the
+                        // NSProgress still holds after the fact.
+                        NSProgress *finished = [progressHolder count] > 0
+                                ? [progressHolder objectAtIndex:0] : nil;
+                        JAVA_LONG moved = status == CN1_NEARBY_PAYLOAD_SUCCESS
+                                ? fileBytes
+                                : (finished == nil ? 0
+                                        : (JAVA_LONG)[finished
+                                                completedUnitCount]);
                         com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                                 getThreadLocalData(), cn1nbJString(encoded),
-                                payloadId, 0, -1, status);
+                                payloadId, moved, fileBytes, status);
                         // Only THIS recipient's transfer is finished. The
                         // others under the same payload id are still going,
                         // and dropping the whole entry here left them
