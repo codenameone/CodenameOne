@@ -348,6 +348,32 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * Descriptors carry a return type but <code>getDeclaredMethod</code> does
+     * not: a pushed call to <code>String value()</code> would otherwise bind
+     * to an installed <code>Object value()</code> when the host revision
+     * broadened the return, and the interpreter would then treat the returned
+     * object as if the descriptor still held. JVMS 5.4.3.3 requires all three
+     * parts to match, so a mismatch is <code>NoSuchMethodError</code>.
+     */
+    @Test
+    @DisplayName("method resolution refuses a candidate whose return type differs")
+    void methodResolutionRefusesADifferentReturnType() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.invokeVirtual(new ReturnBroadener(),
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$ReturnBroadener",
+                    "value", "()Ljava/lang/String;", new Object[0]);
+            throw new AssertionError("bind against Object return should have been refused");
+        } catch (NoSuchMethodException expected) {
+            // JVMS 5.4.3.3 -- name and parameters agree but the return does not.
+        }
+    }
+
+    static class ReturnBroadener {
+        public Object value() { return "installed"; }
+    }
+
+    /**
      * A pushed program that never returns has to be stoppable, or the Stop
      * button is decoration and the only recovery is killing the app. The
      * existing BeanShell playground has no such check.

@@ -175,6 +175,12 @@ public class InterpAndroidLinker implements InterpLinker {
         }
         Class c = resolve(owner);
         Class[] types = paramTypes(descriptor);
+        // The bytecode's descriptor names the return type too; getDeclaredMethod
+        // ignores it, so a host build where `String value()` became
+        // `Object value()` would otherwise bind and hand the caller an object
+        // of the wrong static type. Skip a candidate whose return type differs
+        // -- it is a NoSuchMethodError to the pushed code by JVMS 5.4.3.3.
+        Class expectedReturn = resolve(InterpValuesAccess.returnType(descriptor));
         NoSuchMethodException last = null;
         // Walk up rather than relying on getMethod: the method may be public on
         // a package-private class, or declared on a supertype, and
@@ -187,6 +193,13 @@ public class InterpAndroidLinker implements InterpLinker {
         for (Class k = c; k != null; k = k.getSuperclass()) {
             try {
                 Method candidate = k.getDeclaredMethod(name, types);
+                if (!candidate.getReturnType().equals(expectedReturn)) {
+                    last = new NoSuchMethodException(
+                            k.getName() + "." + name + descriptor
+                            + " (return type " + candidate.getReturnType().getName()
+                            + " does not match)");
+                    continue;
+                }
                 if (k != c && Modifier.isPrivate(candidate.getModifiers())) {
                     throw new IllegalAccessError(k.getName() + "." + name + descriptor
                             + " is private and not inherited by "
@@ -199,7 +212,7 @@ public class InterpAndroidLinker implements InterpLinker {
             }
         }
         if (m == null) {
-            m = findInInterfaces(c, name, types);
+            m = findInInterfaces(c, name, types, expectedReturn);
         }
         if (m == null) {
             throw last != null ? last : new NoSuchMethodException(key);
@@ -209,7 +222,7 @@ public class InterpAndroidLinker implements InterpLinker {
         return m;
     }
 
-    private Method findInInterfaces(Class c, String name, Class[] types) {
+    private Method findInInterfaces(Class c, String name, Class[] types, Class expectedReturn) {
         // Collect every inheritable interface declaration reachable through
         // this class or any of its superclasses, then pick the maximally
         // specific per JLS 5.4.3.3. Returning the first depth-first hit
@@ -222,7 +235,7 @@ public class InterpAndroidLinker implements InterpLinker {
         java.util.HashSet<Class> visited = new java.util.HashSet<Class>();
         for (Class k = c; k != null; k = k.getSuperclass()) {
             for (Class iface : k.getInterfaces()) {
-                collectInterfaceCandidates(iface, name, types, candidates, visited);
+                collectInterfaceCandidates(iface, name, types, expectedReturn, candidates, visited);
             }
         }
         int count = candidates.size();
@@ -302,6 +315,7 @@ public class InterpAndroidLinker implements InterpLinker {
     }
 
     private void collectInterfaceCandidates(Class iface, String name, Class[] types,
+                                            Class expectedReturn,
                                             java.util.ArrayList<Method> candidates,
                                             java.util.HashSet<Class> visited) {
         if (!visited.add(iface)) {
@@ -317,14 +331,19 @@ public class InterpAndroidLinker implements InterpLinker {
             // reflection's virtual dispatch runs the concrete override on
             // the receiver. `findInInterfaces` prefers concrete siblings
             // over abstracts when both are present.
-            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)) {
+            // A candidate whose return type differs from the descriptor is
+            // discarded for the same reason lookupMethod skips them on the
+            // superclass chain: the caller was compiled against a different
+            // shape and reflection would otherwise silently bind it.
+            if (!Modifier.isStatic(mods) && !Modifier.isPrivate(mods)
+                    && m.getReturnType().equals(expectedReturn)) {
                 candidates.add(m);
             }
         } catch (NoSuchMethodException ignore) {
             // Not declared here -- keep walking; a superinterface may declare it.
         }
         for (Class parent : iface.getInterfaces()) {
-            collectInterfaceCandidates(parent, name, types, candidates, visited);
+            collectInterfaceCandidates(parent, name, types, expectedReturn, candidates, visited);
         }
     }
 
