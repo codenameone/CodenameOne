@@ -5045,22 +5045,31 @@ public class IPhoneBuilder extends Executor {
                             // the archive does not contain is a codesign failure, not a warning.
                             String declaredId = appExtensionBundleId(appExtension, null,
                                     plistContext, request.getPackageName());
-                            buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", declaredId != null
-                                    ? declaredId : request.getPackageName() + "." + extensionName);
-                            // And each configuration's own, where the archive's plists differ:
-                            // the value above is what THIS archive is built and signed as, but
-                            // the generated project keeps every configuration, and a Debug build
-                            // off the exported sources processes the Debug plist. Writing only
-                            // the archive's answer left that configuration naming a bundle its
-                            // plist does not.
+                            // Each configuration gets the identity its OWN plist states, base
+                            // included. declaredId is this archive's answer and belongs to it
+                            // alone: writing that as the base setting handed every other
+                            // configuration the identifier of whichever one happened to be
+                            // built, so a Release build off the exported project carried a Debug
+                            // archive's bundle id and would fail against the Release profile.
+                            // Skipping the unqualified key while copying the discovered ones is
+                            // what left it there. The base setting is the base plist's own
+                            // statement, or the derived default when it makes none, and the
+                            // qualifiers sit beside it -- which is also how the archive's own
+                            // answer comes back out, since winningSetting reads them the way
+                            // Xcode does. An explicit PRODUCT_BUNDLE_IDENTIFIER in
+                            // buildSettings.properties is merged over all of this further down
+                            // and still outranks it.
+                            Map<String, String> plistIdentifiers = appExtensionPlistIdentifiers(
+                                    appExtension, plistContext, request.getPackageName());
+                            String basePlistId =
+                                    plistIdentifiers.get("PRODUCT_BUNDLE_IDENTIFIER");
+                            buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", basePlistId != null
+                                    ? basePlistId
+                                    : request.getPackageName() + "." + extensionName);
                             for (Map.Entry<String, String> perConfiguration
-                                    : appExtensionPlistIdentifiers(appExtension, plistContext,
-                                            request.getPackageName()).entrySet()) {
-                                if (!"PRODUCT_BUNDLE_IDENTIFIER".equals(
-                                        perConfiguration.getKey())) {
-                                    buildSettingsMap.put(perConfiguration.getKey(),
-                                            perConfiguration.getValue());
-                                }
+                                    : plistIdentifiers.entrySet()) {
+                                buildSettingsMap.put(perConfiguration.getKey(),
+                                        perConfiguration.getValue());
                             }
                             // The identifier THIS archive gets: a qualified setting overrides the
                             // plain one, so a stale base beside a right device value is not a

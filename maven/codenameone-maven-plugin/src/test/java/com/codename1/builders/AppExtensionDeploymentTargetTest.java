@@ -1262,4 +1262,37 @@ public class AppExtensionDeploymentTargetTest {
         settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Custom");
         assertTrue(IPhoneBuilder.identifierBelongsToApp(plist, "com.example.app", settings));
     }
+
+    @Test
+    public void anArchivesOwnIdentifierDoesNotBecomeEveryConfigurationsBase() throws Exception {
+        File dist = tmp.newFolder("dist73");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        write(new File(extension, "Info.plist"), plistWithIdentifier("com.example.app.Base"));
+        write(new File(extension, "debug.plist"), plistWithIdentifier("com.example.app.Debug"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/Info.plist\n"
+                + "INFOPLIST_FILE[config\\=Debug] = WalletUIExtension/debug.plist\n");
+
+        // A DEBUG archive: its own effective identifier is the Debug one.
+        IPhoneBuilder.ArchiveContext debugArchive = IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                "Debug", "arm64", null);
+        assertEquals("com.example.app.Debug", IPhoneBuilder.appExtensionBundleId(extension,
+                "com.example.app.WalletUIExtension", debugArchive, "com.example.app"));
+
+        // But the settings it writes must not make that the BASE, or a Release build off the
+        // generated project carries the Debug bundle id and fails against the Release profile.
+        java.util.Map<String, String> identifiers = IPhoneBuilder.appExtensionPlistIdentifiers(
+                extension, debugArchive, "com.example.app");
+        assertEquals("com.example.app.Base", identifiers.get("PRODUCT_BUNDLE_IDENTIFIER"));
+        assertEquals("com.example.app.Debug",
+                identifiers.get("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+
+        // And read back the way Xcode reads them, each configuration gets its own.
+        assertEquals("com.example.app.Base", IPhoneBuilder.winningSetting(identifiers,
+                "PRODUCT_BUNDLE_IDENTIFIER", IPhoneBuilder.ArchiveContext.of("iphoneos14.4",
+                        "Release", "arm64", null)));
+        assertEquals("com.example.app.Debug", IPhoneBuilder.winningSetting(identifiers,
+                "PRODUCT_BUNDLE_IDENTIFIER", debugArchive));
+    }
 }
