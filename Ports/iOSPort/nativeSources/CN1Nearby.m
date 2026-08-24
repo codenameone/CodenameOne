@@ -1500,9 +1500,19 @@ static NSString *cn1nbIdForPeer(MCPeerID *peer) {
         // per-payload state on the documented terminal status waited forever
         // on every file that actually arrived -- the one case that always
         // works on Android.
+        //
+        // With the size it actually received, read off the file now that it
+        // is in place. Reporting nothing transferred and no total contradicted
+        // every progress update before it, so a receiver that finalises its
+        // display from the terminal event recorded a finished file as empty.
+        NSNumber *receivedSize = [[[NSFileManager defaultManager]
+                attributesOfItemAtPath:target error:NULL]
+                objectForKey:NSFileSize];
+        JAVA_LONG receivedBytes = receivedSize == nil
+                ? -1 : (JAVA_LONG)[receivedSize longLongValue];
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadProgress___java_lang_String_int_long_long_int(
                 getThreadLocalData(), cn1nbJString(encoded), filePayloadId,
-                0, -1, CN1_NEARBY_PAYLOAD_SUCCESS);
+                receivedBytes, receivedBytes, CN1_NEARBY_PAYLOAD_SUCCESS);
         com_codename1_impl_ios_IOSNearbyCallbacks_payloadReceived___java_lang_String_int_int_byte_1ARRAY_java_lang_String(
                 getThreadLocalData(), cn1nbJString(encoded), filePayloadId,
                 CN1_NEARBY_PAYLOAD_FILE, JAVA_NULL,

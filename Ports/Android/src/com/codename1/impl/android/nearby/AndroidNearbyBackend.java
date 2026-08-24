@@ -722,6 +722,15 @@ public class AndroidNearbyBackend implements NearbyBridge {
     }
 
     private void launch(IntentSender chooserLauncher, int requestId) {
+        // Still ours? The platform keeps searching after associate() returns
+        // and answers on a later main-looper turn, and an activity
+        // recreation in between can fail this request and give the slot
+        // back. Launching anyway put a chooser on screen for a resource that
+        // had already failed, and sent its result to whatever result flow the
+        // replacement activity had installed by then.
+        if (pendingAssociate() != requestId) {
+            return;
+        }
         // This runs from the platform's callback, which is a main-looper hop
         // after the activity was checked -- long enough for it to have gone.
         // Failed rather than thrown, for the reason requestPermissions is.

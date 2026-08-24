@@ -210,6 +210,28 @@ public class AndroidNearbyTransport implements NearbyBridge {
         }
     }
 
+    /// Fails the current start and cleans up after it, under the lock.
+    ///
+    /// The stop is issued from INSIDE the critical section. Deciding to stop
+    /// and then releasing the lock left a window for another thread to begin
+    /// a start, and the global stop that followed switched off that new
+    /// operation instead -- without touching its generation, so its callback
+    /// went on to report success for a radio this had just disabled. The
+    /// lock is held across the platform call for exactly as long as it takes
+    /// to issue it; Google answers it on the main looper, not here.
+    private void failAndCleanUp(boolean advertising, int generation) {
+        synchronized (transportLock) {
+            if (!failStart(advertising, generation)) {
+                return;
+            }
+            if (advertising) {
+                client().stopAdvertising();
+            } else {
+                client().stopDiscovery();
+            }
+        }
+    }
+
     /// Records that the current start failed, so nothing is wanted any more.
     ///
     /// #### Returns
@@ -421,9 +443,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         // being superseded left the platform advertising with
                         // its caller failed. Both resources have failed by
                         // now, so nobody is left to stop it but this.
-                        if (failStart(true, generation)) {
-                            client().stopAdvertising();
-                        }
+                        failAndCleanUp(true, generation);
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
@@ -477,9 +497,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         // Cleared, and the radio stopped if it was left
                         // running for nobody, for the reasons the advertising
                         // failure gives.
-                        if (failStart(false, generation)) {
-                            client().stopDiscovery();
-                        }
+                        failAndCleanUp(false, generation);
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
