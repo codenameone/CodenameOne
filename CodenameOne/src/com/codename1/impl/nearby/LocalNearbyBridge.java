@@ -531,17 +531,31 @@ public class LocalNearbyBridge implements NearbyBridge {
             String localName, int strategy) {
         advertising = true;
         advertiseStrategy = strategy;
-        final int generation = advertiseGeneration;
+        // Bumped by the START as well as by the stop. Only the stop moved it,
+        // so a second start issued before the first answer ran shared its
+        // generation and BOTH resolved successfully -- while only one of them
+        // can be the current advertisement. The ports fail a superseded
+        // start; this is the simulator agreeing with them.
+        final int generation = ++advertiseGeneration;
         answer(new Runnable() {
             @Override
             public void run() {
                 // Stopped before the start was answered, the same race
                 // discovery has: the answer is queued, and a stop can land
                 // in front of it.
-                if (!advertising || generation != advertiseGeneration) {
+                if (!advertising) {
                     NearbyTransport.deliverRequestFailed(requestId,
                             NearbyError.SESSION_INVALIDATED.ordinal(),
                             "advertising was stopped before it started");
+                    return;
+                }
+                if (generation != advertiseGeneration) {
+                    // Told apart from the stop, because they are different
+                    // things to an app: one it asked for, the other it did
+                    // by asking again. Same wording the iOS port uses.
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.SESSION_INVALIDATED.ordinal(),
+                            "another advertising start replaced this one");
                     return;
                 }
                 NearbyTransport.deliverRequestOk(requestId);
@@ -560,7 +574,10 @@ public class LocalNearbyBridge implements NearbyBridge {
             int strategy) {
         discovering = true;
         discoverStrategy = strategy;
-        final int generation = discoverGeneration;
+        // Bumped by the START too, for the reason advertising is -- and here
+        // it also stops a superseded callback labelling every endpoint with
+        // the service id NOBODY is discovering under any more.
+        final int generation = ++discoverGeneration;
         answer(new Runnable() {
             @Override
             public void run() {
@@ -568,10 +585,16 @@ public class LocalNearbyBridge implements NearbyBridge {
                 // discovery to report into. Reporting endpoints anyway had
                 // the stopped simulator announcing peers nobody had asked
                 // for, which is not what a device does.
-                if (!discovering || generation != discoverGeneration) {
+                if (!discovering) {
                     NearbyTransport.deliverRequestFailed(requestId,
                             NearbyError.SESSION_INVALIDATED.ordinal(),
                             "discovery was stopped before it started");
+                    return;
+                }
+                if (generation != discoverGeneration) {
+                    NearbyTransport.deliverRequestFailed(requestId,
+                            NearbyError.SESSION_INVALIDATED.ordinal(),
+                            "another discovery start replaced this one");
                     return;
                 }
                 NearbyTransport.deliverRequestOk(requestId);
