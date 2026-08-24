@@ -7951,64 +7951,83 @@ public class IPhoneBuilder extends Executor {
         if (settings == null || hostPackage == null || hostPackage.length() == 0) {
             return notes;
         }
-        String declaredId = settings.get("PRODUCT_BUNDLE_IDENTIFIER");
-        if (declaredId == null || declaredId.indexOf('$') < 0) {
-            return notes;
-        }
-        // Only when the identifier is sound as this archive has it: an identifier already out of
-        // namespace here is the plain refusal's business, not this one's.
-        String active = resolveSettingsInValue(declaredId, flattenForContext(settings, context));
-        if (active.length() == 0 || !active.startsWith(hostPackage + ".")) {
-            return notes;
-        }
-        // Only the settings the identifier is actually built from. Every qualified setting that
-        // DESCRIBES the offending build is not the same thing as every setting that CAUSES it:
-        // dropping on the context alone deleted a CODE_SIGN_ENTITLEMENTS[config=Debug] sitting
-        // beside the culprit, and that target then signed with the wrong entitlements.
-        List<String> chain = referencedSettingChain(declaredId, settings);
-        for (String key : new ArrayList<String>(settings.keySet())) {
-            if (key.indexOf('[') < 0 || isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
+        // Every form of the identifier, not only the unqualified one: a literal base beside a
+        // PRODUCT_BUNDLE_IDENTIFIER[config=Debug] = $(EXTENSION_ID) has its chain entirely inside
+        // the qualified form, and deriving the chain from the base alone never looked at it.
+        List<String> chain = new ArrayList<String>();
+        for (Map.Entry<String, String> setting : settings.entrySet()) {
+            String key = setting.getKey();
+            if (!"PRODUCT_BUNDLE_IDENTIFIER".equals(key)
+                    && !isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
                 continue;
             }
-            if (!chain.contains(key.substring(0, key.indexOf('[')).trim())) {
+            for (String name : referencedSettingChain(setting.getValue(), settings)) {
+                if (!chain.contains(name)) {
+                    chain.add(name);
+                }
+            }
+        }
+        if (chain.isEmpty()) {
+            return notes;
+        }
+        // Only when the identifier is sound as THIS archive has it: one already out of namespace
+        // here is the plain refusal's business, not this one's.
+        String active = identifierIn(settings, context);
+        if (active == null || !active.startsWith(hostPackage + ".")) {
+            return notes;
+        }
+        // Every context any qualified setting describes -- the identifier's own qualified forms
+        // included, since a narrower helper may only be reachable through one of them.
+        for (String key : new ArrayList<String>(settings.keySet())) {
+            int open = key.indexOf('[');
+            if (open < 0) {
+                continue;
+            }
+            String name = key.substring(0, open).trim();
+            if (!chain.contains(name) && !"PRODUCT_BUNDLE_IDENTIFIER".equals(name)) {
                 continue;
             }
             ArchiveContext own = contextForCondition(key, context);
-            String inThatBuild = resolveSettingsInValue(declaredId,
-                    flattenForContext(settings, own));
-            if (inThatBuild.length() == 0 || inThatBuild.startsWith(hostPackage + ".")) {
+            String inThatBuild = identifierIn(settings, own);
+            if (inThatBuild == null || inThatBuild.startsWith(hostPackage + ".")) {
                 continue;
             }
-            // The OUTERMOST override in the chain, not whichever foreign leaf the map happens to
-            // hand over first. With EXTENSION_ID[config=Debug] = $(DEBUG_ID) over a foreign
-            // DEBUG_ID[config=Debug], deleting DEBUG_ID leaves the EXTENSION_ID override
-            // resolving to nothing -- Xcode then builds that configuration with no identifier at
-            // all instead of falling back to the valid base. Removing the override itself is what
-            // restores the base, and the leaf it referenced becomes unreachable on its own.
+            // The OUTERMOST override in the chain, and the WINNING form of it. Taking the first
+            // applicable entry removed a broad [config=Debug] while a narrower foreign
+            // [config=Debug][sdk=iphonesimulator*] stayed and still governed that build; taking
+            // the first foreign leaf instead left an override resolving to nothing, so Xcode
+            // built with no identifier at all rather than falling back to the valid base.
             String dropped = null;
-            for (String name : chain) {
-                for (String candidate : new ArrayList<String>(settings.keySet())) {
-                    int open = candidate.indexOf('[');
-                    if (open < 0 || !name.equals(candidate.substring(0, open).trim())
-                            || !conditionApplies(candidate, own)) {
-                        continue;
-                    }
-                    dropped = candidate;
-                    break;
-                }
-                if (dropped != null) {
+            for (String candidateName : chain) {
+                String winner = winningSettingKey(settings, candidateName, own);
+                if (winner != null && winner.indexOf('[') >= 0) {
+                    dropped = winner;
                     break;
                 }
             }
             if (dropped == null) {
-                continue;
+                dropped = winningSettingKey(settings, "PRODUCT_BUNDLE_IDENTIFIER", own);
+                if (dropped == null || dropped.indexOf('[') < 0) {
+                    continue;
+                }
             }
             String removed = settings.remove(dropped);
             notes.add(dropped + " = " + removed + " would make the extension's identifier "
                     + inThatBuild + ", which is not under " + hostPackage + ", so it was dropped "
-                    + "and the unqualified value governs that build too");
+                    + "and the value that governs the rest of the build governs it too");
         }
         return notes;
+    }
+
+    /// The extension's identifier as {@code context} gets it, or null when this build cannot say.
+    private static String identifierIn(Map<String, String> settings, ArchiveContext context) {
+        String declared = winningSetting(settings, "PRODUCT_BUNDLE_IDENTIFIER", context);
+        if (declared == null || declared.trim().length() == 0) {
+            return null;
+        }
+        String resolved = resolveSettingsInValue(declared.trim(),
+                flattenForContext(settings, context));
+        return resolved.length() == 0 ? null : resolved;
     }
 
 

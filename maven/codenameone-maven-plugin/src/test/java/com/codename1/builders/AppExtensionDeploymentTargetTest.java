@@ -2067,4 +2067,43 @@ public class AppExtensionDeploymentTargetTest {
         assertTrue(plists.toString(), plists.values().contains(device));
         assertTrue(plists.toString(), plists.values().contains(simulator));
     }
+
+    @Test
+    public void aChainReachableOnlyThroughAQualifiedIdentifierIsRepaired() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "com.example.app.Ext");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]", "$(EXTENSION_ID)");
+        settings.put("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]", "com.other.Sim");
+
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // The base identifier is a literal, so deriving the chain from it alone never looked at
+        // the helper the qualified form uses -- and a Debug simulator build expanded to the
+        // foreign value and could not be signed.
+        assertFalse(settings.toString(),
+                settings.containsKey("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]")
+                        && settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[config=Debug]"));
+        assertEquals(notes.toString(), 1, notes.size());
+        assertEquals("com.example.app.Ext", settings.get("PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
+    @Test
+    public void theWinningOverrideIsTheOneRemoved() throws Exception {
+        java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
+        settings.put("EXTENSION_ID", "com.example.app.Ext");
+        // The broad one first, the foreign narrow one after: map order used to decide this.
+        settings.put("EXTENSION_ID[config=Debug]", "com.example.app.Ext.debug");
+        settings.put("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]", "com.other.Sim");
+        settings.put("PRODUCT_BUNDLE_IDENTIFIER", "$(EXTENSION_ID)");
+
+        IPhoneBuilder.repairQualifiedExtensionSettings(settings, "com.example.app", "12.0",
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", settings));
+
+        // Taking the first applicable entry removed the broad Debug override while the narrower
+        // foreign one stayed and still governed that build.
+        assertFalse(settings.containsKey("EXTENSION_ID[config=Debug][sdk=iphonesimulator*]"));
+        assertEquals("com.example.app.Ext.debug", settings.get("EXTENSION_ID[config=Debug]"));
+    }
 }
