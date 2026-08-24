@@ -6478,6 +6478,38 @@ public class IPhoneBuilder extends Executor {
     /// and sources.tar.bz2 lets either be built later.
     private static final String[] PROJECT_CONFIGURATIONS = {"Debug", "Release"};
 
+    /// The SDKs worth resolving a path against: this build's, and every one the archive itself
+    /// names in a qualifier.
+    ///
+    /// Deliberately not "device and simulator". A path written through $(SDK_NAME) needs a
+    /// VERSIONED name -- iphonesimulator18.0, not iphonesimulator -- and this build has no way to
+    /// know which version a later simulator build will use. Inventing the bare platform name is
+    /// the stem mistake this file already made once: it resolves to a directory nothing is at,
+    /// reports the wrong file missing, and leaves the real one unstamped. Such a path simply does
+    /// not resolve here, which is the honest answer.
+    ///
+    /// What IS knowable is an SDK the archive wrote down itself, in a
+    /// [sdk=...] qualifier on any of its settings -- a path that varies through such a helper
+    /// resolves exactly, so those are enumerated.
+    private static List<String> enumerableSdks(ArchiveContext own, Map<String, String> declared) {
+        List<String> out = new ArrayList<String>();
+        if (own != null && own.sdk != null && own.sdk.length() > 0) {
+            out.add(own.sdk);
+        }
+        if (declared != null) {
+            for (String key : declared.keySet()) {
+                String sdk = conditionsOf(key).get("sdk");
+                // A pattern names a family rather than an SDK; extensionSettingsWithBuiltIns will
+                // not supply SDK_NAME for one, so a path needing it stays unresolved and is
+                // skipped below -- while a path through a declared helper still resolves.
+                if (sdk != null && sdk.length() > 0 && !out.contains(sdk)) {
+                    out.add(sdk);
+                }
+            }
+        }
+        return out;
+    }
+
     /// Records a candidate per configuration when the path RESOLVES differently in each.
     ///
     /// A key says which builds it applies to; it does not say that its value means the same thing
@@ -6499,19 +6531,24 @@ public class IPhoneBuilder extends Executor {
         // $(SDK_NAME) stays unexpanded and the path stays unresolvable instead of being answered
         // with this archive's SDK.
         ArchiveContext own = contextForCondition(key, context);
-        for (String configuration : PROJECT_CONFIGURATIONS) {
-            if (configuration.equalsIgnoreCase(own.configuration)) {
-                continue;
+        File active = out.get(key + " = " + value);
+        for (String sdk : enumerableSdks(own, declared)) {
+            for (String configuration : PROJECT_CONFIGURATIONS) {
+                boolean sameSdk = sdk.equalsIgnoreCase(own.sdk == null ? "" : own.sdk);
+                if (sameSdk && configuration.equalsIgnoreCase(own.configuration)) {
+                    continue;
+                }
+                ArchiveContext other = new ArchiveContext(sdk, configuration, own.arch,
+                        own.variants);
+                File resolved = resolveInfoPlistPath(value, extensionFolder,
+                        extensionSettingsWithBuiltIns(extensionFolder, declared, other));
+                if (resolved == null || sameFile(resolved, active)) {
+                    continue;
+                }
+                String qualifier = sameSdk ? "[config=" + configuration + "]"
+                        : "[sdk=" + sdk + "][config=" + configuration + "]";
+                out.put(key + qualifier + " = " + value, resolved);
             }
-            ArchiveContext other = new ArchiveContext(own.sdk, configuration, own.arch,
-                    own.variants);
-            File resolved = resolveInfoPlistPath(value, extensionFolder,
-                    extensionSettingsWithBuiltIns(extensionFolder, declared, other));
-            File active = out.get(key + " = " + value);
-            if (resolved == null || sameFile(resolved, active)) {
-                continue;
-            }
-            out.put(key + "[config=" + configuration + "] = " + value, resolved);
         }
     }
 

@@ -430,4 +430,49 @@ public class AppExtensionInfoPlistPathTest {
         // second candidate, so nothing downstream sees a file twice.
         assertEquals(plists.toString(), 1, plists.size());
     }
+
+    @Test
+    public void aPathVaryingBySdkIsEnumeratedFromWhatTheArchiveNames() throws Exception {
+        File dist = tmp.newFolder("sdk-path");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(extension.mkdirs());
+        File device = new File(extension, "device.plist");
+        File simulator = new File(extension, "simulator.plist");
+        write(device, identityPlist("com.example.app.Device"));
+        write(simulator, identityPlist("com.example.app.Simulator"));
+        write(new File(extension, "buildSettings.properties"),
+                "PLIST_PATH = WalletUIExtension/device.plist\n"
+                + "PLIST_PATH[sdk\\=iphonesimulator18.0] = WalletUIExtension/simulator.plist\n"
+                + "INFOPLIST_FILE = $(PLIST_PATH)\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // The archive names the other SDK itself, so the simulator plist is knowable and gets
+        // stamped -- a device archive otherwise recorded the device identifier as universal and
+        // never touched the simulator plist that still declares another.
+        assertTrue(plists.toString(), plists.values().contains(device));
+        assertTrue(plists.toString(), plists.values().contains(simulator));
+    }
+
+    @Test
+    public void anUnknownSdkVersionIsNotInvented() throws Exception {
+        File dist = tmp.newFolder("sdk-unknown");
+        File extension = new File(dist, "WalletUIExtension");
+        assertTrue(new File(extension, "iphoneos14.4").mkdirs());
+        write(new File(extension, "iphoneos14.4/Info.plist"), identityPlist("com.example.app.Ext"));
+        write(new File(extension, "buildSettings.properties"),
+                "INFOPLIST_FILE = WalletUIExtension/$(SDK_NAME)/Info.plist\n");
+
+        java.util.Map<String, File> plists = IPhoneBuilder.appExtensionInfoPlists(extension,
+                IPhoneBuilder.ArchiveContext.of("iphoneos14.4", "Release", "arm64", null));
+
+        // $(SDK_NAME) needs a VERSIONED name and this build cannot know which version a later
+        // simulator build will use. Inventing the bare platform name is the stem mistake this
+        // file already made once -- it names a directory nothing is at. Only what resolves is
+        // recorded.
+        assertEquals(plists.toString(), 1, plists.size());
+        assertTrue(plists.toString(),
+                plists.values().contains(new File(extension, "iphoneos14.4/Info.plist")));
+    }
 }
