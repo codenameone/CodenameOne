@@ -8350,22 +8350,27 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
-    /// The build settings Xcode itself defines for every target, which this builder does not
-    /// model and must not treat as missing.
+    /// The build settings Xcode defines UNCONDITIONALLY for every target, which this builder does
+    /// not model and must not treat as missing.
     ///
-    /// Not a complete list of Xcode's settings -- it does not need to be. It is the ones that
-    /// legitimately appear in a bundle identifier, so that an identifier written through one is
-    /// left for Xcode to expand instead of being read as an identifier that comes to nothing.
+    /// Every name here is one Xcode always has a value for, whatever the project says. That is
+    /// the whole test for membership, and it is stricter than "a setting Xcode knows about":
+    /// MARKETING_VERSION and CURRENT_PROJECT_VERSION are Xcode's names but the PROJECT's to
+    /// define, so an identifier written through one of them in a project that never sets it
+    /// expands to nothing and ships as "com.example.app." -- exactly the malformed identifier
+    /// this guard exists to prevent. Optional settings therefore belong on the other side of the
+    /// line: an identifier through one is dropped, and the derived default -- which is always
+    /// valid -- stands instead.
+    ///
+    /// Not a complete list of Xcode's settings, and it does not need to be: only the ones that
+    /// plausibly appear in a bundle identifier.
     private static final java.util.Set<String> XCODE_PROVIDED_SETTINGS =
             new java.util.HashSet<String>(java.util.Arrays.asList(
                     "EXECUTABLE_NAME", "EXECUTABLE_PREFIX", "EXECUTABLE_SUFFIX",
                     "PRODUCT_NAME", "PRODUCT_MODULE_NAME", "TARGET_NAME", "PROJECT_NAME",
-                    "PRODUCT_BUNDLE_IDENTIFIER", "CONFIGURATION", "SDK_NAME", "SDK_VERSION",
-                    "PLATFORM_NAME", "CURRENT_ARCH", "ARCHS", "NATIVE_ARCH",
-                    "DEVELOPMENT_LANGUAGE", "DEVELOPMENT_TEAM", "TeamIdentifierPrefix",
-                    "AppIdentifierPrefix", "MARKETING_VERSION", "CURRENT_PROJECT_VERSION",
-                    "WRAPPER_EXTENSION", "WRAPPER_NAME", "BUNDLE_IDENTIFIER", "SRCROOT",
-                    "PROJECT_DIR", "BUILT_PRODUCTS_DIR", "TARGET_BUILD_DIR", "INFOPLIST_FILE"));
+                    "CONFIGURATION", "SDK_NAME", "SDK_VERSION", "PLATFORM_NAME",
+                    "CURRENT_ARCH", "ARCHS", "NATIVE_ARCH", "WRAPPER_EXTENSION", "WRAPPER_NAME",
+                    "SRCROOT", "PROJECT_DIR", "BUILT_PRODUCTS_DIR", "TARGET_BUILD_DIR"));
 
     /// Whether every reference still left in {@code value} names a setting Xcode supplies itself.
     ///

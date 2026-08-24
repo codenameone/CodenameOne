@@ -1570,6 +1570,16 @@ public class AppExtensionDeploymentTargetTest {
                 "com.example.$(EXECUTABLE_NAME).$(EXTENSION_ID)", none));
         // Nothing left to expand is not "only Xcode's".
         assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings("com.example.app.Ext", none));
+
+        // Optional, PROJECT-defined settings are not on this side of the line: Xcode knows the
+        // names, but a project that never sets them expands them to nothing and the extension
+        // ships as "com.example.app." -- the malformed identifier the guard exists to prevent.
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(MARKETING_VERSION)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(CURRENT_PROJECT_VERSION)", none));
+        assertFalse(IPhoneBuilder.referencesOnlyXcodeSettings(
+                "com.example.app.$(DEVELOPMENT_TEAM)", none));
     }
 
     @Test
