@@ -865,7 +865,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // nothing useful while the properties entries had already been
             // deleted.
             int pkg = head.indexOf("package ");
-            int anchor = pkg >= 0 ? head.indexOf('\n', pkg) + 1 : head.length();
+            // Before any annotation the class already carries. classDeclarationIndex
+            // points at the modifiers, so `head` ends with an existing
+            // @SuppressWarnings -- and anchoring on head.length() put the import
+            // between that annotation and the class, which is not valid in either
+            // language. The verification build then failed and rolled a correct
+            // migration back.
+            int anchor = pkg >= 0 ? head.indexOf('\n', pkg) + 1
+                    : startOfLeadingAnnotations(head);
             head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
@@ -883,6 +890,60 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * the type named by {@code codename1.mainName} is preferred over whatever
      * happens to appear first.</p>
      */
+    /// The index in `head` where the run of annotations immediately preceding the
+    /// declaration begins, or `head.length()` when there is none.
+    ///
+    /// Walks back over whitespace and complete `@Name(...)` forms, matching
+    /// parentheses so a multi-line annotation does not stop the walk early.
+    ///
+    /// Over blanked code, because an argument may contain a parenthesis inside a
+    /// string -- `@SuppressWarnings("a(b")` -- and counting that one leaves the
+    /// walk stranded in the middle of a literal. Positions are preserved by the
+    /// blanking, so the index returned indexes the original text.
+    static int startOfLeadingAnnotations(String original) {
+        String head = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(original);
+        int at = head.length();
+        while (true) {
+            int i = at - 1;
+            while (i >= 0 && Character.isWhitespace(head.charAt(i))) {
+                i--;
+            }
+            if (i < 0) {
+                return at;
+            }
+            if (head.charAt(i) == ')') {
+                int depth = 0;
+                while (i >= 0) {
+                    char c = head.charAt(i);
+                    if (c == ')') {
+                        depth++;
+                    } else if (c == '(') {
+                        depth--;
+                        if (depth == 0) {
+                            i--;
+                            break;
+                        }
+                    }
+                    i--;
+                }
+                if (depth != 0) {
+                    return at;
+                }
+            }
+            // The annotation's name, then its @.
+            int nameEnd = i + 1;
+            while (i >= 0 && (Character.isJavaIdentifierPart(head.charAt(i))
+                    || head.charAt(i) == '.')) {
+                i--;
+            }
+            if (i < 0 || head.charAt(i) != '@' || nameEnd == i + 1) {
+                return at;
+            }
+            at = i;
+        }
+    }
+
     static int classDeclarationIndex(String text, boolean kotlin, String simpleName) {
         // Top level means brace depth zero, not column zero. Anchoring the
         // pattern to the start of a line refused `  public class MyApp`, which

@@ -742,7 +742,13 @@ public class CodenameOneSettings extends Lifecycle {
             valueField.addDataChangedListener((type, index) -> {
                 String next = valueField.getText() == null ? "" : valueField.getText().trim();
                 if (isValidHintValue(meta, next)) {
-                    settings.setBuildHint(meta.name(), next);
+                    // Stored in the domain's own spelling. Accepting `INTERNALONLY`
+                    // and writing it back verbatim marked the value valid and then
+                    // failed the Android build, because the builder copies it into
+                    // the case-sensitive android:installLocation attribute. What
+                    // the developer meant is unambiguous, and only one spelling of
+                    // it works everywhere.
+                    settings.setBuildHint(meta.name(), canonicalHintValue(meta, next));
                     valueField.setUIID(uiid("SettingsField"));
                 } else {
                     valueField.setUIID(uiid("SettingsFieldError"));
@@ -809,6 +815,24 @@ public class CodenameOneSettings extends Lifecycle {
         } else if (meta.type() == BuildHintType.SECRET) {
             field.setConstraint(TextArea.PASSWORD);
         }
+    }
+
+    /// `value` in the spelling the catalog declares, or `value` when the domain
+    /// is open or does not recognise it.
+    ///
+    /// Only the spelling changes, never the choice: an accepted alias resolves to
+    /// the canonical value it names, which is the one every reader accepts.
+    private String canonicalHintValue(BuildHintMetadata meta, String value) {
+        if (value == null || value.length() == 0 || meta.values().isEmpty()) {
+            return value;
+        }
+        com.codename1.build.shared.BuildHints.Hint hint =
+                com.codename1.build.shared.BuildHints.byName(meta.name());
+        if (hint == null || hint.values().isEmpty()) {
+            return value;
+        }
+        String canonical = hint.canonicalValue(value);
+        return canonical == null ? value : canonical;
     }
 
     private boolean isValidHintValue(BuildHintMetadata meta, String value) {

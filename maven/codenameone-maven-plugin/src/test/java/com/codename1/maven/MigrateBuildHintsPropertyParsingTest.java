@@ -228,4 +228,28 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(src.lastIndexOf("class MyApp {}"),
                 MigrateBuildHintsMojo.classDeclarationIndex(src, false, "MyApp"));
     }
+
+    /// A default-package class that already carries an annotation: the import
+    /// must go ABOVE it. Anchoring on the declaration put the import between the
+    /// annotation and the class, which is not valid in either language.
+    @Test
+    public void theImportGoesAboveAnExistingAnnotation() {
+        String head = "/* c */\n@SuppressWarnings(\"unchecked\")\n";
+        assertEquals(head.indexOf("@SuppressWarnings"),
+                MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+    }
+
+    /// A parenthesis inside an annotation argument must not stop the walk.
+    @Test
+    public void anArgumentContainingAParenthesisDoesNotStopTheWalk() {
+        String head = "@Deprecated\n@SuppressWarnings(\"a(b\")\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+    }
+
+    /// With no annotation there is nothing to move above.
+    @Test
+    public void withNoAnnotationTheAnchorIsTheEnd() {
+        String head = "/* copyright */\n\n";
+        assertEquals(head.length(), MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+    }
 }

@@ -669,4 +669,19 @@ public class BuildHintCatalogTest {
                 + "@Ios(teamId = \"T\")\nclass MyApp\n";
         assertTrue(CodenameOneSettings.importsAnnotation(src, "Ios", true));
     }
+
+    /// Only one spelling of a closed-domain value works everywhere:
+    /// AndroidGradleBuilder copies android.installLocation straight into the
+    /// case-sensitive android:installLocation manifest attribute. Accepting
+    /// `INTERNALONLY` and storing it verbatim marked it valid and then failed the
+    /// Android build.
+    @Test
+    public void aClosedDomainValueHasOneWorkingSpelling() {
+        com.codename1.build.shared.BuildHints.Hint h =
+                com.codename1.build.shared.BuildHints.byName("android.installLocation");
+        assertEquals("internalOnly", h.canonicalValue("INTERNALONLY"));
+        assertEquals("internalOnly", h.canonicalValue("internalonly"));
+        assertEquals("internalOnly", h.canonicalValue("internalOnly"));
+        assertNull(h.canonicalValue("nowhere"));
+    }
 }
