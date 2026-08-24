@@ -145,6 +145,16 @@ public class AndroidNearbyTransport implements NearbyBridge {
     private boolean advertisingWanted;
     private boolean discoveringWanted;
 
+    /// Whether the radio is on with NO resolved caller owning it.
+    ///
+    /// A start that succeeded after being superseded leaves exactly that: the
+    /// platform is advertising, and the caller who asked was failed, because
+    /// a newer start had taken the operation. If that newer start then fails
+    /// too, both resources have failed and the radio is still on for nobody
+    /// -- which is what this lets the failure notice and undo.
+    private boolean unownedAdvertising;
+    private boolean unownedDiscovering;
+
     /// This start owns the operation and should report success.
     private static final int START_CURRENT = 0;
     /// It was stopped and nothing has asked since: undo it.
@@ -184,18 +194,46 @@ public class AndroidNearbyTransport implements NearbyBridge {
         }
     }
 
-    /// Records that the current start failed, so nothing is wanted any more.
-    private void failStart(boolean advertising, int generation) {
+    /// Records what a start's answer did, so a later failure knows whether
+    /// the radio is still on for nobody.
+    private void noteStartOutcome(boolean advertising, int state) {
         synchronized (transportLock) {
+            // SUPERSEDED is the one outcome that leaves the platform running
+            // with its caller failed. CURRENT has an owner, and ORPHANED was
+            // just stopped.
+            boolean unowned = state == START_SUPERSEDED;
             if (advertising) {
-                if (generation == advertiseGeneration) {
-                    advertisingWanted = false;
-                }
+                unownedAdvertising = unowned;
                 return;
             }
-            if (generation == discoverGeneration) {
-                discoveringWanted = false;
+            unownedDiscovering = unowned;
+        }
+    }
+
+    /// Records that the current start failed, so nothing is wanted any more.
+    ///
+    /// #### Returns
+    ///
+    /// true when the radio has to be stopped as well, because a superseded
+    /// start had left it running for a caller that was already failed
+    private boolean failStart(boolean advertising, int generation) {
+        synchronized (transportLock) {
+            if (advertising) {
+                if (generation != advertiseGeneration) {
+                    return false;
+                }
+                advertisingWanted = false;
+                boolean orphaned = unownedAdvertising;
+                unownedAdvertising = false;
+                return orphaned;
             }
+            if (generation != discoverGeneration) {
+                return false;
+            }
+            discoveringWanted = false;
+            boolean orphaned = unownedDiscovering;
+            unownedDiscovering = false;
+            return orphaned;
         }
     }
 
@@ -205,10 +243,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
             if (advertising) {
                 advertiseGeneration++;
                 advertisingWanted = false;
+                unownedAdvertising = false;
                 return;
             }
             discoverGeneration++;
             discoveringWanted = false;
+            unownedDiscovering = false;
         }
     }
 
@@ -347,6 +387,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         int state = classifyStart(true, generation);
+                        noteStartOutcome(true, state);
                         if (state != START_CURRENT) {
                             // Stopped, so the platform is advertising for a
                             // caller that no longer wants it. Undone here,
@@ -375,7 +416,14 @@ public class AndroidNearbyTransport implements NearbyBridge {
                         // owned the radio, so it declined to undo itself --
                         // and went on advertising after both an explicit stop
                         // and this failure.
-                        failStart(true, generation);
+                        //
+                        // And an EARLIER start that already succeeded after
+                        // being superseded left the platform advertising with
+                        // its caller failed. Both resources have failed by
+                        // now, so nobody is left to stop it but this.
+                        if (failStart(true, generation)) {
+                            client().stopAdvertising();
+                        }
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
@@ -408,6 +456,7 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     public void onSuccess(Void unused) {
                         int state = classifyStart(false, generation);
+                        noteStartOutcome(false, state);
                         if (state != START_CURRENT) {
                             // Only when nobody has asked since, for the
                             // reason the advertising branch gives.
@@ -425,9 +474,12 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
-                        // Cleared for the reason the advertising failure
-                        // clears its own.
-                        failStart(false, generation);
+                        // Cleared, and the radio stopped if it was left
+                        // running for nobody, for the reasons the advertising
+                        // failure gives.
+                        if (failStart(false, generation)) {
+                            client().stopDiscovery();
+                        }
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());

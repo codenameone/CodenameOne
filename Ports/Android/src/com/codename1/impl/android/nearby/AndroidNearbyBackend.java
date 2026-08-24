@@ -90,7 +90,43 @@ public class AndroidNearbyBackend implements NearbyBridge {
     private final NearbyBridge ranging;
     private final NearbyBridge transport;
 
+    /// Guards pendingAssociateRequest.
+    ///
+    /// The chooser slot is a reservation, and a reservation tested in one
+    /// step and taken in another is not one: two callers both read it free
+    /// and both took it, the second overwriting the first, and a refusal
+    /// then cleared the slot while the first chooser was still open. The
+    /// public API does not promise associate() is called from one thread.
+    private final Object associateLock = new Object();
+
     private int pendingAssociateRequest;
+
+    /// Takes the chooser slot for this request, if it is free.
+    private boolean reserveAssociate(int requestId) {
+        synchronized (associateLock) {
+            if (pendingAssociateRequest != 0) {
+                return false;
+            }
+            pendingAssociateRequest = requestId;
+            return true;
+        }
+    }
+
+    /// Gives the slot back, but only if this request still owns it.
+    private void releaseAssociate(int requestId) {
+        synchronized (associateLock) {
+            if (pendingAssociateRequest == requestId) {
+                pendingAssociateRequest = 0;
+            }
+        }
+    }
+
+    /// The request holding the slot, or 0.
+    private int pendingAssociate() {
+        synchronized (associateLock) {
+            return pendingAssociateRequest;
+        }
+    }
 
     public AndroidNearbyBackend(Activity activity) {
         this.initialActivity = new WeakReference<Activity>(activity);
@@ -151,7 +187,8 @@ public class AndroidNearbyBackend implements NearbyBridge {
     /// BUSY. Called from AndroidImplementation.init through
     /// AndroidNearbyBridge, the one place that knows the activity changed.
     public void onActivityChanged() {
-        if (pendingAssociateRequest == 0) {
+        int outstanding = pendingAssociate();
+        if (outstanding == 0) {
             return;
         }
         Activity current = currentActivity();
@@ -159,13 +196,13 @@ public class AndroidNearbyBackend implements NearbyBridge {
             return;
         }
         CompanionDeviceManager cdm = manager();
-        if (cdm == null || !listenForResult(pendingAssociateRequest, cdm)) {
+        if (cdm == null || !listenForResult(outstanding, cdm)) {
             // Nothing can answer it now, so it is failed rather than left to
             // hang -- and the pending slot is released so the next
             // association is not refused as BUSY for a chooser nobody is
             // waiting on any more.
-            int requestId = pendingAssociateRequest;
-            pendingAssociateRequest = 0;
+            int requestId = outstanding;
+            releaseAssociate(requestId);
             listeningOn = null;
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.USER_CANCELED.ordinal(),
@@ -571,7 +608,9 @@ public class AndroidNearbyBackend implements NearbyBridge {
                     "companion association needs Android 8 or later");
             return;
         }
-        if (pendingAssociateRequest != 0) {
+        // Reserved HERE, where it is tested. Everything between this and the
+        // chooser opening gives it back on the way out.
+        if (!reserveAssociate(requestId)) {
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.BUSY.ordinal(),
                     "an association chooser is already open");
@@ -592,6 +631,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             String deviceProfile = Build.VERSION.SDK_INT >= 31
                     ? profileFor(profile) : null;
             if (deviceProfile == null) {
+                releaseAssociate(requestId);
                 CompanionDevices.deliverRequestFailed(requestId,
                         NearbyError.NOT_SUPPORTED.ordinal(),
                         "this Android version has no companion profile "
@@ -609,6 +649,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // worth reporting, not one worth widening.
         for (int i = 0; filters != null && i < filters.length; i++) {
             if (!addFilter(request, filters[i])) {
+                releaseAssociate(requestId);
                 CompanionDevices.deliverRequestFailed(requestId,
                         NearbyError.INVALID_TOKEN.ordinal(),
                         "this device filter could not be used: " + filters[i]);
@@ -622,11 +663,10 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // to see everything. A request with no filters at all is what makes
         // the platform scan all three transports, which is what the portable
         // API promises for an empty filter list.
-        pendingAssociateRequest = requestId;
         if (!listenForResult(requestId, cdm)) {
             // Nothing would ever answer this request, so it is refused now
             // rather than left pending while another flow takes its result.
-            pendingAssociateRequest = 0;
+            releaseAssociate(requestId);
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.BUSY.ordinal(),
                     "another activity result is outstanding; try again when"
@@ -643,7 +683,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         try {
             associateNow(cdm, request.build(), requestId);
         } catch (Throwable refused) {
-            pendingAssociateRequest = 0;
+            releaseAssociate(requestId);
             releaseResultListener();
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.NOT_SUPPORTED.ordinal(),
@@ -665,7 +705,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
 
             @Override
             public void onFailure(CharSequence error) {
-                pendingAssociateRequest = 0;
+                releaseAssociate(requestId);
                 // The listener was installed before associate() was called,
                 // and installing one marks CodenameOneActivity as waiting for
                 // a result. Leaving it there when no chooser is ever launched
@@ -687,7 +727,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
         // Failed rather than thrown, for the reason requestPermissions is.
         Activity host = currentActivity();
         if (host == null) {
-            pendingAssociateRequest = 0;
+            releaseAssociate(requestId);
             releaseResultListener();
             CompanionDevices.deliverRequestFailed(requestId,
                     NearbyError.USER_CANCELED.ordinal(),
@@ -699,7 +739,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
             host.startIntentSenderForResult(chooserLauncher,
                     ASSOCIATE_REQUEST, null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
-            pendingAssociateRequest = 0;
+            releaseAssociate(requestId);
             // Same as the onFailure path: nothing will come back through the
             // listener, so it must not stay installed.
             releaseResultListener();
@@ -755,7 +795,7 @@ public class AndroidNearbyBackend implements NearbyBridge {
                 // Dropped here, not only when the next association replaces
                 // it: the flow this listener belongs to is over.
                 listeningOn = null;
-                pendingAssociateRequest = 0;
+                releaseAssociate(requestId);
                 if (resultCode != Activity.RESULT_OK) {
                     CompanionDevices.deliverRequestFailed(requestId,
                             NearbyError.USER_CANCELED.ordinal(),
