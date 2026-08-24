@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -397,6 +399,64 @@ class IPhoneBuilderSceneManifestValidationTest {
                 "an unrelated empty dictionary is not rewritten");
         assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
                 "and the manifest is still added");
+    }
+
+    @Test
+    void anInjectionWithNoManifestOfItsOwnIsAccepted() {
+        assertNull(IPhoneBuilder.sceneManifestRejection(
+                        "<key>CFBundleName</key><string>Demo</string>"),
+                "the build writes its own manifest for the Mac slice; there is nothing "
+                        + "here to object to");
+    }
+
+    @Test
+    void aSingleSceneIosManifestIsAccepted() {
+        // The point of the Mac-specific copy: an application injecting a manifest for
+        // its iOS slice must not be forced to put true in the plist that slice reads.
+        assertNull(IPhoneBuilder.sceneManifestRejection(manifest(
+                        "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n")),
+                "a single-scene iOS manifest is the right thing to inject");
+    }
+
+    @Test
+    void aManifestThatIsNotADictionaryIsRejected() {
+        // Nothing can be added to it, and left alone the Mac copy is a silent no-op:
+        // a build that succeeds and a window unsupported on the device.
+        String rejection = IPhoneBuilder.sceneManifestRejection(
+                "<key>UIApplicationSceneManifest</key>\n<string>yes please</string>");
+        assertNotNull(rejection, "a manifest that is not a dictionary has to be refused");
+        assertTrue(rejection.contains("is not a <dict>"), rejection);
+    }
+
+    @Test
+    void sceneConfigurationsThatAreNotADictionaryAreRejected() {
+        String rejection = IPhoneBuilder.sceneManifestRejection(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <array/>\n"));
+        assertNotNull(rejection, "configurations that are not a dictionary have to be refused");
+        assertTrue(rejection.contains("UISceneConfigurations"), rejection);
+    }
+
+    @Test
+    void aWindowRoleNamingAnotherDelegateIsRejected() {
+        String foreign = WINDOW_ROLE.replace("CodenameOne_GLSceneDelegate", "SomebodyElse");
+        String rejection = IPhoneBuilder.sceneManifestRejection(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + foreign
+                + "    </dict>\n"));
+        assertNotNull(rejection, "we cannot add ours beside theirs; UIKit reads the role");
+        assertTrue(rejection.contains("CodenameOne_GLSceneDelegate"), rejection);
+    }
+
+    @Test
+    void aWindowRoleAlreadyNamingOurDelegateIsAccepted() {
+        assertNull(IPhoneBuilder.sceneManifestRejection(manifest(
+                        "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                        + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                        + WINDOW_ROLE
+                        + "    </dict>\n")),
+                "an application that already wired our delegate has done nothing wrong");
     }
 
     @Test

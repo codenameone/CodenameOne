@@ -11693,6 +11693,68 @@ public class IPhoneBuilder extends Executor {
     /// #### Returns
     ///
     /// true if the window scene role names `CodenameOne_GLSceneDelegate`
+    /// Why this build cannot give the Mac slice a usable scene manifest, or null when
+    /// it can.
+    ///
+    /// Only reached when the application supplied its own `UIApplicationSceneManifest`
+    /// through `ios.plistInject`, in which case this build must not write a second
+    /// one. What it must not do either is demand that manifest already support
+    /// multiple scenes: that fragment goes into the plist the iPhone/iPad slice reads,
+    /// and true there is the iPad multi-window opt-in the Mac-specific copy exists to
+    /// avoid. A single-scene iOS manifest is the right thing to inject, and
+    /// `#plistForMacSlice(String)` adds the support key and the window role to the Mac
+    /// copy.
+    ///
+    /// So what is rejected is only what cannot be repaired without discarding
+    /// something the application wrote:
+    ///
+    /// - a manifest, or a `UISceneConfigurations`, that is not a dictionary. There is
+    ///   nothing to add a member to, and left alone the Mac copy is a silent no-op --
+    ///   a build that succeeds and a window that is unsupported on the device.
+    /// - a window role already wired to somebody else's delegate. Adding ours beside
+    ///   it would not help, since UIKit reads the role rather than a list of
+    ///   candidates.
+    ///
+    /// Separate from the throw so it can be tested: this decides what a build with
+    /// windows will accept, and every part of it has been wrong at least once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `inject`: the injected plist fragment
+    ///
+    /// #### Returns
+    ///
+    /// the reason to refuse, or null to proceed
+    static String sceneManifestRejection(String inject) {
+        if (!plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
+            return null;
+        }
+        String manifest = plistManifestScope(inject);
+        if (!"dict".equals(nextElementName(manifest, 0))) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject is not a <dict>. UIKit "
+                    + "reads it as a dictionary of scene settings, so it has to be one.";
+        }
+        String configurations = plistDictMember(manifest, "UISceneConfigurations");
+        if (configurations != null && !"dict".equals(nextElementName(configurations, 0))) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UISceneConfigurations in the UIApplicationSceneManifest from "
+                    + "ios.plistInject is not a <dict>. UIKit reads it as a dictionary keyed "
+                    + "by scene role, so it has to be one.";
+        }
+        String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
+        if (role != null && !plistManifestWiresWindowScene(inject)) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject already declares a "
+                    + "UIWindowSceneSessionRoleApplication that does not name "
+                    + "CodenameOne_GLSceneDelegate. A window is a scene of that role, so it is "
+                    + "the delegate that has to be Codename One's. Point that configuration at "
+                    + "CodenameOne_GLSceneDelegate, or drop the window role from your manifest "
+                    + "and let the build add one for the Mac slice.";
+        }
+        return null;
+    }
+
     /// The Mac slice's version of a finished plist: one that supports multiple scenes
     /// and declares the window role to create them with.
     ///
@@ -12457,31 +12519,10 @@ public class IPhoneBuilder extends Executor {
         // and getWindowManager() reads that key back out of the bundle, so windows were
         // reported unsupported and constructing one threw, in the very build that had
         // just asked for them.
-        if (multiWindow && plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
-            // The application supplied its own manifest, so this build must not write a
-            // second one. What it must not do either is demand that manifest already
-            // support multiple scenes: this fragment goes into the plist the iPhone/iPad
-            // slice reads, and true there is exactly the iPad multi-window opt-in the
-            // Mac-specific copy exists to avoid. A single-scene iOS manifest is the
-            // right thing for an application to inject, and plistForMacSlice adds the
-            // support key and the window role to the Mac copy.
-            //
-            // One case cannot be repaired and is refused rather than overruled: a
-            // window role that names somebody else's delegate. Adding ours beside it
-            // would not help -- UIKit reads the role, not a list of candidates -- and
-            // replacing theirs would silently discard a choice the application made.
-            String manifest = plistManifestScope(inject);
-            String configurations = plistDictMember(manifest, "UISceneConfigurations");
-            String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
-            if (role != null && !plistManifestWiresWindowScene(inject)) {
-                throw new BuildException(
-                        "macNative.enabled=true asks for com.codename1.ui.Window support, but "
-                        + "the UIApplicationSceneManifest in ios.plistInject already declares a "
-                        + "UIWindowSceneSessionRoleApplication that does not name "
-                        + "CodenameOne_GLSceneDelegate. A window is a scene of that role, so it "
-                        + "is the delegate that has to be Codename One's. Point that "
-                        + "configuration at CodenameOne_GLSceneDelegate, or drop the window role "
-                        + "from your manifest and let the build add one for the Mac slice.");
+        if (multiWindow) {
+            String rejection = sceneManifestRejection(inject);
+            if (rejection != null) {
+                throw new BuildException(rejection);
             }
         }
         // multiWindow is deliberately NOT in this condition. Declaring
