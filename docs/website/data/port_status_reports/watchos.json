@@ -1,36 +1,36 @@
 {
-  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
-  "generated_at": "2026-08-19T14:40:32Z",
+  "commit": "c2732fd24ff606421f361f239792cc2d717ce47d",
+  "generated_at": "2026-08-23T06:25:35Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 433298000
+        "duration_ns": 450268000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 197790000
+        "duration_ns": 193759000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 209522000
+        "duration_ns": 206141000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 135765000
+        "duration_ns": 133625000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 525986000
+        "duration_ns": 575246000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 432644000
+        "duration_ns": 405366000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 872982000
+        "duration_ns": 980573000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "watchos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868735",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32613256755",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 168,
+    "pass": 166,
     "skip": 13
   },
   "tests": {
@@ -462,10 +462,6 @@
       "feature": "notifications",
       "status": "pass"
     },
-    "LogSubclassCaptureTest": {
-      "feature": "logging-diagnostics",
-      "status": "pass"
-    },
     "LottieAnimatedScreenshotTest": {
       "feature": "svg-lottie",
       "status": "pass"
@@ -512,10 +508,6 @@
     },
     "MultiButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
-      "status": "pass"
-    },
-    "MultiWindowApiTest": {
-      "feature": "multi-window",
       "status": "pass"
     },
     "MutableImageClipReadbackTest": {

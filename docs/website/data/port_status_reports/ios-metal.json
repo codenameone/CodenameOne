@@ -1,36 +1,36 @@
 {
-  "commit": "896356159b4a984b5eb6633e060dff480b7c9ed8",
-  "generated_at": "2026-08-19T14:15:59Z",
+  "commit": "c2732fd24ff606421f361f239792cc2d717ce47d",
+  "generated_at": "2026-08-23T10:35:55Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 294811000
+        "duration_ns": 312898000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 22420000
+        "duration_ns": 23531000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 127686000
+        "duration_ns": 142431000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 77184000
+        "duration_ns": 94978000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 302310000
+        "duration_ns": 393993000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 124076000
+        "duration_ns": 139869000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 151972000
+        "duration_ns": 175892000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32242868735",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32613256755",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 177,
+    "pass": 175,
     "skip": 4
   },
   "tests": {
@@ -453,10 +453,6 @@
       "feature": "notifications",
       "status": "pass"
     },
-    "LogSubclassCaptureTest": {
-      "feature": "logging-diagnostics",
-      "status": "pass"
-    },
     "LottieAnimatedScreenshotTest": {
       "feature": "svg-lottie",
       "status": "pass"
@@ -503,10 +499,6 @@
     },
     "MultiButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
-      "status": "pass"
-    },
-    "MultiWindowApiTest": {
-      "feature": "multi-window",
       "status": "pass"
     },
     "MutableImageClipReadbackTest": {

@@ -5712,6 +5712,18 @@ public final class Display extends CN1Constants {
         return impl.getHomeBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.nearby` API to reach precision
+    /// ranging, companion-device association and the nearby transport, or null when this port
+    /// implements none of them. Internal -- application code uses the `com.codename1.nearby`
+    /// packages rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the nearby bridge, or null
+    public com.codename1.nearby.spi.NearbyBridge getNearbyBridge() {
+        return impl.getNearbyBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
     /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge

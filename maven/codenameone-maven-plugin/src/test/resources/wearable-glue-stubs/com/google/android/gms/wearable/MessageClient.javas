@@ -1,0 +1,5 @@
+package com.google.android.gms.wearable;
+import com.google.android.gms.tasks.Task;
+public abstract class MessageClient {
+    public abstract Task<Integer> sendMessage(String nodeId, String path, byte[] data);
+}

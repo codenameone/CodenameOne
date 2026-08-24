@@ -1,0 +1,5 @@
+package androidx.wear.watchface.complications.data;
+/** Stub mirroring the real enum. Only the constants the generated source names are listed. */
+public enum TimeDifferenceStyle {
+    STOPWATCH, SHORT_SINGLE_UNIT, SHORT_DUAL_UNIT, WORDS_SINGLE_UNIT, SHORT_WORDS_SINGLE_UNIT
+}

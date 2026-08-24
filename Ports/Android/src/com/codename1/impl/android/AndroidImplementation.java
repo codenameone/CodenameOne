@@ -1580,6 +1580,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             setActivity(null);
             setContext((Context)m);
         }
+        // The nearby bridge is cached for the life of the process while
+        // Android recreates the activity freely -- a configuration change,
+        // or "Don't keep activities". An association chooser opened by the
+        // old activity delivers its result to the NEW one, where the
+        // backend's result listener is not installed, so the association
+        // resource never settled and every later association answered BUSY.
+        // Told here because this is the one place that knows it changed.
+        if (nearbyBridge != null) {
+            nearbyBridge.onActivityChanged();
+        }
 
         instance = this;
         if(getActivity() != null && getActivity().hasUI()){
@@ -13487,6 +13497,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    private AndroidNearbyBridge nearbyBridge;
+
+    /// The nearby bridge, which finds its own implementation.
+    ///
+    /// Always returned rather than conditionally null: the shell answers every
+    /// capability query honestly whether or not the optional backend was
+    /// bundled, so the public API reports NOT_SUPPORTED without this getter
+    /// having to know how the app was built.
+    @Override
+    public synchronized com.codename1.nearby.spi.NearbyBridge
+            getNearbyBridge() {
+        // Synchronized, because two threads reaching nearby for the first
+        // time both saw null and both built a backend. Only one was kept,
+        // and the loser could already have prepared a UWB session or taken
+        // the companion chooser slot in state nothing could reach again --
+        // so a later start or stop could not find its session, and the radio
+        // it had opened stayed open.
+        if (nearbyBridge == null) {
+            nearbyBridge = new AndroidNearbyBridge(getActivity());
+        }
+        return nearbyBridge;
     }
 
     @Override

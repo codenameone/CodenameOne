@@ -1,12 +1,12 @@
 {
-  "_comment": "Build-time widget kinds manifest for the cn1ss device suite. Referencing com.codename1.surfaces from the suite (Surfaces* tests) makes the iOS/Android builders require this manifest: widget kinds are compiled into the native widget gallery, so they cannot be registered at runtime only. The id mirrors the runtime Surfaces.registerWidgetKind call in SurfacesPublishTest. liveActivities keeps the ActivityKit lowering (CN1LiveActivityWidget.swift, NSSupportsLiveActivities, the Android ongoing-notification manager) compiled and exercised by every platform CI leg.",
+  "_comment": "Build-time widget kinds manifest for the cn1ss device suite. Referencing com.codename1.surfaces from the suite (Surfaces* tests) makes the iOS/Android builders require this manifest: widget kinds are compiled into the native widget gallery, so they cannot be registered at runtime only. The id mirrors the runtime Surfaces.registerWidgetKind call in SurfacesPublishTest. liveActivities keeps the ActivityKit lowering (CN1LiveActivityWidget.swift, NSSupportsLiveActivities, the Android ongoing-notification manager) compiled and exercised by every platform CI leg. The watch families are here for the same reason: the suite declares codename1.watchMain, so they make the build-ios-watch job compile the generated CN1WatchWidgets extension for watchOS on every PR -- which is the only automated check that the shared surfaces Swift stays portable to a platform without UIGraphicsImageRenderer or the system widget families. 'families' is the portable spelling of 'iosFamilies'.",
   "liveActivities": true,
   "kinds": [
     {
       "id": "cn1ss_status",
       "name": "CN1SS Status",
       "description": "Surfaces suite status widget",
-      "iosFamilies": ["small", "medium"],
+      "families": ["small", "medium", "watchCircular", "watchRectangular"],
       "androidMinWidthDp": 180,
       "androidMinHeightDp": 60
     }

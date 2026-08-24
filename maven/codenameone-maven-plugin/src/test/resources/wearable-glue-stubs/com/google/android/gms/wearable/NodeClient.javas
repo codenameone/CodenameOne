@@ -1,0 +1,6 @@
+package com.google.android.gms.wearable;
+import com.google.android.gms.tasks.Task;
+public abstract class NodeClient {
+    public abstract Task<java.util.List<Node>> getConnectedNodes();
+    public abstract Task<Node> getLocalNode();
+}

@@ -20,9 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.home;
+package com.codename1.impl.async;
 
-import com.codename1.impl.async.EdtResult;
 
 import java.util.ArrayList;
 import java.util.HashMap;

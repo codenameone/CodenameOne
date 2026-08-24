@@ -218,15 +218,31 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
 
         //final HashMap<String, Long> slowest = new HashMap<>();
         //final HashMap<String, Long> counts = new HashMap<>();
-        int count = renderingOperations.size();
+        // Snapshot under the lock this method already takes to clear the queue.
+        // Reading size() and then copying without it let flushGraphics swap the
+        // list in between, and ArrayList.addAll copies through toArray(): a
+        // concurrent mutation there returns an array sized for the new contents
+        // and padded with NULLS. Those nulls arrived here as AsyncOps and threw
+        // out of executeWithClip below, which is a hard crash on the UI thread.
+        // flushGraphics has carried an "if (o != null)" guard against the same
+        // corruption since a user reported it; this is the other end of it, and
+        // the reason the nulls exist at all.
+        //
+        // Only the copy is synchronized. The ops are executed below without the
+        // lock because that is the frame's actual drawing, and holding it there
+        // would park the EDT in flushGraphics for the whole paint.
+        int count;
+        synchronized (RENDERING_OPERATIONS_LOCK) {
+            count = renderingOperations.size();
 
-        // this works around the case of a blank screen when an invalidate occurs out of nowhere
-        // and no operations are in the queue
-        if(count > 0) {
-            currentlyRendering.clear();
-            currentlyRendering.addAll(renderingOperations);
-        } else {
-            count = currentlyRendering.size();
+            // this works around the case of a blank screen when an invalidate occurs out of nowhere
+            // and no operations are in the queue
+            if(count > 0) {
+                currentlyRendering.clear();
+                currentlyRendering.addAll(renderingOperations);
+            } else {
+                count = currentlyRendering.size();
+            }
         }
         int offset = 0;
         for(; offset < count ; offset++) {
@@ -364,13 +380,23 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
     // When this reaches 10, the rendering operations are flushed.
     private int timeoutCounter=0;
 
+    // Not the crash, but the same field: dispatchDraw clears renderingOperations
+    // holding the lock, so reading it without one has no happens-before against
+    // that clear and can spin on a stale size. Leaving one access of a
+    // lock-guarded field unguarded is how the next one gets written that way.
+    private boolean renderingOperationsPending() {
+        synchronized (RENDERING_OPERATIONS_LOCK) {
+            return !renderingOperations.isEmpty();
+        }
+    }
+
     @Override
     public void flushGraphics(Rect rect) {
         //Log.d(Display.getInstance().getProperty("AppName", "CodenameOne"), "Flush graphics invoked with pending: " + pendingRenderingOperations.size() + " and current " + renderingOperations.size());
 
         // we might have pending entries in the rendering queue
         int counter = 0;
-        while (!renderingOperations.isEmpty()) {
+        while (renderingOperationsPending()) {
             try {
                 synchronized (RENDERING_OPERATIONS_LOCK) {
                     RENDERING_OPERATIONS_LOCK.wait(5);
@@ -404,9 +430,14 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             }
         }
         timeoutCounter = 0;
-        ArrayList<AsyncOp> tmp = renderingOperations;
-        renderingOperations = pendingRenderingOperations;
-        pendingRenderingOperations = tmp;
+        // The swap the snapshot in dispatchDraw races with. Unsynchronized, it
+        // could replace the list mid-copy, which is how the copy came back
+        // holding nulls.
+        synchronized (RENDERING_OPERATIONS_LOCK) {
+            ArrayList<AsyncOp> tmp = renderingOperations;
+            renderingOperations = pendingRenderingOperations;
+            pendingRenderingOperations = tmp;
+        }
         try {
             for (AsyncOp o : renderingOperations) {
                 // can happen due to synchronization issues see: https://www.reddit.com/r/cn1/comments/1oo43in/error_while_using_app/

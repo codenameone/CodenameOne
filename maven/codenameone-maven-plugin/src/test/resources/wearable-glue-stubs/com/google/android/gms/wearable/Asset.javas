@@ -1,0 +1,8 @@
+package com.google.android.gms.wearable;
+public class Asset {
+    public static Asset createFromBytes(byte[] data) { return null; }
+    public static Asset createFromRef(String ref) { return null; }
+    public static Asset createFromUri(android.net.Uri uri) { return null; }
+    public android.net.Uri getUri() { return null; }
+    public String getDigest() { return null; }
+}

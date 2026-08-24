@@ -51,7 +51,11 @@ public class WidgetKind {
         this.id = id;
     }
 
-    private static boolean isValidId(String id) {
+    /// Whether an id matches the documented `[a-z][a-z0-9_]*` grammar.
+    ///
+    /// Package-visible because `Surfaces.publishRemote` has to apply the same rule to an id that
+    /// arrived from outside the process, and two copies of a grammar is how they come to disagree.
+    static boolean isValidId(String id) {
         int n = id.length();
         if (n == 0) {
             return false;

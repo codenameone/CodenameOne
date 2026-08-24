@@ -92,10 +92,11 @@ def feature_test_entries(feature: dict):
 
     A feature lists its tests either as plain names, which every port is expected to
     run, or as ``{"test": ..., "ports": [...]}`` for a test that only applies to some
-    of them. The scoped form exists so that a capability a port does not have -- a
-    windowing system, say -- is absent from that port's report rather than present as
-    a row of skips: the tests genuinely do not apply there, and reporting them as
-    skipped invites the reader to count them as something the port failed to do.
+    of them. The scoped form exists for a capability a port does not have -- a
+    windowing system, say. Without it such a test is absent from that port's report
+    forever, which the coverage gate reads as a test the port dropped, and the only
+    way to quiet that is a row of skips on the public table inviting the reader to
+    count a capability the port was never asked for as something it failed to do.
     """
     for entry in feature.get("tests", []):
         if isinstance(entry, str):
@@ -243,72 +244,16 @@ def validate(manifest: dict) -> dict:
         if owner is None:
             problems.append(f"Golden screenshot {name} is not mapped to a test")
 
-    skipped_tests: set[str] = set()
-    report_directory = manifest.get("report_directory")
-    if report_directory:
-        report_root = REPO_ROOT / report_directory
-        for port_id in port_ids:
-            report_path = report_root / f"{port_id}.json"
-            try:
-                report = read_json(report_path)
-            except ContractError as exc:
-                problems.append(str(exc))
-                continue
-            if report.get("schema_version") != manifest.get("schema_version"):
-                problems.append(f"Stored report {report_path} has the wrong schema version")
-            if report.get("port") != port_id:
-                problems.append(f"Stored report {report_path} identifies port {report.get('port')}")
-            report_tests = report.get("tests")
-            if not isinstance(report_tests, dict):
-                problems.append(f"Stored report {report_path} has no test result map")
-                continue
-            expected_tests = tests_for_port(manifest, port_id)
-            unknown_tests = sorted(set(report_tests) - expected_tests)
-            if unknown_tests:
-                problems.append(
-                    f"Stored report {report_path} contains unknown tests: "
-                    + ", ".join(unknown_tests)
-                )
-            missing_tests = sorted(expected_tests - set(report_tests))
-            if missing_tests:
-                problems.append(
-                    f"Stored report {report_path} is missing tests: "
-                    + ", ".join(missing_tests)
-                )
-            unrun_tests = []
-            for test, result in report_tests.items():
-                if not isinstance(result, dict) or result.get("status") not in {
-                    "pass", "fail", "skip", "not-run"
-                }:
-                    problems.append(f"Stored report {report_path} has an invalid result for {test}")
-                elif result.get("status") == "skip":
-                    skipped_tests.add(test)
-                elif result.get("status") == "not-run":
-                    unrun_tests.append(test)
-            if unrun_tests:
-                # A registered test that never started is indistinguishable, on the page, from one
-                # that runs and passes -- nothing here objected to it, so a test could be
-                # published and quietly never executed on any port. A port that genuinely cannot
-                # do something reports "skip", from the suite itself, and is unaffected; "not-run"
-                # is the absence of evidence, and the answer to it is to run the suite and check
-                # the report in rather than to record the absence.
-                problems.append(
-                    f"Stored report {report_path} reports tests that never ran: "
-                    + ", ".join(sorted(unrun_tests))
-                )
-            actual_summary = Counter(
-                result.get("status")
-                for result in report_tests.values()
-                if isinstance(result, dict)
-            )
-            expected_summary = {
-                key: actual_summary.get(key, 0)
-                for key in ("pass", "fail", "skip", "not-run")
-            }
-            if report.get("summary") != expected_summary:
-                problems.append(
-                    f"Stored report {report_path} summary does not match its test results"
-                )
+    # The checked-in reports are a snapshot of what CI measured, not a second
+    # copy of the contract. Requiring them to carry exactly the manifest's test
+    # set made every test-adding PR hand-edit eleven files, and the cheapest way
+    # to satisfy that was to invent a result -- twelve "pass" entries reached
+    # master attributed to runs that never executed the test. Classify them with
+    # the same drift / malformed split publication uses: a snapshot that predates
+    # a test is drift and is reported, never fatal; a snapshot nothing can render
+    # is still a defect.
+    skipped_tests, snapshot_drift, snapshot_malformed = stored_report_problems(manifest)
+    problems.extend(snapshot_malformed)
 
     manual_feature_count = 0
     try:
@@ -331,7 +276,10 @@ def validate(manifest: dict) -> dict:
             "Skip errata references unknown tests: "
             + ", ".join(unknown_skip_reasons)
         )
-    missing_skip_reasons = sorted(skipped_tests - set(skip_reason_tests))
+    # Only tests the contract still defines. A snapshot taken before a test was
+    # retired still carries its skip, and demanding an erratum for something
+    # nobody can run again would be unfixable except by editing the snapshot.
+    missing_skip_reasons = sorted((skipped_tests & set(mapped)) - set(skip_reason_tests))
     if missing_skip_reasons:
         problems.append("Skipped tests without errata: " + ", ".join(missing_skip_reasons))
     for item in supplement.get("skip_reasons", []):
@@ -340,6 +288,30 @@ def validate(manifest: dict) -> dict:
             problems.append(
                 "Every skip erratum needs test, reason, platform_support, and verification"
             )
+        # A reason code with no prefix documents everything. Both matchers ask
+        # whether the reason starts with it, and every string starts with the
+        # empty one -- so an erratum that lost this field by a typo would turn
+        # any future skip of that test green, on the nightly gate and on the
+        # page alike, which is the opposite of what writing an erratum is for.
+        for code in item.get("reason_codes") or []:
+            prefix = code.get("prefix")
+            if not isinstance(prefix, str) or not prefix:
+                problems.append(
+                    f"Skip erratum {item.get('test')} has a reason code with no prefix"
+                )
+            # Deliberately not named `ports`: that is the manifest's port list,
+            # in scope for the whole of validate(), and rebinding it here left
+            # the returned port count reading whichever erratum happened to be
+            # last. The counts test caught it, which is what it is for.
+            code_ports = code.get("ports")
+            if code_ports is not None and (
+                not isinstance(code_ports, list)
+                or not code_ports
+                or any(port not in port_ids for port in code_ports)
+            ):
+                problems.append(
+                    f"Skip erratum {item.get('test')} has a reason code naming unknown ports"
+                )
 
     manual_features = supplement.get("features", [])
     manual_feature_count = len(manual_features)
@@ -445,6 +417,7 @@ def validate(manifest: dict) -> dict:
     if problems:
         raise ContractError("\n".join(problems))
     return {
+        "drift": snapshot_drift,
         "ports": len(ports),
         "features": len(features),
         "tests": len(mapped),
@@ -454,6 +427,426 @@ def validate(manifest: dict) -> dict:
         "deployment_platforms": len(deployment_rows),
         "browser_engines": len(browsers),
     }
+
+
+def stored_report_problems(manifest: dict) -> tuple[set[str], list[str], list[str]]:
+    """Classify the checked-in fallback reports.
+
+    Returns (skipped tests, drift, malformed). The reports under
+    ``report_directory`` are produced by the port workflows and refreshed from
+    the data branch before Hugo runs; nothing about a pull request is supposed
+    to touch them. Read them exactly the way publication reads a persisted
+    report, so "this snapshot predates a test the branch just registered" is the
+    ordinary, expected state it already is everywhere else in this pipeline
+    rather than a build failure a human resolves by inventing a result.
+    """
+    skipped: set[str] = set()
+    drift: list[str] = []
+    malformed: list[str] = []
+    report_directory = manifest.get("report_directory")
+    if not report_directory:
+        return skipped, drift, malformed
+    root = REPO_ROOT / report_directory
+    for port in manifest.get("ports", []):
+        port_id = port.get("id")
+        if not port_id:
+            continue
+        path = root / f"{port_id}.json"
+        if not path.is_file():
+            # A port with no published report renders as "No stored report" on
+            # every one of its cells, which is what is true of a port CI has
+            # never heard from. Demanding a file here is what made adding a port
+            # start by hand-authoring one, and a hand-authored report is the
+            # thing this whole contract is trying to stop existing.
+            drift.append(f"{port_id}: no stored report yet")
+            continue
+        try:
+            report = read_json(path)
+        except ContractError as exc:
+            malformed.append(str(exc))
+            continue
+        port_drift, port_malformed = publishable_report_problems(manifest, port_id, report)
+        drift.extend(f"{port_id}: {item}" for item in port_drift)
+        malformed.extend(f"{port_id}: {item}" for item in port_malformed)
+        tests = report.get("tests")
+        if not isinstance(tests, dict):
+            continue
+        for name, result in tests.items():
+            if isinstance(result, dict) and result.get("status") == "skip":
+                skipped.add(name)
+    return skipped, drift, malformed
+
+
+def report_stamp(report: dict) -> datetime | None:
+    raw = report.get("generated_at")
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo else None
+
+
+def skip_is_documented(supplement: dict, port_id: str, test: str, reasons: list) -> bool:
+    """The page's rule for a green documented skip, applied to a report.
+
+    Mirrors port-status-feature-status.html deliberately: an erratum documents a
+    skip only when it names the test AND, where it lists reason codes, every
+    reason the run gave matches one of them from a port that code applies to.
+    Matching on the test name alone would let any future skip of a named test
+    read as documented -- an encoder that regressed would render green under an
+    erratum written about a simulator.
+    """
+    for item in supplement.get("skip_reasons", []):
+        if item.get("test") != test:
+            continue
+        codes = item.get("reason_codes")
+        if not codes:
+            return True
+        if not reasons:
+            continue
+        if all(
+            any(
+                code.get("prefix")
+                and (not code.get("ports") or port_id in code["ports"])
+                and isinstance(reason, str)
+                and reason.startswith(code["prefix"])
+                for code in codes
+            )
+            for reason in reasons
+        ):
+            return True
+    return False
+
+
+def coverage_problems(
+    manifest: dict,
+    reports: dict[str, dict],
+    contracts: dict[str, set[str]] | None = None,
+) -> list[str]:
+    """Hold the *published* reports to "every registered test runs on every port".
+
+    This is the gate that used to live, badly, in the checked-in snapshots. Two
+    rules, both decidable from the reports themselves:
+
+    ``not-run`` is always a defect. The suite reached that port, the test was in
+    its contract, and nothing reported back.
+
+    A test absent from a report is normally just a run that predates it -- the
+    port has not merged past the commit that registered the test yet. It becomes
+    a defect the moment some *older* report carries that test: a run that
+    happened earlier already knew about it, so a later run that does not is a
+    test the port has dropped rather than one it has not reached. No history
+    lookup and no grace period to tune; the reports date themselves.
+
+    That comparison is blind to a test missing from *every* report, because then
+    no report is the older one that proves it existed -- and a test nothing runs
+    anywhere is the worst version of the failure this gate is for, not a
+    tolerable one. ``contracts`` closes it: the set of tests each report's own
+    commit defined, which the caller reads at that commit. A report whose
+    contract already listed the test has no excuse for omitting it, whatever the
+    other ports did. Offline callers pass None and keep the weaker comparison.
+
+    A ``skip`` is the one permitted exception, and only with an erratum that
+    accounts for the reason the run actually gave. Reading skips out of the
+    checked-in fallbacks instead -- which is all validate() can see -- would let
+    a port start skipping a test, publish it, and pass this gate, with the
+    undocumented skip surfacing later as a failed website build rather than as
+    the name of the port that started skipping.
+    """
+    problems: list[str] = []
+    supplement = read_json(SUPPLEMENT)
+    mapped = test_to_feature(manifest)
+    stamps = {port: report_stamp(report) for port, report in reports.items()}
+
+    # The earliest run that proves a test was in the contract. Anything younger
+    # than this has no excuse for missing it.
+    known_since: dict[str, datetime] = {}
+    for port, report in reports.items():
+        stamp = stamps.get(port)
+        tests = report.get("tests")
+        if stamp is None or not isinstance(tests, dict):
+            continue
+        for name in tests:
+            if name in mapped and (name not in known_since or stamp < known_since[name]):
+                known_since[name] = stamp
+
+    for port in sorted(reports):
+        report = reports[port]
+        tests = report.get("tests")
+        if not isinstance(tests, dict):
+            problems.append(f"{port}: report has no test result map")
+            continue
+        # `name in mapped`, the same filter the skip check below uses. Scanning
+        # every entry meant a report that predates a test's retirement and
+        # carries it as not-run failed this gate over a test nobody can run any
+        # more -- and the same report is tolerated as drift everywhere else, so
+        # the sweep stayed red until that port happened to rerun.
+        unrun = sorted(
+            name
+            for name, result in tests.items()
+            if isinstance(result, dict)
+            and result.get("status") == "not-run"
+            and name in mapped
+        )
+        if unrun:
+            problems.append(f"{port}: reported no result for " + ", ".join(unrun))
+        undocumented = sorted(
+            name
+            for name, result in tests.items()
+            if isinstance(result, dict)
+            and result.get("status") == "skip"
+            and name in mapped
+            and not skip_is_documented(
+                supplement, port, name, result.get("reasons") or []
+            )
+        )
+        if undocumented:
+            problems.append(
+                f"{port}: skipped without an erratum that explains the reason given: "
+                + ", ".join(undocumented)
+            )
+        stamp = stamps.get(port)
+        if stamp is None:
+            problems.append(f"{port}: report has no usable generated_at")
+            continue
+        own_contract = (contracts or {}).get(port)
+        # Scoped to this port. A test that does not apply here -- a windowed
+        # baseline on a port with no windowing system -- is absent from every
+        # report this port will ever publish, so without this the first desktop
+        # run to carry it would make every other port look like it dropped it.
+        absent = tests_for_port(manifest, port) - set(tests)
+        dropped = sorted(
+            name
+            for name in absent
+            if name in known_since and known_since[name] < stamp
+        )
+        if dropped:
+            problems.append(
+                f"{port}: ran at {report.get('generated_at')} without "
+                + ", ".join(dropped)
+                + ", which an earlier run on another port already covered"
+            )
+        if own_contract is not None:
+            unreported = sorted(name for name in absent - set(dropped) if name in own_contract)
+            if unreported:
+                problems.append(
+                    f"{port}: ran at {report.get('commit') or 'an unknown commit'}, which "
+                    "defines " + ", ".join(unreported) + ", and reported nothing for them"
+                )
+    return problems
+
+
+PROVENANCE_FIELDS = ("generated_at", "commit", "run_url")
+# What has to be *new* before changed findings are believable. `commit` is not
+# among them: a port legitimately re-runs the same master commit, and its second
+# run is a different run. `run_url` is the run's identity and `generated_at` is
+# when it reported; a real snapshot carries new values for both.
+RUN_IDENTITY_FIELDS = ("generated_at", "run_url")
+# A run URL names a run on this forge. Shape alone proves nothing about whether
+# the run happened -- the data branch below is what establishes that -- but it
+# costs nothing and rejects a field filled in with a placeholder.
+RUN_URL_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/actions/runs/\d+(?:/[A-Za-z0-9_/-]*)?$"
+)
+
+
+def provenance_problems(
+    port_id: str,
+    before: dict | None,
+    after: dict | None,
+    published: list[dict] | None = None,
+) -> list[str]:
+    """Refuse a hand-edited report.
+
+    A report says "at this commit, this run, at this time, this is what the port
+    did". Editing what it did while leaving that provenance alone does not
+    correct the record, it forges it -- which is how twelve tests came to be
+    published as passing on ports that had never executed them. Changing the
+    findings is legitimate only as part of taking a new snapshot, and a new
+    snapshot carries a new stamp.
+
+    Everything except the provenance fields counts as a finding, not just the
+    test map: ``performance`` is the ten benchmark durations the page publishes
+    as measurements of that run, and ``suite_finished`` is what makes a port card
+    say the suite completed. Naming a subset here would leave the numbers most
+    worth doubting -- the ones nobody can check by reading them -- as the one
+    thing a branch could still rewrite in place.
+
+    ``published`` is what turns this from a shape check into a verification. It
+    is every version of this port's report the ``port-status-data`` branch has
+    held recently, and a changed snapshot has to *be* one of them -- which it
+    will be, because the only way to refresh one is to copy what CI published.
+    A new ``run_url`` and stamp are then not two strings a branch can invent;
+    they have to belong to a report that a run really produced, and producing one
+    needs the write access to the data branch that only the publish workflows
+    have. Pass None when the branch could not be reached: unverifiable is not the
+    same as forged, and failing a pull request because a fetch flaked would teach
+    people to route around this.
+    """
+    if after is None:
+        if before is None:
+            return []
+        # Absent because it never existed and absent because someone removed it
+        # are different things, and only the first is harmless. The site serves
+        # this file whenever the data branch cannot be reached or its newest
+        # report predates the contract, so deleting one turns an established
+        # port's whole column unknown at exactly the moment the live data is
+        # missing -- which is the moment the fallback exists for. Retiring a
+        # port is still fine: drop it from the manifest and this check never
+        # looks at it.
+        return [
+            f"{port_id}: the checked-in report was deleted. It is the fallback "
+            "the site serves when the data branch is unreachable, so an "
+            "established port would render as unknown. Only a port that has "
+            "never published needs no report."
+        ]
+
+    if before == after:
+        return []
+
+    advice = (
+        "A checked-in report is a copy of what CI put on the port-status-data "
+        "branch, so refresh it from there rather than editing it; adding a test "
+        "needs no report change at all."
+    )
+
+    # Checked on any change to the field, not only alongside changed findings.
+    if before is None or before.get("run_url") != after.get("run_url"):
+        run_url = after.get("run_url")
+        if not isinstance(run_url, str) or not RUN_URL_RE.match(run_url):
+            return [
+                f"{port_id}: run_url {run_url!r} does not name a workflow run. "
+                + advice
+            ]
+
+    # Every identity field, not any provenance field. Accepting a change to one
+    # of the three left the gate open to the easier version of the same forgery:
+    # invent a result, type today's date into `generated_at`, and leave the
+    # `commit` and `run_url` still naming the run that never produced it. A
+    # snapshot that came from a run has a new run behind it.
+    findings = tuple(
+        {key: value for key, value in (report or {}).items() if key not in PROVENANCE_FIELDS}
+        for report in (before, after)
+    )
+    if before is not None and findings[0] != findings[1] and not all(
+        before.get(field) != after.get(field) and after.get(field)
+        for field in RUN_IDENTITY_FIELDS
+    ):
+        changed = sorted(
+            key
+            for key in set(findings[0]) | set(findings[1])
+            if findings[0].get(key) != findings[1].get(key)
+        )
+        stale = sorted(
+            field
+            for field in RUN_IDENTITY_FIELDS
+            if not (before.get(field) != after.get(field) and after.get(field))
+        )
+        return [
+            f"{port_id}: {', '.join(changed)} changed without a new run behind it -- "
+            f"{', '.join(stale)} still name{'s' if len(stale) == 1 else ''} the "
+            "previous one. These reports are CI output, and a branch never needs to "
+            "edit one. Adding a test needs no report change at all; each port picks "
+            "it up on its next master run."
+        ]
+
+    # Asked of *any* change, including one that touches only the provenance
+    # fields. Retyping generated_at alone changes no finding, and the page reads
+    # that field to decide whether a column is stale -- so the edit nothing else
+    # objected to was the one that made a port which had stopped reporting look
+    # like it was still running.
+    if published is None:
+        return []
+    if any(candidate == after for candidate in published):
+        return []
+    if not published:
+        return [
+            f"{port_id}: this port has never published a report, so there is "
+            "nothing for a checked-in one to be a copy of. Leave it out -- every "
+            "cell reads 'No stored report' until the port's first run, which is "
+            "what is true. " + advice
+        ]
+    return [
+        f"{port_id}: this report is not a version the port-status-data branch "
+        "ever held. " + advice
+    ]
+
+
+def documented_skip_goldens(
+    manifest: dict,
+    port_id: str,
+    logs: list[Path],
+    reference: Path,
+    comparisons: list[Path] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Golden names whose test reported a documented skip, and why.
+
+    The screenshot count guard fails a run when a golden is not re-produced,
+    because a test that hangs or crashes leaves no per-test record and the
+    missing file is the only evidence there is. A test that prints
+    ``status=SKIPPED reason=...`` is the opposite of that: it left a record, and
+    the errata already say the reason is expected on this port. GoogleWebMap
+    skips on android and both iOS renderers when the Google Maps tiles never
+    load, which is a network the run cannot reach rather than anything about the
+    port -- and the guard failed the whole job over it anyway, so that skip path
+    could never actually succeed on a port that owns a golden.
+
+    Only a skip that is *documented for this port* counts. Silence still fails,
+    an unexplained skip still fails, and a reason code written about another
+    port still fails, which is what keeps this from being a hole.
+
+    And only goldens that are actually absent. The caller subtracts this count
+    from the number of uncovered goldens, so naming one the run did compare
+    would subtract a golden nothing was missing -- and the spare subtraction
+    would then hide a genuinely uncovered golden belonging to some other test.
+    A test that owns several screenshots and captures a few before skipping is
+    exactly that case.
+    """
+    supplement = read_json(SUPPLEMENT)
+    skipped: dict[str, list[str]] = {}
+    for path in logs:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            match = SKIP_RE.search(line)
+            if not match:
+                continue
+            name, reason = match.group(1), match.group(2)
+            owner = name if name in test_to_feature(manifest) else screenshot_test(manifest, name)
+            if owner:
+                skipped.setdefault(owner, []).append(reason or "")
+
+    compared: set[str] = set()
+    for path in comparisons or []:
+        if not path.is_file():
+            continue
+        try:
+            payload = read_json(path)
+        except ContractError:
+            continue
+        for result in payload.get("results", []):
+            if isinstance(result, dict) and result.get("status") in {"equal", "different"}:
+                name = result.get("test")
+                if name:
+                    compared.add(name)
+
+    accounted: list[str] = []
+    notes: list[str] = []
+    if not reference.is_dir():
+        return accounted, notes
+    for golden in sorted(reference.glob("*.png")):
+        owner = screenshot_test(manifest, golden.stem)
+        if owner is None or owner not in skipped or golden.stem in compared:
+            continue
+        reasons = [reason for reason in skipped[owner] if reason]
+        if skip_is_documented(supplement, port_id, owner, reasons):
+            accounted.append(golden.stem)
+            notes.append(f"{golden.stem}: {owner} skipped ({', '.join(reasons)})")
+    return accounted, notes
 
 
 def add_reason(entry: dict, reason: str) -> None:
@@ -769,7 +1162,7 @@ def publishable_report_problems(
                 )
 
     # Scoped to this port: a test that does not apply here is not something the
-    # report predates, it is something the report is right not to carry.
+    # report predates, it is something the report is right never to carry.
     expected = tests_for_port(manifest, port_id)
     tests = report.get("tests")
     if not isinstance(tests, dict):
@@ -971,6 +1364,53 @@ def build_parser() -> argparse.ArgumentParser:
     accept_parser.add_argument("--port", required=True)
     accept_parser.add_argument("--report", required=True, type=Path)
 
+    coverage_parser = subparsers.add_parser(
+        "coverage",
+        help="hold published reports to running every registered test on every port",
+    )
+    coverage_parser.add_argument(
+        "--reports",
+        required=True,
+        type=Path,
+        help="directory of published <port>.json reports",
+    )
+    coverage_parser.add_argument(
+        "--contracts",
+        type=Path,
+        help=(
+            "directory of <port>.json manifests read at each report's own commit; "
+            "omit when they cannot be fetched"
+        ),
+    )
+
+    provenance_parser = subparsers.add_parser(
+        "provenance",
+        help="refuse a report whose results were edited without a new run",
+    )
+    provenance_parser.add_argument(
+        "--base",
+        required=True,
+        type=Path,
+        help="directory holding the base revision's reports",
+    )
+    provenance_parser.add_argument(
+        "--published",
+        type=Path,
+        help=(
+            "directory of <port>/*.json holding every version of each report the "
+            "data branch has held recently; omit when it could not be fetched"
+        ),
+    )
+
+    skips_parser = subparsers.add_parser(
+        "documented-skips",
+        help="goldens whose test reported a skip this port's errata explain",
+    )
+    skips_parser.add_argument("--port", required=True)
+    skips_parser.add_argument("--log", action="append", type=Path, default=[])
+    skips_parser.add_argument("--reference", required=True, type=Path)
+    skips_parser.add_argument("--compare", action="append", type=Path, default=[])
+
     normalize_parser = subparsers.add_parser("normalize", help="write a normalized port report")
     normalize_parser.add_argument("--port", required=True)
     normalize_parser.add_argument("--log", action="append", type=Path, default=[])
@@ -999,6 +1439,85 @@ def main() -> int:
                 f"{counts['tests']} tests, {counts['features']} features, "
                 f"{counts['ports']} ports, {counts['goldens']} golden names."
             )
+            for item in counts["drift"]:
+                # Information, not a warning to be silenced. Every port reaches
+                # a newly registered test on its next master run, and the page
+                # shows the gap as "not run" until it does.
+                print(f"port-status: checked-in snapshot {item}")
+            return 0
+        if args.command == "documented-skips":
+            accounted, notes = documented_skip_goldens(
+                manifest, args.port, args.log, args.reference, args.compare
+            )
+            for note in notes:
+                print(f"port-status: documented skip accounts for {note}", file=sys.stderr)
+            print(len(accounted))
+            return 0
+        if args.command == "coverage":
+            reports = {}
+            for port in manifest.get("ports", []):
+                port_id = port.get("id")
+                path = args.reports / f"{port_id}.json"
+                if not path.is_file():
+                    print(f"port-status: no published report for {port_id}", file=sys.stderr)
+                    return 1
+                reports[port_id] = read_json(path)
+            contracts = None
+            if args.contracts is not None:
+                contracts = {}
+                for port_id in reports:
+                    path = args.contracts / f"{port_id}.json"
+                    if not path.is_file():
+                        continue
+                    try:
+                        contracts[port_id] = set(test_to_feature(read_json(path)))
+                    except ContractError:
+                        # A manifest we cannot read proves nothing. Leaving the
+                        # port out keeps the weaker comparison rather than
+                        # inventing an obligation or excusing one.
+                        continue
+            problems = coverage_problems(manifest, reports, contracts)
+            for problem in problems:
+                print(f"port-status coverage: {problem}", file=sys.stderr)
+            if problems:
+                print(
+                    "Every registered test runs on every port unless the suite itself "
+                    "reports a skip with an erratum. Fix the port or record the skip.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"Every registered test reported a result on all {len(reports)} ports.")
+            return 0
+        if args.command == "provenance":
+            report_directory = manifest.get("report_directory")
+            problems = []
+            for port in manifest.get("ports", []):
+                port_id = port.get("id")
+                base_path = args.base / f"{port_id}.json"
+                head_path = REPO_ROOT / report_directory / f"{port_id}.json"
+                if not head_path.is_file() and not base_path.is_file():
+                    # A port that has never published. Nothing to check.
+                    continue
+                published = None
+                if args.published is not None:
+                    candidates = args.published / port_id
+                    published = [
+                        read_json(item)
+                        for item in sorted(candidates.glob("*.json"))
+                    ] if candidates.is_dir() else []
+                problems.extend(
+                    provenance_problems(
+                        port_id,
+                        read_json(base_path) if base_path.is_file() else None,
+                        read_json(head_path) if head_path.is_file() else None,
+                        published,
+                    )
+                )
+            for problem in problems:
+                print(f"port-status: {problem}", file=sys.stderr)
+            if problems:
+                return 1
+            print("No port status report was edited by hand.")
             return 0
         if args.command == "accept":
             drift, malformed = publishable_report_problems(

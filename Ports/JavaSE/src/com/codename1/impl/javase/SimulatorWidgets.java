@@ -82,9 +82,24 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
     private static final int EXPANDED_W = 350;
     private static final int EXPANDED_H = 160;
 
-    private static final String[] SIZE_NAMES = {"small", "medium", "large"};
-    private static final int[] SIZE_W = {158, 338, 338};
-    private static final int[] SIZE_H = {158, 158, 354};
+    /// The families the preview can render, in the order the combo lists them.
+    ///
+    /// The four watch families are complications. They are here because a developer designing
+    /// one otherwise has no way to look at it: a complication cannot be placed on a watch face
+    /// by simctl, so short of building to a device and adding it by hand there is nothing to
+    /// see. The sizes are the accessory families' own point sizes on a 45mm watch.
+    ///
+    /// What this previews is the NODE TREE, at the right size and shape. It is not the
+    /// per-platform lowering -- WidgetKit renders these through the same descriptor, but Wear OS
+    /// reduces a complication to typed ComplicationData -- so a layout that looks right here can
+    /// still lose detail on a watch face. Say so in the window rather than implying otherwise.
+    private static final String[] SIZE_NAMES = {"small", "medium", "large",
+        "watchCircular", "watchRectangular", "watchInline", "watchCorner"};
+    private static final int[] SIZE_W = {158, 338, 338, 84, 168, 168, 84};
+    private static final int[] SIZE_H = {158, 158, 354, 84, 76, 26, 84};
+    /// Which families are round, so the preview clips them the way a watch face does. A corner
+    /// complication hugs the bezel and is circular on every face that has one.
+    private static final boolean[] SIZE_ROUND = {false, false, false, true, false, false, true};
 
     private static SimulatorWidgets instance;
 
@@ -138,7 +153,8 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
         kindScroll.setPreferredSize(new Dimension(180, 200));
         kindScroll.setBorder(BorderFactory.createTitledBorder("Widget kinds"));
 
-        sizeCombo = new JComboBox<String>(new String[] {"Small", "Medium", "Large"});
+        sizeCombo = new JComboBox<String>(new String[] {"Small", "Medium", "Large",
+            "Watch circular", "Watch rectangular", "Watch inline", "Watch corner"});
         sizeCombo.addActionListener(new java.awt.event.ActionListener() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
@@ -313,6 +329,7 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
         final long now = System.currentTimeMillis();
         final Map<String, Object> layout = SurfaceRasterizer.layoutForSize(doc, sizeName);
         widgetPanel.setLogicalSize(SIZE_W[sizeIndex], SIZE_H[sizeIndex]);
+        widgetPanel.setRoundBackground(SIZE_ROUND[sizeIndex]);
         if (layout == null) {
             widgetPanel.showImage(null, new ArrayList<SurfaceRasterizer.ActionRect>());
             updateTimelineLabel(doc, now);
@@ -509,6 +526,8 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
         private int logicalHeight;
         private final boolean checkerBackdrop;
         private boolean pillBackground;
+        /// Clip and back the surface as a circle, for the round complication families.
+        private boolean roundBackground;
         private SourceLookup sourceLookup;
         private String sourceLookupValue;
 
@@ -537,6 +556,13 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
 
         void setPillBackground(boolean pill) {
             this.pillBackground = pill;
+        }
+
+        void setRoundBackground(boolean round) {
+            if (round != roundBackground) {
+                this.roundBackground = round;
+                repaint();
+            }
         }
 
         void setLogicalSize(int w, int h) {
@@ -580,7 +606,19 @@ class SimulatorWidgets implements JavaSEWidgetBridge.Listener {
                     RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             if (checkerBackdrop) {
                 g2.setColor(new Color(0xEDEDED));
-                g2.fillRoundRect(0, 0, logicalWidth, logicalHeight, 20, 20);
+                if (roundBackground) {
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                            RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.fillOval(0, 0, logicalWidth, logicalHeight);
+                } else {
+                    g2.fillRoundRect(0, 0, logicalWidth, logicalHeight, 20, 20);
+                }
+            }
+            if (roundBackground) {
+                // A watch face clips a circular complication to its slot, so anything the layout
+                // draws into the corners is not merely tight -- it is not shown at all. Previewing
+                // it square would make a design look fine that loses content on the device.
+                g2.setClip(new java.awt.geom.Ellipse2D.Float(0, 0, logicalWidth, logicalHeight));
             }
             if (pillBackground) {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,

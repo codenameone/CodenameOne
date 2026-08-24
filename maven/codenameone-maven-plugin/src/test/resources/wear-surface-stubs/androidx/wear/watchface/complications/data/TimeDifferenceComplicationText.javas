@@ -1,0 +1,16 @@
+package androidx.wear.watchface.complications.data;
+/**
+ * Stub mirroring the real API. The two constructor overloads are the point: a countdown and a
+ * count-up are distinguished by the TYPE of the reference, not by a flag, so a generated source
+ * that passes the wrong one does not compile here either.
+ */
+public class TimeDifferenceComplicationText implements ComplicationText {
+    public static class Builder {
+        public Builder(TimeDifferenceStyle style, CountUpTimeReference reference) { }
+        public Builder(TimeDifferenceStyle style, CountDownTimeReference reference) { }
+        public Builder setText(CharSequence text) { return this; }
+        public Builder setDisplayAsNow(boolean displayAsNow) { return this; }
+        public Builder setMinimumTimeUnit(java.util.concurrent.TimeUnit unit) { return this; }
+        public TimeDifferenceComplicationText build() { return null; }
+    }
+}

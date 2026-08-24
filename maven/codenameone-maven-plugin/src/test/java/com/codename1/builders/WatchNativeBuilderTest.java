@@ -1612,4 +1612,21 @@ class WatchNativeBuilderTest {
             return null;
         }
     }
+
+    /// The complication extension is embedded in the watch app, so a watch that cannot install
+    /// the app cannot show its complication. WidgetKit itself goes back to watchOS 9 and the
+    /// extension builds there, which is where its own floor sits -- but the DEFAULT the builder
+    /// is given has to be the app's, or the extension advertises support that does not exist.
+    /// Pinned as a relationship rather than a number so lowering the app's floor later needs no
+    /// change here.
+    @Test
+    public void theWatchAppNeverRequiresMoreThanItsComplicationAdvertises() {
+        String app = WatchNativeBuilder.MIN_DEPLOYMENT_TARGET;
+        String extension = com.codename1.util.IOSWidgetExtensionBuilder.WATCH_MIN_DEPLOYMENT_TARGET;
+
+        assertTrue(Double.parseDouble(app) >= Double.parseDouble(extension),
+                "the watch app requires watchOS " + app + " while its complication extension "
+                        + "claims to support " + extension + "; the extension is embedded in the "
+                        + "app, so the app's floor is the one users actually meet");
+    }
 }

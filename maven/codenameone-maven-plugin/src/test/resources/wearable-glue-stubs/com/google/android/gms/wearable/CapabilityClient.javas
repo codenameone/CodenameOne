@@ -1,0 +1,10 @@
+package com.google.android.gms.wearable;
+import com.google.android.gms.tasks.Task;
+public abstract class CapabilityClient {
+    public static final int FILTER_ALL = 0;
+    public static final int FILTER_REACHABLE = 1;
+    public abstract Task<Void> addLocalCapability(String capability);
+    public abstract Task<Void> removeLocalCapability(String capability);
+    public abstract Task<CapabilityInfo> getCapability(String capability, int filter);
+    public abstract Task<java.util.Map<String, CapabilityInfo>> getAllCapabilities(int filter);
+}

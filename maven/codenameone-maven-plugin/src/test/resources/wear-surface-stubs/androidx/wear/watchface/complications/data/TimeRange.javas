@@ -1,0 +1,7 @@
+package androidx.wear.watchface.complications.data;
+public final class TimeRange {
+    public static final TimeRange ALWAYS = null;
+    public static TimeRange after(java.time.Instant i) { return null; }
+    public static TimeRange before(java.time.Instant i) { return null; }
+    public static TimeRange between(java.time.Instant a, java.time.Instant b) { return null; }
+}

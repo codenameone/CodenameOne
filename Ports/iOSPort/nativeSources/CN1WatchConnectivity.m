@@ -155,6 +155,20 @@ static NSString *cn1WearableInboxDir(void) {
     return dir;
 }
 
+#if !TARGET_OS_WATCH
+/// Where complication payloads waiting their turn are parked, for the same reason received
+/// transfers are: the process does not own its own lifetime.
+static NSString *cn1PendingComplicationsPath(void) {
+    NSArray *dirs = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory,
+                                                        NSUserDomainMask, YES);
+    NSString *base = dirs.count > 0 ? dirs[0] : NSTemporaryDirectory();
+    NSString *dir = [base stringByAppendingPathComponent:@"cn1-surface-outbox"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES
+                                               attributes:nil error:NULL];
+    return [dir stringByAppendingPathComponent:@"pending.plist"];
+}
+#endif
+
 /// Writes the encoded transfer to the inbox and returns its file name, or nil.
 /// Entries whose durable write failed -- storage full, or unavailable behind data protection --
 /// keyed by the same token the durable copy would have used.
@@ -888,6 +902,39 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     /// When each pending reply arrived, so one that is never answered can be retired. Parallel to
     /// _pendingReplies and guarded by the same monitor.
     NSMutableDictionary<NSNumber *, NSNumber *> *_pendingReplyAt;
+    /// Complication payloads waiting to be sent, keyed by kind id.
+    ///
+    /// transferCurrentComplicationUserInfo: keeps only the MOST RECENT transfer -- handing it a
+    /// second payload discards the first -- and each payload carries one kind. So two kinds
+    /// published before the first is delivered meant the earlier one simply never arrived, and
+    /// with the generated providers disabling periodic updates nothing would refresh it. Held
+    /// here and sent one at a time instead. A repeat of the same kind replaces its own entry,
+    /// which is what should happen: only the newest timeline for a kind is worth sending.
+    NSMutableDictionary<NSString *, NSDictionary *> *_pendingComplications;
+    /// The order the kinds were published in, so the queue is not at the mercy of dictionary
+    /// enumeration. A kind already queued keeps its original position.
+    NSMutableArray<NSString *> *_pendingComplicationOrder;
+    /// The kind currently handed to WCSession, or nil when nothing is in flight.
+    NSString *_complicationInFlight;
+    /// The exact payload handed over for that kind. Compared by identity when the transfer
+    /// finishes, so a NEWER payload queued for the same kind meanwhile is not mistaken for the
+    /// one that was just delivered and discarded with it.
+    NSDictionary *_complicationInFlightPayload;
+    /// The transfer object WCSession returned for it.
+    ///
+    /// The completion callback is told which TRANSFER finished, and matching on the kind alone is
+    /// not enough: the fallback transferUserInfo: path queues its own transfers for the same
+    /// kinds, and one of those completing would clear an unrelated newer transfer that is still
+    /// in flight -- after which the next publish displaces it before the watch ever sees it.
+    WCSessionUserInfoTransfer *_complicationInFlightTransfer;
+    /// Transfers whose completion arrived before the sending thread could record them.
+    ///
+    /// transferCurrentComplicationUserInfo: can complete on the delegate queue before it has even
+    /// returned to the caller, so the recorded slot is briefly nil while a transfer is genuinely
+    /// in flight. Discarding the completion in that window left _complicationInFlight set for
+    /// ever and stalled the whole queue -- every later publication silently unsent. The
+    /// completion is parked here instead, and the sending thread finds it the moment it records.
+    NSMutableSet *_complicationCompletedEarly;
     /// Guards the recurring tombstone sweep to a single pending chain; see pruneTombstonesNow.
     BOOL _tombstoneSweepScheduled;
     /// Guards the post-removal deadline sweep to one block, however many paths are removed.
@@ -918,6 +965,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if (self != nil) {
         _pendingReplies = [[NSMutableDictionary alloc] init];
         _pendingReplyAt = [[NSMutableDictionary alloc] init];
+        _pendingComplications = [[NSMutableDictionary alloc] init];
+        _pendingComplicationOrder = [[NSMutableArray alloc] init];
+        _complicationCompletedEarly = [[NSMutableSet alloc] init];
         _nextInboundToken = 1;
         _lastReceived = [[NSMutableDictionary alloc] init];
     }
@@ -928,13 +978,306 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     if ([WCSession isSupported]) {
         WCSession *s = [WCSession defaultSession];
         s.delegate = self;
-        [s activate];
+        // activateSession, not activate: `activate` is the name Swift renames this to, and the
+        // Objective-C selector has never existed. iOS answers it anyway, so the phone worked and
+        // hid the mistake; watchOS does not, and the watch app died at launch with
+        // "-[WCSession activate]: unrecognized selector".
+        //
+        // The compiler had nothing to say because this class declares an -activate of its own, so
+        // the selector is known to the translation unit and the typed receiver only earns a
+        // warning rather than an error.
+        //
+        // Still asynchronous, which is what the callers below assume: the header makes
+        // activateSession asynchronous exactly when the delegate implements
+        // session:activationDidCompleteWithState:error:, and this one does.
+        [s activateSession];
+    }
+#if !TARGET_OS_WATCH
+    // Anything that was still waiting its turn when the process last ended. Only the head of the
+    // queue is ever handed to WCSession -- the rest lived only in memory -- so a suspension or a
+    // termination during a background transfer lost them outright, and their complications stayed
+    // stale until something else published. Restored here because activation is the one thing
+    // that always happens, whatever brought the process up.
+    [self restorePendingComplications];
+#endif
+}
+
+#if !TARGET_OS_WATCH
+/// Writes the waiting queue to disk. Called with the monitor held.
+- (void)persistPendingComplicationsLocked {
+    @try {
+        if ([_pendingComplicationOrder count] == 0) {
+            [[NSFileManager defaultManager] removeItemAtPath:cn1PendingComplicationsPath()
+                                                       error:NULL];
+            return;
+        }
+        NSDictionary *doc = [NSDictionary dictionaryWithObjectsAndKeys:
+                [NSArray arrayWithArray:_pendingComplicationOrder], @"order",
+                [NSDictionary dictionaryWithDictionary:_pendingComplications], @"payloads", nil];
+        NSData *encoded = [NSPropertyListSerialization dataWithPropertyList:doc
+                format:NSPropertyListBinaryFormat_v1_0 options:0 error:nil];
+        if (encoded != nil) {
+            [encoded writeToFile:cn1PendingComplicationsPath() atomically:YES];
+        }
+    } @catch (NSException *ex) {
+        NSLog(@"[CN1Surfaces] could not park the pending complication queue: %@", ex.reason);
     }
 }
+
+/// Reads back whatever the last process left waiting, and starts sending again.
+- (void)restorePendingComplications {
+    NSData *encoded = [NSData dataWithContentsOfFile:cn1PendingComplicationsPath()];
+    if (encoded == nil) {
+        return;
+    }
+    id doc = [NSPropertyListSerialization propertyListWithData:encoded options:0 format:NULL
+                                                         error:nil];
+    if (![doc isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    id order = [(NSDictionary *)doc objectForKey:@"order"];
+    id payloads = [(NSDictionary *)doc objectForKey:@"payloads"];
+    if (![order isKindOfClass:[NSArray class]] || ![payloads isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    @synchronized (self) {
+        for (id kind in (NSArray *)order) {
+            id payload = [(NSDictionary *)payloads objectForKey:kind];
+            if (![kind isKindOfClass:[NSString class]]
+                    || ![payload isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            // A kind published since the restore is NEWER than what was parked, so the parked
+            // one is dropped rather than overwriting it.
+            if ([_pendingComplications objectForKey:kind] != nil) {
+                continue;
+            }
+            [_pendingComplicationOrder addObject:kind];
+            [_pendingComplications setObject:payload forKey:kind];
+        }
+    }
+    [self sendNextComplicationUserInfo];
+}
+#endif
 
 - (WCSession *)session {
     return [WCSession isSupported] ? [WCSession defaultSession] : nil;
 }
+
+// --- surface mirror ------------------------------------------------------
+//
+// Complication content published on the phone, delivered to the watch. Kept beside the rest of
+// the WCSession plumbing rather than in IOSNative.m so session activation and delegate
+// bookkeeping have one owner.
+
++ (void)mirrorComplicationUserInfo:(NSDictionary *)info {
+#if TARGET_OS_WATCH
+    // Only the phone mirrors. The watch's own publish is authoritative and sending it back would
+    // loop when the phone mirrored in the first place.
+    (void)info;
+#else
+    if (info == nil) {
+        return;
+    }
+    // Activates lazily on first touch, which is what makes this work in an app that publishes
+    // surfaces and never calls the wearable API.
+    CN1WatchConnectivity *self_ = [CN1WatchConnectivity shared];
+    WCSession *s = [self_ session];
+    if (s == nil) {
+        return;
+    }
+    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
+    if (kind == nil) {
+        kind = @"";
+    }
+    if (s.activationState != WCSessionActivationStateActivated) {
+        // NOT YET JUDGED. shared activates the session asynchronously, so the first publish in a
+        // fresh process arrives before activation completes -- and until it does, isPaired and
+        // isWatchAppInstalled are not reliable and a transfer may be refused outright. Deciding
+        // here would discard the only copy of that payload on the strength of an answer the
+        // session was not ready to give.
+        //
+        // Queued instead, which also parks it on disk, and activationDidCompleteWithState sends
+        // it once the session can actually be asked.
+        [self_ enqueueComplicationUserInfo:info forKind:kind];
+        return;
+    }
+    if (!s.isPaired || !s.isWatchAppInstalled) {
+        // No watch, or no watch app to receive it. Not a failure: most installs are this.
+        //
+        // A FAST PATH ONLY. sendNextComplicationUserInfo asks the same question again about
+        // whatever it is about to send, because a payload can reach it without passing through
+        // here at all. Kept because the common install has no watch, and without it every
+        // publish on such a phone would write a queue file and delete it again.
+        return;
+    }
+    // Which transfer to spend is decided at the moment of SENDING, not here: see
+    // sendNextComplicationUserInfo.
+    [self_ enqueueComplicationUserInfo:info forKind:kind];
+#endif
+}
+
+#if !TARGET_OS_WATCH
+/// Queues a complication payload and sends it when the session is free.
+///
+/// One at a time, because transferCurrentComplicationUserInfo: keeps only the most recent
+/// transfer: handing it a second payload while the first is still pending discards the first
+/// outright. Sending only when nothing is in flight means the payload it holds is always one we
+/// have not yet been told was delivered, so nothing is displaced.
+- (void)enqueueComplicationUserInfo:(NSDictionary *)info forKind:(NSString *)kind {
+    @synchronized (self) {
+        if ([_pendingComplications objectForKey:kind] == nil) {
+            [_pendingComplicationOrder addObject:kind];
+        }
+        [_pendingComplications setObject:info forKey:kind];
+        [self persistPendingComplicationsLocked];
+    }
+    [self sendNextComplicationUserInfo];
+}
+
+/// Hands the next queued payload to WCSession, if nothing is in flight.
+- (void)sendNextComplicationUserInfo {
+    NSDictionary *info = nil;
+    NSString *kind = nil;
+    @synchronized (self) {
+        if (_complicationInFlight != nil || [_pendingComplicationOrder count] == 0) {
+            return;
+        }
+        kind = [_pendingComplicationOrder objectAtIndex:0];
+        info = [_pendingComplications objectForKey:kind];
+        if (info == nil) {
+            [_pendingComplicationOrder removeObjectAtIndex:0];
+            return;
+        }
+        _complicationInFlight = kind;
+        _complicationInFlightPayload = info;
+        _complicationInFlightTransfer = nil;
+    }
+    WCSession *s = [self session];
+    // Not before the session can be asked. The restore on activation calls this too, and a queue
+    // drained against an unactivated session would spend its payloads on transfers that may be
+    // refused -- which is the discard this queue exists to prevent.
+    if (s == nil || s.activationState != WCSessionActivationStateActivated) {
+        @synchronized (self) {
+            _complicationInFlight = nil;
+            _complicationInFlightPayload = nil;
+            _complicationInFlightTransfer = nil;
+        }
+        return;
+    }
+    // THE LADDER, weakest guarantee last -- and here rather than at the publish that produced the
+    // payload, because a payload can reach this point without having been judged at all: the
+    // pre-activation queue and the restore from disk both hand over payloads whose publish either
+    // could not ask the session yet or happened in a previous run of the app. Sending those
+    // straight down the budgeted path spends a transfer on a watch with no complication placed,
+    // or on a budget already exhausted -- and the resulting exception retires the payload, which
+    // is the discard this queue exists to prevent.
+    if (!s.isPaired || !s.isWatchAppInstalled) {
+        // Nothing to deliver it to. Retired rather than held for ever: a queue that keeps a
+        // payload for a watch that is not there never drains, and it is persisted, so it would
+        // outlive the process too.
+        [self finishComplicationForKind:kind];
+        return;
+    }
+    // transferCurrentComplicationUserInfo is the only API that WAKES the watch app in the
+    // background to refresh a complication, and it is budgeted -- roughly fifty a day. Spending
+    // one when the user has placed no complication wastes the budget the app will want later,
+    // and spending one that is not there fails outright, so both cases fall through to
+    // transferUserInfo: queued, unbudgeted, and applied whenever the watch app next runs. That
+    // is materially weaker -- a complication may show stale content until then -- which is why
+    // it is the fallback rather than the default.
+    BOOL wantsWake = s.isComplicationEnabled;
+    if (wantsWake && s.remainingComplicationUserInfoTransfers == 0) {
+        wantsWake = NO;
+        NSLog(@"[CN1Surfaces] the watch complication refresh budget is spent for today; "
+              "queueing the update to apply when the watch app next runs");
+    }
+    if (!wantsWake) {
+        @try {
+            // transferUserInfo: QUEUES -- successive calls all survive -- so it needs none of the
+            // in-flight sequencing the budgeted transfer below does. Handed over and retired in
+            // one step, which also drains whatever is behind it.
+            [s transferUserInfo:info];
+        } @catch (NSException *ex) {
+            // WCSession raises rather than returning an error for a payload it will not carry.
+            // The publish itself already succeeded, so this is reported and dropped.
+            NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+        }
+        [self finishComplicationForKind:kind];
+        return;
+    }
+    @try {
+        WCSessionUserInfoTransfer *handed = [s transferCurrentComplicationUserInfo:info];
+        BOOL alreadyDone = NO;
+        @synchronized (self) {
+            // Only if this is still the transfer we started. A completion can land before this
+            // assignment does, and overwriting a cleared slot would leave the queue believing
+            // something is in flight for ever.
+            if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]
+                    && _complicationInFlightPayload == info) {
+                if (handed != nil && [_complicationCompletedEarly containsObject:handed]) {
+                    // It finished before we got here. The delegate parked it rather than
+                    // discarding it, precisely so this thread can retire it now -- discarding it
+                    // there would have left the queue believing this kind was still in flight and
+                    // stalled every publication behind it.
+                    [_complicationCompletedEarly removeObject:handed];
+                    alreadyDone = YES;
+                } else {
+                    _complicationInFlightTransfer = handed;
+                }
+            } else if (handed != nil) {
+                [_complicationCompletedEarly removeObject:handed];
+            }
+        }
+        if (alreadyDone) {
+            [self finishComplicationForKind:kind];
+        }
+    } @catch (NSException *ex) {
+        // Raised for a payload the session will not carry. Drop this kind and carry on with the
+        // rest: holding the queue for it would strand every kind behind it.
+        NSLog(@"[CN1Surfaces] could not mirror a surface to the watch: %@", ex.reason);
+        [self finishComplicationForKind:kind];
+    }
+}
+
+/// Retires a kind whose transfer has completed (or failed) and starts the next.
+///
+/// Only the payload that was actually sent is retired. Publishing the same kind again while its
+/// transfer is in flight replaces the queued value with the newer timeline, and removing the
+/// entry unconditionally here threw that replacement away -- the watch then stayed on the older
+/// timeline for good, since the generated provider disables periodic updates. Compared by
+/// identity rather than by kind: it is the same object only if nothing has replaced it.
+- (void)finishComplicationForKind:(NSString *)kind {
+    if (kind == nil) {
+        return;
+    }
+    @synchronized (self) {
+        NSDictionary *sent = _complicationInFlightPayload;
+        if (_complicationInFlight != nil && [_complicationInFlight isEqualToString:kind]) {
+            _complicationInFlight = nil;
+            _complicationInFlightPayload = nil;
+            _complicationInFlightTransfer = nil;
+            // Nothing is in flight, so a parked completion can only be for a transfer already
+            // retired. Cleared here rather than left to accumulate.
+            [_complicationCompletedEarly removeAllObjects];
+        }
+        NSDictionary *queued = [_pendingComplications objectForKey:kind];
+        if (queued == nil || queued == sent) {
+            // Nothing newer arrived while it was in flight, so this kind is done.
+            [_pendingComplications removeObjectForKey:kind];
+            [_pendingComplicationOrder removeObject:kind];
+        } else {
+            // A newer timeline for the same kind is waiting. Keep it queued -- and move it to the
+            // BACK, so a kind republished in a tight loop cannot hold the head of the queue and
+            // starve the other kinds behind it.
+            [_pendingComplicationOrder removeObject:kind];
+            [_pendingComplicationOrder addObject:kind];
+        }
+        [self persistPendingComplicationsLocked];
+    }
+    [self sendNextComplicationUserInfo];
+}
+#endif
 
 // --- state ---------------------------------------------------------------
 
@@ -1334,6 +1677,51 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 
 // --- WCSessionDelegate ---------------------------------------------------
 
+#if !TARGET_OS_WATCH
+/// Completion for the complication queue: the transfer WCSession was holding is done, so the
+/// next queued kind can be handed over without displacing anything.
+///
+/// Retired on failure too. A payload the watch refused is not going to succeed by being kept at
+/// the head of the queue, and holding it there strands every kind behind it -- which is the very
+/// failure the queue exists to prevent.
+- (void)session:(WCSession *)session
+        didFinishUserInfoTransfer:(WCSessionUserInfoTransfer *)userInfoTransfer
+                            error:(NSError *)error {
+    NSDictionary *info = userInfoTransfer.userInfo;
+    NSString *kind = info == nil ? nil : [info objectForKey:@"cn1.surfaces.kind"];
+    if (kind == nil) {
+        // Not one of ours -- the wearable API's own transferUserInfo: traffic lands here too.
+        return;
+    }
+    // THIS transfer, not merely this kind. The fallback transferUserInfo: path queues transfers
+    // for the same kinds, and an old one of those completing would otherwise clear a newer
+    // complication transfer that is still in flight -- after which the next publish displaces it
+    // and the watch never sees it. A surfaces transfer we are not tracking needs no bookkeeping.
+    BOOL mine = NO;
+    @synchronized (self) {
+        if (_complicationInFlightTransfer != nil) {
+            mine = _complicationInFlightTransfer == userInfoTransfer;
+        } else if (_complicationInFlight != nil
+                && [_complicationInFlight isEqualToString:kind]) {
+            // In flight for this kind, but the sending thread has not recorded the transfer
+            // object yet -- WCSession can complete before transferCurrentComplicationUserInfo:
+            // has even returned. Parked rather than dropped: dropping it is what left the queue
+            // believing this kind was still in flight for ever, with every later publication
+            // silently unsent. The sender retires it the moment it looks.
+            [_complicationCompletedEarly addObject:userInfoTransfer];
+        }
+    }
+    if (error != nil) {
+        NSLog(@"[CN1Surfaces] the watch did not accept the update for \"%@\": %@", kind,
+              error.localizedDescription);
+    }
+    if (!mine) {
+        return;
+    }
+    [self finishComplicationForKind:kind];
+}
+#endif
+
 - (void)session:(WCSession *)session
         didFinishFileTransfer:(WCSessionFileTransfer *)fileTransfer
                         error:(NSError *)error {
@@ -1355,6 +1743,15 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // only thing that will ever look at that batch again.
     [self pruneTombstonesNow];
     cn1_wearable_notifyStateChanged();
+#if !TARGET_OS_WATCH
+    // Complication payloads queued BEFORE the session finished activating. A publish in a fresh
+    // process reaches the mirror before this callback, and the session's pairing and installed-app
+    // answers are not reliable until now -- so those payloads waited rather than being judged
+    // against an unformed session, and this is where they go.
+    if (activationState == WCSessionActivationStateActivated) {
+        [self sendNextComplicationUserInfo];
+    }
+#endif
 }
 
 #if !TARGET_OS_WATCH
@@ -1364,7 +1761,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
 
 - (void)sessionDidDeactivate:(WCSession *)session {
     // The user switched to a different watch. Re-activating is what keeps the link alive.
-    [session activate];
+    // activateSession for the reason given in -activate above. iOS-only code, so this one was
+    // not crashing -- but it was calling a selector no header declares.
+    [session activateSession];
     cn1_wearable_notifyStateChanged();
 }
 
@@ -1431,6 +1830,153 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     }
     cn1_wearable_deliverMessage(path.UTF8String, body.bytes, (int) body.length, token);
 }
+
+- (void)session:(WCSession *)session didReceiveUserInfo:(NSDictionary<NSString *, id> *)userInfo {
+    // The receiving half of the surface mirror. Both rungs of the sender's ladder --
+    // transferCurrentComplicationUserInfo and transferUserInfo -- arrive here.
+    //
+    // Framework traffic is routed BEFORE anything app-visible, the same way /cnxk acknowledgement
+    // traffic is: a reserved key is bookkeeping, and delivering it to the app's own listeners
+    // would show it a message it never sent itself.
+    if (userInfo != nil && [userInfo objectForKey:@"cn1.surfaces.kind"] != nil) {
+        [self applyMirroredSurface:userInfo];
+        return;
+    }
+    // Nothing else uses this queue today. Ignored rather than guessed at: a payload with no
+    // reserved key did not come from this framework.
+}
+
+#if TARGET_OS_WATCH
+/// Applies a mirrored timeline: persist it where the complication extension reads, then ask
+/// WidgetKit to re-render.
+///
+/// Deliberately HEADLESS -- it does not start the CN1 runtime. Everything this needs is a file
+/// write and a WidgetCenter poke, and the app process may well not be running: the whole point of
+/// the wake is to refresh a complication, not to bring an application forward the user did not
+/// ask for. When the runtime IS up, Surfaces.publishRemote is called as well so the app's own
+/// diagnostics observe the update.
+/// The one queue every mirrored apply runs on, delivered or retried.
+///
+/// The delegate hands deliveries over on its own queue and a retry fires from a timer, so without
+/// this they can run at once -- and the check-install-record sequence below is not atomic.
+static dispatch_queue_t cn1MirrorQueue(void) {
+    static dispatch_queue_t queue = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("com.codename1.surfaces.mirror", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+/// How many times a mirrored surface the watch could not install is re-attempted, and the delay
+/// before the first. The delays double, so the last lands a little over twenty minutes out --
+/// past the transient conditions this is for, and short of holding a payload indefinitely.
+#define CN1_MIRROR_APPLY_RETRIES 6
+#define CN1_MIRROR_APPLY_DELAY_NS (20ull * NSEC_PER_SEC)
+
+/// Re-attempts a mirrored surface, on the same delegate-facing path as the original delivery.
+- (void)retryMirroredSurface:(NSDictionary<NSString *, id> *)info attempt:(int)attempt {
+    if (attempt > CN1_MIRROR_APPLY_RETRIES) {
+        NSLog(@"[CN1Surfaces] gave up installing a mirrored surface after %d attempts; the watch "
+              "keeps what it had until the phone publishes again", CN1_MIRROR_APPLY_RETRIES);
+        return;
+    }
+    // Captured PLAIN, not __block. This file is manual reference counting -- see the retain and
+    // release calls throughout -- and a copied block retains an ordinary captured object while a
+    // __block one it does not: the payload would have been released when didReceiveUserInfo
+    // returned, and the retry would read freed memory twenty seconds later.
+    NSDictionary *payload = info;
+    // On the MIRROR QUEUE, not a global one. applyMirroredSurface reads the stored sequence,
+    // installs, and records the new mark, and those three are not atomic together: a retry racing
+    // a freshly delivered publication could pass the check, let the newer one install and record,
+    // and then overwrite it and LOWER the mark -- leaving the complication stale and the ordering
+    // permanently confused. One serial queue makes every apply, delivered or retried, exclusive.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+            (int64_t)(CN1_MIRROR_APPLY_DELAY_NS << (attempt - 1))),
+            cn1MirrorQueue(), ^{
+        [self applyMirroredSurface:payload attempt:attempt + 1];
+    });
+}
+
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
+    // Onto the mirror queue, so a delivery cannot interleave with a retry already in flight.
+    NSDictionary *payload = info;
+    dispatch_async(cn1MirrorQueue(), ^{
+        [self applyMirroredSurface:payload attempt:1];
+    });
+}
+
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info attempt:(int)attempt {
+    NSString *kind = [info objectForKey:@"cn1.surfaces.kind"];
+    NSData *json = [info objectForKey:@"cn1.surfaces.json"];
+    if (![kind isKindOfClass:[NSString class]] || ![json isKindOfClass:[NSData class]]) {
+        return;
+    }
+    // ARRIVAL ORDER IS NOT PUBLICATION ORDER. The sender has two transports and they do not share
+    // a queue: transferCurrentComplicationUserInfo is prioritized, transferUserInfo merely
+    // queued, and the sender falls back to the second whenever the complication is disabled or
+    // its daily budget is spent. So a publication sent on the queued transport can arrive after a
+    // later one sent on the prioritized one, and applying both in the order they land lets the
+    // older timeline overwrite the newer -- permanently, since the generated provider has no
+    // periodic update to correct it.
+    //
+    // Persisted rather than held in memory: this delegate runs in a process the system starts and
+    // stops at will, and a counter that resets would let the next stale payload through.
+    id sequence = [info objectForKey:@"cn1.surfaces.seq"];
+    NSString *sequenceKey = nil;
+    long long incoming = 0;
+    if ([sequence isKindOfClass:[NSNumber class]]) {
+        sequenceKey = [@"cn1.surfaces.seq." stringByAppendingString:kind];
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        long long applied = (long long)[defaults doubleForKey:sequenceKey];
+        incoming = [(NSNumber *)sequence longLongValue];
+        if (applied != 0 && incoming <= applied) {
+            NSLog(@"[CN1Surfaces] ignoring a mirrored update for \"%@\" that was superseded "
+                  "before it arrived (%lld <= %lld)", kind, incoming, applied);
+            return;
+        }
+    }
+    NSMutableArray *names = [NSMutableArray array];
+    NSMutableArray *blobs = [NSMutableArray array];
+    for (NSString *key in info) {
+        if ([key hasPrefix:@"cn1.surfaces.img."]) {
+            id blob = [info objectForKey:key];
+            if ([blob isKindOfClass:[NSData class]]) {
+                [names addObject:[key substringFromIndex:[@"cn1.surfaces.img." length]]];
+                [blobs addObject:blob];
+            }
+        }
+    }
+    // The mark moves only when the timeline is actually INSTALLED. Recording it first meant a
+    // write that failed -- a momentarily unwritable App Group, a full disk -- still raised the
+    // high-water mark, so the payload was consumed and even a redelivery of the very same one was
+    // rejected as superseded. The complication then kept its old content until the phone happened
+    // to publish again. A failed apply now leaves the mark where it was, so the next delivery of
+    // this publication, or any later one, still lands.
+    if (!cn1_watch_apply_mirrored_surface(kind, json, names, blobs)) {
+        // Retried, because nothing else will offer this payload again: didReceiveUserInfo is a
+        // one-shot delivery, and leaving the high-water mark alone only permits a LATER
+        // publication -- it does not bring this one back. If the phone publishes nothing further,
+        // the complication keeps its old content for good.
+        //
+        // In memory and bounded, the same shape the Android mirror uses: the condition this is
+        // for is transient (an App Group briefly unwritable, a full disk), and persisting the
+        // payload to survive a process death would mean writing to the storage that just refused
+        // a write.
+        [self retryMirroredSurface:info attempt:attempt];
+        return;
+    }
+    if (sequenceKey != nil) {
+        [[NSUserDefaults standardUserDefaults] setDouble:(double)incoming forKey:sequenceKey];
+    }
+}
+#else
+- (void)applyMirroredSurface:(NSDictionary<NSString *, id> *)info {
+    // Only the watch consumes a mirror. Reaching here on the phone means the payload came back
+    // the way it went, which nothing sends.
+    (void)info;
+}
+#endif
 
 - (void)session:(WCSession *)session
         didReceiveApplicationContext:(NSDictionary<NSString *, id> *)applicationContext {
