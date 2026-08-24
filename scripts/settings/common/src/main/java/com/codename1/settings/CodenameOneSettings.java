@@ -699,14 +699,32 @@ public class CodenameOneSettings extends Lifecycle {
         if (ownedBy != null) {
             // Set by an annotation on the main class. Editing it here would write a
             // second declaration and the next build would refuse the project, so the
-            // value is shown and the controls are withheld.
-            TextArea owned = new TextArea("Set by " + ownedBy + " on the main class. "
-                    + "Change it there -- declaring it here as well fails the build.");
+            // value is shown and the editor is withheld.
+            boolean duplicate = active;
+            TextArea owned = new TextArea(duplicate
+                    ? "Declared BOTH here and by " + ownedBy + " on the main class. The next "
+                      + "build refuses that. Remove the properties declaration with the button "
+                      + "on the right, or delete the annotation attribute."
+                    : "Set by " + ownedBy + " on the main class. "
+                      + "Change it there -- declaring it here as well fails the build.");
             owned.setUIID(uiid("SettingsRowText"));
             owned.setEditable(false);
             owned.setFocusable(false);
             text.add(owned);
-            row.add(text);
+            if (duplicate) {
+                // The properties declaration exists AND an annotation owns the
+                // hint, so this row is the build failure. Withholding every
+                // control left the tool able to report the problem and unable to
+                // fix it; the value stays uneditable -- editing it would only
+                // move the conflict -- but removing it is exactly the resolution,
+                // so that button stays.
+                Container header = new Container(new BorderLayout());
+                header.add(BorderLayout.CENTER, text);
+                header.add(BorderLayout.EAST, removeHintButton(meta));
+                row.add(header);
+            } else {
+                row.add(text);
+            }
         } else if (active) {
             text.add(activeHintEditor(meta, value, effectiveType));
         } else {
@@ -771,14 +789,7 @@ public class CodenameOneSettings extends Lifecycle {
             });
             controls.add(BorderLayout.CENTER, valueField);
         }
-        Button remove = new Button("", uiid("SettingsSmallIconButton"));
-        remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
-        remove.addActionListener(e -> {
-            settings.removeBuildHint(meta.name());
-            renderBuildHintsList();
-            animatePage();
-        });
-        controls.add(BorderLayout.EAST, remove);
+        controls.add(BorderLayout.EAST, removeHintButton(meta));
         editor.add(editorLayout.createConstraint(0, 0).widthPercentage(72), new Container());
         editor.add(editorLayout.createConstraint(0, 1).widthPercentage(28), controls);
         return editor;
@@ -797,8 +808,35 @@ public class CodenameOneSettings extends Lifecycle {
         return settings.keys().contains(SettingsProperties.fullBuildHintKey(key));
     }
 
+    /// Deletes this hint's properties declaration.
+    ///
+    /// One implementation, used by the ordinary editor and by the conflict row:
+    /// removing the declaration is the resolution in both, and the second copy
+    /// this replaced was the reason the conflict row had no way out at all.
+    private Button removeHintButton(BuildHintMetadata meta) {
+        Button remove = new Button("", uiid("SettingsSmallIconButton"));
+        remove.setMaterialIcon(FontImage.MATERIAL_DELETE, 2.2f);
+        remove.addActionListener(e -> {
+            settings.removeBuildHint(meta.name());
+            renderBuildHintsList();
+            animatePage();
+        });
+        return remove;
+    }
+
     private String defaultHintValue(BuildHintMetadata meta) {
+        // The builder's OWN default, when the catalog records one. Seeding a
+        // type-wide placeholder instead writes a value the project did not have:
+        // android.NotificationChannel.importance defaults to 2, and Add
+        // persisting 0 silences the channel before the user has typed anything.
+        // Adding a hint should start from what the build already does.
+        String catalogDefault = meta.defaultValue();
+        if (catalogDefault != null && catalogDefault.length() > 0) {
+            return catalogDefault;
+        }
         if (meta.type() == BuildHintType.BOOLEAN) {
+            // No recorded default. `true` is still the useful seed here, since
+            // adding a boolean hint is how you turn something on.
             return "true";
         }
         if (meta.type() == BuildHintType.INTEGER) {

@@ -133,7 +133,10 @@ public class SettingsThemeTest {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
         assertTrue(source.contains("widthPercentage(72), new Container()"));
         assertTrue(source.contains("widthPercentage(28), controls"));
-        assertTrue(source.contains("controls.add(BorderLayout.EAST, remove)"));
+        // The delete control is EAST of the editor. The button itself moved into
+        // removeHintButton so the conflict row can reuse it -- what this asserts
+        // is where it sits, which is unchanged.
+        assertTrue(source.contains("controls.add(BorderLayout.EAST, removeHintButton(meta))"));
     }
 
     @Test

@@ -720,4 +720,21 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.declaresClass(
                 "package\n    com.example\nclass MyApp\n", "MyApp", "com.example", true));
     }
+
+    /// Adding a hint must start from what the build already does. Seeding a
+    /// type-wide placeholder wrote a value the project did not have:
+    /// android.NotificationChannel.importance defaults to 2, and persisting 0
+    /// silences the channel before the user has typed anything.
+    @Test
+    public void theCatalogCarriesTheBuildersOwnDefault() {
+        BuildHintMetadata importance =
+                BuildHintCatalog.load().get("android.NotificationChannel.importance");
+        assertNotNull(importance);
+        assertEquals("2", importance.defaultValue());
+
+        BuildHintMetadata pods = BuildHintCatalog.load().get("ios.pods");
+        assertNotNull(pods);
+        assertTrue(pods.defaultValue() == null || pods.defaultValue().isEmpty(),
+                "a hint with no builder default must not invent one");
+    }
 }
