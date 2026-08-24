@@ -25,6 +25,8 @@ package com.codename1.maven;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertNull;
 
 /// Covers the properties parsing in `MigrateBuildHintsMojo`.
@@ -251,5 +253,19 @@ public class MigrateBuildHintsPropertyParsingTest {
     public void withNoAnnotationTheAnchorIsTheEnd() {
         String head = "/* copyright */\n\n";
         assertEquals(head.length(), MigrateBuildHintsMojo.startOfLeadingAnnotations(head));
+    }
+
+    /// The migration's source lookup must require a TOP-LEVEL declaration. A
+    /// leftover Main.kt holding `class Outer { class Main }` otherwise stopped
+    /// the search, the annotations went onto Outer, and the verification build
+    /// rejected the placement and rolled the migration back.
+    @Test
+    public void onlyATopLevelDeclarationIdentifiesTheMainClass() {
+        String nested = "package com.example\nclass Outer { class MyApp }\n";
+        assertFalse(com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaresNestedPath(nested, new String[] {"MyApp"}, true));
+        String topLevel = "package com.example\nclass Outer { }\nclass MyApp\n";
+        assertTrue(com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaresNestedPath(topLevel, new String[] {"MyApp"}, true));
     }
 }

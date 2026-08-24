@@ -824,10 +824,16 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             return false;
         }
         boolean kotlin = f.getName().endsWith(".kt");
+        // TOP LEVEL, which a single-segment nested path is exactly the test for.
+        // An application's main class is not nested, and accepting one at any
+        // depth stopped the search on a leftover Main.kt holding
+        // `class Outer { class Main }` -- the annotations were then inserted on
+        // Outer, and the verification build rejected the placement and rolled the
+        // migration back.
         return pkg.equals(com.codename1.maven.processors.BuildHintAnnotationProcessor
                         .declaredPackageIn(text, kotlin))
                 && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaresType(text, simple, kotlin);
+                        .declaresNestedPath(text, new String[] {simple}, kotlin);
     }
 
     /**

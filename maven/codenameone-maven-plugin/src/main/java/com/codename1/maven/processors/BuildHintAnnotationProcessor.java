@@ -338,18 +338,29 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Braces are counted on the blanked text, where every comment and string
     /// literal is already spaces, so a brace inside either cannot throw the
     /// nesting off.
-    static boolean declaresNestedPath(String text, String[] path) {
+    public static boolean declaresNestedPath(String text, String[] path) {
         return declaresNestedPath(text, path, false);
     }
 
-    static boolean declaresNestedPath(String text, String[] path, boolean kotlin) {
+    public static boolean declaresNestedPath(String text, String[] path, boolean kotlin) {
         String code = blankNonCode(text, kotlin);
         int from = 0;
         int end = code.length();
-        for (String segment : path) {
+        for (int p = 0; p < path.length; p++) {
+            String segment = path[p];
             int at = declarationOf(code, segment, from, end);
             if (at < 0) {
-                return false;
+                // Kotlin builds a local class's binary name out of the enclosing
+                // FUNCTION names -- a Wrong declared in Main.start() is
+                // Main$start$Wrong, with nothing to mark `start` as synthetic. So
+                // past the outermost type a Kotlin segment that is not a declared
+                // type is inconclusive, not proof of an orphan: concluding orphan
+                // drops a live annotated class silently, while keeping a stale one
+                // costs a placement error the developer can see and act on.
+                //
+                // The outermost segment is still required, since that is the type
+                // the file declares and the whole match rests on it.
+                return kotlin && p > 0;
             }
             int open = code.indexOf('{', at);
             if (open < 0 || open >= end) {
@@ -666,7 +677,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // one physical line saw an empty remainder and reported the default
         // package -- so a live class looked like it belonged somewhere else, read
         // as an orphan, and its misplaced annotation went unreported.
-        String code = blankNonCode(text);
+        String code = blankNonCode(text, kotlin);
         int i = 0;
         while (i < code.length()) {
             char c = code.charAt(i);

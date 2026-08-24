@@ -549,6 +549,38 @@ public class BuildHintAnnotationProcessorTest {
         assertEquals("\napply plugin: 'x'", p.getProperty("codename1.arg.android.xgradle"));
     }
 
+    /// Kotlin builds a local class's binary name out of the enclosing FUNCTION
+    /// names -- Main$start$Wrong -- with nothing marking `start` as synthetic.
+    /// Requiring it to be a declared type dropped the live annotated class
+    /// silently. Past the outermost type a Kotlin segment is inconclusive.
+    @Test
+    public void aKotlinLocalClassPathIsInconclusiveNotAnOrphan() {
+        String kt = "package com.example\n"
+                + "class Main {\n"
+                + "    fun start() {\n"
+                + "        class Wrong\n"
+                + "    }\n"
+                + "}\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Main", "start", "Wrong"}, true));
+        // The outermost type is still required: it is what the file declares.
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                kt, new String[] {"Other", "start", "Wrong"}, true));
+        // Java keeps the strict reading, since javac marks its locals with $1.
+        assertFalse(BuildHintAnnotationProcessor.declaresNestedPath(
+                "class Main { void start() { } }", new String[] {"Main", "start", "Wrong"},
+                false));
+    }
+
+    /// A Kotlin file annotation holding a raw string that ends in a quote closes
+    /// on a run of four. Reading it by Java's rules blanked the package
+    /// declaration that followed.
+    @Test
+    public void aKotlinRawStringBeforeThePackageDoesNotEatIt() {
+        String kt = "@file:Suppress(\"\"\"a\"\"\"\")\npackage com.example\nclass MyApp\n";
+        assertEquals("com.example", BuildHintAnnotationProcessor.declaredPackageIn(kt, true));
+    }
+
     // ------------------------------------------------------------------
     // helpers
     // ------------------------------------------------------------------
