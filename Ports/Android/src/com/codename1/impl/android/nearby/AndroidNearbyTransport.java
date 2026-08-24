@@ -292,6 +292,15 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
+                        if (generation == advertiseGeneration) {
+                            // Nothing is advertising and nothing is trying
+                            // to. Leaving the flag set told an older start
+                            // whose success is still on its way that a live
+                            // replacement owned the radio, so it declined to
+                            // undo itself -- and went on advertising after
+                            // both an explicit stop and this failure.
+                            advertisingWanted = false;
+                        }
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
@@ -342,6 +351,11 @@ public class AndroidNearbyTransport implements NearbyBridge {
                 })
                 .addOnFailureListener(new OnFailureListener() {
                     public void onFailure(Exception e) {
+                        if (generation == discoverGeneration) {
+                            // Cleared for the reason the advertising failure
+                            // clears its own.
+                            discoveringWanted = false;
+                        }
                         NearbyTransport.deliverRequestFailed(requestId,
                                 NearbyError.SESSION_FAILED.ordinal(),
                                 e.getMessage());
