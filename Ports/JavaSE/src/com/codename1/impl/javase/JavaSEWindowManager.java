@@ -819,11 +819,15 @@ public class JavaSEWindowManager extends WindowManager {
     @Override
     public void setIcon(Object peerObj, final com.codename1.ui.Image icon) {
         final Peer p = peer(peerObj);
-        if (p == null || icon == null) {
+        if (p == null) {
             return;
         }
-        final Object nativeImage = icon.getImage();
-        if (!(nativeImage instanceof java.awt.Image)) {
+        // A null icon is a request to clear one, not a missing argument. Returning
+        // here left the previous image on the frame while getWindowIcon() reported
+        // none, so the title bar and the taskbar went on showing an icon the
+        // application had removed and there was no way to take it back off.
+        final Object nativeImage = icon == null ? null : icon.getImage();
+        if (icon != null && !(nativeImage instanceof java.awt.Image)) {
             return;
         }
         runOnAwt(new Runnable() {
