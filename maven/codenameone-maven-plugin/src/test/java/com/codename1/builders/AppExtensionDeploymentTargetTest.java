@@ -627,13 +627,29 @@ public class AppExtensionDeploymentTargetTest {
         assertEquals(1, notes.size());
     }
 
+    /// This pinned the opposite until an out-of-namespace identifier for an inactive build was
+    /// traced all the way through: every entry here is copied onto the generated target verbatim,
+    /// so com.other.Sim survived into the project and failed the simulator build later. Unlike a
+    /// deployment target -- whose floor came from the entitlements THIS archive is signed with,
+    /// and means nothing for a build carrying others -- an identifier outside the host's namespace
+    /// cannot be embedded in this app in ANY configuration. So the namespace repair runs on
+    /// inactive keys and the floor repair does not, and the test above still holds for targets.
     @Test
-    public void anIdentifierForAnotherBuildIsNotDroppedEither() throws Exception {
+    public void anIdentifierForAnotherBuildIsDroppedToo() throws Exception {
         java.util.Map<String, String> settings = new java.util.LinkedHashMap<String, String>();
         settings.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]", "com.other.Sim");
-        IPhoneBuilder.repairQualifiedExtensionSettings(settings, "com.example.app", "12.0",
+        java.util.List<String> notes = IPhoneBuilder.repairQualifiedExtensionSettings(settings,
+                "com.example.app", "12.0", "iphoneos14.4", "Release", "arm64");
+        assertFalse(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
+        assertEquals(notes.toString(), 1, notes.size());
+
+        // And one that IS under the host is left alone, inactive or not.
+        java.util.Map<String, String> under = new java.util.LinkedHashMap<String, String>();
+        under.put("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]", "com.example.app.Sim");
+        IPhoneBuilder.repairQualifiedExtensionSettings(under, "com.example.app", "12.0",
                 "iphoneos14.4", "Release", "arm64");
-        assertTrue(settings.containsKey("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
+        assertEquals("com.example.app.Sim",
+                under.get("PRODUCT_BUNDLE_IDENTIFIER[sdk=iphonesimulator*]"));
     }
 
     @Test

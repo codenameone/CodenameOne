@@ -6634,7 +6634,12 @@ public class IPhoneBuilder extends Executor {
                 constraints.get("config"));
         for (String sdk : allowedBy(enumerableSdks(own, declared), constraints.get("sdk"))) {
             for (String configuration : configurations) {
-                for (String arch : allowedBy(enumerableArchs(own, declared),
+                // ARCHS can be qualified too, so the architectures of a Debug build are not
+                // necessarily this archive's: asking with the fixed context never enumerated them
+                // and that configuration's plist went undiscovered.
+                ArchiveContext archContext = new ArchiveContext(sdk, configuration, own.arch,
+                        own.variants);
+                for (String arch : allowedBy(enumerableArchs(archContext, declared),
                         constraints.get("arch"))) {
                     // Recomputed here, not captured once: BUILD_VARIANTS can itself be qualified,
                     // so the variants of a Debug build are not necessarily this archive's. Reusing
@@ -7746,7 +7751,15 @@ public class IPhoneBuilder extends Executor {
         for (Map.Entry<String, String> setting : new ArrayList<Map.Entry<String, String>>(
                 settings.entrySet())) {
             String key = setting.getKey();
-            if (!conditionApplies(key, context)) {
+            // An identifier out of the host's namespace can never be embedded in this app -- in
+            // ANY configuration -- so that repair runs on inactive keys too. Every entry here is
+            // copied onto the target verbatim, so a [config=Debug] identifier from another
+            // project survived into the generated project and failed the Debug build later. The
+            // deployment floor is the opposite: it was computed from the entitlements THIS
+            // archive is signed with, and applying it to a build that carries different ones
+            // raises a target for something it does not have.
+            boolean applies = conditionApplies(key, context);
+            if (!applies && !isQualified(key, "PRODUCT_BUNDLE_IDENTIFIER")) {
                 continue;
             }
             String value = setting.getValue() == null ? "" : setting.getValue().trim();
@@ -7770,7 +7783,7 @@ public class IPhoneBuilder extends Executor {
                 // Except $(inherited), which is not a setting this build failed to find but a
                 // directive: Xcode replaces it with the value from the level above, and writing
                 // the floor over it would pin an extension that inherits iOS 16 down to 12.
-                if (!isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")) {
+                if (!applies || !isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")) {
                     continue;
                 }
                 if (value.toLowerCase().indexOf("$(inherited)") >= 0
@@ -7798,7 +7811,7 @@ public class IPhoneBuilder extends Executor {
                         + "target is no minimum at all, so it was set to " + floor);
                 continue;
             }
-            if (isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
+            if (applies && isQualified(key, "IPHONEOS_DEPLOYMENT_TARGET")
                     && isDeploymentTargetBelow(resolved, floor)) {
                 settings.put(key, floor);
                 notes.add(key + " raised from " + value + " to " + floor);
