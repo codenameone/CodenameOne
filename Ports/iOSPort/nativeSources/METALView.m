@@ -409,6 +409,60 @@ extern BOOL isRetinaBug();
 // is never published, and CN1MetalGlyphAtlas+atlasForFont: returns nil
 // for every font -- which is exactly the "no atlas available" failure
 // the Mac CI surfaced.
+// The stencil attachment is loadAction=Clear / storeAction=DontCare in every pass
+// that binds it -- the frame pass, the present pass and the resize preserve -- so
+// its contents never outlive a render pass. That is precisely the contract for
+// MTLStorageModeMemoryless, which keeps the buffer in tile memory and costs ZERO
+// physical bytes. The older code chose Private and reasoned the cost was "tiny
+// (1 byte/pixel)"; CN1_TEXTURE_CENSUS measured it at 5.6MB per allocation at
+// 2048x1536, so the assumption was simply wrong -- and A/B'd over three launches
+// Memoryless is worth ~3.8MB of physical footprint. Memoryless exists only on
+// tile-based (Apple-family) GPUs, hence the runtime probe: Intel Macs and the
+// older Intel-Mac CI simulators still get Private. CN1_STENCIL_PRIVATE=1 forces
+// the old behaviour for an A/B.
+static MTLStorageMode cn1StencilStorageMode(id<MTLDevice> device) {
+    static int forcePrivate = -1;
+    if(forcePrivate < 0) {
+        forcePrivate = getenv("CN1_STENCIL_PRIVATE") != NULL ? 1 : 0;
+    }
+    if(!forcePrivate && device != nil && [device supportsFamily:MTLGPUFamilyApple1]) {
+        return MTLStorageModeMemoryless;
+    }
+    return MTLStorageModePrivate;
+}
+
+// DIRECT-TO-DRAWABLE mode (opt-in, CN1_DIRECT_DRAWABLE=1).
+//
+// The default renderer draws into a persistent full-window `screenTexture` and
+// blits it onto the drawable at present. That retained buffer is what lets CN1
+// repaint only a dirty region: last frame's pixels are still there. It also
+// costs a full-window texture -- 12.12MB at 2048x1536 -- which a renderer that
+// draws straight into the drawable does not pay at all.
+//
+// In direct mode there is no screenTexture: the frame's render pass targets the
+// drawable itself. The drawable must then be acquired at setFramebuffer (start
+// of frame) rather than at present, and held across op encoding -- which does
+// cost some nextDrawable latency, the reason the default path acquires it late.
+//
+// CORRECTNESS REQUIREMENT: the layer vends a DIFFERENT buffer each frame, so a
+// region left unpainted shows content from two or three frames ago, not from
+// last frame. Every frame must therefore repaint everything, which
+// IOSImplementation.paintDirty arranges by enqueueing the whole Form whenever
+// anything is dirty. Do not enable this mode without that half.
+static int cn1DirectToDrawable(void) {
+    static int v = -1;
+    if(v < 0) {
+        v = getenv("CN1_DIRECT_DRAWABLE") != NULL ? 1 : 0;
+    }
+    return v;
+}
+
+// Non-static so IOSNative can ask, since the Java paint model must follow the
+// renderer's choice rather than decide it independently.
+int cn1DirectToDrawableEnabled(void) {
+    return cn1DirectToDrawable();
+}
+
 - (void)cn1SetupMetal {
     self.clearsContextBeforeDrawing = NO;
     if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
@@ -422,14 +476,15 @@ extern BOOL isRetinaBug();
     metalLayer.device = MTLCreateSystemDefaultDevice();
     metalLayer.opaque = TRUE;
     metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-        // framebufferOnly must be NO: presentFramebuffer blits screenTexture
+        // framebufferOnly must be NO: presentScreenTextureInto: blits screenTexture
         // into the drawable via copyFromTexture:toTexture:, and Metal's blit
         // validation aborts ("destinationTexture must not be a framebufferOnly
-        // texture") when the destination drawable was framebufferOnly. Debug
-        // builds with Metal API Validation enabled crash on the first paint;
-        // release builds silently produced undefined-behaviour copies on some
-        // GPUs. Trading the (small) memoryless-storage benefit for a working
-        // present path.
+        // texture") when the destination drawable was framebufferOnly.
+        // Presenting with a textured quad instead (which framebufferOnly = YES
+        // permits) was built and measured: Metal validation was clean and the
+        // resident IOSurface did not move by even a megabyte, because Apple's
+        // lossless compression saves bandwidth rather than allocation. Not worth
+        // a second present path.
         metalLayer.framebufferOnly = NO;
         // Colour space for the Metal layer. Default is sRGB so colours
         // match the GL path's CAEAGLLayer output: without it, CG-rasterised
@@ -468,7 +523,27 @@ extern BOOL isRetinaBug();
         // most CAMetalLayer use cases. Combined with our nextDrawable
         // skip-frame fallback in presentFramebuffer this keeps the
         // pipeline non-blocking under pressure.
-        metalLayer.maximumDrawableCount = 3;
+        //
+        // The cap is an upper bound on what CoreAnimation MAY vend, not a
+        // reservation, and in the retained path it is inert: 2 and 3 both settle
+        // at exactly 24.0MB of IOSurface, because that path only ever has two
+        // drawables in flight (measured at four paired launches per setting).
+        //
+        // Direct mode is different -- it holds the drawable across the whole
+        // frame, so the third slot really is taken. At 3 the GPU allocation
+        // swings between 21.8MB and 27.2MB from launch to launch; at 2 it is
+        // 21.8MB every time. That is worth ~4.5MB on average and, more usefully,
+        // turns a 10.8MB launch-to-launch spread into 1.9MB. Hence 2 there and 3
+        // here, where the headroom is free. CN1_MAX_DRAWABLES re-runs the A/B.
+        {
+            const char *e = getenv("CN1_MAX_DRAWABLES");
+            NSUInteger n = e != NULL ? (NSUInteger)atoi(e)
+                                     : (cn1DirectToDrawable() ? 2 : 3);
+            if(n < 2 || n > 3) {
+                n = 3;   // CAMetalLayer only accepts 2 or 3
+            }
+            metalLayer.maximumDrawableCount = n;
+        }
         // `makeCommandQueue` is the Swift name; Objective-C uses `newCommandQueue`.
         // newCommandQueue returns +1 (NARC family); release the local after
         // the synthesized retain setter takes its own retain so we end up at
@@ -478,15 +553,40 @@ extern BOOL isRetinaBug();
 #ifndef CN1_USE_ARC
         [newQueue release];
 #endif
+#ifdef CN1_TEXTURE_CENSUS
+        // Frame-count triggers are useless here: an idle gallery presents fewer
+        // than twenty frames in thirty seconds, so a "every 200th present" hook
+        // never fires. Wall-clock does.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(20 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ cn1TextureCensusDump("t20"); });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(35 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ cn1TextureCensusDump("t35"); });
+#endif
         // Publish the device + queue to CN1Metalcompat so its global
         // accessors don't have to dereference our (UIView) layer from
         // background threads. Doing it on the main thread, exactly once,
         // means CN1MetalDevice / CN1MetalCommandQueue become cheap static
         // reads safe to invoke from the EDT and any background GCD queue.
         CN1MetalSetDeviceAndCommandQueue(metalLayer.device, self.commandQueue);
-        CGSize sz = self.bounds.size;
-        CGFloat s = self.contentScaleFactor;
-        [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
+        // Do NOT size the framebuffer here. self.bounds has not been laid out
+        // yet, and on Mac Catalyst an unlaid-out view reports the whole DISPLAY:
+        // CN1_TEXTURE_CENSUS measured the resulting screenTexture at 3456x2234 /
+        // 30.03MB, allocated and then thrown away moments later when
+        // layoutSubviews supplies the real 2048x1536 / 12.12MB. That transient
+        // 30MB is also the best candidate for the +-20MB run-to-run swing in
+        // this process's footprint, since whether it is still resident when you
+        // sample is pure timing.
+        //
+        // layoutSubviews always follows and sizes it correctly, and
+        // createRenderPassDescriptor already treats a nil screenTexture as "no
+        // frame this pass", so a frame attempted in between is a safe no-op
+        // rather than a crash. CN1_EAGER_FRAMEBUFFER=1 restores the old eager
+        // sizing for an A/B.
+        if (getenv("CN1_EAGER_FRAMEBUFFER") != NULL) {
+            CGSize sz = self.bounds.size;
+            CGFloat s = self.contentScaleFactor;
+            [self updateFrameBufferSize:(int)(sz.width * s) h:(int)(sz.height * s)];
+        }
 
     // Drop the glyph atlas + text cache + gradient cache on memory
     // pressure. Pipeline state cache stays — those are precious to
@@ -629,6 +729,10 @@ extern BOOL isRetinaBug();
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
         width:pw height:ph mipmapped:NO];
+    // ShaderRead measured FREE here: dropping it (with the blit present path, the
+    // only consumer that samples rather than blits) left allocatedSize unchanged
+    // at 21.1MB. The 21.1MB-vs-12.1MB gap against an identical drawable is GPU
+    // compression metadata, not this flag.
     desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     // newTextureWithDescriptor returns +1 (NARC family); the synthesized
@@ -636,7 +740,11 @@ extern BOOL isRetinaBug();
     // local once the property holds its own retain so we don't leak the
     // previous screenTexture every time the framebuffer is resized
     // (rotation, window resize, etc.).
-    id<MTLTexture> newScreen = [layer.device newTextureWithDescriptor:desc];
+    // Direct mode renders into the drawable, so the retained buffer -- and its
+    // 12.12MB -- is simply never allocated.
+    id<MTLTexture> newScreen = cn1DirectToDrawable() ? nil
+            : [layer.device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("screenTexture", newScreen);
     self.screenTexture = newScreen;
 #ifndef CN1_USE_ARC
     [newScreen release];
@@ -672,8 +780,9 @@ extern BOOL isRetinaBug();
             texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
             width:pw height:ph mipmapped:NO];
         clearStencilDesc.usage = MTLTextureUsageRenderTarget;
-        clearStencilDesc.storageMode = MTLStorageModePrivate;
+        clearStencilDesc.storageMode = cn1StencilStorageMode(layer.device);
         clearStencilTex = [layer.device newTextureWithDescriptor:clearStencilDesc];
+        CN1_TEX_NOTE("resizePreserveStencil", clearStencilTex);
         if (clearStencilTex != nil) {
             clearPass.stencilAttachment.texture = clearStencilTex;
             clearPass.stencilAttachment.loadAction = MTLLoadActionClear;
@@ -701,18 +810,15 @@ extern BOOL isRetinaBug();
     [clearEnc endEncoding];
     [clearCb commit];
 
-    // Build a matching Stencil8 attachment for polygon-shape clipping
-    // (#3921). Private storage rather than Memoryless because Memoryless
-    // is only supported on tile-based deferred GPUs (iOS Simulator on
-    // older Intel-Mac CI runners doesn't accept it). The stencil is
-    // ephemeral conceptually but Private works on all GPU families and
-    // the size cost is tiny (1 byte/pixel).
+    // Build a matching Stencil8 attachment for polygon-shape clipping (#3921).
+    // Storage mode is chosen at runtime -- see cn1StencilStorageMode.
     MTLTextureDescriptor *stencilDesc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatStencil8
         width:pw height:ph mipmapped:NO];
     stencilDesc.usage = MTLTextureUsageRenderTarget;
-    stencilDesc.storageMode = MTLStorageModePrivate;
+    stencilDesc.storageMode = cn1StencilStorageMode(layer.device);
     id<MTLTexture> newStencil = [layer.device newTextureWithDescriptor:stencilDesc];
+    CN1_TEX_NOTE("stencilTexture", newStencil);
     self.stencilTexture = newStencil;
 #ifndef CN1_USE_ARC
     [newStencil release];
@@ -769,6 +875,9 @@ extern BOOL isRetinaBug();
     }
     needsResizePresent = NO;
     if (self.screenTexture == nil) {
+        // Direct mode keeps no previous frame to re-present; the resize simply
+        // repaints (#5162's black flash is not reachable there because every
+        // frame is a full repaint anyway).
         return;
     }
     // An encoder may be mid-frame if the EDT started painting between the resize
@@ -784,15 +893,7 @@ extern BOOL isRetinaBug();
         return;
     }
     id<MTLCommandBuffer> presentCb = [self.commandQueue commandBuffer];
-    id<MTLBlitCommandEncoder> blit = [presentCb blitCommandEncoder];
-    [blit copyFromTexture:self.screenTexture
-              sourceSlice:0 sourceLevel:0
-             sourceOrigin:MTLOriginMake(0, 0, 0)
-               sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
-                toTexture:dr.texture
-         destinationSlice:0 destinationLevel:0
-        destinationOrigin:MTLOriginMake(0, 0, 0)];
-    [blit endEncoding];
+    [self presentScreenTextureInto:dr.texture commandBuffer:presentCb];
     [presentCb presentDrawable:dr];
     [presentCb commit];
 }
@@ -837,7 +938,19 @@ extern BOOL isRetinaBug();
 }
 
 -(void)createRenderPassDescriptor {
-    if (self.screenTexture == nil) {
+    id<MTLTexture> target = self.screenTexture;
+    if (cn1DirectToDrawable()) {
+        // Acquire the frame's drawable here, at the START of the frame, and hold
+        // it until presentFramebuffer. The default path deliberately acquires
+        // late to keep dwell time down; direct mode cannot, because the ops
+        // encode straight into it.
+        if (self.drawable == nil) {
+            CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+            self.drawable = [layer nextDrawable];
+        }
+        target = self.drawable.texture;
+    }
+    if (target == nil) {
         self.renderPassDescriptor = nil;
         return;
     }
@@ -848,8 +961,16 @@ extern BOOL isRetinaBug();
     // before. MTLLoadActionLoad preserves previous pixels (vs MTLLoadActionClear
     // which would wipe everything each frame) — CN1 only queues diff ops
     // per frame; the OpenGL path relies on its renderbuffer persisting.
-    colorAttachment.texture = self.screenTexture;
-    if (clearRetainedFramebufferOnNextFrame) {
+    colorAttachment.texture = target;
+    if (cn1DirectToDrawable()) {
+        // Never Load: this buffer holds a frame from two or three presents ago.
+        // The Form repaints in full every frame (IOSImplementation.paintDirty),
+        // so there is nothing worth preserving and Clear is also the cheaper
+        // load action on a tile GPU.
+        colorAttachment.loadAction = MTLLoadActionClear;
+        colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+        clearRetainedFramebufferOnNextFrame = NO;
+    } else if (clearRetainedFramebufferOnNextFrame) {
         colorAttachment.loadAction = MTLLoadActionClear;
         colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
         clearRetainedFramebufferOnNextFrame = NO;
@@ -905,12 +1026,24 @@ extern BOOL isRetinaBug();
 // command buffer -- the only path that produces real glass on a running app
 // (the offscreen-image blur only covered fidelity tiles). Costs a GPU sync per
 // glass paint; acceptable for the small, mostly-static nav/tab bars.
+// The texture holding what has already been painted THIS frame -- the backdrop
+// a glass/blur/lens op samples. That is screenTexture in the default retained
+// path and the frame's own drawable in direct mode, where these ops read back
+// from the drawable they are drawing into (legal: the layer is framebufferOnly
+// = NO, and each op ends and commits the encoder before blitting).
+- (id<MTLTexture>)backdropTexture {
+    if (self.screenTexture != nil) {
+        return self.screenTexture;
+    }
+    return self.drawable.texture;
+}
+
 - (void)blurScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius {
-    if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
+    if ([self backdropTexture] == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
         return;
     }
     CGFloat s = self.contentScaleFactor;
-    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int texW = (int)[self backdropTexture].width, texH = (int)[self backdropTexture].height;
     int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
     if (fx < 0) { fw += fx; fx = 0; }
     if (fy < 0) { fh += fy; fy = 0; }
@@ -939,9 +1072,10 @@ extern BOOL isRetinaBug();
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
     id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("blurScratch", scratch);
     id<MTLCommandBuffer> blitCb = [self.commandQueue commandBuffer];
     id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
-    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+    [blit copyFromTexture:[self backdropTexture] sourceSlice:0 sourceLevel:0
               sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
                  toTexture:scratch destinationSlice:0 destinationLevel:0
          destinationOrigin:MTLOriginMake(0, 0, 0)];
@@ -1053,7 +1187,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 - (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
               cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
                     offset:(float)offset refract:(float)refract specular:(float)specular {
-    if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
+    if ([self backdropTexture] == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
         return;
     }
     // CN1-logical -> framebuffer-pixel scale. NOT contentScaleFactor alone:
@@ -1064,7 +1198,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // the region in the fidelity app (wrong screenTexture slice + 3x radius).
     float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
     CGFloat s = self.contentScaleFactor / sv;
-    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int texW = (int)[self backdropTexture].width, texH = (int)[self backdropTexture].height;
     int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
     if (fx < 0) { fw += fx; fx = 0; }
     if (fy < 0) { fh += fy; fy = 0; }
@@ -1098,9 +1232,10 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModeShared;
     id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("glassScratch", scratch);
     id<MTLCommandBuffer> blitCb = [self.commandQueue commandBuffer];
     id<MTLBlitCommandEncoder> blit = [blitCb blitCommandEncoder];
-    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+    [blit copyFromTexture:[self backdropTexture] sourceSlice:0 sourceLevel:0
               sourceOrigin:MTLOriginMake(ax0, ay0, 0) sourceSize:MTLSizeMake(aw, ah, 1)
                  toTexture:scratch destinationSlice:0 destinationLevel:0
          destinationOrigin:MTLOriginMake(0, 0, 0)];
@@ -1222,12 +1357,12 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 // samples within its own bounds. Runs during the drain like the glass op.
 - (void)lensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
                   magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength {
-    if (self.screenTexture == nil || w <= 0 || h <= 0) {
+    if ([self backdropTexture] == nil || w <= 0 || h <= 0) {
         return;
     }
     float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
     CGFloat s = self.contentScaleFactor / sv;
-    int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
+    int texW = (int)[self backdropTexture].width, texH = (int)[self backdropTexture].height;
     int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
     if (fx < 0) { fw += fx; fx = 0; }
     if (fy < 0) { fh += fy; fy = 0; }
@@ -1261,11 +1396,12 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("lensScratch", scratch);
     if (scratch == nil) { [self setFramebuffer]; return; }
 
     // 3) Blit the bar region screenTexture -> scratch on the frame's command buffer.
     id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
-    [blit copyFromTexture:self.screenTexture sourceSlice:0 sourceLevel:0
+    [blit copyFromTexture:[self backdropTexture] sourceSlice:0 sourceLevel:0
               sourceOrigin:MTLOriginMake(fx, fy, 0) sourceSize:MTLSizeMake(fw, fh, 1)
                  toTexture:scratch destinationSlice:0 destinationLevel:0
          destinationOrigin:MTLOriginMake(0, 0, 0)];
@@ -1282,6 +1418,25 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 5) Draw the lens quad sampling scratch (cornerRadius logical -> physical px; < 0 = capsule).
     float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
     CN1MetalDrawLens(scratch, x, y, w, h, fw, fh, magnify, aberration, tintColor, tintStrength, crPx);
+}
+
+// Put the frame held in screenTexture onto \a dst (a drawable's texture),
+// either as a full-screen textured quad (default) or via a blit
+// (CN1_PRESENT_BLIT=1). Both write the same pixels; they differ only in
+// Both write the same pixels onto the drawable.
+-(void)presentScreenTextureInto:(id<MTLTexture>)dst commandBuffer:(id<MTLCommandBuffer>)cb {
+    if (self.screenTexture == nil || dst == nil || cb == nil) {
+        return;
+    }
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:self.screenTexture
+              sourceSlice:0 sourceLevel:0
+             sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
+                toTexture:dst
+         destinationSlice:0 destinationLevel:0
+        destinationOrigin:MTLOriginMake(0, 0, 0)];
+    [blit endEncoding];
 }
 
 - (BOOL)presentFramebuffer
@@ -1304,28 +1459,77 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     self.renderCommandEncoder = nil;
     self.renderPassDescriptor = nil;
 
-    // Acquire the drawable here (not in setFramebuffer) to minimise its
-    // dwell time -- holding a drawable across the whole op-encoding phase
-    // stalls nextDrawable for subsequent frames.
-    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    id<CAMetalDrawable> dr = [layer nextDrawable];
+    // Direct mode already holds the drawable -- the ops encoded straight into
+    // it, so there is nothing to copy and nothing to acquire.
+    id<CAMetalDrawable> dr = self.drawable;
+    if (!cn1DirectToDrawable()) {
+        // Acquire the drawable here (not in setFramebuffer) to minimise its
+        // dwell time -- holding a drawable across the whole op-encoding phase
+        // stalls nextDrawable for subsequent frames.
+        CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+        dr = [layer nextDrawable];
+        if (dr == nil) {
+            // Memory pressure dropped the drawable. Commit render work so
+            // screenTexture still updates; skip this frame's present.
+            [self.commandBuffer commit];
+            self.commandBuffer = nil;
+            return NO;
+        }
+        self.drawable = dr;
+        [self presentScreenTextureInto:dr.texture commandBuffer:self.commandBuffer];
+    }
     if (dr == nil) {
-        // Memory pressure dropped the drawable. Commit render work so
-        // screenTexture still updates; skip this frame's present.
         [self.commandBuffer commit];
         self.commandBuffer = nil;
         return NO;
     }
-    self.drawable = dr;
-    id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
-    [blit copyFromTexture:self.screenTexture
-              sourceSlice:0 sourceLevel:0
-             sourceOrigin:MTLOriginMake(0, 0, 0)
-               sourceSize:MTLSizeMake(framebufferWidth, framebufferHeight, 1)
-                toTexture:dr.texture
-         destinationSlice:0 destinationLevel:0
-        destinationOrigin:MTLOriginMake(0, 0, 0)];
-    [blit endEncoding];
+#ifdef CN1_VERIFY_PRESENT
+    // Reads back a patch of the drawable that is ACTUALLY being presented.
+    // Nothing else here can prove the screen is not blank: if the drawable were
+    // nil the render pass would be nil, every op would no-op against a null
+    // encoder, and Metal validation would still be clean and FIRSTFRAME would
+    // still print. An offscreen repaint (bench_shot) cannot prove it either --
+    // it paints the scene graph again rather than reading the framebuffer.
+    {
+        static int shots = 0;
+        if (dr != nil && shots < 3) {
+            shots++;
+            int px = 128, py = 128, pw = 64, ph = 64;
+            id<MTLDevice> dev = CN1MetalDevice();
+            MTLTextureDescriptor *pd = [MTLTextureDescriptor
+                texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                width:pw height:ph mipmapped:NO];
+            pd.usage = MTLTextureUsageShaderRead;
+            pd.storageMode = MTLStorageModeShared;
+            id<MTLTexture> probe = [dev newTextureWithDescriptor:pd];
+            if (probe != nil) {
+                id<MTLBlitCommandEncoder> pb = [self.commandBuffer blitCommandEncoder];
+                [pb copyFromTexture:dr.texture sourceSlice:0 sourceLevel:0
+                       sourceOrigin:MTLOriginMake(px, py, 0)
+                         sourceSize:MTLSizeMake(pw, ph, 1)
+                          toTexture:probe destinationSlice:0 destinationLevel:0
+                  destinationOrigin:MTLOriginMake(0, 0, 0)];
+                [pb endEncoding];
+                [self.commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
+                    uint32_t buf[64 * 64];
+                    [probe getBytes:buf bytesPerRow:64 * 4
+                        fromRegion:MTLRegionMake2D(0, 0, 64, 64) mipmapLevel:0];
+                    unsigned long nonBlack = 0, sum = 0;
+                    for(int i = 0 ; i < 64 * 64 ; i++) {
+                        uint32_t p = buf[i];
+                        if((p & 0x00FFFFFF) != 0) nonBlack++;
+                        sum = sum * 31u + p;
+                    }
+                    fprintf(stderr, "BENCH:PRESENTED nonBlack=%lu/4096 hash=%lu\n", nonBlack, sum);
+                    fflush(stderr);
+#ifndef CN1_USE_ARC
+                    [probe release];
+#endif
+                }];
+            }
+        }
+    }
+#endif
     [self.commandBuffer presentDrawable:dr];
     [self.commandBuffer commit];
     self.drawable = nil;

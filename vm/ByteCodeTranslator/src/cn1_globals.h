@@ -225,6 +225,15 @@ struct clazz {
     // an exact registry instead of a distance heuristic (see gcMarkObject). Only
     // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
     JAVA_BOOLEAN cn1ClazzRegistered;
+#ifdef CN1_ALLOC_CENSUS
+    // TRAILING for the same reason as cn1ClazzRegistered above: the generated
+    // clazz initializers are positional and never name these, so C zero-fills
+    // them and no translator change is needed. Plain non-atomic counters -- this
+    // is a diagnostic build only, and an increment lost to a race costs nothing
+    // a census is meant to answer.
+    long cn1AllocCount;
+    long cn1AllocBytes;
+#endif
 };
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -241,6 +250,21 @@ extern void cn1GcRegisterClazz(struct clazz* c);
     } while(0)
 #else
 #define CN1_CLAZZ_REGISTER(cptr) do {} while(0)
+#endif
+
+// Allocation volume BY CLASS. "The heap is 60MB" names nothing anyone can act
+// on; "3.1MB of java_lang_Long" names a fix. Counted at every allocation path
+// (both inline BiBOP bump paths and the out-of-line codenameOneGcMalloc), so
+// unlike a walk of allObjectsInHeap it does not silently miss the BiBOP and
+// nursery objects -- which is precisely where small, high-churn objects such as
+// boxed values live.
+#ifdef CN1_ALLOC_CENSUS
+#define CN1_ALLOC_CENSUS_COUNT(cptr, sz) do { \
+        struct clazz* __cc = (struct clazz*)(cptr); \
+        if(__cc != 0) { __cc->cn1AllocCount++; __cc->cn1AllocBytes += (long)(sz); } \
+    } while(0)
+#else
+#define CN1_ALLOC_CENSUS_COUNT(cptr, sz) do {} while(0)
 #endif
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)
@@ -1575,6 +1599,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
             // header (force-visited / monitor side tables); no per-object stores.
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -1664,6 +1689,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             // class pointer.
             o->__codenameOneParentClsReference = (struct clazz*)0;
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];

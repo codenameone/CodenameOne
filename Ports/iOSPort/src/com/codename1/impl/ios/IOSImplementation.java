@@ -1809,6 +1809,48 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
     
+    /// True when the Metal view renders straight into the drawable, so no retained
+    /// screen texture exists. Resolved once -- the renderer decides it at startup.
+    private int directToDrawable = -1;
+
+    private boolean isDirectToDrawable() {
+        if (directToDrawable < 0) {
+            boolean d = false;
+            try {
+                d = nativeInstance.isDirectToDrawable();
+            } catch (Throwable t) {
+                d = false;
+            }
+            directToDrawable = d ? 1 : 0;
+        }
+        return directToDrawable == 1;
+    }
+
+    /// Direct-to-drawable rendering presents a DIFFERENT buffer every frame, so a
+    /// region left unpainted does not show last frame -- it shows whatever was in
+    /// that buffer two or three presents ago. Painting only the dirty components,
+    /// which is the whole point of {@code paintDirty}, is therefore incorrect in
+    /// that mode.
+    ///
+    /// Enqueueing the current Form ahead of the superclass call is enough to fix
+    /// it: a Component queued with a null dirty region is painted under a
+    /// full-screen clip, and {@code repaint(Animation)} already drops any child
+    /// whose ancestor is queued, so this both forces the full paint and collapses
+    /// the queue instead of adding to it. Components enqueued BEFORE this call
+    /// still repaint redundantly; that is a real cost, and it is the trade the
+    /// mode exists to make.
+    @Override
+    public void paintDirty() {
+        if (isDirectToDrawable() && hasPendingPaints()) {
+            Form f = Display.getInstance().getCurrent();
+            if (f != null) {
+                f.setDirtyRegion(null);
+                repaint(f);
+            }
+        }
+        super.paintDirty();
+    }
+
     public void flushGraphics(int x, int y, int width, int height) {
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
@@ -13029,6 +13071,31 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
+    }
+
+    /// UIKit PULLS the semantic tree (it asks the view for accessibility elements),
+    /// so the portable tree only has to be projected eagerly while something is
+    /// actually listening. The base class notes exactly this -- "pull-based ports
+    /// should override this to return true only while assistive technology is
+    /// active" -- but the iOS port never overrode it, so it inherited
+    /// isAccessibilityTreeSupported() and rebuilt the whole snapshot on EVERY
+    /// invalidation: every layout, every scroll, every text setter, on every
+    /// device, whether or not VoiceOver was running. Measured with
+    /// malloc_history that was 4.0MB of live allocation under
+    /// AccessibilityManager.getSnapshot on an idle Mac Catalyst app with no
+    /// assistive technology running at all, plus the CPU to build it.
+    ///
+    /// Turning VoiceOver on mid-session is picked up on the next invalidation --
+    /// the flag is read per call, and any mutation after that point projects
+    /// normally.
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        try {
+            return nativeInstance.isAssistiveTechnologyActive();
+        } catch (Throwable t) {
+            // Never let a semantics optimisation take the app down.
+            return true;
+        }
     }
 
     public static void performAccessibilityActionFromNative(long nodeId, String actionId, String argument) {

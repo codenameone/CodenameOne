@@ -1856,6 +1856,23 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         threadStateData->exception = JAVA_NULL;
     }
     flushReleaseQueue();
+#ifdef CN1_ALLOC_CENSUS
+    {
+        // Several points, not one: allocation during startup and allocation once
+        // the first screen is up are different questions, and a single sample
+        // cannot tell them apart.
+        extern void cn1AllocCensus(const char*);
+        extern void cn1HeapAccounting(const char*);
+        static int cn1CensusCycle = 0;
+        int c = ++cn1CensusCycle;
+        if(c == 3 || c == 10 || c == 25 || c == 50) {
+            char lbl[32];
+            snprintf(lbl, sizeof(lbl), "cycle%d", c);
+            cn1AllocCensus(lbl);
+            cn1HeapAccounting(lbl);
+        }
+    }
+#endif
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
 }

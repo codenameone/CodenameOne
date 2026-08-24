@@ -4181,6 +4181,129 @@ void cn1GcRegisterClazz(struct clazz* c) {
     c->cn1ClazzRegistered = JAVA_TRUE;
 }
 
+#if defined(CN1_ALLOC_CENSUS) && defined(__APPLE__)
+// cn1HeapAccounting weighs legacy-heap blocks with malloc_size (the object
+// header does not record instance size). The other include of this header is
+// scoped to CN1_GC_VERIFY builds, so the census needs its own.
+#include <malloc/malloc.h>
+#endif
+
+#ifdef CN1_ALLOC_CENSUS
+/**
+ * Prints allocation volume by class, biggest first.
+ *
+ * Deliberately a census of what was ALLOCATED rather than of what is live: churn
+ * is what costs, and a live-object walk cannot see the BiBOP or nursery objects
+ * at all (they never enter allObjectsInHeap), which is exactly where the small
+ * high-turnover objects sit. Counters are read without synchronisation; a
+ * diagnostic wants the shape, not the last digit.
+ */
+/**
+ * Separates the JAVA heap from native allocation.
+ *
+ * vmmap cannot do this: BiBOP arenas are posix_memalign'd so they land in
+ * MALLOC_LARGE and the legacy heap in MALLOC_SMALL, side by side with every
+ * Metal, CoreGraphics and image buffer the process owns. Comparing "our malloc
+ * total" against another runtime's figures therefore compares a heap against a
+ * heap PLUS a renderer. These numbers are the heap on its own.
+ *
+ * Reserved is what BiBOP has taken from the allocator; live is what objects
+ * actually occupy. The difference is the honest cost of the page pool: BiBOP
+ * never frees a page back per-object, it pools swept pages by size class.
+ */
+void cn1HeapAccounting(const char* label) {
+    long long pages = 0, capBytes = 0, liveBytes = 0, ownedPages = 0, emptyPages = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        pages++;
+        capBytes += CN1_BIBOP_PAGE_SIZE;
+        int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+        int live = bi - p->freeCount;
+        if(live < 0) {
+            live = 0;
+        }
+        if(live == 0) {
+            emptyPages++;
+        }
+        liveBytes += (long long)live * (long long)p->slotSize;
+        if(p->owned) {
+            ownedPages++;
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+    // The legacy heap is NOT part of the BiBOP figures above and is easy to
+    // forget: objects too big for the largest size class go through calloc and
+    // the allObjectsInHeap table instead. Reporting only the BiBOP total
+    // understates the Java heap by whatever these weigh, so weigh them --
+    // malloc_size gives the true block size for a calloc'd pointer.
+    long long legacyBytes = 0, legacyLive = 0;
+    int nHeap = currentSizeOfAllObjectsInHeap;
+    for(int i = 0 ; i < nHeap ; i++) {
+        JAVA_OBJECT o = allObjectsInHeap[i];
+        if(o == JAVA_NULL) {
+            continue;
+        }
+        legacyLive++;
+#if defined(__APPLE__)
+        legacyBytes += (long long)malloc_size((void*)o);
+#endif
+    }
+    fprintf(stderr,
+            "[JHEAP:%s] bibop pages=%lld reserved=%.2fMB live=%.2fMB slack=%.2fMB "
+            "(owned=%lld empty=%lld) | legacy objects=%lld bytes=%.2fMB | "
+            "JAVA TOTAL live=%.2fMB resident=%.2fMB\n",
+            label, pages, capBytes / 1048576.0, liveBytes / 1048576.0,
+            (capBytes - liveBytes) / 1048576.0, ownedPages, emptyPages,
+            legacyLive, legacyBytes / 1048576.0,
+            (liveBytes + legacyBytes) / 1048576.0,
+            (capBytes + legacyBytes) / 1048576.0);
+    fflush(stderr);
+}
+
+void cn1AllocCensus(const char* label) {
+    struct Row { const char* name; long count; long bytes; };
+    static struct Row rows[4096];
+    int used = 0;
+    long long totalBytes = 0, totalCount = 0;
+    for(int i = 0 ; i < CN1_CLAZZ_SET_SIZE ; i++) {
+        uintptr_t v = atomic_load_explicit(&cn1ClazzSet[i], memory_order_relaxed);
+        if(v == 0) {
+            continue;
+        }
+        struct clazz* c = (struct clazz*)v;
+        if(c->cn1AllocBytes == 0 && c->cn1AllocCount == 0) {
+            continue;
+        }
+        totalBytes += c->cn1AllocBytes;
+        totalCount += c->cn1AllocCount;
+        if(used < 4096) {
+            rows[used].name = c->clsName ? c->clsName : "?";
+            rows[used].count = c->cn1AllocCount;
+            rows[used].bytes = c->cn1AllocBytes;
+            used++;
+        }
+    }
+    fprintf(stderr, "[ALLOC:%s] %lld objects, %lld bytes (%.1fMB) across %d classes\n",
+            label, totalCount, totalBytes, totalBytes / (1024.0 * 1024.0), used);
+    for(int shown = 0 ; shown < 30 ; shown++) {
+        int best = -1;
+        for(int i = 0 ; i < used ; i++) {
+            if(rows[i].bytes > 0 && (best < 0 || rows[i].bytes > rows[best].bytes)) {
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        fprintf(stderr, "[ALLOC:%s]   %10ld bytes %9ld objs  %s\n",
+                label, rows[best].bytes, rows[best].count, rows[best].name);
+        rows[best].bytes = 0;
+    }
+    fflush(stderr);
+}
+#endif
+
+
 // ========================== Immortal object registry ==========================
 // Objects deliberately REMOVED from the heap table (interned constant-pool
 // strings, static-final removal values, VM cache singletons) are unresolvable
@@ -6536,6 +6659,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     allocationsSinceLastGC += size;
     totalAllocations += size;
+    CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; cn1_instr_allocCount++;
 #endif

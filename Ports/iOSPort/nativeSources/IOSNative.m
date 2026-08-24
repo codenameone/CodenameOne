@@ -14894,6 +14894,28 @@ static void cn1_resetContext(void) {
 }
 #endif // !TARGET_OS_TV
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // CN1_EAGER_A11Y=1 restores the old always-project behaviour for an A/B.
+    if(getenv("CN1_EAGER_A11Y") != NULL) {
+        return JAVA_TRUE;
+    }
+#if !TARGET_OS_WATCH
+    return (UIAccessibilityIsVoiceOverRunning() ||
+            UIAccessibilityIsSwitchControlRunning()) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectToDrawable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_USE_METAL
+    extern int cn1DirectToDrawableEnabled(void);
+    return cn1DirectToDrawableEnabled() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {

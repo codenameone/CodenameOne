@@ -1073,6 +1073,18 @@ public final class IOSNative {
     /** True when LAContext.canEvaluatePolicy(deviceOwnerAuthenticationWithBiometrics) succeeds. */
     native boolean isBiometricsSupported();
 
+    /// True when the Metal view renders straight into the CAMetalLayer drawable
+    /// instead of into a retained screen texture. The renderer decides this, not
+    /// Java, but the paint model has to follow it: a direct-mode frame presents a
+    /// different buffer every time, so anything left unpainted shows a frame from
+    /// two or three presents ago. See IOSImplementation.paintDirty.
+    native boolean isDirectToDrawable();
+
+    /// True while VoiceOver, Switch Control or Voice Control is actually running.
+    /// UIKit pulls the semantic tree on demand, so nothing needs projecting eagerly
+    /// unless one of these is listening.
+    native boolean isAssistiveTechnologyActive();
+
     /** Same as {@link #isBiometricsSupported()} but also requires at least one biometric to be enrolled. */
     native boolean canAuthenticateBiometric();
 

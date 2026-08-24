@@ -36,12 +36,13 @@
 #include "TargetConditionals.h"
 #if !TARGET_OS_WATCH
 
+#import "CN1Metalcompat.h"
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import "CN1MetalGlyphAtlas.h"
 
-#define CN1_METAL_ATLAS_INITIAL_W 1024
-#define CN1_METAL_ATLAS_INITIAL_H 1024
+#define CN1_METAL_ATLAS_INITIAL_W 256
+#define CN1_METAL_ATLAS_INITIAL_H 256
 #define CN1_METAL_ATLAS_MAX_W     2048
 #define CN1_METAL_ATLAS_MAX_H     2048
 #define CN1_METAL_ATLAS_PADDING   1
@@ -104,6 +105,22 @@ static uint64_t                atlasCacheTick = 0;
     CN1MetalGlyphAtlas *atlas = [self atlasForCTFont:ctFont];
     CFRelease(ctFont);
     return atlas;
+}
+
+// See initWithCTFont: -- one atlas per font SIZE makes the initial dimension a
+// per-size cost, not a one-off.
+static int cn1AtlasInitialDim(void) {
+    static int v = -1;
+    if (v < 0) {
+        const char *e = getenv("CN1_ATLAS_INITIAL");
+        int parsed = e != NULL ? atoi(e) : CN1_METAL_ATLAS_INITIAL_W;
+        // Powers of two only, and never above the growth ceiling.
+        if (parsed < 64 || parsed > CN1_METAL_ATLAS_MAX_W || (parsed & (parsed - 1)) != 0) {
+            parsed = CN1_METAL_ATLAS_INITIAL_W;
+        }
+        v = parsed;
+    }
+    return v;
 }
 
 + (nullable instancetype)atlasForCTFont:(nonnull CTFontRef)ctFont {
@@ -182,8 +199,15 @@ static uint64_t                atlasCacheTick = 0;
     // render garbage / nothing — store premultiplied BGRA instead.
     _isColor = (CTFontGetSymbolicTraits(_ctFont) & kCTFontTraitColorGlyphs) != 0;
 
-    _textureWidth = CN1_METAL_ATLAS_INITIAL_W;
-    _textureHeight = CN1_METAL_ATLAS_INITIAL_H;
+    // The cache key is postScriptName|SIZE, so every distinct text size gets its
+    // OWN atlas -- and a Material text theme has fifteen-odd sizes across two or
+    // three families. Starting each one at 1024x1024 therefore reserved a
+    // megabyte per size before a single glyph was rasterised. Start small and let
+    // the existing doubling path (growAtlas, up to CN1_METAL_ATLAS_MAX) size each
+    // atlas to what its font actually needs. CN1_ATLAS_INITIAL overrides for A/B;
+    // pass 1024 to reproduce the old behaviour.
+    _textureWidth = cn1AtlasInitialDim();
+    _textureHeight = _textureWidth;
 
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:(_isColor ? MTLPixelFormatBGRA8Unorm : MTLPixelFormatR8Unorm)
@@ -192,6 +216,7 @@ static uint64_t                atlasCacheTick = 0;
         mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     _texture = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("glyphAtlasInitial", _texture);
     if (_texture == nil) {
         CFRelease(_ctFont);
         _ctFont = NULL;
@@ -249,6 +274,7 @@ static uint64_t                atlasCacheTick = 0;
         width:(NSUInteger)newW height:(NSUInteger)newH mipmapped:NO];
     desc.usage = MTLTextureUsageShaderRead;
     id<MTLTexture> newTex = [device newTextureWithDescriptor:desc];
+    CN1_TEX_NOTE("glyphAtlasGrow", newTex);
     if (newTex == nil) return NO;
 
     // Drop slots; next reference re-rasterises into the larger atlas.
