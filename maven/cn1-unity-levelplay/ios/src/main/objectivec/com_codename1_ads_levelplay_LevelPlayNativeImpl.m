@@ -56,6 +56,18 @@
 #endif
 #endif
 
+// The generated app target is manual retain/release (CLANG_ENABLE_OBJC_ARC = NO
+// in the translator's template project), so an object handed to one of the
+// dictionaries or to a strong property below is owned twice over: once by the
+// alloc and once by the container that retains it. Releasing the extra
+// reference outright would not compile under ARC, where it does not exist and
+// release is forbidden, so ownership is handed over through this macro.
+#if __has_feature(objc_arc)
+#define CN1_HANDOVER(x) (x)
+#else
+#define CN1_HANDOVER(x) [(x) autorelease]
+#endif
+
 extern void com_codename1_ads_levelplay_LevelPlayCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_INT handle, JAVA_INT event, JAVA_INT code,
         JAVA_OBJECT message, JAVA_OBJECT rewardType, JAVA_INT rewardAmount);
@@ -149,6 +161,16 @@ static NSString *cn1AppKey() {
 @end
 
 @implementation CN1LPFullScreen
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.interstitial = nil;
+    self.rewarded = nil;
+    self.delegate = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 @interface CN1LPBanner : NSObject
@@ -157,6 +179,15 @@ static NSString *cn1AppKey() {
 @end
 
 @implementation CN1LPBanner
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.view = nil;
+    self.delegate = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 // sizeType matches the SIZE_* constants in com.codename1.ads.BannerAd.
@@ -192,8 +223,9 @@ static LPMAdSize *cn1BannerSize(int sizeType, int widthDp) {
         } else if (param2 == 2) {
             [LPMPrivacySettings setCOPPA:NO];
         }
-        LPMInitRequest *request = [[[LPMInitRequestBuilder alloc]
-                initWithAppKey:cn1AppKey()] build];
+        LPMInitRequestBuilder *initBuilder =
+                CN1_HANDOVER([[LPMInitRequestBuilder alloc] initWithAppKey:cn1AppKey()]);
+        LPMInitRequest *request = [initBuilder build];
         [LevelPlay initWithRequest:request
                         completion:^(LPMConfiguration *config, NSError *error) {
             if (error != nil) {
@@ -207,15 +239,15 @@ static LPMAdSize *cn1BannerSize(int sizeType, int widthDp) {
     if (param1 != CN1_FORMAT_INTERSTITIAL && param1 != CN1_FORMAT_REWARDED) {
         return NO; // LevelPlay has no dedicated app-open / rewarded-interstitial
     }
-    CN1LPFullScreen *fs = [[CN1LPFullScreen alloc] init];
+    CN1LPFullScreen *fs = CN1_HANDOVER([[CN1LPFullScreen alloc] init]);
     fs.format = param1;
-    fs.delegate = [[CN1LPFullScreenDelegate alloc] init];
+    fs.delegate = CN1_HANDOVER([[CN1LPFullScreenDelegate alloc] init]);
     fs.delegate.handle = param;
     if (param1 == CN1_FORMAT_REWARDED) {
-        fs.rewarded = [[LPMRewardedAd alloc] initWithAdUnitId:param2];
+        fs.rewarded = CN1_HANDOVER([[LPMRewardedAd alloc] initWithAdUnitId:param2]);
         [fs.rewarded setDelegate:fs.delegate];
     } else {
-        fs.interstitial = [[LPMInterstitialAd alloc] initWithAdUnitId:param2];
+        fs.interstitial = CN1_HANDOVER([[LPMInterstitialAd alloc] initWithAdUnitId:param2]);
         [fs.interstitial setDelegate:fs.delegate];
     }
     cn1FullScreen[@(param)] = fs;
@@ -270,12 +302,14 @@ static LPMAdSize *cn1BannerSize(int sizeType, int widthDp) {
 -(void*)createBanner:(int)param param1:(NSString*)param1 param2:(int)param2 param3:(int)param3 {
     __block LPMBannerAdView *bannerView = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        LPMBannerAdViewConfig *config = [[[[LPMBannerAdViewConfigBuilder alloc] init]
-                setWithAdSize:cn1BannerSize(param2, param3)] build];
-        bannerView = [[LPMBannerAdView alloc] initWithAdUnitId:param1 config:config];
-        CN1LPBanner *holder = [[CN1LPBanner alloc] init];
+        LPMBannerAdViewConfigBuilder *builder =
+                CN1_HANDOVER([[LPMBannerAdViewConfigBuilder alloc] init]);
+        LPMBannerAdViewConfig *config =
+                [[builder setWithAdSize:cn1BannerSize(param2, param3)] build];
+        bannerView = CN1_HANDOVER([[LPMBannerAdView alloc] initWithAdUnitId:param1 config:config]);
+        CN1LPBanner *holder = CN1_HANDOVER([[CN1LPBanner alloc] init]);
         holder.view = bannerView;
-        holder.delegate = [[CN1LPBannerDelegate alloc] init];
+        holder.delegate = CN1_HANDOVER([[CN1LPBannerDelegate alloc] init]);
         holder.delegate.handle = param;
         [bannerView setDelegate:holder.delegate];
         cn1Banners[@(param)] = holder;

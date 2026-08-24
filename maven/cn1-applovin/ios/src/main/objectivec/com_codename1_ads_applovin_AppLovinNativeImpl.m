@@ -48,6 +48,18 @@
 #endif
 #endif
 
+// The generated app target is manual retain/release (CLANG_ENABLE_OBJC_ARC = NO
+// in the translator's template project), so an object handed to one of the
+// dictionaries or to a strong property below is owned twice over: once by the
+// alloc and once by the container that retains it. Releasing the extra
+// reference outright would not compile under ARC, where it does not exist and
+// release is forbidden, so ownership is handed over through this macro.
+#if __has_feature(objc_arc)
+#define CN1_HANDOVER(x) (x)
+#else
+#define CN1_HANDOVER(x) [(x) autorelease]
+#endif
+
 extern void com_codename1_ads_applovin_AppLovinCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_INT handle, JAVA_INT event, JAVA_INT code,
         JAVA_OBJECT message, JAVA_OBJECT rewardType, JAVA_INT rewardAmount);
@@ -122,6 +134,16 @@ static UIViewController *cn1RootController() {
 @property (nonatomic) BOOL loaded;
 @end
 @implementation CN1MaxFullScreen
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.adUnitId = nil;
+    self.ad = nil;
+    self.delegate = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 @interface CN1MaxBanner : NSObject
@@ -129,6 +151,15 @@ static UIViewController *cn1RootController() {
 @property (nonatomic, strong) CN1MaxBannerDelegate *delegate;
 @end
 @implementation CN1MaxBanner
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.view = nil;
+    self.delegate = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 static NSMutableDictionary *cn1FullScreen;
@@ -166,10 +197,10 @@ static NSMutableDictionary *cn1Banners;
 
 -(BOOL)createFullScreen:(int)param param1:(int)param1 param2:(NSString*)param2 {
     if (param1 == 3) { return NO; } // no rewarded-interstitial in MAX
-    CN1MaxFullScreen *fs = [[CN1MaxFullScreen alloc] init];
+    CN1MaxFullScreen *fs = CN1_HANDOVER([[CN1MaxFullScreen alloc] init]);
     fs.format = param1;
     fs.adUnitId = param2;
-    fs.delegate = [[CN1MaxDelegate alloc] init];
+    fs.delegate = CN1_HANDOVER([[CN1MaxDelegate alloc] init]);
     fs.delegate.handle = param;
     cn1FullScreen[@(param)] = fs;
     return YES;
@@ -184,7 +215,8 @@ static NSMutableDictionary *cn1Banners;
     if (fs == nil) { return; }
     dispatch_async(dispatch_get_main_queue(), ^{
         if (fs.format == CN1_FORMAT_INTERSTITIAL) {
-            MAInterstitialAd *ad = [[MAInterstitialAd alloc] initWithAdUnitIdentifier:fs.adUnitId];
+            MAInterstitialAd *ad =
+                    CN1_HANDOVER([[MAInterstitialAd alloc] initWithAdUnitIdentifier:fs.adUnitId]);
             ad.delegate = fs.delegate;
             fs.ad = ad;
             [ad loadAd];
@@ -194,7 +226,8 @@ static NSMutableDictionary *cn1Banners;
             fs.ad = ad;
             [ad loadAd];
         } else if (fs.format == CN1_FORMAT_APP_OPEN) {
-            MAAppOpenAd *ad = [[MAAppOpenAd alloc] initWithAdUnitIdentifier:fs.adUnitId];
+            MAAppOpenAd *ad =
+                    CN1_HANDOVER([[MAAppOpenAd alloc] initWithAdUnitIdentifier:fs.adUnitId]);
             ad.delegate = fs.delegate;
             fs.ad = ad;
             [ad loadAd];
@@ -239,10 +272,10 @@ static NSMutableDictionary *cn1Banners;
 -(void*)createBanner:(int)param param1:(NSString*)param1 param2:(int)param2 param3:(int)param3 {
     __block MAAdView *bannerView = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        bannerView = [[MAAdView alloc] initWithAdUnitIdentifier:param1];
-        CN1MaxBanner *holder = [[CN1MaxBanner alloc] init];
+        bannerView = CN1_HANDOVER([[MAAdView alloc] initWithAdUnitIdentifier:param1]);
+        CN1MaxBanner *holder = CN1_HANDOVER([[CN1MaxBanner alloc] init]);
         holder.view = bannerView;
-        holder.delegate = [[CN1MaxBannerDelegate alloc] init];
+        holder.delegate = CN1_HANDOVER([[CN1MaxBannerDelegate alloc] init]);
         holder.delegate.handle = param;
         bannerView.delegate = holder.delegate;
         cn1Banners[@(param)] = holder;

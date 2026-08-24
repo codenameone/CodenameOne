@@ -57,6 +57,18 @@
 #endif
 #endif
 
+// The generated app target is manual retain/release (CLANG_ENABLE_OBJC_ARC = NO
+// in the translator's template project), so an object handed to one of the
+// dictionaries or to a strong property below is owned twice over: once by the
+// alloc and once by the container that retains it. Releasing the extra
+// reference outright would not compile under ARC, where it does not exist and
+// release is forbidden, so ownership is handed over through this macro.
+#if __has_feature(objc_arc)
+#define CN1_HANDOVER(x) (x)
+#else
+#define CN1_HANDOVER(x) [(x) autorelease]
+#endif
+
 // Generated entry point for com.codename1.ads.admob.AdMobCallback.fire(int,int,int,String,String,int)
 extern void com_codename1_ads_admob_AdMobCallback_fire___int_int_int_java_lang_String_java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_INT handle, JAVA_INT event, JAVA_INT code,
@@ -138,6 +150,17 @@ static void cn1FireAd(int handle, int event, int code, NSString *message, NSStri
 @end
 
 @implementation CN1FullScreenAd
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.adUnitId = nil;
+    self.ad = nil;
+    self.delegate = nil;
+    self.ssv = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 @interface CN1Banner : NSObject
@@ -146,6 +169,15 @@ static void cn1FireAd(int handle, int event, int code, NSString *message, NSStri
 @end
 
 @implementation CN1Banner
+#if !__has_feature(objc_arc)
+- (void)dealloc {
+    // MRR releases nothing for us when the holder goes away. Clearing through
+    // the synthesized setters does it without naming the ivars.
+    self.view = nil;
+    self.delegate = nil;
+    [super dealloc];
+}
+#endif
 @end
 
 static NSMutableDictionary *cn1FullScreenAds;
@@ -161,7 +193,7 @@ static GADRequest *cn1BuildRequest(NSString *keywords, BOOL nonPersonalized) {
         request.keywords = [keywords componentsSeparatedByString:@","];
     }
     if (nonPersonalized) {
-        GADExtras *extras = [[GADExtras alloc] init];
+        GADExtras *extras = CN1_HANDOVER([[GADExtras alloc] init]);
         extras.additionalParameters = @{@"npa": @"1"};
         [request registerAdNetworkExtras:extras];
     }
@@ -224,10 +256,10 @@ static void cn1ApplyPrivacyFlags(GADRequestConfiguration *cfg, int childDirected
 }
 
 -(BOOL)createFullScreen:(int)param param1:(int)param1 param2:(NSString*)param2 {
-    CN1FullScreenAd *fs = [[CN1FullScreenAd alloc] init];
+    CN1FullScreenAd *fs = CN1_HANDOVER([[CN1FullScreenAd alloc] init]);
     fs.format = param1;
     fs.adUnitId = param2;
-    fs.delegate = [[CN1AdDelegate alloc] init];
+    fs.delegate = CN1_HANDOVER([[CN1AdDelegate alloc] init]);
     fs.delegate.handle = param;
     cn1FullScreenAds[@(param)] = fs;
     return YES;
@@ -236,7 +268,8 @@ static void cn1ApplyPrivacyFlags(GADRequestConfiguration *cfg, int childDirected
 -(void)setServerSideVerification:(int)param param1:(NSString*)param1 param2:(NSString*)param2 {
     CN1FullScreenAd *fs = cn1FullScreenAds[@(param)];
     if (fs == nil) { return; }
-    GADServerSideVerificationOptions *opts = [[GADServerSideVerificationOptions alloc] init];
+    GADServerSideVerificationOptions *opts =
+            CN1_HANDOVER([[GADServerSideVerificationOptions alloc] init]);
     if (param1 != nil) { opts.userIdentifier = param1; }
     if (param2 != nil) { opts.customRewardString = param2; }
     fs.ssv = opts;
@@ -340,12 +373,12 @@ static void cn1ApplyPrivacyFlags(GADRequestConfiguration *cfg, int childDirected
                 size = GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width);
             }
         }
-        bannerView = [[GADBannerView alloc] initWithAdSize:size];
+        bannerView = CN1_HANDOVER([[GADBannerView alloc] initWithAdSize:size]);
         bannerView.adUnitID = param1;
         bannerView.rootViewController = cn1RootController();
-        CN1Banner *holder = [[CN1Banner alloc] init];
+        CN1Banner *holder = CN1_HANDOVER([[CN1Banner alloc] init]);
         holder.view = bannerView;
-        holder.delegate = [[CN1BannerDelegate alloc] init];
+        holder.delegate = CN1_HANDOVER([[CN1BannerDelegate alloc] init]);
         holder.delegate.handle = param;
         bannerView.delegate = holder.delegate;
         cn1Banners[@(param)] = holder;
@@ -373,7 +406,7 @@ static void cn1ApplyPrivacyFlags(GADRequestConfiguration *cfg, int childDirected
         if (@available(iOS 14, *)) {
             [ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:^(ATTrackingManagerAuthorizationStatus status) {}];
         }
-        UMPRequestParameters *parameters = [[UMPRequestParameters alloc] init];
+        UMPRequestParameters *parameters = CN1_HANDOVER([[UMPRequestParameters alloc] init]);
         parameters.tagForUnderAgeOfConsent = param;
         [UMPConsentInformation.sharedInstance requestConsentInfoUpdateWithParameters:parameters
                 completionHandler:^(NSError *_Nullable error) {
