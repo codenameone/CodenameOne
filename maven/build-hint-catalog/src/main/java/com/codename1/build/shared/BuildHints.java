@@ -210,6 +210,7 @@ public final class BuildHints {
         private HintType type = HintType.STRING;
         private String enumName;
         private final List<String> values = new ArrayList<String>();
+        private final Map<String, String> valueAliases = new LinkedHashMap<String, String>();
         private final List<String> valueLabels = new ArrayList<String>();
         private String def;
         private String separator;
@@ -256,6 +257,36 @@ public final class BuildHints {
 
         public Hint type(HintType t) {
             this.type = t;
+            return this;
+        }
+
+        /**
+         * Extra wire values the runtime accepts for an already-declared domain,
+         * each mapped to the canonical value it means.
+         *
+         * <p>Deliberately separate from {@link #values}: these do NOT become enum
+         * constants, because two constants for one behaviour is an API that asks
+         * a question with no right answer. They exist so that validation accepts
+         * what the runtime accepts &mdash; {@code ios.themeMode=flat} and
+         * {@code and.themeMode=material} are real, documented spellings, and
+         * rejecting them told a developer their working configuration was
+         * invalid &mdash; and so a migration can render one as the canonical
+         * constant rather than refusing it.</p>
+         *
+         * @param pairs alias then canonical, repeated
+         */
+        public Hint valueAliases(String... pairs) {
+            if (pairs.length % 2 != 0) {
+                throw new IllegalArgumentException(
+                        "Build hint " + name + ": valueAliases takes alias/canonical pairs");
+            }
+            for (int i = 0; i < pairs.length; i += 2) {
+                if (!values.contains(pairs[i + 1])) {
+                    throw new IllegalArgumentException("Build hint " + name + " aliases "
+                            + pairs[i] + " to " + pairs[i + 1] + ", which is not in its domain");
+                }
+                valueAliases.put(pairs[i], pairs[i + 1]);
+            }
             return this;
         }
 
@@ -356,6 +387,32 @@ public final class BuildHints {
         public HintType type() { return type; }
         public String enumName() { return enumName; }
         public List<String> values() { return Collections.unmodifiableList(values); }
+
+        /** Accepted spellings that are not their own value, alias to canonical. */
+        public Map<String, String> valueAliases() {
+            return Collections.unmodifiableMap(valueAliases);
+        }
+
+        /**
+         * The canonical form of {@code value}, or null when the domain does not
+         * accept it. Case-insensitive, matching every reader of these hints.
+         */
+        public String canonicalValue(String value) {
+            if (value == null) {
+                return null;
+            }
+            for (String allowed : values) {
+                if (allowed.equalsIgnoreCase(value)) {
+                    return allowed;
+                }
+            }
+            for (Map.Entry<String, String> e : valueAliases.entrySet()) {
+                if (e.getKey().equalsIgnoreCase(value)) {
+                    return e.getValue();
+                }
+            }
+            return null;
+        }
         public List<String> valueLabels() { return Collections.unmodifiableList(valueLabels); }
         public String def() { return def; }
         public String separator() { return separator; }

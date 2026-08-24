@@ -147,10 +147,22 @@ public final class ClassScanner {
         }
 
         AnnotatedClass build() {
-            return new AnnotatedClass(
+            AnnotatedClass out = new AnnotatedClass(
                     internalName, superInternalName, interfaces, access,
                     classAnnotations, methods, fields, source);
+            out.setSourceFile(sourceFile);
+            return out;
         }
+
+        /// The SourceFile attribute, which is the only reliable link from a
+        /// compiled class back to the file that declared it -- Kotlin does not
+        /// require the two to share a name.
+        @Override
+        public void visitSource(String sourceFileName, String debug) {
+            this.sourceFile = sourceFileName;
+        }
+
+        private String sourceFile;
 
         @Override
         public void visit(int version, int access, String name, String signature,

@@ -481,4 +481,62 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.importsAnnotation(
                 "import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
     }
+
+    /// The runtime accepts spellings the picklist does not offer:
+    /// IOSImplementation.installNativeTheme compares against `flat` and `liquid`,
+    /// AndroidImplementation against `material` and `holo`. Rejecting them told a
+    /// developer a working configuration was invalid and refused the edit.
+    @Test
+    public void documentedThemeSpellingsAreAccepted() {
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertEquals("ios7", ios.canonicalValue("flat"));
+        assertEquals("modern", ios.canonicalValue("liquid"));
+        assertEquals("legacy", ios.canonicalValue("iphone"));
+        assertEquals("modern", ios.canonicalValue("MODERN"));
+        assertNull(ios.canonicalValue("nonsense"));
+
+        com.codename1.build.shared.BuildHints.Hint and =
+                com.codename1.build.shared.BuildHints.byName("and.themeMode");
+        assertEquals("modern", and.canonicalValue("material"));
+        assertEquals("hololight", and.canonicalValue("holo"));
+        assertNull(and.canonicalValue("nonsense"));
+    }
+
+    /// An alias does not become a picklist choice or an enum constant: one
+    /// behaviour, one constant, or the annotation asks a question with no right
+    /// answer.
+    @Test
+    public void anAcceptedSpellingIsNotOfferedAsAChoice() {
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertFalse(ios.values().contains("flat"));
+        assertFalse(ios.values().contains("liquid"));
+    }
+
+    /// `import ...Ios as BuildIos` puts BuildIos in scope, NOT Ios. Counting it
+    /// as a simple-name import attributed another library's @Ios to us.
+    @Test
+    public void anAliasedImportDoesNotBringTheSimpleNameIntoScope() {
+        String src = "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "import com.example.other.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", true));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// ...while the alias itself still is.
+    @Test
+    public void theAliasMarkerStillCounts() {
+        String src = "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
 }

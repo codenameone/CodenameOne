@@ -819,7 +819,18 @@ public class CodenameOneSettings extends Lifecycle {
         // A closed value domain is the one case where a wrong value is certain to
         // be wrong: the builder compares against these strings and silently uses
         // its default when it recognises none of them.
+        //
+        // Through the catalog's own canonicalisation rather than the picklist,
+        // because a domain can accept spellings that are not offered as choices:
+        // ios.themeMode=flat and and.themeMode=material are what the runtime
+        // compares against, and rejecting them told a developer that a working
+        // configuration was invalid and then refused to save the edit.
         if (!meta.values().isEmpty()) {
+            com.codename1.build.shared.BuildHints.Hint hint =
+                    com.codename1.build.shared.BuildHints.byName(meta.name());
+            if (hint != null && !hint.values().isEmpty()) {
+                return hint.canonicalValue(v) != null;
+            }
             for (String allowed : meta.values()) {
                 if (allowed.equalsIgnoreCase(v)) {
                     return true;
@@ -2216,13 +2227,28 @@ public class CodenameOneSettings extends Lifecycle {
                 int after = at + needle.length();
                 boolean whole = needle.endsWith("*")
                         || after >= source.length() || !continuesAName(source.charAt(after));
-                if (whole && precededByImport(source, at)) {
+                // `import ...Ios as BuildIos` does NOT put Ios in scope -- it puts
+                // BuildIos there, and the file is then free to import someone
+                // else's Ios. Counting the aliased import as a simple-name import
+                // attributed that other annotation to us.
+                if (whole && precededByImport(source, at) && !hasAsClause(source, after)) {
                     return true;
                 }
                 at = nextMarker(source, needle, after, kotlin);
             }
         }
         return false;
+    }
+
+    /// Whether an `as` rename follows the import target at `after`.
+    private static boolean hasAsClause(String source, int after) {
+        int i = after;
+        while (i < source.length() && (source.charAt(i) == ' ' || source.charAt(i) == '\t')) {
+            i++;
+        }
+        return source.regionMatches(i, "as", 0, 2)
+                && i + 2 < source.length()
+                && !continuesAName(source.charAt(i + 2));
     }
 
     /// The name a Kotlin `import ... as Alias` gives an annotation, or null.    /// The name a Kotlin `import ... as Alias` gives an annotation, or null.

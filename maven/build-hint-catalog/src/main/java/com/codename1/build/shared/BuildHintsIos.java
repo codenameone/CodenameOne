@@ -1037,6 +1037,11 @@ final class BuildHintsIos {
         h.add(new Hint("ios.themeMode")
                 .annotatedAs(HintGroup.IOS, "themeMode")
                 .values("IosThemeMode", "auto", "modern", "ios7", "legacy")
+                // Spellings IOSImplementation.installNativeTheme accepts for the
+                // same two themes. Not enum constants: one behaviour, one
+                // constant, or the annotation asks a question with no right
+                // answer.
+                .valueAliases("flat", "ios7", "liquid", "modern", "iphone", "legacy")
                 .platform("ios")
                 .consumedBy("IPhoneBuilder")
                 .doc("`auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the existing iOS 7 "

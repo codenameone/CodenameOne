@@ -75,6 +75,10 @@ final class BuildHintsAndroid {
         h.add(new Hint("and.themeMode")
                 .annotatedAs(HintGroup.ANDROID, "themeMode")
                 .values("AndroidThemeMode", "auto", "modern", "hololight", "legacy")
+                // AndroidImplementation.installNativeTheme compares against these
+                // too; see the note on ios.themeMode about why they are not
+                // constants.
+                .valueAliases("material", "modern", "holo", "hololight")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` "

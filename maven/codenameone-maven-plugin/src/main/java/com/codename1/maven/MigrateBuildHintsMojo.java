@@ -589,13 +589,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 } catch (NumberFormatException ex) {
                     return null;
                 }
-            case ENUM:
-                for (String allowed : hint.values()) {
-                    if (allowed.equalsIgnoreCase(v.trim())) {
-                        return hint.enumName() + "." + enumConstant(allowed);
-                    }
-                }
-                return null;
+            case ENUM: {
+                // Canonicalised, so a documented spelling that is not its own
+                // constant migrates to the constant it means -- ios.themeMode=flat
+                // becomes IosThemeMode.IOS7 -- rather than being refused as
+                // outside the domain, which is what an existing project setting a
+                // legacy spelling would have hit.
+                String canonical = hint.canonicalValue(v.trim());
+                return canonical == null ? null : hint.enumName() + "." + enumConstant(canonical);
+            }
             case STRING_LIST: {
                 String sep = hint.separator();
                 if (sep == null || sep.length() == 0) {

@@ -106,7 +106,12 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         }
 
         ProcessorContext ctx = new ProcessorContext(outputDirectory, stubSourceDirectory,
-                index, getLog(), getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName());
+                index, getLog(), getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName(),
+                // The roots Maven is actually compiling, so a processor asking
+                // whether a class still has a source is not guessing at the
+                // layout. Kotlin and generated-source roots are in here too,
+                // because build-helper and the Kotlin plugin add them.
+                project == null ? null : project.getCompileSourceRoots());
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {

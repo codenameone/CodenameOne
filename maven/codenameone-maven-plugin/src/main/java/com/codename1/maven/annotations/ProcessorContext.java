@@ -62,6 +62,7 @@ public final class ProcessorContext {
     private final File projectDir;
     private final Properties projectSettings;
     private final String mainClassBinaryName;
+    private final List<String> compileSourceRoots;
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
@@ -78,6 +79,20 @@ public final class ProcessorContext {
                              Map<String, AnnotatedClass> classIndex, Log log,
                              File projectDir, Properties projectSettings,
                              String mainClassBinaryName) {
+        this(outputClassDir, stubSourceDir, classIndex, log, projectDir, projectSettings,
+                mainClassBinaryName, null);
+    }
+
+    /// Adds the module's configured compile source roots.
+    ///
+    /// Passed in rather than guessed at from the project directory: a module may
+    /// add `generated-sources`, or a Kotlin root, or replace the conventional one
+    /// altogether, and a processor that assumes `src/main/java` would decide a
+    /// perfectly live class has no source.
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log,
+                             File projectDir, Properties projectSettings,
+                             String mainClassBinaryName, List<String> compileSourceRoots) {
         this.outputClassDir = outputClassDir;
         this.stubSourceDir = stubSourceDir;
         this.classIndex = classIndex == null
@@ -87,7 +102,17 @@ public final class ProcessorContext {
         this.projectDir = projectDir;
         this.projectSettings = projectSettings;
         this.mainClassBinaryName = mainClassBinaryName;
+        this.compileSourceRoots = compileSourceRoots == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileSourceRoots));
     }
+
+    /// The module's configured compile source roots, empty when unknown.
+    ///
+    /// Empty means "not told", never "there are none": a caller deciding whether
+    /// a class still has a source has to treat the two differently, or an
+    /// unfamiliar layout looks exactly like a deleted file.
+    public List<String> getCompileSourceRoots() { return compileSourceRoots; }
 
     /// The Codename One project directory -- the one holding
     /// `codenameone_settings.properties` -- or null when it could not be found.

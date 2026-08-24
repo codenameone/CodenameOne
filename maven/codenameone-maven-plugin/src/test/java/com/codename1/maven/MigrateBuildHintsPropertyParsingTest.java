@@ -155,4 +155,18 @@ public class MigrateBuildHintsPropertyParsingTest {
     public void aMalformedUnicodeEscapeIsNotDecoded() {
         assertEquals("a.uZZZZb", MigrateBuildHintsMojo.propertyKeyOf("a.\\uZZZZb=1"));
     }
+
+    /// A documented spelling that is not its own constant migrates to the one it
+    /// means, rather than being refused as outside the domain -- which is what an
+    /// existing project setting a legacy spelling would have hit.
+    @Test
+    public void anAcceptedSpellingMigratesToTheConstantItMeans() {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertEquals("IosThemeMode.IOS7", mojo.toSourceLiteral(ios, "flat", false));
+        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "liquid", false));
+        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
+        assertNull(mojo.toSourceLiteral(ios, "nonsense", false));
+    }
 }

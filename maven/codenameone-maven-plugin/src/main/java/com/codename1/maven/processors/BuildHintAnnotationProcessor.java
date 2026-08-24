@@ -209,42 +209,63 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return main != null && main.equals(cls.getBinaryName());
     }
 
-    /// Whether a source file for `cls` still exists under the project.
+    /// Whether a source file for `cls` still exists under the module.
     ///
-    /// Answered "yes" whenever the question cannot actually be put: no project
-    /// directory, or no source tree under it to search. Absence of a source tree
-    /// is not evidence that a class is orphaned -- it means this is a layout the
-    /// lookup does not know, and dropping annotations on that basis would apply
-    /// none of a project's hints while reporting nothing.
+    /// Answered "yes" whenever the question cannot actually be put, because the
+    /// only thing this decides is whether to IGNORE an annotated class, and
+    /// ignoring a live one applies none of its hints and reports nothing. Only a
+    /// class this can positively show has no source is treated as an orphan.
+    ///
+    /// Searched by the file name the compiler recorded, anywhere under the
+    /// module's configured source roots, rather than by the package path. Both
+    /// halves matter: a module may add `generated-sources` or replace
+    /// `src/main/java` outright, and Kotlin lets a file's name and directory
+    /// differ from the class it declares, so a package-path lookup would call a
+    /// perfectly live class orphaned.
     private static boolean hasBackingSource(AnnotatedClass cls, ProcessorContext ctx) {
-        File dir = ctx.getProjectDir();
-        if (dir == null) {
+        List<String> roots = ctx.getCompileSourceRoots();
+        if (roots == null || roots.isEmpty()) {
             return true;
         }
-        // The outermost class owns the file: Outer$Inner lives in Outer.java.
-        String binary = cls.getBinaryName();
-        int nested = binary.indexOf('$');
-        if (nested >= 0) {
-            binary = binary.substring(0, nested);
+        String sourceFile = cls.getSourceFile();
+        if (sourceFile == null || sourceFile.length() == 0) {
+            // Compiled without debug information; nothing to look for.
+            return true;
         }
-        String rel = binary.replace('.', File.separatorChar);
-        String[] roots = {"src" + File.separator + "main" + File.separator + "java",
-                          "src" + File.separator + "main" + File.separator + "kotlin",
-                          "src"};
-        String[] extensions = {".java", ".kt"};
         boolean sawARoot = false;
         for (String root : roots) {
-            if (!new File(dir, root).isDirectory()) {
+            File dir = new File(root);
+            if (!dir.isDirectory()) {
                 continue;
             }
             sawARoot = true;
-            for (String ext : extensions) {
-                if (new File(dir, root + File.separator + rel + ext).isFile()) {
-                    return true;
-                }
+            if (containsFileNamed(dir, sourceFile, 0)) {
+                return true;
             }
         }
         return !sawARoot;
+    }
+
+    /// Whether `name` exists anywhere under `dir`. Depth-limited, because this
+    /// runs on every annotated class and a source tree is not a search index.
+    private static boolean containsFileNamed(File dir, String name, int depth) {
+        if (depth > 24) {
+            return false;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return false;
+        }
+        for (File f : children) {
+            if (f.isFile()) {
+                if (f.getName().equals(name)) {
+                    return true;
+                }
+            } else if (f.isDirectory() && containsFileNamed(f, name, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Build hints configure the application, so they belong on the class the    /// Build hints configure the application, so they belong on the class the
