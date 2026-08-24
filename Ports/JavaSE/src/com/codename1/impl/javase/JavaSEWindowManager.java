@@ -227,7 +227,7 @@ public class JavaSEWindowManager extends WindowManager {
             final boolean ownedByMainWindow) {
         final Peer p = new Peer();
         p.windowId = windowId;
-        runOnAwtAndWait(new Runnable() {
+        boolean created = runOnAwtAndWait(new Runnable() {
             @Override
             public void run() {
                 // An owned window stays above its owner and is iconified with it,
@@ -370,6 +370,19 @@ public class JavaSEWindowManager extends WindowManager {
                 p.monitorIndex = monitorIndexOf(p);
             }
         });
+        // These are the last thing the AWT task does, so either it finished or it did
+        // not. runOnAwtAndWait logs whatever the task threw and returns normally --
+        // allocating a native peer can fail, and a headless or exhausted window server
+        // is the ordinary way -- and returning this peer anyway would report success.
+        // Window.show() checks only for null, so it would register the window, publish
+        // it through Desktop and fire Shown for a window with no frame and no surface
+        // behind it; every later call here would then quietly do nothing against the
+        // null frame, which is a window that exists to the application and to nobody
+        // else. Nor is the peer registered: a peer that never became a window has
+        // nothing for the sweeps over `peers` to do.
+        if (!created || p.frame == null || p.canvas == null) {
+            return null;
+        }
         synchronized (peers) {
             peers.add(p);
         }
@@ -1170,15 +1183,33 @@ public class JavaSEWindowManager extends WindowManager {
         }
     }
 
-    private static void runOnAwtAndWait(Runnable r) {
+    /**
+     * Runs a task on the AWT event thread and waits for it.
+     *
+     * <p>Returns whether the task actually completed. Allocating a native window peer
+     * can fail -- an exhausted or headless window server is the ordinary way -- and
+     * this swallows and logs that, so a caller that goes on to report success needs a
+     * way to know. A caller that ignores the result behaves exactly as before.</p>
+     *
+     * <p>Package private so it can be tested directly: whether a failure is reported
+     * rather than logged and forgotten is the whole point of the return value.</p>
+     *
+     * @param r the task to run
+     * @return true when the task ran to completion
+     */
+    static boolean runOnAwtAndWait(Runnable r) {
         if (SwingUtilities.isEventDispatchThread()) {
+            // Already there, so nothing is swallowed: a failure propagates to the
+            // caller as it always has.
             r.run();
-            return;
+            return true;
         }
         try {
             SwingUtilities.invokeAndWait(r);
+            return true;
         } catch (Exception err) {
             com.codename1.io.Log.e(err);
+            return false;
         }
     }
 }
