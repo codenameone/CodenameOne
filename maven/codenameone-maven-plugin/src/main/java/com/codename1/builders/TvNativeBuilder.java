@@ -258,8 +258,7 @@ class TvNativeBuilder {
         // Keyed off the Bonjour services because that array is written only
         // for a build that uses the transport; an app that declares none is
         // not one, and gets neither key.
-        java.util.List<String> bonjour = WatchNativeBuilder
-                .injectedPlistStringArray(request, "NSBonjourServices");
+        java.util.List<String> bonjour = tvBonjourServices(request);
         if (!bonjour.isEmpty()) {
             String why = request.getArg("ios.NSLocalNetworkUsageDescription",
                     null);
@@ -278,6 +277,38 @@ class TvNativeBuilder {
         sb.append("</dict>\n</plist>\n");
         File plist = new File(appSrcDir, request.getMainClass() + "-TV-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /// The Bonjour service types the iOS slice ended up declaring.
+    ///
+    /// TWO sources, because the build writes to whichever the app left it.
+    /// An app that declares the array itself puts it in ios.plistInject and
+    /// the merge leaves it alone; every other build -- the ordinary
+    /// generated one -- gets a comma-separated hint in ios.NSBonjourServices
+    /// instead. Reading only the first found nothing in the normal case, so
+    /// the tvOS plist was written without either local-network key and the
+    /// slice still could not discover anything.
+    private static java.util.List<String> tvBonjourServices(
+            BuildRequest request) {
+        java.util.List<String> declared = WatchNativeBuilder
+                .injectedPlistStringArray(request, "NSBonjourServices");
+        if (!declared.isEmpty()) {
+            return declared;
+        }
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String hint = request.getArg("ios.NSBonjourServices", "");
+        if (hint == null) {
+            return out;
+        }
+        // Both separators, because mergeNearbyBonjourServices splits on both
+        // when it reads the hint back.
+        for (String entry : hint.split("[,;]")) {
+            String service = entry.trim();
+            if (service.length() > 0) {
+                out.add(service);
+            }
+        }
+        return out;
     }
 
     private static void plistString(StringBuilder sb, String key, String value) {

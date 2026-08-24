@@ -92,4 +92,24 @@ class TvNativeBuilderNearbyTest {
                 "and the usage description, without which tvOS 14 refuses"
                 + " the discovery outright");
     }
+
+    /**
+     * The generated hint is read, not only a hand-written plistInject.
+     *
+     * <p>The build writes to whichever source the app left it: an app that
+     * declares NSBonjourServices itself puts it in {@code ios.plistInject}
+     * and the merge leaves it alone, while every other build -- the
+     * ordinary generated one -- gets a comma-separated
+     * {@code ios.NSBonjourServices} instead. Reading only the first found
+     * nothing in the normal case, so the tvOS plist was written without
+     * either local-network key and the slice still could not discover
+     * anything.</p>
+     */
+    @Test
+    void theTvPlistReadsTheGeneratedBonjourHint() throws Exception {
+        String src = source();
+        assertTrue(src.contains("ios.NSBonjourServices"),
+                "the tvOS plist has to read the hint the nearby merge"
+                + " writes, not only ios.plistInject");
+    }
 }

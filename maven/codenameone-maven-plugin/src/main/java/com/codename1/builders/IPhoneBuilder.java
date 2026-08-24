@@ -4691,6 +4691,32 @@ public class IPhoneBuilder extends Executor {
                                     + " startAdvertising)"));
                     mergeNearbyBonjourServices(request, serviceTypes,
                             usesBonjour);
+                    // The disclosure is MANDATORY, so an unusable one is
+                    // refused rather than shipped.
+                    //
+                    // The catalog supplies a default, but only where the app
+                    // set nothing: "false" suppresses the key outright and a
+                    // blank value renders an empty string, and iOS treats
+                    // either as no disclosure at all -- so MultipeerConnectivity
+                    // finds no peers and says nothing about why. Refused here,
+                    // before the cloud slot is spent, the way the Matter flow
+                    // refuses a build it knows cannot work.
+                    String localNetwork = request.getArg(
+                            "ios.NSLocalNetworkUsageDescription", "");
+                    if (localNetwork == null
+                            || localNetwork.trim().length() == 0
+                            || "false".equalsIgnoreCase(localNetwork.trim())) {
+                        throw new RuntimeException(
+                                "This app uses com.codename1.nearby.transport,"
+                                + " which iOS will not let discover or"
+                                + " advertise without a local-network purpose"
+                                + " string, and"
+                                + " ios.NSLocalNetworkUsageDescription is set"
+                                + " to '" + localNetwork + "'. Give it a"
+                                + " sentence telling the user why the app"
+                                + " looks for nearby devices, or remove the"
+                                + " hint and let the build supply one.");
+                    }
                 }
                 if (usesNearbyCompanion) {
                     // Info.plist keys and NO entitlement, deliberately.
