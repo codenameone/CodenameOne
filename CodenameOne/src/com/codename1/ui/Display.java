@@ -1480,7 +1480,9 @@ public final class Display extends CN1Constants {
 
         // The main surface's timers, exactly as they always were.
         long t = System.currentTimeMillis();
-        if (current != null) {
+        // The main surface is blockable too: a modal window blocks it, and a held key
+        // must stop repeating into the form behind that modal.
+        if (current != null && !Desktop.getInstance().isWindowInputBlocked(0)) {
             if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
                 current.keyRepeated(keyRepeatValue);
                 int keyRepeatNextIntervalTime = 10;

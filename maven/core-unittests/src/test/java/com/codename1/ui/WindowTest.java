@@ -3788,36 +3788,54 @@ class WindowTest extends UITestBase {
 
         Window w = new Window("target", new BorderLayout());
         w.setWindowSize(400, 300);
+        RepeatCountingComponent c = new RepeatCountingComponent();
+        c.setFocusable(true);
+        w.add(BorderLayout.CENTER, c);
         w.show();
+        w.asContainer().revalidate();
+        w.setFocused(c);
         flushSerialCalls();
 
-        java.lang.reflect.Method target = Display.class.getDeclaredMethod(
-                "repeatTarget", int.class, Form.class);
-        target.setAccessible(true);
         Window modal = new Window("modal", new BorderLayout());
         modal.setWindowSize(200, 150);
         try {
-            assertSame(w, target.invoke(Display.getInstance(),
-                    Integer.valueOf(w.getWindowId()), main),
-                    "an unblocked window is a valid repeat target");
+            // A key held down in the window. The timers are driven with an explicit
+            // clock rather than by waiting out the 800ms first-repeat delay, so the
+            // test is deterministic instead of timing-dependent.
+            Desktop.getInstance().windowKeyPressed(w.getWindowId(), 65);
+            DisplayTest.flushEdt();
+            w.serviceInputTimers(System.currentTimeMillis() + 5000, 500);
+            assertTrue(c.repeats > 0, "a held key repeats into the window that saw it");
 
-            // A handler can open an application modal from the very press that is
-            // still being held. These timers are armed when the press is accepted and
-            // fire from the paint loop, which calls keyRepeated and longPointerPress
-            // directly -- so they never meet the modality filter the packed queue
-            // applies, and the held press went on driving the window behind the modal.
+            // A modal goes up over everything. The held key has not been released, so
+            // the timer is still armed -- but its repeats must stop reaching a window
+            // the user can no longer interact with.
             modal.setModalityType(Window.MODALITY_APPLICATION);
             modal.show();
             flushSerialCalls();
-
-            assertNull(target.invoke(Display.getInstance(),
-                    Integer.valueOf(w.getWindowId()), main),
+            int before = c.repeats;
+            w.serviceInputTimers(System.currentTimeMillis() + 10000, 500);
+            assertEquals(before, c.repeats,
                     "a window blocked by a modal must not receive repeats or long presses");
-            assertNull(target.invoke(Display.getInstance(), Integer.valueOf(0), main),
-                    "nor must the main form");
         } finally {
             modal.dispose();
             w.dispose();
+            DisplayTest.flushEdt();
+        }
+    }
+
+    /// Counts key repeats reaching a component.
+    private static final class RepeatCountingComponent extends Component {
+        private int repeats;
+
+        @Override
+        public void keyRepeated(int keyCode) {
+            repeats++;
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            return new com.codename1.ui.geom.Dimension(120, 90);
         }
     }
 

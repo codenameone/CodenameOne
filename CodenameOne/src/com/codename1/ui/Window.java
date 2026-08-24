@@ -2811,6 +2811,13 @@ public class Window extends Container implements TopLevelContainer {
         if (!nativeVisible || disposing) {
             return;
         }
+        // A window the user cannot reach must not go on receiving the repeats and long
+        // presses a still-held key armed before it was blocked. The routing helper this
+        // replaced made the same check, and dropping it here would have delivered input
+        // to a window sitting behind a modal.
+        if (Desktop.getInstance().isWindowInputBlocked(getWindowId())) {
+            return;
+        }
         if (keyRepeatArmed && keyRepeatNext <= now) {
             keyRepeated(keyRepeatValue);
             int keyRepeatNextIntervalTime = 10;
