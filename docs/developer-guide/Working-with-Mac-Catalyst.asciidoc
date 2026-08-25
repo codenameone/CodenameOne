@@ -66,17 +66,22 @@ Deployment floors are macOS 10.15 and Catalyst 13.1.
 
 === Windows
 
-Windows are opt-in here. Set `macNative.multiWindow=true` alongside
-`macNative.enabled=true`; the native macOS build needs no such hint, because
-AppKit is multi-window natively. The opt-in exists because a Catalyst window
-needs a multi-scene `Info.plist` key that shifts every layout in the
-application slightly -- see <<mac-catalyst-windows>> for the measurement.
+Windows are off by default here, and turning them on isn't recommended. Set
+`macNative.multiWindow=true` alongside `macNative.enabled=true` if you need
+them anyway.
 
-With it set, a Codename One `Window` works, with one difference worth knowing:
-the window's content is rendered into an off-screen raster and presented to the
-scene's view, rather than the window owning its own GPU surface. Native peer
-components and native text editing still use the scene's real view hierarchy and
-behave normally.
+They're off because the implementation has limits Catalyst can't lift, listed
+below, and because enabling them costs the rest of the application a layout
+shift -- see <<mac-catalyst-windows>> for the measurement. Neither was worth
+paying once the native macOS build existed: there, windows are on with no hint
+at all and every operation on the API is implemented, because AppKit is a
+multi-window system and Catalyst is an iOS one wearing a Mac frame.
+
+With the hint set, a Codename One `Window` works, with one difference worth
+knowing: the window's content is rendered into an off-screen raster and
+presented to the scene's view, rather than the window owning its own GPU
+surface. Native peer components and native text editing still use the scene's
+real view hierarchy and behave normally.
 
 Some window controls have no Mac Catalyst equivalent, because AppKit owns the
 behavior and Catalyst doesn't expose it to a `UIWindowScene`. `setAlwaysOnTop`,

@@ -412,7 +412,7 @@ between them updates it.
 
 Every operation on the windowing API is implemented. That's worth saying
 explicitly because the Mac Catalyst target below can't implement several of
-them, and code written against one target shouldn't surprise you on the other.
+them -- which is why windows are off by default there and on by default here.
 
 [[mac-catalyst-windows]]
 === Mac Catalyst (legacy)
