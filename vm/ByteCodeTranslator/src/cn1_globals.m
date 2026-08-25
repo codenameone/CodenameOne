@@ -1290,20 +1290,30 @@ static void cn1MatureObject(JAVA_OBJECT obj) {
     // Sticky-flag the host page so its slots always take the full per-slot sweep walk
     // (which skips live -4 slots) instead of the O(1) page reset, which would recycle this
     // still-live object's memory out from under the legacy collector.
-#ifdef CN1_GC_CONFORM
     {
         CN1BibopPage* __mp = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
+        // ONE atomic transition rather than a test and a separate store. The CAS above
+        // guarantees a single thread matures a given OBJECT, but two markers can mature
+        // two different objects on the SAME page concurrently -- so a plain store here is
+        // a data race the moment gcMarkResolveThreadCount stops returning 1, and a
+        // test-then-increment would count that page twice. Exchange returns the previous
+        // value, so exactly one thread sees the FALSE->TRUE edge.
+        JAVA_BOOLEAN __wasAdopted = __atomic_exchange_n(&__mp->gcHasAdopted, JAVA_TRUE,
+                                                        __ATOMIC_RELAXED);
+#ifdef CN1_GC_CONFORM
         atomic_fetch_add_explicit(&cn1GcMaturedTotal, 1, memory_order_relaxed);
-        // Count the page only on the FALSE->TRUE transition: gcHasAdopted is sticky, so
-        // counting every maturation would report maturations, not pinned pages, and the
-        // ratio pinnedPages/pagesRegistered is the whole point (a pinned page can never
-        // take the O(1) reclaim shortcut again).
-        if(__mp->gcHasAdopted == JAVA_FALSE) {
+        // Count the PAGE only on that edge: gcHasAdopted is sticky, so counting every
+        // maturation would report maturations rather than pinned pages, and the ratio
+        // pinnedPages/pagesRegistered is the whole point -- a pinned page can never take
+        // the O(1) reclaim shortcut again. That ratio is read chiefly in the
+        // CN1_GC_MARK_THREADS>1 arm, which is exactly where a racy count would be wrong.
+        if(__wasAdopted == JAVA_FALSE) {
             atomic_fetch_add_explicit(&cn1GcMaturedPages, 1, memory_order_relaxed);
         }
-    }
+#else
+        (void)__wasAdopted;
 #endif
-    ((CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcHasAdopted = JAVA_TRUE;
+    }
     // Buffer for post-mark registration (NOT placeObjectInHeapCollection here -- see above).
     pthread_mutex_lock(&gcAdoptMutex);
     if(gcAdoptTop >= gcAdoptCap) {
@@ -1552,9 +1562,14 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
         // Same reasoning as the filter above; a census may misclassify but must not be a
         // mixed atomic/non-atomic access to the field.
         int __m = __atomic_load_n(&old->__codenameOneGcMark, __ATOMIC_RELAXED);
-        // Read atomically for the same reason: this runs on a mutator, and the collector
-        // owns and increments currentGcMarkValue.
-        if(__m == __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED)) {
+        // Against the ATOMIC mirror, not currentGcMarkValue: this runs on a mutator while
+        // the collector increments that plain int, and an atomic read of a plainly-written
+        // object is still a mixed access.
+#ifdef CN1_DISABLE_BIBOP
+        if(0) {
+#else
+        if(__m == atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed)) {
+#endif
             atomic_fetch_add_explicit(&cn1GcSatbAlready, 1, memory_order_relaxed);
         } else if(__m == -1) {
             atomic_fetch_add_explicit(&cn1GcSatbFresh, 1, memory_order_relaxed);
@@ -9469,11 +9484,20 @@ static void* cn1GcProbeThread(void* ignored) {
                         " bytesSinceGc=%lld staleSkips=%ld\n",
             cn1GcProbeElapsedMs(),
             (long long)cn1ProcFootprintBytes() / 1024,
-            // Atomic: the collector increments this ordinary int in codenameOneGCMark
-            // while this detached thread reads it. Plain would be a data race, and this
-            // emitter exists precisely to keep reporting when the collector is stalled --
-            // the moment a stale or invented value would mislead most.
-            __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED),
+#ifdef CN1_DISABLE_BIBOP
+            // No page heap means no atomic mirror of the cycle counter, and making only
+            // the READER atomic would not make currentGcMarkValue's plain ++ in
+            // codenameOneGCMark well-defined. Report "unavailable" rather than a figure
+            // read through a data race.
+            -1,
+#else
+            // bibopGcEpoch is the collector's own _Atomic mirror of currentGcMarkValue,
+            // published at cycle start. Reading it keeps both sides of this access atomic
+            // -- which making just the reader atomic would not have done -- and matters
+            // here because this emitter exists to keep reporting when the collector is
+            // stalled, the moment a stale cycle number misleads most.
+            atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed),
+#endif
 #ifdef CN1_DISABLE_BIBOP
             0LL,
 #else
