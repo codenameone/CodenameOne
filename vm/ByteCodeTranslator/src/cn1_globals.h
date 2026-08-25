@@ -2183,7 +2183,7 @@ extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struc
 static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
     struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
     a->__codenameOneParentClsReference = acls;
-    a->__codenameOneGcMark = -1;
+    a->__codenameOneGcMark = -1;   // not yet published; see codenameOneGcMalloc
     a->__heapPosition = -1;
     a->length = len;
     a->dimensions = 1;

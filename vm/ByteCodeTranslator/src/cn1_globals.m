@@ -2749,7 +2749,7 @@ void codenameOneGCSweep() {
                     //counter++;
                 }
             } else {
-                o->__codenameOneGcMark = currentGcMarkValue;
+                __atomic_store_n(&o->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);
             }
         }
     }
@@ -5330,7 +5330,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                             }
                         }
                         cn1GcVerifyPoisonSlot(__o, page->slotSize);
-                        __o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
+                        __atomic_store_n(&__o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
                         cn1GcVerifyFreedSlots++;
                     }
                 }
@@ -5383,7 +5383,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 *(void**)o = fl; fl = o; freeCount++;
             } else if(m == -1) {
                 // fresh, never marked -> one cycle of grace (legacy parity)
-                o->__codenameOneGcMark = V;
+                __atomic_store_n(&o->__codenameOneGcMark, V, __ATOMIC_RELAXED);
                 liveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
                 // parentCls==0 => a MID-CONSTRUCTION memset-elided object (the
@@ -5404,7 +5404,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 // are written after, so the page structure is unaffected.
                 cn1GcVerifyPoisonSlot(o, page->slotSize);
 #endif
-                o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
+                __atomic_store_n(&o->__codenameOneGcMark, CN1_BIBOP_FREE_MARK, __ATOMIC_RELAXED);
                 *(void**)o = fl; fl = o; freeCount++;
             } else {
                 liveCount++;
@@ -6421,7 +6421,7 @@ JAVA_BOOLEAN cn1GcVerifyQuarantineFree(JAVA_OBJECT obj) {
 #endif
     cn1GcVerifyFreedLegacy++;
     cn1GcPoisonBody(obj, sz);
-    obj->__codenameOneGcMark = CN1_GC_POISON_MARK;
+    __atomic_store_n(&obj->__codenameOneGcMark, CN1_GC_POISON_MARK, __ATOMIC_RELAXED);
     obj->__heapPosition = CN1_GC_POISON_POS;
     JAVA_OBJECT evicted = cn1GcQRing[cn1GcQRingPos];
     cn1GcQRing[cn1GcQRingPos] = obj;
@@ -7280,6 +7280,10 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         memset(o, 0, size);
     }
     o->__codenameOneParentClsReference = parent;
+    // PLAIN, unlike the collector-side writes below: this is header initialisation of an
+    // object no other thread can reach yet. The SATB barrier only ever reads the mark of
+    // an object the mutator holds a reference to, i.e. one already published, and the
+    // publishing store is what orders this write against any reader.
     o->__codenameOneGcMark = -1;
     o->__heapPosition = -1;
 #ifdef DEBUG_GC_ALLOCATIONS
@@ -8118,7 +8122,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
     }
 #endif
-    obj->__codenameOneGcMark = markVal;
+    __atomic_store_n(&obj->__codenameOneGcMark, markVal, __ATOMIC_RELAXED);
     CN1_BIBOP_STAMP_MARKED_GRACE(obj, markVal, markSnapshot);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
     gcMarkNewObjectCount++;   // SATB fixpoint detection (mark-thread only)
@@ -8405,6 +8409,10 @@ JAVA_OBJECT cn1NurseryAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* p
     threadStateData->nurseryAllocSinceMinor++;
     memset(o, 0, size);
     o->__codenameOneParentClsReference = parent;
+    // PLAIN, unlike the collector-side writes below: this is header initialisation of an
+    // object no other thread can reach yet. The SATB barrier only ever reads the mark of
+    // an object the mutator holds a reference to, i.e. one already published, and the
+    // publishing store is what orders this write against any reader.
     o->__codenameOneGcMark = -1;
     o->__heapPosition = -1;
     return o;
@@ -8439,7 +8447,7 @@ void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN 
     // there the array's mark bit is NOT claimed through gcMarkObject, so set it as the
     // pre-existing code did.
     if(threadStateData->nurseryPromoting) {
-        obj->__codenameOneGcMark = currentGcMarkValue;
+        __atomic_store_n(&obj->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);
     }
 #endif
     // In the concurrent GC drain (serial or parallel) this array's mark bit was already
