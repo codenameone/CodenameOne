@@ -1856,8 +1856,9 @@ JAVA_VOID java_lang_System_gcLight__(CODENAME_ONE_THREAD_STATE) {
 JAVA_BOOLEAN firstTimeGcThread = JAVA_TRUE;
 JAVA_BOOLEAN gcCurrentlyRunning = JAVA_FALSE;
 #ifdef CN1_GC_CONFORM
-extern void cn1GcProbeCycle(double markMs, double sweepMs);
+extern void cn1GcProbeCycle(double markMs, double sweepMs, int threw);
 double cn1GcProbeMarkMs = 0, cn1GcProbeSweepMs = 0;
+int cn1GcProbeThrew = 0;
 #endif
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     gcCurrentlyRunning = JAVA_TRUE;
@@ -1881,6 +1882,16 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // backstop: on any throw, drop it, and still clear gcCurrentlyRunning so the collector
     // stays healthy and the next cycle retries. If MARK threw, SWEEP is skipped -- correct,
     // sweeping a partial mark would free reachable objects.
+#ifdef CN1_GC_CONFORM
+    // Cleared BEFORE the protected region. A cycle that throws jumps past the timing
+    // assignments below, so without this the row would carry the previous cycle's markMs
+    // and sweepMs beside the partial current cycle's phase counters -- two cycles in one
+    // row, concealing the exceptional cycle, which is the one worth seeing. These are
+    // file-scope, so the setjmp/longjmp indeterminate-local rule does not apply.
+    cn1GcProbeMarkMs = 0;
+    cn1GcProbeSweepMs = 0;
+    cn1GcProbeThrew = 0;
+#endif
     int __gcSavedTryBlock = threadStateData->tryBlockOffset;
     jmp_buf __gcTryJmp;
     if(CN1_TRY_SETJMP(__gcTryJmp) == 0) {
@@ -1921,10 +1932,13 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     } else {
         threadStateData->tryBlockOffset = __gcSavedTryBlock;
         threadStateData->exception = JAVA_NULL;
+#ifdef CN1_GC_CONFORM
+        cn1GcProbeThrew = 1;
+#endif
     }
     flushReleaseQueue();
 #ifdef CN1_GC_CONFORM
-    cn1GcProbeCycle(cn1GcProbeMarkMs, cn1GcProbeSweepMs);
+    cn1GcProbeCycle(cn1GcProbeMarkMs, cn1GcProbeSweepMs, cn1GcProbeThrew);
 #endif
 #ifdef CN1_ALLOC_CENSUS
     {

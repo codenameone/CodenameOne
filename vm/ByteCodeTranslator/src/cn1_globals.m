@@ -9370,7 +9370,11 @@ static void cn1GcProbeResetPhases(void) {
     cn1GcPoolNs = 0;
 }
 
-void cn1GcProbeCycle(double markMs, double sweepMs) {
+// threw != 0 means the collection cycle raised into gcMarkSweep's catch-all, so mark and
+// sweep timings are zero and every other figure describes a PARTIAL cycle. The row is
+// still emitted, and flagged: suppressing it would hide the one cycle a reader most wants
+// to see, which is the same reason this probe has a wall-clock emitter at all.
+void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
     int every = cn1GcProbeEvery();
     if(every == 0) {
         return;
@@ -9464,7 +9468,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
     long long residKb = fpKb - (residentPgBytes + legBlockBytes + legTableBytes + sideBytes) / 1024;
 
     fprintf(stderr,
-        "[GCPROBE] v=1 cyc=%d tMs=%lld fpKb=%lld"
+        "[GCPROBE] v=1 cyc=%d tMs=%lld fpKb=%lld threw=%d"
         " pgTotal=%lld pgEmpty=%lld pgReleased=%lld pgAdopted=%lld pgMon=%lld pgOwned=%lld pgGrace=%lld"
         " resvKb=%lld residentPgKb=%lld liveSlotKb=%lld deadSlotKb=%lld"
         " legCap=%d legUsed=%lld legAdopted=%lld legTableKb=%lld legBlockKb=%lld"
@@ -9476,7 +9480,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
         " staleSkips=%ld ovfCycles=%ld graceDrains=%ld"
         " consWords=%lld consResolved=%lld consFirstMarks=%lld"
         " monitors=%ld immortal=%d fvLive=%ld sideKb=%lld residKb=%lld\n",
-        currentGcMarkValue, cn1GcProbeElapsedMs(), fpKb,
+        currentGcMarkValue, cn1GcProbeElapsedMs(), fpKb, threw,
         pgTotal, pgEmpty, pgReleased, pgAdopted, pgMon, pgOwned, pgGrace,
         resvBytes / 1024, residentPgBytes / 1024, liveSlots / 1024, deadSlots / 1024,
         legCap, legUsed, legAdopted, legTableBytes / 1024, legBlockBytes / 1024,
