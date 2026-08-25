@@ -569,6 +569,37 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aKeySpelledWithCdataIsStillThatKey() {
+        // A plist parser resolves <key><![CDATA[NSMainNibFile]]></key> to NSMainNibFile,
+        // so this IS a main NIB declaration. Matching the raw serialization missed it,
+        // and the Mac copy then kept the effective entry and paired it with the scene
+        // manifest added below -- the launch failure the removal exists to prevent.
+        String shared = document(
+                "    <key><![CDATA[NSMainNibFile]]></key>\n    <string>MainWindow</string>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertFalse(mac.contains("NSMainNibFile"),
+                "a CDATA-spelled key names the same key and has to go with it");
+        assertFalse(mac.contains("MainWindow"), "and its value goes with it");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "the Mac copy still gains the manifest that made the NIB fatal");
+    }
+
+    @Test
+    void aKeyCarryingACommentOrAnEntityIsStillThatKey() {
+        // Same question, the other two legal spellings: a comment inside the element,
+        // and a character reference. Both resolve to the same name.
+        String commented = document(
+                "    <key>NSMain<!-- why -->NibFile</key>\n    <string>MainWindow</string>\n");
+        assertFalse(IPhoneBuilder.plistForMacSlice(commented).contains("MainWindow"),
+                "a comment inside the key does not change which key it is");
+
+        String entity = document(
+                "    <key>&#78;SMainNibFile</key>\n    <string>MainWindow</string>\n");
+        assertFalse(IPhoneBuilder.plistForMacSlice(entity).contains("MainWindow"),
+                "nor does spelling its first letter as a character reference");
+    }
+
+    @Test
     void markupInsideACdataSectionIsNotADeclaration() {
         // Character data that happens to look like markup. The element search excluded
         // only XML comments, so this was read as a live declaration: plistDeclaresKey

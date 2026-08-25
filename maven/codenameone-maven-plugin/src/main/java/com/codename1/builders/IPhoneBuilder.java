@@ -11483,7 +11483,14 @@ public class IPhoneBuilder extends Executor {
             // is the same key as the contiguous spelling, and requiring the tags and the
             // name to be adjacent reported it absent -- which made the build append a
             // second manifest beside the application's own, leaving duplicate keys.
-            if (key.equals(plist.substring(contentStart, close).trim())) {
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContent(
+                    plist.substring(contentStart, close)))) {
                 return at;
             }
             at = plistElementIndex(plist, "key", close);
@@ -12039,7 +12046,14 @@ public class IPhoneBuilder extends Executor {
             if (valueEnd < 0) {
                 return null;
             }
-            if (key.equals(plist.substring(contentStart, close).trim())) {
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContent(
+                    plist.substring(contentStart, close)))) {
                 return new int[] {keyIndex, valueEnd};
             }
             at = valueEnd;
@@ -12182,7 +12196,14 @@ public class IPhoneBuilder extends Executor {
             if (valueEnd < 0) {
                 return null;
             }
-            if (key.equals(plist.substring(contentStart, close).trim())) {
+            // The key's CONTENT resolved, not its serialization: `<key><![CDATA[Foo]]></key>`,
+            // a comment inside the element and a character reference all name the same key
+            // to a plist parser. Comparing the raw text missed every one of those, so an
+            // injected key spelled that way was reported absent -- and the caller then left
+            // it in place, or appended a second one beside it. plistKeyEnd already resolved
+            // through the same helper, so this was two answers to one question.
+            if (key.equals(WatchNativeBuilder.plistStringContent(
+                    plist.substring(contentStart, close)))) {
                 return new int[] {valueStart, valueEnd};
             }
             at = valueEnd;
