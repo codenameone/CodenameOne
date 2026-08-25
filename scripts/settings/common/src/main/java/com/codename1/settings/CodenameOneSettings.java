@@ -2315,8 +2315,21 @@ public class CodenameOneSettings extends Lifecycle {
     /// for it could be read at all.
     private java.util.Map<String, String> annotationOwnedHintsFromSource() {
         java.util.Map<String, String> out = new java.util.HashMap<>();
-        String main = settings == null ? null : settings.get("codename1.mainName");
-        String pkg = settings == null ? null : settings.get("codename1.packageName");
+        // What the launcher resolved, when it did: `codename1.mainName` can be
+        // overridden with -D, and that overlay is the entry point
+        // process-annotations stamps the manifest with. Reading the file here
+        // scanned a different class than the build compiles, so an annotation on
+        // the selected one was reported as absent -- and Add then writes the
+        // duplicate declaration the next build refuses.
+        //
+        // The pair travels together or not at all: a resolved main class with no
+        // package means a project that has none.
+        String main = binding == null ? null : binding.mainName();
+        String pkg = binding == null ? null : binding.packageName();
+        if (main == null || main.isEmpty()) {
+            main = settings == null ? null : settings.get("codename1.mainName");
+            pkg = settings == null ? null : settings.get("codename1.packageName");
+        }
         if (binding == null || binding.projectDir() == null || main == null || main.isEmpty()) {
             return out;
         }

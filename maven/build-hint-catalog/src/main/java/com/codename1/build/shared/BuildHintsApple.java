@@ -189,7 +189,8 @@ final class BuildHintsApple {
                         + "slice's own `Info.plist`; `getWindowManager()` reads that key back out of the "
                         + "bundle, so without it windows are reported unsupported and constructing one "
                         + "throws. Off by default because multi-window support relayouts the app into a "
-                        + "resizable window, which an app that never asked for it should not get."));
+                        + "resizable window, and an app that never asked for windows gets that "
+                        + "relayout for free."));
 
         h.add(new Hint("macNative.notarize")
                 .group(HintGroup.MAC_NATIVE)

@@ -254,7 +254,15 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 + bindingLines("sourceRoot",
                         compileSourceRoots(moduleAt(projectDir), userProperties()))
                 + bindingValue("sourceEncoding",
-                        sourceEncodingOf(moduleAt(projectDir), userProperties()));
+                        sourceEncodingOf(moduleAt(projectDir), userProperties()))
+                // The EFFECTIVE entry point, which is what process-annotations
+                // stamps the manifest with and what the build hint merge expects.
+                // `properties` carries any -Dcodename1.mainName; the settings
+                // file does not, so a tool reading the file looked at a different
+                // class than the build and reported the annotations on the
+                // selected one as absent.
+                + bindingValue("mainName", effective("codename1.mainName"))
+                + bindingValue("packageName", effective("codename1.packageName"));
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {
@@ -307,6 +315,12 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         } catch (IOException ex) {
             return f.getAbsolutePath();
         }
+    }
+
+    /// One key of the settings Maven resolved, or null before `execute()` has
+    /// loaded them -- which is how the tests drive `writeBinding` directly.
+    private String effective(String key) {
+        return properties == null ? null : properties.getProperty(key);
     }
 
     private static String bindingValue(String key, String value) {

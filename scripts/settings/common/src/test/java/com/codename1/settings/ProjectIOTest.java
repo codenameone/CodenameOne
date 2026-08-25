@@ -93,4 +93,29 @@ public class ProjectIOTest {
         assertTrue(older.sourceRoots().isEmpty());
         assertNull(older.sourceEncoding());
     }
+
+    /// The launcher's entry point reaches the tool.
+    ///
+    /// `codename1.mainName` can be overridden with `-D`, and that overlay is the
+    /// class `process-annotations` stamps the manifest with. Without it the tool
+    /// scanned the file's entry point instead and reported the annotations on
+    /// the one the build selected as absent.
+    @Test
+    public void theBindingCarriesTheResolvedMainClass() {
+        ProjectBinding b = ProjectBinding.parse(
+                "projectDir=/p/common\n"
+                        + "settings=/p/common/codenameone_settings.properties\n"
+                        + "mainName=OverriddenApp\n"
+                        + "packageName=com.example\n");
+        assertEquals("OverriddenApp", b.mainName());
+        assertEquals("com.example", b.packageName());
+    }
+
+    /// A launcher that did not say leaves the tool to read the file.
+    @Test
+    public void theBindingSaysNothingWhenTheLauncherDidNot() {
+        ProjectBinding b = ProjectBinding.parse("projectDir=/p/common\n");
+        assertNull(b.mainName());
+        assertNull(b.packageName());
+    }
 }

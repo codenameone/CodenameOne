@@ -29,6 +29,8 @@ public final class ProjectBinding {
     private String multimoduleRoot;
     private final java.util.List<String> sourceRoots = new java.util.ArrayList<>();
     private String sourceEncoding;
+    private String mainName;
+    private String packageName;
 
     public String projectDir() {
         return projectDir;
@@ -63,6 +65,28 @@ public final class ProjectBinding {
         return sourceEncoding;
     }
 
+    /// The main class name Maven RESOLVED, or null when the launcher did not
+    /// say.
+    ///
+    /// `codename1.mainName` can be overridden with `-D`, and the overlay is what
+    /// `process-annotations` stamps the manifest with and what `CN1BuildMojo`
+    /// expects. Reading the settings file here looked at a different class than
+    /// the build does, and an annotation on the class the build actually selected
+    /// was reported as absent -- which is the state that lets Add write the
+    /// duplicate the next build refuses.
+    public String mainName() {
+        return mainName;
+    }
+
+    /// The package name Maven resolved, or null when the launcher did not say.
+    ///
+    /// Taken together with [mainName] or not at all: a resolved main class with
+    /// no package means a project that has none, not one whose package should
+    /// come from the file.
+    public String packageName() {
+        return packageName;
+    }
+
     public boolean isValid() {
         return settings != null && settings.length() > 0;
     }
@@ -95,6 +119,8 @@ public final class ProjectBinding {
                     }
                 }
                 case "sourceEncoding" -> b.sourceEncoding = val;
+                case "mainName" -> b.mainName = val;
+                case "packageName" -> b.packageName = val;
                 default -> {
                 }
             }

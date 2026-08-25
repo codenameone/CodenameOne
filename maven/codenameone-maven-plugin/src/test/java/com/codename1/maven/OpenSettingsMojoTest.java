@@ -187,6 +187,51 @@ public class OpenSettingsMojoTest {
         assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
     }
 
+    /// The EFFECTIVE entry point travels in the binding.
+    ///
+    /// `codename1.mainName` can be overridden with `-D`, and that overlay is
+    /// what `process-annotations` stamps the manifest with. Settings reading the
+    /// file instead scanned a different class than the build compiles, so an
+    /// annotation on the selected one was reported as absent -- and Add then
+    /// writes the duplicate declaration the next build refuses.
+    @Test
+    public void bindingCarriesTheEffectiveMainClass() throws Exception {
+        File root = tmp.newFolder("identity");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("identity.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        // What execute() leaves behind once the command line has been overlaid.
+        mojo.properties = new java.util.Properties();
+        mojo.properties.setProperty("codename1.mainName", "OverriddenApp");
+        mojo.properties.setProperty("codename1.packageName", "com.example");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("mainName=OverriddenApp\n"));
+        assertTrue(binding, binding.contains("packageName=com.example\n"));
+    }
+
+    /// ...and a launcher that has loaded no settings says nothing rather than
+    /// failing, which is how the other tests here drive writeBinding.
+    @Test
+    public void bindingOmitsTheMainClassWhenNothingResolvedIt() throws Exception {
+        File root = tmp.newFolder("noidentity");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("noidentity.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertFalse(binding, binding.contains("mainName="));
+    }
+
     /// Maven does not copy a plugin parameter into the project's properties, so
     /// a POM that sets `<encoding>` inside maven-compiler-plugin -- in a profile,
     /// say -- published nothing and left the tool guessing.
