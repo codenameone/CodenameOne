@@ -2349,82 +2349,61 @@ public class CodenameOneSettings extends Lifecycle {
     /// declarations made elsewhere.
     private String lastSourcePath;
 
-    /// Whether the walk should descend into `dir`/`name` looking for sources
-    /// that take part in compiling the main class.
+    /// The directories a module's MAIN sources are compiled from, by
+    /// convention, as candidates to be filtered by what exists.
     ///
-    /// Three rules, and each of them was a bug first:
+    /// An allow-list rather than a walk of the whole project with exclusions.
+    /// The exclusions were never going to be complete -- `src/test` was
+    /// followed by `src/testFixtures`, then `src/main/resources`, then
+    /// `src/main/templates` and `src/main/proto` -- because "not a source root"
+    /// is not a property of a directory's name. Naming the roots instead makes
+    /// every one of those wrong by construction.
     ///
-    /// - An output directory holds COPIES of the sources read elsewhere, and
-    ///   walking one found a generated stub and called it the main class.
-    /// - Unless `build` is a package NAME under a source tree, which this
-    ///   repository has -- refusing to descend there meant a main class living
-    ///   in it could not be read at all.
-    /// - A test source set takes no part in compiling the main class, so a
-    ///   same-package type there shadows nothing; counting it made a production
-    ///   annotation look like somebody else's.
+    /// `target/generated-sources` is a root: Maven plugins add it, so a
+    /// declaration there is one the compiler sees. Nothing else under an output
+    /// directory is reachable, which also retires the `build` special case --
+    /// starting inside a source root means com.codename1.build.shared is walked
+    /// as the package it is, with no rule needed to tell it from an output
+    /// directory.
     ///
-    /// That last one is a directory under `src` whose name says test:
-    /// `src/test`, and equally `src/testFixtures`, `src/integrationTest` and
-    /// `src/androidTest`, which are source sets by the same convention. Only
-    /// under `src`, because deeper down the same word is an ordinary package
-    /// name.
-    static boolean peerDirectoryHoldsSources(String dir, String name, boolean insideSourceTree) {
-        if (name.startsWith(".")) {
-            return false;
+    /// The flat `src` is a candidate only where there is no `src/main`, since
+    /// that is the layout it belongs to; in a Maven layout it would drag the
+    /// test sets back in.
+    ///
+    /// KNOWN LIMIT, and the reason it is acceptable: a module that configures a
+    /// custom root in its POM is not covered, because this tool has no resolved
+    /// project to ask and its POM handling is deliberately string surgery rather
+    /// than an XML model. Missing a peer means a shadowing type goes unseen, so
+    /// a hint reads as annotation-owned and its editor stays hidden -- annoying,
+    /// but it cannot write the duplicate declaration that fails the next build,
+    /// which is what including a non-source directory could.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (projectDir == null) {
+            return out;
         }
-        if (("target".equals(name) || "build".equals(name)) && !insideSourceTree) {
-            return false;
+        out.add(projectDir + "/src/main/java");
+        out.add(projectDir + "/src/main/kotlin");
+        if (!hasSrcMain) {
+            out.add(projectDir + "/src");
         }
-        if (dir.endsWith("/src") && isTestSourceSet(name)) {
-            return false;
-        }
-        // A source set's resources are not compiled, so a `.java` or `.kt`
-        // TEMPLATE kept in one is not a peer -- treating it as a same-package
-        // type made a real annotation read as somebody else's. Only where the
-        // layout says resources root: `src/main/resources` and the flat
-        // `src/resources`, not a package that happens to be called that.
-        return !("resources".equals(name)
-                && (dir.endsWith("/src") || parentOf(dir).endsWith("/src")));
+        out.add(projectDir + "/target/generated-sources");
+        out.add(projectDir + "/build/generated-sources");
+        return out;
     }
 
-    /// `dir` without its last segment.
-    private static String parentOf(String dir) {
-        int slash = dir.lastIndexOf('/');
-        return slash < 0 ? "" : dir.substring(0, slash);
-    }
-
-    /// Whether `name` is a test source set by the usual convention.
-    ///
-    /// The convention is a shape, not a word anywhere in the name: `test`
-    /// itself, `test` followed by a capital as in `testFixtures`, or a name
-    /// ending in `Test`/`Tests` as in `integrationTest` and `androidTest`.
-    /// Matching the substring pruned `src/latest` and `src/contest`, which are
-    /// production roots, and a main class living in one could not be found at
-    /// all.
-    private static boolean isTestSourceSet(String name) {
-        if ("test".equals(name)) {
-            return true;
+    /// Those of them that are there.
+    private java.util.List<String> mainSourceRoots(String projectDir) {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        boolean hasSrcMain = projectDir != null
+                && fs.isDirectory(ProjectIO.fsUrl(projectDir + "/src/main"));
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String candidate : candidateSourceRoots(projectDir, hasSrcMain)) {
+            if (fs.isDirectory(ProjectIO.fsUrl(candidate))) {
+                out.add(candidate);
+            }
         }
-        if (name.length() > 4 && name.startsWith("test")
-                && Character.isUpperCase(name.charAt(4))) {
-            return true;
-        }
-        return name.endsWith("Test") || name.endsWith("Tests");
-    }
-
-    /// The generated source root under the output directory `dir`/`name`, or
-    /// null when that is not what this directory is.
-    ///
-    /// Everything else under an output directory is a copy, but
-    /// `generated-sources` is not: Maven plugins add it as a compile root, so a
-    /// declaration there is one the compiler sees. Named rather than read out of
-    /// the effective model, which is a large amount of machinery for one
-    /// conventional directory.
-    static String generatedSourceRootUnder(String dir, String name) {
-        if (!"target".equals(name) && !"build".equals(name)) {
-            return null;
-        }
-        return dir + "/" + name + "/generated-sources";
+        return out;
     }
 
     /// The text of every OTHER source in the project, bounded.
@@ -2445,8 +2424,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (projectDir == null) {
             return out;
         }
-        java.util.List<String> queue = new java.util.ArrayList<>();
-        queue.add(projectDir);
+        java.util.List<String> queue = new java.util.ArrayList<>(mainSourceRoots(projectDir));
         for (int i = 0; i < queue.size() && i < 4000 && out.size() < 200; i++) {
             String dir = queue.get(i);
             String[] children;
@@ -2462,14 +2440,8 @@ public class CodenameOneSettings extends Lifecycle {
                 String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
                 String path = dir + "/" + name;
                 if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
-                    if (peerDirectoryHoldsSources(dir, name, insideSourceTree(dir))) {
+                    if (!name.startsWith(".")) {
                         queue.add(path);
-                    } else {
-                        String generated = generatedSourceRootUnder(dir, name);
-                        if (generated != null && FileSystemStorage.getInstance()
-                                .isDirectory(ProjectIO.fsUrl(generated))) {
-                            queue.add(generated);
-                        }
                     }
                     continue;
                 }
@@ -2512,8 +2484,7 @@ public class CodenameOneSettings extends Lifecycle {
         // for, so exactly the case it would drop.
         java.util.List<String> named = new java.util.ArrayList<>();
         java.util.List<String> others = new java.util.ArrayList<>();
-        java.util.List<String> queue = new java.util.ArrayList<>();
-        queue.add(projectDir);
+        java.util.List<String> queue = new java.util.ArrayList<>(mainSourceRoots(projectDir));
         for (int i = 0; i < queue.size() && i < 4000; i++) {
             String dir = queue.get(i);
             String[] children;
@@ -2529,19 +2500,10 @@ public class CodenameOneSettings extends Lifecycle {
                 String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
                 String path = dir + "/" + name;
                 if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
-                    // The same rules as the peer sweep, and for the same reason:
-                    // a main class generated into target/generated-sources is a
-                    // class the compiler sees, so skipping the whole of target
-                    // left its ownership unknown -- and Settings then offered an
-                    // annotation-owned hint as editable.
-                    if (peerDirectoryHoldsSources(dir, name, insideSourceTree(dir))) {
+                    // The same roots as the peer sweep, so the two cannot
+                    // disagree about where this module's sources are.
+                    if (!name.startsWith(".")) {
                         queue.add(path);
-                    } else {
-                        String generated = generatedSourceRootUnder(dir, name);
-                        if (generated != null && FileSystemStorage.getInstance()
-                                .isDirectory(ProjectIO.fsUrl(generated))) {
-                            queue.add(generated);
-                        }
                     }
                     continue;
                 }
@@ -2559,12 +2521,6 @@ public class CodenameOneSettings extends Lifecycle {
         return hit != null ? hit : firstDeclaring(others, main, pkg, 400);
     }
 
-    /// Whether `dir` is under a source root, where `build` is a package name
-    /// rather than an output directory.
-    static boolean insideSourceTree(String dir) {
-        String normalised = dir.replace('\\', '/');
-        return normalised.contains("/src/") || normalised.endsWith("/src");
-    }
 
     /// The text of the first of `paths` that declares `main` in `pkg`, opening at
     /// most `budget` of them.

@@ -738,18 +738,6 @@ public class BuildHintCatalogTest {
                 "a hint with no builder default must not invent one");
     }
 
-    /// `build` is an ordinary package name -- this repository has
-    /// com.codename1.build.shared -- so refusing to descend into it meant a main
-    /// class living there could not be read. An output directory is never nested
-    /// under src/.
-    @Test
-    public void buildIsAPackageNameInsideASourceTree() {
-        assertTrue(CodenameOneSettings.insideSourceTree("/p/common/src/main/kotlin/com/example"));
-        assertTrue(CodenameOneSettings.insideSourceTree("/p/common/src"));
-        assertFalse(CodenameOneSettings.insideSourceTree("/p/common"));
-        assertFalse(CodenameOneSettings.insideSourceTree("/p/common/target/classes"));
-    }
-
     /// facebook.appId has no default: both builders decide whether Facebook
     /// support is in the app by asking whether the hint is null, so seeding the
     /// literal from the call site enabled the integration against an unrelated
@@ -1522,68 +1510,36 @@ public class BuildHintCatalogTest {
         assertNull(owned.get("ios.teamId"));
     }
 
-    /// Which directories the peer sweep walks. Each of these rules was a bug
-    /// first, and until now they lived inside the walk itself -- which needs a
-    /// project directory and the Codename One FileSystemStorage, so none of them
-    /// were covered.
+    /// Where the peer sweep looks. An allow-list of roots, not a walk of the
+    /// whole project with exclusions -- those were never going to be complete:
+    /// `src/test` was followed by `src/testFixtures`, then `src/main/resources`,
+    /// then `src/main/templates` and `src/main/proto`, because "not a source
+    /// root" is not a property of a directory's name.
     @Test
-    public void thePeerSweepWalksTheSourceTreesOnly() {
-        // Ordinary source directories.
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "src", false));
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "main", false));
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src/main", "kotlin",
-                false));
+    public void thePeerSweepLooksInTheSourceRootsOnly() {
+        java.util.List<String> maven =
+                CodenameOneSettings.candidateSourceRoots("/p/common", true);
+        assertTrue(maven.contains("/p/common/src/main/java"));
+        assertTrue(maven.contains("/p/common/src/main/kotlin"));
+        // Generated sources are a compile root that plugins add.
+        assertTrue(maven.contains("/p/common/target/generated-sources"));
 
-        // Output directories hold copies of those same sources.
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "target", false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "build", false));
+        // Everything the exclusion list used to chase is simply not a root.
+        for (String notARoot : new String[] {"/p/common/src/test", "/p/common/src/testFixtures",
+                "/p/common/src/integrationTest", "/p/common/src/main/resources",
+                "/p/common/src/main/templates", "/p/common/src/main/proto",
+                "/p/common/target", "/p/common/build"}) {
+            assertFalse(maven.contains(notARoot), maven.toString());
+        }
 
-        // ...unless `build` is a package name, which this repository has.
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
-                "/p/common/src/main/java/com/codename1", "build", true));
+        // The flat layout keeps its own root, and only there: under a Maven
+        // layout `src` would drag the test sets back in.
+        assertFalse(maven.contains("/p/common/src"));
+        java.util.List<String> flat =
+                CodenameOneSettings.candidateSourceRoots("/p/common", false);
+        assertTrue(flat.contains("/p/common/src"));
 
-        // A test source set takes no part in compiling the main class, and
-        // `test` is not the only name one goes by.
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "test", false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "testFixtures",
-                false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src",
-                "integrationTest", false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "androidTest",
-                false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "jvmTests",
-                false));
-        // The main source set is not one of them, and neither is a production
-        // root that merely contains the letters.
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "main", false));
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "latest", false));
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "contest",
-                false));
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "testing",
-                false));
-        // ...and deeper down the same word is an ordinary package name.
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
-                "/p/common/src/main/java/com", "test", false));
-
-        // A source set's resources are not compiled, so a source template kept
-        // in one is not a peer.
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src/main",
-                "resources", false));
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "resources",
-                false));
-        // ...but a package that happens to be called that is a package.
-        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
-                "/p/common/src/main/java/com/example", "resources", false));
-
-        // Hidden directories are not source trees.
-        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p", ".git", false));
-
-        // Generated sources under an output directory ARE a compile root.
-        assertEquals("/p/common/target/generated-sources",
-                CodenameOneSettings.generatedSourceRootUnder("/p/common", "target"));
-        assertEquals("/p/common/build/generated-sources",
-                CodenameOneSettings.generatedSourceRootUnder("/p/common", "build"));
-        assertNull(CodenameOneSettings.generatedSourceRootUnder("/p/common/src", "test"));
+        assertTrue(CodenameOneSettings.candidateSourceRoots(null, false).isEmpty());
     }
 
     /// The compiler's source encoding is a project setting this tool does not
