@@ -90,6 +90,13 @@ static inline void UIRectClip(CGRect rect) {
 /// these keep a small stack of their own to preserve the UIKit call pattern the
 /// shared drawing code is written against.
 static inline void UIGraphicsBeginImageContextWithOptions(CGSize size, BOOL opaque, CGFloat scale) {
+    // The graphics state is saved unconditionally, before anything that can
+    // fail. UIGraphicsEndImageContext always restores, so an early return that
+    // skipped the save would leave the stack unbalanced -- and AppKit does not
+    // tolerate an unmatched pop, it traps. A zero-sized image is not a
+    // theoretical case: the framework asks for one whenever a component has
+    // been created but not yet laid out.
+    [NSGraphicsContext saveGraphicsState];
     CGFloat s = scale > 0 ? scale : 1.0;
     size_t w = (size_t)(size.width * s), h = (size_t)(size.height * s);
     if (w == 0 || h == 0) { return; }
@@ -103,7 +110,6 @@ static inline void UIGraphicsBeginImageContextWithOptions(CGSize size, BOOL opaq
     // Flip to UIKit's top-left origin, which is what the drawing code assumes.
     CGContextTranslateCTM(ctx, 0, size.height);
     CGContextScaleCTM(ctx, 1, -1);
-    [NSGraphicsContext saveGraphicsState];
     [NSGraphicsContext setCurrentContext:
         [NSGraphicsContext graphicsContextWithCGContext:ctx flipped:YES]];
     CGContextRelease(ctx);
@@ -111,6 +117,9 @@ static inline void UIGraphicsBeginImageContextWithOptions(CGSize size, BOOL opaq
 
 static inline CN1Image * _Nullable UIGraphicsGetImageFromCurrentImageContext(void) {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
+    // Nil when the context was never created -- a zero-sized image, or an
+    // allocation that failed. The UIKit function answers nil there too, so the
+    // caller's existing nil check is the one that runs.
     if (ctx == NULL) { return nil; }
     CGImageRef cg = CGBitmapContextCreateImage(ctx);
     if (cg == NULL) { return nil; }

@@ -91,6 +91,12 @@ public abstract class Executor {
     // preceded this port, so an existing project keeps building without an edit
     // and simply gets the AppKit app instead.
     public static final String BUILD_TARGET_MAC_NATIVE = "mac-os-x-native";
+    // The local counterpart, mirroring local-linux-device: builds the AppKit app
+    // on the developer's own Mac rather than submitting it. Separate from the
+    // cloud name for the same reason Windows and Linux keep the two apart --
+    // "which machine compiled this" is not something a target string should
+    // leave ambiguous.
+    public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = "local-mac-device";
     // Legacy Mac Catalyst. The Catalyst slice rides the iOS pipeline with the
     // macNative.enabled build hint, exactly as it always did; it moved off
     // "mac-os-x-native" onto its own names so a project that depends on the
@@ -1582,6 +1588,427 @@ public abstract class Executor {
                 result.add(f);
             }
         }
+    }
+
+    /**
+     * The {@code -source} / {@code -target} pair to compile the generated
+     * application stub with.
+     *
+     * <p>Shared by both Apple builders, which generate the same shape of stub.
+     * The default is 1.6 because ParparVM targets Java 5 with Java 8 syntax via
+     * retrolambda; a JDK 9 or later javac refuses 1.6 outright, so those compile
+     * the stub as 8 instead.</p>
+     */
+    /**
+     * The leading integer of a version string, or {@code defaultVal} when it has
+     * none.
+     */
+    protected int getMajorVersionInt(String versionStr, int defaultVal) {
+        if (versionStr == null) {
+            return defaultVal;
+        }
+        int pos = versionStr.indexOf(".");
+        try {
+            return Integer.parseInt(pos != -1 ? versionStr.substring(0, pos) : versionStr);
+        } catch (Throwable ex) {
+            return defaultVal;
+        }
+    }
+
+    protected String[] getStubCompileSourceTarget(String javacPath) {
+        String source = "1.6";
+        String target = "1.6";
+        int major = -1;
+        String version = null;
+        try {
+            String versionOutput = execString(getBuildDirectory() != null ? getBuildDirectory() : new File("."), javacPath, "-version");
+            if (versionOutput != null && versionOutput.trim().length() > 0) {
+                String[] parts = versionOutput.trim().split("\\s+");
+                version = parts[parts.length - 1];
+                major = getMajorVersionInt(version, -1);
+            }
+        } catch (Exception ex) {
+            debug("Failed to resolve the javac version for the stub compile: " + ex.getMessage());
+        }
+        if (major < 0) {
+            version = System.getProperty("java.version");
+            major = getMajorVersionInt(version, -1);
+        }
+        if (major >= 9) {
+            source = "8";
+            target = "8";
+            log("JDK " + version + " does not support -source/-target 1.6. Compiling the stubs with -source/-target 8.");
+        }
+        return new String[]{source, target};
+    }
+
+    /**
+     * The framework headers the generated native-interface bridge imports.
+     *
+     * <p>The bridge itself is platform neutral -- it moves a native peer pointer
+     * across the ParparVM boundary -- but the file it lands in is compiled
+     * alongside the port's own Objective-C, so it has to see the same UI
+     * framework.</p>
+     */
+    /*
+     * Type-name mapping for the generated native-interface bridge. Shared by
+     * both Apple builders because the mangling is ParparVM's, not any one
+     * platform's.
+     */
+
+    protected String convertToJavaMethod(Class type) {
+        if(type.isArray()) {
+            type = type.getComponentType();
+            if(Integer.class == type || Integer.TYPE == type) {
+                return "nsDataToIntArray(";
+            }
+            if(Long.class == type || Long.TYPE == type) {
+                return "nsDataToLongArray(";
+            }
+            if(Byte.class == type || Byte.TYPE == type) {
+                return "nsDataToByteArr(";
+            }
+            if(Short.class == type || Short.TYPE == type) {
+                return "nsDataToShortArray(";
+            }
+            if(Character.class == type || Character.TYPE == type) {
+                return "nsDataToCharArray(";
+            }
+            if(Boolean.class == type || Boolean.TYPE == type) {
+                return "nsDataToBooleanArray(";
+            }
+            if(Float.class == type || Float.TYPE == type) {
+                return "nsDataToFloatArray(";
+            }
+            if(Double.class == type || Double.TYPE == type) {
+                return "nsDataToDoubleArray(";
+            }
+        }
+        if(String.class == type) {
+            return "fromNSString(CN1_THREAD_GET_STATE_PASS_ARG ";
+        }
+        return "";
+    }
+
+    protected String getSimpleNameWithJavaLang(Class c) {
+        if(c.isPrimitive()) {
+            return c.getSimpleName();
+        }
+        if(c.isArray()) {
+            return getSimpleNameWithJavaLang(c.getComponentType()) + "[]";
+        }
+        if(c.getClass().getName().startsWith("java.lang.")) {
+            return c.getName();
+        }
+        return c.getSimpleName();
+    }
+
+    protected String typeToXMLVMJavaName(Class type) {
+        if(type.isArray()) {
+            return getSimpleNameWithJavaLang(type.getComponentType()).replace('.', '_') + "_1ARRAY";
+        }
+        return getSimpleNameWithJavaLang(type).replace('.', '_');
+    }
+
+    protected String typeToXMLVMName(Class type) {
+        if(type.getName().equals("com.codename1.ui.PeerComponent")) {
+            return "JAVA_LONG";
+        }
+        if(Integer.class == type || Integer.TYPE == type) {
+            return "JAVA_INT";
+        }
+        if(Long.class == type || Long.TYPE == type) {
+            return "JAVA_LONG";
+        }
+        if(Byte.class == type || Byte.TYPE == type) {
+            return "JAVA_BYTE";
+        }
+        if(Short.class == type || Short.TYPE == type) {
+            return "JAVA_SHORT";
+        }
+        if(Character.class == type || Character.TYPE == type) {
+            return "JAVA_CHAR";
+        }
+        if(Boolean.class == type || Boolean.TYPE == type) {
+            return "JAVA_BOOLEAN";
+        }
+        if(Void.class == type || Void.TYPE == type) {
+            return "void";
+        }
+        if(Float.class == type || Float.TYPE == type) {
+            return "JAVA_FLOAT";
+        }
+        if(Double.class == type || Double.TYPE == type) {
+            return "JAVA_DOUBLE";
+        }
+        // array/string
+        return "JAVA_OBJECT";
+    }
+
+    protected String convertToObjectiveCMethod(Class type) {
+        if(type.isArray()) {
+            return "arrayToData(";
+        }
+        if(String.class == type) {
+            return "toNSString(CN1_THREAD_GET_STATE_PASS_ARG ";
+        }
+        return "";
+    }
+
+    protected String convertToClosing(Class type) {
+        if(type.isArray()) {
+            return ")";
+        }
+        if(String.class == type) {
+            return ")";
+        }
+        return "";
+    }
+
+    protected String nativeInterfaceFrameworkImports() {
+        return "#import \"CodenameOne_GLViewController.h\"\n"
+                + "#import <UIKit/UIKit.h>\n";
+    }
+
+    /**
+     * Generates the Java and Objective-C halves of every {@code @NativeInterface}
+     * binding the application declares.
+     *
+     * <p>Shared by both Apple builders. The Java class carries the native methods
+     * ParparVM turns into C functions; the generated {@code .m} defines those
+     * functions and forwards each to the developer's own Objective-C class,
+     * reached through a peer pointer. A native interface with no implementation
+     * in the project gets a placeholder header rather than a build failure, and
+     * calls into it no-op -- which is what the runtime already does when the peer
+     * comes back nil.</p>
+     */
+    protected void generateNativeInterfaceBindings(File stubSource, File resDir) throws BuildException {
+            Class[] nativeInterfaces = getNativeInterfaces();
+            if(nativeInterfaces != null && nativeInterfaces.length > 0) {
+                for(Class currentNative : nativeInterfaces) {
+                    File folder = new File(stubSource, currentNative.getPackage().getName().replace('.', File.separatorChar));
+                    folder.mkdirs();
+                    File javaFile = new File(folder, currentNative.getSimpleName() + getImplSuffix() + ".java");
+                
+                    String javaImplSourceFile = "package " + currentNative.getPackage().getName() + ";\n\n"
+                            + "import com.codename1.ui.PeerComponent;\n\n"
+                            + "public class " + currentNative.getSimpleName() + getImplSuffix() + " {\n"
+                            + "    private long nativePeer;\n\n"
+                            + "    public " + currentNative.getSimpleName() + getImplSuffix() + "() {\n"
+                            + "        nativePeer = initializeNativePeer();\n"
+                            + "    }\n\n"
+                            + "    public void finalize() {\n"
+                            + "        releaseNativePeerInstance(nativePeer);\n"
+                            + "    }\n\n"
+                            + "    private static native long initializeNativePeer();\n\n"
+                            + "    private static native void releaseNativePeerInstance(long peer);\n\n";
+                
+                    String prefixForNewVM = "";
+                    String postfixForNewVM = "";
+                    String prefix2ForNewVM = "";
+                    String newVMEnterNativeCode = "";
+                    String newVMExitNativeCode = "";
+                    String newVMInclude = "";
+
+                    newVMInclude = "\n#include \"cn1_globals.h\"\n";
+                    newVMEnterNativeCode = "    POOL_BEGIN();\n    enteringNativeAllocations();\n";
+                    newVMExitNativeCode = "    finishedNativeAllocations();\n    POOL_END();\n";
+                    prefixForNewVM = "CODENAME_ONE_THREAD_STATE";
+                    prefix2ForNewVM = "CODENAME_ONE_THREAD_STATE, ";
+                    postfixForNewVM = "_R_long";
+
+                    String classNameWithUnderscores = currentNative.getName().replace('.', '_');
+                    String mSourceFile = "#include \"xmlvm.h\"\n"
+                            + "#include \"java_lang_String.h\"\n"
+                            + "#include <stdlib.h>\n"
+                            + nativeInterfaceFrameworkImports()
+                            + "#import <objc/runtime.h>\n"
+                            + "#import \"" + classNameWithUnderscores + "Impl.h\"\n"
+                            + newVMInclude
+                            + "#include \"" + classNameWithUnderscores + getImplSuffix() + ".h\"\n\n"
+                            + "static id cn1_createNativeInterfacePeer(NSString* className) {\n"
+                            + "    NSMutableArray* candidates = [NSMutableArray arrayWithObject:className];\n"
+                            + "    NSString* executableName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleExecutable\"];\n"
+                            + "    NSString* bundleName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@\"CFBundleName\"];\n"
+                            + "    NSArray* moduleNames = @[executableName ?: @\"\", bundleName ?: @\"\"];\n"
+                            + "    for(NSString* moduleName in moduleNames) {\n"
+                            + "        if(moduleName.length == 0) {\n"
+                            + "            continue;\n"
+                            + "        }\n"
+                            + "        NSString* sanitized = [[moduleName stringByReplacingOccurrencesOfString:@\"-\" withString:@\"_\"] stringByReplacingOccurrencesOfString:@\" \" withString:@\"_\"];\n"
+                            + "        [candidates addObject:[sanitized stringByAppendingFormat:@\".%@\", className]];\n"
+                            + "        if(![sanitized isEqualToString:moduleName]) {\n"
+                            + "            [candidates addObject:[moduleName stringByAppendingFormat:@\".%@\", className]];\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    Class cls = Nil;\n"
+                            + "    for(NSString* candidate in candidates) {\n"
+                            + "        cls = NSClassFromString(candidate);\n"
+                            + "        if(cls != Nil) {\n"
+                            + "            break;\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    if(cls == Nil) {\n"
+                            + "        unsigned int classCount = 0;\n"
+                            + "        Class *classList = objc_copyClassList(&classCount);\n"
+                            + "        NSString* dottedSuffix = [@\".\" stringByAppendingString:className];\n"
+                            + "        for(unsigned int i = 0; i < classCount; i++) {\n"
+                            + "            NSString* runtimeName = [NSString stringWithUTF8String:class_getName(classList[i])];\n"
+                            + "            if([runtimeName isEqualToString:className] || [runtimeName hasSuffix:dottedSuffix] || [runtimeName hasSuffix:className]) {\n"
+                            + "                cls = classList[i];\n"
+                            + "                NSLog(@\"[CN1] Resolved native interface class %@ via runtime scan as %@\", className, runtimeName);\n"
+                            + "                break;\n"
+                            + "            }\n"
+                            + "        }\n"
+                            + "        if(classList != NULL) {\n"
+                            + "            free(classList);\n"
+                            + "        }\n"
+                            + "    }\n"
+                            + "    if(cls == Nil) {\n"
+                            + "        NSLog(@\"[CN1] Failed to find native interface class %@. Tried: %@\", className, candidates);\n"
+                            + "        return nil;\n"
+                            + "    }\n"
+                            + "    return [[cls alloc] init];\n"
+                            + "}\n\n"
+                            + "JAVA_LONG " + classNameWithUnderscores + getImplSuffix() + "_initializeNativePeer__" + postfixForNewVM + "(" + prefixForNewVM + ") {\n"
+                            + "    id i = cn1_createNativeInterfacePeer(@\"" + classNameWithUnderscores + "Impl\");\n"
+                            + "    return i;\n"
+                            + "}\n\n"
+                            + "void " + classNameWithUnderscores + getImplSuffix() + "_releaseNativePeerInstance___long(" + prefix2ForNewVM + "JAVA_LONG l) {\n"
+                            + "    id i = (id)l;\n"
+                            + "    [i release];\n"
+                            + "}\n\n"
+                            + "extern NSData* arrayToData(JAVA_OBJECT arr);\n"
+                            + "extern NSString* toNSString(" + prefix2ForNewVM + "JAVA_OBJECT str);\n"
+                            + "extern JAVA_OBJECT nsDataToByteArr(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToBooleanArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToCharArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToShortArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToIntArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToLongArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToFloatArray(NSData *data);\n"
+                            + "extern JAVA_OBJECT nsDataToDoubleArray(NSData *data);\n\n"
+                            + "void xmlvm_init_native_"+ classNameWithUnderscores + getImplSuffix() + "() {}\n\n";
+
+                    for(Method m : currentNative.getMethods()) {
+                        String name = m.getName();
+                        if(name.equals("hashCode") || name.equals("equals") || name.equals("toString")) {
+                            continue;
+                        }
+                    
+                        Class returnType = m.getReturnType();
+                    
+                        mSourceFile += typeToXMLVMName(returnType) + " " + currentNative.getName().replace('.', '_') + getImplSuffix() + "_" + 
+                                name + "__";
+                        String mFileArgs;
+                        String mFileBody;
+
+                        mFileArgs = "(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me";
+                        mFileBody = "    id ptr = (id)get_field_" + classNameWithUnderscores + getImplSuffix() + "_nativePeer(me);\n";
+
+                    
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            mFileBody += "    " + typeToXMLVMName(returnType) + " returnValue = " + convertToJavaMethod(returnType);
+                        }
+                        mFileBody += "[((" + classNameWithUnderscores + "Impl*)ptr) " + name;
+                    
+                        if(returnType.getName().equals("com.codename1.ui.PeerComponent")) {
+                            javaImplSourceFile += "    public native long " + name + "(";
+                        } else {
+                            javaImplSourceFile += "    public native " + getSimpleNameWithJavaLang(returnType) + " " + name + "(";
+                        }
+                        Class[] params = m.getParameterTypes();
+                        if(params != null && params.length > 0) {
+                            for(int iter = 0 ; iter < params.length ; iter++) {
+                                if(params[iter].getName().equals("com.codename1.ui.PeerComponent")) {
+                                    params[iter] = Long.TYPE;
+                                }
+                            }
+                            javaImplSourceFile += getSimpleNameWithJavaLang(params[0]) + " param0";
+                            for(int iter = 1 ; iter < params.length ; iter++) {
+                                javaImplSourceFile += ", " + getSimpleNameWithJavaLang(params[iter]) + " param" + iter;
+                            }
+                                                
+                            for(int iter = 0 ; iter < params.length ; iter++) {
+                                mSourceFile += "_" + typeToXMLVMJavaName(params[iter]);
+                                mFileArgs += ", " + typeToXMLVMName(params[iter]) + " param" + iter;
+                                if(iter == 0) {
+                                    mFileBody += ":" + convertToObjectiveCMethod(params[iter]) + "param0" + convertToClosing(params[iter]); 
+                                } else {
+                                    mFileBody += " param" + iter + ":" + convertToObjectiveCMethod(params[iter]) + "param" + iter + convertToClosing(params[iter]); 
+                                }
+                            }
+                        }
+
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            if(returnType.getName().endsWith("PeerComponent")) {
+                                mSourceFile += "_R_long";
+                            } else {
+                                mSourceFile += "_R_" + typeToXMLVMJavaName(returnType);
+                            }
+                        }
+
+                        if(!(returnType.equals(Void.class) || returnType.equals(Void.TYPE))) {
+                            mSourceFile += mFileArgs + ") {\n" + newVMEnterNativeCode +
+                                    mFileBody + "]" + convertToClosing(returnType) + ";\n" + newVMExitNativeCode 
+                                    + "    return returnValue;\n}\n\n";                        
+                        } else {
+                            mSourceFile += mFileArgs + ") {\n" + newVMEnterNativeCode +
+                                    mFileBody + "]" + convertToClosing(returnType) + ";\n" + newVMExitNativeCode 
+                                    + "}\n\n";                        
+                        }
+                        javaImplSourceFile += ");\n";
+                    }
+                
+                    javaImplSourceFile += "}\n";
+                
+                
+                    try (FileOutputStream out = new FileOutputStream(javaFile)) {
+                        out.write(javaImplSourceFile.getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
+                    }
+                    File mFile = new File(resDir, "native_" + currentNative.getName().replace('.', '_') + getImplSuffix() + ".m");
+
+                    try (FileOutputStream out = new FileOutputStream(mFile)) {
+                        out.write(mSourceFile.getBytes(StandardCharsets.UTF_8));
+                    } catch (IOException ex) {
+                        throw new BuildException("Error while generating native interface stub for "+currentNative, ex);
+                    }
+
+                    // The generated .m imports "<X>Impl.h" -- the Objective-C
+                    // class the user is expected to provide as their native
+                    // implementation. When no such class exists for this app
+                    // (native interfaces pulled in transitively from a CN1
+                    // library, the app never instantiates them), the build
+                    // still needs an @interface in scope so the .m compiles.
+                    // Generate a tiny placeholder iff the user hasn't dropped
+                    // their own copy alongside the project sources. The peer
+                    // class itself stays absent at runtime, which is fine: any
+                    // call into this native interface from Java would have
+                    // failed to resolve a peer regardless.
+                    File implHeader = new File(resDir, classNameWithUnderscores + "Impl.h");
+                    if (!implHeader.exists()) {
+                        String guard = classNameWithUnderscores.toUpperCase() + "_IMPL_H";
+                        String hStub = "#ifndef " + guard + "\n"
+                                + "#define " + guard + "\n"
+                                + "// Auto-generated placeholder: the native interface "
+                                + currentNative.getName() + " has no user-provided\n"
+                                + "// Objective-C implementation in this project. The CN1\n"
+                                + "// runtime returns nil from cn1_createNativeInterfacePeer\n"
+                                + "// in that case; calls into the peer no-op silently.\n"
+                                + "#import <Foundation/Foundation.h>\n"
+                                + "@interface " + classNameWithUnderscores + "Impl : NSObject\n"
+                                + "@end\n"
+                                + "#endif\n";
+                        try (FileOutputStream out = new FileOutputStream(implHeader)) {
+                            out.write(hStub.getBytes(StandardCharsets.UTF_8));
+                        } catch (IOException ex) {
+                            throw new BuildException("Error while generating placeholder header for "+currentNative, ex);
+                        }
+                    }
+                }
+            }
     }
 
     public Class[] getNativeInterfaces() {

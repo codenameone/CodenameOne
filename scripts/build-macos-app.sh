@@ -145,7 +145,7 @@ VM_START=$(date +%s)
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
 
-export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
+export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/macos-builder-stats.txt"
 
 EXTRA_IOS_ARGS=()
 if [ -n "${IOS_DEPENDENCY_ARGS:-}" ]; then
@@ -162,7 +162,7 @@ bma_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
   MVN_CMD=(
     ./mvnw package
     -DskipTests
-    -Dcodename1.platform=ios
+    -Dcodename1.platform=mac
     -Dcodename1.buildTarget=mac-source
     -Dmaven.compiler.fork=true
     -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac"
@@ -180,9 +180,9 @@ bma_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
     bma_log "Maven build failed (exit=$RC). Log: $MVN_LOG"
     bma_log "Key failure lines:"
     if command -v rg >/dev/null 2>&1; then
-      rg -n "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_LOG" | tail -n 200 || true
+      rg -n "(macOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_LOG" | tail -n 200 || true
     else
-      grep -nE "(iOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_LOG" | tail -n 200 || true
+      grep -nE "(macOS builder log:|Caused by:|BuildException|Cannot run program|UnsupportedClassVersionError|error:|\\[ERROR\\])" "$MVN_LOG" | tail -n 200 || true
     fi
     exit $RC
   fi
@@ -194,33 +194,35 @@ cd "$REPO_ROOT"
 echo "$VM_TIME" > "$ARTIFACTS_DIR/vm_time.txt"
 bma_log "VM translation time: ${VM_TIME}s (saved to $ARTIFACTS_DIR/vm_time.txt)"
 
-if [ -f "$ARTIFACTS_DIR/iphone-builder-stats.txt" ]; then
-    TOTAL_BUILDER_TIME_MS=$(grep "Total Time" "$ARTIFACTS_DIR/iphone-builder-stats.txt" | awk -F ':' '{print $2}' | tr -d ' ms')
+if [ -f "$ARTIFACTS_DIR/macos-builder-stats.txt" ]; then
+    TOTAL_BUILDER_TIME_MS=$(grep "Total Time" "$ARTIFACTS_DIR/macos-builder-stats.txt" | awk -F ':' '{print $2}' | tr -d ' ms')
     if [ -n "$TOTAL_BUILDER_TIME_MS" ]; then
         TOTAL_BUILDER_TIME_SEC=$((TOTAL_BUILDER_TIME_MS / 1000))
         MAVEN_OVERHEAD=$((VM_TIME - TOTAL_BUILDER_TIME_SEC))
-        echo "Maven Overhead : ${MAVEN_OVERHEAD}000 ms" >> "$ARTIFACTS_DIR/iphone-builder-stats.txt"
+        echo "Maven Overhead : ${MAVEN_OVERHEAD}000 ms" >> "$ARTIFACTS_DIR/macos-builder-stats.txt"
     fi
 fi
 
-IOS_TARGET_DIR="$APP_DIR/ios/target"
-if [ ! -d "$IOS_TARGET_DIR" ]; then
-  bma_log "iOS target directory not found at $IOS_TARGET_DIR" >&2
+# The AppKit port has its own maven module, unlike Mac Catalyst, which builds
+# from ios/ because it is a variant of the iOS build.
+MAC_TARGET_DIR="$APP_DIR/mac/target"
+if [ ! -d "$MAC_TARGET_DIR" ]; then
+  bma_log "macOS target directory not found at $MAC_TARGET_DIR" >&2
   exit 1
 fi
 
 # CN1BuildMojo routes the generated project to <finalName>-mac-source/ when
 # the mac-source target is used (see getGeneratedMacProjectSourceDirectory).
 PROJECT_DIR=""
-for candidate in "$IOS_TARGET_DIR"/*-mac-source; do
+for candidate in "$MAC_TARGET_DIR"/*-mac-source; do
   if [ -d "$candidate" ]; then
     PROJECT_DIR="$candidate"
     break
   fi
 done
 if [ -z "$PROJECT_DIR" ]; then
-  bma_log "Failed to locate generated Mac native project under $IOS_TARGET_DIR (expected *-mac-source/)" >&2
-  find "$IOS_TARGET_DIR" -maxdepth 2 -type d -print >&2 || true
+  bma_log "Failed to locate generated Mac native project under $MAC_TARGET_DIR (expected *-mac-source/)" >&2
+  find "$MAC_TARGET_DIR" -maxdepth 2 -type d -print >&2 || true
   exit 1
 fi
 bma_log "Found generated Mac native project at $PROJECT_DIR"

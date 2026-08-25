@@ -294,6 +294,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- MacPort 'bundle' (MacPort.jar + nativemac.jar) supplies the native macOS
+             platform classes and Objective-C sources to MacOSNativeBuilder. nativemac.jar
+             is the materialised set (MacPort's own sources plus the shared iOSPort ones
+             the exclusion manifest keeps), so what the builder stages is exactly what
+             clang compiles, and exactly what the offline signature gate verifies. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-mac</artifactId>
+            <classifier>bundle</classifier>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- LinuxPort 'bundle' (LinuxPort.jar + nativelinux.jar) supplies the native
              Linux platform classes and C sources to LinuxNativeBuilder as classpath
              resources, the same way the WindowsPort bundle does. -->

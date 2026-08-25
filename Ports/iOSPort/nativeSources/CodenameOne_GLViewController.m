@@ -23,6 +23,12 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
+
+#if TARGET_OS_OSX
+// From Ports/MacPort, reachable only on a macOS build where both ports' native
+// sources are staged into one directory.
+#import "CN1AppKitCompat.h"
+#endif
 #if TARGET_OS_OSX
 #import "CN1MacHost.h"
 #endif
@@ -585,13 +591,8 @@ void initVMImpl() {
 }
 
 void deinitVMImpl() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
 #ifndef CN1_USE_ARC
     [globalCodenameOnePool release];
-#endif
 #endif
 }
 
@@ -856,20 +857,24 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 }
 
 int isIPad() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return 0;
-#else
 #if TARGET_OS_WATCH
     return 0;
+#elif TARGET_OS_OSX
+    // Reported as a tablet, which is what Display.isTablet() is asking and what
+    // the framework uses to pick between phone and large-screen layouts. Mac
+    // Catalyst answers the same way, because it runs under the iPad idiom, so
+    // both Mac ports lay out alike.
+    return 1;
 #else
     return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
 #endif
-#endif
 }
 
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_OSX
+// There is no iOS version to compare against on macOS, and every one of these
+// checks asks "is this at least iOS N" for an N long past. Answering NO to
+// "less than" makes each of them true, which is the honest reading: the
+// capability they gate on is present.
 #define SYSTEM_VERSION_LESS_THAN(v)                 (NO)
 #else
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
@@ -879,47 +884,28 @@ int cn1IsIOS8 = -1;
 int cn1IsIOS8_2 = -1;
 int cn1IsIOS10 = -1;
 BOOL isIOS10() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
     if (cn1IsIOS10 < 0) {
         cn1IsIOS10 = !SYSTEM_VERSION_LESS_THAN(@"10.0") ? 1:0;
     }
     return cn1IsIOS10 > 0;
-#endif
 }
 
 BOOL isIOS8() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
     if (cn1IsIOS8 < 0) {
         cn1IsIOS8 = !SYSTEM_VERSION_LESS_THAN(@"8.0") ? 1:0;
     }
     return cn1IsIOS8 > 0;
-#endif
 }
 BOOL isIOS8_2() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
     if (cn1IsIOS8_2 < 0) {
         cn1IsIOS8_2 = !SYSTEM_VERSION_LESS_THAN(@"8.2") ? 1:0;
     }
     return cn1IsIOS8_2 > 0;
-#endif
 }
 
 BOOL isVKBAlwaysOpen() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
+    // There is no virtual keyboard on a Mac, so it is never open.
     return NO;
 #else
     if(vkbAlwaysOpen) {
@@ -1431,44 +1417,29 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 
 
 BOOL isRetinaBug() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
-#if TARGET_OS_WATCH
+#if TARGET_OS_WATCH || TARGET_OS_OSX
+    // The bug is an iOS 5 iPad one; there is no macOS equivalent to work around.
     return NO;
 #else
     return isIPad() && [[UIScreen mainScreen] scale] == 2 && SYSTEM_VERSION_LESS_THAN(@"6.0");
 #endif
-#endif
 }
 
 BOOL isRetina() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
 #if TARGET_OS_WATCH
     return YES;
+#elif TARGET_OS_OSX
+    return [NSScreen mainScreen].backingScaleFactor > 1;
 #else
     if([[UIScreen mainScreen] scale] > 1) {
         return !isRetinaBug();
     }
     return NO;
 #endif
-#endif
 }
 
 BOOL isIOS7() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
     return !SYSTEM_VERSION_LESS_THAN(@"7.0");
-#endif
 }
 
 
@@ -2115,20 +2086,20 @@ static CGContextRef cn1CreateARGBBitmapContext(CGSize size) {
 }
 
 static UInt8* cn1CreateBitmap(CN1Image* image) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return nil;
-#else
     CGContextRef context = cn1CreateARGBBitmapContext(image.size);
     if (context == NULL) return NULL;
     CGRect rect = CGRectMake(0.0f, 0.0f, image.size.width, image.size.height);
     CGContextClearRect(context, rect);
+#if TARGET_OS_OSX
+    // NSImage holds representations rather than a bitmap, so the CGImage is
+    // asked for at the rect being drawn rather than read off a property.
+    CGContextDrawImage(context, rect, CN1AppKitCGImageFromNSImage(image));
+#else
     CGContextDrawImage(context, rect, image.CGImage);
+#endif
     UInt8* data = CGBitmapContextGetData(context);
     CGContextRelease(context);
     return data;
-#endif
 }
 
 static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
@@ -2141,11 +2112,6 @@ static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
 }
 
 static CN1Image* cn1ImageWithBits(UInt8* bits, int width, int height) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return nil;
-#else
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     if (colorSpace == NULL) {
         CN1Log(@"Error allocating color space");
@@ -2166,7 +2132,6 @@ static CN1Image* cn1ImageWithBits(UInt8* bits, int width, int height) {
     return newImage;
     
     
-#endif
 }
 void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
     JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
@@ -2684,10 +2649,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
 #ifdef CN1_USE_METAL
     {
         GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
@@ -2711,7 +2672,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
         CGContextRestoreGState(context);
     }
 
-#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
@@ -2886,11 +2846,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return nil;
-#else
 #ifdef CN1_USE_METAL
     {
         // Phase 3 v2: clear the current mutable target. Pending ops (queued
@@ -2912,7 +2867,6 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     [CodenameOne_GLViewController instance].currentMutableImage = nil;
     currentMutableTransformSet = NO;
     return (BRIDGE_CAST void*)gl;
-#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
@@ -3062,11 +3016,6 @@ void loadResourceFile
 }
 
 int getResourceSize(const char* name, int nameLen, const char* type, int typeLen) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return 0;
-#else
     NSString* nameNS = [NSString stringWithUTF8String:name];
     NSString* typeNS = type == NULL ? nil : [NSString stringWithUTF8String:type];
     //CN1Log(@"getResourceSize %@ %@ started", nameNS, typeNS);
@@ -3078,7 +3027,6 @@ int getResourceSize(const char* name, int nameLen, const char* type, int typeLen
     int size = [iData length];
     //CN1Log(@"getResourceSize %i finished", size);
     return size;
-#endif
 }
 
 
@@ -4208,11 +4156,6 @@ EAGLView* lastFoundEaglView;
 }
 
 CGFloat getOriginY() {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return 0;
-#else
     int statusbarHeight = 20;
     if(isIOS7()) {
         statusbarHeight = 0;
@@ -4226,7 +4169,6 @@ CGFloat getOriginY() {
             return -[CodenameOne_GLViewController instance].view.frame.origin.x * upsideDownMultiplier - ((upsideDownMultiplier == 1) ? 0 : statusbarHeight);
         }
     }
-#endif
 }
 
 CGRect setOriginY(CGFloat y, CGRect frame) {

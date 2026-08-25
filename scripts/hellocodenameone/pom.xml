@@ -160,6 +160,18 @@
       </modules>
     </profile>
     <profile>
+      <id>mac</id>
+      <activation>
+        <property>
+          <name>codename1.platform</name>
+          <value>mac</value>
+        </property>
+      </activation>
+      <modules>
+        <module>mac</module>
+      </modules>
+    </profile>
+    <profile>
       <id>android</id>
       <activation>
         <property>

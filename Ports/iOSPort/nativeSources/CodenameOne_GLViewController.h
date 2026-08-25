@@ -500,6 +500,11 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)drawScreen;
 -(void)drawFrame:(CGRect)rect;
 -(void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
+/// Drains the queue and draws even when the application is not frontmost.
+/// Display.screenshot() calls this: a capture must not wait for the normal
+/// paint cycle, which may never come while the window is not key -- and the
+/// screenshot suite runs exactly there.
+-(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height;
 @end
 #else
 @interface CodenameOne_GLViewController : UIViewController<

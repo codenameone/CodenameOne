@@ -144,6 +144,28 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     [self drawFrame:CGRectZero];
 }
 
+- (void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height {
+    @synchronized (self) {
+        if ([upcomingTarget count] > 0) {
+            [currentTarget addObjectsFromArray:upcomingTarget];
+            [upcomingTarget removeAllObjects];
+        }
+    }
+    painted = NO;
+    // On the main thread and waiting, because the caller reads the framebuffer
+    // back as soon as this returns; drawing asynchronously would capture the
+    // previous frame. allowInactive is YES for the same reason: a screenshot
+    // taken while the window is not key still has to reflect what was painted.
+    void (^flushBlock)(void) = ^{
+        [self drawFrame:CGRectMake(x, y, width, height) allowInactive:YES];
+    };
+    if ([NSThread isMainThread]) {
+        flushBlock();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), flushBlock);
+    }
+}
+
 - (void)drawFrame:(CGRect)rect {
     [self drawFrame:rect allowInactive:NO];
 }

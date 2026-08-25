@@ -90,6 +90,64 @@ public class MacBuildTargetRoutingTest {
     }
 
     @Test
+    public void theLocalAppKitTargetIsBuiltHere() throws Exception {
+        assertEquals("local-mac-device", Executor.BUILD_TARGET_MAC_NATIVE_LOCAL);
+        // It has to be recognised as local, or the mojo submits it to the build
+        // server and the developer's Xcode is never used.
+        assertTrue(isLocal(Executor.BUILD_TARGET_MAC_NATIVE_LOCAL));
+        assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_NATIVE_LOCAL));
+    }
+
+    @Test
+    public void theAppKitCloudTargetDoesNotAskForCatalyst() throws Exception {
+        // macNative.enabled is what tells the server-side IPhoneBuilder to emit a
+        // Catalyst slice. Setting it for an AppKit target would mean asking the
+        // iOS builder for Catalyst under a name that promises AppKit, which is
+        // exactly the ambiguity the separate queue exists to remove -- and the
+        // failure would be a green build shipping the wrong application.
+        assertFalse(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_NATIVE));
+        assertFalse(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));
+        assertTrue(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_CATALYST));
+        assertTrue(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
+    }
+
+    /// Reads the mojo's own source for the cloud dispatch arm, because the
+    /// decision lives in a private branch of a method that needs a whole Maven
+    /// session to invoke. Asserting on the source is worth less than asserting on
+    /// behaviour, but it is worth much more than not asserting at all: this is a
+    /// silent failure, and the test names which targets may carry the hint.
+    private static boolean catalystHintIsSetFor(String target) throws Exception {
+        java.io.File src = new java.io.File("src/main/java/com/codename1/maven/CN1BuildMojo.java");
+        if (!src.isFile()) {
+            throw new IllegalStateException("Could not locate CN1BuildMojo.java at " + src.getAbsolutePath());
+        }
+        String body = new String(java.nio.file.Files.readAllBytes(src.toPath()), "UTF-8");
+        int at = body.indexOf("codename1.arg.macNative.enabled");
+        while (at > 0) {
+            int blockStart = body.lastIndexOf("if (", at);
+            String condition = body.substring(blockStart, at);
+            if (condition.contains(constantNameFor(target))) {
+                return true;
+            }
+            at = body.indexOf("codename1.arg.macNative.enabled", at + 1);
+        }
+        return false;
+    }
+
+    private static String constantNameFor(String target) {
+        if (Executor.BUILD_TARGET_MAC_NATIVE.equals(target)) {
+            return "BUILD_TARGET_MAC_NATIVE.equals";
+        }
+        if (Executor.BUILD_TARGET_MAC_NATIVE_PROJECT.equals(target)) {
+            return "BUILD_TARGET_MAC_NATIVE_PROJECT.equals";
+        }
+        if (Executor.BUILD_TARGET_MAC_CATALYST.equals(target)) {
+            return "BUILD_TARGET_MAC_CATALYST.equals";
+        }
+        return "BUILD_TARGET_MAC_CATALYST_PROJECT.equals";
+    }
+
+    @Test
     public void catalystSourceIsRecognizedByTheHardeningPreflight() {
         assertTrue(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
         assertTrue(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));

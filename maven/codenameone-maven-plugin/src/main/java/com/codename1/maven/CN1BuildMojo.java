@@ -515,6 +515,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private static String hardenPlatformForBuildTarget(String buildTarget) {
         if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)
                 || BUILD_TARGET_MAC_CATALYST.equals(buildTarget)
                 || BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)) {
             return "mac";
@@ -1178,6 +1179,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
     public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
+    public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = Executor.BUILD_TARGET_MAC_NATIVE_LOCAL;
     public static final String BUILD_TARGET_MAC_CATALYST = Executor.BUILD_TARGET_MAC_CATALYST;
     public static final String BUILD_TARGET_MAC_CATALYST_PROJECT = Executor.BUILD_TARGET_MAC_CATALYST_PROJECT;
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
@@ -1686,13 +1688,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     // delegates the Catalyst-specific emission when it sees it.
                     cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
-                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
-                    // mac-source is the native AppKit project. It still rides the
-                    // iOS local-build entry point for now; the AppKit builder takes
-                    // over in a later step of this series. Until then it behaves as
-                    // it did before, so the target is never broken mid-series.
-                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
-                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                        || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {
+                    // The native AppKit build. mac-source stops once the Xcode
+                    // project exists; local-mac-device goes on to build it, and
+                    // both run the same builder, so what a developer opens in
+                    // Xcode is what the device target compiles. mac-os-x-native
+                    // is the cloud target and is not handled here -- it has its
+                    // own queue rather than riding the iOS one.
+                    if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                        cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
+                    }
+                    doMacOSNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("javascript")) {
@@ -1701,17 +1708,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     throw new MojoExecutionException("Build target not supported "+buildTarget);
                 }
             } else {
-                // Cloud-builds route through a remote build server; for the Mac
-                // native targets we set the same macNative.enabled hint here so the
-                // server-side IPhoneBuilder takes the Mac branch. Both the source
-                // project (mac-source) and the device build (mac-os-x-native) need it
-                // -- previously only mac-source did, so the cloud mac-os-x-native
-                // target rode the plain iOS pipeline instead of emitting a Mac app.
-                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                        || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
-                        || BUILD_TARGET_MAC_CATALYST.equals(buildTarget)
+                // Cloud builds route through a remote build server. The Catalyst
+                // targets ride the iOS queue and are switched onto the Mac branch
+                // by the macNative.enabled hint the server-side IPhoneBuilder
+                // reads; the AppKit targets have their own queue and their own
+                // builder, so setting that hint for them would be asking the iOS
+                // builder for a Catalyst slice under an AppKit target name --
+                // exactly the ambiguity the separate queue exists to remove.
+                if (BUILD_TARGET_MAC_CATALYST.equals(buildTarget)
                         || BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)) {
                     cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                }
+                if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                    cn1SettingsProps.setProperty("codename1.arg.macos.sourceOnly", "true");
                 }
                 if (automated) {
                     getLog().debug("Attempting to start hyper beam stream the build log to the console");
@@ -2270,6 +2279,91 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * wiring. The native compile only succeeds on Windows with the MSVC/clang-cl
      * toolchain present; elsewhere the builder fails fast with a clear message.
      */
+    /**
+     * Builds the native macOS (AppKit) application locally.
+     *
+     * <p>Unlike Mac Catalyst, which is the iOS build with one hint set, this
+     * runs its own builder against the macosx SDK. Both {@code mac-source} and
+     * {@code mac-os-x-native} come here; the former sets
+     * {@code macos.sourceOnly} so the builder stops once the Xcode project
+     * exists.</p>
+     */
+    private void doMacOSNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
+        File codenameOneJar = getJar("com.codenameone", "codenameone-core");
+        MacOSNativeBuilder e = new MacOSNativeBuilder();
+        e.setLogger(getLog());
+        File buildDirectory = new File(tmpProjectDir, "dist" + File.separator + "macos-build");
+        e.setBuildDirectory(buildDirectory);
+        e.setCodenameOneJar(codenameOneJar);
+
+        BuildRequest r = new BuildRequest();
+        r.setDisplayName(props.getProperty("codename1.displayName"));
+        r.setPackageName(props.getProperty("codename1.packageName"));
+        r.setMainClass(props.getProperty("codename1.mainName"));
+        putSecondaryEntryPointArguments(r, props);
+        r.setVersion(props.getProperty("codename1.version"));
+        r.setVendor(props.getProperty("codename1.vendor"));
+        r.setType("macos");
+        for (Object k : props.keySet()) {
+            String key = (String) k;
+            if (key.startsWith("codename1.arg.")) {
+                String currentKey = key.substring("codename1.arg.".length());
+                if (currentKey.indexOf(' ') > -1) {
+                    throw new MojoExecutionException("The build argument contains a space in the key: '" + currentKey + "'");
+                }
+                r.putArgument(currentKey, props.getProperty(key));
+            }
+        }
+        applyHardeningRequestArgs(r);
+        r.setIncludeSource(true);
+
+        try {
+            boolean result = e.runBuild(distJar, r);
+            if (!result) {
+                String builderLog = e.getErrorMessage();
+                if (builderLog != null && builderLog.trim().length() > 0) {
+                    getLog().error("macOS builder log:\n" + builderLog);
+                }
+                throw new MojoExecutionException("Native macOS build failed");
+            }
+            if (e.getXcodeProjectDir() != null && BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
+                // Collected under the same <finalName>-mac-source name the
+                // Catalyst path used, so a project that switches between the
+                // two ports finds its Xcode project in the same place.
+                File output = getGeneratedMacProjectSourceDirectory();
+                output.getParentFile().mkdirs();
+                try {
+                    // Replaced rather than merged: a stale source file from a
+                    // previous build is still compiled by the regenerated
+                    // project, and the resulting failure names a file the
+                    // developer never wrote.
+                    if (output.exists()) {
+                        FileUtils.deleteDirectory(output);
+                    }
+                    getLog().info("Copying macOS Xcode project to " + output);
+                    FileUtils.copyDirectory(e.getXcodeProjectDir(), output);
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to collect the generated macOS Xcode project", ex);
+                }
+            }
+            if (e.getAppBundle() != null) {
+                getLog().info("Built native macOS application: " + e.getAppBundle().getAbsolutePath());
+            } else if (e.getXcodeProjectDir() != null) {
+                getLog().info("Generated macOS Xcode project: " + e.getXcodeProjectDir().getAbsolutePath());
+            }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
+        } catch (org.apache.tools.ant.BuildException ex) {
+            String builderLog = e.getErrorMessage();
+            if (builderLog != null && builderLog.trim().length() > 0) {
+                getLog().error("macOS builder log:\n" + builderLog);
+            }
+            throw new MojoExecutionException("Failed to build the macOS app", ex);
+        } finally {
+            e.cleanup();
+        }
+    }
+
     private void doWindowsNativeLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
         WindowsNativeBuilder e = new WindowsNativeBuilder();
