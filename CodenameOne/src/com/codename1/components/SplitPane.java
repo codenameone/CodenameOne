@@ -29,7 +29,6 @@ import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -41,6 +40,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1095,7 +1095,7 @@ public class SplitPane extends Container {
         @Override
         protected void initComponent() {
             super.initComponent();
-            Form form = getComponentForm();
+            TopLevelContainer form = getTopLevelContainer();
             if (form != null) {
                 form.setEnableCursors(true);
             }
@@ -1105,11 +1105,17 @@ public class SplitPane extends Container {
         @Override
         protected Dimension calcPreferredSize() {
             Display d = Display.getInstance();
+            // Spanning the surface this divider is on, not the main display: in a
+            // Window the divider asked for the whole screen's width or height.
+            TopLevelContainer top = getTopLevelContainer();
+            Container c = top == null ? null : top.asContainer();
+            int spanW = c != null && c.getWidth() > 0 ? c.getWidth() : d.getDisplayWidth();
+            int spanH = c != null && c.getHeight() > 0 ? c.getHeight() : d.getDisplayHeight();
             switch (orientation) {
                 case VERTICAL_SPLIT:
-                    return new Dimension(d.getDisplayWidth(), d.convertToPixels(dividerThicknessMM));
+                    return new Dimension(spanW, d.convertToPixels(dividerThicknessMM));
                 default:
-                    return new Dimension(d.convertToPixels(dividerThicknessMM), d.getDisplayHeight());
+                    return new Dimension(d.convertToPixels(dividerThicknessMM), spanH);
             }
         }
 

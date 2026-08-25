@@ -1180,23 +1180,52 @@ class WatchNativeBuilder {
         return -1;
     }
 
-    /// Where to resume scanning so that `at` is not inside a comment or a CDATA section.
+    /// Where to resume scanning so that `at` is not inside markup a plist parser ignores.
     ///
-    /// Returns `at` when it is already outside both, the position just past the enclosing
-    /// construct when it is not, and -1 when that construct never ends.
+    /// Four constructs qualify, and all of them can contain text that looks like an
+    /// element without being one: a CDATA section, a comment, a processing instruction
+    /// and a declaration such as a DOCTYPE. A parser reads none of their content as
+    /// markup, so neither may this.
+    ///
+    /// Returns `at` when it is already outside all of them, the position just past the
+    /// enclosing construct when it is not, and -1 when that construct never ends -- in
+    /// which case nothing after it can be located reliably and the caller treats what it
+    /// was looking for as absent rather than guessing.
     static int skipMarkupBefore(String inject, int at, int from) {
-        int cdata = inject.indexOf(CDATA_OPEN, from);
-        int comment = inject.indexOf(COMMENT_OPEN, from);
-        boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
-        int skipFrom = cdataFirst ? cdata : comment;
+        // Most specific opener first. "<!--" and "<![CDATA[" both begin with "<!", so the
+        // generic declaration opener has to be considered last: at the same index the
+        // earlier entry wins, and it is the one that knows the right closer.
+        String[][] constructs = {
+            {CDATA_OPEN, CDATA_CLOSE},
+            {COMMENT_OPEN, COMMENT_CLOSE},
+            {PI_OPEN, PI_CLOSE},
+            {DECLARATION_OPEN, DECLARATION_CLOSE},
+        };
+        int skipFrom = -1;
+        String opener = null;
+        String closer = null;
+        for (int iter = 0; iter < constructs.length; iter++) {
+            int found = inject.indexOf(constructs[iter][0], from);
+            if (found >= 0 && (skipFrom < 0 || found < skipFrom)) {
+                skipFrom = found;
+                opener = constructs[iter][0];
+                closer = constructs[iter][1];
+            }
+        }
         if (skipFrom < 0 || skipFrom > at) {
             return at;
         }
-        String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
-        String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
         int end = inject.indexOf(closer, skipFrom + opener.length());
         return end < 0 ? -1 : end + closer.length();
     }
+
+    private static final String PI_OPEN = "<?";
+    private static final String PI_CLOSE = "?>";
+    /// A declaration -- in a plist, the DOCTYPE. Ends at the first `>`, which is right for
+    /// every declaration a property list carries; one with an internal subset could hold a
+    /// `>` of its own, and no plist has one.
+    private static final String DECLARATION_OPEN = "<!";
+    private static final String DECLARATION_CLOSE = ">";
 
     private static int nextMarkup(String inject, String tag, int from) {
         int i = from;
@@ -1205,22 +1234,16 @@ class WatchNativeBuilder {
             if (at < 0) {
                 return -1;
             }
-            int cdata = inject.indexOf(CDATA_OPEN, i);
-            int comment = inject.indexOf(COMMENT_OPEN, i);
-            boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
-            int skipFrom = cdataFirst ? cdata : comment;
-            if (skipFrom < 0 || skipFrom > at) {
-                return at;
-            }
-            String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
-            String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
-            int end = inject.indexOf(closer, skipFrom + opener.length());
-            if (end < 0) {
+            int skipped = skipMarkupBefore(inject, at, i);
+            if (skipped < 0) {
                 // Unterminated: nothing after it can be located reliably, so the key is treated as
                 // absent rather than guessed at.
                 return -1;
             }
-            i = end + closer.length();
+            if (skipped == at) {
+                return at;
+            }
+            i = skipped;
         }
         return -1;
     }
@@ -1239,24 +1262,18 @@ class WatchNativeBuilder {
                 return -1;
             }
             int close = m.start();
-            int cdata = inject.indexOf(CDATA_OPEN, i);
-            int comment = inject.indexOf(COMMENT_OPEN, i);
-            // Whichever construct starts first, if either starts before the candidate end tag.
-            // A </string> written inside a comment is no more an end tag than one inside CDATA.
-            boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
-            int skipFrom = cdataFirst ? cdata : comment;
-            if (skipFrom < 0 || skipFrom > close) {
-                return close;
-            }
-            String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
-            String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
-            int end = inject.indexOf(closer, skipFrom + opener.length());
-            if (end < 0) {
+            // A </string> written inside a comment is no more an end tag than one inside
+            // CDATA, a processing instruction or a declaration.
+            int skipped = skipMarkupBefore(inject, close, i);
+            if (skipped < 0) {
                 // Unterminated. Nothing after it can be located reliably, so the key is treated as
                 // absent rather than guessed at.
                 return -1;
             }
-            i = end + closer.length();
+            if (skipped == close) {
+                return close;
+            }
+            i = skipped;
         }
         return -1;
     }
@@ -1270,30 +1287,6 @@ class WatchNativeBuilder {
     /// A comment is markup, not content: the parser reading the phone's plist drops it, so keeping
     /// it here escaped "<!-- note -->" into the watch's visible string. Inside CDATA the same
     /// characters are data and are left exactly as written.
-    private static String stripComments(String value) {
-        if (value == null || value.indexOf(COMMENT_OPEN) < 0) {
-            return value;
-        }
-        StringBuilder out = new StringBuilder(value.length());
-        int i = 0;
-        while (i < value.length()) {
-            int open = value.indexOf(COMMENT_OPEN, i);
-            if (open < 0) {
-                out.append(value.substring(i));
-                break;
-            }
-            out.append(value, i, open);
-            int close = value.indexOf(COMMENT_CLOSE, open + COMMENT_OPEN.length());
-            if (close < 0) {
-                // Unterminated: everything after it is inside the comment, so nothing more is
-                // content.
-                break;
-            }
-            i = close + COMMENT_CLOSE.length();
-        }
-        return out.toString();
-    }
-
     private static final String CDATA_OPEN = "<![CDATA[";
 
     private static final String CDATA_CLOSE = "]]>";
@@ -1321,27 +1314,63 @@ class WatchNativeBuilder {
         if (raw == null) {
             return null;
         }
-        if (raw.indexOf(CDATA_OPEN) < 0) {
-            return decodeXmlEntities(stripComments(raw));
-        }
+        // ONE left-to-right pass over all three constructs, because they nest both ways and
+        // neither order works as a pre-pass. A "<![CDATA[" written inside a comment is comment
+        // text, so finding CDATA first opened a section that never closes and swallowed the
+        // rest of the value; but a "<!--" written inside CDATA is literal data, so stripping
+        // comments first would delete text the author meant to keep. Only interleaving gets
+        // both right: at each step whichever construct starts earliest is the real one.
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
         while (i < raw.length()) {
             int cdata = raw.indexOf(CDATA_OPEN, i);
-            if (cdata < 0) {
-                out.append(decodeXmlEntities(stripComments(raw.substring(i))));
+            int comment = raw.indexOf(COMMENT_OPEN, i);
+            int pi = raw.indexOf(PI_OPEN, i);
+            int next = -1;
+            String opener = null;
+            String closer = null;
+            boolean isData = false;
+            if (cdata >= 0) {
+                next = cdata;
+                opener = CDATA_OPEN;
+                closer = CDATA_CLOSE;
+                isData = true;
+            }
+            if (comment >= 0 && (next < 0 || comment < next)) {
+                next = comment;
+                opener = COMMENT_OPEN;
+                closer = COMMENT_CLOSE;
+                isData = false;
+            }
+            if (pi >= 0 && (next < 0 || pi < next)) {
+                next = pi;
+                opener = PI_OPEN;
+                closer = PI_CLOSE;
+                isData = false;
+            }
+            if (next < 0) {
+                out.append(decodeXmlEntities(raw.substring(i)));
                 break;
             }
-            out.append(decodeXmlEntities(stripComments(raw.substring(i, cdata))));
-            int body = cdata + CDATA_OPEN.length();
-            int end = raw.indexOf(CDATA_CLOSE, body);
+            out.append(decodeXmlEntities(raw.substring(i, next)));
+            int body = next + opener.length();
+            int end = raw.indexOf(closer, body);
             if (end < 0) {
-                // Unterminated: take the remainder as data rather than emitting the marker as text.
-                out.append(raw.substring(body));
+                if (isData) {
+                    // Unterminated: take the remainder as data rather than emitting the marker
+                    // as text.
+                    out.append(raw.substring(body));
+                }
+                // An unterminated comment or instruction swallows the rest, which is what a
+                // parser does with it too.
                 break;
             }
-            out.append(raw, body, end);
-            i = end + CDATA_CLOSE.length();
+            if (isData) {
+                // Verbatim: CDATA is not entity-encoded, so decoding it would corrupt an
+                // author's literal "&amp;".
+                out.append(raw, body, end);
+            }
+            i = end + closer.length();
         }
         return out.toString();
     }

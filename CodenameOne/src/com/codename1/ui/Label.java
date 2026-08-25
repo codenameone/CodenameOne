@@ -593,7 +593,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         // solves the case of a user starting a ticker before adding the component
         // into the container
         if (isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
-            getComponentForm().registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(this, this);
         }
         checkAnimation();
         if (maskName != null && mask == null) {
@@ -612,10 +612,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
-        Form f = getComponentForm();
-        if (f != null) {
-            f.deregisterAnimated(this);
-        }
+        deregisterFromAnimation();
 
         if (getIcon() != null) {
             getIcon().removeActionListener(iconChangeListener);
@@ -656,12 +653,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     void checkAnimation() {
         super.checkAnimation();
         if (icon != null && icon.isAnimation()) {
-            Form parent = getComponentForm();
-            if (parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
+            registerForAnimation();
         }
     }
 
@@ -1073,9 +1065,9 @@ public class Label extends Component implements IconHolder, TextHolder {
             return;
         }
         if (!isCellRenderer()) {
-            Form parent = getComponentForm();
+            TopLevelContainer parent = getTopLevelContainer();
             if (parent != null) {
-                parent.registerAnimatedInternal(this);
+                TopLevelSupport.registerAnimatedInternal(parent, this);
             }
         }
         tickerStartTime = AnimationTime.now();

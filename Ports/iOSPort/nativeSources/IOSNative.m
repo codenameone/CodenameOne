@@ -2086,6 +2086,70 @@ void cn1CapturePointerMetadata(UITouch* touch) {
 }
 #endif // !TARGET_OS_WATCH
 
+#if TARGET_OS_MACCATALYST
+/*
+ * Mac Catalyst desktop windows. These marshal a window's own events into the
+ * framework, mirroring the pointerPressed / screenSizeChanged bridges below so
+ * all the ParparVM thread-state handling stays in one file.
+ */
+void CN1MacWindowDeliverClose(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowCloseCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverClosed(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowClosedNativelyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+
+void CN1MacWindowDeliverMonitorsChanged(void) {
+    com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
+    com_codename1_impl_ios_IOSImplementation_windowFocusCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, gained ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1MacWindowDeliverContentReady(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowContentReadyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverActivationFailed(int windowId, int requestSeq) {
+    com_codename1_impl_ios_IOSImplementation_windowActivationFailedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, requestSeq);
+}
+
+void CN1MacWindowDeliverVisibility(int windowId, BOOL shown) {
+    com_codename1_impl_ios_IOSImplementation_windowVisibilityCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, shown ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void CN1MacWindowDeliverResize(int windowId, int width, int height) {
+    com_codename1_impl_ios_IOSImplementation_windowSizeCallback___int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, width, height);
+}
+
+void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowPointerCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
+}
+
+void CN1MacWindowDeliverHover(int windowId, int type, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowHoverCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
+}
+
+void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY) {
+    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY);
+}
+
+void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowPinchCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, scale, x, y);
+}
+
+void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowRotationCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, radians, x, y);
+}
+
+void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
+    com_codename1_impl_ios_IOSImplementation_windowKeyCallback___int_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, keyCode, pressed ? JAVA_TRUE : JAVA_FALSE);
+}
+#endif
+
 void pointerPressed(int* x, int* y, int length) {
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
@@ -2343,6 +2407,239 @@ void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(C
 void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
 #if TARGET_OS_MACCATALYST
     CN1SetMacWindowUndecorated(undecorated ? YES : NO);
+#endif
+}
+
+/* ---- Mac Catalyst desktop windows (CN1MacWindows.m) --------------------- */
+#if TARGET_OS_MACCATALYST
+#import "CN1MacWindows.h"
+#endif
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
+        JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
+#if TARGET_OS_MACCATALYST
+    POOL_BEGIN();
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    int slot = CN1MacWindowCreate(windowId, t == nil ? @"" : t, x, y, width, height,
+            decorated ? YES : NO, resizable ? YES : NO, positionSet ? YES : NO);
+    POOL_END();
+    return slot;
+#else
+    return -1;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowDestroy(slot);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowRequestSeq(slot);
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowShow(slot, visible ? YES : NO);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetDecorated(slot, decorated == JAVA_TRUE ? YES : NO);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetMinimumSize(slot, width, height);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetEditingSlot(slot);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacMainWindowSetInputEnabled(enabled == JAVA_TRUE);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+#if TARGET_OS_MACCATALYST
+    UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+    return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowWatchScreens();
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
+#if TARGET_OS_MACCATALYST
+    POOL_BEGIN();
+    NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    CN1MacWindowSetTitle(slot, t == nil ? @"" : t);
+    POOL_END();
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetBounds(slot, x, y, width, height);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return JAVA_FALSE;
+    }
+    return CN1MacMainWindowGetBounds((int*) ((JAVA_ARRAY) out)->data) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return;
+    }
+    CN1MacWindowGetBounds(slot, (int*) ((JAVA_ARRAY) out)->data);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowGetWidth(slot);
+#else
+    return 0;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowGetHeight(slot);
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetState(slot, state);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
+#if TARGET_OS_MACCATALYST
+    if (argb == JAVA_NULL) {
+        return;
+    }
+    CN1MacWindowPresent(slot, ((JAVA_ARRAY) argb)->data, width, height);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMultiWindowSupported() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorCount();
+#else
+    return 1;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacPrimaryMonitor();
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+#if TARGET_OS_MACCATALYST
+    if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
+        return;
+    }
+    CN1MacMonitorBounds(monitor, workArea ? YES : NO, (int*) ((JAVA_ARRAY) out)->data);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorDpi(monitor);
+#else
+    return 96;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+#if TARGET_OS_MACCATALYST
+    /* Scaled by a hundred because the bridge carries ints; the Java side divides
+     * it back out. */
+    return (JAVA_INT) (CN1MacMonitorScale(monitor) * 100.0 + 0.5);
+#else
+    return 100;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorForWindow(slot);
+#else
+    return 0;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorForMainWindow();
+#else
+    return 0;
 #endif
 }
 
@@ -16648,6 +16945,26 @@ void cn1_watch_activate_connectivity(void) {
     [CN1WatchConnectivity shared];
 }
 #endif
+
+// Declared rather than left implicit. These six are the translated form of the static
+// Java methods on IOSWearableCallbacks, and ParparVM emits their definitions -- but it
+// emits no header this file includes, so every call below was an implicit declaration.
+// C99 dropped those, and a clang that enforces it turns all six into build errors:
+// "call to undeclared function ... ISO C99 and later do not support implicit function
+// declarations". That is a toolchain change away from breaking every iOS target at
+// once, which is exactly what happened, so the declarations are written out here.
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeMessageReceived___java_lang_String_byte_1ARRAY_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_INT replyToken);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeReplyReceived___int_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT replyToken, JAVA_OBJECT payload, JAVA_OBJECT error);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChanged___java_lang_String_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChangedTracked___java_lang_String_byte_1ARRAY_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_OBJECT token);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeDataRemoved___java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path);
+extern JAVA_VOID com_codename1_impl_ios_IOSWearableCallbacks_nativeStateChanged__(
+        CODENAME_ONE_THREAD_STATE);
 
 // Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
 // surface, which owns EDT dispatch and the cold-start queue.

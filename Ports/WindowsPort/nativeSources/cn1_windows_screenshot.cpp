@@ -250,6 +250,101 @@ static JAVA_OBJECT cn1WinWicSourceToPngBytes(CODENAME_ONE_THREAD_STATE, IWICBitm
 }
 
 /*
+ * Encodes one secondary window's client area to PNG bytes.
+ *
+ * Not the WIC path the main surface uses: a secondary window draws into an
+ * ID2D1HwndRenderTarget, which Direct2D gives no readback for, so there is no
+ * bitmap to hand the encoder. PrintWindow asks the window to render itself into
+ * a DC instead, and PW_RENDERFULLCONTENT is the part that matters -- without it
+ * a Direct2D / DirectComposition surface comes back blank. PW_CLIENTONLY keeps
+ * the frame out, so the result is the same rectangle the framework laid out and
+ * the goldens are sized to.
+ *
+ * The point of doing this at all is that it reads back what the window is
+ * actually showing, native peers and editors included. Window.capture() falls
+ * back to re-rendering the component hierarchy when this returns null, and that
+ * fallback draws what the window *should* show -- it cannot tell a correct
+ * window from one whose raster and hierarchy disagree, and it never contains a
+ * peer or a native editor at all.
+ */
+#ifndef PW_RENDERFULLCONTENT
+/* Windows 8.1 and later. Defined here rather than assumed, because an older SDK
+ * header omits it and the flag is the difference between a captured Direct2D
+ * surface and a blank one -- a build that quietly dropped it would produce empty
+ * goldens rather than a compile error. */
+#define PW_RENDERFULLCONTENT 0x00000002
+#endif
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_captureDesktopWindowToPngBytes___int_R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
+    HWND hwnd = cn1WinDesktopHwnd((int) __cn1Arg1);
+    if (hwnd == NULL) {
+        cn1WindowsLog("captureDesktopWindowToPngBytes: no window for slot");
+        return JAVA_NULL;
+    }
+    IWICImagingFactory* wic = cn1ShotWicFactory();
+    if (wic == NULL) {
+        return JAVA_NULL;
+    }
+    RECT client;
+    if (!GetClientRect(hwnd, &client)) {
+        return JAVA_NULL;
+    }
+    int width = (int) (client.right - client.left);
+    int height = (int) (client.bottom - client.top);
+    if (width <= 0 || height <= 0) {
+        cn1WindowsLog("captureDesktopWindowToPngBytes: window has no client area yet");
+        return JAVA_NULL;
+    }
+
+    JAVA_OBJECT result = JAVA_NULL;
+    HDC windowDC = GetDC(hwnd);
+    if (windowDC != NULL) {
+        HDC memDC = CreateCompatibleDC(windowDC);
+        if (memDC != NULL) {
+            BITMAPINFO info;
+            ZeroMemory(&info, sizeof(info));
+            info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            info.bmiHeader.biWidth = width;
+            /* Negative: a top-down DIB, matching the row order WIC expects. */
+            info.bmiHeader.biHeight = -height;
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BI_RGB;
+            void* bits = NULL;
+            HBITMAP dib = CreateDIBSection(memDC, &info, DIB_RGB_COLORS, &bits, NULL, 0);
+            if (dib != NULL && bits != NULL) {
+                HGDIOBJ previous = SelectObject(memDC, dib);
+                if (PrintWindow(hwnd, memDC, PW_CLIENTONLY | PW_RENDERFULLCONTENT)) {
+                    /* GDI flushes lazily and the bits are read straight out of the
+                     * section below, so the drawing has to be finished first. */
+                    GdiFlush();
+                    UINT stride = (UINT) width * 4;
+                    UINT total = stride * (UINT) height;
+                    IWICBitmap* bitmap = NULL;
+                    if (SUCCEEDED(wic->CreateBitmapFromMemory((UINT) width, (UINT) height,
+                            GUID_WICPixelFormat32bppBGRA, stride, total,
+                            (BYTE*) bits, &bitmap)) && bitmap != NULL) {
+                        result = cn1WinWicSourceToPngBytes(threadStateData,
+                                (IWICBitmapSource*) bitmap);
+                        bitmap->Release();
+                    }
+                } else {
+                    cn1WindowsLog("captureDesktopWindowToPngBytes: PrintWindow failed");
+                }
+                SelectObject(memDC, previous);
+            }
+            if (dib != NULL) {
+                DeleteObject(dib);
+            }
+            DeleteDC(memDC);
+        }
+        ReleaseDC(hwnd, windowDC);
+    }
+    return result;
+}
+
+/*
  * Encodes the current window's render target to PNG bytes. In headless /
  * offscreen mode the window target is a WIC bitmap (drawn into by the EDT's
  * normal paint), so this is the proven render path the headless capture uses --

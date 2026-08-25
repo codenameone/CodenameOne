@@ -372,6 +372,7 @@ preloads
 prerendered
 querystring
 rasterizer
+readback
 recurse
 redeclaring
 redeclaration
@@ -665,6 +666,9 @@ unretraceable
 # The value a thermostat is aiming for, as the HVAC industry and both
 # platforms name it.
 [Ss]etpoints?
+# A close request a listener can refuse, which is how the window close operation
+# is described throughout the desktop windows chapter.
+[Vv]etoable
 
 # -----------------------------------------------------------------------------
 # Nearby devices (Nearby-Devices.asciidoc) terminology.

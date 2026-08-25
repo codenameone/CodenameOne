@@ -36,7 +36,6 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -47,6 +46,7 @@ import com.codename1.ui.TextSelection;
 import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
 import com.codename1.ui.TextSelection.Spans;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.events.FocusListener;
@@ -2238,7 +2238,14 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             return;
         }
 
-        final Form parentForm = cmp.getComponentForm();
+        // Resolve the top level rather than the Form: getComponentForm() is null
+        // for anything inside a Window, and this registration is unguarded, so a
+        // pull-to-refresh gesture in a window would NPE on the EDT.
+        final TopLevelContainer parentTopLevel = cmp.getTopLevelContainer();
+        // Through a local: the container is created lazily, and the taskExecuted path
+        // below never queries the height, which is the other place that would have
+        // created it -- so the field could still be null right here.
+        final Container pullContainer = initPullToRefreshComponents();
         final int scrollY = cmp.getScrollY();
         Component cmpToDraw;
         if (taskExecuted) {
@@ -2251,9 +2258,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
         }
 
-        if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) { //NOPMD CompareObjectsWithEquals
+        if (parentTopLevel != null && pullContainer.getComponentAt(0) != updating && cmpToDraw != pullContainer.getComponentAt(0)) { //NOPMD CompareObjectsWithEquals
 
-            parentForm.registerAnimated(new Animation() {
+            parentTopLevel.registerAnimated(new Animation() {
 
                 int counter = 0;
                 Image i;
@@ -2269,7 +2276,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 public boolean animate() {
                     counter++;
 
-                    if (pull.getComponentAt(0) == releaseToRefresh) { //NOPMD CompareObjectsWithEquals
+                    if (pullContainer.getComponentAt(0) == releaseToRefresh) { //NOPMD CompareObjectsWithEquals
                         ((Label) releaseToRefresh).setIcon(i.rotate(180 - (180 / 6) * counter));
                     } else {
                         ((Label) pullDown).setIcon(i.rotate(180 * counter / 6));
@@ -2277,7 +2284,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     if (counter == 6) {
                         ((Label) releaseToRefresh).setIcon(i);
                         ((Label) pullDown).setIcon(i.rotate(180));
-                        parentForm.deregisterAnimated(this);
+                        parentTopLevel.deregisterAnimated(this);
                     }
 
                     // Placing the repaint inside a callSerially() because repaint directly
@@ -2300,25 +2307,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             });
 
         }
-        if (pull.getComponentAt(0) != cmpToDraw //NOPMD CompareObjectsWithEquals
+        if (pullContainer.getComponentAt(0) != cmpToDraw //NOPMD CompareObjectsWithEquals
                 && cmpToDraw instanceof Label
-                && (pull.getComponentAt(0) instanceof Label)) {
-            ((Label) cmpToDraw).setIcon(((Label) pull.getComponentAt(0)).getIcon());
+                && (pullContainer.getComponentAt(0) instanceof Label)) {
+            ((Label) cmpToDraw).setIcon(((Label) pullContainer.getComponentAt(0)).getIcon());
         }
-        Component current = pull.getComponentAt(0);
+        Component current = pullContainer.getComponentAt(0);
         if (current != cmpToDraw) { //NOPMD CompareObjectsWithEquals
-            pull.replace(current, cmpToDraw, null);
+            pullContainer.replace(current, cmpToDraw, null);
         }
 
-        pull.setWidth(cmp.getWidth());
-        pull.setX(cmp.getAbsoluteX());
-        pull.setY(cmp.getY() - scrollY - getPullToRefreshHeight());
-        pull.layoutContainer();
+        pullContainer.setWidth(cmp.getWidth());
+        pullContainer.setX(cmp.getAbsoluteX());
+        pullContainer.setY(cmp.getY() - scrollY - getPullToRefreshHeight());
+        pullContainer.layoutContainer();
 
         // We need to make the InfiniteProgress to animate, otherwise the progress
         // just stays static.
-        ComponentSelector.select("*", pull).each(new PullToRefreshComponentClosure());
-        pull.paintComponent(g);
+        ComponentSelector.select("*", pullContainer).each(new PullToRefreshComponentClosure());
+        pullContainer.paintComponent(g);
     }
 
     /// Material 3 / iOS modern pull-to-refresh: a circular arc spinner
@@ -2342,6 +2349,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// the sweep mirrors the user's pull fraction; post-threshold (but
     /// pre-release) the sweep is fixed at the full ring.
     private long modernSpinStartTime = 0L;
+
+    /// The spinner's repaint animation, kept so the same instance is registered each
+    /// frame and can be released when spinning ends.
+    private Animation modernSpinnerAnimation;
+
+    /// The top level that animation was registered on.
+    private TopLevelContainer modernSpinnerHost;
 
     public void drawModernPullToRefresh(Graphics g, Component cmp, boolean taskExecuted) {
         final int height = getPullToRefreshHeight();
@@ -2372,12 +2386,31 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             sweep = 280;
             // Schedule the next frame -- without this the spinner freezes
             // after one paint pass.
-            Form f = cmp.getComponentForm();
+            TopLevelContainer f = cmp.getTopLevelContainer();
             if (f != null) {
-                f.registerAnimated(modernSpinnerRepaintAnimation(cmp));
+                // One animation for the spinner, not one per paint. registerAnimated
+                // de-duplicates by identity, and a fresh instance every frame is never
+                // the one already registered -- so the list grew by one per frame and
+                // none of them ever came off, keeping the event dispatch thread awake
+                // for good once a refresh had run.
+                if (modernSpinnerAnimation == null) {
+                    modernSpinnerAnimation = modernSpinnerRepaintAnimation(cmp);
+                }
+                modernSpinnerHost = f;
+                f.registerAnimated(modernSpinnerAnimation);
             }
         } else {
             modernSpinStartTime = 0L;
+            // Spinning has stopped, so the repaint animation has no more work. Released
+            // from the top level that took it rather than from wherever the component
+            // resolves to now.
+            if (modernSpinnerAnimation != null) {
+                if (modernSpinnerHost != null) {
+                    modernSpinnerHost.deregisterAnimated(modernSpinnerAnimation);
+                    modernSpinnerHost = null;
+                }
+                modernSpinnerAnimation = null;
+            }
             // Pull fraction 0..1 over the threshold height.
             float pull = pullDistance / (float) Math.max(1, height);
             float clamped = Math.min(1f, Math.max(0f, pull));
@@ -2496,11 +2529,33 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             int margin = Display.getInstance().convertToPixels(2f);
             return diameter + margin * 2;
         }
+        Container pullContainer = initPullToRefreshComponents();
+        String s = UIManager.getInstance().getThemeConstant("pullToRefreshHeight", null);
+        if (s != null) {
+            float f = Util.toFloatValue(s);
+            if (f > 0) {
+                return Display.getInstance().convertToPixels(f);
+            }
+        }
+        return pullContainer.getHeight();
+    }
+
+    /// Creates the legacy pull-to-refresh components on first use and returns the
+    /// container that hosts them, which is never null. Both the height query and the
+    /// drawing path need them, and the drawing path is reached without a height query
+    /// when a refresh task is already running, so the initialization cannot live in
+    /// `#getPullToRefreshHeight()` alone.
+    ///
+    /// #### Returns
+    ///
+    /// the pull-to-refresh container, never null
+    private Container initPullToRefreshComponents() {
         if (pull == null) {
             BorderLayout bl = new BorderLayout();
             bl.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
             pull = new Container(bl);
         }
+        Container pullContainer = pull;
         if (pullDown == null) {
             pullDown = new Label(getUIManager().localize("pull.down", "Pull down to refresh..."));
             pullDown.setUIID("PullToRefresh");
@@ -2528,20 +2583,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             l.setUIID("PullToRefresh");
             ((Container) updating).addComponent(l);
 
-            pull.getUnselectedStyle().setPadding(0, 0, 0, 0);
-            pull.getUnselectedStyle().setMargin(0, 0, 0, 0);
-            pull.addComponent(BorderLayout.CENTER, updating);
-            pull.layoutContainer();
-            pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));
+            pullContainer.getUnselectedStyle().setPadding(0, 0, 0, 0);
+            pullContainer.getUnselectedStyle().setMargin(0, 0, 0, 0);
+            pullContainer.addComponent(BorderLayout.CENTER, updating);
+            pullContainer.layoutContainer();
+            pullContainer.setHeight(Math.max(pullDown.getPreferredH(), pullContainer.getPreferredH()));
         }
-        String s = UIManager.getInstance().getThemeConstant("pullToRefreshHeight", null);
-        if (s != null) {
-            float f = Util.toFloatValue(s);
-            if (f > 0) {
-                return Display.getInstance().convertToPixels(f);
-            }
-        }
-        return pull.getHeight();
+        return pullContainer;
     }
 
 

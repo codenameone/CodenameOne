@@ -332,7 +332,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         fullScreen = aFullScreen;
     }
 
-    private JFrame findTopFrame() {
+    /* Package private rather than private: the window manager needs it to own a
+     * window to the application's main frame. */
+    JFrame findTopFrame() {
         java.awt.Component c = canvas;
         return (JFrame)canvas.getTopLevelAncestor();
         /*
@@ -475,6 +477,29 @@ public class JavaSEPort extends CodenameOneImplementation {
             intentBridge = new JavaSEIntentBridge();
         }
         return intentBridge;
+    }
+
+    /// Reports the main frame's keyboard focus to `Desktop` as window zero.
+    ///
+    /// Both callbacks were empty, and nothing else in this port ever passed window
+    /// zero, so the main surface was never told it had lost the keyboard. The physical
+    /// key-up goes to whatever gained focus, so a key held on the main form went on
+    /// repeating for as long as it stayed open -- whether focus moved to a secondary
+    /// `com.codename1.ui.Window` or to another application entirely. Activating a
+    /// secondary window reports only that window's gain, so the gain path cannot stand
+    /// in for this: it never fires when the user simply switches apps.
+    ///
+    /// Deliberately not gated on `#isDesktop()`, unlike the window events below: a key
+    /// latches the same way in skin mode, and this only cancels input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gained`: true when the main frame took focus, false when it lost it
+    private void mainSurfaceFocusChanged(boolean gained) {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        com.codename1.ui.Desktop.getInstance().windowFocusChanged(0, gained);
     }
 
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
@@ -2299,7 +2324,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame));
+                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame, null));
                 frame.revalidate();
             }
         });
@@ -2309,7 +2334,30 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
     /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
     /// Codename One EDT before invoking the command's action.
-    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame) {
+    /// Builds a menu bar for a secondary desktop window's commands.
+    ///
+    /// Same builder as the main window's, with the owning window passed through so
+    /// activation goes to `com.codename1.ui.Window#dispatchCommand` -- the command
+    /// listeners registered on the window have to see it. Passing an owner also keeps
+    /// the MCP menu off: that belongs to the application's main frame, not to every
+    /// window that happens to carry a command.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the window's named commands
+    ///
+    /// - `owner`: the window these commands belong to
+    ///
+    /// #### Returns
+    ///
+    /// the menu bar to install on the window
+    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands,
+            com.codename1.ui.Window owner) {
+        return buildNativeMenuBar(commands, null, owner);
+    }
+
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame,
+            final com.codename1.ui.Window owner) {
         JMenuBar bar = new JMenuBar();
         // preserve first-seen order of the menu groups
         java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
@@ -2336,16 +2384,30 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            cmd.actionPerformed(new com.codename1.ui.events.ActionEvent(cmd));
+                            com.codename1.ui.events.ActionEvent ev =
+                                    new com.codename1.ui.events.ActionEvent(cmd);
+                            if (owner != null) {
+                                // Through the window, not straight to the command:
+                                // TopLevelContainer says listeners registered with
+                                // addCommandListener observe activated commands, and
+                                // invoking the command directly bypasses them.
+                                owner.dispatchCommand(cmd, ev);
+                            } else {
+                                cmd.actionPerformed(ev);
+                            }
                         }
                     });
                 }
             });
             menu.add(item);
         }
-        // Every desktop Codename One tool gets the native MCP menu so it can be exposed
-        // to and driven by an LLM agent.
-        bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
+        if (owner == null) {
+            // Every desktop Codename One tool gets the native MCP menu so it can be
+            // exposed to and driven by an LLM agent -- on the application's main frame
+            // only. A secondary application window would otherwise gain development
+            // controls like "Expose This Tool To Agents" simply for carrying a command.
+            bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
+        }
         return bar;
     }
 
@@ -2494,7 +2556,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     /// @return true when running on the desktop with a title-bar mode that hides the CN1
     /// Toolbar in favor of native chrome (native or custom).
-    private boolean isDesktopNativeChromeMode() {
+    boolean isDesktopNativeChromeMode() {
         if (!isDesktop()) {
             return false;
         }
@@ -2926,6 +2988,94 @@ public class JavaSEPort extends CodenameOneImplementation {
         private AWTEventListener magnificationWheelFallbackListener;
         private boolean gestureDebug = Boolean.getBoolean("cn1.javase.gestureDebug");
         public int x, y;
+        /**
+         * The desktop window this canvas renders, or 0 for the application's main
+         * surface. Input from this canvas is tagged with it so the framework routes
+         * the event to the right component hierarchy.
+         */
+        int windowId;
+
+        /**
+         * This canvas's own drawable width, which is what its pointer bounds checks
+         * and coordinate clamping have to use. The display dimensions describe the
+         * <em>primary</em> canvas, so a secondary window larger than it -- or shown
+         * before a main form has sized it -- would silently discard presses outside
+         * those dimensions and clamp drags into them. The primary canvas keeps going
+         * through the display dimensions unchanged, because those also account for a
+         * loaded skin's screen coordinates.
+         */
+        /// The backing scale of the display *this* canvas is on.
+        ///
+        /// The global `retinaScale` is the main display's, fixed at startup. A
+        /// secondary window can sit on a monitor with a different transform, and the
+        /// window manager already lays it out using that monitor's scale -- so
+        /// sizing the surface, the backing buffer and the pointer mapping from the
+        /// global one clipped or stretched the content and put hit testing out of
+        /// step as soon as the window was moved to another display.
+        /// The top level this canvas actually renders, rather than whatever form is
+        /// current.
+        ///
+        /// Hit testing and focus lookups that resolved `Display.getCurrent()` were
+        /// answering about the main form even when the event arrived on a secondary
+        /// window's canvas: a peer in a window stopped receiving mouse input because an
+        /// unrelated main-form component at those window-local coordinates was not a
+        /// peer, and an editor focused in a window was not seen as focused at all.
+        ///
+        /// #### Returns
+        ///
+        /// this canvas's top level, or null when there is none
+        com.codename1.ui.TopLevelContainer canvasTopLevel() {
+            if (windowId == 0) {
+                return com.codename1.ui.CN.getCurrentForm();
+            }
+            return com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        }
+
+        /// Repaints whatever this canvas is showing: the application's current form for
+        /// the main surface, this canvas's own window otherwise.
+        ///
+        /// The callbacks below run for whichever canvas AWT is dealing with, and a
+        /// secondary window has its own. Repainting the current form from them dirtied
+        /// and redrew an unrelated surface, and left this one holding the blank buffer
+        /// that prompted the repaint in the first place.
+        private void repaintCanvasTopLevel() {
+            com.codename1.ui.TopLevelContainer top = canvasTopLevel();
+            if (top != null) {
+                top.asContainer().repaint();
+            }
+        }
+
+        double canvasScale() {
+            if (windowId == 0) {
+                return retinaScale;
+            }
+            try {
+                GraphicsConfiguration cfg = getGraphicsConfiguration();
+                if (cfg != null) {
+                    double sx = cfg.getDefaultTransform().getScaleX();
+                    if (sx > 0) {
+                        return sx;
+                    }
+                }
+            } catch (Throwable err) {
+                // fall through to the global scale
+            }
+            return retinaScale;
+        }
+
+        int surfaceWidth() {
+            if (windowId == 0) {
+                return getDisplayWidthImpl();
+            }
+            return Math.max(1, (int) (getWidth() * canvasScale()));
+        }
+
+        int surfaceHeight() {
+            if (windowId == 0) {
+                return getDisplayHeightImpl();
+            }
+            return Math.max(1, (int) (getHeight() * canvasScale()));
+        }
 
         C() {
             super(null);
@@ -3075,7 +3225,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        private void disposeGestureListeners() {
+        /// Package private so JavaSEWindowManager can release the global Toolkit
+        /// listener when the window is disposed; otherwise it outlives the canvas.
+        void disposeGestureListeners() {
             if (magnificationWheelFallbackListener != null) {
                 try {
                     Toolkit.getDefaultToolkit().removeAWTEventListener(magnificationWheelFallbackListener);
@@ -3083,6 +3235,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 magnificationWheelFallbackListener = null;
             }
+        }
+
+        /**
+         * Drops this canvas's screen buffers and its entry in the screen graphics
+         * registry. The registry keys a Graphics2D to its owning canvas strongly, so
+         * without this a disposed window stayed reachable through it for the life of
+         * the application, holding its BufferedImages -- tens of megabytes at a large
+         * window size, and one set per window ever opened. A disposed window never
+         * paints again, so nothing here can be needed afterwards.
+         */
+        void releaseScreenGraphics() {
+            unregisterScreenGraphics(g2dInstance);
+            if (g2dInstance != null) {
+                g2dInstance.dispose();
+                g2dInstance = null;
+            }
+            synchronized (bufferLock) {
+                edtBuffer = null;
+            }
+            buffer = null;
         }
 
         private void handleMagnification(final int x, final int y, double magnification) {
@@ -3100,7 +3272,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void fireMagnify(final int x, final int y, final float scale) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    Display.getInstance().fireMagnifyGesture(x, y, scale);
+                    // Routed by window id like every other input this canvas
+                    // produces: the canvas a trackpad magnify arrived on is the
+                    // window whose component tree has to see it.
+                    com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
                 }
             });
         }
@@ -3121,7 +3296,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedImage previous = buffer;
             if (getScreenCoordinates() == null) {
                 java.awt.Dimension d = getSize();
-                if (buffer == null || buffer.getWidth() != (int)(d.width * retinaScale) || buffer.getHeight() != (int)(d.height*retinaScale)) {
+                double cs = canvasScale();
+                if (buffer == null || buffer.getWidth() != (int)(d.width * cs) || buffer.getHeight() != (int)(d.height * cs)) {
                     buffer = createBufferedImage();
                 }
             } else {
@@ -3155,10 +3331,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    Form f = getCurrentForm();
-                    if (f != null) {
-                        f.repaint();
-                    }
+                    repaintCanvasTopLevel();
                 }
             });
         }
@@ -3203,6 +3376,25 @@ public class JavaSEPort extends CodenameOneImplementation {
          */
         int blitCounter;
         
+        /**
+         * Snapshot of what this canvas last painted, used by the windowed screenshot
+         * tests: the ordinary screenshot path can only see the primary surface.
+         */
+        BufferedImage captureBuffer() {
+            synchronized (bufferLock) {
+                BufferedImage src = buffer != null ? buffer : edtBuffer;
+                if (src == null) {
+                    return null;
+                }
+                BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(),
+                        BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics g = out.getGraphics();
+                g.drawImage(src, 0, 0, null);
+                g.dispose();
+                return out;
+            }
+        }
+
         public void blit() {
             if(menuDisplayed){
                 return;
@@ -3340,7 +3532,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             //g.setColor(Color.white);
             //g.fillRect(0, 0, canvas.getWidth(), canvas.getHeight());
             AffineTransform t = ((Graphics2D)g).getTransform();
-            AffineTransform t2 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
+            // This canvas's scale, not the main display's. The raster is sized with
+            // canvasScale(), so undoing it with the global retinaScale left the
+            // raster-to-canvas transform as the *ratio* between two monitors' scales
+            // -- a window moved to a display of a different scale was then stretched
+            // or clipped. Identical for the main window, whose canvasScale() is
+            // retinaScale by definition.
+            double blitScale = canvasScale();
+            AffineTransform t2 = AffineTransform.getScaleInstance(1/blitScale, 1/blitScale);
             
             t2.concatenate(t);
             
@@ -3449,12 +3648,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 AffineTransform t = g2.getTransform();
                 double tx = t.getTranslateX();
                 double ty = t.getTranslateY();
-                AffineTransform t2 = AffineTransform.getScaleInstance(retinaScale, retinaScale);
+                // Paired with the inverse applied in drawScreenBuffer, and for the
+                // same reason it uses this canvas's scale rather than the main
+                // display's.
+                double paintScale = canvasScale();
+                AffineTransform t2 = AffineTransform.getScaleInstance(paintScale, paintScale);
                 t2.translate(tx, ty);
                 if (getJavaVersion() < 9) {
                     // Java 8 didn't have full retina support
                     t2 = AffineTransform.getScaleInstance(1, 1);
-                    t2.translate(tx * retinaScale, ty * retinaScale);
+                    t2.translate(tx * paintScale, ty * paintScale);
                 }
 
 
@@ -3469,10 +3672,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (Display.isInitialized()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            Form f = getCurrentForm();
-                            if (f != null) {
-                                f.repaint();
-                            }
+                            repaintCanvasTopLevel();
                         }
                     });
 
@@ -3480,7 +3680,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        flushGraphics();
+                        if (windowId == 0) {
+                            flushGraphics();
+                        } else {
+                            // flushGraphics() is the main surface's. A window is flushed
+                            // by painting it, which goes through its own paint surface
+                            // and its own manager.
+                            repaintCanvasTopLevel();
+                        }
                     }
                 });
             }
@@ -3522,6 +3729,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             while(g2dInstance == null) {
                 
                 g2dInstance = edtBuffer.createGraphics();
+                registerScreenGraphics(g2dInstance, this);
                 updateGraphicsScale(g2dInstance);
                 try {
                     Thread.sleep(10);
@@ -3533,11 +3741,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private BufferedImage createBufferedImage() {
+            unregisterScreenGraphics(g2dInstance);
             g2dInstance = null;
             if (getScreenCoordinates() != null) {
                 return new BufferedImage(Math.max(20, (int) (getScreenCoordinates().width * zoomLevel)), Math.max(20, (int) (getScreenCoordinates().height * zoomLevel)), BufferedImage.TYPE_INT_RGB);
             }
-            return new BufferedImage(Math.max(20, (int)(getWidth() * retinaScale)), Math.max(20, (int)(getHeight() * retinaScale)), BufferedImage.TYPE_INT_RGB);
+            return new BufferedImage(Math.max(20, (int)(getWidth() * canvasScale())), Math.max(20, (int)(getHeight() * canvasScale())), BufferedImage.TYPE_INT_RGB);
         }
 
         public void validate() {
@@ -3598,7 +3807,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
         private boolean isPureEditorFocused() {
-            com.codename1.ui.Form f = com.codename1.ui.CN.getCurrentForm();
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
         }
 
@@ -3634,7 +3843,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             boolean editorFocused = isPureEditorFocused();
             if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'c') {
-                Form f = CN.getCurrentForm();
+                // This canvas's top level, not the current form: the shortcut arrived
+                // on a particular window's canvas, and resolving the current form
+                // copied or selected from the unrelated main form -- or did nothing at
+                // all in a window-only application.
+                com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
                     if (ts.isEnabled()) {
@@ -3660,7 +3873,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'a') {
-                Form f = CN.getCurrentForm();
+                // This canvas's top level, not the current form: the shortcut arrived
+                // on a particular window's canvas, and resolving the current form
+                // copied or selected from the unrelated main form -- or did nothing at
+                // all in a window-only application.
+                com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
                     if (ts.isEnabled()) {
@@ -3701,7 +3918,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (testRecorder != null) {
                 testRecorder.eventKeyPressed(code);
             }
-            JavaSEPort.this.keyPressed(code);
+            JavaSEPort.this.windowKeyPressed(windowId, code);
         }
 
         public void keyReleased(KeyEvent e) {
@@ -3737,7 +3954,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (testRecorder != null) {
                 testRecorder.eventKeyReleased(code);
             }
-            JavaSEPort.this.keyReleased(code);
+            JavaSEPort.this.windowKeyReleased(windowId, code);
         }
 
         public void mouseClicked(MouseEvent e) {
@@ -3752,11 +3969,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return false;
             }
 
-            Form f = Display.getInstance().getCurrent();
+            // This canvas is shared with secondary windows, so the hit test has to run
+            // against the top level this canvas renders. Resolving the current form
+            // inspected a component of the unrelated main form, and in a window-only
+            // application it showed and consumed the inspection menu while having
+            // nothing to inspect -- which also swallowed the window's own context menu.
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(me.getX());
                 int y = scaleCoordinateY(me.getY());
-                Component cmp = f.getComponentAt(x, y);
+                Component cmp = f.asContainer().getComponentAt(x, y);
                 if (cmp == null || cmp instanceof PeerComponent) {
                     return false;
                 }
@@ -3771,11 +3993,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent e) {
                     ComponentTreeInspector inspector = getOrCreateComponentTreeInspector();
                     if (inspector != null && inspector.isSimulatorRightClickEnabled()) {
-                        Form f = Display.getInstance().getCurrent();
+                        com.codename1.ui.TopLevelContainer f = canvasTopLevel();
                         if (f != null) {
                             int x = scaleCoordinateX(me.getX());
                             int y = scaleCoordinateY(me.getY());
-                            Component cmp = f.getComponentAt(x, y);
+                            Component cmp = f.asContainer().getComponentAt(x, y);
                             inspector.inspectComponent(cmp);
                         }
                     }
@@ -3790,14 +4012,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
-            return (int)(coordinate * retinaScale);
+            // canvasScale(), not retinaScale: a press has to land where the content
+            // was drawn, and the two differ on a mixed-scale desktop.
+            return (int)(coordinate * canvasScale());
         }
 
         private int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
-            return (int)(coordinate * retinaScale);
+            return (int)(coordinate * canvasScale());
         }
         Integer triggeredKeyCode;
         private boolean mouseDown;
@@ -3808,11 +4032,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             this.mouseDown = true;
-            Form f = Display.getInstance().getCurrent();
+            com.codename1.ui.TopLevelContainer f = canvasTopLevel();
             if (f != null) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                Component cmp = f.getComponentAt(x, y);
+                Component cmp = f.asContainer().getComponentAt(x, y);
                 if (!(cmp instanceof PeerComponent)) {
                     cn1GrabbedDrag = true;
                 }
@@ -3826,13 +4050,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
                     if (touchDevice) {
                         if (testRecorder != null) {
                             testRecorder.eventPointerPressed(x, y);
                         }
                         updatePointerMetadata(e, true);
-                        JavaSEPort.this.pointerPressed(x, y);
+                        JavaSEPort.this.windowPointerPressed(windowId, x, y);
                     }
                 } else {
                     if (getSkin() != null) {
@@ -3863,7 +4087,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             if (testRecorder != null) {
                                 testRecorder.eventKeyPressed(code);
                             }
-                            JavaSEPort.this.keyPressed(code);
+                            JavaSEPort.this.windowKeyPressed(windowId, code);
                         }
                     }
                 }
@@ -3889,15 +4113,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
-                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
+                        x = Math.min(surfaceWidth(), Math.max(0, x));
+                        y = Math.min(surfaceHeight(), Math.max(0, y));
                         if (testRecorder != null) {
                             testRecorder.eventPointerReleased(x, y);
                         }
                         updatePointerMetadata(e, true);
-                        JavaSEPort.this.pointerReleased(x, y);
+                        JavaSEPort.this.windowPointerReleased(windowId, x, y);
                     }
                 }
                 if (triggeredKeyCode != null) {
@@ -3905,7 +4129,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (testRecorder != null) {
                         testRecorder.eventKeyReleased(code);
                     }
-                    JavaSEPort.this.keyReleased(code);
+                    JavaSEPort.this.windowKeyReleased(windowId, code);
                     triggeredKeyCode = null;
                 }
             } 
@@ -3927,15 +4151,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
-                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
+                        x = Math.min(surfaceWidth(), Math.max(0, x));
+                        y = Math.min(surfaceHeight(), Math.max(0, y));
                         if (testRecorder != null && hasDragStarted(x, y)) {
                             testRecorder.eventPointerDragged(x, y);
                         }
                         updatePointerMetadata(e, false);
-                        JavaSEPort.this.pointerDragged(x, y);
+                        JavaSEPort.this.windowPointerDragged(windowId, x, y);
                     }
                 }
                 return;
@@ -3945,9 +4169,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && isPinchZoom(e)) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        JavaSEPort.this.pointerDragged(new int[]{Math.min(getDisplayWidthImpl(), Math.max(0,x)), 0}, new int[]{Math.min(getDisplayHeightImpl(), Math.max(0, y)), 0});
+                        // Tagged with the window id like the press that started the
+                        // gesture; otherwise the second pointer of a simulated pinch
+                        // lands on the main form and drags unrelated content.
+                        JavaSEPort.this.windowPointerDragged(windowId,
+                                new int[]{Math.min(surfaceWidth(), Math.max(0, x)), 0},
+                                new int[]{Math.min(surfaceHeight(), Math.max(0, y)), 0});
                     }
                 } 
                 return;
@@ -4030,6 +4259,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean pendingDelayedWindowRepaint;
 
         private void queueSizeChangeEvent(int w, int h, boolean revalidate, boolean forceRevalidate, boolean resetGraphics, boolean delayedWindowRepaint) {
+            if (windowId != 0) {
+                // This canvas is a secondary window's, and this path resizes the
+                // *main* surface: laying out a secondary frame would have resized the
+                // main form's hierarchy to the secondary canvas's dimensions. The
+                // guard is here rather than at the call sites because all three of
+                // them -- setBounds and both branches of ancestorResized -- are
+                // primary-canvas logic that a secondary canvas also runs, being the
+                // same class and the same listener.
+                //
+                // A secondary window reports its own size through
+                // JavaSEWindowManager's componentResized, which tags the event with
+                // the window id.
+                return;
+            }
             synchronized (pendingSizeChangeLock) {
                 pendingSizeChangeWidth = w;
                 pendingSizeChangeHeight = h;
@@ -4067,6 +4310,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.sizeChanged(queuedW, queuedH);
 
                     if (doResetGraphics) {
+                        unregisterScreenGraphics(g2dInstance);
                         g2dInstance = null;
                     }
 
@@ -4110,18 +4354,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(invokePointerHover || JavaSEPort.this.isDesktop()) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    JavaSEPort.this.pointerHover(x, y);
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
+                    JavaSEPort.this.windowPointerHover(windowId, x, y);
                 }
 
 
             }
-            Form f = Display.getInstance().getCurrent();
-            if (f != null && f.isEnableCursors()) {
+            // Cursors resolve against this canvas's own top level, not the current
+            // form: a window's components are the ones under the pointer here.
+            com.codename1.ui.TopLevelContainer top = windowId > 0
+                    ? com.codename1.ui.Desktop.getInstance().windowById(windowId)
+                    : Display.getInstance().getCurrent();
+            if (top != null && top.isEnableCursors()) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    Component cmp = f.getComponentAt(x, y);
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
+                    Component cmp = top.asContainer().getComponentAt(x, y);
                     if (cmp != null) {
                         int cursor = cmp.getCursor();
                         if (cursor != currentCursor) {
@@ -4170,7 +4418,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         
         public void ancestorResized(HierarchyEvent e) {
-            
+            if (windowId != 0) {
+                // Everything below is primary-surface logic that a secondary canvas
+                // also runs, being the same class and the same listener: it reads the
+                // skin, and mutates the *port's* canvas field rather than this one --
+                // canvas.setForcedSize() would stamp the main canvas with a secondary
+                // window's dimensions and let a later Swing layout resize or clip the
+                // main surface. A secondary window's own resize arrives through its
+                // componentResized, window-tagged.
+                //
+                // Rejected here rather than deeper down: queueSizeChangeEvent already
+                // guards itself, but by then the main canvas has been mutated.
+                return;
+            }
+
             /*
             if (e.getChanged() != getParent()) {
                 EventQueue.invokeLater(new Runnable() {
@@ -4281,13 +4542,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
             }
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
-                Form f = getCurrentForm();
+                // Resolve against the canvas's own top level rather than the current
+                // form: this handler is installed on every canvas, and a wheel over a
+                // desktop window has to scroll that window's content.
+                com.codename1.ui.Container f = windowId > 0
+                        ? (com.codename1.ui.Container) com.codename1.ui.Desktop.getInstance().windowById(windowId)
+                        : (com.codename1.ui.Container) getCurrentForm();
                 if(f != null){
-                    Component cmp;
+                    com.codename1.ui.Component cmp;
                     try {
                         cmp = f.getComponentAt(x, y);
                     } catch (Throwable t) {
-                        // Since this is called off the edt, we sometimes hit 
+                        // Since this is called off the edt, we sometimes hit
                         // NPEs and Array Index out of bounds errors here
                         cmp = null;
                     }
@@ -4322,9 +4588,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 boolean precise = e.getPreciseWheelRotation() != e.getWheelRotation();
                 int modifiers = modifierMask(e);
                 if (e.isShiftDown()) {
-                    pointerWheelMoved(x, y, units, 0, precise, modifiers);
+                    windowPointerWheelMoved(windowId, x, y, units, 0, precise, modifiers);
                 } else {
-                    pointerWheelMoved(x, y, 0, units, precise, modifiers);
+                    windowPointerWheelMoved(windowId, x, y, 0, units, precise, modifiers);
                 }
             }
         }
@@ -4371,6 +4637,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deinitialize() {
+        // The window manager's monitor poller is a daemon timer that outlives the port
+        // otherwise. A simulator session that restarts through deinitialize()/init()
+        // builds a new manager each time, and every previous poller kept waking every
+        // two seconds and reporting the same topology change independently.
+        synchronized (windowManagerLock) {
+            if (windowManager != null) {
+                windowManager.stopWatchingMonitorTopology();
+                windowManager = null;
+            }
+        }
         if (canvas != null) {
             canvas.disposeGestureListeners();
         }
@@ -10123,9 +10399,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowActivated(WindowEvent e) {
+                    mainSurfaceFocusChanged(true);
                 }
 
                 public void windowDeactivated(WindowEvent e) {
+                    mainSurfaceFocusChanged(false);
                 }
             });
             window.addComponentListener(new ComponentAdapter() {
@@ -10599,7 +10877,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             setText(tf, text);
         }
-        canvas.add(tf);
+        // The owning window's canvas, like the Swing editor path: an editor added to
+        // the primary canvas would appear on the main window.
+        final C editorCanvas = editorCanvasFor(cmp);
+        editorCanvas.add(tf);
+        // Recorded so a monitor-scale change can reposition this editor as well. The
+        // compat editor divides by the same canvas scale as the normal one and goes
+        // stale the same way when its window moves to a display with another.
+        legacyEditor = tf;
+        legacyEditingField = cmp;
         if (getSkin() != null) {
             tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
@@ -10607,7 +10893,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
         } else {
-            tf.setBounds(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
+            // As in the path above: device pixels converted to Swing's logical ones.
+            double legacyScale = editorCanvas.canvasScale();
+            tf.setBounds((int) (cmp.getAbsoluteX() / legacyScale), (int) (cmp.getAbsoluteY() / legacyScale),
+                    (int) (cmp.getWidth() / legacyScale), (int) (cmp.getHeight() / legacyScale));
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         setCaretPosition(tf, getText(tf).length());
@@ -10634,11 +10923,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 ((TextComponent) tf).removeTextListener(this);
                 tf.removeFocusListener(this);
-                canvas.remove(tf);
+                legacyEditor = null;
+                legacyEditingField = null;
+                editorCanvas.remove(tf);
                 synchronized (this) {
                     notify();
                 }
-                canvas.repaint();
+                editorCanvas.repaint();
             }
 
             public void focusGained(FocusEvent e) {
@@ -10731,8 +11022,115 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void stopTextEditing() {
         if (textCmp != null && textCmp.getParent() != null) {
-            canvas.remove(textCmp);
+            // remove from whichever canvas it was attached to, which is not
+            // necessarily the primary one
+            textCmp.getParent().remove(textCmp);
         }
+    }
+
+    /**
+     * The canvas a native editor for this component belongs on. Editing inside a
+     * desktop Window has to attach the Swing editor to that window's canvas, or the
+     * caret appears on the main window instead.
+     */
+    /**
+     * Places the Swing editor over the field it is editing.
+     *
+     * Divided by the owning canvas's backing scale, exactly as a native peer divides
+     * by peerScale(). Codename One coordinates are device pixels --
+     * getDisplayWidthImpl multiplies the canvas size by this same scale -- while Swing
+     * bounds are logical, so assigning one to the other left the editor oversized and
+     * offset from its field by the scale factor on any canvas whose monitor is not 1x.
+     *
+     * Computed here rather than inline so the same placement can be reapplied when the
+     * window moves to a display with a different scale; see reapplyEditorBounds.
+     */
+    private void applyEditorBounds(com.codename1.ui.Component cmp) {
+        if (textCmp == null || cmp == null) {
+            return;
+        }
+        int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
+        int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
+        int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
+        int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+        double editorScale = editorCanvasFor(cmp).canvasScale();
+        textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft) / editorScale),
+                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + marginTop) / editorScale),
+                (int) ((cmp.getWidth() - marginRight - marginLeft) / editorScale),
+                (int) ((cmp.getHeight() - marginTop - marginBottom) / editorScale));
+    }
+
+    /**
+     * Reapplies the editor's placement after its window may have changed backing
+     * scale. The placement divides by the canvas's scale, and that divisor changes
+     * when a window is dragged to a display with a different one -- the Codename One
+     * hierarchy is re-laid out for the new scale, but nothing moved the Swing editor,
+     * leaving it offset and mis-sized over its field until editing restarted.
+     *
+     * Called on the AWT thread, where the move is reported and where Swing bounds may
+     * be set.
+     */
+    void reapplyEditorBounds(int windowId) {
+        if (getSkin() != null) {
+            return;
+        }
+        if (currentlyEditingField != null && textCmp != null
+                && editorWindowId(currentlyEditingField) == windowId) {
+            applyEditorBounds(currentlyEditingField);
+        }
+        // TextCompatMode uses its own editor, placed by the same division and stale in
+        // the same way. The mode is opt-in; the bug is not, once it is on.
+        if (legacyEditor != null && legacyEditingField != null
+                && editorWindowId(legacyEditingField) == windowId) {
+            double legacyScale = editorCanvasFor(legacyEditingField).canvasScale();
+            legacyEditor.setBounds((int) (legacyEditingField.getAbsoluteX() / legacyScale),
+                    (int) (legacyEditingField.getAbsoluteY() / legacyScale),
+                    (int) (legacyEditingField.getWidth() / legacyScale),
+                    (int) (legacyEditingField.getHeight() / legacyScale));
+        }
+    }
+
+    private int editorWindowId(com.codename1.ui.Component cmp) {
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
+        return peer instanceof JavaSEWindowManager.Peer
+                ? ((JavaSEWindowManager.Peer) peer).windowId : 0;
+    }
+
+    /// Recomputes the Swing bounds of every native peer hosted by the given window.
+    ///
+    /// A monitor move changes the backing scale the peer bounds divide by, but the
+    /// Codename One bounds behind them often do not change at all, so nothing would
+    /// ask the peer to re-place itself. The scale is part of the cache key as well;
+    /// this is what makes something consult that key after a move.
+    void reapplyPeerBounds(int windowId) {
+        com.codename1.ui.Window w = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        if (w == null) {
+            return;
+        }
+        refreshPeers(w.asContainer());
+    }
+
+    private void refreshPeers(com.codename1.ui.Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            com.codename1.ui.Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof Peer) {
+                ((Peer) cmp).onPositionSizeChange();
+            } else if (cmp instanceof com.codename1.ui.Container) {
+                refreshPeers((com.codename1.ui.Container) cmp);
+            }
+        }
+    }
+
+    private C editorCanvasFor(com.codename1.ui.Component cmp) {
+        Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(cmp);
+        if (peer instanceof JavaSEWindowManager.Peer) {
+            C owner = ((JavaSEWindowManager.Peer) peer).canvas;
+            if (owner != null) {
+                return owner;
+            }
+        }
+        return canvas;
     }
 
     @Override
@@ -10755,6 +11153,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private EditingInProgress editingInProgress;
     private Component currentlyEditingField;
+    /// The TextCompatMode editor and the field it is editing, tracked only so a
+    /// monitor-scale change can reposition it; cleared when that editor is removed.
+    private java.awt.Component legacyEditor;
+    private Component legacyEditingField;
     
     private Process tabTipProcess;
     
@@ -11019,7 +11421,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         textCmp.setBorder(null);
         textCmp.setOpaque(false);
                 
-        canvas.add(textCmp);
+        editorCanvasFor(cmp).add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
         int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
@@ -11033,8 +11435,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));  
         } else {
-            textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
-            //System.out.println("Set bounds to "+textCmp.getBounds());
+            applyEditorBounds(cmp);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         if (tf instanceof JPasswordField && tf.getFont() != null && tf.getFont().getFontName().contains("Roboto")) {
@@ -11167,13 +11568,25 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ((JTextComponent) tf).getDocument().removeDocumentListener(this);
                 
                 tf.removeFocusListener(this);
-                canvas.remove(swingComponentToRemove);
+                // Removed from whatever actually holds it, not from the primary canvas.
+                // An editor opened in a desktop window is attached to that window's
+                // canvas, so removing from the primary one is a no-op that leaves the
+                // native editor on screen swallowing input, and every further edit
+                // stacks another one on top.
+                java.awt.Container editorParent = swingComponentToRemove.getParent();
+                if (editorParent != null) {
+                    editorParent.remove(swingComponentToRemove);
+                }
                 editingInProgress = null;
                 currentlyEditingField = null;
                 synchronized (this) {
                     notify();
                 }
-                canvas.repaint();
+                if (editorParent != null) {
+                    editorParent.repaint();
+                } else {
+                    canvas.repaint();
+                }
                 if (invokeAfter != null) {
                     for (Runnable r : invokeAfter) {
                         r.run();
@@ -12513,9 +12926,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object getNativeGraphics() {
         //if (ng == null) {
             ng = new NativeScreenGraphics();
+            ng.owner = canvas;
         //}
         return ng;
         //return new NativeScreenGraphics();
+    }
+
+    /**
+     * Screen graphics for a secondary window's canvas rather than the primary one.
+     */
+    Object getNativeGraphics(C owner) {
+        NativeScreenGraphics g = new NativeScreenGraphics();
+        g.owner = owner;
+        return g;
     }
 
     /**
@@ -14250,13 +14673,51 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (ng.sourceImage != null) {
             return ng.sourceImage.createGraphics();
         }
-        Graphics2D g2d = canvas.getGraphics2D();
+        C owner = ng.owner != null ? ng.owner : canvas;
+        Graphics2D g2d = owner.getGraphics2D();
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
     
+    /**
+     * True when this Graphics2D is some canvas's screen buffer rather than a mutable
+     * image's. With desktop windows there is more than one canvas, so this is a
+     * membership test over the registered screen buffers rather than an identity
+     * comparison against the primary canvas. Consumers use it to decide whether to
+     * undo the zoom scale when drawing native peers, so answering wrongly for a
+     * secondary window would mis-scale its peers.
+     */
     public boolean isScreenGraphics(Graphics2D g) {
-        return g == canvas.getGraphics2D();
+        if (g == null) {
+            return false;
+        }
+        synchronized (screenGraphicsRegistry) {
+            return screenGraphicsRegistry.containsKey(g);
+        }
+    }
+
+    /**
+     * Registered screen buffers, keyed by identity. Maintained in the only two places
+     * C.g2dInstance is written: getGraphics2D() creates one, createBufferedImage()
+     * and the size-change reset discard it.
+     */
+    private final java.util.Map<Graphics2D, C> screenGraphicsRegistry =
+            new java.util.IdentityHashMap<Graphics2D, C>();
+
+    private void registerScreenGraphics(Graphics2D g, C owner) {
+        if (g != null) {
+            synchronized (screenGraphicsRegistry) {
+                screenGraphicsRegistry.put(g, owner);
+            }
+        }
+    }
+
+    private void unregisterScreenGraphics(Graphics2D g) {
+        if (g != null) {
+            synchronized (screenGraphicsRegistry) {
+                screenGraphicsRegistry.remove(g);
+            }
+        }
     }
 
     /**
@@ -14313,6 +14774,59 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     public static class CN1JPanel extends JPanel {
+
+        /**
+         * The canvas belonging to the window this peer is in. A peer placed inside a
+         * desktop {@code Window} lives in that window's frame, so hit testing,
+         * coordinate conversion and event forwarding against the primary canvas all
+         * resolve outside it -- and the peer silently stops responding to the mouse.
+         *
+         * Resolved from this panel's own Swing ancestry rather than from the Codename
+         * One hierarchy, because these run on the AWT thread during event dispatch.
+         * Cached because they run for every mouse move, and dropped whenever the panel
+         * is re-parented.
+         */
+        private C ownerCanvas() {
+            if (cachedOwnerCanvas == null) {
+                java.awt.Container top = getTopLevelAncestor();
+                cachedOwnerCanvas = top == null ? null : findCanvas(top);
+                if (cachedOwnerCanvas == null) {
+                    cachedOwnerCanvas = instance == null ? null : instance.canvas;
+                }
+            }
+            return cachedOwnerCanvas;
+        }
+
+        private static C findCanvas(java.awt.Container parent) {
+            java.awt.Component[] children = parent.getComponents();
+            for (int iter = 0; iter < children.length; iter++) {
+                if (children[iter] instanceof C) {
+                    return (C) children[iter];
+                }
+                if (children[iter] instanceof java.awt.Container) {
+                    C found = findCanvas((java.awt.Container) children[iter]);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private C cachedOwnerCanvas;
+
+        @Override
+        public void addNotify() {
+            super.addNotify();
+            cachedOwnerCanvas = null;
+        }
+
+        @Override
+        public void removeNotify() {
+            super.removeNotify();
+            cachedOwnerCanvas = null;
+        }
+
         
         double zoom_;
 
@@ -14348,8 +14862,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public boolean contains(int x, int y) {
-            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            Point p = SwingUtilities.convertPoint(this, new Point(x, y), ownerCanvas());
+            return ownerCanvas().getVisibleRect().contains(p);
         }
 
         @Override
@@ -14373,8 +14887,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
         private boolean isOnCanvas(MouseEvent e) {
-            Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), ownerCanvas());
+            return ownerCanvas().getVisibleRect().contains(p);
 
         }
         
@@ -14386,35 +14900,40 @@ public class JavaSEPort extends CodenameOneImplementation {
             int cn1Y = getCN1Y(e);
             if ((!peerGrabbedDrag || true) && Display.isInitialized()) {
                 if (!isOnCanvas(e)) return false;
-                Form f = Display.getInstance().getCurrent();
+                // The owning canvas's top level, not the current form: a peer in a
+                // secondary window was hit tested against the main form, and an
+                // unrelated non-peer at those coordinates set cn1GrabbedDrag and
+                // swallowed the event, so browser links and other native controls in
+                // the window stopped receiving mouse input.
+                com.codename1.ui.TopLevelContainer f = ownerCanvas().canvasTopLevel();
                 if (f != null) {
-                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    Component cmp = f.asContainer().getComponentAt(cn1X, cn1Y);
                     //if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
-                        e = SwingUtilities.convertMouseEvent(this, e, instance.canvas);
+                        e = SwingUtilities.convertMouseEvent(this, e, ownerCanvas());
                         switch (e.getID()) {
                             case MouseEvent.MOUSE_CLICKED:
-                                instance.canvas.mouseClicked(e);
+                                ownerCanvas().mouseClicked(e);
                                 break;
                             case MouseEvent.MOUSE_DRAGGED:
-                                instance.canvas.mouseDragged(e);
+                                ownerCanvas().mouseDragged(e);
                                 break;
                             case MouseEvent.MOUSE_MOVED:
-                                instance.canvas.mouseMoved(e);
+                                ownerCanvas().mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
                                 // Mouse pressed in native component - passed to lightweight cmp
                                 if (!(cmp instanceof PeerComponent)) {
                                     instance.cn1GrabbedDrag = true;
                                 }
-                                instance.canvas.mousePressed(e);
+                                ownerCanvas().mousePressed(e);
                                 break;
                             case MouseEvent.MOUSE_RELEASED:
                                 instance.cn1GrabbedDrag = false;
-                                instance.canvas.mouseReleased(e);
+                                ownerCanvas().mouseReleased(e);
                                 break;
                             case MouseEvent.MOUSE_WHEEL:
-                                instance.canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                ownerCanvas().mouseWheelMoved((MouseWheelEvent)e);
                                 break;
                                 
                         }
@@ -14438,8 +14957,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
         
+        /**
+         * Converts one axis of a screen coordinate into the owning canvas's Codename
+         * One coordinate space.
+         *
+         * <p>The scale passed in is the <em>owning canvas's</em>, not the global
+         * retinaScale. A peer is laid out with peerScale(), which already answers from
+         * the canvas's monitor; converting the hit test with the main monitor's scale
+         * instead makes the preliminary lookup in sendToCn1() test a different point
+         * than the peer occupies on a mixed-DPI desktop. That lookup can then find an
+         * unrelated component, set cn1GrabbedDrag and swallow mouse input meant for a
+         * browser or other native control.
+         *
+         * @param screenCoordinate the event's coordinate on screen
+         * @param canvasOriginOnScreen the owning canvas's origin on screen
+         * @param canvasOffset the owning canvas's offset within its frame
+         * @param screenCoordsOffset the skin's screen-coordinate offset
+         * @param zoom the active zoom level
+         * @param canvasScale the owning canvas's backing scale
+         * @return the coordinate in the canvas's Codename One space
+         */
+        static int toCn1Coordinate(int screenCoordinate, int canvasOriginOnScreen,
+                int canvasOffset, int screenCoordsOffset, double zoom, double canvasScale) {
+            return (int) ((screenCoordinate - canvasOriginOnScreen
+                    - (canvasOffset + screenCoordsOffset) * zoom / canvasScale) / zoom * canvasScale);
+        }
+
         private int getCN1X(MouseEvent e) {
-            if (instance.canvas == null) {
+            if (ownerCanvas() == null) {
                 int out = e.getXOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -14476,11 +15021,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
+            return toCn1Coordinate(x, ownerCanvas().getLocationOnScreen().x,
+                    ownerCanvas().x, screenCoords.x, zoom, ownerCanvas().canvasScale());
         }
 
         private int getCN1Y(MouseEvent e) {
-            if (instance.canvas == null) {
+            if (ownerCanvas() == null) {
                 int out = e.getYOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -14516,7 +15062,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
+            return toCn1Coordinate(y, ownerCanvas().getLocationOnScreen().y,
+                    ownerCanvas().y, screenCoords.y, zoom, ownerCanvas().canvasScale());
 
         }
         
@@ -14674,6 +15221,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D cachedGraphics;
         Transform transform;
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
+        /**
+         * The canvas this screen graphics draws into. Null means the primary canvas,
+         * which is the only possibility before desktop windows; a secondary window
+         * carries its own canvas here so getGraphics() resolves to that window's
+         * buffer instead of the primary one's.
+         */
+        C owner;
     }
     
     private Object lastNativeGraphics;
@@ -19362,9 +19916,9 @@ public class JavaSEPort extends CodenameOneImplementation {
          * @see #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) 
          */
         private BufferedImage getBuffer() {
-            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / instance.zoomLevel) {
+            if (buf == null || buf.getWidth() != cnt.getWidth() * peerScale() / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * peerScale() / instance.zoomLevel) {
 
-                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / instance.zoomLevel), (int)(cnt.getHeight() * retinaScale / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
+                buf = new BufferedImage((int)(cnt.getWidth() * peerScale() / instance.zoomLevel), (int)(cnt.getHeight() * peerScale() / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
             }
             return buf;
         }
@@ -19534,7 +20088,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
             Graphics2D g2d = buf.createGraphics();
-            g2d.scale(retinaScale / instance.zoomLevel, retinaScale / instance.zoomLevel);
+            g2d.scale(peerScale() / instance.zoomLevel, peerScale() / instance.zoomLevel);
 
             cmp.paintAll(g2d);
             g2d.dispose();
@@ -19694,12 +20248,101 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 init = true;
                 cnt.setVisible(true);
-                frm.add(cnt, 0);
-                frm.repaint();
+                java.awt.Window target = resolveOwningFrame();
+                addPeerTo(target);
+                target.repaint();
             }
             
         }
         
+        /**
+         * The frame this peer belongs in. A peer inside a desktop Window has to be
+         * parented to that window's frame rather than to the main one, or it appears
+         * on the wrong window. Resolved at attach time rather than at construction
+         * because the peer is created before it is added to a hierarchy, so its
+         * window is not known yet.
+         */
+        /**
+         * Attaches the peer panel to the given window.
+         *
+         * A desktop window's frame lays its content pane out with a BorderLayout and
+         * holds the Codename One canvas in CENTER, and an unconstrained add() takes
+         * that slot -- so the peer replaced the canvas as the managed centre. The
+         * canvas then stopped being resized with the window while the peer was laid
+         * out over the whole frame. The layered pane has no layout manager, which is
+         * what the peer's absolute bounds need anyway, and leaves the canvas alone.
+         *
+         * Only for a secondary window. The main frame's peers have gone through
+         * add(cnt, 0) since long before windows existed, and its content pane is not
+         * arranged the same way, so that path is left exactly as it was.
+         */
+        private void addPeerTo(java.awt.Window target) {
+            if (owningFrame != null && target instanceof javax.swing.RootPaneContainer) {
+                ((javax.swing.RootPaneContainer) target).getLayeredPane()
+                        .add(cnt, javax.swing.JLayeredPane.PALETTE_LAYER);
+                return;
+            }
+            target.add(cnt, 0);
+        }
+
+        private void removePeerFrom(java.awt.Window target) {
+            if (owningFrame != null && target instanceof javax.swing.RootPaneContainer) {
+                ((javax.swing.RootPaneContainer) target).getLayeredPane().remove(cnt);
+                return;
+            }
+            target.remove(cnt);
+        }
+
+        private java.awt.Window resolveOwningFrame() {
+            Object peer = com.codename1.ui.Desktop.getInstance().getWindowPeerForComponent(this);
+            if (peer instanceof JavaSEWindowManager.Peer) {
+                JavaSEWindowManager.Peer owner = (JavaSEWindowManager.Peer) peer;
+                if (owner.frame != null) {
+                    // Remembered rather than re-resolved: removeNativeCnt() runs after
+                    // the component has left the hierarchy, so the owning window is no
+                    // longer discoverable from it, and removing from the wrong frame
+                    // leaves the Swing panel attached to the window that is going away.
+                    owningFrame = owner.frame;
+                    owningCanvas = owner.canvas;
+                    return owner.frame;
+                }
+            }
+            // Cleared rather than left alone: a peer moved back out of a window and
+            // into the main form would otherwise keep pointing at the window it used
+            // to be in. addPeerTo would still treat it as a secondary-window peer, and
+            // its bounds, its scale and its eventual removal would all target a canvas
+            // it no longer lives in.
+            owningFrame = null;
+            owningCanvas = null;
+            return frm;
+        }
+
+        /**
+         * The backing scale of the display this peer's window is on.
+         *
+         * Peer geometry used the global retinaScale -- the <em>main</em> display's --
+         * while the hierarchy and pointer coordinates around it use the owning
+         * canvas's. On a mixed-scale desktop the peer was then offset and sized by the
+         * ratio between the two monitors, so a browser or a native editor drifted away
+         * from the component it belongs to.
+         */
+        private double peerScale() {
+            C c = owningCanvas();
+            return c == null ? retinaScale : c.canvasScale();
+        }
+
+        /**
+         * The canvas this peer's coordinates are relative to. A peer inside a desktop
+         * Window is positioned against that window's canvas; using the main one offsets
+         * it by the two frames' on-screen distance.
+         */
+        private C owningCanvas() {
+            return owningCanvas != null ? owningCanvas : instance.canvas;
+        }
+
+        private java.awt.Window owningFrame;
+        private C owningCanvas;
+
         /**
          * Removes the native container from the Swing component hierarchy.
          * This can be called on or off the swing event thread.  If called off the swing event
@@ -19718,9 +20361,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 peerImage = generatePeerImage();
             }
             init = false;
-            frm.remove(cnt);
-            frm.repaint();
-            
+            java.awt.Window target = owningFrame != null ? owningFrame : frm;
+            removePeerFrom(target);
+            target.repaint();
+
         }
 
         @Override
@@ -19790,8 +20434,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / instance.zoomLevel), 
-                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
+            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* peerScale() / instance.zoomLevel), 
+                    (int)(cmp.getPreferredSize().getHeight() * peerScale() / instance.zoomLevel));
         }
 
         
@@ -19834,6 +20478,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         int lastX, lastY, lastW, lastH;
         double lastZoom;
+        /// The backing scale the cached bounds were computed with. Part of the key
+        /// because the Swing bounds divide by it: without it a window moved to a
+        /// display of another scale skipped the update whenever its Codename One
+        /// bounds happened to be unchanged, and the native control kept the old
+        /// divisor -- wrong size and wrong place.
+        double lastPeerScale = -1;
 
         @Override
         protected void onPositionSizeChange() {
@@ -19855,9 +20505,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
             double zoom_ = instance.zoomLevel;
-            if (lastZoom == zoom_ && x == lastX && y == lastY && w == lastW && h == lastH) {
+            double peerScale_ = peerScale();
+            if (lastZoom == zoom_ && lastPeerScale == peerScale_
+                    && x == lastX && y == lastY && w == lastW && h == lastH) {
                 return;
             }
+            lastPeerScale = peerScale_;
             final int screenX;
             final int screenY;
             if (instance.getScreenCoordinates() != null) {
@@ -19879,21 +20532,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     if (cnt.getParent() == null) return;
-                    Point absCanvasLocation = SwingUtilities.convertPoint(instance.canvas, new Point(0, 0), cnt.getParent());
+                    Point absCanvasLocation = SwingUtilities.convertPoint(owningCanvas(), new Point(0, 0), cnt.getParent());
                     if (peerBuffer == null) {
-                        double scale = zoom/retinaScale;
+                        double scale = zoom / peerScale();
 
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
-                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
+                                (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + owningCanvas().y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
                     } else {
-                        double scale = zoom/retinaScale;
+                        double scale = zoom / peerScale();
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
-                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
+                                (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + owningCanvas().y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
@@ -19921,6 +20574,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (_inHierarchyChanged) return;
             _inHierarchyChanged = true;
             try {
+                // A peer inside a desktop window is already parented to that window's
+                // frame; re-homing it to the main canvas's ancestor would move it to
+                // the wrong window on every hierarchy change.
+                if (owningFrame != null) {
+                    onPositionSizeChange();
+                    return;
+                }
                 java.awt.Container win = instance.canvas.getTopLevelAncestor();
                 if (win != frm) {
                     removeNativeCnt();
@@ -20950,6 +21610,53 @@ public class JavaSEPort extends CodenameOneImplementation {
         return old;
     }
    
+    private JavaSEWindowManager windowManager;
+
+    /// Guards the lazy creation of windowManager against the matching teardown in
+    /// deinitialize(). Both paths are reachable off the EDT -- Desktop.isSupported()
+    /// and the Window constructor are callable from any thread -- and an unsynchronized
+    /// lazy init loses more than a wasted allocation here: the constructor starts a
+    /// monitor-topology timer, so the instance that loses the race is unreachable
+    /// through the field yet its poller keeps waking every two seconds for the life of
+    /// the process, reporting every topology change a second time and surviving the
+    /// deinitialize() that was supposed to stop it.
+    private final Object windowManagerLock = new Object();
+
+    /**
+     * Creates the canvas backing one desktop window, tagged with the id its input
+     * events are routed by.
+     */
+    C createWindowCanvas(int windowId) {
+        C c = new C();
+        c.windowId = windowId;
+        return c;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * Returns null while a phone skin is loaded: a skin simulates a single device
+     * screen with its own coordinates and zoom, and a real operating system window
+     * inside that simulation would be incoherent. Mirrors the predicate
+     * isFullScreenSupported already uses.
+     */
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return null;
+        }
+        if (isSimulator() && !Preferences.userNodeForPackage(JavaSEPort.class)
+                .getBoolean("desktopSkin", false)) {
+            return null;
+        }
+        synchronized (windowManagerLock) {
+            if (windowManager == null) {
+                windowManager = new JavaSEWindowManager(this);
+            }
+            return windowManager;
+        }
+    }
+
     @Override
     public Object createNativeBrowserWindow(String startURL) {
         

@@ -284,31 +284,69 @@ public final class Display extends CN1Constants {
     /// where we only synchronize on the very minimal point of switching between the stacks
     /// and adding to the active stack.
     private int[] inputEventStack = new int[1000];
+    /// Pointer metadata slot per queued packet, indexed by the packet's type-word
+    /// offset in `inputEventStack`. Kept beside the stack rather than inside the packet
+    /// so the packet layout -- and every offset computation and `skipEvent` count that
+    /// depends on it -- is unchanged. A slot is only written when a pointer packet is
+    /// queued and only read for a pointer type at that same offset, so it is always the
+    /// slot belonging to the packet being dispatched.
+    private int[] pointerMetaStack = new int[1000];
+    private int[] pointerMetaStackTmp = new int[1000];
     private int inputEventStackPointer;
     private int[] inputEventStackTmp = new int[1000];
     private int inputEventStackPointerTmp;
-    private boolean longPointerCharged;
     private boolean pointerPressedAndNotReleasedOrDragged;
+
+    /// Per window: whether a contact is down and has not yet been released or
+    /// dragged, and where it went down.
+    ///
+    /// Window zero keeps using the singleton above and the global pointerX/pointerY,
+    /// so the single window path is untouched. Anything else needs its own copy: with
+    /// a contact down in two windows the singleton was set and cleared by whichever
+    /// window's packet ran last, so releasing in one window dropped the pressed
+    /// selection in the other while it was still held. The coordinates travel with it
+    /// because shouldRenderSelection(Component) tests them against the component's own
+    /// bounds, and window coordinates are window relative -- a component in one window
+    /// tested against another window's pointer is comparing two different origins.
     private boolean recursivePointerReleaseA;
     private boolean recursivePointerReleaseB;
     private int pointerX;
     private int pointerY;
     private PointerEvent currentPointerEvent;
+    /// The main surface's key-repeat and long-press timers, as they always were.
+    /// A window keeps its own on the window, so there is no table here to lease.
     private boolean keyRepeatCharged;
     private boolean longPressCharged;
+    private boolean longPointerCharged;
+    private int keyRepeatValue;
+    private long nextKeyRepeatEvent;
     private long longKeyPressTime;
     private int longPressInterval = 500;
-    private long nextKeyRepeatEvent;
-    private int keyRepeatValue;
     private boolean lastInteractionWasKeypad;
-    private boolean dragOccured;
     private boolean processingSerialCalls;
     private int PATHLENGTH;
+
+    /// A gesture-path ring sized for this platform. Windows ask for their own rather
+    /// than being handed a row of a shared table.
+    PointerDragHistory newDragHistory() {
+        return new PointerDragHistory(PATHLENGTH, displayInitTime);
+    }
+
+    /// Drag sample history, one ring per window.
+    ///
+    /// The main surface's gesture path, exactly as it always was. A window keeps its
+    /// own ring on the window rather than borrowing a row here, so two contacts
+    /// dragging in two surfaces cannot append to the same samples.
     private float[] dragPathX;
     private float[] dragPathY;
     private long[] dragPathTime;
-    private int dragPathOffset = 0;
-    private int dragPathLength = 0;
+    private int dragPathOffset;
+    private int dragPathLength;
+
+    /// The window whose drag samples `#getDragSpeed(boolean)` should report. Set
+    /// while that window's pointer events are dispatched, since the public accessor
+    /// takes no window and is called by components during their own release.
+    private int dragHistoryCurrent;
     private Boolean darkMode;
     private PluginSupport pluginSupport;
     /// Internally track display initialization time as a fixed point to allow tagging of pointer
@@ -328,7 +366,15 @@ public final class Display extends CN1Constants {
     private DebugRunnable currentEdtContext;
     private int previousKeyPressed;
     private int lastKeyPressed;
+    /// Offset of the dimensions in the size-change packet currently queued, or -1.
+    /// A newer size overwrites it rather than queueing behind it.
+    private int lastSizeChangeOffset = -1;
+
     private int lastDragOffset;
+    /// The window the coalescable drag packet at lastDragOffset belongs to. Coalescing
+    /// across windows would overwrite one window's coordinates with another's while
+    /// the packet still carries the first window's id.
+    private int lastDragWindowId;
     private boolean lockOrientation;
     private boolean disableScreenshots;
 
@@ -338,8 +384,45 @@ public final class Display extends CN1Constants {
     private boolean pendingHideOverlayWindows;
 
     // huge false positive from PMD...
-    @SuppressWarnings("PMD.SingularField")
-    private Form eventForm;
+    /// Ids of the windows with a pointer press in flight, paired with
+    /// `#pointerPressTargets` by index.
+
+    /// The top level that received each in-flight pointer press.
+    ///
+    /// One entry per window rather than one for the pointer, for the same reason the
+    /// key targets are per key: two touchscreen contacts can be down in two windows
+    /// at once -- the Linux handlers deliberately track a sequence per window -- and
+    /// a single field made the second press erase the first, so both releases were
+    /// dropped and both components stayed latched down.
+    /// The main surface's pending press target; a window keeps its own.
+    private Container mainPointerPressTarget;
+
+    /// How many entries the per-key and per-window input tables hold.
+    ///
+    /// CN1_MAX_DESKTOP_WINDOWS in the native ports, *plus one* for the application's
+    /// main surface, which holds a permanent entry of its own. Sizing this to 32
+    /// alone left only 31 usable secondary slots, so the last window the ports allow
+    /// still lost its drag state.
+    ///
+    /// It was originally 8, a size chosen for simultaneous key presses that I reused
+    /// for the window-keyed tables without asking what bounds those. Exhaustion is
+    /// silent -- the lookup returns -1 and the setter no-ops -- so the window simply
+    /// behaves as though the drag never happened.
+    private static final int TRACKED_KEY_PRESSES = 33;
+
+    /// Key codes currently held, paired with `#keyPressTargets` by index.
+    private final int[] keyPressCodes = new int[TRACKED_KEY_PRESSES];
+
+    /// The top level that received the press of each held key.
+    ///
+    /// One field per key rather than one for the keyboard: hold a key in window A,
+    /// focus window B and press another key there, and a single field names B, so
+    /// A's release matches nothing and is dropped while clearing the field -- which
+    /// then drops B's release too, latching a component in each window.
+    private final Container[] keyPressTargets = new Container[TRACKED_KEY_PRESSES];
+
+    /// Window ids remembered so a key repeat or long press started in a window is
+    /// delivered back to that window rather than to the main form.
 
     /// Private constructor to prevent instanciation
     private Display() {
@@ -373,6 +456,13 @@ public final class Display extends CN1Constants {
             impl.setDisplayLock(lock);
             impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(impl.getNativeGraphics());
+            // A monitor listener registered before this point could not start the
+            // port watching for display changes, because there was no implementation
+            // to ask. Doing it here rather than only guarding the registration is what
+            // makes such a listener actually hear about a change: the ports start
+            // watching when their window manager is first created, and nothing else
+            // necessarily creates it.
+            Desktop.startMonitorWatchingIfListening();
             INSTANCE.codenameOneGraphics.paintPeersBehind = impl.paintNativePeersBehind();
             impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
@@ -1150,7 +1240,10 @@ public final class Display extends CN1Constants {
         try {
             // when there is no current form the EDT is useful only
             // for features such as call serially
-            while (impl.getCurrentForm() == null) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
+            // A window shown before the first Form.show() must not be starved: this
+            // phase never calls edtLoopImpl(), so it neither drains input nor paints.
+            while (impl.getCurrentForm() == null
+                    && !Desktop.getInstance().hasVisibleWindows()) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
                 synchronized (lock) {
                     while (shouldEDTSleep() && pendingIdleSerialCalls.isEmpty()) {
                         try {
@@ -1242,6 +1335,10 @@ public final class Display extends CN1Constants {
                 }
             }
         }
+        // Dispose any window still open, on the EDT, before the implementation goes
+        // away. Doing this from the static deinitialize() would run the teardown off
+        // the EDT, which is exactly the thread the window's tree expects.
+        Desktop.getInstance().disposeAll();
         impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
@@ -1300,6 +1397,20 @@ public final class Display extends CN1Constants {
                 // paint transition or intro animations and don't do anything else if such
                 // animations are in progress...
                 paintTransitionAnimation();
+                // Except the other windows. A transition belongs to the main surface,
+                // and this early return is what keeps the rest of the loop off it while
+                // one is running -- but a secondary window is an independent native
+                // window and has no part in it. Left out, an ordinary form transition
+                // froze every open window for its duration: no painting, no animation.
+                //
+                // Input stays queued rather than being dispatched here. That is how the
+                // main surface already behaves during a transition, and draining the
+                // shared queue from this branch would change the main path's semantics
+                // to fix a window's -- a worse trade than a few hundred milliseconds of
+                // deferred input.
+                if (Desktop.getInstance().hasOpenWindows()) {
+                    Desktop.getInstance().paintWindows();
+                }
                 return;
             }
         } catch (RuntimeException ignor) {
@@ -1312,16 +1423,25 @@ public final class Display extends CN1Constants {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
             lastDragOffset = -1;
+            lastSizeChangeOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
+            // The metadata slots are addressed by offset into the stack being
+            // dispatched, so they have to change hands with it; leaving them behind
+            // would have every packet read the slot of whatever packet last occupied
+            // that offset in the other buffer.
+            int[] qtMeta = pointerMetaStackTmp;
+            pointerMetaStackTmp = pointerMetaStack;
 
             // We have a special flag here for a case where the input event stack might still be processing this can
             // happen if an event callback calls something like invokeAndBlock while processing and might reach
             // this code again
             if (qt[qt.length - 1] == Integer.MAX_VALUE) {
                 inputEventStack = new int[qt.length];
+                pointerMetaStack = new int[qt.length];
             } else {
                 inputEventStack = qt;
+                pointerMetaStack = qtMeta;
                 qt[qt.length - 1] = 0;
             }
         }
@@ -1331,11 +1451,19 @@ public final class Display extends CN1Constants {
         int actualTmpPointer = inputEventStackPointerTmp;
         inputEventStackPointerTmp = 0;
         int[] actualStack = inputEventStackTmp;
+        // Copied to the stack for the same reason as the event stack itself: a nested
+        // invokeAndBlock can swap the field while this loop is still dispatching.
+        int[] actualMeta = pointerMetaStackTmp;
         int offset = 0;
         actualStack[actualStack.length - 1] = Integer.MAX_VALUE;
         while (offset < actualTmpPointer) {
-            offset = handleEvent(offset, actualStack);
+            offset = handleEvent(offset, actualStack, actualMeta);
         }
+        // The restored metadata is only authoritative while this batch is being
+        // dispatched. Leaving it selected made every later read answer from the last
+        // packet dispatched, so a port that staged fresh metadata and then asked --
+        // without going through the queue -- got the previous event's button back.
+        impl.clearPointerEventMetadataSelection();
 
         actualStack[actualStack.length - 1] = 0;
 
@@ -1355,8 +1483,19 @@ public final class Display extends CN1Constants {
 
         if (current != null) {
             current.repaintAnimations();
-            // check key repeat events
-            long t = System.currentTimeMillis();
+        }
+
+        // Additional native windows, painted after the main surface so its call
+        // ordering is untouched. One field read per frame when none are open.
+        if (Desktop.getInstance().hasOpenWindows()) {
+            Desktop.getInstance().paintWindows();
+        }
+
+        // The main surface's timers, exactly as they always were.
+        long t = System.currentTimeMillis();
+        // The main surface is blockable too: a modal window blocks it, and a held key
+        // must stop repeating into the form behind that modal.
+        if (current != null && !Desktop.getInstance().isWindowInputBlocked(0)) {
             if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
                 current.keyRepeated(keyRepeatValue);
                 int keyRepeatNextIntervalTime = 10;
@@ -1370,6 +1509,12 @@ public final class Display extends CN1Constants {
                 longPointerCharged = false;
                 current.longPointerPress(pointerX, pointerY);
             }
+        }
+        // Every open window services its own, which is a walk over the windows that
+        // actually exist rather than over a fixed table of slots most of which are
+        // empty. A window that went away took its timers with it.
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.serviceInputTimers(t, longPressInterval);
         }
         processSerialCalls();
 
@@ -1831,9 +1976,8 @@ public final class Display extends CN1Constants {
         if (!initialWindowSizeApplied) {
             initialWindowSizeApplied = applyInitialWindowSize(newForm);
         }
-        keyRepeatCharged = false;
-        longPressCharged = false;
-        longPointerCharged = false;
+        cancelAllKeyRepeats();
+        cancelAllLongPresses();
         current = newForm;
         impl.setCurrentForm(current);
         current.setVisible(true);
@@ -1919,7 +2063,11 @@ public final class Display extends CN1Constants {
         if (cmp instanceof TextArea) {
             ((TextArea) cmp).setSuppressActionEvent(false);
         }
-        Form f = cmp.getComponentForm();
+        // The top level rather than the form. getComponentForm() is null by design
+        // inside a Window, so this guard rejected every editor in a window before any
+        // of the port level editor routing could run -- native text editing in a window
+        // was unreachable from here however correct the ports were.
+        TopLevelContainer f = cmp.getTopLevelContainer();
 
         // this can happen in the spinner in the simulator where the key press should in theory start native
         // edit
@@ -1929,8 +2077,7 @@ public final class Display extends CN1Constants {
         Component.setDisableSmoothScrolling(true);
         f.scrollComponentToVisible(cmp);
         Component.setDisableSmoothScrolling(false);
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelAllKeyRepeats();
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         impl.editStringImpl(cmp, maxSize, constraint, text, initiatingKeycode);
@@ -2002,24 +2149,60 @@ public final class Display extends CN1Constants {
         getImplementation().restoreMinimizedApplication();
     }
 
-    private void addSingleArgumentEvent(int type, int code) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped -- the caller must not arm
+    /// anything off a press that was never accepted
+    private boolean addSingleArgumentEvent(int type, int code) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
-            if (!hasInputEventStackCapacity(2)) {
-                return;
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(2)
+                    : !hasDroppableInputEventStackCapacity(2)) {
+                return false;
             }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
             lock.notifyAll();
+            return true;
         }
     }
 
+    /// Slots at the end of the input stack that only a termination may use.
+    ///
+    /// The native queues protect a release from being dropped on overflow, and that is
+    /// worth nothing if this second queue drops it instead: a lost release leaves the
+    /// component the press went to stuck down, or a drag never finished. Ordinary input
+    /// -- moves, drags, presses, hovers -- therefore stops short of the end of the
+    /// stack, leaving room for the releases and size changes that cannot be
+    /// reconstructed.
+    ///
+    /// A press is ordinary on purpose: a release arriving with no press behind it finds
+    /// no recorded target and is discarded harmlessly, so when something has to go it
+    /// must never be the release.
+    private static final int TERMINATION_RESERVE = 64;
+
     private boolean hasInputEventStackCapacity(int additionalSlots) {
         return inputEventStackPointer + additionalSlots < inputEventStack.length;
+    }
+
+    /// Capacity for an event that may be dropped, which stops short of the reserve.
+    private boolean hasDroppableInputEventStackCapacity(int additionalSlots) {
+        return inputEventStackPointer + additionalSlots
+                < inputEventStack.length - TERMINATION_RESERVE;
+    }
+
+    /// Whether this packed event type is one whose loss the framework cannot recover
+    /// from, and which may therefore use the reserve.
+    private static boolean isTerminationEvent(int packedType) {
+        int type = packedType & 0xFF;
+        return type == POINTER_RELEASED || type == POINTER_RELEASED_MULTI
+                || type == POINTER_HOVER_RELEASED || type == KEY_RELEASED
+                || type == SIZE_CHANGED;
     }
 
     /// Checks if the control key is currently down.  Only relevant for desktop ports.
@@ -2141,21 +2324,7 @@ public final class Display extends CN1Constants {
     ///
     /// true if a listener consumed the wheel event
     public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
-        Form f = getCurrent();
-        if (f == null) {
-            return false;
-        }
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            cmp = null;
-        }
-        if (cmp == null) {
-            return false;
-        }
-        com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
-        return cmp.fireMouseWheelEvent(we);
+        return windowMouseWheelEventImpl(0, x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Dispatches a magnify (pinch) gesture to the component under the given coordinates, walking up
@@ -2170,25 +2339,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
     public void fireMagnifyGesture(int x, int y, float scale) {
-        Form f = getCurrent();
-        if (f == null) {
-            return;
-        }
-        Component cmp;
-        try {
-            cmp = f.getComponentAt(x, y);
-        } catch (Throwable t) {
-            cmp = null;
-        }
-        if (cmp == null) {
-            cmp = f;
-        }
-        while (cmp != null) {
-            if (cmp.pinch(scale)) {
-                return;
-            }
-            cmp = cmp.getParent();
-        }
+        windowMagnifyGestureImpl(0, x, y, scale);
     }
 
     /// Dispatches a rotation (twist) gesture to the component under the given coordinates, walking
@@ -2203,21 +2354,33 @@ public final class Display extends CN1Constants {
     ///
     /// - `radians`: the incremental rotation in radians, positive is clockwise
     public void fireRotationGesture(int x, int y, float radians) {
-        Form f = getCurrent();
-        if (f == null) {
-            return;
+        windowRotationGestureImpl(0, x, y, radians);
+    }
+
+    /// The top level a gesture was aimed at, or null when it is gone or currently
+    /// blocked by a modal window. Gestures are filtered like every other input event:
+    /// pinching a window a modal is blocking has to do nothing, the same way clicking
+    /// it does.
+    private Container gestureRoot(int windowId) {
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return null;
         }
-        Component cmp;
+        if (windowId > 0) {
+            // Hidden as well as blocked. A pinch or rotation callback queued before
+            // the window was hidden still finds it registered, and would drive the
+            // gesture handlers of an invisible tree -- the same stale-callback case
+            // the wheel path and the packed queue already reject.
+            Window w = Desktop.getInstance().windowById(windowId);
+            return w != null && w.isWindowShowing() ? w : null;
+        }
+        return getCurrent();
+    }
+
+    private static Component gestureComponentAt(Container root, int x, int y) {
         try {
-            cmp = f.getComponentAt(x, y);
+            return root.getComponentAt(x, y);
         } catch (Throwable t) {
-            cmp = null;
-        }
-        while (cmp != null) {
-            if (cmp.rotation(radians)) {
-                return;
-            }
-            cmp = cmp.getParent();
+            return null;
         }
     }
 
@@ -2230,18 +2393,27 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
-        addSingleArgumentEvent(KEY_PRESSED, keyCode);
+        keyPressedImpl(0, keyCode);
+    }
+
+    void keyPressedImpl(int windowId, final int keyCode) {
+        if (!addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode)) {
+            // The press was not accepted, so nothing may be armed off it. The repeat
+            // and long-press timers fire straight into the top level, so a component
+            // that never received keyPressed() would start getting keyRepeated() and
+            // longKeyPress() for a press it never saw -- and with the key still held,
+            // go on getting them.
+            return;
+        }
 
         lastInteractionWasKeypad = lastInteractionWasKeypad || (keyCode != MenuBar.leftSK && keyCode != MenuBar.clearSK && keyCode != MenuBar.backSK);
 
         // this solves a Sony Ericsson bug where on slider open/close someone "brilliant" chose
         // to send a keyPress with a -43/-44 keycode... Without ever sending a key release!
-        keyRepeatCharged = (keyCode >= 0 || getGameAction(keyCode) > 0) || keyCode == impl.getClearKeyCode();
-        longPressCharged = keyRepeatCharged;
-        longKeyPressTime = System.currentTimeMillis();
-        keyRepeatValue = keyCode;
+        boolean armed = (keyCode >= 0 || getGameAction(keyCode) > 0) || keyCode == impl.getClearKeyCode();
+        long now = System.currentTimeMillis();
         int keyRepeatInitialIntervalTime = 800;
-        nextKeyRepeatEvent = System.currentTimeMillis() + keyRepeatInitialIntervalTime;
+        chargeKeyRepeat(windowId, keyCode, armed, now, now + keyRepeatInitialIntervalTime);
         previousKeyPressed = lastKeyPressed;
         lastKeyPressed = keyCode;
     }
@@ -2252,8 +2424,7 @@ public final class Display extends CN1Constants {
     ///
     /// - `keyCode`: keycode of the key event
     public void keyReleased(final int keyCode) {
-        keyRepeatCharged = false;
-        longPressCharged = false;
+        cancelKeyRepeatForCode(keyCode);
         if (impl.getCurrentForm() == null) {
             return;
         }
@@ -2281,14 +2452,21 @@ public final class Display extends CN1Constants {
     void keyRepeatedInternal(final int keyCode) {
     }
 
-    private void addPointerEvent(int type, int x, int y) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped -- the caller must not arm
+    /// anything off a press that was never accepted
+    private boolean addPointerEvent(int type, int x, int y) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
-            if (!hasInputEventStackCapacity(3)) {
-                return;
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(3)
+                    : !hasDroppableInputEventStackCapacity(3)) {
+                return false;
             }
+            pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x;
@@ -2296,17 +2474,24 @@ public final class Display extends CN1Constants {
             inputEventStack[inputEventStackPointer] = y;
             inputEventStackPointer++;
             lock.notifyAll();
+            return true;
         }
     }
 
-    private void addPointerEvent(int type, int[] x, int[] y) {
+    /// #### Returns
+    ///
+    /// true if the event was queued, false if it was dropped
+    private boolean addPointerEvent(int type, int[] x, int[] y) {
         synchronized (lock) {
             if (this.dropEvents) {
-                return;
+                return false;
             }
-            if (!hasInputEventStackCapacity(3 + x.length + y.length)) {
-                return;
+            if (isTerminationEvent(type)
+                    ? !hasInputEventStackCapacity(3 + x.length + y.length)
+                    : !hasDroppableInputEventStackCapacity(3 + x.length + y.length)) {
+                return false;
             }
+            pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = x.length;
@@ -2322,26 +2507,42 @@ public final class Display extends CN1Constants {
                 inputEventStackPointer++;
             }
             lock.notifyAll();
+            return true;
         }
     }
 
-    private void addPointerDragEventWithTimestamp(int x, int y) {
+    private void addPointerDragEventWithTimestamp(int windowId, int x, int y) {
         synchronized (lock) {
             if (this.dropEvents) {
                 return;
             }
             try {
-                if (lastDragOffset > -1) {
+                if (lastDragOffset > -1 && lastDragWindowId == windowId) {
+                    // A coalesced drag replaces the queued one, so it must also carry
+                    // the newest metadata rather than the metadata of the drag it just
+                    // overwrote. The type word sits one slot before the payload.
+                    //
+                    // The existing slot is overwritten rather than a new one taken:
+                    // coalescing keeps one packet however many updates arrive, so
+                    // taking a slot per update would run the ring forward without
+                    // bound -- with the event dispatch thread blocked it would wrap
+                    // and clobber slots belonging to presses and releases that are
+                    // still queued, which is exactly the mix-up this prevents.
+                    pointerMetaStack[lastDragOffset - 1] =
+                            impl.recapturePointerEventMetadata(pointerMetaStack[lastDragOffset - 1]);
                     inputEventStack[lastDragOffset] = x;
                     inputEventStack[lastDragOffset + 1] = y;
                     inputEventStack[lastDragOffset + 2] = (int) (System.currentTimeMillis() - displayInitTime);
                 } else {
-                    if (!hasInputEventStackCapacity(4)) {
+                    // A drag is ordinary input, so it stops short of the reserve.
+                    if (!hasDroppableInputEventStackCapacity(4)) {
                         return;
                     }
-                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
+                    pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
+                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED | (windowId << 8);
                     inputEventStackPointer++;
                     lastDragOffset = inputEventStackPointer;
+                    lastDragWindowId = windowId;
                     inputEventStack[inputEventStackPointer] = x;
                     inputEventStackPointer++;
                     inputEventStack[inputEventStackPointer] = y;
@@ -2363,9 +2564,12 @@ public final class Display extends CN1Constants {
                 return;
             }
             try {
-                if (!hasInputEventStackCapacity(4)) {
+                if (isTerminationEvent(type)
+                        ? !hasInputEventStackCapacity(4)
+                        : !hasDroppableInputEventStackCapacity(4)) {
                     return;
                 }
+                pointerMetaStack[inputEventStackPointer] = impl.capturePointerEventMetadata();
                 inputEventStack[inputEventStackPointer] = type;
                 inputEventStackPointer++;
                 inputEventStack[inputEventStackPointer] = x;
@@ -2393,15 +2597,19 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerDraggedImpl(0, x, y);
+    }
+
+    void pointerDraggedImpl(int windowId, final int[] x, final int[] y) {
         if (x.length == 0) {
             // Native ports have been observed to deliver zero-length pointer arrays
             return;
         }
-        longPointerCharged = false;
+        cancelLongPress(windowId);
         if (x.length == 1) {
-            addPointerDragEventWithTimestamp(x[0], y[0]);
+            addPointerDragEventWithTimestamp(windowId, x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
+            addPointerEvent(POINTER_DRAGGED_MULTI | (windowId << 8), x, y);
         }
     }
 
@@ -2413,13 +2621,20 @@ public final class Display extends CN1Constants {
     ///
     /// - `y`: the y position of the pointer
     public void pointerHover(final int[] x, final int[] y) {
-        if (impl.getCurrentForm() == null) {
+        pointerHoverImpl(0, x, y);
+    }
+
+    void pointerHoverImpl(int windowId, final int[] x, final int[] y) {
+        if (windowId == 0 && impl.getCurrentForm() == null) {
+            return;
+        }
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) == null) {
             return;
         }
         if (x.length == 1) {
-            addPointerEventWithTimestamp(POINTER_HOVER, x[0], y[0]);
+            addPointerEventWithTimestamp(POINTER_HOVER | (windowId << 8), x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_HOVER, x, y);
+            addPointerEvent(POINTER_HOVER | (windowId << 8), x, y);
         }
     }
 
@@ -2462,17 +2677,29 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerPressedImpl(0, x, y);
+    }
 
+    void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
+        boolean accepted;
+        if (x.length == 1) {
+            accepted = addPointerEvent(POINTER_PRESSED | (windowId << 8), x[0], y[0]);
+        } else {
+            accepted = addPointerEvent(POINTER_PRESSED_MULTI | (windowId << 8), x, y);
+        }
+        if (!accepted) {
+            // Nothing may be armed off a press the queue refused. longPointerPress()
+            // is delivered straight to the top level, so a component that never
+            // received pointerPressed() would get a long press for a press it never
+            // saw. Same rule as the key path.
+            return;
+        }
         lastInteractionWasKeypad = false;
-        longPointerCharged = true;
-        longKeyPressTime = System.currentTimeMillis();
+        chargeLongPress(windowId, x[0], y[0]);
+        // Still tracked globally: this is "where the pointer last was", which
+        // getCurrentPointerEvent reports and which is not per window.
         pointerX = x[0];
         pointerY = y[0];
-        if (x.length == 1) {
-            addPointerEvent(POINTER_PRESSED, x[0], y[0]);
-        } else {
-            addPointerEvent(POINTER_PRESSED_MULTI, x, y);
-        }
     }
 
     /// Pushes a pointer release event with the given coordinates into Codename One
@@ -2483,24 +2710,49 @@ public final class Display extends CN1Constants {
     ///
     /// - `y`: the y position of the pointer
     public void pointerReleased(final int[] x, final int[] y) {
-        longPointerCharged = false;
+        cancelLongPress(0);
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerReleasedImpl(0, x, y);
+    }
+
+    void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
+        // Cancelled here rather than by each caller: a release ends the gesture, so
+        // the long-press timer it armed must not outlive it.
+        cancelLongPress(windowId);
         if (x.length == 1) {
-            addPointerEvent(POINTER_RELEASED, x[0], y[0]);
+            addPointerEvent(POINTER_RELEASED | (windowId << 8), x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_RELEASED_MULTI, x, y);
+            addPointerEvent(POINTER_RELEASED_MULTI | (windowId << 8), x, y);
         }
     }
 
     private void addSizeChangeEvent(int type, int w, int h) {
         synchronized (lock) {
+            // Coalesced onto whichever size packet of this type is already queued. A
+            // live resize produces hundreds of these, and queueing each one fills the
+            // stack -- after which the *final* size is dropped, leaving the hierarchy
+            // laid out for a size the surface no longer has, and the releases behind it
+            // are dropped with it because a size change may use the reserve. Only the
+            // latest dimensions matter, so a queued packet is overwritten rather than
+            // followed.
+            if (lastSizeChangeOffset > -1
+                    && inputEventStack[lastSizeChangeOffset - 1] == type) {
+                inputEventStack[lastSizeChangeOffset] = w;
+                inputEventStack[lastSizeChangeOffset + 1] = h;
+                lock.notifyAll();
+                return;
+            }
+            // A size change is state, and a lost one leaves the hierarchy laid out at
+            // a size the surface no longer has -- painting and hit testing stay
+            // misaligned until something else resizes the window.
             if (!hasInputEventStackCapacity(3)) {
                 return;
             }
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
+            lastSizeChangeOffset = inputEventStackPointer;
             inputEventStack[inputEventStackPointer] = w;
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = h;
@@ -2533,6 +2785,387 @@ public final class Display extends CN1Constants {
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
+    /// The most recent size reported for each open window that has not been delivered
+    /// yet. See `#windowSizeChanged(int, int, int)`.
+
+    /// Whether this release finishes a press the framework already accepted.
+    ///
+    /// A press handler is allowed to open a modal window, and then the matching
+    /// release arrives with its own window blocked. Dropping it leaves the component
+    /// that took the press latched down for good and the recorded target never
+    /// cleared, so the next release matches the wrong thing. Modality is there to stop
+    /// *new* interaction, not to strand a gesture that was already under way.
+    ///
+    /// Only a release with a recorded press passes. A press that was itself filtered
+    /// leaves no record, so clicking a blocked window still does nothing.
+    private boolean completesAcceptedPress(int type, int windowId, int offset, int[] stack) {
+        switch (type) {
+            case KEY_RELEASED:
+                // The key code is the packet's first argument.
+                return hasKeyPressTarget(stack[offset + 1]);
+            case POINTER_RELEASED:
+            case POINTER_RELEASED_MULTI:
+                return hasPointerPressTarget(windowId);
+            default:
+                return false;
+        }
+    }
+
+    /// Whether a press for this key is recorded, without consuming it.
+    private boolean hasKeyPressTarget(int keyCode) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether this packet is user input, and so subject to modal blocking.
+    ///
+    /// Modality blocks what the user does to a window, not what the platform tells the
+    /// framework about it. A blocked window is still resized, hidden and shown by the
+    /// window system, and dropping those left the hierarchy at stale dimensions once
+    /// the modal closed -- painting and hit testing then disagreed with the native
+    /// canvas until something else forced a resize.
+    /// True for the event types that carry rich pointer metadata, i.e. the ones whose
+    /// dispatch builds a `com.codename1.ui.events.PointerEvent`.
+    private static boolean isPointerEvent(int type) {
+        switch (type) {
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_DRAGGED:
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI:
+            case POINTER_HOVER:
+            case POINTER_HOVER_PRESSED:
+            case POINTER_HOVER_RELEASED:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isUserInputEvent(int type) {
+        switch (type) {
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_DRAGGED:
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI:
+            case POINTER_HOVER:
+            case POINTER_HOVER_PRESSED:
+            case POINTER_HOVER_RELEASED:
+            case KEY_PRESSED:
+            case KEY_RELEASED:
+                return true;
+            default:
+                // SIZE_CHANGED, HIDE_NOTIFY and SHOW_NOTIFY are the platform
+                // reporting what it did, not the user reaching the window.
+                return false;
+        }
+    }
+
+    /// Whether a drag has happened on the *main* surface since its press.
+    ///
+    /// The main surface keeps the original single flag deliberately. Routing window 0
+    /// through the per-window table changed behaviour for ordinary single-window
+    /// applications -- it regressed an unrelated component test -- and the defect
+    /// being fixed here is specifically that a *secondary* window's press clobbered
+    /// another window's state. Windows above 0 get their own entry.
+    private boolean dragOccured;
+
+    /// Whether a drag has happened in each secondary window since its press, paired
+    /// by index with `#longPressWindows`.
+    ///
+    /// Global before: pressing in one window cleared the flag after another had
+    /// already dragged, so releasing the first made `List` and friends read
+    /// `hasDragOccured()` as false and treat a completed drag as a click.
+
+    /// Arms key repeat and the long-key-press timer for one surface. Window zero is
+    /// the main surface and keeps the fields it always kept; any other window keeps
+    /// its own, on the window.
+    private void chargeKeyRepeat(int windowId, int keyCode, boolean armed, long now,
+            long firstRepeatAt) {
+        if (windowId == 0) {
+            keyRepeatCharged = armed;
+            longPressCharged = armed;
+            keyRepeatValue = keyCode;
+            longKeyPressTime = now;
+            nextKeyRepeatEvent = firstRepeatAt;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.chargeKeyRepeat(keyCode, armed, now, firstRepeatAt);
+        }
+    }
+
+    /// Cancels whichever window armed a repeat for this key code.
+    ///
+    /// Keyed by the code rather than by the window the key-up packet names: the
+    /// physical key was armed by the *press*, and focus can move between the two, so
+    /// cancelling the releasing window's slot left the pressing window repeating
+    /// every 10ms with the key physically up.
+    private void cancelKeyRepeatForCode(int keyCode) {
+        if (keyRepeatValue == keyCode) {
+            keyRepeatCharged = false;
+            longPressCharged = false;
+        }
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelKeyRepeatForCode(keyCode);
+        }
+    }
+
+    /// Cancels key repeat for one window, leaving the others alone.
+    private void cancelKeyRepeat(int windowId) {
+        if (windowId == 0) {
+            keyRepeatCharged = false;
+            longPressCharged = false;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.cancelKeyRepeat();
+        }
+    }
+
+    /// Cancels key repeat everywhere, for the paths that reset all input state.
+    private void cancelAllKeyRepeats() {
+        keyRepeatCharged = false;
+        longPressCharged = false;
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelKeyRepeat();
+        }
+    }
+
+    /// Whether any window has *both* key repeat and a long key press armed. The
+    /// single-flag predicate this replaces was `!keyRepeatCharged ||
+    /// !longPressCharged`, i.e. false only when both were set.
+    private boolean anyKeyRepeatAndLongPressArmed() {
+        if (keyRepeatCharged && longPressCharged) {
+            return true;
+        }
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasKeyRepeatAndLongPressArmed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether any window still has key repeat or a long key press pending.
+    private boolean anyKeyRepeatArmed() {
+        if (keyRepeatCharged || longPressCharged) {
+            return true;
+        }
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasKeyRepeatArmed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Records a press that has not been released or dragged yet, for one window.
+    private void setSelectionPressed(int windowId, boolean value, int x, int y) {
+        if (windowId == 0) {
+            pointerPressedAndNotReleasedOrDragged = value;
+            return;
+        }
+        // Window zero is the main surface and keeps the field it has always kept.
+        // Every other window keeps its own, on the window -- so there is no table here
+        // to size, lease or reclaim.
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.setSelectionPressed(value, x, y);
+        }
+    }
+
+    /// Clears the pressed selection for one window; the coordinates stop mattering
+    /// the moment the flag goes down.
+    private void clearSelectionPressed(int windowId) {
+        setSelectionPressed(windowId, false, 0, 0);
+    }
+
+    /// Whether any window has a press down. What the component-less
+    /// shouldRenderSelection() answers, since it has nothing to resolve a window from.
+    private boolean anySelectionPressed() {
+        if (pointerPressedAndNotReleasedOrDragged) {
+            return true;
+        }
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasSelectionPressed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Clears every window's pressed selection. Used where the whole application
+    /// loses its input, which is not a per window event.
+    private void clearAllSelectionPressed() {
+        pointerPressedAndNotReleasedOrDragged = false;
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.setSelectionPressed(false, 0, 0);
+        }
+    }
+
+    /// Records that a drag happened in one window.
+    private void setDragOccured(int windowId, boolean value) {
+        if (windowId == 0) {
+            dragOccured = value;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.setDragOccured(value);
+        }
+    }
+
+    /// Starts timing a long press for one window.
+    ///
+    /// Per window rather than singleton for the same reason the press targets are:
+    /// with a contact down in two windows, pressing in the second replaced the
+    /// first's coordinates and timer, and releasing either cancelled the other's
+    /// pending long press.
+    private void chargeLongPress(int windowId, int x, int y) {
+        if (windowId == 0) {
+            longPointerCharged = true;
+            longKeyPressTime = System.currentTimeMillis();
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.chargeLongPointerPress(x, y);
+        }
+    }
+
+    /// Cancels the long press pending for one window, leaving other windows alone.
+    private void cancelLongPress(int windowId) {
+        if (windowId == 0) {
+            longPointerCharged = false;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.cancelLongPointerPress();
+        }
+    }
+
+    /// Whether any window is still timing a long press; the event dispatch thread
+    /// must not park while one is pending.
+    private boolean anyLongPressArmed() {
+        if (longPointerCharged) {
+            return true;
+        }
+        for (Window each : Desktop.getInstance().getWindows()) {
+            if (each.hasLongPointerArmed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Cancels every pending long press, for the paths that reset all input state.
+    private void cancelAllLongPresses() {
+        longPointerCharged = false;
+        for (Window each : Desktop.getInstance().getWindows()) {
+            each.cancelLongPointerPress();
+        }
+    }
+
+    /// Records which top level saw a pointer press in the given window.
+    private void rememberPointerPress(int windowId, Container target) {
+        if (windowId == 0) {
+            mainPointerPressTarget = target;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.rememberPointerPress(target);
+        }
+    }
+
+    /// Returns and forgets the top level that saw this window's pointer press.
+    private Container takePointerPressTarget(int windowId) {
+        if (windowId == 0) {
+            Container out = mainPointerPressTarget;
+            mainPointerPressTarget = null;
+            return out;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w == null ? null : w.takePointerPressTarget();
+    }
+
+    /// Whether a pointer press is recorded for the window, without consuming it.
+    private boolean hasPointerPressTarget(int windowId) {
+        if (windowId == 0) {
+            return mainPointerPressTarget != null;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        return w != null && w.hasPointerPressTarget();
+    }
+
+    /// Records which top level saw a key press, so its release can be matched to it.
+    /// Called on the event dispatch thread only.
+    /// Records which top level is holding this key, and answers the one the press
+    /// belongs to.
+    ///
+    /// #### Returns
+    ///
+    /// the top level that saw this key go down, which is `target` for a fresh press
+    /// and the remembered one for a repeat
+    private Container rememberKeyPress(int keyCode, Container target) {
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                // Already held. The native ports forward every autorepeat as another
+                // press, so replacing the target here handed the key to whichever
+                // window had focus when the repeat arrived -- and the eventual key-up
+                // then went there instead of to the window that saw the original
+                // press, leaving a fire-key-activated Button stuck down.
+                return keyPressTargets[iter];
+            }
+            if (free < 0 && keyPressTargets[iter] == null) {
+                free = iter;
+            }
+        }
+        if (free >= 0) {
+            keyPressCodes[free] = keyCode;
+            keyPressTargets[free] = target;
+        }
+        return target;
+    }
+
+    /// Forgets every key this window saw go down. Keyed by key code because several
+    /// keys can be held at once, which is why this one table is not per window and
+    /// still needs clearing when a window leaves.
+    private void forgetKeyPressesFor(Container w) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+            }
+        }
+    }
+
+    /// Returns and forgets the top level that saw this key's press, or null when
+    /// there is no record of one.
+    private Container takeKeyPressTarget(int keyCode) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                Container out = keyPressTargets[iter];
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+                return out;
+            }
+        }
+        return null;
+    }
+
     private void addNotifyEvent(int type) {
         synchronized (lock) {
             if (!hasInputEventStackCapacity(1)) {
@@ -2547,10 +3180,10 @@ public final class Display extends CN1Constants {
     /// Broadcasts hide notify into Codename One, this method is invoked by the Codename One implementation
     /// to notify Codename One of hideNotify events
     public void hideNotify() {
-        keyRepeatCharged = false;
-        longPressCharged = false;
-        longPointerCharged = false;
-        pointerPressedAndNotReleasedOrDragged = false;
+        cancelAllKeyRepeats();
+        cancelAllLongPresses();
+        // Every window, not just the main one: the application is losing its input.
+        clearAllSelectionPressed();
         addNotifyEvent(HIDE_NOTIFY);
     }
 
@@ -2567,22 +3200,46 @@ public final class Display extends CN1Constants {
         synchronized (lock) {
             b = inputEventStackPointer == 0 &&
                     hasNoSerialCallsPending() &&
-                    (!keyRepeatCharged || !longPressCharged);
+                    // Deliberately "not both", which is what the single-flag version
+                    // meant: (!keyRepeatCharged || !longPressCharged). Collapsing it
+                    // to "neither armed" is a different predicate and made this
+                    // report not-idle far more often, which stalled the flush.
+                    !anyKeyRepeatAndLongPressArmed();
         }
         return b;
     }
 
-    private void updateDragSpeedStatus(int x, int y, int timestamp) {
-        //save dragging input to calculate the dragging speed later
-        dragPathX[dragPathOffset] = x;
-        dragPathY[dragPathOffset] = y;
-        dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
-        if (dragPathLength < PATHLENGTH) {
-            dragPathLength++;
+    private void updateDragSpeedStatus(int windowId, int x, int y, int timestamp) {
+        if (windowId == 0) {
+            //save dragging input to calculate the dragging speed later
+            dragPathX[dragPathOffset] = x;
+            dragPathY[dragPathOffset] = y;
+            dragPathTime[dragPathOffset] = displayInitTime + (long) timestamp;
+            if (dragPathLength < PATHLENGTH) {
+                dragPathLength++;
+            }
+            dragPathOffset++;
+            if (dragPathOffset >= PATHLENGTH) {
+                dragPathOffset = 0;
+            }
+            return;
         }
-        dragPathOffset++;
-        if (dragPathOffset >= PATHLENGTH) {
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.recordDrag(x, y, timestamp);
+        }
+    }
+
+    /// Clears one window's drag history, on press and on disposal.
+    private void resetDragHistory(int windowId) {
+        if (windowId == 0) {
+            dragPathLength = 0;
             dragPathOffset = 0;
+            return;
+        }
+        Window w = Desktop.getInstance().windowById(windowId);
+        if (w != null) {
+            w.resetDragHistory();
         }
     }
 
@@ -2600,195 +3257,353 @@ public final class Display extends CN1Constants {
     }
 
     /// Invoked on the EDT to propagate the event
-    private int handleEvent(int offset, int[] inputEventStackTmp) {
-        Form f = getCurrentUpcomingForm(true);
+    private int handleEvent(int offset, int[] inputEventStackTmp, int[] pointerMetaTmp) {
+        // The window id is packed into the high bits of the type word. Window 0 is
+        // the main surface, and for it the packed word is numerically identical to
+        // what it always was, so the main path is unchanged.
+        int packed = inputEventStackTmp[offset];
+        int type = packed & 0xFF;
+        int windowId = packed >>> 8;
 
-        // might happen when returning from a deinitialized version of Codename One
-        if (f == null) {
-            return offset;
+        // Restore the metadata that arrived with this packet. The port reports it into
+        // a single mutable record, and a port that drains a burst of pointer messages
+        // overwrites that record several times before any of them is dispatched -- so
+        // without this every event in the burst would build its PointerEvent from the
+        // last packet's button and device type.
+        if (isPointerEvent(type) && offset < pointerMetaTmp.length) {
+            impl.selectPointerEventMetadata(pointerMetaTmp[offset]);
         }
 
-        // no need to synchronize since we are reading only and modifying the stack frame offset
-        int type = inputEventStackTmp[offset];
-        offset++;
+        Container f;
+        if (windowId == 0) {
+            f = getCurrentUpcomingForm(true);
+        } else {
+            f = Desktop.getInstance().windowById(windowId);
+        }
 
-        switch (type) {
-            case KEY_PRESSED:
-                f.keyPressed(inputEventStackTmp[offset]);
-                offset++;
-                eventForm = f;
-                break;
-            case KEY_RELEASED:
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form xf = eventForm;
-                eventForm = null;
-
-                //make sure the released event is sent to the same Form who got a
-                //pressed event
-                if (xf == f || multiKeyMode) { //NOPMD CompareObjectsWithEquals
-                    f.keyReleased(inputEventStackTmp[offset]);
-                    offset++;
-                }
-                break;
-            case POINTER_PRESSED:
-                if (recursivePointerReleaseA) {
-                    recursivePointerReleaseB = true;
-                }
-                dragOccured = false;
-                dragPathLength = 0;
-                pointerPressedAndNotReleasedOrDragged = true;
-                xArray1[0] = inputEventStackTmp[offset];
-                offset++;
-                yArray1[0] = inputEventStackTmp[offset];
-                offset++;
-                currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
-                f.pointerPressed(xArray1, yArray1);
-                eventForm = f;
-                break;
-            case POINTER_PRESSED_MULTI: {
-                if (recursivePointerReleaseA) {
-                    recursivePointerReleaseB = true;
-                }
-                dragOccured = false;
-                dragPathLength = 0;
-                pointerPressedAndNotReleasedOrDragged = true;
-                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array2.length + 1;
-                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                f.pointerPressed(array1, array2);
-                eventForm = f;
-                break;
+        // might happen when returning from a deinitialized version of Codename One,
+        // or when a window was disposed while its events were still in flight
+        // A packet already queued when the window was hidden would otherwise be
+        // dispatched into an invisible tree -- and a press among them would re-arm
+        // the very timers the hide just cancelled. Cancelling at the transition
+        // cannot close that race on its own, because these are already in flight.
+        boolean hidden = windowId > 0 && f != null && !f.isTopLevelShowing();
+        if (f == null || (isUserInputEvent(type) && hidden)
+                || (isUserInputEvent(type) && Desktop.getInstance().isWindowInputBlocked(windowId)
+                && !completesAcceptedPress(type, windowId, offset, inputEventStackTmp))) {
+            // A press that is being filtered must not leave its long-press timer
+            // armed. The timer is charged off the event dispatch thread when the
+            // press is queued, before modality has had a say, and the event
+            // dispatch thread later fires longPointerPress directly without
+            // consulting the filter again -- so a context menu could open behind an
+            // application modal for a press the component never received.
+            if (type == POINTER_PRESSED || type == POINTER_PRESSED_MULTI) {
+                cancelLongPress(windowId);
             }
-            case POINTER_RELEASED:
-                recursivePointerReleaseA = true;
-                pointerPressedAndNotReleasedOrDragged = false;
+            // The same for the keyboard. keyPressedImpl arms this window's key repeat
+            // and long-key timers before modality has had a say, and the paint loop
+            // fires keyRepeated and longKeyPress directly without consulting the
+            // filter again -- so holding a key could drive a component behind a modal
+            // that never received the press. I fixed the pointer half of this and did
+            // not check the keyboard half at the time.
+            if (type == KEY_PRESSED) {
+                cancelKeyRepeat(windowId);
+            }
+            // NOTE: drain the packet rather than returning offset unchanged. The
+            // caller loops while (offset < end), so returning it unchanged spins the
+            // EDT forever, and returning a sentinel would drop the rest of the batch
+            // -- which may contain main form events.
+            return skipEvent(type, offset + 1, inputEventStackTmp);
+        }
 
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form x = eventForm;
-                eventForm = null;
+        // Which window's samples getDragSpeed should report while this packet's
+        // handlers run. Saved and restored around the dispatch rather than simply
+        // assigned: a listener may call invokeAndBlock, whose nested event loop
+        // dispatches another window's packets, and without restoring it the rest of
+        // *this* release would read the nested window's drag state.
+        final int previousDragHistory = dragHistoryCurrent;
+        dragHistoryCurrent = windowId;
+        try {
 
-                // make sure the released event is sent to the same Form that got a
-                // pressed event
-                if (x == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+            // no need to synchronize since we are reading only and modifying the stack frame offset
+            offset++;
+
+            switch (type) {
+                case KEY_PRESSED:
+                    // Dispatched to the top level that saw the key go down, not to the
+                    // one this packet names -- the same rule the release already
+                    // follows. A repeat names whichever window has focus now, so once
+                    // focus moves mid-hold the repeats landed in the new window while
+                    // the key-up still went to the old one: the new window entered its
+                    // pressed state and no release was ever coming for it.
+                    Container pressTarget = rememberKeyPress(inputEventStackTmp[offset], f);
+                    pressTarget.keyPressed(inputEventStackTmp[offset]);
+                    offset++;
+                    break;
+                case KEY_RELEASED:
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    //make sure the released event is sent to the same Form who got a
+                    //pressed event
+                    int releasedKey = inputEventStackTmp[offset];
+                    Container xf = takeKeyPressTarget(releasedKey);
+                    offset++;
+                    if (xf != null) {
+                        // Delivered to the top level that saw the press, not to the one
+                        // the key-up packet names. A desktop window system sends key-up
+                        // to whatever is focused now, so releasing a key after focus has
+                        // moved reports the new window -- and matching on that dropped
+                        // the release, latching the pressed component in the old one.
+                        // For the single window case the two are the same top level, so
+                        // this is the behaviour that was always there.
+                        xf.keyReleased(releasedKey);
+                    } else if (multiKeyMode) {
+                        // No record of the press: either it arrived before this window
+                        // existed or the tracking table was full. Multi key mode has
+                        // always delivered these anyway.
+                        f.keyReleased(releasedKey);
+                    }
+                    break;
+                case POINTER_PRESSED:
+                    if (recursivePointerReleaseA) {
+                        recursivePointerReleaseB = true;
+                    }
+                    setDragOccured(windowId, false);
+                    resetDragHistory(windowId);
                     xArray1[0] = inputEventStackTmp[offset];
                     offset++;
                     yArray1[0] = inputEventStackTmp[offset];
                     offset++;
+                    // After the coordinates are decoded, because the press is recorded
+                    // with them: the selection test compares them against the pressed
+                    // component's own bounds.
+                    setSelectionPressed(windowId, true, xArray1[0], yArray1[0]);
                     currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
-                    f.pointerReleased(xArray1, yArray1);
+                    // Recorded before the dispatch, not after. A pressed callback can
+                    // enter a nested loop -- showModal() does -- and the matching
+                    // release can be processed inside it; with the record made
+                    // afterwards that release saw no accepted press and was
+                    // discarded, and the record then landed stale, latching the
+                    // component and misrouting the next release.
+                    rememberPointerPress(windowId, f);
+                    f.pointerPressed(xArray1, yArray1);
+                    break;
+                case POINTER_PRESSED_MULTI: {
+                    if (recursivePointerReleaseA) {
+                        recursivePointerReleaseB = true;
+                    }
+                    setDragOccured(windowId, false);
+                    resetDragHistory(windowId);
+                    int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array1.length + 1;
+                    int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += array2.length + 1;
+                    // Same ordering reason as the single-pointer branch.
+                    setSelectionPressed(windowId, true, array1[0], array2[0]);
+                    currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
+                    // Same ordering as the single-pointer branch above.
+                    rememberPointerPress(windowId, f);
+                    f.pointerPressed(array1, array2);
+                    break;
                 }
-                recursivePointerReleaseA = false;
-                recursivePointerReleaseB = false;
-                break;
-            case POINTER_RELEASED_MULTI:
-                recursivePointerReleaseA = true;
-                pointerPressedAndNotReleasedOrDragged = false;
+                case POINTER_RELEASED:
+                    recursivePointerReleaseA = true;
+                    clearSelectionPressed(windowId);
 
-                // pointer release can cycle into invoke and block which will cause this method
-                // to recurse if a pointer will be released while we are in an invoke and block state
-                // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form xy = eventForm;
-                eventForm = null;
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    Container x = takePointerPressTarget(windowId);
 
-                // make sure the released event is sent to the same Form that got a
-                // pressed event
-                if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+                    // make sure the released event is sent to the same Form that got a
+                    // pressed event
+                    int releasedX = inputEventStackTmp[offset];
+                    offset++;
+                    int releasedY = inputEventStackTmp[offset];
+                    offset++;
+                    if (x == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+                        xArray1[0] = releasedX;
+                        yArray1[0] = releasedY;
+                        currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
+                        f.pointerReleased(xArray1, yArray1);
+                    }
+                    recursivePointerReleaseA = false;
+                    recursivePointerReleaseB = false;
+                    // The gesture is over, so hand the ring back. Reclaimed here rather
+                    // than only on disposal: entries were held for the life of the
+                    // window, so a handful of long-lived windows could exhaust the table
+                    // and leave a later window unable to record drag state at all.
+                    // After the dispatch, since the release handlers read it.
+                    //
+                    // Unless a newer gesture has already started in this window: a
+                    // release handler can enter invokeAndBlock, whose nested loop
+                    // dispatches a fresh press, and that press records a target. Freeing
+                    // the ring then would strip the replacement gesture of its velocity.
+                    break;
+                case POINTER_RELEASED_MULTI:
+                    recursivePointerReleaseA = true;
+                    clearSelectionPressed(windowId);
+
+                    // pointer release can cycle into invoke and block which will cause this method
+                    // to recurse if a pointer will be released while we are in an invoke and block state
+                    // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
+                    Container xy = takePointerPressTarget(windowId);
+
+                    // make sure the released event is sent to the same Form that got a
+                    // pressed event
+                    int[] releasedMultiX = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += releasedMultiX.length + 1;
+                    int[] releasedMultiY = readArrayStackArgument(inputEventStackTmp, offset);
+                    offset += releasedMultiY.length + 1;
+                    if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
+                        currentPointerEvent = impl.buildPointerEvent(releasedMultiX[0], releasedMultiY[0], false);
+                        f.pointerReleased(releasedMultiX, releasedMultiY);
+                    }
+                    recursivePointerReleaseA = false;
+                    recursivePointerReleaseB = false;
+                    // The gesture is over, so hand the ring back. Reclaimed here rather
+                    // than only on disposal: entries were held for the life of the
+                    // window, so a handful of long-lived windows could exhaust the table
+                    // and leave a later window unable to record drag state at all.
+                    // After the dispatch, since the release handlers read it.
+                    //
+                    // Unless a newer gesture has already started in this window: a
+                    // release handler can enter invokeAndBlock, whose nested loop
+                    // dispatches a fresh press, and that press records a target. Freeing
+                    // the ring then would strip the replacement gesture of its velocity.
+                    break;
+                case POINTER_DRAGGED: {
+                    setDragOccured(windowId, true);
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    int timestamp = inputEventStackTmp[offset];
+                    offset++;
+                    updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
+                    clearSelectionPressed(windowId);
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
+                    f.pointerDragged(xArray1, yArray1);
+                    break;
+                }
+                case POINTER_DRAGGED_MULTI: {
+                    setDragOccured(windowId, true);
+                    clearSelectionPressed(windowId);
                     int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
                     offset += array2.length + 1;
                     currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                    f.pointerReleased(array1, array1);
+                    f.pointerDragged(array1, array2);
+                    break;
                 }
-                recursivePointerReleaseA = false;
-                recursivePointerReleaseB = false;
-                break;
-            case POINTER_DRAGGED: {
-                dragOccured = true;
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                int timestamp = inputEventStackTmp[offset];
-                offset++;
-                updateDragSpeedStatus(arg1, arg2, timestamp);
-                pointerPressedAndNotReleasedOrDragged = false;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, false);
-                f.pointerDragged(xArray1, yArray1);
-                break;
+                case POINTER_HOVER: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    int timestamp = inputEventStackTmp[offset];
+                    offset++;
+                    updateDragSpeedStatus(windowId, arg1, arg2, timestamp);
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHover(xArray1, yArray1);
+                    break;
+                }
+                case POINTER_HOVER_RELEASED: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHoverReleased(xArray1, yArray1);
+                    break;
+                }
+                case POINTER_HOVER_PRESSED: {
+                    int arg1 = inputEventStackTmp[offset];
+                    offset++;
+                    int arg2 = inputEventStackTmp[offset];
+                    offset++;
+                    xArray1[0] = arg1;
+                    yArray1[0] = arg2;
+                    currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
+                    f.pointerHoverPressed(xArray1, yArray1);
+                    break;
+                }
+                case SIZE_CHANGED:
+                    int w = inputEventStackTmp[offset];
+                    offset++;
+                    int h = inputEventStackTmp[offset];
+                    offset++;
+                    f.sizeChangedInternal(w, h);
+                    break;
+                case HIDE_NOTIFY:
+                    f.hideNotify();
+                    break;
+                case SHOW_NOTIFY:
+                    f.showNotify();
+                    break;
+                default:
+                    break;
             }
-            case POINTER_DRAGGED_MULTI: {
-                dragOccured = true;
-                pointerPressedAndNotReleasedOrDragged = false;
-                int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array1.length + 1;
-                int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
-                offset += array2.length + 1;
-                currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                f.pointerDragged(array1, array2);
-                break;
-            }
-            case POINTER_HOVER: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                int timestamp = inputEventStackTmp[offset];
-                offset++;
-                updateDragSpeedStatus(arg1, arg2, timestamp);
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHover(xArray1, yArray1);
-                break;
-            }
-            case POINTER_HOVER_RELEASED: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHoverReleased(xArray1, yArray1);
-                break;
-            }
-            case POINTER_HOVER_PRESSED: {
-                int arg1 = inputEventStackTmp[offset];
-                offset++;
-                int arg2 = inputEventStackTmp[offset];
-                offset++;
-                xArray1[0] = arg1;
-                yArray1[0] = arg2;
-                currentPointerEvent = impl.buildPointerEvent(arg1, arg2, true);
-                f.pointerHoverPressed(xArray1, yArray1);
-                break;
-            }
-            case SIZE_CHANGED:
-                int w = inputEventStackTmp[offset];
-                offset++;
-                int h = inputEventStackTmp[offset];
-                offset++;
-                f.sizeChangedInternal(w, h);
-                break;
-            case HIDE_NOTIFY:
-                f.hideNotify();
-                break;
-            case SHOW_NOTIFY:
-                f.showNotify();
-                break;
-            default:
-                break;
+            return offset;
+
+        } finally {
+            dragHistoryCurrent = previousDragHistory;
         }
-        return offset;
+    }
+
+    /// Consumes one event's payload without dispatching it, so that a packet aimed at
+    /// a window that has gone away does not desynchronise the rest of the batch.
+    ///
+    /// The lengths here mirror the switch in `#handleEvent(int, int[], int[])` exactly; the
+    /// multi touch forms are self describing, each array being a length followed by
+    /// that many values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event type, with the window id already stripped
+    ///
+    /// - `offset`: the offset just past the type word
+    ///
+    /// - `stack`: the event stack
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the next event
+    private int skipEvent(int type, int offset, int[] stack) {
+        switch (type) {
+            case KEY_PRESSED:
+            case KEY_RELEASED:
+                return offset + 1;
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_HOVER_RELEASED:
+            case POINTER_HOVER_PRESSED:
+            case SIZE_CHANGED:
+                return offset + 2;
+            case POINTER_DRAGGED:
+            case POINTER_HOVER:
+                return offset + 3;
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI: {
+                int len1 = stack[offset];
+                offset += len1 + 1;
+                int len2 = stack[offset];
+                return offset + len2 + 1;
+            }
+            case HIDE_NOTIFY:
+            case SHOW_NOTIFY:
+            default:
+                return offset;
+        }
     }
 
     /// This method should be invoked by components that broadcast events on the pointerReleased callback.
@@ -2799,18 +3614,29 @@ public final class Display extends CN1Constants {
     ///
     /// true if a drag has occured since the last pointer pressed
     public boolean hasDragOccured() {
-        return dragOccured;
+        // The surface whose events are being dispatched, for the same reason
+        // getDragSpeed uses it: components ask during their own release handling.
+        if (dragHistoryCurrent == 0) {
+            return dragOccured;
+        }
+        Window w = Desktop.getInstance().windowById(dragHistoryCurrent);
+        return w != null && w.hasDragOccured();
     }
 
     /// Returns true for a case where the EDT has nothing at all to do
     boolean shouldEDTSleep() {
         Form current = impl.getCurrentForm();
         return ((current == null || (!current.hasAnimations())) &&
+                !Desktop.getInstance().anyWindowHasAnimations() &&
                 (animationQueue == null || animationQueue.isEmpty()) &&
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
-                hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged) || (isMinimized() && hasNoSerialCallsPending());
+                hasNoSerialCallsPending() && !anyKeyRepeatArmed()
+                && !anyLongPressArmed())
+                // a minimized main window must not park the EDT while a tool window
+                // is still on screen and animating
+                || (isMinimized() && !Desktop.getInstance().hasVisibleWindows()
+                        && hasNoSerialCallsPending());
     }
 
     Form getCurrentInternal() {
@@ -2999,6 +3825,42 @@ public final class Display extends CN1Constants {
     /// - `cmp`: the given component to repaint
     void repaint(final Animation cmp) {
         impl.repaint(cmp);
+    }
+
+    // ---- desktop windows ---------------------------------------------------------
+
+    /// Windows blocking input, innermost last. A modal window drops input aimed at
+    /// anything it blocks; enforcing this here rather than in the ports means
+    /// modality behaves identically on every platform, whether or not the platform
+    /// implements its own.
+
+    /// Wakes the event dispatch thread, used when a window becomes visible before
+    /// the first form has been shown and the loop would otherwise still be parked.
+    void wakeEdt() {
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+    }
+
+    /// Paints every open window after the main surface. Iterates by index and
+    /// re-reads the size because a nested event loop -- a modal dialog, or
+    /// invokeAndBlock -- can dispose a window part way through.
+    /// Repaints the main form and every open window.
+    ///
+    /// For work that finishes without knowing which top level is showing its result --
+    /// an image that has just decoded, say. Repainting only the current form left that
+    /// result invisible in every window until something else happened to dirty one.
+    ///
+    /// Lives here rather than at the call site so `Desktop` and `Window` are not
+    /// referenced from code every application uses: on ParparVM that reference would
+    /// keep the whole window implementation alive in binaries that never open one.
+    /// `Display` already reaches `Desktop`, so this adds nothing.
+    void repaintTopLevels() {
+        Form current = getCurrent();
+        if (current != null) {
+            current.repaint();
+        }
+        Desktop.getInstance().repaintWindows();
     }
 
     /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
@@ -3418,13 +4280,17 @@ public final class Display extends CN1Constants {
     ///
     /// the dragging speed
     public float getDragSpeed(boolean yAxis) {
-        float speed;
-        if (yAxis) {
-            speed = impl.getDragSpeed(dragPathY, dragPathTime, dragPathOffset, dragPathLength);
-        } else {
-            speed = impl.getDragSpeed(dragPathX, dragPathTime, dragPathOffset, dragPathLength);
+        // The surface whose events are being dispatched. Components call this from
+        // their own pointerReleased, so "the surface currently being serviced" is the
+        // one that owns the samples they mean.
+        if (dragHistoryCurrent == 0) {
+            if (yAxis) {
+                return impl.getDragSpeed(dragPathY, dragPathTime, dragPathOffset, dragPathLength);
+            }
+            return impl.getDragSpeed(dragPathX, dragPathTime, dragPathOffset, dragPathLength);
         }
-        return speed;
+        Window w = Desktop.getInstance().windowById(dragHistoryCurrent);
+        return w == null ? 0 : w.windowDragSpeed(yAxis);
     }
 
     /// Indicates whether Codename One should consider the bidi RTL algorithm
@@ -3601,7 +4467,7 @@ public final class Display extends CN1Constants {
     ///
     /// the shouldRenderSelection
     public boolean shouldRenderSelection() {
-        return !pureTouch || pointerPressedAndNotReleasedOrDragged || lastInteractionWasKeypad;
+        return !pureTouch || anySelectionPressed() || lastInteractionWasKeypad;
     }
 
     /// This is an internal state flag relevant only for pureTouch mode (otherwise it
@@ -3615,11 +4481,38 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// the shouldRenderSelection
+    /// Whether the main surface is holding a press that falls inside the given
+    /// component. Package private: it exists so `Form` can answer
+    /// `Container#showsSelectionFor(Component)` from the pointer state that lives
+    /// here, rather than having this class ask what kind of top level it is looking
+    /// at.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to test
+    ///
+    /// #### Returns
+    ///
+    /// true if a live main surface press falls inside the component
+    boolean mainSurfacePressIsOver(Component c) {
+        return pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY);
+    }
+
     public boolean shouldRenderSelection(Component c) {
         if (c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderComponentSelection();
+        // Asked of the component's own top level rather than resolved through a window
+        // id here: a window knows whether it is holding a press and where, and those
+        // coordinates only mean anything against its own components.
+        TopLevelContainer top = c.getTopLevelContainer();
+        // A component with no top level still answers from the main surface's press,
+        // which is what this did before each top level owned the test.
+        boolean pressed = top == null
+                ? mainSurfacePressIsOver(c)
+                : top.asContainer().showsSelectionFor(c);
+        return !pureTouch || lastInteractionWasKeypad || pressed
+                || c.shouldRenderComponentSelection();
     }
 
     /// A pure touch device has no focus showing when the user is using the touch
@@ -7539,6 +8432,223 @@ public final class Display extends CN1Constants {
             }
         }
 
+    }
+
+
+    /// Cancels every input timer and recorded press for a window that is no longer
+    /// reachable, without deregistering it. Called when a window is hidden: it stays
+    /// registered, so a repeat armed before it went away would keep firing into a
+    /// component tree the user cannot see.
+    /// Drops the input the application's main surface is holding, the way
+    /// `#windowInputCancelled(Window)` does for a window.
+    ///
+    /// The main surface is window zero and is not a registered `Window`, so the
+    /// window-keyed paths cannot reach it: its repeat and long-press timers are fields
+    /// here. Called when the platform reports that focus has left it -- activating a
+    /// secondary window, or another application -- because the key-up is then
+    /// delivered somewhere else and never disarms them.
+    void mainSurfaceInputCancelled() {
+        cancelKeyRepeat(0);
+        cancelLongPress(0);
+        // Keyed by key code rather than by surface, so entries pressed on the main
+        // form outlive the focus change unless they are cleared here.
+        Form current = getCurrent();
+        if (current != null) {
+            forgetKeyPressesFor(current);
+        }
+    }
+
+    void windowInputCancelled(Window w) {
+        int id = w.getWindowId();
+        cancelKeyRepeat(id);
+        cancelLongPress(id);
+        // The implementation holds its own per-window input state -- the drag
+        // activation slot -- which these records cannot reach.
+        Display.impl.releaseWindowInputState(id);
+        // The key table is keyed by key code rather than by window -- several keys can
+        // be held at once -- so a departing window's entries still have to be cleared
+        // here. Its pointer press target went with the window itself.
+        forgetKeyPressesFor(w);
+    }
+
+    void windowDisposed(Window w) {
+        Desktop.getInstance().forgetModal(w);
+        forgetKeyPressesFor(w);
+        cancelKeyRepeat(w.getWindowId());
+        cancelLongPress(w.getWindowId());
+        // As above: a window disposed mid-press never delivers a release, and its
+        // drag slot would be held by an id that can never come back.
+        Display.impl.releaseWindowInputState(w.getWindowId());
+    }
+
+    /// Same as `#fireMouseWheelEvent(int, int, int, int, boolean, int)`, for a wheel
+    /// event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to route the wheel explicitly: the main form
+    /// version resolves the component from `#getCurrent()`, so a wheel over a second
+    /// window would either do nothing or scroll the main form's content instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    boolean windowMouseWheelEventImpl(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return true;
+        }
+        Container root;
+        if (windowId > 0) {
+            Window w = Desktop.getInstance().windowById(windowId);
+            // The same hidden check the packed input path applies. A wheel callback
+            // queued before its window was hidden still finds the window registered,
+            // and would dispatch into an invisible tree -- an unconsumed listener that
+            // hides its own window is the immediate case, since the synthetic press,
+            // drag and release queued after it start against a window that is gone.
+            if (w == null || !w.isWindowShowing()) {
+                return false;
+            }
+            root = w;
+        } else {
+            root = getCurrent();
+        }
+        if (root == null) {
+            return false;
+        }
+        Component cmp;
+        try {
+            cmp = root.getComponentAt(x, y);
+        } catch (Throwable t) {
+            cmp = null;
+        }
+        if (cmp == null) {
+            return false;
+        }
+        com.codename1.ui.events.WheelEvent we = new com.codename1.ui.events.WheelEvent(cmp, x, y, scrollX, scrollY, precise, modifiers);
+        return cmp.fireMouseWheelEvent(we);
+    }
+
+    /// Dispatches a magnify (pinch) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireMagnifyGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `scale`: the magnification scale, larger than 1 zooms in and smaller than 1 zooms out
+    void windowMagnifyGestureImpl(int windowId, int x, int y, float scale) {
+        Container f = gestureRoot(windowId);
+        if (f == null) {
+            return;
+        }
+        Component cmp = gestureComponentAt(f, x, y);
+        if (cmp == null) {
+            cmp = f;
+        }
+        while (cmp != null) {
+            if (cmp.pinch(scale)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+    /// Dispatches a rotation (twist) gesture aimed at one native window. Invoked by the
+    /// implementation for a gesture that arrived over a secondary window; window 0 is
+    /// the application's main surface, which is what `#fireRotationGesture(int, int, float)`
+    /// reports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the gesture x position in pixels, relative to that window
+    ///
+    /// - `y`: the gesture y position in pixels, relative to that window
+    ///
+    /// - `radians`: the incremental rotation in radians, positive is clockwise
+    void windowRotationGestureImpl(int windowId, int x, int y, float radians) {
+        Container f = gestureRoot(windowId);
+        if (f == null) {
+            return;
+        }
+        Component cmp = gestureComponentAt(f, x, y);
+        while (cmp != null) {
+            if (cmp.rotation(radians)) {
+                return;
+            }
+            cmp = cmp.getParent();
+        }
+    }
+
+
+    /// Pushes a key release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    void keyReleasedImpl(int windowId, int keyCode) {
+        if (windowId > 0) {
+            cancelKeyRepeatForCode(keyCode);
+            addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
+        }
+    }
+
+    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    void pointerHoverPressedImpl(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_PRESSED | (windowId << 8), x[0], y[0]);
+        }
+    }
+
+    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    void pointerHoverReleasedImpl(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_RELEASED | (windowId << 8), x[0], y[0]);
+        }
     }
 
 }

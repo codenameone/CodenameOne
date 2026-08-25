@@ -36,30 +36,35 @@
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 extern struct clazz class_array1__JAVA_INT;
 
-typedef struct { GtkWidget* w; int x, y, width, height; int out[2]; JAVA_INT* argb; } CN1PeerOp;
+/* slot identifies the window the peer belongs to; CN1_MAIN_WINDOW_SLOT is the
+ * application's own window. Without it every peer landed in the main window's
+ * overlay regardless of which Window hosted it. */
+typedef struct { int slot; GtkWidget* w; int x, y, width, height; int out[2]; JAVA_INT* argb; } CN1PeerOp;
 
 static void cn1PeerInitOnMain(void* p) {
     CN1PeerOp* op = (CN1PeerOp*) p;
-    cn1LinuxOverlayAdd(op->w, op->x, op->y, op->width, op->height);
+    cn1LinuxOverlayAdd(op->slot, op->w, op->x, op->y, op->width, op->height);
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_peerInitialized___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+JAVA_VOID com_codename1_impl_linux_LinuxNative_peerInitialized___long_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT slot) {
     CN1PeerOp op;
     op.w = (GtkWidget*) (intptr_t) peer;
     if (!op.w) { return; }
+    op.slot = slot;
     op.x = x; op.y = y; op.width = w; op.height = h;
     cn1LinuxRunOnMainAndWait(cn1PeerInitOnMain, &op);
 }
 
 static void cn1PeerBoundsOnMain(void* p) {
     CN1PeerOp* op = (CN1PeerOp*) p;
-    cn1LinuxOverlayMove(op->w, op->x, op->y, op->width, op->height);
+    cn1LinuxOverlayMove(op->slot, op->w, op->x, op->y, op->width, op->height);
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_peerSetBounds___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+JAVA_VOID com_codename1_impl_linux_LinuxNative_peerSetBounds___long_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT slot) {
     CN1PeerOp op;
     op.w = (GtkWidget*) (intptr_t) peer;
     if (!op.w) { return; }
+    op.slot = slot;
     op.x = x; op.y = y; op.width = w; op.height = h;
     cn1LinuxRunOnMainAndWait(cn1PeerBoundsOnMain, &op);
 }
@@ -83,13 +88,14 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_peerSetVisible___long_boolean(COD
 
 static void cn1PeerDeinitOnMain(void* p) {
     CN1PeerOp* op = (CN1PeerOp*) p;
-    cn1LinuxOverlayRemove(op->w); /* the app still owns the widget's lifetime */
+    cn1LinuxOverlayRemove(op->slot, op->w); /* the app still owns the widget's lifetime */
 }
 
-JAVA_VOID com_codename1_impl_linux_LinuxNative_peerDeinitialized___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
+JAVA_VOID com_codename1_impl_linux_LinuxNative_peerDeinitialized___long_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer, JAVA_INT slot) {
     CN1PeerOp op;
     op.w = (GtkWidget*) (intptr_t) peer;
     if (!op.w) { return; }
+    op.slot = slot;
     cn1LinuxRunOnMainAndWait(cn1PeerDeinitOnMain, &op);
 }
 

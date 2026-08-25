@@ -174,7 +174,7 @@ public class Slider extends Label implements ActionSource {
     @Override
     public void initComponent() {
         if (infinite) {
-            getComponentForm().registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(this, this);
             if (thumbImage == null) {
                 thumbImage = UIManager.getInstance().getThemeImageConstant("sliderThumbImage");
             }
@@ -185,10 +185,10 @@ public class Slider extends Label implements ActionSource {
     @Override
     public void deinitialize() {
         if (infinite) {
-            Form f = getComponentForm();
-            if (f != null) {
-                f.deregisterAnimatedInternal(this);
-            }
+            // Matches the registration, which goes through the top level. Resolving
+            // the form here leaked the animation for every infinite slider inside a
+            // Window, where that form is null.
+            TopLevelSupport.deregisterAnimatedInternal(this, this);
         }
     }
 
@@ -240,9 +240,9 @@ public class Slider extends Label implements ActionSource {
             infinite = i;
             if (isInitialized()) {
                 if (i) {
-                    getComponentForm().registerAnimatedInternal(this);
+                    TopLevelSupport.registerAnimatedInternal(this, this);
                 } else {
-                    getComponentForm().deregisterAnimatedInternal(this);
+                    TopLevelSupport.deregisterAnimatedInternal(this, this);
                 }
             }
         }

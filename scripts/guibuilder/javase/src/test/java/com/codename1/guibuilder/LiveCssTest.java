@@ -65,9 +65,21 @@ class LiveCssTest {
         System.setProperty("guibuilder.input", input.toString());
         System.setProperty("guibuilder.canvasMode", "desktop");
 
-        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
-        builder.init(null);
-        builder.runApp();
+        final CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        // On the event dispatch thread, because that is where Codename One invokes an
+        // application's lifecycle and therefore what the code being tested is written
+        // against. Called from the test thread instead, this ran the whole of runApp()
+        // -- building the form, opening a file, showing a ToastBar -- concurrently with
+        // a live EDT, and the two raced over Form's animation registry: an ArrayList
+        // whose size went negative and then threw ArrayIndexOutOfBoundsException: -1
+        // out of Tabs.initComponentImpl, intermittently and nowhere near the cause.
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                builder.init(null);
+                builder.runApp();
+            }
+        });
         settle();
         assertNull(onEdt(() -> builder.mcpOpenForm("com.example.StyledForm")));
         settle();
@@ -181,9 +193,21 @@ class LiveCssTest {
         System.setProperty("guibuilder.input", input.toString());
         System.setProperty("guibuilder.canvasMode", "desktop");
 
-        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
-        builder.init(null);
-        builder.runApp();
+        final CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        // On the event dispatch thread, because that is where Codename One invokes an
+        // application's lifecycle and therefore what the code being tested is written
+        // against. Called from the test thread instead, this ran the whole of runApp()
+        // -- building the form, opening a file, showing a ToastBar -- concurrently with
+        // a live EDT, and the two raced over Form's animation registry: an ArrayList
+        // whose size went negative and then threw ArrayIndexOutOfBoundsException: -1
+        // out of Tabs.initComponentImpl, intermittently and nowhere near the cause.
+        Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                builder.init(null);
+                builder.runApp();
+            }
+        });
         settle();
         assertNull(onEdt(() -> builder.mcpOpenForm("com.example.StyledForm")));
         settle();

@@ -100,6 +100,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     private int releaseFadeDuration;
     /// Motion driving the release fade alpha (255 -> 0); non-null while fading.
     private Motion releaseFadeMotion;
+
+    /// The top level the release fade was registered on.
+    private TopLevelContainer releaseFadeHost;
     /// Snapshot of the pressed background, faded out over the settled background.
     private Image releaseFadeImage;
     /// A listener used to bind the state with another button.  When that button's state
@@ -556,12 +559,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if ((pressedIcon != null && pressedIcon.isAnimation()) ||
                 (rolloverIcon != null && rolloverIcon.isAnimation()) ||
                 (disabledIcon != null && disabledIcon.isAnimation())) {
-            Form parent = getComponentForm();
-            if (parent != null) {
-                // animations are always running so the internal animation isn't
-                // good enough. We never want to stop this sort of animation
-                parent.registerAnimated(this);
-            }
+            registerForAnimation();
         }
     }
 
@@ -721,9 +719,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
             dispatcher.fireActionEvent(ev);
             if (!ev.isConsumed()) {
-                Form f = getComponentForm();
-                if (f != null) {
-                    f.actionCommandImplNoRecurseComponent(cmd, ev);
+                // The top level rather than the form: getComponentForm() is null by
+                // design inside a Window, so a command-backed button there fired its
+                // own listeners and then told nobody -- the window's command listeners
+                // never saw the activation. Neither path re-invokes the command, which
+                // this method has already run.
+                TopLevelContainer top = getTopLevelContainer();
+                if (top != null) {
+                    top.asContainer().commandActivatedFromComponent(cmd, ev);
                 }
             }
         } else {
@@ -837,10 +840,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         pressed();
-        Form f = getComponentForm();
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // registering through it left the window's awaiting-release list empty and a
+        // press dragged out of the button was never cancelled -- releasing outside it
+        // still fired the action.
+        TopLevelContainer t = getTopLevelContainer();
         // might happen when programmatically triggering press
-        if (f != null) {
-            f.addComponentAwaitingRelease(this);
+        if (t != null) {
+            t.addComponentAwaitingRelease(this);
         }
     }
 
@@ -854,10 +861,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 return;
             }
         }
-        Form f = getComponentForm();
+        TopLevelContainer t = getTopLevelContainer();
         // might happen when programmatically triggering press
-        if (f != null) {
-            f.removeComponentAwaitingRelease(this);
+        if (t != null) {
+            t.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it
@@ -1060,9 +1067,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             if (releaseFadeMotion.isFinished()) {
                 releaseFadeMotion = null;
                 releaseFadeImage = null;
-                Form f = getComponentForm();
-                if (f != null) {
-                    f.deregisterAnimated(this);
+                if (releaseFadeHost != null) {
+                    releaseFadeHost.deregisterAnimated(this);
+                    releaseFadeHost = null;
                 }
             }
             a = true;
@@ -1109,8 +1116,12 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         releaseFadeImage = img;
         releaseFadeMotion = Motion.createEaseOutMotion(255, 0, releaseFadeDuration);
         releaseFadeMotion.start();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
+            // Remembered so the fade comes off the top level that took it. A button
+            // removed or reparented before the fade ends resolves to null or somewhere
+            // else, and the original keeps the animation for good.
+            releaseFadeHost = f;
             f.registerAnimated(this);
         }
     }

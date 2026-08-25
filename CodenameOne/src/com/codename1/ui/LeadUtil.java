@@ -98,10 +98,12 @@ abstract class LeadUtil {
         }
         Component lead = leadComponentImpl(cmp);
         lead.pointerPressed(x, y);
-        Form f = cmp.getComponentForm();
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // resolving through it silently skipped focus for every lead component there.
+        TopLevelContainer t = cmp.getTopLevelContainer();
         Component leadParent = leadParentImpl(cmp);
-        if (f != null && !Display.impl.isScrollWheeling() && leadParent.isFocusable() && leadParent.isEnabled()) {
-            f.setFocused(leadParent);
+        if (t != null && !Display.impl.isScrollWheeling() && leadParent.isFocusable() && leadParent.isEnabled()) {
+            t.setFocused(leadParent);
         }
         if (cmp != lead) { //NOPMD CompareObjectsWithEquals
             leadParent.repaint();
@@ -238,9 +240,13 @@ abstract class LeadUtil {
         if (cmp == null) {
             return;
         }
-        Form f = cmp.getComponentForm();
-        if (f != null) {
-            Component fc = f.getFocused();
+        // Resolved through the top level rather than the Form. This is what cancels a
+        // button press once the pointer leaves it, and getComponentForm() is null
+        // inside a Window -- so the whole method did nothing there and a press dragged
+        // out of a button still fired on release.
+        TopLevelContainer t = cmp.getTopLevelContainer();
+        if (t != null) {
+            Component fc = t.getFocused();
             if (fc != null) {
                 fc.dragInitiated();
             }

@@ -67,6 +67,9 @@ class SearchBar extends Toolbar {
             }
         });
         setUIIDFinal("ToolbarSearch");
+        // A search bar lives in a Toolbar and a Toolbar belongs to a Form, so the
+        // form is the only top level it can be in and getComponentForm() is the
+        // right question to ask.
         if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
             search.startEditingAsync();
         } else {
@@ -87,7 +90,14 @@ class SearchBar extends Toolbar {
                     @Override
                     public void run() {
                         onSearch("");
-                        final Form f = (Form) SearchBar.this.getParent();
+                        // getComponentForm() rather than a cast of getParent(): a
+                        // search bar is not always a direct child of its form, and
+                        // ParparVM does not check CHECKCAST, so that cast would not
+                        // fail as a ClassCastException anything could catch.
+                        final Form f = SearchBar.this.getComponentForm();
+                        if (f == null) {
+                            return;
+                        }
                         f.getAnimationManager().flushAnimation(new Runnable() {
                             @Override
                             public void run() {

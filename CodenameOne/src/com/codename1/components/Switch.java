@@ -26,11 +26,11 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ImageFactory;
 import com.codename1.ui.ReleasableComponent;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
@@ -172,9 +172,11 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private final ActionListener pointerPressed = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f != null) {
-                f.addComponentAwaitingRelease(Switch.this);
+            // The top level rather than the Form, so this still registers inside a
+            // Window where getComponentForm() is null.
+            TopLevelContainer t = getTopLevelContainer();
+            if (t != null) {
+                t.addComponentAwaitingRelease(Switch.this);
             }
             dragged = false;
             dragStartTime = System.currentTimeMillis();
@@ -1033,7 +1035,15 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         if (animDuration > 0) {
             current.start();
             deltaX = deltaStart;
-            getComponentForm().registerAnimated(new Animation() {
+            // Resolved through the top level rather than the form: getComponentForm()
+            // is null by design inside a Window, so a switch hosted in one threw
+            // instead of toggling.
+            final TopLevelContainer top = getTopLevelContainer();
+            if (top == null) {
+                setValue(value, true);
+                return;
+            }
+            top.registerAnimated(new Animation() {
                 @Override
                 public boolean animate() {
                     deltaX = current.getValue();
@@ -1042,10 +1052,14 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                         dragged = false;
                         deltaX = 0;
                         deltaY = 0;
-                        Form f = getComponentForm();
-                        if (f != null) {
-                            f.deregisterAnimated(this);
-                        }
+                        // Deregistered from the top level that registered it, not
+                        // from wherever this component is now. A switch removed or
+                        // reparented mid-animation resolves to null or to a different
+                        // top level, so the original one kept the animation for good:
+                        // its hasAnimations() stays true, the event dispatch thread
+                        // never sleeps, and this branch runs again on every frame --
+                        // firing the change listener each time.
+                        top.deregisterAnimated(this);
                         Switch.this.setValue(value, true);
                     }
                     repaint();
