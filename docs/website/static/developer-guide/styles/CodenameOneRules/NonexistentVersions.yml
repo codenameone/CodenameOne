@@ -1,0 +1,23 @@
+extends: existence
+message: "'%s' refers to a Codename One version that has not been released. The current release line is 7.0.x; do not write 'Codename One 8', 'Codename One 9', or 'Codename One 7.1'."
+level: error
+ignorecase: false
+nonword: true
+# `vocab: false` is critical: by default Vale subtracts any term from
+# `styles/config/vocabularies/CodenameOne/accept.txt` (which includes
+# "Codename") from matches, which would silently swallow every hit because
+# our patterns start with "Codename One".
+vocab: false
+# Match the version number in isolation, then assert "Codename One" precedes it
+# in raw text (vale RE2 has no lookbehind, so we use \b on either side and rely
+# on the regex matching unique enough strings inside prose).
+#
+# Block:
+#   - "Codename One 8"/"Codename One 9"/... (no major version >= 8 has shipped)
+#   - "Codename One 7.1"/"Codename One 7.2"/... (latest 7.x is 7.0.81; nothing
+#     past 7.0 has shipped)
+# We deliberately allow plain "Codename One 7" and "Codename One 7.0.x"
+# because those are the live release line.
+tokens:
+  - '\bCodename One ([89]|[1-9][0-9]+)\b'
+  - '\bCodename One 7\.[1-9][0-9]*\b'

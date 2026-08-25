@@ -684,7 +684,7 @@
         },
         {
           "ports": [
-            "macos", "mac-catalyst",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -696,6 +696,14 @@
           "state": "unavailable",
           "label": "NOT_AVAILABLE",
           "detail": "The portable API returns its documented non-supporting fallback."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "LocalAuthentication",
+          "detail": "Touch ID through LocalAuthentication and Keychain, on a Mac that has it. The framework reports it unsupported on one that does not, which is the same answer an iPhone with no enrolled sensor gives."
         }
       ]
     },
