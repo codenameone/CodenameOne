@@ -1,0 +1,25 @@
+# Java sources in Ports/iOSPort/src that the native macOS (AppKit) port does NOT
+# compile. Everything not listed here is shared -- see shared-natives.exclude for
+# why the list is an exclusion rather than an inclusion.
+#
+# This list is short on purpose, and shorter than the natives one.
+#
+# The UIKit-bound Java classes -- Lifecycle, IOSVirtualKeyboard, IOSGLSurface,
+# IOSCarBridge, MacWindowManager, CatalystWindowNative -- still ship here, because
+# IOSImplementation references them directly and excluding them simply does not
+# compile. That is safe rather than sloppy: every native they declare is defined
+# in the shared IOSNative.m behind a platform guard, so the symbol exists on a
+# macOS build and the body is a no-op. MacImplementation overrides
+# getWindowManager() to return the AppKit manager, so the Catalyst one is never
+# instantiated and its no-op natives are never reached.
+#
+# Prising those classes out of IOSImplementation is worth doing -- it is what
+# would let the macOS port stop carrying dead UIKit bindings at all -- but it is
+# a refactor of the shared implementation, not a manifest entry, and it does not
+# block the port from working.
+
+# The port's own implementation factory. Each port ships one, under the same
+# fully-qualified name, shadowing the core one so Display instantiates that
+# port's implementation. Two of them on one compiler source path is a duplicate
+# class; two on one translator classpath would be whichever wins.
+com/codename1/impl/ImplementationFactory.java

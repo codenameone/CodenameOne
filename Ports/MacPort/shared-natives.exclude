@@ -1,0 +1,74 @@
+# Native sources in Ports/iOSPort/nativeSources that the native macOS (AppKit)
+# port does NOT compile. Everything not listed here is shared.
+#
+# Exclusion rather than inclusion, deliberately. Roughly four fifths of the Apple
+# native layer is platform-neutral -- Foundation, CoreGraphics, CoreText, Metal,
+# AVFoundation, EventKit, CoreBluetooth, Network, Security are the same
+# frameworks on both platforms -- so "shared unless stated" is a description of
+# what is true, while an include list would be a description that decays.
+#
+# It also fails in the right direction. A new UIKit-bound file that nobody adds
+# here gets zipped into nativemac.jar and clang under SDKROOT=macosx says
+# 'UIKit/UIKit.h' file not found: the loudest possible failure, at the earliest
+# possible moment, with no metadata to keep in step. A stale include list fails
+# the other way, as a file that silently is not there.
+#
+# The reverse direction is covered too. Dropping a shared native from the mac set
+# makes NativeSignatureVerifier report MISSING, because the shared IOSNative.java
+# still declares it -- fatal under CN1_NATIVE_VERIFY=strict.
+#
+# Ant/glob syntax, one pattern per line, '#' comments.
+
+# ---- UIKit application, scene and view-controller layer -------------------
+# Replaced by CN1AppDelegate / CN1AppKitWindow / CN1AppKitMetalView.
+CodenameOne_GLAppDelegate.h
+CodenameOne_GLAppDelegate.m
+CodenameOne_GLSceneDelegate.h
+CodenameOne_GLSceneDelegate.m
+CodenameOne_GLViewController.h
+CodenameOne_GLViewController.m
+
+# XIBs. The AppKit shell builds its menu bar in code and owns no nib at all,
+# which is also what keeps Interface Builder out of the build.
+**/*.xib
+**/*.storyboard
+
+# ---- UIKit input and text -------------------------------------------------
+# Replaced by NSEvent handling and NSTextInputClient.
+CN1TapGestureRecognizer.h
+CN1TapGestureRecognizer.m
+CN1TextInputView.h
+CN1TextInputView.m
+CN1UITextField.h
+CN1UITextField.m
+CN1UITextView.h
+CN1UITextView.m
+UIWebViewEventDelegate.h
+UIWebViewEventDelegate.m
+
+# ---- OpenGL ES ------------------------------------------------------------
+# This port is Metal-only, and OpenGL ES does not exist on macOS at all.
+EAGLView.h
+EAGLView.m
+CN1ES1compat.m
+CN1ES2compat.h
+CN1ES2compat.m
+CN1GL3D.h
+CN1GL3D.m
+
+# ---- Mac Catalyst windowing ----------------------------------------------
+# UIWindowScene windows fed a CPU raster. The AppKit port gives every window a
+# real NSWindow with its own CAMetalLayer, so none of this applies. Its Java
+# bindings live on CatalystWindowNative, which this port does not ship either.
+CN1MacWindows.h
+CN1MacWindows.m
+
+# ---- Other Apple platforms ------------------------------------------------
+# WatchConnectivity is iOS-only; CarPlay has no macOS analogue.
+CN1Watch*.h
+CN1Watch*.m
+CodenameOne_CarPlaySceneDelegate.h
+CodenameOne_CarPlaySceneDelegate.m
+
+# ---- Documentation --------------------------------------------------------
+*.md

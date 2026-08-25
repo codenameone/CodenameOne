@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!--
+    The native macOS (AppKit) port.
+
+    Artifacts, mirroring the iOS port:
+
+    1. codenameone-mac-8.0-SNAPSHOT.jar
+        The compiled port classes.
+    2. codenameone-mac-8.0-SNAPSHOT-jar-with-dependencies.jar
+        Port classes plus every transitive dependency including codenameone-core.
+        Becomes MacPort.jar inside the bundle. Core MUST be inside it or ParparVM
+        silently emits empty C, because it cannot resolve classes an app lambda
+        body references.
+    3. codenameone-mac-8.0-SNAPSHOT-bundle.jar
+        Zip holding MacPort.jar and nativemac.jar in its root. This is the
+        classifier the maven plugin depends on and the builder reads off its own
+        classpath.
+
+    This module compiles TWO source roots. Ports/MacPort/src holds what is
+    genuinely macOS - the implementation, the AppKit window manager, the AppKit
+    native bindings - and Ports/iOSPort/src is added on top, minus the classes in
+    Ports/MacPort/shared-java.exclude.
+
+    Sharing that second root rather than copying it is forced by ParparVM: it
+    mangles the declaring package and class into every C symbol, so republishing
+    IOSNative under com.codename1.impl.mac would rename all 836 of its natives and
+    oblige this port to reimplement IOSNative.m rather than share it. See
+    MacImplementation for the full reasoning.
+    -->
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-mac</artifactId>
+    <version>8.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>Codename One macOS Port</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>6</maven.compiler.source>
+        <maven.compiler.target>6</maven.compiler.target>
+        <src.dir>../../Ports/MacPort/src</src.dir>
+        <shared.src.dir>../../Ports/iOSPort/src</shared.src.dir>
+        <shared.apple.src.dir>${project.build.directory}/generated-sources/shared-apple</shared.apple.src.dir>
+        <shared.apple.natives.dir>${project.build.directory}/generated-natives/mac</shared.apple.natives.dir>
+        <codename1.nativemac.dir>../../Ports/MacPort/nativeSources</codename1.nativemac.dir>
+        <codename1.nativeios.dir>../../Ports/iOSPort/nativeSources</codename1.nativeios.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+<sourceDirectory>${src.dir}</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>${src.dir}</directory>
+                <excludes><exclude>**/*.java</exclude></excludes>
+            </resource>
+            <resource>
+                <directory>${shared.src.dir}</directory>
+                <excludes><exclude>**/*.java</exclude></excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <!-- Maven allows exactly one sourceDirectory, so the shared Apple
+                         root is added here. Same idiom the iOS and Windows ports use
+                         for their extra roots. -->
+                    <execution>
+                        <id>add-shared-apple-source</id>
+                        <!-- After the antrun copy below has staged it. -->
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${shared.apple.src.dir}</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>attach-artifacts</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/${project.build.finalName}-bundle.jar</file>
+                                    <type>jar</type>
+                                    <classifier>bundle</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Built for the -bundle step below, deliberately not
+                                 attached: nothing consumes the published
+                                 jar-with-dependencies classifier, and it is tens of
+                                 megabytes of shaded bytes per release. -->
+                            <attach>false</attach>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>stage-shared-apple-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Stage the shared Apple sources this port does
+                                     compile, filtered by the one manifest that also
+                                     drives the natives.
+
+                                     A copy rather than adding Ports/iOSPort/src
+                                     directly, because maven-compiler-plugin's
+                                     includes/excludes do not reliably reach a root
+                                     contributed by build-helper's add-source: they
+                                     dropped this port's own ImplementationFactory,
+                                     which sits at the same path in both roots, while
+                                     leaving every iOS class they named. Filtering the
+                                     tree before the compiler sees it removes the
+                                     question, and makes the exclude file the single
+                                     source of truth for Java and natives alike. -->
+                                <delete dir="${shared.apple.src.dir}" quiet="true"/>
+                                <mkdir dir="${shared.apple.src.dir}"/>
+                                <copy todir="${shared.apple.src.dir}">
+                                    <fileset dir="${shared.src.dir}"
+                                             excludesfile="${project.basedir}/../../Ports/MacPort/shared-java.exclude"/>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>build-bundle</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/codenameone/macport-bundle"/>
+                                <!-- nativemac.jar is the AppKit layer plus every
+                                     shared iOS native EXCEPT the ones named in
+                                     shared-natives.exclude.
+
+                                     Include-all-except, not an include list: about
+                                     four fifths of the Apple native layer is
+                                     platform-neutral, so "shared unless stated" is
+                                     what is actually true. It also fails the right
+                                     way - a new UIKit-bound file nobody excluded
+                                     gets compiled here and clang says
+                                     'UIKit/UIKit.h' file not found, which is the
+                                     loudest failure available and needs no
+                                     metadata kept in step. -->
+<!-- Materialize the exact native set first, then pack it.
+                                     The staged directory is what clang will see, and
+                                     it is what scripts/check-native-signatures.sh
+                                     points its mac leg at: the gate has to consume
+                                     this manifest's output, never its inputs, or an
+                                     excluded UIKit file would satisfy a symbol the
+                                     macOS build never compiles. -->
+                                <delete dir="${shared.apple.natives.dir}" quiet="true"/>
+                                <mkdir dir="${shared.apple.natives.dir}"/>
+                                <copy todir="${shared.apple.natives.dir}">
+                                    <fileset dir="${codename1.nativemac.dir}" erroronmissingdir="false"/>
+                                </copy>
+                                <copy todir="${shared.apple.natives.dir}">
+                                    <fileset dir="${codename1.nativeios.dir}"
+                                             excludesfile="${project.basedir}/../../Ports/MacPort/shared-natives.exclude"/>
+                                </copy>
+                                <zip destfile="${project.build.directory}/codenameone/macport-bundle/nativemac.jar">
+                                    <fileset dir="${shared.apple.natives.dir}"/>
+                                    <fileset dir="${project.basedir}/../../Themes">
+                                        <include name="iOSModernTheme.res"/>
+                                    </fileset>
+                                </zip>
+                                <copy file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"
+                                      tofile="${project.build.directory}/codenameone/macport-bundle/MacPort.jar"
+                                      overwrite="true"/>
+                                <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
+                                    <fileset dir="${project.build.directory}/codenameone/macport-bundle"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -95,6 +95,7 @@
         <module>css-cli</module>
         <module>android</module>
         <module>ios</module>
+        <module>mac</module>
         <module>windows</module>
         <module>linux</module>
         <module>parparvm</module>

@@ -53,6 +53,14 @@ fi
 # mangling is enforced by javah/the JNI linker rather than by this scheme.
 PORTS=(
   "ios|maven/ios/target/classes|Ports/iOSPort/nativeSources"
+  # The macOS port shares most of its natives with iOS, minus the UIKit-bound
+  # ones named in Ports/MacPort/shared-natives.exclude. It is therefore checked
+  # against the MATERIALIZED set its build stages -- exactly what clang sees --
+  # and never against Ports/iOSPort/nativeSources directly: pointing it at the
+  # unfiltered tree would let an excluded UIKit file satisfy a symbol this port
+  # never compiles, which is the whole hole the gate exists to close. Requires
+  # `mvn -pl mac package`, not just compile.
+  "mac|maven/mac/target/classes|maven/mac/target/generated-natives/mac"
   "windows|maven/windows/target/classes|Ports/WindowsPort/nativeSources"
   "linux|maven/linux/target/classes|Ports/LinuxPort/nativeSources"
 )
