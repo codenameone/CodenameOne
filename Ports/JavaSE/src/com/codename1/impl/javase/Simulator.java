@@ -498,14 +498,23 @@ public class Simulator {
         java.util.Properties p = found.hints;
         File f = found.file;
         String stampedFor = p.getProperty("cn1.buildHints.mainClass");
-        if (stampedFor != null && expectedMain != null && !stampedFor.equals(expectedMain)) {
+        if (expectedMain != null && !expectedMain.equals(stampedFor)) {
             // Somebody else's configuration. codename1.mainName changing without a
             // clean build leaves the old class and its manifest together in the
             // output directory, and the timestamp check finds that pair perfectly
             // consistent -- so without the stamp the simulator runs the previous
             // application's hints. The native merge already refuses this.
-            System.err.println("Warning: " + found.where + " was generated for " + stampedFor
-                    + ", not " + expectedMain + ", so its build hints were NOT applied.");
+            //
+            // No stamp is refused on the same terms rather than trusted: the
+            // resource is written by process-annotations, which always records
+            // one, so a file without it was written by something else. And
+            // staleManifestReason cannot judge it either -- with no main class
+            // named there is nothing to compare the manifest against, so it
+            // reports "not stale" and the hints would be published unchecked.
+            System.err.println("Warning: " + found.where + (stampedFor == null
+                            ? " does not say which application it was generated for"
+                            : " was generated for " + stampedFor + ", not " + expectedMain)
+                    + ", so its build hints were NOT applied.");
             return;
         }
         // Sharing an archive does not mean sharing a build. Nothing deletes an
@@ -722,7 +731,6 @@ public class Simulator {
         // manifest and the old class beside it, so the staleness check compares
         // two obsolete files against each other, finds them consistent, and
         // publishes last week's hints while the real ones sit on the classpath.
-        FoundManifest fallback = null;
         FoundManifest stale = null;
         if (classPathStr != null) {
             for (String entry
@@ -765,12 +773,18 @@ public class Simulator {
                                     stale = found;
                                 }
                             }
-                            if (stamp == null && fallback == null) {
-                                // No stamp is not a foreign manifest, only an
-                                // unidentifiable one. Kept as a last resort so a
-                                // manifest that predates the stamp is still read.
-                                fallback = found;
-                            }
+                            // A manifest with no stamp at all is passed over
+                            // when there IS a main class to compare against. It
+                            // was kept as a last resort "in case it predates the
+                            // stamp", but nothing predates it: the whole
+                            // resource is written by process-annotations, which
+                            // has always stamped it. What that leniency really
+                            // did was let an unstamped file in a dependency's
+                            // output directory -- or one a project keeps in
+                            // src/main/resources -- outrank this application's
+                            // own manifest, because it was returned before the
+                            // conventional target/classes lookup below and the
+                            // caller accepted a null stamp.
                         }
                     }
                     continue;
@@ -800,9 +814,6 @@ public class Simulator {
                     }
                 }
             }
-        }
-        if (fallback != null) {
-            return fallback;
         }
         // Only when the classpath carries none: a launch that did not pass the
         // module's output directory at all still finds a conventional build.

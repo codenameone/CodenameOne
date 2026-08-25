@@ -41,6 +41,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 public class SimulatorAnnotationManifestTest {
 
+    /** A manifest that names no main class -- not something the processor writes. */
+    private static void unstampedManifestIn(File dir, String hint) throws Exception {
+        File out = new File(dir, "META-INF/codenameone");
+        out.mkdirs();
+        Properties p = new Properties();
+        p.setProperty("codename1.arg.desktop.titleBar", hint);
+        FileOutputStream os = new FileOutputStream(new File(out, "build-hints.properties"));
+        try {
+            p.store(os, null);
+        } finally {
+            os.close();
+        }
+    }
+
     private static File manifestIn(File dir, String mainClass, String hint) throws Exception {
         File out = new File(dir, "META-INF/codenameone");
         out.mkdirs();
@@ -78,6 +92,44 @@ public class SimulatorAnnotationManifestTest {
         assertNotNull(found);
         assertEquals("com.example.MyApp", found.hints.getProperty("cn1.buildHints.mainClass"));
         assertEquals("NATIVE", found.hints.getProperty("codename1.arg.desktop.titleBar"));
+    }
+
+    /**
+     * An unstamped manifest anywhere on the classpath does not outrank this
+     * application's own.
+     *
+     * <p>It used to be kept as a last resort "in case it predates the stamp",
+     * and returned BEFORE the conventional <code>target/classes</code> lookup.
+     * Nothing predates it -- the resource is written by
+     * <code>process-annotations</code>, which always stamps it -- so what the
+     * leniency really did was let a dependency's output directory, or a copy a
+     * project keeps in <code>src/main/resources</code>, supply the hints while
+     * this project's own properly stamped manifest was never looked at.</p>
+     */
+    @Test
+    public void anUnstampedManifestDoesNotOutrankTheProjectsOwn(@TempDir File tmp)
+            throws Exception {
+        File stranger = new File(tmp, "dependency-classes");
+        unstampedManifestIn(stranger, "MINIMAL");
+        manifestIn(new File(tmp, "target/classes"), "com.example.MyApp", "NATIVE");
+
+        Simulator.FoundManifest found = Simulator.findAnnotationManifest(
+                tmp, stranger.getAbsolutePath(), "com.example.MyApp");
+        assertNotNull(found);
+        assertEquals("com.example.MyApp", found.hints.getProperty("cn1.buildHints.mainClass"));
+        assertEquals("NATIVE", found.hints.getProperty("codename1.arg.desktop.titleBar"));
+    }
+
+    /**
+     * ...and with no manifest of our own anywhere, an unstamped one is not
+     * adopted either: nothing is published rather than a stranger's hints.
+     */
+    @Test
+    public void anUnstampedManifestIsNotAdoptedOnItsOwn(@TempDir File tmp) throws Exception {
+        File stranger = new File(tmp, "dependency-classes");
+        unstampedManifestIn(stranger, "MINIMAL");
+        assertNull(Simulator.findAnnotationManifest(
+                tmp, stranger.getAbsolutePath(), "com.example.MyApp"));
     }
 
     /**
