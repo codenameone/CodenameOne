@@ -2828,6 +2828,12 @@ public class CodenameOneSettings extends Lifecycle {
     /// Only the configuration that is in effect, the same rule
     /// `activeConfiguration` applies to everything else.
     static void declaredProperties(String pomText, java.util.Map<String, String> out) {
+        // Within ONE POM the later declaration wins: `activeConfiguration`
+        // returns the document before its profiles, and an active profile
+        // REDEFINING a base property is the whole point of writing it there.
+        // Keeping the first value read the base one Maven has overridden, and
+        // resolved a root or an encoding to something the build is not using.
+        java.util.Map<String, String> nearest = new java.util.HashMap<>();
         for (String active : activeConfiguration(pomText)) {
             // The plugin sections carry `<properties>` elements of their own --
             // surefire's system properties, for one -- and reading those as
@@ -2836,7 +2842,16 @@ public class CodenameOneSettings extends Lifecycle {
             String declarations = withoutElement(active, "plugins");
             declarations = withoutElement(declarations, "pluginManagement");
             for (String block : elementValues(declarations, "properties")) {
-                collectProperties(block, out);
+                java.util.Map<String, String> declared = new java.util.HashMap<>();
+                collectProperties(block, declared);
+                nearest.putAll(declared);
+            }
+        }
+        // Across POMs the first one read wins, which is the nearest: a module's
+        // own property overrides its parent's.
+        for (String name : nearest.keySet()) {
+            if (!out.containsKey(name)) {
+                out.put(name, nearest.get(name));
             }
         }
     }

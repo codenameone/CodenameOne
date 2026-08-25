@@ -1867,6 +1867,39 @@ public class BuildHintCatalogTest {
         assertEquals("p", properties.get("only.parent"));
     }
 
+    /// An `activeByDefault` profile redefining a base property is the whole
+    /// point of writing it there, so within one POM the profile's value wins.
+    ///
+    /// Reading the base value resolved a root or an encoding to something the
+    /// build is not using -- and then the annotated main source is missed and
+    /// its hints are offered as duplicate properties.
+    @Test
+    public void anActiveProfileOverridesTheBaseProperty() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties>"
+                        + "<gen>base</gen><only.base>b</only.base>"
+                        + "</properties><profiles>"
+                        + "<profile><activation><activeByDefault>true</activeByDefault>"
+                        + "</activation><properties><gen>profile</gen></properties></profile>"
+                        // An inactive profile contributes nothing, the same rule
+                        // the rest of this reader applies.
+                        + "<profile><id>never</id>"
+                        + "<properties><gen>inactive</gen></properties></profile>"
+                        + "</profiles></project>", properties);
+        assertEquals("profile", properties.get("gen"));
+        assertEquals("b", properties.get("only.base"));
+
+        // ...but a PARENT's active profile still loses to the module's own
+        // value: the nearer POM wins across the chain.
+        CodenameOneSettings.declaredProperties(
+                "<project><profiles><profile>"
+                        + "<activation><activeByDefault>true</activeByDefault></activation>"
+                        + "<properties><gen>parent</gen></properties>"
+                        + "</profile></profiles></project>", properties);
+        assertEquals("profile", properties.get("gen"));
+    }
+
     /// A `$` that opens nothing is an ordinary character in a path -- dropping
     /// such a root lost a real source directory.
     @Test
