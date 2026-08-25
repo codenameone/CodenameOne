@@ -143,6 +143,7 @@ private static final String GROUP_ID="com.codenameone";
         // silently absent under cn1:run.
         forwardIdentity(java, "codename1.mainName");
         forwardIdentity(java, "codename1.packageName");
+        forwardCommandLineBuildHints(java);
         java.setDir(getCN1ProjectDir());
         
         Permissions perms = java.createPermissions();
@@ -233,6 +234,47 @@ private static final String GROUP_ID="com.codenameone";
         v.setKey(key);
         v.setValue(value.trim());
         java.addSysproperty(v);
+    }
+
+    /**
+     * Passes the build hints this build was invoked with to the fork.
+     *
+     * <p>The simulator publishes an annotated hint only where no system property
+     * already claims the key, so that {@code -D} keeps winning the way it does
+     * in a device build. Nothing was forwarding those properties into the forked
+     * JVM, though, so the guard never saw one: the annotation value was applied
+     * and {@code -Dcodename1.arg.desktop.titleBar=...} did nothing, while the
+     * same command line changed the device build. </p>
+     *
+     * <p>Only the USER properties -- what {@code -D} actually passed -- and not
+     * every hint in the settings file. Publishing the file's hints as system
+     * properties would outrank the file itself in {@code buildHint()} and hide
+     * the both-declared conflict the simulator is supposed to report.</p>
+     */
+    private void forwardCommandLineBuildHints(Java java) {
+        Properties hints = commandLineBuildHints(
+                getSession() == null ? null : getSession().getUserProperties());
+        for (String key : hints.stringPropertyNames()) {
+            Variable v = new Variable();
+            v.setKey(key);
+            v.setValue(hints.getProperty(key));
+            java.addSysproperty(v);
+        }
+    }
+
+    /// The `codename1.arg.*` entries of `userProperties`, which is what `-D`
+    /// actually passed.
+    static Properties commandLineBuildHints(Properties userProperties) {
+        Properties out = new Properties();
+        if (userProperties == null) {
+            return out;
+        }
+        for (String key : userProperties.stringPropertyNames()) {
+            if (key.startsWith("codename1.arg.")) {
+                out.setProperty(key, userProperties.getProperty(key));
+            }
+        }
+        return out;
     }
 
     private Path prepareClasspath(Java java) {

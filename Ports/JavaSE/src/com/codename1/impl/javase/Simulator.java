@@ -597,7 +597,6 @@ public class Simulator {
     }
 
     /**
-     * The properties key that declares the same setting as {@code key} in the    /**
      * The properties key that declares the same setting as {@code key} in the
      * settings file, or null when the file declares none of its spellings.
      *

@@ -13,6 +13,34 @@ import java.util.Properties;
 @Mojo(name="run")
 public class CN1RunMojo extends AbstractCN1Mojo {
 
+    /**
+     * What the nested build is invoked with.
+     *
+     * <p>cn1:run is a nested Maven build, and nothing of the outer command line
+     * reached it. So {@code mvn cn1:run -Dcodename1.arg.desktop.titleBar=NATIVE}
+     * -- or {@code -Dcodename1.mainName} -- was accepted, printed, and then
+     * dropped: the inner build overlaid nothing, process-annotations stamped the
+     * manifest for the file's entry point, and the simulator ran on values the
+     * same command line would have changed for a device build.</p>
+     *
+     * <p>Everything in the {@code codename1} namespace, which is the rule
+     * {@code overlayCommandLineBuildHints} applies -- except the platform, which
+     * is set last because this goal IS the javase simulator and a stray
+     * {@code -Dcodename1.platform} must not send the nested build elsewhere.</p>
+     */
+    static Properties nestedBuildProperties(Properties userProperties) {
+        Properties props = new Properties();
+        if (userProperties != null) {
+            for (String key : userProperties.stringPropertyNames()) {
+                if (key.startsWith("codename1.")) {
+                    props.setProperty(key, userProperties.getProperty(key));
+                }
+            }
+        }
+        props.setProperty("codename1.platform", "javase");
+        return props;
+    }
+
     @Override
     protected String helpStep() {
         return "local_run";
@@ -45,10 +73,8 @@ public class CN1RunMojo extends AbstractCN1Mojo {
 
         request.setGoals( Arrays.asList( "verify") );
         request.setProfiles(Arrays.asList("simulator"));
-        Properties props = new Properties();
-        props.setProperty("codename1.platform", "javase");
-
-
+        Properties props = nestedBuildProperties(
+                getSession() == null ? null : getSession().getUserProperties());
         request.setProperties(props);
         request.setBaseDirectory(rootMavenProjectDir);
 
