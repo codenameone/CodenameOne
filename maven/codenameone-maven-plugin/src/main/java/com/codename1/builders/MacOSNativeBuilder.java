@@ -192,6 +192,50 @@ public class MacOSNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for database usage", ex);
         }
 
+        // The crypto primitives are compiled in only for an application that
+        // references them, as on iOS -- an application that does not never
+        // references a CommonCrypto or Security symbol.
+        //
+        // This is not an optimisation to skip. The stubs the toggle leaves in
+        // place return unsupported for the ciphers, but secureRandomBytes just
+        // leaves the caller's buffer alone: two calls then agree, because both
+        // read back the zeroes that were already there. A random source that
+        // silently returns a constant is the worst possible failure, and it is
+        // what an unconfigured build ships.
+        final boolean[] usesCrypto = {false};
+        try {
+            scanClassesForPermissions(classesDir, new CryptoScanner(usesCrypto));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan the application for crypto usage", ex);
+        }
+        if (usesCrypto[0]) {
+            // In the staged native tree, not in the resources: that tree is what
+            // the translator copies into the Xcode project, and it is the copy
+            // clang reads. The iOS builder edits its resources directory because
+            // that is where it unzips the port's natives; here they are their own
+            // translator source root.
+            File cn1Crypto = new File(nativeSources, "CN1Crypto.h");
+            if (!cn1Crypto.exists()) {
+                // Not skipped quietly. The stub secureRandomBytes leaves the
+                // caller's buffer untouched, so the failure is a random source
+                // that returns a constant -- which nothing downstream can detect.
+                throw new BuildException("The application uses com.codename1.security but "
+                        + "CN1Crypto.h is missing from the staged native sources at "
+                        + cn1Crypto.getAbsolutePath());
+            }
+            try {
+                replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO", "#define CN1_INCLUDE_CRYPTO");
+                if ("true".equalsIgnoreCase(request.getArg("macos.crypto.gcm",
+                        request.getArg("ios.crypto.gcm", "false")))) {
+                    replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO_GCM",
+                            "#define CN1_INCLUDE_CRYPTO_GCM");
+                }
+            } catch (Exception ex) {
+                throw new BuildException("Failed to configure CN1Crypto.h", ex);
+            }
+        }
+        log("Crypto API " + (usesCrypto[0] ? "enabled" : "disabled"));
+
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
         // a class set with no main at all -- so the stub is what makes the
@@ -493,6 +537,43 @@ public class MacOSNativeBuilder extends Executor {
         Map<String, Object> ent = MacOSXcodeProject.entitlements(appStore, hints.isSandboxed(),
                 caps, loadsExternalCode);
         MacOSXcodeProject.writePlist(ent, new File(srcRoot, appName + ".entitlements"));
+    }
+
+    /**
+     * Notices whether the application reaches the crypto primitives.
+     *
+     * <p>Biometrics and secure storage live in the same package and are
+     * deliberately not counted: they need LocalAuthentication rather than the
+     * cipher implementations, and this port links the former unconditionally.</p>
+     */
+    private static final class CryptoScanner implements Executor.ClassScanner {
+        private final boolean[] flag;
+
+        CryptoScanner(boolean[] flag) {
+            this.flag = flag;
+        }
+
+        @Override
+        public void implementsInterface(String cls, String iface) {
+        }
+
+        @Override
+        public void usesClass(String cls) {
+            if (cls == null || !cls.startsWith("com/codename1/security/")) {
+                return;
+            }
+            String shortName = cls.substring("com/codename1/security/".length());
+            boolean isBiometric = shortName.startsWith("Biometric")
+                    || shortName.equals("SecureStorage")
+                    || shortName.equals("AuthenticationOptions");
+            if (!isBiometric) {
+                flag[0] = true;
+            }
+        }
+
+        @Override
+        public void usesClassMethod(String cls, String method) {
+        }
     }
 
     /** Maps class references onto the entitlements they require. */
