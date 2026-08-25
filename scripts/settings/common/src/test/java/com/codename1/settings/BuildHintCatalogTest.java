@@ -2205,6 +2205,44 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(pom).toString());
     }
 
+    /// A commented-out plugin is not a plugin.
+    ///
+    /// This reader is a string search, so a block someone parked inside
+    /// `<!-- -->` matched exactly like a live one and contributed source roots
+    /// the build does not compile -- where a dormant copy of the main class
+    /// hides the compiled source and its annotation-owned hints look editable.
+    @Test
+    public void aCommentedOutPluginContributesNothing() {
+        String pom = "<project><build><plugins>"
+                + "<!--"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/commented</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "-->"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/real</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("gen/real"), roots.toString());
+        assertFalse(roots.contains("gen/commented"), roots.toString());
+
+        // ...and a commented-out <sourceDirectory> is not one either.
+        String sourceDirectory = "<project><build>"
+                + "<!-- <sourceDirectory>commented</sourceDirectory> -->"
+                + "<sourceDirectory>appsrc</sourceDirectory>"
+                + "</build></project>";
+        java.util.List<String> declared = CodenameOneSettings.declaredSourceRoots(sourceDirectory);
+        assertTrue(declared.contains("appsrc"), declared.toString());
+        assertFalse(declared.contains("commented"), declared.toString());
+
+        // An unterminated comment swallows the rest, which is what an XML parser
+        // does with it too.
+        assertEquals("<project>", CodenameOneSettings.withoutComments("<project><!-- oops"));
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

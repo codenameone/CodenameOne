@@ -2500,6 +2500,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomText == null) {
             return out;
         }
+        pomText = withoutComments(pomText);
         out.add(withoutElement(pomText, "profiles"));
         int at = pomText.indexOf("<profile>");
         while (at >= 0) {
@@ -4117,11 +4118,39 @@ public class CodenameOneSettings extends Lifecycle {
         return managed == null ? active : managed;
     }
 
+    /// `xml` with every `<!-- ... -->` removed.
+    ///
+    /// Everything here reads POM text by searching it, so a commented-out
+    /// element is indistinguishable from a live one unless the comments are
+    /// taken out first. An unterminated comment swallows the rest of the file,
+    /// which is what an XML parser does with it too.
+    static String withoutComments(String xml) {
+        if (xml == null || xml.indexOf("<!--") < 0) {
+            return xml;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<!--", at);
+            if (open < 0) {
+                out.append(xml.substring(at));
+                return out.toString();
+            }
+            out.append(xml, at, open);
+            int close = xml.indexOf("-->", open + 4);
+            if (close < 0) {
+                return out.toString();
+            }
+            at = close + 3;
+        }
+    }
+
     /// The `<pluginManagement>` sections of `pomText`, and nothing else.
     private static String managementOnly(String pomText) {
         if (pomText == null) {
             return null;
         }
+        pomText = withoutComments(pomText);
         String open = "<pluginManagement>";
         String shut = "</pluginManagement>";
         StringBuilder out = new StringBuilder();
@@ -4172,6 +4201,12 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomText == null) {
             return null;
         }
+        // A commented-out <plugin> is not a plugin. This reader is a string
+        // search, so a block someone parked inside <!-- --> matched exactly like
+        // a live one and contributed source roots the build does not compile --
+        // where a dormant copy of the main class hides the compiled source, and
+        // its annotation-owned hints look editable.
+        pomText = withoutComments(pomText);
         int at = pomText.indexOf("<artifactId>" + artifactId + "</artifactId>");
         if (at < 0) {
             return null;
