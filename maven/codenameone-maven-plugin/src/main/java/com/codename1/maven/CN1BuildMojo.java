@@ -2978,7 +2978,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                                       String exclude) {
         List<String> roots;
         try {
-            roots = project == null ? null : project.getCompileSourceRoots();
+            // The complete set, not only what getCompileSourceRoots lists: the
+            // Kotlin plugin compiles its own sourceDirs without adding them
+            // back, and this list is used to decide that a source is ABSENT.
+            roots = compileSourceRoots(project);
         } catch (RuntimeException ex) {
             return null;
         }

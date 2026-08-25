@@ -773,10 +773,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // aborted with "Could not find the source" on a project Maven compiles
         // perfectly well.
         org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
-        if (owner == null || owner.getCompileSourceRoots() == null) {
+        // The complete set, since the Kotlin plugin compiles its own sourceDirs
+        // without adding them back -- a main class living only in one of those
+        // is compiled by Maven and was reported here as missing.
+        java.util.List<String> moduleRoots = compileSourceRoots(owner);
+        if (moduleRoots == null) {
             return null;
         }
-        for (String root : owner.getCompileSourceRoots()) {
+        for (String root : moduleRoots) {
             File dir = new File(root);
             if (!dir.isDirectory()) {
                 continue;

@@ -1115,5 +1115,92 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return true;
     }
    
+
+    /**
+     * Every directory a source could be compiled from, not only the ones
+     * {@code getCompileSourceRoots} lists.
+     *
+     * <p>build-helper and the generated-source plugins do add their roots there,
+     * but the Kotlin plugin compiles its own {@code <sourceDirs>} without adding
+     * them back -- so in a module that configures them, a Kotlin class could
+     * have a perfectly good source and still look deleted. The orphan filter
+     * would then drop it silently and its misplaced annotation would produce
+     * neither its hint nor the placement error.</p>
+     *
+     * <p>The conventional {@code src/main/kotlin} is included when it exists for
+     * the same reason: this list is used to decide that a source is ABSENT, and
+     * a list that is merely incomplete must not be read as that.</p>
+     */
+    protected static List<String> compileSourceRoots(MavenProject project) {
+        if (project == null) {
+            return null;
+        }
+        List<String> roots = new ArrayList<String>();
+        List<String> configured = project.getCompileSourceRoots();
+        if (configured != null) {
+            roots.addAll(configured);
+        }
+        File basedir = project.getBasedir();
+        if (basedir != null) {
+            File kotlin = new File(basedir, "src" + File.separator + "main"
+                    + File.separator + "kotlin");
+            if (kotlin.isDirectory() && !roots.contains(kotlin.getAbsolutePath())) {
+                roots.add(kotlin.getAbsolutePath());
+            }
+        }
+        addKotlinSourceDirs(project, roots);
+        return roots;
+    }
+
+    /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
+    private static void addKotlinSourceDirs(MavenProject project, List<String> roots) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return;
+        }
+        if (plugins == null) {
+            return;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            addSourceDirsFrom(project, plugin.getConfiguration(), roots);
+            if (plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                addSourceDirsFrom(project, execution.getConfiguration(), roots);
+            }
+        }
+    }
+
+    private static void addSourceDirsFrom(MavenProject project, Object configuration,
+                                          List<String> roots) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom dirs =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("sourceDirs");
+        if (dirs == null) {
+            return;
+        }
+        for (org.codehaus.plexus.util.xml.Xpp3Dom dir : dirs.getChildren()) {
+            String value = dir.getValue();
+            if (value == null || value.trim().isEmpty()) {
+                continue;
+            }
+            File f = new File(value.trim());
+            if (!f.isAbsolute() && project.getBasedir() != null) {
+                f = new File(project.getBasedir(), value.trim());
+            }
+            if (!roots.contains(f.getAbsolutePath())) {
+                roots.add(f.getAbsolutePath());
+            }
+        }
+    }
+
 }
     
