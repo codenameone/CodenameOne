@@ -11632,22 +11632,17 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the element name, or null when no element opens after `from`
     static String nextElementName(String plist, int from) {
-        int lt = plist.indexOf('<', from);
+        // nextMarkupAt steps over comments, CDATA, processing instructions and
+        // declarations whole. Doing it here instead meant three different sets of rules
+        // in one parser: this one skipped a comment properly but advanced a single
+        // character past "<?", landing inside the instruction's data and returning the
+        // element name written there -- so a key's real value was reported as whatever
+        // an ignored instruction happened to mention.
+        int lt = nextMarkupAt(plist, from);
         while (lt >= 0 && lt + 1 < plist.length()) {
-            if (plist.startsWith("<!--", lt)) {
-                // Past the whole comment, not merely past its opening: resuming at the
-                // next '<' lands inside the comment, so a commented-out value would be
-                // read as the key's real one.
-                int close = plist.indexOf("-->", lt);
-                if (close < 0) {
-                    return null;
-                }
-                lt = plist.indexOf('<', close + 3);
-                continue;
-            }
-            char kind = plist.charAt(lt + 1);
-            if (kind == '!' || kind == '?' || kind == '/') {
-                lt = plist.indexOf('<', lt + 1);
+            if (plist.charAt(lt + 1) == '/') {
+                // Markup, but a closing tag is not the next element's name.
+                lt = nextMarkupAt(plist, lt + 1);
                 continue;
             }
             int end = lt + 1;

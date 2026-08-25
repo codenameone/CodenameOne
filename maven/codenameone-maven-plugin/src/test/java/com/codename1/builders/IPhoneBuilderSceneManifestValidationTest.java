@@ -569,6 +569,24 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aProcessingInstructionBetweenAKeyAndItsValueIsSkippedWhole() {
+        // The parser ignores the whole instruction, so the manifest's value is still the
+        // <dict> after it. Advancing only past "<?" landed inside the instruction's data
+        // and returned the element name written there, so the manifest was reported as
+        // something other than a dictionary and a valid Catalyst build was refused.
+        String inject = "<key>UIApplicationSceneManifest</key>\n"
+                + "    <?cn1 <string>note</string> ?>\n"
+                + "    <dict>\n"
+                + "        <key>UIApplicationSupportsMultipleScenes</key>\n        <true/>\n"
+                + "        <key>UISceneConfigurations</key>\n        <dict>\n"
+                + WINDOW_ROLE
+                + "        </dict>\n"
+                + "    </dict>\n";
+        assertNull(IPhoneBuilder.sceneManifestRejection(inject),
+                "the instruction is ignored and the <dict> after it is the value");
+    }
+
+    @Test
     void aKeyInterruptedByAProcessingInstructionIsStillThatKey() {
         // A PI inside element content is markup the parser drops, exactly as a comment
         // is, so this key resolves to NSMainNibFile. Leaving the PI in the resolved text
