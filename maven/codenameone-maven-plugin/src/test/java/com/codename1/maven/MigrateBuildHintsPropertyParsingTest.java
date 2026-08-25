@@ -902,6 +902,35 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertFalse(mojoWithEncoding("UTF-8").declares(f, pkg, "\u30a2\u30d7\u30ea"));
     }
 
+    /// A project that declares no encoding is not assumed to be UTF-8.
+    ///
+    /// javac with no `-encoding` uses the PLATFORM default, so a source in a
+    /// single-byte encoding with a non-ASCII class name is perfectly ordinary.
+    /// Read as UTF-8 it comes back as replacement characters, the name never
+    /// matches, and the goal refused a project that compiles.
+    @Test
+    public void anUndeclaredEncodingIsNotAssumedToBeUtf8() throws Exception {
+        String pkg = "com.example";
+        // A name that is not ASCII and not valid UTF-8 in this encoding's bytes.
+        String main = "Caf\u00e9App";
+        String source = "package " + pkg + ";\npublic class " + main + " {\n}\n";
+        File f = File.createTempFile("Latin1", ".java");
+        f.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(source.getBytes("windows-1252"));
+        } finally {
+            os.close();
+        }
+
+        // No project.build.sourceEncoding anywhere, which is the whole point.
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        mojo.project = new org.apache.maven.project.MavenProject();
+
+        assertTrue("a source that compiles was reported as not declaring its class",
+                mojo.declares(f, pkg, main));
+    }
+
     /// A -Dcodename1.mainName override decides the entry point for the whole
     /// migration, and only the entry point.
     ///

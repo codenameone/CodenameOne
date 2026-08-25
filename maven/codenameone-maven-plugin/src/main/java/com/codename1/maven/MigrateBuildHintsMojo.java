@@ -1033,7 +1033,18 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
     }
 
-    /// The encoding this module's sources are compiled with, or UTF-8.
+    /// The encoding this module's sources are compiled with.
+    ///
+    /// UTF-8 was assumed when nothing is configured, and that is not what the
+    /// build does: javac with no `-encoding` uses the PLATFORM default. A
+    /// Windows-1252 source with a non-ASCII package or class name read as UTF-8
+    /// comes back as replacement characters, the name never matches, and the
+    /// goal refused a project that compiles perfectly well.
+    ///
+    /// So: what the module declares, else the platform default when the file
+    /// round-trips through it, else byte-transparent -- which never fails to
+    /// decode, and which `declares` already knows how to compare against by
+    /// spelling the name it is looking for in the file's own bytes.
     private String sourceCharset(File source) {
         // The module that OWNS the file, not the reactor root. `cn1:migrate-
         // build-hints` runs from the root of a multi-module project while the
@@ -1042,7 +1053,12 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // charset, which is the bug this was added to fix, one level out.
         org.apache.maven.project.MavenProject owner = moduleOwning(source);
         String configured = sourceEncodingOf(owner == null ? project : owner, userProperties());
-        return configured == null ? "UTF-8" : configured;
+        if (configured != null && configured.trim().length() > 0) {
+            return configured.trim();
+        }
+        String platform = java.nio.charset.Charset.defaultCharset().name();
+        return roundTripsThrough(source, platform) ? platform
+                : SOURCE_BYTE_TRANSPARENT_ENCODING;
     }
 
     /**
