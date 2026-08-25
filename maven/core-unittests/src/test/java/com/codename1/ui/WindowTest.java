@@ -2594,6 +2594,50 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aShowListenerThatHidesTheWindowStillSeesShownBeforeHidden() {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("reversing show listener", new BorderLayout());
+        w.setWindowSize(300, 200);
+
+        // Only the two transitions under test. A window also reports Resized and
+        // Moved while it is being brought up, and those say nothing about this.
+        final java.util.List<String> order = new java.util.ArrayList<String>();
+        w.addWindowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                WindowEvent.Type t = ((WindowEvent) e).getType();
+                if (t == WindowEvent.Type.Shown || t == WindowEvent.Type.Hidden) {
+                    order.add(t.name());
+                }
+            }
+        });
+
+        // A show listener is allowed to change its mind. Shown used to be published
+        // after the listeners ran, so this produced "Hidden, Shown" -- an ordering that
+        // cannot happen, and one that makes lifecycle-driven cleanup tear down and then
+        // immediately set back up over a window that is not on screen.
+        w.addShowListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                w.hide();
+            }
+        });
+
+        try {
+            w.show();
+            DisplayTest.flushEdt();
+
+            assertEquals(java.util.Arrays.asList("Shown", "Hidden"), order,
+                    "the reversal has to be reported in the order it happened");
+            assertFalse(w.isWindowShowing(), "and the window really is hidden afterwards");
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            w.dispose();
+        }
+    }
+
+    @FormTest
     void focusLeavingTheMainSurfaceDisarmsItsHeldKeys() throws Exception {
         implementation.setMultiWindowSupported(true);
         Form main = new Form("main", new BorderLayout());

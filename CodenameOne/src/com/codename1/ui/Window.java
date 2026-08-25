@@ -1954,10 +1954,23 @@ public class Window extends Container implements TopLevelContainer {
             // had the window in the dock or taskbar.
             wm.restore(nativePeer);
         }
-        showListeners.fireActionEvent(new ActionEvent(this));
+        // Published as soon as the platform has the window mapped and before any
+        // application callback runs, mirroring hide(), which fires Hidden once the
+        // native hide has happened. A show listener is free to hide() or dispose() the
+        // window it has just been told about, and firing Shown after that ran let
+        // listeners observe the impossible pair "Hidden, Shown" for a window that is
+        // not on screen -- so lifecycle-driven cleanup would tear down and then be told
+        // to set up again. This way the reversal is reported in the order it happened.
         fireWindowEvent(WindowEvent.Type.Shown);
-        repaint();
-        Display.getInstance().wakeEdt();
+        showListeners.fireActionEvent(new ActionEvent(this));
+        // Which means a listener may have hidden or disposed it by now. A hidden window
+        // must not be repainted or have the event dispatch thread woken for it: hide()
+        // drops the paint surface precisely so nothing queues onto it, and re-arming
+        // that keeps the thread awake over a window the user cannot see.
+        if (isWindowShowing() && !isWindowDisposed()) {
+            repaint();
+            Display.getInstance().wakeEdt();
+        }
     }
 
     /// Shows this window and blocks the calling code until it is disposed.
