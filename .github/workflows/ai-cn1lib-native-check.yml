@@ -20,6 +20,17 @@ on:
       - 'maven/cn1-ai-stablediffusion/**'
       - 'scripts/gen-ai-cn1libs.py'
 
+concurrency:
+  # These jobs run on macOS, where the runner pool is small and a queued run
+  # holds its slots until it finishes. Without this, a branch that is pushed
+  # several times queues every superseded run behind the current one -- five
+  # obsolete runs of this workflow, 4 macOS jobs each, sat queued on this
+  # branch before it was added. On push to master head_ref is empty and the
+  # group falls back to the unique run_id, so every master commit is still
+  # checked in full.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   xcodebuild-cn1libs:
     name: xcodebuild ${{ matrix.lib }} (ARC ${{ matrix.arc }})
