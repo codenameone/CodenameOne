@@ -259,6 +259,20 @@ void CN1MacHostSetDarkAppearance(BOOL dark) {
     });
 }
 
+/// Whether VoiceOver is running, read from its own preference domain. macOS has
+/// no equivalent of UIAccessibilityIsVoiceOverRunning and publishes no
+/// notification when it starts, so this is the whole of what the platform will
+/// tell an application.
+BOOL CN1MacHostIsVoiceOverRunning(void) {
+    NSUserDefaults *voiceOver = [[NSUserDefaults alloc]
+        initWithSuiteName:@"com.apple.universalaccess"];
+    BOOL running = [voiceOver boolForKey:@"voiceOverOnOffKey"];
+#ifndef CN1_USE_ARC
+    [voiceOver release];
+#endif
+    return running;
+}
+
 BOOL CN1MacHostIsDarkMode(void) {
     NSAppearance *effective = NSApp.effectiveAppearance;
     if (effective == nil) {

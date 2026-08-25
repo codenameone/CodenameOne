@@ -916,6 +916,19 @@ static int CN1MacKeyCode(NSEvent *event) {
 - (void)textFieldDidChange {
 }
 
+/// Whether the renderer draws straight to the drawable instead of accumulating
+/// into a retained target.
+///
+/// Always no here. The UIKit backend offers it behind CN1_DIRECT_DRAWABLE, and
+/// it only works because that backend pairs it with repainting the whole Form
+/// every frame; this driver accumulates into a persistent screen texture, which
+/// is what makes a partial flush cheap. IOSNative asks because the Java paint
+/// model has to follow the renderer's choice rather than decide it, so the
+/// answer has to come from the renderer that is actually running.
+int cn1DirectToDrawableEnabled(void) {
+    return 0;
+}
+
 // ---- materials ----------------------------------------------------------
 
 /// The shared drawing pipeline's Codename One pixels to AppKit points factor.

@@ -16723,6 +16723,7 @@ BOOL cn1AccessibilityEagerLatched(void) {
     return cn1A11yLatched;
 }
 
+#if !TARGET_OS_OSX
 static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
                                           CFStringRef name, const void *object,
                                           CFDictionaryRef userInfo) {
@@ -16730,6 +16731,7 @@ static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
+#endif
 
 // Called from the METALView / EAGLView accessibilityElements getters: a real
 // client asked for
@@ -16740,8 +16742,21 @@ void cn1AccessibilityNoteClientQuery(void) {
         return;   // one transition only; this is on a UIKit query path
     }
     cn1A11yLatched = YES;
+#if TARGET_OS_OSX
+    // Never reached on the native macOS port: the callers are the UIKit views'
+    // accessibilityElements getters, and this port's rendering view exposes no
+    // accessibility tree yet.
+    //
+    // The Java call is left out rather than kept unreachable, deliberately. The
+    // method is a static invoked only from C, which the dead-code pass drops --
+    // the retention rule keeps a NATIVE method alive by its symbol appearing
+    // here, not a plain static called the other way. Referencing a method that
+    // has been dropped is a link error, and the alternative -- forcing it to be
+    // retained -- would keep a callback nothing can ever invoke.
+#else
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#endif
 }
 
 void cn1RegisterAccessibilityStatusObservers(void) {
@@ -16750,6 +16765,14 @@ void cn1RegisterAccessibilityStatusObservers(void) {
         return;
     }
     done = YES;
+#if TARGET_OS_OSX
+    // Nothing to observe. macOS publishes no notification for an assistive
+    // technology starting -- NSWorkspace reports the display-appearance
+    // preferences and nothing about VoiceOver or Switch Control -- so there is
+    // no transition to latch on. isAssistiveTechnologyActive below reads
+    // VoiceOver's own preference instead, which is the one signal the platform
+    // does give.
+#else
     // Built up rather than written as a literal: the AssistiveTouch notification
     // is iOS 10, and ios.deployment_target lets IPhoneBuilder emit older
     // targets, where the weakly-linked constant is nil -- and a nil inside an
@@ -16770,6 +16793,7 @@ void cn1RegisterAccessibilityStatusObservers(void) {
                                         (__bridge CFStringRef)n, NULL,
                                         CFNotificationSuspensionBehaviorDeliverImmediately);
     }
+#endif // TARGET_OS_OSX
 }
 #endif
 
@@ -16789,6 +16813,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     if(cn1AccessibilityEagerLatched()) {
         return JAVA_TRUE;
     }
+#if TARGET_OS_OSX
+    // VoiceOver's own preference domain, which is where macOS records it, and
+    // the only assistive technology the platform lets an application ask about.
+    // Switch Control and AssistiveTouch have no macOS query and no macOS
+    // equivalent respectively.
+    extern BOOL CN1MacHostIsVoiceOverRunning(void);
+    return CN1MacHostIsVoiceOverRunning() ? JAVA_TRUE : JAVA_FALSE;
+#else
     if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
         return JAVA_TRUE;
     }
@@ -16799,6 +16831,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
         return JAVA_TRUE;
     }
     return JAVA_FALSE;
+#endif // TARGET_OS_OSX
 #else
     return JAVA_FALSE;
 #endif
