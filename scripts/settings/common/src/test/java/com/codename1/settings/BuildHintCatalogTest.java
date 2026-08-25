@@ -1443,17 +1443,31 @@ public class BuildHintCatalogTest {
                 java.util.Collections.singletonList(ownAnnotation));
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
 
-        // A Kotlin main class with a Java peer, which a mixed project has: the
-        // package declaration reads the same in both languages.
-        String javaPeer = "package com.example;\n@interface Ios { String teamId(); }\n";
+        // A Kotlin main class with a Java peer, which a mixed project has. The
+        // peer is read in ITS language, and the languages genuinely disagree:
+        // a block comment nests in Kotlin and does not in Java, so `/* /* */`
+        // ends here and leaves the package declaration live -- read by Kotlin's
+        // rules the comment never closes and the peer lands in the default
+        // package, shadowing nothing.
+        String javaPeer = "/* /* */\n"
+                + "package com.example;\n"
+                + "@interface Ios { String teamId(); }\n";
         String kotlinMainWithJavaPeer = "package com.example\n"
                 + "import com.codename1.annotations.buildhints.*\n"
                 + "@Ios(teamId = \"X\")\n"
                 + "class MyApp\n";
         owned.clear();
-        CodenameOneSettings.collectAnnotationOwnedHints(kotlinMainWithJavaPeer, owned, true,
-                java.util.Collections.singletonList(javaPeer));
+        CodenameOneSettings.collectOwnedHints(kotlinMainWithJavaPeer, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(javaPeer, false)));
         assertNull(owned.get("ios.teamId"));
+
+        // The same peer read as Kotlin is the bug, stated as a test.
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(kotlinMainWithJavaPeer, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(javaPeer, true)));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
 
         // A peer in ANOTHER package shadows nothing.
         String elsewherePeer = "package com.other;\n@interface Ios { String teamId(); }\n";

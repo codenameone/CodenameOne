@@ -2319,7 +2319,7 @@ public class CodenameOneSettings extends Lifecycle {
                 if (text == null || !declaresClass(text, main, pkg, ext.equals(".kt"))) {
                     continue;
                 }
-                collectAnnotationOwnedHints(text, out, ext.equals(".kt"),
+                collectOwnedHints(text, out, ext.equals(".kt"),
                         otherProjectSources(binding.projectDir(), path));
                 return out;
             }
@@ -2332,7 +2332,7 @@ public class CodenameOneSettings extends Lifecycle {
         // properly before giving up.
         String found = findMainClassSource(binding.projectDir(), main, pkg);
         if (found != null) {
-            collectAnnotationOwnedHints(found, out, lastSourceWasKotlin,
+            collectOwnedHints(found, out, lastSourceWasKotlin,
                     otherProjectSources(binding.projectDir(), lastSourcePath));
             return out;
         }
@@ -2362,8 +2362,8 @@ public class CodenameOneSettings extends Lifecycle {
     /// the tool opens a project and a source tree is not a search index; a
     /// project past the bound simply keeps the earlier behaviour for whatever
     /// was declared in a file nobody reached.
-    private java.util.List<String> otherProjectSources(String projectDir, String exclude) {
-        java.util.List<String> out = new java.util.ArrayList<>();
+    private java.util.List<PeerSource> otherProjectSources(String projectDir, String exclude) {
+        java.util.List<PeerSource> out = new java.util.ArrayList<>();
         if (projectDir == null) {
             return out;
         }
@@ -2388,7 +2388,13 @@ public class CodenameOneSettings extends Lifecycle {
                     // holds copies, unless `build` is a package name under src/.
                     boolean output = ("target".equals(name) || "build".equals(name))
                             && !insideSourceTree(dir);
-                    if (!output && !name.startsWith(".")) {
+                    // A test tree does not take part in compiling the main
+                    // class, so a same-package type there shadows nothing --
+                    // counting it made a production `@Ios` look like somebody
+                    // else's, so the hint read as unowned and Add wrote the
+                    // duplicate the next build refuses.
+                    boolean tests = "test".equals(name) && dir.endsWith("/src");
+                    if (!output && !tests && !name.startsWith(".")) {
                         queue.add(path);
                     }
                     continue;
@@ -2401,7 +2407,13 @@ public class CodenameOneSettings extends Lifecycle {
                 }
                 String text = readIfPresent(path);
                 if (text != null) {
-                    out.add(text);
+                    boolean kotlinPeer = name.endsWith(".kt");
+                    // Java's escapes are translated before anything is
+                    // tokenized, so a peer declaring an escaped package name is
+                    // in the package it decodes to -- and reading it literally
+                    // put it in another one, where it shadows nothing.
+                    out.add(new PeerSource(
+                            kotlinPeer ? text : decodeUnicodeEscapes(text), kotlinPeer));
                 }
             }
         }
@@ -3019,6 +3031,37 @@ public class CodenameOneSettings extends Lifecycle {
         return false;
     }
 
+    /// Another source file, with the language it is written in.
+    ///
+    /// The language travels with the text because it changes what the text
+    /// MEANS: raw strings close differently, block comments nest in one and not
+    /// the other, and Java translates unicode escapes before it tokenizes -- so
+    /// a Java peer declaring `package \u0070;` is in package p, which a
+    /// Kotlin-mode read cannot see.
+    static final class PeerSource {
+        final String text;
+        final boolean kotlin;
+
+        PeerSource(String text, boolean kotlin) {
+            this.text = text;
+            this.kotlin = kotlin;
+        }
+    }
+
+    /// Peers written in one language, which is what a caller that has plain
+    /// texts means by them.
+    static java.util.List<PeerSource> peers(java.util.List<String> texts, boolean kotlin) {
+        java.util.List<PeerSource> out = new java.util.ArrayList<>();
+        if (texts != null) {
+            for (String text : texts) {
+                if (text != null) {
+                    out.add(new PeerSource(text, kotlin));
+                }
+            }
+        }
+        return out;
+    }
+
     /// Every `typealias` `mainSource` can see, with the name it sees it under.
     ///
     /// Visibility is per SYMBOL, not per package: `import com.other.Unrelated`
@@ -3030,26 +3073,33 @@ public class CodenameOneSettings extends Lifecycle {
     /// annotation went unrecognised and Add wrote the duplicate.
     static java.util.List<AliasDeclaration> visibleTypeAliases(String mainSource,
                                                                java.util.List<String> others) {
+        return visibleTypeAliases(mainSource, peers(others, true), true);
+    }
+
+    static java.util.List<AliasDeclaration> visibleTypeAliases(String mainSource,
+                                                               java.util.List<PeerSource> others,
+                                                               boolean kotlin) {
         java.util.List<AliasDeclaration> out = new java.util.ArrayList<>();
         if (mainSource == null) {
             return out;
         }
-        String mainPkg = declaredPackageIn(mainSource, true);
-        for (String[] declared : typeAliasDeclarations(mainSource, true)) {
+        String mainPkg = declaredPackageIn(mainSource, kotlin);
+        for (String[] declared : typeAliasDeclarations(mainSource, kotlin)) {
             out.add(new AliasDeclaration(declared[0], declared[0], declared[1], mainPkg,
                     mainSource));
         }
         if (others == null) {
             return out;
         }
-        java.util.List<Imported> imports = importsIn(mainSource, true);
-        for (String other : others) {
+        java.util.List<Imported> imports = importsIn(mainSource, kotlin);
+        for (PeerSource peer : others) {
+            String other = peer == null ? null : peer.text;
             if (other == null) {
                 continue;
             }
-            String pkg = declaredPackageIn(other, true);
+            String pkg = declaredPackageIn(other, peer.kotlin);
             boolean samePackage = pkg.equals(mainPkg);
-            for (String[] declared : typeAliasDeclarations(other, true)) {
+            for (String[] declared : typeAliasDeclarations(other, peer.kotlin)) {
                 if ("private".equals(declared[2])) {
                     // On a top-level Kotlin declaration `private` means this FILE
                     // only, not this package -- so another file's is not a name
@@ -3290,22 +3340,28 @@ public class CodenameOneSettings extends Lifecycle {
     static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
                                             boolean kotlin,
                                             java.util.List<String> otherSources) {
+        collectOwnedHints(source, out, kotlin, peers(otherSources, kotlin));
+    }
+
+    static void collectOwnedHints(String source, java.util.Map<String, String> out,
+                                  boolean kotlin, java.util.List<PeerSource> otherSources) {
         // Once, not once per hint: which aliases exist and what the main file
         // calls them does not depend on which hint is being asked about.
         java.util.List<AliasDeclaration> declaredAliases =
-                kotlin ? visibleTypeAliases(source, otherSources)
+                kotlin ? visibleTypeAliases(source, otherSources, kotlin)
                        : new java.util.ArrayList<AliasDeclaration>();
         // The sources whose top-level types could shadow an on-demand import:
-        // this file, and the rest of its package. A package declaration reads
-        // the same in both languages, so a mixed project's Java peers are
-        // classified correctly even when the main class is Kotlin.
-        java.util.List<String> samePackage = new java.util.ArrayList<>();
-        samePackage.add(source);
+        // this file, and the rest of its package. Each is read in the language
+        // it is written in, since that decides what its text means -- a Java
+        // peer's unicode escapes among other things.
+        java.util.List<PeerSource> samePackage = new java.util.ArrayList<>();
+        samePackage.add(new PeerSource(source, kotlin));
         if (otherSources != null) {
             String mainPkg = declaredPackageIn(source, kotlin);
-            for (String other : otherSources) {
-                if (other != null && declaredPackageIn(other, kotlin).equals(mainPkg)) {
-                    samePackage.add(other);
+            for (PeerSource peer : otherSources) {
+                if (peer != null && peer.text != null
+                        && declaredPackageIn(peer.text, peer.kotlin).equals(mainPkg)) {
+                    samePackage.add(peer);
                 }
             }
         }
@@ -3334,8 +3390,8 @@ public class CodenameOneSettings extends Lifecycle {
             // processor never emits, which is indistinguishable from the tool
             // being broken.
             boolean shadowed = false;
-            for (String text : samePackage) {
-                if (declaresTypeNamed(text, simple, kotlin)) {
+            for (PeerSource peer : samePackage) {
+                if (declaresTypeNamed(peer.text, simple, peer.kotlin)) {
                     shadowed = true;
                     break;
                 }
