@@ -4060,7 +4060,7 @@ static long long cn1PacingVolume(int which) {
     return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
 }
 
-#ifndef CN1_DISABLE_BIBOP
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
 /**
  * Uncollected bytes across BOTH allocation paths, as ONE figure.
  *
