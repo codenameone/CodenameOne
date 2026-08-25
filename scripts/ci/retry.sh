@@ -22,6 +22,12 @@ set -uo pipefail
 # gets a second chance. Leave it unset for steps that merely download and build.
 attempts="${RETRY_ATTEMPTS:-3}"
 delay="${RETRY_DELAY_SECONDS:-30}"
+# The wait GROWS. A flat retry spends all its attempts inside the same window
+# Central is still refusing in -- observed as three 403s in sixty seconds, which
+# failed the branch for a reason that had nothing to do with it. Quadrupling
+# from the first delay gives 30s, 2m, 5m, which is the same shape the Windows
+# cross-compile workflow settled on for the same reason.
+max_delay="${RETRY_MAX_DELAY_SECONDS:-300}"
 only_matching="${RETRY_ONLY_MATCHING:-}"
 
 if [ "$#" -eq 0 ]; then
@@ -38,6 +44,13 @@ esac
 case "$delay" in
   ''|*[!0-9]*) echo "retry.sh: RETRY_DELAY_SECONDS must be a non-negative integer, got '${delay}'" >&2; exit 2 ;;
 esac
+case "$max_delay" in
+  ''|*[!0-9]*) echo "retry.sh: RETRY_MAX_DELAY_SECONDS must be a non-negative integer, got '${max_delay}'" >&2; exit 2 ;;
+esac
+if [ "$max_delay" -lt "$delay" ]; then
+  max_delay="$delay"
+fi
+wait_seconds="$delay"
 
 # Counted with arithmetic rather than `seq`: BSD and GNU seq disagree on
 # degenerate ranges, and this loop body must run exactly `attempts` times.
@@ -69,8 +82,12 @@ while [ "$attempt" -le "$attempts" ]; do
   fi
   if [ "$attempt" -lt "$attempts" ]; then
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
-      "retrying in ${delay}s (possible transient Maven Central 403/429/5xx)" >&2
-    sleep "$delay"
+      "retrying in ${wait_seconds}s (possible transient Maven Central 403/429/5xx)" >&2
+    sleep "$wait_seconds"
+    wait_seconds=$((wait_seconds * 4))
+    if [ "$wait_seconds" -gt "$max_delay" ]; then
+      wait_seconds="$max_delay"
+    fi
   fi
   attempt=$((attempt + 1))
 done
