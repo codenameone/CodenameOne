@@ -2407,16 +2407,54 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomText == null) {
             return out;
         }
-        for (String element : new String[] {"sourceDirectory", "sourceDir", "source"}) {
-            for (String value : elementValues(pomText, element)) {
-                String path = value.trim().replace('\\', '/');
-                if (path.isEmpty() || path.indexOf('$') >= 0 || looksLikeATestRoot(path)) {
-                    continue;
-                }
-                if (!out.contains(path)) {
-                    out.add(path);
+        // Scoped to the elements that actually declare a compile root.
+        // `<source>` and `<sourceDir>` are ordinary words: another plugin
+        // naming src/main/templates in one of them is not saying it is
+        // compiled, and treating it as a root put the templates back in the
+        // sweep that the root list had just taken them out of.
+        collectRoots(elementValues(pomText, "sourceDirectory"), out);
+        collectRoots(elementValues(pluginBlock(pomText, "kotlin-maven-plugin"), "sourceDir"), out);
+        String helper = pluginBlock(pomText, "build-helper-maven-plugin");
+        if (helper != null) {
+            // add-test-source uses the same element, so an execution that adds
+            // TEST sources is passed over -- the same distinction the Kotlin
+            // plugin's compile and test-compile executions need.
+            for (String execution : executionsOf(helper)) {
+                if (execution.indexOf("add-test-source") < 0) {
+                    collectRoots(elementValues(execution, "source"), out);
                 }
             }
+        }
+        return out;
+    }
+
+    private static void collectRoots(java.util.List<String> values, java.util.List<String> out) {
+        for (String value : values) {
+            String path = value.trim().replace('\\', '/');
+            if (path.isEmpty() || path.indexOf('$') >= 0 || looksLikeATestRoot(path)) {
+                continue;
+            }
+            if (!out.contains(path)) {
+                out.add(path);
+            }
+        }
+    }
+
+    /// The `<execution>` blocks in a plugin element, or the whole element when
+    /// it has none -- configuration at plugin level applies to every goal.
+    private static java.util.List<String> executionsOf(String pluginBlock) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            out.add(pluginBlock.substring(at, close));
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        if (out.isEmpty()) {
+            out.add(pluginBlock);
         }
         return out;
     }
@@ -2438,6 +2476,9 @@ public class CodenameOneSettings extends Lifecycle {
 
     private static java.util.List<String> elementValues(String xml, String name) {
         java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
         String open = "<" + name + ">";
         String shut = "</" + name + ">";
         int at = xml.indexOf(open);
@@ -2463,11 +2504,16 @@ public class CodenameOneSettings extends Lifecycle {
         // class is the one file this list cannot afford to miss: without it
         // nothing knows which hints an annotation owns, and Add writes the
         // duplicate the next build refuses.
-        for (String declared : declaredSourceRoots(pomText())) {
-            String path = declared.startsWith("/") || declared.indexOf(':') == 1
-                    ? declared : projectDir + "/" + declared;
-            if (!candidates.contains(path)) {
-                candidates.add(path);
+        // The whole chain: Maven inherits <sourceDirectory> and plugin
+        // configuration from the parent, and a relative one resolves against
+        // THIS module rather than the module that declared it.
+        for (String pom : pomChain()) {
+            for (String declared : declaredSourceRoots(pom)) {
+                String path = declared.startsWith("/") || declared.indexOf(':') == 1
+                        ? declared : normalizePath(projectDir + "/" + declared);
+                if (!candidates.contains(path)) {
+                    candidates.add(path);
+                }
             }
         }
         java.util.List<String> out = new java.util.ArrayList<>();

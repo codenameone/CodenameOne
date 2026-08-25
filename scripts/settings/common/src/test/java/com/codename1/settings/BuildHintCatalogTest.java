@@ -1720,6 +1720,30 @@ public class BuildHintCatalogTest {
         assertFalse(withTests.contains("src/test/java"), withTests.toString());
         assertFalse(withTests.contains("src/integrationTest/java"), withTests.toString());
 
+        // `<source>` and `<sourceDir>` are ordinary words: another plugin naming
+        // a directory in one is not saying it is compiled.
+        java.util.List<String> unrelated = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>some-other-plugin</artifactId>"
+                        + "<configuration><sources><source>src/main/templates</source>"
+                        + "</sources></configuration></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(unrelated.isEmpty(), unrelated.toString());
+
+        // build-helper's add-test-source uses the same element as add-source.
+        java.util.List<String> helper = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                        + "<execution><goals><goal>add-source</goal></goals><configuration>"
+                        + "<sources><source>gen/main</source></sources></configuration></execution>"
+                        + "<execution><goals><goal>add-test-source</goal></goals><configuration>"
+                        + "<sources><source>gen/fixtures</source></sources></configuration>"
+                        + "</execution>"
+                        + "</executions></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(helper.contains("gen/main"), helper.toString());
+        assertFalse(helper.contains("gen/fixtures"), helper.toString());
+
         // What it cannot resolve it leaves alone rather than guessing.
         assertTrue(CodenameOneSettings.declaredSourceRoots(
                 "<project><build><sourceDirectory>${basedir}/x</sourceDirectory></build></project>")
