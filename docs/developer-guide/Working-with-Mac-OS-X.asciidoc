@@ -119,18 +119,17 @@ Java source is shared with your other targets; no Mac-specific code is required.
 
 NOTE: This target replaced a Mac Catalyst build, which produced a UIKit application running in macOS's iOS compatibility layer. Existing projects keep building without an edit and simply get the AppKit app instead. If you depend on the previous behavior, see <<_working_with_mac_catalyst>>.
 
-[WARNING]
+[NOTE]
 ====
-The AppKit runtime isn't finished. The build targets, the port module, the build
-hints and the compliance suite described here are in place, but the port's own
-AppKit layer -- its application shell, windows, input, text input and menu bar --
-isn't complete, so `mac-os-x-native` and `mac-source` can't produce a working
-AppKit application yet.
+A few device capabilities have no macOS counterpart and are inert rather than
+emulated: motion sensors, orientation locking, SMS, and background task
+scheduling. `Display` reports each of them as unsupported, so an application
+that checks before using one behaves correctly without a Mac-specific branch.
 
-Until they can, build `mac-catalyst` or `mac-catalyst-source`, which are the
-previous Mac behavior under their own names and are fully supported. This
-chapter documents the target these names are moving to; <<_working_with_mac_catalyst>>
-documents what builds today.
+Accessibility is the one gap worth planning around. The port draws its own
+interface, and exposing a custom-drawn interface to VoiceOver means building an
+accessibility tree rather than setting a flag; that's not yet done, and the iOS
+port has the same gap.
 ====
 
 Each additional window your application opens through the `Window` API is a real `NSWindow`, with its own GPU surface rather than a raster copied from somewhere else. See <<_desktop_windows>>.
