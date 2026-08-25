@@ -2189,6 +2189,22 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(disabled).toString());
     }
 
+    /// ...and disabling a differently named compile execution leaves the
+    /// extension lifecycle alone here too.
+    @Test
+    public void aDisabledCustomExecutionLeavesTheExtensionAlone() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration>"
+                + "<executions><execution><id>extra-compile</id><phase>none</phase>"
+                + "<goals><goal>compile</goal></goals></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

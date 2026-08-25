@@ -1699,6 +1699,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * conventional root, and not the plugin-level {@code <sourceDirs>} either,
      * which is a directory Maven does not compile and a place a stale annotated
      * class can keep a source.</p>
+     *
+     * <p>Only {@code default-compile} cancels it. The execution the extension
+     * contributes is that one, so disabling a DIFFERENTLY named execution that
+     * happens to bind {@code compile} switches off only that execution and
+     * leaves the lifecycle running. Reading any disabled compile execution as
+     * cancellation dropped the Kotlin roots of a module that still compiles
+     * Kotlin, which classifies a live class as stale -- the opposite mistake,
+     * and the one that loses a real annotation.</p>
      */
     private static boolean kotlinRunsWithoutExecution(org.apache.maven.model.Plugin plugin) {
         if (!plugin.isExtensions()) {
@@ -1706,7 +1714,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
         if (plugin.getExecutions() != null) {
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                if (bindsCompile(execution) && isDisabled(execution)) {
+                if ("default-compile".equals(execution.getId()) && isDisabled(execution)) {
                     return false;
                 }
             }

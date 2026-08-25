@@ -4010,6 +4010,12 @@ public class CodenameOneSettings extends Lifecycle {
     /// `<extensions>true</extensions>` is what binds compile without one, and a
     /// POM switches that off the way it switches off any inherited execution --
     /// `<id>default-compile</id>` with `<phase>none</phase>`.
+    ///
+    /// Only that id cancels it: the execution the extension contributes is
+    /// `default-compile`, so disabling a differently named one that happens to
+    /// bind `compile` switches off only that execution. Reading any disabled
+    /// compile execution as cancellation dropped the Kotlin roots of a module
+    /// that still compiles Kotlin.
     static boolean kotlinRunsWithoutExecution(String pluginBlock) {
         if (pluginBlock == null
                 || pluginBlock.indexOf("<extensions>true</extensions>") < 0) {
@@ -4023,8 +4029,7 @@ public class CodenameOneSettings extends Lifecycle {
             }
             String execution = pluginBlock.substring(at, close);
             if (execution.indexOf("<phase>none</phase>") >= 0
-                    && (execution.indexOf("<goal>compile</goal>") >= 0
-                        || execution.indexOf("<id>default-compile</id>") >= 0)) {
+                    && execution.indexOf("<id>default-compile</id>") >= 0) {
                 return false;
             }
             at = pluginBlock.indexOf("<execution>", close);

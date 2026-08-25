@@ -374,6 +374,37 @@ public class CompileSourceRootsTest {
                 contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/app/kotlin"));
     }
 
+    /**
+     * Disabling a DIFFERENTLY named compile execution does not cancel the
+     * extension lifecycle.
+     *
+     * <p>The execution `<extensions>true</extensions>` contributes is
+     * `default-compile`, so switching off a custom one that happens to bind
+     * `compile` switches off only that execution. Reading any disabled compile
+     * execution as cancellation dropped the Kotlin roots of a module that still
+     * compiles Kotlin -- which classifies a LIVE class as stale, the opposite
+     * mistake and the one that loses a real annotation.</p>
+     */
+    @Test
+    public void aDisabledCustomExecutionLeavesTheExtensionLifecycleAlone() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        PluginExecution off = execution("compile", "<jvmTarget>17</jvmTarget>");
+        off.setId("extra-compile");
+        off.setPhase("none");
+        kotlin.addExecution(off);
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {
