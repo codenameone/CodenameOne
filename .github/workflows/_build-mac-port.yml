@@ -1,0 +1,210 @@
+name: _Build iOS port (reusable)
+
+# Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-mac-port.sh
+# once per workflow run, populating shared caches that downstream test jobs (in
+# scripts-ios.yml, scripts-ios-native.yml, ios-packaging.yml) restore via the
+# same cache keys.
+#
+# A separate "cn1-built-mac" cache is keyed on the CN1 source hash with no restore-
+# keys (exact match only). On hit, the entire setup-workspace + build-ios-port
+# sequence is skipped — the iOS port artifact in ~/.m2/repository/com/codenameone
+# is already correct for the current source state.
+#
+# This cache is shared across all three iOS workflows on the same branch, so
+# whichever workflow runs first populates it and the others skip the rebuild.
+
+on:
+  workflow_call:
+    outputs:
+      cn1_built_mac_cache_key:
+        description: "Cache key the build job used for the cn1-built-mac artifact bundle. Dependent jobs should reuse this exact key to avoid recomputing the hash and getting a spurious cache miss."
+        value: ${{ jobs.build.outputs.cn1_built_mac_cache_key }}
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      cn1_built_mac_cache_key: ${{ steps.cn1_built_mac_key.outputs.key }}
+    concurrency:
+      group: mac-ios-port-${{ github.workflow }}-${{ github.ref_name }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          if ! command -v ruby >/dev/null; then
+            echo "ruby not found"; exit 1
+          fi
+          GEM_USER_DIR="$(ruby -e 'print Gem.user_dir')"
+          export PATH="$GEM_USER_DIR/bin:$PATH"
+          if ! command -v pod >/dev/null 2>&1; then
+            gem install cocoapods xcodeproj --no-document --user-install
+          fi
+          pod --version
+
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute CN1 source hash
+        id: src_hash
+        run: |
+          set -euo pipefail
+          # `maven/svg-transcoder/src/main` belongs in here: the cn1-built-mac
+          # cache contains ~/.m2/repository/com/codenameone, including the
+          # svg-transcoder JAR that the test-app build resolves at
+          # transcode-svg time. Without svg-transcoder in the source hash, a
+          # fix to SVGParser etc. doesn't change the cache key, the cn1-built-mac
+          # cache hit short-circuits setup-workspace, the test app keeps
+          # generating against the stale JAR, and the SVG render bug never
+          # gets fixed in CI (most visible on clipped_badge.svg, whose outer
+          # rect kept rendering as a square long after the clip-path
+          # forwarding fix landed in the transcoder source).
+          SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
+              maven/codenameone-maven-plugin/src/main \
+              maven/svg-transcoder/src/main \
+              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
+              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          SCRIPT_HASH=$(shasum -a 256 \
+              scripts/setup-workspace.sh \
+              scripts/build-mac-port.sh \
+              scripts/build-native-themes.sh \
+              .github/workflows/_build-mac-port.yml \
+              | shasum -a 256 | awk '{print $1}')
+          echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
+
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        id: cn1_tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Restore cn1-binaries cache
+        uses: actions/cache@v5
+        with:
+          path: ../cn1-binaries
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            cn1-binaries-${{ runner.os }}-
+
+      # Built CN1 + iOS port artifacts. Restored after the m2 cache so it
+      # overwrites any stale com/codenameone subtree pulled in by the broader
+      # m2 cache (whose key is keyed on POMs, not source).
+      - name: Compute cn1-built-mac cache key
+        id: cn1_built_mac_key
+        # Single source of truth for the cache key, exposed as a job output
+        # so dependent jobs (build-ios, build-ios-metal in scripts-ios.yml,
+        # the iOS-native and packaging workflows) restore the EXACT key this
+        # job saved against. Computing the same hash again on each consumer
+        # job has been observed to produce a different value on some runners
+        # (suspected: the find -type f traversal picks up runner-specific
+        # filesystem metadata that survives between jobs). Sharing the key
+        # via an output sidesteps that.
+        run: echo "key=cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache built CN1 + iOS port artifacts
+        id: cn1_built
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.m2/repository/com/codenameone
+            Themes
+            Ports/MacPort/nativeSources
+            Ports/iOSPort/nativeSources
+          key: ${{ steps.cn1_built_mac_key.outputs.key }}
+
+      - name: Setup workspace
+        # Run when the prebuilt CN1 jars are missing, OR when the
+        # codenameone-tools cache (keyed separately, on setup-workspace.sh) is
+        # missing. Without the second condition a jars-cache hit short-circuits
+        # setup-workspace and leaves tools/env.sh absent, which the dependent app
+        # jobs (build-ios*, native-ios, packaging, mac-native) need but only ever
+        # restore from cache -- so an evicted tools cache breaks all of them.
+        if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Build iOS port
+        if: steps.cn1_built.outputs.cache-hit != 'true'
+        run: ./scripts/build-mac-port.sh -q -DskipTests
+        timeout-minutes: 40
+
+      - name: Report cache outcome
+        run: |
+          if [ "${{ steps.cn1_built.outputs.cache-hit }}" = "true" ]; then
+            echo "cn1-built-mac cache HIT for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — setup-workspace and build-ios-port were skipped."
+          else
+            echo "cn1-built-mac cache MISS for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — built fresh."
+          fi
+
+      # Hand the built tree to dependent jobs as a workflow ARTIFACT, not only a
+      # cache. The cache above is kept for cross-run build-skip, but caches are
+      # LRU-evicted once the repo cache store exceeds quota -- which, during long
+      # runner-starvation queues, happened between this job and a dependent job's
+      # fail-on-cache-miss restore, hard-failing build-ios/metal/tv/watch/
+      # mac-native/packaging at the restore step before any work. Artifacts are
+      # not evicted for the life of the run (and survive partial `--failed`
+      # re-runs), so the handoff is reliable. tar relative to / so the home
+      # (~/.m2) and workspace paths restore to identical absolute locations on
+      # the consumer (same macos-15 image -> same /Users/runner paths).
+      - name: Bundle built CN1 + iOS port artifacts
+        run: |
+          set -euo pipefail
+          # Include codenameone-tools (the workspace tools dir holding
+          # tools/env.sh) alongside the built tree. It is produced by
+          # setup-workspace in this job and consumed by every dependent build
+          # script (build-ios-app.sh etc. read ${TMPDIR}/codenameone-tools/
+          # tools/env.sh, TMPDIR=runner.temp). It had its own evictable cache
+          # too; when that cache was evicted mid-queue the dependent builds
+          # failed with "Workspace tools not found" even after the cn1-built-mac
+          # restore succeeded. Bundling it into the same artifact makes the
+          # whole handoff eviction-proof.
+          tar -C / -cf "$RUNNER_TEMP/cn1-built-mac-bundle.tar" \
+            "${HOME#/}/.m2/repository/com/codenameone" \
+            "${GITHUB_WORKSPACE#/}/Themes" \
+            "${GITHUB_WORKSPACE#/}/Ports/MacPort/nativeSources" \
+            "${GITHUB_WORKSPACE#/}/Ports/iOSPort/nativeSources" \
+            "${RUNNER_TEMP#/}/codenameone-tools"
+          ls -la "$RUNNER_TEMP/cn1-built-mac-bundle.tar"
+
+      - name: Upload built CN1 + iOS port bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn1-built-mac-bundle
+          path: ${{ runner.temp }}/cn1-built-mac-bundle.tar
+          retention-days: 1
+          if-no-files-found: error

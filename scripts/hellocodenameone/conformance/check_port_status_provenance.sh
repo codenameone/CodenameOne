@@ -84,6 +84,12 @@ while IFS= read -r port; do
       continue
     fi
   elif [ ! -f "${head_report}" ]; then
+    # Neither side has a report: a port registered in the manifest that has
+    # never published. The redirect above created an empty file before git show
+    # failed, and leaving it behind hands the provenance reader a zero-byte
+    # "report" to parse. Nothing surfaced this until a branch added a port,
+    # because until then every registered port already had a fallback.
+    rm -f "${base_dir}/${port}.json"
     continue
   else
     # A report the branch ADDS. Skipping it here is how a pull request that also

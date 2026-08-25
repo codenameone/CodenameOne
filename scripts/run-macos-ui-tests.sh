@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Run Codename One UI screenshot tests on a Mac native (Mac Catalyst) build
-# and compare against goldens. Mirrors scripts/run-ios-ui-tests.sh, but the
-# Mac slice runs as a native process on the host so there is no simulator
-# to boot / install / launch -- xcodebuild produces a .app under
-# Build/Products/Debug-maccatalyst and we exec the binary directly.
+# Run Codename One UI screenshot tests on a native macOS (AppKit) build and
+# compare against goldens. Mirrors scripts/run-ios-ui-tests.sh, but the app
+# runs as a native process on the host so there is no simulator to boot,
+# install or launch -- xcodebuild produces a .app under Build/Products/Debug
+# and LaunchServices opens it directly.
 set -euo pipefail
 
-rm_log() { echo "[run-mac-native-ui-tests] $1"; }
+rm_log() { echo "[run-macos-ui-tests] $1"; }
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
@@ -84,7 +84,7 @@ rm_log "Loading workspace environment from $ENV_FILE"
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 
-# Pin Xcode 26 for CI validation. The Mac Catalyst slice needs the macOS
+# Pin Xcode 26 for CI validation. Building against the macOS SDK 26+ needs the
 # SDK 26+ headers / Metal Toolchain to compile.
 if [ -z "${XCODE_APP:-}" ]; then
   XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
@@ -128,9 +128,9 @@ fi
 SCHEME="$REQUESTED_SCHEME"
 rm_log "Using scheme $SCHEME"
 
-# Golden-image directory defaults to scripts/mac-native/screenshots/.
+# Golden-image directory defaults to scripts/macos/screenshots/.
 # Override via SCREENSHOT_REF_DIR for parallel rendering backends or local
-# experimentation. See scripts/mac-native/screenshots/README.md.
+# experimentation. See scripts/macos/screenshots/README.md.
 if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
   if [ ! -d "$SCREENSHOT_REF_DIR" ]; then
     rm_log "SCREENSHOT_REF_DIR override '$SCREENSHOT_REF_DIR' is not a directory" >&2
@@ -139,11 +139,11 @@ if [ -n "${SCREENSHOT_REF_DIR:-}" ]; then
   SCREENSHOT_REF_DIR="$(cd "$SCREENSHOT_REF_DIR" && pwd)"
   rm_log "Using screenshot reference dir from SCREENSHOT_REF_DIR: $SCREENSHOT_REF_DIR"
 else
-  SCREENSHOT_REF_DIR="$REPO_ROOT/scripts/mac-native/screenshots"
+  SCREENSHOT_REF_DIR="$REPO_ROOT/scripts/macos/screenshots"
 fi
 ensure_dir "$SCREENSHOT_REF_DIR"
 
-SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-mac-native-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-mac-native-tests")"
+SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1-macos-tests-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1-macos-tests")"
 SCREENSHOT_RAW_DIR="$SCREENSHOT_TMP_DIR/raw"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
 mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
@@ -152,12 +152,12 @@ export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
 # Tight golden gate (see run-ios-ui-tests.sh): the stock 0.30% default lets
-# widget-level regressions pass silently on full-screen captures. Mac Catalyst
+# widget-level regressions pass silently on full-screen captures. The macOS app
 # renders deterministically; noisy screens carry per-test .tolerance files.
 export CN1SS_MAX_MISMATCH_PERCENT="${CN1SS_MAX_MISMATCH_PERCENT:-0.05}"
 
 # Start the host-side WebSocket screenshot server on the fixed standard port.
-# The Mac Catalyst app runs on this host, so the device-runner defaults to
+# The app runs on this host, so the device-runner defaults to
 # ws://127.0.0.1:8765 with no per-launch URL injection (see
 # Cn1ssDeviceRunnerHelper.CN1SS_WS_DEFAULT_PORT). Screenshots the app sends
 # land directly in $WS_RAW_DIR; if the WS transport delivers nothing (server
@@ -204,18 +204,18 @@ DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
-# Mac Catalyst destination + configuration. CODE_SIGN_* are disabled so
+# macOS destination + configuration. CODE_SIGN_* are disabled so
 # unsigned local / CI runs don't require provisioning. The macNative
 # entitlements file is still set via CODE_SIGN_ENTITLEMENTS on the project
 # (IPhoneBuilder injects it), but with signing disabled it is a no-op.
-rm_log "Building Mac Catalyst app with xcodebuild"
+rm_log "Building native macOS app with xcodebuild"
 COMPILE_START=$(date +%s)
 XCODE_BUILD_CMD=(
   xcodebuild
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
   -configuration Debug
-  -destination 'platform=macOS,variant=Mac Catalyst'
+  -destination 'platform=macOS'
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
   "ARCHS=$BUILD_ARCH"
@@ -234,15 +234,19 @@ XCODE_BUILD_CMD=(
 # freshly-generated project sometimes runs before Xcode has enumerated its
 # build destinations, so the build aborts in ~2s with an *empty* "Available
 # destinations" list and "Unable to find a destination matching ... Mac
-# Catalyst". Mac Catalyst is not a downloadable runtime -- it is the host
-# macOS SDK already shipped inside Xcode, so there is nothing to fetch; the
-# destination cache just needs to warm. Poll -showdestinations until the
-# Catalyst destination is listed before building (mirrors the iOS scripts).
-warm_catalyst_destination() {
+# the destination list. macOS is not a downloadable runtime -- it is the host
+# xcodebuild can report an empty destination list on a cold runner before its
+# destination cache warms. That race is a property of xcodebuild rather than of
+# any one platform, so a single warm-up poll stays; everything the Catalyst
+# script did beyond this -- downloading the iOS platform, restarting
+# CoreSimulator, three build attempts -- existed only because a Catalyst
+# destination is a destination of an SDKROOT=iphoneos target. A native macOS
+# target needs none of it.
+warm_macos_destination() {
   local deadline=$(( $(date +%s) + 90 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" \
-         -showdestinations 2>/dev/null | grep -q "Mac Catalyst"; then
+         -showdestinations 2>/dev/null | grep -q "platform:macOS"; then
       return 0
     fi
     sleep 5
@@ -250,51 +254,16 @@ warm_catalyst_destination() {
   return 1
 }
 
-# The Catalyst destination of an SDKROOT=iphoneos target also needs the iOS
-# platform content installed in the active Xcode. Some runner instances ship
-# Xcode without it (the same provisioning gap run-ios-native-tests.sh handles),
-# and no amount of destination warming helps -- the scheme lists only
-# watchOS/tvOS destinations. Detect the missing iphoneos SDK and download the
-# platform, restarting a wedged CoreSimulator service when the download fails
-# with "Unable to connect to simulator".
-ensure_ios_platform() {
-  if xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos"; then
-    return 0
-  fi
-  rm_log "The active Xcode has no iOS platform (required for the Mac Catalyst destination); downloading via xcodebuild -downloadPlatform iOS"
-  local out
-  out="$(xcodebuild -downloadPlatform iOS 2>&1)" || true
-  printf '%s\n' "$out"
-  if printf '%s' "$out" | grep -qi "Unable to connect to simulator"; then
-    rm_log "CoreSimulator not responding; restarting the service and retrying the platform download"
-    killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
-    sleep 5
-    xcrun simctl list runtimes >/dev/null 2>&1 || true
-    xcodebuild -downloadPlatform iOS || true
-  fi
-}
-ensure_ios_platform
+if warm_macos_destination; then
+  rm_log "macOS destination available"
+else
+  rm_log "macOS destination still not listed after 90s warm-up; attempting build anyway"
+fi
 
 BUILD_OK=0
-for attempt in 1 2 3; do
-  if [ "$attempt" -gt 1 ]; then
-    rm_log "xcodebuild could not resolve the Mac Catalyst destination (attempt $((attempt - 1))); warming destinations and retrying"
-  fi
-  if warm_catalyst_destination; then
-    rm_log "Mac Catalyst destination available"
-  else
-    rm_log "Mac Catalyst destination still not listed after 90s warm-up; attempting build anyway"
-  fi
-  if "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
-    BUILD_OK=1
-    break
-  fi
-  # Only the destination-resolution race is transient -- a genuine clang/link
-  # error must fail fast rather than burn three full builds.
-  if ! grep -q "Unable to find a destination matching" "$BUILD_LOG"; then
-    break
-  fi
-done
+if "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
+  BUILD_OK=1
+fi
 if [ "$BUILD_OK" -ne 1 ]; then
   rm_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
@@ -303,36 +272,36 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 rm_log "Compilation time: ${COMPILATION_TIME}s"
 
-# Locate the produced .app under DerivedData. Mac Catalyst products land
-# under Debug-maccatalyst/ (vs Debug-iphonesimulator/ on iOS).
-BUILD_SETTINGS="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -configuration Debug -destination 'platform=macOS,variant=Mac Catalyst' -showBuildSettings 2>/dev/null || true)"
+# Locate the produced .app under DerivedData. macOS products land
+# under Debug/ (vs Debug-iphonesimulator/ on iOS).
+BUILD_SETTINGS="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -configuration Debug -destination 'platform=macOS' -showBuildSettings 2>/dev/null || true)"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}' | tr -d ' ')"
 if [ -z "$WRAPPER_NAME" ]; then
   WRAPPER_NAME="${SCHEME}.app"
 fi
 if [ -z "$APP_BUNDLE_PATH" ]; then
-  CANDIDATE_BUNDLE="$DERIVED_DATA_DIR/Build/Products/Debug-maccatalyst/$WRAPPER_NAME"
+  CANDIDATE_BUNDLE="$DERIVED_DATA_DIR/Build/Products/Debug/$WRAPPER_NAME"
   if [ -d "$CANDIDATE_BUNDLE" ]; then
     APP_BUNDLE_PATH="$CANDIDATE_BUNDLE"
   fi
 fi
 if [ -z "$APP_BUNDLE_PATH" ]; then
-  CANDIDATE_BUNDLE="$(find "$DERIVED_DATA_DIR" -path "*/Debug-maccatalyst/$WRAPPER_NAME" -type d -print -quit 2>/dev/null || true)"
+  CANDIDATE_BUNDLE="$(find "$DERIVED_DATA_DIR" -path "*/Debug/$WRAPPER_NAME" -type d -print -quit 2>/dev/null || true)"
   if [ -d "$CANDIDATE_BUNDLE" ]; then
     APP_BUNDLE_PATH="$CANDIDATE_BUNDLE"
   fi
 fi
 if [ -z "$APP_BUNDLE_PATH" ] || [ ! -d "$APP_BUNDLE_PATH" ]; then
-  rm_log "FATAL: Mac Catalyst app bundle not found under $DERIVED_DATA_DIR (looking for $WRAPPER_NAME)"
+  rm_log "FATAL: macOS app bundle not found under $DERIVED_DATA_DIR (looking for $WRAPPER_NAME)"
   find "$DERIVED_DATA_DIR/Build/Products" -maxdepth 2 -type d -print >&2 2>/dev/null || true
   exit 11
 fi
-rm_log "Found Mac Catalyst app bundle at $APP_BUNDLE_PATH"
+rm_log "Found macOS app bundle at $APP_BUNDLE_PATH"
 
 APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 APP_EXECUTABLE="$APP_BUNDLE_PATH/Contents/MacOS/$APP_PROCESS_NAME"
 if [ ! -x "$APP_EXECUTABLE" ]; then
-  rm_log "FATAL: Mac Catalyst executable not found at $APP_EXECUTABLE"
+  rm_log "FATAL: macOS executable not found at $APP_EXECUTABLE"
   ls -l "$APP_BUNDLE_PATH/Contents/MacOS/" >&2 2>/dev/null || true
   exit 11
 fi
@@ -343,7 +312,7 @@ fi
 rm_log "App bundle id: ${BUNDLE_IDENTIFIER:-<unknown>}"
 rm_log "App executable: $APP_EXECUTABLE"
 
-# Mac Catalyst apps need a proper window-server session to keep their
+# The app needs a proper window-server session to keep its
 # UIScene alive. Running the binary directly from a non-interactive shell
 # (which is what the CI runner provides) launches the app outside of any
 # Aqua session; the app gets a few seconds before the OS tears it down,
@@ -360,7 +329,7 @@ cleanup() {
     kill "$LOG_STREAM_PID" >/dev/null 2>&1 || true
     wait "$LOG_STREAM_PID" 2>/dev/null || true
   fi
-  # Terminate the launched Catalyst app by process name (open -W detaches
+  # Terminate the launched app by process name (open -W detaches
   # the child PID so a direct kill of $APP_PID only ends the `open`
   # wrapper, not the actual app). pkill -x matches exact name so we
   # don't accidentally hit a host process.
@@ -394,7 +363,7 @@ sleep 1
 pkill -x "$APP_PROCESS_NAME" >/dev/null 2>&1 || true
 sleep 1
 
-rm_log "Launching Mac Catalyst app via LaunchServices: $APP_BUNDLE_PATH"
+rm_log "Launching macOS app via LaunchServices: $APP_BUNDLE_PATH"
 # Timestamp marker so crash reports written during this run can be picked
 # out of ~/Library/Logs/DiagnosticReports afterwards (find -newer).
 LAUNCH_MARKER="$SCREENSHOT_TMP_DIR/.launch-marker"
@@ -417,14 +386,14 @@ LAUNCH_START=$(date +%s)
 ) &
 APP_PID=$!
 LAUNCH_END=$(date +%s)
-echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/mac-test-stats.txt"
+echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/macos-test-stats.txt"
 
 # Resolve the actual app PID once LaunchServices has started it. Used
 # only for diagnostics; the wait loop polls log content, not the PID.
 sleep 2
 RESOLVED_APP_PID="$(pgrep -x "$APP_PROCESS_NAME" 2>/dev/null | head -n 1 || true)"
 if [ -n "$RESOLVED_APP_PID" ]; then
-  rm_log "Mac Catalyst app pid=$RESOLVED_APP_PID"
+  rm_log "macOS app pid=$RESOLVED_APP_PID"
 else
   rm_log "Warning: could not resolve pid for $APP_PROCESS_NAME"
 fi
@@ -499,7 +468,7 @@ capture_crash_diagnostics() {
 # ReportCrash runs asynchronously, so on a fast CI runner the report may not be
 # on disk yet when the app's `open` wrapper returns. Poll for up to ~45s when a
 # crash is suspected. Search both the per-user and system DiagnosticReports
-# dirs, and match the process name as well as common Catalyst report suffixes
+# dirs, and match the process name as well as common crash report suffixes
 # (.ips / .crash / .diag). Echo the first report's header (Exception Type /
 # Termination / Crashed Thread) into the job log so the cause is visible
 # without unzipping the artifact bundle.
@@ -572,7 +541,7 @@ while true; do
   sleep 5
 done
 END_TIME=$(date +%s)
-echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/mac-test-stats.txt"
+echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/macos-test-stats.txt"
 
 sleep 2
 
@@ -651,7 +620,7 @@ fi
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
-export CN1SS_PORT_ID="${CN1SS_PORT_ID:-mac-native}"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-macos}"
 export CN1SS_SUITE_LOG="$TEST_LOG"
 export CN1SS_SUITE_LOG_2="$FALLBACK_LOG"
 export CN1SS_SUITE_LOG_3="$LATE_FALLBACK_LOG"
@@ -660,9 +629,9 @@ export CN1SS_BINARY_PATH="$APP_BUNDLE_PATH"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 # Distinct PR-comment marker / preview path / title so this job posts its
 # own comment instead of overwriting the iOS / iOS Metal job's comment.
-export CN1SS_COMMENT_MARKER="${CN1SS_COMMENT_MARKER:-<!-- CN1SS_MAC_NATIVE_COMMENT -->}"
-export CN1SS_COMMENT_LOG_PREFIX="${CN1SS_COMMENT_LOG_PREFIX:-[run-mac-native-ui-tests]}"
-export CN1SS_PREVIEW_SUBDIR="${CN1SS_PREVIEW_SUBDIR:-mac-native}"
+export CN1SS_COMMENT_MARKER="${CN1SS_COMMENT_MARKER:-<!-- CN1SS_MACOS_COMMENT -->}"
+export CN1SS_COMMENT_LOG_PREFIX="${CN1SS_COMMENT_LOG_PREFIX:-[run-macos-ui-tests]}"
+export CN1SS_PREVIEW_SUBDIR="${CN1SS_PREVIEW_SUBDIR:-macos}"
 export CN1SS_SUCCESS_MESSAGE="${CN1SS_SUCCESS_MESSAGE:-✅ Native Mac screenshot tests passed.}"
 REPORT_TITLE="${CN1SS_REPORT_TITLE:-Mac native screenshot updates}"
 

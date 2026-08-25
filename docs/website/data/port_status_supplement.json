@@ -71,7 +71,7 @@
         {
           "prefix": "webview-not-captured-on-desktop",
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript"
           ]
         },
@@ -108,7 +108,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos"
           ]
         },
@@ -160,7 +160,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos",
             "watchos",
             "linux-x64",
@@ -254,7 +254,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -264,7 +264,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -274,7 +274,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -284,7 +284,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "tvos",
             "watchos"
           ]
@@ -313,7 +313,7 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "supported",
           "label": "AVFoundation",
@@ -369,7 +369,7 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "supported",
           "label": "Native recorder",
@@ -448,7 +448,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -481,7 +481,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "watchos"
           ],
           "state": "conditional",
@@ -545,7 +545,7 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Apple entitlement",
@@ -593,7 +593,7 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "conditional",
           "label": "StoreKit",
@@ -635,7 +635,7 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Apple services",
@@ -684,7 +684,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -726,7 +726,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -761,7 +761,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -803,7 +803,7 @@
         },
         {
           "ports": [
-            "mac-native"
+            "macos", "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Target-dependent",
@@ -852,7 +852,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -880,7 +880,7 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -922,7 +922,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -971,7 +971,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1014,7 +1014,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1056,7 +1056,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "linux-x64",
             "linux-arm64",
             "windows-x64",
@@ -1097,7 +1097,7 @@
         },
         {
           "ports": [
-            "mac-native",
+            "macos", "mac-catalyst",
             "linux-x64",
             "linux-arm64"
           ],
@@ -1146,7 +1146,7 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1181,7 +1181,7 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "mac-native",
+            "macos", "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",

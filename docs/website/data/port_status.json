@@ -23,7 +23,8 @@
     "scripts/ios/screenshots-metal",
     "scripts/ios/screenshots-watch",
     "scripts/ios/screenshots-tv",
-    "scripts/mac-native/screenshots",
+    "scripts/mac-catalyst/screenshots",
+    "scripts/macos/screenshots",
     "scripts/javascript/screenshots",
     "scripts/linux/screenshots",
     "scripts/linux/screenshots-arm",
@@ -49,10 +50,16 @@
       "workflow": "scripts-ios.yml"
     },
     {
-      "id": "mac-native",
-      "name": "macOS native",
-      "detail": "Mac Catalyst native build",
-      "workflow": "scripts-mac-native.yml"
+      "id": "macos",
+      "name": "macOS",
+      "detail": "Native AppKit build",
+      "workflow": "scripts-macos.yml"
+    },
+    {
+      "id": "mac-catalyst",
+      "name": "macOS (Mac Catalyst)",
+      "detail": "Legacy Mac Catalyst build",
+      "workflow": "scripts-mac-catalyst.yml"
     },
     {
       "id": "javascript",
@@ -787,37 +794,43 @@
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ],
     "WindowScrollTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ],
     "WindowGraphicsTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ],
     "WindowEditingTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ],
     "WindowOverlayTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ],
     "WindowModalTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
-      "windows-arm64"
+      "windows-arm64",
+      "macos"
     ]
   },
   "screenshot_mappings": [

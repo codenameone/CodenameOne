@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Build a sample "Hello Codename One" Mac native application using the
-# locally-built Codename One iOS port. The Mac slice is produced by the
-# same IPhoneBuilder pipeline as iOS, via the macNative.enabled=true build
-# hint (Mac Catalyst under the hood -- implementation detail not surfaced
-# in user-facing names). Mirrors scripts/build-ios-app.sh.
+# Build a sample "Hello Codename One" native macOS application from the
+# locally-built Codename One macOS port. This is a real AppKit app: its
+# Xcode project targets the macOS SDK, links AppKit and Metal, and carries
+# no UIKit at all. The legacy Mac Catalyst build is
+# scripts/build-mac-catalyst-app.sh. Mirrors scripts/build-ios-app.sh.
 set -euo pipefail
 
-bma_log() { echo "[build-mac-native-app] $1"; }
+bma_log() { echo "[build-macos-app] $1"; }
 
-# Pin Xcode 26 for CI validation (Mac Catalyst archive on macOS SDK 26+
-# requires the Metal Toolchain component; older Xcode doesn't include the
-# Catalyst build settings the macNative path injects).
+# Pin Xcode 26 for CI validation: building against macOS SDK 26+ needs the
+# Metal Toolchain component.
 if [ -z "${XCODE_APP:-}" ]; then
   XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
 fi
@@ -63,19 +62,11 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
   exit 1
 fi
 
-# The macNative path uses Ruby's xcodeproj gem unconditionally to inject
-# the Mac Catalyst build settings (SUPPORTS_MACCATALYST, deployment
-# targets, signing) post-generation. Fail early if it's missing -- the
-# Maven build would otherwise get most of the way through ParparVM before
-# the hook script crashes.
-if ! command -v ruby >/dev/null 2>&1; then
-  bma_log "ruby not found. Install Ruby and the xcodeproj gem." >&2
-  exit 1
-fi
-if ! ruby -e "require 'xcodeproj'" >/dev/null 2>&1; then
-  bma_log "The xcodeproj Ruby gem is required for macNative builds. Install with: gem install xcodeproj" >&2
-  exit 1
-fi
+# No Ruby / xcodeproj gem preflight here, deliberately. The Catalyst path needs
+# that gem because it injects its build settings into an already-generated iOS
+# project after the fact; the AppKit builder writes a macOS project with every
+# setting already in it, so there is nothing to inject and one less thing that
+# can break a build host.
 
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 BASE_PATH="$PATH"
@@ -96,7 +87,7 @@ fi
 APP_MAIN_NAME="${CN1_APP_MAIN_NAME:-${MAIN_NAME_FROM_SETTINGS:-HelloCodenameOne}}"
 bma_log "Using APP_DIR=$APP_DIR APP_MAIN_NAME=$APP_MAIN_NAME"
 
-# Inject the macNative.* build hints into the sample's
+# Inject the macos.* build hints into the sample's
 # codenameone_settings.properties. -D arguments on the Maven CLI don't flow
 # into the Codename One Maven plugin's BuildRequest (the plugin reads
 # build args from the settings file on disk); follow the same pattern the
@@ -128,27 +119,26 @@ ensure_setting() {
   fi
 }
 
-ensure_setting "codename1.arg.macNative.enabled" "true"
 # Use placeholder team / distribution defaults so unsigned local + CI builds
 # succeed. Real-app submissions override these via their own settings.
-ensure_setting "codename1.arg.macNative.teamId" \
-    "${MAC_NATIVE_TEAM_ID:-ABCDEF1234}"
-ensure_setting "codename1.arg.macNative.distribution" \
-    "${MAC_NATIVE_DISTRIBUTION:-both}"
-ensure_setting "codename1.arg.macNative.appCategory" \
-    "${MAC_NATIVE_APP_CATEGORY:-public.app-category.developer-tools}"
-# Pin the Catalyst window size deterministically so the screenshot
+ensure_setting "codename1.arg.macos.teamId" \
+    "${MACOS_TEAM_ID:-ABCDEF1234}"
+ensure_setting "codename1.arg.macos.distribution" \
+    "${MACOS_DISTRIBUTION:-both}"
+ensure_setting "codename1.arg.macos.appCategory" \
+    "${MACOS_APP_CATEGORY:-public.app-category.developer-tools}"
+# Pin the window size deterministically so the screenshot
 # CI's strict-pixel comparison stays stable across runs. Off by
 # default for real apps -- only the screenshot sample sets this.
-ensure_setting "codename1.arg.macNative.fixedWindowSize" \
-    "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
+ensure_setting "codename1.arg.macos.fixedWindowSize" \
+    "${MACOS_FIXED_WINDOW_SIZE:-1024x685}"
 
-bma_log "macNative.* hints in codenameone_settings.properties:"
-grep -n 'codename1\.arg\.macNative' "$CN1_SETTINGS_FILE" || true
+bma_log "macos.* hints in codenameone_settings.properties:"
+grep -n 'codename1\.arg\.macos' "$CN1_SETTINGS_FILE" || true
 
 xcodebuild -version
 
-bma_log "Building Mac native Xcode project using Codename One iOS port (macNative.enabled=true)"
+bma_log "Building native macOS Xcode project using the Codename One macOS port"
 cd "$REPO_ROOT/$APP_DIR"
 VM_START=$(date +%s)
 
@@ -168,12 +158,12 @@ bma_log "Running $APP_MAIN_NAME Maven build with JAVA_HOME=$JAVA17_HOME"
 (
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$BASE_PATH"
-  MVN_LOG="$ARTIFACTS_DIR/cn1-mac-native-build.log"
+  MVN_LOG="$ARTIFACTS_DIR/cn1-macos-build.log"
   MVN_CMD=(
     ./mvnw package
     -DskipTests
     -Dcodename1.platform=ios
-    -Dcodename1.buildTarget=ios-source
+    -Dcodename1.buildTarget=mac-source
     -Dmaven.compiler.fork=true
     -Dmaven.compiler.executable="$JAVA17_HOME/bin/javac"
     -Dopen=false
@@ -220,7 +210,7 @@ if [ ! -d "$IOS_TARGET_DIR" ]; then
 fi
 
 # CN1BuildMojo routes the generated project to <finalName>-mac-source/ when
-# the macNative.enabled hint is on (see getGeneratedMacProjectSourceDirectory).
+# the mac-source target is used (see getGeneratedMacProjectSourceDirectory).
 PROJECT_DIR=""
 for candidate in "$IOS_TARGET_DIR"/*-mac-source; do
   if [ -d "$candidate" ]; then
@@ -235,25 +225,25 @@ if [ -z "$PROJECT_DIR" ]; then
 fi
 bma_log "Found generated Mac native project at $PROJECT_DIR"
 
-# Surface the macNative artefacts (entitlements + ExportOptions plists +
+# Surface the macOS artefacts (entitlements + ExportOptions plists +
 # Mac.appiconset) so they're visible in the CI upload. Keep them in
-# ARTIFACTS_DIR/mac-native-project/ to mirror the iOS pipeline's
+# ARTIFACTS_DIR/macos-project/ to mirror the iOS pipeline's
 # bytecode-translator-sources staging.
-MAC_NATIVE_ARTIFACTS_DIR="$ARTIFACTS_DIR/mac-native-project"
-rm -rf "$MAC_NATIVE_ARTIFACTS_DIR"
-mkdir -p "$MAC_NATIVE_ARTIFACTS_DIR"
+MACOS_ARTIFACTS_DIR="$ARTIFACTS_DIR/macos-project"
+rm -rf "$MACOS_ARTIFACTS_DIR"
+mkdir -p "$MACOS_ARTIFACTS_DIR"
 for f in "$PROJECT_DIR"/ExportOptions-*-Mac.plist \
          "$PROJECT_DIR"/cn1-Bridging-Header.h \
          "$PROJECT_DIR/$APP_MAIN_NAME-src/$APP_MAIN_NAME.entitlements" \
          "$PROJECT_DIR/$APP_MAIN_NAME-src/$APP_MAIN_NAME-AppStore.entitlements" \
          "$PROJECT_DIR/$APP_MAIN_NAME-src/$APP_MAIN_NAME-DeveloperID.entitlements"; do
-  [ -f "$f" ] && cp -p "$f" "$MAC_NATIVE_ARTIFACTS_DIR/" || true
+  [ -f "$f" ] && cp -p "$f" "$MACOS_ARTIFACTS_DIR/" || true
 done
 if [ -d "$PROJECT_DIR/$APP_MAIN_NAME-src/Images.xcassets/Mac.appiconset" ]; then
   cp -R "$PROJECT_DIR/$APP_MAIN_NAME-src/Images.xcassets/Mac.appiconset" \
-        "$MAC_NATIVE_ARTIFACTS_DIR/Mac.appiconset"
+        "$MACOS_ARTIFACTS_DIR/Mac.appiconset"
 fi
-bma_log "Staged Mac native artefacts at $MAC_NATIVE_ARTIFACTS_DIR"
+bma_log "Staged macOS artefacts at $MACOS_ARTIFACTS_DIR"
 
 if [ -d "$PROJECT_DIR/${APP_MAIN_NAME}.xcodeproj" ]; then
   bma_log "Ensuring shared Xcode scheme exists"
@@ -294,9 +284,9 @@ fi
 bma_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$APP_MAIN_NAME"
 
 if [[ "$WORKSPACE" == *.xcworkspace ]]; then
-  xcodebuild -workspace "$WORKSPACE" -list > "$ARTIFACTS_DIR/xcodebuild-list-mac.txt" 2>&1 || true
+  xcodebuild -workspace "$WORKSPACE" -list > "$ARTIFACTS_DIR/xcodebuild-list-macos.txt" 2>&1 || true
 else
-  xcodebuild -project "$WORKSPACE" -list > "$ARTIFACTS_DIR/xcodebuild-list-mac.txt" 2>&1 || true
+  xcodebuild -project "$WORKSPACE" -list > "$ARTIFACTS_DIR/xcodebuild-list-macos.txt" 2>&1 || true
 fi
 
 exit 0

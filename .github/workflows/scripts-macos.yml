@@ -1,0 +1,230 @@
+name: Test macOS UI build scripts
+
+# The native macOS (AppKit) port. A real macOS Xcode project: SDKROOT=macosx,
+# AppKit and Metal, no UIKit. The legacy Mac Catalyst suite is
+# scripts-mac-catalyst.yml.
+# The build routes the generated project to target/<finalName>-mac-source/
+# with every setting written at generation time -- no post-hoc injection and
+# no Ruby xcodeproj gem, because the project is macOS-shaped to begin with
+# rather than an iOS one being adjusted. This workflow exercises that path
+# end-to-end: sample app -> Xcode project -> .app -> screenshot suite ->
+# golden comparison.
+#
+# The port artifact comes from the reusable _build-mac-port.yml workflow
+# rather than _build-ios-port.yml. Sharing the iOS one would put
+# Ports/MacPort in its source hash, so a macOS-only change would invalidate
+# the cache for all four of its iOS consumers -- one change paying for four
+# rebuilds.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 1 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/scripts-macos.yml'
+      - '.github/workflows/_build-mac-port.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-mac-port.sh'
+      - 'scripts/build-macos-app.sh'
+      - 'scripts/run-macos-ui-tests.sh'
+      - 'scripts/hellocodenameone/**'
+      - 'scripts/ios/tests/**'
+      - 'scripts/macos/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'scripts/common/java/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'CodenameOne/src/**'
+      - '!CodenameOne/src/**/*.md'
+      - 'Ports/MacPort/**'
+      - '!Ports/MacPort/**/*.md'
+      - 'native-themes/ios-modern/**'
+      - '!native-themes/ios-modern/**/*.md'
+      - 'vm/**'
+      - '!vm/**/*.md'
+      - 'tests/**'
+      - '!tests/**/*.md'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+      - '!docs/**'
+  push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/scripts-macos.yml'
+      - '.github/workflows/_build-mac-port.yml'
+      - 'scripts/setup-workspace.sh'
+      - 'scripts/build-mac-port.sh'
+      - 'scripts/build-macos-app.sh'
+      - 'scripts/run-macos-ui-tests.sh'
+      - 'scripts/hellocodenameone/**'
+      - 'scripts/ios/tests/**'
+      - 'scripts/macos/**'
+      - 'scripts/templates/**'
+      - '!scripts/templates/**/*.md'
+      - 'scripts/common/java/**'
+      - 'scripts/lib/cn1ss.sh'
+      - 'CodenameOne/src/**'
+      - 'Ports/MacPort/**'
+      - 'native-themes/ios-modern/**'
+      - 'vm/**'
+      - 'tests/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+jobs:
+  build-port:
+    # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
+    # via the cn1-built cache; first runner to land a fresh SHA populates it
+    # and the others skip the rebuild.
+    uses: ./.github/workflows/_build-mac-port.yml
+
+  build-macos:
+    needs: build-port
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    # build step (<=45) + screenshot-run step (<=45) <= 90, matching the
+    # iOS Metal job headroom bump (a08e87b32). The 45-min job cap used to
+    # SIGKILL the screenshot run mid-post-processing on slow runners.
+    timeout-minutes: 90
+    concurrency:
+      group: mac-ci-${{ github.workflow }}-macos-${{ github.ref_name }}
+      cancel-in-progress: true
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # The device runner reports logical test failures through CN1SS log
+      # markers, not through the build or the screenshot comparison. Make the
+      # normalized report authoritative so a failing or never-run compliance
+      # test cannot leave this workflow green and then be published from master.
+      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # Optional: when set, build-macos-app.sh writes it as a bundled
+      # resource so the GoogleWebMap screenshot test renders a live Google map;
+      # absent (e.g. fork PRs with no access to the secret) the test skips.
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache CocoaPods and user gems
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gem
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: ${{ runner.os }}-pods-v1-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-v1-
+
+      - name: Ensure CocoaPods / xcodeproj tooling
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          set -euo pipefail
+          # No xcodeproj gem here, deliberately. The Catalyst workflow needs it
+          # because that path injects its build settings into an
+          # already-generated iOS project; this one generates a macOS project
+          # with the settings already in it.
+          echo "no gem dependencies for the AppKit build"
+
+      - name: Install Metal Toolchain
+        # Xcode 26+ requires the Metal Toolchain component for .metal shader
+        # compilation. This port is Metal-only -- OpenGL ES does not exist on
+        # macOS -- so the download is always required.
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ ! -x "$XCODE_APP/Contents/Developer/usr/bin/xcodebuild" ]; then
+            echo "Xcode 26 not found under /Applications. Cannot install Metal Toolchain." >&2
+            exit 1
+          fi
+          echo "Using $XCODE_APP"
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -downloadComponent MetalToolchain
+        timeout-minutes: 10
+
+      - name: Build sample macOS app and compile workspace
+        id: build-macos-app
+        run: ./scripts/build-macos-app.sh -q -DskipTests
+        timeout-minutes: 30
+
+      - name: Run macOS UI screenshot tests
+        env:
+          ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/macos-ui-tests
+          # Strict screenshot gating: every expected frame must be captured and
+          # compared. Enforced centrally in scripts/lib/cn1ss.sh.
+          CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_ALLOWED_MISSING: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "${ARTIFACTS_DIR}"
+
+          echo "workspace='${{ steps.build-macos-app.outputs.workspace }}'"
+          echo "scheme='${{ steps.build-macos-app.outputs.scheme }}'"
+
+          ./scripts/run-macos-ui-tests.sh \
+            "${{ steps.build-macos-app.outputs.workspace }}" \
+            "" \
+            "${{ steps.build-macos-app.outputs.scheme }}"
+        # The script's own suite budget is already 1500s (25m); add app
+        # launch + post-processing (compare 122 images, render report, post
+        # comment) and a slow runner tips just over the old 30m step cap and
+        # gets SIGKILLed mid-compare -- a flaky timeout, not a real mismatch.
+        # 45m lets the script's internal timeout govern gracefully instead.
+        timeout-minutes: 45
+
+      - name: Upload macOS port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-macos
+          path: artifacts/macos-ui-tests/port-status-macos.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publish macOS screenshot summary
+        # Surfaces run-macos-ui-tests.sh's comparison result in the
+        # job's GitHub Actions summary page so the Mac slice status is
+        # visible at a glance without digging into the artifact zip.
+        # Reuses the existing metal-screenshot-summary.py helper because
+        # the JSON schema is identical -- the summary text says "iOS
+        # Metal" so the wrapper here overrides the headline manually.
+        if: always()
+        env:
+          COMPARE_JSON: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-compare.json
+          COMMENT_MD: ${{ github.workspace }}/artifacts/macos-ui-tests/screenshot-comment.md
+        run: |
+          set -eu
+          {
+            echo "## macOS screenshot comparison"
+            echo
+            echo "Ran against \`scripts/hellocodenameone\` as a native macOS (AppKit) build."
+            echo "Golden images: \`scripts/macos/screenshots/\` (see the README there for the seeding workflow)."
+            echo
+            if [ -s "$COMPARE_JSON" ]; then
+              python3 scripts/ci/metal-screenshot-summary.py --markdown "$COMPARE_JSON"
+            elif [ -s "$COMMENT_MD" ]; then
+              cat "$COMMENT_MD"
+            else
+              echo "_No screenshot comparison artifact was produced. See the upload step output for details._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$COMPARE_JSON" ]; then
+            NOTICE="$(python3 scripts/ci/metal-screenshot-summary.py --headline "$COMPARE_JSON" || true)"
+            if [ -n "$NOTICE" ]; then
+              echo "::notice title=macOS screenshot comparison::${NOTICE}"
+            fi
+          fi
+
+      - name: Upload macOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-ui-tests
+          path: artifacts
+          if-no-files-found: warn
+          retention-days: 14
