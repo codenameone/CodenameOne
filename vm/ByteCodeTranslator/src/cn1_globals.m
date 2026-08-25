@@ -9372,21 +9372,43 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
     long long pgOwned = 0, pgGrace = 0, liveSlots = 0, deadSlots = 0, resvBytes = 0;
     long long releasedBytes = 0;
 #ifndef CN1_DISABLE_BIBOP
+    // DELIBERATELY UNSYNCHRONISED, like cn1HeapAccounting beside it, which samples the
+    // same registry the same way and says so: "a diagnostic wants the shape, not the last
+    // digit". Mutators are running here and one of them can be bump-allocating out of a
+    // page it owns while this reads that page's counters.
+    //
+    // Both ways of making it sound are worse than the unsoundness. Stopping the page
+    // owners would perturb collector/mutator timing, which is the quantity this probe
+    // exists to report, and would cost CN1_GC_CONFORM the behaviour-neutrality that is
+    // the whole reason it is a separate flag from CN1_GC_VERIFY. Making the page fields
+    // _Atomic would put atomic accesses on the inlined bump path in cn1_globals.h -- the
+    // hottest code in the VM -- to improve a diagnostic.
+    //
+    // What IS worth fixing is the stated harm: an internally inconsistent partition. Only
+    // an owned page can move under this walk, at most one per size class per thread out
+    // of many thousands, and clamping freeCount into [0, bumpIndex] means a stale pair can
+    // never make live and dead slots sum past the page. The buckets stay a valid partition
+    // whatever it reads; the conclusions drawn from them are slopes over hundreds of
+    // cycles, not last digits.
     size_t relOff = cn1BibopReleaseOffset();
     CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
     while(p != 0) {
         pgTotal++;
         resvBytes += CN1_BIBOP_PAGE_SIZE;
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
-        int live = bi - p->freeCount;
-        if(live < 0) {
-            live = 0;
+        int freeNow = p->freeCount;
+        if(freeNow < 0) {
+            freeNow = 0;
         }
+        if(freeNow > bi) {
+            freeNow = bi;
+        }
+        int live = bi - freeNow;
         if(live == 0) {
             pgEmpty++;
         }
         liveSlots += (long long)live * (long long)p->slotSize;
-        deadSlots += (long long)p->freeCount * (long long)p->slotSize;
+        deadSlots += (long long)freeNow * (long long)p->slotSize;
         if(p->gcPageReleased) {
             pgReleased++;
             // Only the slot region is handed back; the header page stays resident.

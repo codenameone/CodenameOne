@@ -79,11 +79,12 @@ public class GcSteadyState {
      * this benchmark compares -- a build whose threads park more would lose fewer
      * increments and so report a throughput advantage it does not have.
      *
-     * Each worker republishes its slot once per round, so the SAMPLE series tracks
-     * progress live. NODES= at the end is the authoritative figure: it is summed after
-     * join(), which gives it a happens-before edge to every worker's last write. The
-     * SAMPLE series reads the same slots while they are still being written, so it is a
-     * progress indicator and not a measurement.
+     * Each worker republishes its slot once per round under SUM_LOCK, which the sampler
+     * also holds to read them, so the live series is properly published rather than
+     * merely hoped for. NODES= at the end is still the authoritative figure -- it is
+     * summed after join(), which orders it against every worker's last write regardless
+     * -- and the live series remains a progress indicator rather than a measurement,
+     * because a worker that is mid-round has not published yet.
      */
     static long[] nodeCounts;
 
@@ -155,15 +156,24 @@ public class GcSteadyState {
                         // Publish once per round so the SAMPLE series is a live progress
                         // indicator rather than a row of zeroes. A worker that stalls
                         // stops publishing, and its slot going flat IS the signal.
-                        nodeCounts[slot] = counter[0];
+                        //
+                        // Under the lock sumNodes() reads: a plain long[] element write has
+                        // no visibility guarantee against a concurrent reader and Java 8
+                        // permits a 64-bit element to be observed torn, so the series could
+                        // sit stale or jump nonsensically -- precisely when a stalled
+                        // worker is what it is meant to show. Once per round is roughly
+                        // once a second per worker, so the lock costs nothing.
+                        synchronized (SUM_LOCK) {
+                            nodeCounts[slot] = counter[0];
+                        }
                         round++;
                         if (sleepMs > 0) {
                             sleep(sleepMs);
                         }
                     }
-                    nodeCounts[slot] = counter[0];
                     // Order-independent, so the checksum does not depend on scheduling.
                     synchronized (SUM_LOCK) {
+                        nodeCounts[slot] = counter[0];
                         checksum += sum;
                     }
                 }
@@ -258,11 +268,13 @@ public class GcSteadyState {
     }
 
     private static long sumNodes() {
-        long total = 0;
-        for (int i = 0; i < nodeCounts.length; i++) {
-            total += nodeCounts[i];
+        synchronized (SUM_LOCK) {
+            long total = 0;
+            for (int i = 0; i < nodeCounts.length; i++) {
+                total += nodeCounts[i];
+            }
+            return total;
         }
-        return total;
     }
 
     private static long footprintKb() {
