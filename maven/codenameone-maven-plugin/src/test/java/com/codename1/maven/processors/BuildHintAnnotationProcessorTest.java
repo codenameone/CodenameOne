@@ -786,6 +786,87 @@ public class BuildHintAnnotationProcessorTest {
         }
     }
 
+    /// A UTF-16 source is read as UTF-16, even though it decodes as UTF-8.
+    ///
+    /// An ASCII-named class compiled as UTF-16LE is `p\0a\0c\0k\0...` on
+    /// disk. NUL is a perfectly good UTF-8 character, so the UTF-8 test the
+    /// charset guess relied on SUCCEEDED and left a NUL between every character.
+    /// Neither the package nor the type declaration was then found, so a live
+    /// annotated class read as an orphan and `processClass` skipped the
+    /// misplaced-annotation error it exists to raise -- a green build with the
+    /// hint quietly ignored, which is the failure this whole feature removes.
+    @Test
+    public void aUtf16SourceIsNotMistakenForAnOrphan() throws Exception {
+        for (String charset : new String[]{"UTF-16LE", "UTF-16BE", "UTF-16"}) {
+            String source = "package com.example;\npublic class Wide {\n}\n";
+            File src = tmp.newFolder();
+            File dir = new File(src, "com/example");
+            assertTrue(dir.mkdirs());
+            java.io.OutputStream os =
+                    new java.io.FileOutputStream(new File(dir, "Wide.java"));
+            try {
+                // "UTF-16" writes a byte order mark; the LE/BE spellings do not,
+                // so this covers both the marked and the unmarked shape.
+                os.write(source.getBytes(charset));
+            } finally {
+                os.close();
+            }
+
+            File classes = tmp.newFolder();
+            JavaSourceCompiler.compile(
+                    JavaSourceCompiler.singleSource("com.example.Wide", source),
+                    classes, Arrays.asList(testClassesDir(), coreJar()));
+            AnnotatedClass cls = ClassScanner.scan(classes).get("com/example/Wide");
+            assertTrue("the class under test must have been compiled", cls != null);
+
+            assertTrue("a live class read as an orphan when the source is " + charset,
+                    BuildHintAnnotationProcessor.hasBackingSource(cls,
+                            java.util.Collections.singletonList(src.getAbsolutePath())));
+
+            // Read, not merely judged unreadable: no NUL survives the decode.
+            String head = BuildHintAnnotationProcessor.readHead(new File(dir, "Wide.java"));
+            assertTrue("misread when the source is " + charset,
+                    head.contains("package com.example;"));
+            assertTrue("NUL left in the text when the source is " + charset,
+                    head.indexOf(0) < 0);
+        }
+    }
+
+    /// ...and neither is a UTF-8 source that starts with a byte order mark,
+    /// which is what an editor on Windows writes by default.
+    ///
+    /// The mark decodes to U+FEFF and stays in the text. It is not whitespace,
+    /// so the text does not begin with the package declaration and the class
+    /// read as an orphan -- the same silent skip as the UTF-16 case, on a file
+    /// far more likely to exist.
+    @Test
+    public void aByteOrderMarkIsNotProofOfAnOrphan() throws Exception {
+        String source = "package com.example;\npublic class Marked {\n}\n";
+        File src = tmp.newFolder();
+        File dir = new File(src, "com/example");
+        assertTrue(dir.mkdirs());
+        java.io.OutputStream os = new java.io.FileOutputStream(new File(dir, "Marked.java"));
+        try {
+            os.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
+            os.write(source.getBytes("UTF-8"));
+        } finally {
+            os.close();
+        }
+
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Marked", source),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        AnnotatedClass cls = ClassScanner.scan(classes).get("com/example/Marked");
+        assertTrue("the class under test must have been compiled", cls != null);
+
+        assertTrue("a live class read as an orphan because of its byte order mark",
+                BuildHintAnnotationProcessor.hasBackingSource(cls,
+                        java.util.Collections.singletonList(src.getAbsolutePath())));
+        assertTrue(BuildHintAnnotationProcessor.readHead(new File(dir, "Marked.java"))
+                .startsWith("package com.example;"));
+    }
+
     /// Running out of search budget is "cannot tell", not "no such source".
     /// Answering no dropped a live annotated class silently, with its placement
     /// error lost, for the sake of a bound -- which is the wrong way round:

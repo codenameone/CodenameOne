@@ -1236,19 +1236,27 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// a budget: 4MB is far past any hand-written Java or Kotlin file, and
     /// exceeding it returns null, which the caller reads as "cannot tell" and so
     /// keeps the class.
-    /// The charset to read `f` as: UTF-8 when it decodes as UTF-8, ISO-8859-1
-    /// otherwise.
+    /// The charset to read `f` as: UTF-16 when the bytes say so, else UTF-8 when
+    /// it decodes as UTF-8, else ISO-8859-1.
     ///
     /// The compiler's source encoding is a project setting this scan cannot see.
     /// Guessing it from the bytes is not exact, but decoding everything as UTF-8
     /// produced replacement characters for a source that was never UTF-8, and a
     /// name that cannot be read never matches.
+    ///
+    /// UTF-16 has to be settled BEFORE the UTF-8 test, because it passes that
+    /// test. An ASCII-named class compiled as UTF-16LE is `p\0a\0c\0k\0...`
+    /// on disk, NUL is a perfectly good UTF-8 character, so the decode succeeded
+    /// and UTF-8 was chosen -- leaving a NUL between every character. No package
+    /// and no type declaration was then found, so a live annotated class read as
+    /// an orphan, and `processClass` skipped the misplaced-annotation error it
+    /// exists to raise: a green build with the hint quietly ignored.
     private static java.nio.charset.Charset decoderFor(File f) {
         try {
             byte[] bytes = new byte[(int) Math.min(f.length(), 64L * 1024)];
             InputStream in = new FileInputStream(f);
+            int read = 0;
             try {
-                int read = 0;
                 while (read < bytes.length) {
                     int n = in.read(bytes, read, bytes.length - read);
                     if (n < 0) {
@@ -1256,20 +1264,69 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                     }
                     read += n;
                 }
-                java.nio.charset.CharsetDecoder decoder =
-                        java.nio.charset.Charset.forName("UTF-8").newDecoder();
-                decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT);
-                decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
-                decoder.decode(java.nio.ByteBuffer.wrap(bytes, 0, read));
-                return java.nio.charset.Charset.forName("UTF-8");
             } finally {
                 in.close();
             }
+            java.nio.charset.Charset utf16 = utf16CharsetOf(bytes, read);
+            if (utf16 != null) {
+                return utf16;
+            }
+            java.nio.charset.CharsetDecoder decoder =
+                    java.nio.charset.Charset.forName("UTF-8").newDecoder();
+            decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT);
+            decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+            decoder.decode(java.nio.ByteBuffer.wrap(bytes, 0, read));
+            return java.nio.charset.Charset.forName("UTF-8");
         } catch (java.nio.charset.CharacterCodingException notUtf8) {
             return java.nio.charset.Charset.forName("ISO-8859-1");
         } catch (IOException ex) {
             return java.nio.charset.Charset.forName("UTF-8");
         }
+    }
+
+    /// UTF-16LE or UTF-16BE when `bytes` is one of those, else null.
+    ///
+    /// By the byte order mark when there is one, decoded through the plain
+    /// `UTF-16` charset, which reads the mark and CONSUMES it. That matters: the
+    /// LE and BE decoders keep it, and a leading U+FEFF is not whitespace, so
+    /// the text no longer begins with the package declaration.
+    ///
+    /// Without a mark, by the NULs. Source text never contains a NUL: it is not
+    /// legal in a Java or Kotlin identifier, keyword or literal, so a run of
+    /// them all sitting at the same parity is UTF-16 encoding ASCII and nothing
+    /// else. Requiring a real share of the sample keeps a stray NUL in some
+    /// file that is not source at all from being read as an encoding.
+    private static java.nio.charset.Charset utf16CharsetOf(byte[] bytes, int len) {
+        if (len >= 2) {
+            int b0 = bytes[0] & 0xFF;
+            int b1 = bytes[1] & 0xFF;
+            if ((b0 == 0xFF && b1 == 0xFE) || (b0 == 0xFE && b1 == 0xFF)) {
+                return java.nio.charset.Charset.forName("UTF-16");
+            }
+        }
+        if (len < 4) {
+            return null;
+        }
+        int atEven = 0;
+        int atOdd = 0;
+        for (int i = 0; i < len; i++) {
+            if (bytes[i] == 0) {
+                if ((i & 1) == 0) {
+                    atEven++;
+                } else {
+                    atOdd++;
+                }
+            }
+        }
+        int quarter = len / 4;
+        if (atOdd > quarter && atEven == 0) {
+            // ASCII in UTF-16LE: the high byte of every character is the NUL.
+            return java.nio.charset.Charset.forName("UTF-16LE");
+        }
+        if (atEven > quarter && atOdd == 0) {
+            return java.nio.charset.Charset.forName("UTF-16BE");
+        }
+        return null;
     }
 
     static String readHead(File f) {
@@ -1290,6 +1347,13 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             String line;
             while ((line = r.readLine()) != null) {
                 sb.append(line).append('\n');
+            }
+            // A byte order mark the decoder handed through -- the UTF-8 one is
+            // what an editor on Windows writes by default. U+FEFF is not
+            // whitespace, so a text that starts with it does not start with the
+            // package declaration, and the class reads as an orphan.
+            if (sb.length() > 0 && sb.charAt(0) == '\uFEFF') {
+                sb.deleteCharAt(0);
             }
             return sb.toString();
         } catch (IOException ex) {
