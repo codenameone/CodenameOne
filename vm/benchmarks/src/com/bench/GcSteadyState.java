@@ -119,6 +119,16 @@ public class GcSteadyState {
         movesPerNode = cfg(CFG_MOVES);
         legacyBlocks = cfg(CFG_LEGACY);
         scrubDepth = cfg(CFG_SCRUB);
+        // CN1_WL_LEGACY=0 is a legitimate ablation -- run without the retained legacy
+        // population -- so it has to work rather than crash, and a negative value must not
+        // reach new Object[n][]. Likewise a thread count below one produces a run that
+        // measures nothing and announces it only by reporting zero.
+        if (legacyBlocks < 0) {
+            legacyBlocks = 0;
+        }
+        if (threads < 1) {
+            threads = 1;
+        }
         System.out.println("WLCONFIG seconds=" + seconds + " threads=" + threads
                 + " depth=" + depth + " branch=" + branch + " sleepMs=" + sleepMs
                 + " moves=" + movesPerNode + " legacy=" + legacyBlocks
@@ -222,8 +232,16 @@ public class GcSteadyState {
         System.out.println("NODES=" + sumNodes());
         System.out.println("ELAPSED_MS=" + (System.currentTimeMillis() - startMs));
         System.out.println("FINAL_FOOTPRINT_KB=" + footprintKb());
-        Move lastHeld = (Move) legacyLiveSet[legacyBlocks - 1][LEGACY_BLOCK_REFS - 1];
-        System.out.println("RESULT=" + (checksum + lastHeld.from + lastHeld.to));
+        // Keeps the population reachable to the end and folds it into RESULT, so the
+        // host-JVM comparison covers it too. Skipped when it was ablated away: reaching
+        // for element -1 would throw AFTER the whole timed run had been paid for, losing
+        // RESULT and the completion marker with it.
+        long held = 0;
+        if (legacyBlocks > 0) {
+            Move lastHeld = (Move) legacyLiveSet[legacyBlocks - 1][LEGACY_BLOCK_REFS - 1];
+            held = lastHeld.from + lastHeld.to;
+        }
+        System.out.println("RESULT=" + (checksum + held));
         System.out.println("GC_STEADY_STATE_DONE");
     }
 
