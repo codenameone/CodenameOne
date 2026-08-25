@@ -1989,6 +1989,62 @@ public class BuildHintCatalogTest {
         assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(pom));
     }
 
+    /// A parent's managed execution, activated by a bare `<plugin>` in the
+    /// module, still counts.
+    ///
+    /// This is the ordinary multi-module shape, and neither POM answers on its
+    /// own: the child has the activation and no configuration, the parent has
+    /// the configuration and no activation. Reading them independently lost the
+    /// root, and a main class living there then looked absent -- which is what
+    /// puts an annotation-owned hint back in the editor for Add to declare a
+    /// second time.
+    @Test
+    public void aParentsManagedExecutionIsInheritedByTheActivatingModule() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>inherited/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId></plugin>"
+                + "</plugins></build></project>";
+
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("inherited/gen"), roots.toString());
+
+        // The parent on its own still activates nothing.
+        String parent = "<project><build>" + parentManaged + "</build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(parent, null, parentManaged).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(parent, null, parentManaged).toString());
+    }
+
+    /// ...and the same for a compiler encoding pinned in the parent.
+    @Test
+    public void aParentsManagedEncodingIsInherited() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><release>17</release></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS",
+                CodenameOneSettings.declaredSourceEncoding(child, null, parentManaged));
+
+        // The compiler plugin is lifecycle-bound, so it does not even need the
+        // <plugins> entry.
+        String bare = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties></project>";
+        assertEquals("Shift_JIS",
+                CodenameOneSettings.declaredSourceEncoding(bare, null, parentManaged));
+    }
+
     /// The compiler plugin is the exception: it runs from the default lifecycle,
     /// so a `<pluginManagement>` configuration for it IS in effect -- and an
     /// explicit `<plugins>` entry still overrides that.

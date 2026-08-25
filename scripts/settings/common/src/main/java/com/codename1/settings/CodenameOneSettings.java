@@ -2446,9 +2446,26 @@ public class CodenameOneSettings extends Lifecycle {
     /// compiles, and dropping it is a main class this tool cannot find.
     static java.util.List<String> declaredSourceRoots(String pomText,
                                                       java.util.Map<String, String> properties) {
+        return declaredSourceRoots(pomText, properties, null);
+    }
+
+    /// The same list, with `managedFromChain` -- every `<pluginManagement>`
+    /// section in this POM's parent chain -- available as the configuration an
+    /// activated plugin inherits.
+    ///
+    /// A parent that puts the `add-source` execution in `<pluginManagement>`
+    /// while the module turns it on with a bare `<plugin>` is the ordinary
+    /// multi-module shape, and neither POM answers on its own: the child has the
+    /// activation and no configuration, the parent has the configuration and no
+    /// activation. Reading them independently lost the root, and a main class
+    /// living there then looked absent -- which is what puts an annotation-owned
+    /// hint back in the editor for Add to declare a second time.
+    static java.util.List<String> declaredSourceRoots(String pomText,
+                                                      java.util.Map<String, String> properties,
+                                                      String managedFromChain) {
         java.util.List<String> out = new java.util.ArrayList<>();
         for (String active : activeConfiguration(pomText)) {
-            collectDeclaredRoots(active, properties, out);
+            collectDeclaredRoots(active, properties, managedFromChain, out);
         }
         return out;
     }
@@ -2485,6 +2502,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private static void collectDeclaredRoots(String pomText,
                                              java.util.Map<String, String> properties,
+                                             String managedFromChain,
                                              java.util.List<String> out) {
         // Scoped to the elements that actually declare a compile root.
         // `<source>` and `<sourceDir>` are ordinary words: another plugin
@@ -2493,9 +2511,10 @@ public class CodenameOneSettings extends Lifecycle {
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
         collectRoots(compileGoalConfiguration(
-                activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir"),
+                activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir", managedFromChain),
                 "compile", "sourceDir"), "sourceDir", properties, out);
-        String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source");
+        String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source",
+                managedFromChain);
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
@@ -2828,7 +2847,8 @@ public class CodenameOneSettings extends Lifecycle {
         // explicitly DEACTIVATES an activeByDefault profile, so a root read from
         // such a profile is one the build is not compiling.
         for (String pom : pomChain()) {
-            for (String declared : declaredSourceRoots(pom, pomProperties())) {
+            for (String declared : declaredSourceRoots(pom, pomProperties(),
+                    chainPluginManagement())) {
                 String expanded = expandProjectPaths(declared, projectDir,
                         buildDirectory(projectDir), pomProperties());
                 if (expanded == null) {
@@ -2967,6 +2987,32 @@ public class CodenameOneSettings extends Lifecycle {
             at = close + name.length() + 3;
         }
     }
+
+    /// Every `<pluginManagement>` section in the POM chain, read once.
+    ///
+    /// A plugin is ACTIVATED by a `<plugin>` entry and CONFIGURED by a managed
+    /// block, and in a multi-module project those routinely live in different
+    /// files: the module turns the plugin on, the parent says what it does.
+    /// Reading each POM independently found neither -- the child has no managed
+    /// block and the parent has no activation -- so an inherited source root was
+    /// lost and a main class living there looked absent.
+    private String chainPluginManagement() {
+        if (!chainManagementRead) {
+            chainManagementRead = true;
+            StringBuilder sb = new StringBuilder();
+            for (String pom : pomChain()) {
+                String managed = managementOnly(pom);
+                if (managed != null) {
+                    sb.append(managed);
+                }
+            }
+            chainManagement = sb.length() == 0 ? null : sb.toString();
+        }
+        return chainManagement;
+    }
+
+    private boolean chainManagementRead;
+    private String chainManagement;
 
     /// The bound POM and its ancestors, nearest first.
     ///
@@ -3805,7 +3851,8 @@ public class CodenameOneSettings extends Lifecycle {
             // the bound POM found nothing in the standard layout.
             for (String pom : pomChain()) {
                 for (String active : activeConfiguration(pom)) {
-                    sourceEncoding = declaredSourceEncoding(active, pomProperties());
+                    sourceEncoding = declaredSourceEncoding(active, pomProperties(),
+                            chainPluginManagement());
                     if (sourceEncoding != null) {
                         break;
                     }
@@ -3841,6 +3888,13 @@ public class CodenameOneSettings extends Lifecycle {
     /// charset -- missing the annotated source altogether.
     static String declaredSourceEncoding(String pomText,
                                          java.util.Map<String, String> properties) {
+        return declaredSourceEncoding(pomText, properties, null);
+    }
+
+    /// The same, also consulting the parent chain's `<pluginManagement>`.
+    static String declaredSourceEncoding(String pomText,
+                                         java.util.Map<String, String> properties,
+                                         String managedFromChain) {
         if (pomText == null) {
             return null;
         }
@@ -3856,7 +3910,7 @@ public class CodenameOneSettings extends Lifecycle {
         // was read as neither.
         String value = null;
         for (String block : compileGoalConfiguration(
-                compilerPluginBlock(pomText), "compile", "encoding")) {
+                compilerPluginBlock(pomText, managedFromChain), "compile", "encoding")) {
             value = elementValue(block, "encoding");
             if (value != null && value.trim().length() > 0) {
                 break;
@@ -3907,6 +3961,14 @@ public class CodenameOneSettings extends Lifecycle {
     /// Not for the compiler plugin, which is bound by the default lifecycle --
     /// see `compilerPluginBlock`.
     static String activePluginBlock(String pomText, String artifactId, String element) {
+        return activePluginBlock(pomText, artifactId, element, null);
+    }
+
+    /// The same, also looking in `managedFromChain` -- the `<pluginManagement>`
+    /// sections of this POM's ANCESTORS -- for the configuration an activated
+    /// plugin inherits. This POM's own managed block is nearer, so it wins.
+    static String activePluginBlock(String pomText, String artifactId, String element,
+                                    String managedFromChain) {
         if (pomText == null) {
             return null;
         }
@@ -3918,6 +3980,12 @@ public class CodenameOneSettings extends Lifecycle {
             return active;
         }
         String managed = pluginBlock(managementOnly(pomText), artifactId);
+        if (managed == null || managed.indexOf("<" + element + ">") < 0) {
+            String inherited = pluginBlock(managedFromChain, artifactId);
+            if (inherited != null && inherited.indexOf("<" + element + ">") >= 0) {
+                return inherited;
+            }
+        }
         return managed == null ? active : managed;
     }
 
@@ -3952,11 +4020,23 @@ public class CodenameOneSettings extends Lifecycle {
     /// usually comes first in the file, so taking the first match in the text
     /// picked exactly the wrong one.
     static String compilerPluginBlock(String pomText) {
-        String active = activePluginBlock(pomText, "maven-compiler-plugin", "encoding");
+        return compilerPluginBlock(pomText, null);
+    }
+
+    /// The same, also consulting the parent chain's managed sections.
+    static String compilerPluginBlock(String pomText, String managedFromChain) {
+        String active = activePluginBlock(pomText, "maven-compiler-plugin", "encoding",
+                managedFromChain);
         if (active != null) {
             return active;
         }
-        return pluginBlock(managementOnly(pomText), "maven-compiler-plugin");
+        String managed = pluginBlock(managementOnly(pomText), "maven-compiler-plugin");
+        if (managed != null) {
+            return managed;
+        }
+        // Bound by the default lifecycle, so an ancestor's managed configuration
+        // applies with no <plugins> entry anywhere.
+        return pluginBlock(managedFromChain, "maven-compiler-plugin");
     }
 
     /// The `<plugin>` element declaring `artifactId`, or null.
