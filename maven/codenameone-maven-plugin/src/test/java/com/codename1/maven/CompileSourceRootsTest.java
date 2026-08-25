@@ -175,4 +175,44 @@ public class CompileSourceRootsTest {
         // What it cannot resolve it still leaves alone rather than guessing.
         assertFalse(roots.toString(), roots.toString().contains("nobody.knows"));
     }
+
+    /**
+     * `combine.children="append"` is how a POM asks for both lists, and then
+     * both are in effect. Treating the execution element as a replacement
+     * regardless omitted the plugin-level root, so a main class living there
+     * could not be found.
+     */
+    @Test
+    public void anAppendedListKeepsBothLevels() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>gen/plugin-level</a></sources>"));
+        helper.addExecution(execution("add-source",
+                "<sources combine.children=\"append\"><b>gen/execution</b></sources>"));
+        project.getBuild().addPlugin(helper);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/execution"));
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/plugin-level"));
+    }
+
+    /** ...and without the attribute it is still a replacement. */
+    @Test
+    public void aPlainListStillReplaces() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>gen/plugin-level</a></sources>"));
+        helper.addExecution(execution("add-source", "<sources><b>gen/execution</b></sources>"));
+        project.getBuild().addPlugin(helper);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/execution"));
+        assertFalse(roots.toString(), contains(roots, basedir, "gen/plugin-level"));
+    }
 }

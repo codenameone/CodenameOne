@@ -1188,14 +1188,40 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 // unless the POM says so. Taking both would have added a
                 // directory the build does not compile, which is a phantom root
                 // for everything downstream to scan.
-                out.add(has(execution.getConfiguration(), element)
-                        ? execution.getConfiguration() : plugin.getConfiguration());
+                //
+                // Unless the POM DOES say so: `combine.children="append"` is how
+                // it asks for both, and then both are in effect.
+                if (!has(execution.getConfiguration(), element)) {
+                    out.add(plugin.getConfiguration());
+                    continue;
+                }
+                out.add(execution.getConfiguration());
+                if (appends(execution.getConfiguration(), element)
+                        && plugin.getConfiguration() != null) {
+                    out.add(plugin.getConfiguration());
+                }
             }
         }
         if (!bound && plugin.getConfiguration() != null) {
             out.add(plugin.getConfiguration());
         }
         return out;
+    }
+
+    /// Whether the POM asked for this element's children to be appended to the
+    /// inherited ones rather than to replace them.
+    ///
+    /// Maven reads the attribute on the element itself or on the configuration
+    /// it sits in, so both are checked.
+    private static boolean appends(Object configuration, String element) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return false;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom root =
+                (org.codehaus.plexus.util.xml.Xpp3Dom) configuration;
+        return "append".equals(root.getAttribute("combine.children"))
+                || (root.getChild(element) != null
+                    && "append".equals(root.getChild(element).getAttribute("combine.children")));
     }
 
     private static boolean has(Object configuration, String element) {

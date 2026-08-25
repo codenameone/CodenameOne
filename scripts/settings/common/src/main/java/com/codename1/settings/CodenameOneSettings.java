@@ -2663,21 +2663,26 @@ public class CodenameOneSettings extends Lifecycle {
         }
         boolean hasSrcMain = projectDir != null
                 && fs.isDirectory(ProjectIO.fsUrl(projectDir + "/src/main"));
+        if (!out.isEmpty()) {
+            // Maven answered, so that IS the set. A project that replaces
+            // src/main/java with a custom root can still have dormant files in
+            // the conventional tree, and adding it back scanned code the build
+            // does not compile -- where a same-package type shadows a real
+            // annotation. The conventions are a guess for when nobody resolved
+            // the roots, not a supplement to an answer.
+            return out;
+        }
         java.util.List<String> candidates =
                 new java.util.ArrayList<>(candidateSourceRoots(projectDir, hasSrcMain));
         // A module may put its sources somewhere else entirely, and the main
         // class is the one file this list cannot afford to miss: without it
         // nothing knows which hints an annotation owns, and Add writes the
         // duplicate the next build refuses.
-        // Only when the launcher did not answer. Maven applies profile
-        // activation, and activating one explicitly DEACTIVATES an
-        // activeByDefault profile -- so a root this reader takes from such a
-        // profile is one the build is not compiling, and adding it beside a
-        // resolved list put a source tree back that Maven had already excluded.
-        // The conventional roots above are safe either way: they are where
-        // sources live, not something a profile turns on.
-        for (String pom : resolvedRoots.isEmpty() ? pomChain()
-                : java.util.Collections.<String>emptyList()) {
+        // Reached only when the launcher said nothing, since the resolved list
+        // returns above. Maven applies profile activation, and activating one
+        // explicitly DEACTIVATES an activeByDefault profile, so a root read from
+        // such a profile is one the build is not compiling.
+        for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom)) {
                 String expanded = expandProjectPaths(declared, projectDir, buildDirectory(projectDir));
                 if (expanded == null) {
