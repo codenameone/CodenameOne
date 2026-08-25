@@ -204,10 +204,9 @@ DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
-# macOS destination + configuration. CODE_SIGN_* are disabled so
-# unsigned local / CI runs don't require provisioning. The macNative
-# entitlements file is still set via CODE_SIGN_ENTITLEMENTS on the project
-# (IPhoneBuilder injects it), but with signing disabled it is a no-op.
+# macOS destination + configuration. CODE_SIGN_* are disabled so unsigned local
+# and CI runs don't require provisioning. MacOSNativeBuilder still writes the
+# entitlements beside the project, but with signing disabled nothing reads them.
 rm_log "Building native macOS app with xcodebuild"
 COMPILE_START=$(date +%s)
 XCODE_BUILD_CMD=(
