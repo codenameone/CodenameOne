@@ -2494,6 +2494,53 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void hidingAModalWindowReleasesTheCallerWithoutDisposingIt() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        final Window w = new Window("hide ends the wait", new BorderLayout());
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        DisplayTest.flushEdt();
+
+        final Thread caller = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                w.showModal();
+            }
+        }, "cn1-test-modal-caller");
+        caller.start();
+        for (int iter = 0; iter < 100 && !Desktop.getInstance().isWindowInputBlocked(0); iter++) {
+            DisplayTest.flushEdt();
+            Thread.sleep(5);
+        }
+        try {
+            assertTrue(Desktop.getInstance().isWindowInputBlocked(0),
+                    "precondition: the modal is up and blocking");
+
+            // hide(), not dispose(). The window is closed as far as the user is
+            // concerned, so parking the caller on something nobody can see or reach
+            // would hang it -- HIDE_ON_CLOSE reaches exactly this path.
+            w.hide();
+            for (int iter = 0; iter < 200 && caller.isAlive(); iter++) {
+                DisplayTest.flushEdt();
+                Thread.sleep(5);
+            }
+            caller.join(2000);
+            assertFalse(caller.isAlive(), "hiding a modal window has to release its caller");
+
+            // And the guarantee the documentation has to state: it comes back still
+            // live, so cleanup that only suits a destroyed window must not assume it.
+            assertFalse(w.isWindowDisposed(),
+                    "the window is reusable after this, not disposed");
+            assertFalse(Desktop.getInstance().isWindowInputBlocked(0),
+                    "and it stops blocking everything behind it");
+        } finally {
+            w.dispose();
+            DisplayTest.flushEdt();
+            caller.join(2000);
+        }
+    }
+
+    @FormTest
     void showModalOnAWindowAlreadyUpStillBlocks() throws Exception {
         implementation.setMultiWindowSupported(true);
         final Window w = new Window("late modal", new BorderLayout());

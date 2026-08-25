@@ -199,9 +199,16 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava008Snippet.java[tag=desktop-windows-java-008,indent=0]
 ----
 
-`showModal()` parks the calling code until the window is disposed, exactly as a modal
-`Dialog` does. It doesn't freeze the application: the event dispatch thread keeps
+`showModal()` parks the calling code until the window is no longer showing, much as a
+modal `Dialog` does. It doesn't freeze the application: the event dispatch thread keeps
 running, so every other window carries on painting and animating while the modal is up.
+
+Both `dispose()` and `hide()` end the wait -- the window is closed as far as the user is
+concerned either way, and parking the caller on a window nobody can reach would hang it.
+That matters when the close operation is `HIDE_ON_CLOSE`, because `showModal()` then
+returns with the window still live and reusable. Cleanup that only makes sense for a
+destroyed window should ask `isWindowDisposed()` rather than assume it. Minimizing
+doesn't end the wait: a minimized window is still up.
 
 Three modality types are available:
 

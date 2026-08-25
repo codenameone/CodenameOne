@@ -2019,7 +2019,16 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
-    /// Shows this window and blocks the calling code until it is disposed.
+    /// Shows this window and blocks the calling code until it stops being on screen --
+    /// whether that is `#dispose()` or `#hide()`.
+    ///
+    /// Hiding ends the wait as surely as disposing does, and that is deliberate: the
+    /// window is closed as far as the user is concerned, and parking the caller on a
+    /// window nobody can see or reach would hang it. `#HIDE_ON_CLOSE` reaches this
+    /// path, so a modal window with that close operation returns here still live and
+    /// reusable. Code that runs cleanup after this returns should therefore ask
+    /// `#isWindowDisposed()` rather than assume it -- the window may be waiting to be
+    /// shown again. Minimizing does not end the wait; a minimized window is still up.
     ///
     /// This uses the same mechanism as a modal `Dialog`: the caller is parked while
     /// the event dispatch thread keeps running, so every other window carries on
