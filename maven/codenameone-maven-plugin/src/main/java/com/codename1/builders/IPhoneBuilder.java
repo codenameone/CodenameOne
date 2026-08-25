@@ -11798,6 +11798,15 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         plist = plistWithExpandedDict(plist, 0);
+        // The Mac slice always ends up with a scene manifest, and a scene lifecycle
+        // beside a legacy main NIB is the orphan window FrontBoard terminates -- the
+        // very pairing that keeps the manifest out of the shared plist. The shared
+        // plist only drops NSMainNibFile under ios.uiscene, so for the default Catalyst
+        // build it is still there and has to go here.
+        //
+        // The Mac build settings exclude MainWindow.xib from compilation anyway, so the
+        // key names a NIB that is not in this bundle even before the lifecycle argument.
+        plist = plistWithoutRootMember(plist, "NSMainNibFile");
         int[] root = plistRootDictBody(plist);
         if (root == null) {
             return plist;
@@ -11985,6 +11994,70 @@ public class IPhoneBuilder extends Executor {
             end = dict.length();
         }
         return plistMemberRange(dict, at, end, key);
+    }
+
+    /// The `{key start, value end}` offsets of a member at the level between `from`
+    /// and `to`, so the whole entry can be removed rather than just its value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to look for
+    ///
+    /// #### Returns
+    ///
+    /// the entry's offsets, or null
+    static int[] plistMemberEntryRange(String plist, int from, int to, String key) {
+        int at = from;
+        while (at < to) {
+            int keyIndex = plistElementIndex(plist, "key", at);
+            if (keyIndex < 0 || keyIndex >= to) {
+                return null;
+            }
+            int contentStart = plistOpenTagEnd(plist, keyIndex);
+            int close = plistCloseElementIndex(plist, "key", keyIndex);
+            int valueStart = plistKeyEnd(plist, keyIndex);
+            if (contentStart < 0 || close < 0 || valueStart < 0) {
+                return null;
+            }
+            int valueEnd = plistValueElementEnd(plist, valueStart);
+            if (valueEnd < 0) {
+                return null;
+            }
+            if (key.equals(plist.substring(contentStart, close).trim())) {
+                return new int[] {keyIndex, valueEnd};
+            }
+            at = valueEnd;
+        }
+        return null;
+    }
+
+    /// The same plist without `key` as a member of its root dictionary.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: a whole plist document
+    ///
+    /// - `key`: the member to drop
+    ///
+    /// #### Returns
+    ///
+    /// the plist without that member, or unchanged when it has none
+    static String plistWithoutRootMember(String plist, String key) {
+        int[] root = plistRootDictBody(plist);
+        if (root == null) {
+            return plist;
+        }
+        int[] entry = plistMemberEntryRange(plist, root[0], root[1], key);
+        if (entry == null) {
+            return plist;
+        }
+        return plist.substring(0, entry[0]) + plist.substring(entry[1]);
     }
 
     /// Whether `key` appears more than once as a member at the level between `from`

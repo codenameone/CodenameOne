@@ -548,6 +548,36 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void theMacSliceDropsTheMainNibItWouldOtherwisePairWithAScene() {
+        // The default Catalyst build: ios.uiscene is off, so the shared plist keeps
+        // NSMainNibFile -- its removal there is gated on that hint. The Mac copy always
+        // gains a scene manifest, and a scene lifecycle beside a legacy main NIB is the
+        // orphan window FrontBoard terminates at launch. It is also excluded from the
+        // Mac slice's compilation, so the key names a NIB that is not in that bundle.
+        String shared = document(
+                "    <key>NSMainNibFile</key>\n    <string>MainWindow</string>\n");
+        assertTrue(shared.contains("NSMainNibFile"),
+                "the shared plist keeps it, which is what the iOS slice needs");
+
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertFalse(mac.contains("NSMainNibFile"),
+                "the Mac copy must not pair a scene manifest with a main NIB");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "and it still gains the manifest, which is why the NIB had to go");
+        assertTrue(mac.contains("<key>CFBundleName</key>"),
+                "nothing else is disturbed");
+    }
+
+    @Test
+    void aPlistWithNoMainNibIsUnharmed() {
+        String mac = IPhoneBuilder.plistForMacSlice(document(
+                "    <key>UILaunchStoryboardName</key>\n    <string>LaunchScreen</string>\n"));
+        assertTrue(mac.contains("<key>UILaunchStoryboardName</key>"),
+                "a plist that never named a main NIB keeps everything it had");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)));
+    }
+
+    @Test
     void oneOfEachReservedKeyIsStillAccepted() {
         // The duplicate checks must not fire on a well formed manifest, which is the
         // way a rejection rule usually goes wrong.
