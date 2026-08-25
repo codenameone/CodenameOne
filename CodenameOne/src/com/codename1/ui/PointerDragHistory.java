@@ -88,10 +88,4 @@ final class PointerDragHistory {
         }
         return impl.getDragSpeed(pathX, pathTime, offset, length);
     }
-
-    /// How many positions are recorded. Used to tell a real gesture from one that
-    /// never moved.
-    int recordedLength() {
-        return length;
-    }
 }

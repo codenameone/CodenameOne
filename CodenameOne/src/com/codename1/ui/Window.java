@@ -427,10 +427,6 @@ public class Window extends Container implements TopLevelContainer {
         return layer;
     }
 
-    Container getWindowLayeredPaneIfExists() {
-        return windowLayeredPane;
-    }
-
     /// {@inheritDoc}
     @Override
     public Painter getGlassPane() {
