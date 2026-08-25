@@ -1443,6 +1443,25 @@ public class BuildHintCatalogTest {
                 java.util.Collections.singletonList(ownAnnotation));
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
 
+        // A Kotlin main class with a Java peer, which a mixed project has: the
+        // package declaration reads the same in both languages.
+        String javaPeer = "package com.example;\n@interface Ios { String teamId(); }\n";
+        String kotlinMainWithJavaPeer = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(kotlinMainWithJavaPeer, owned, true,
+                java.util.Collections.singletonList(javaPeer));
+        assertNull(owned.get("ios.teamId"));
+
+        // A peer in ANOTHER package shadows nothing.
+        String elsewherePeer = "package com.other;\n@interface Ios { String teamId(); }\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false,
+                java.util.Collections.singletonList(elsewherePeer));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
         // Kotlin declares an annotation with `annotation class`.
         String kotlinOwn = "package com.example\n"
                 + "annotation class Ios(val teamId: String)\n";

@@ -2320,8 +2320,7 @@ public class CodenameOneSettings extends Lifecycle {
                     continue;
                 }
                 collectAnnotationOwnedHints(text, out, ext.equals(".kt"),
-                        ext.equals(".kt")
-                                ? otherKotlinSources(binding.projectDir(), path) : null);
+                        otherProjectSources(binding.projectDir(), path));
                 return out;
             }
         }
@@ -2334,9 +2333,7 @@ public class CodenameOneSettings extends Lifecycle {
         String found = findMainClassSource(binding.projectDir(), main, pkg);
         if (found != null) {
             collectAnnotationOwnedHints(found, out, lastSourceWasKotlin,
-                    lastSourceWasKotlin
-                            ? otherKotlinSources(binding.projectDir(), lastSourcePath)
-                            : null);
+                    otherProjectSources(binding.projectDir(), lastSourcePath));
             return out;
         }
         // Genuinely no source. Distinct from "found and declares nothing", and
@@ -2352,14 +2349,20 @@ public class CodenameOneSettings extends Lifecycle {
     /// declarations made elsewhere.
     private String lastSourcePath;
 
-    /// The text of every OTHER Kotlin source in the project, bounded.
+    /// The text of every OTHER source in the project, bounded.
     ///
-    /// Only for declarations that are not file-scoped -- a `typealias` naming one
-    /// of our annotations. Bounded in files read and in directories walked,
-    /// because this runs when the tool opens a project and a source tree is not
-    /// a search index; a project past the bound simply keeps the previous
-    /// behaviour for an alias declared in a file nobody reached.
-    private java.util.List<String> otherKotlinSources(String projectDir, String exclude) {
+    /// For the declarations that are not file-scoped and so can decide what a
+    /// name in the main source means: a `typealias` naming one of our
+    /// annotations, and a type whose name shadows an on-demand import of one.
+    /// Java as well as Kotlin, because the second of those is a Java rule too --
+    /// a `p/Ios.java` beside the main class is what `@Ios` means there,
+    /// whatever the wildcard import says.
+    ///
+    /// Bounded in files read and in directories walked, because this runs when
+    /// the tool opens a project and a source tree is not a search index; a
+    /// project past the bound simply keeps the earlier behaviour for whatever
+    /// was declared in a file nobody reached.
+    private java.util.List<String> otherProjectSources(String projectDir, String exclude) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (projectDir == null) {
             return out;
@@ -2390,7 +2393,10 @@ public class CodenameOneSettings extends Lifecycle {
                     }
                     continue;
                 }
-                if (!name.endsWith(".kt") || path.equals(exclude) || out.size() >= 200) {
+                if (!name.endsWith(".kt") && !name.endsWith(".java")) {
+                    continue;
+                }
+                if (path.equals(exclude) || out.size() >= 200) {
                     continue;
                 }
                 String text = readIfPresent(path);
@@ -3290,10 +3296,9 @@ public class CodenameOneSettings extends Lifecycle {
                 kotlin ? visibleTypeAliases(source, otherSources)
                        : new java.util.ArrayList<AliasDeclaration>();
         // The sources whose top-level types could shadow an on-demand import:
-        // this file, and the rest of its package. Limited to what has been read
-        // -- the sweep exists for typealiases and so is Kotlin-only -- which
-        // costs a false "owned" for a same-named type declared in a file nobody
-        // opened, exactly as before this check existed.
+        // this file, and the rest of its package. A package declaration reads
+        // the same in both languages, so a mixed project's Java peers are
+        // classified correctly even when the main class is Kotlin.
         java.util.List<String> samePackage = new java.util.ArrayList<>();
         samePackage.add(source);
         if (otherSources != null) {
