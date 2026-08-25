@@ -1396,7 +1396,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // declaration and have to go with it.
             int last = i;
             StringBuilder logical = new StringBuilder(withoutTerminator(lines.get(i)));
-            while (continues(withoutTerminator(lines.get(last))) && last + 1 < lines.size()) {
+            // A COMMENT is a natural line: continuation does not apply to it, so
+            // `# note \` ends at the newline and the declaration below it is an
+            // ordinary property. Joining the two made the pair read as a
+            // comment, so the migrated declaration was retained and the
+            // verification build failed on the duplicate.
+            boolean comment = isCommentLine(logical.toString());
+            while (!comment && continues(withoutTerminator(lines.get(last)))
+                    && last + 1 < lines.size()) {
                 // The continuation backslash is a MARKER, not part of the value:
                 // Properties.load drops it, so leaving it in made
                 // `codename1.arg.ios.teamId\` + ` =ABCDE` read as an escaped `=`
@@ -1412,7 +1419,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // Properties.load, while leaving it in produced a key ending in `\`
             // that matched nothing -- so the declaration stayed and the
             // verification build failed on the duplicate.
-            if (continues(logical.toString())) {
+            if (!comment && continues(logical.toString())) {
                 logical.setLength(logical.length() - 1);
             }
             String key = propertyKeyOf(logical.toString());
@@ -1482,6 +1489,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             end--;
         }
         return line.substring(0, end);
+    }
+
+    /** Whether the line is a comment, which continuation does not apply to. */
+    private static boolean isCommentLine(String line) {
+        int i = 0;
+        while (i < line.length() && isPropertySpace(line.charAt(i))) {
+            i++;
+        }
+        return i < line.length() && (line.charAt(i) == '#' || line.charAt(i) == '!');
     }
 
     /** Whether a physical line ends in an odd number of backslashes. */

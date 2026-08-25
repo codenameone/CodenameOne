@@ -696,4 +696,46 @@ public class MigrateBuildHintsPropertyParsingTest {
                 java.util.Arrays.asList("codename1.arg.ios.teamId"));
         assertEquals("codename1.displayName=Demo\n", read(f));
     }
+
+    /// A comment is a natural line: continuation does not apply to it, so
+    /// `# note \` ends at the newline and the declaration below it is an
+    /// ordinary property. Joining the two made the pair read as a comment, so
+    /// the migrated declaration was retained and the verification build failed
+    /// on the duplicate.
+    @Test
+    public void aCommentEndingInABackslashDoesNotSwallowTheNextLine() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "# note \\\n"
+                + "codename1.arg.ios.pods=Alamofire\n"
+                + "codename1.displayName=Demo\n");
+
+        java.util.Properties loaded = new java.util.Properties();
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            loaded.load(in);
+        } finally {
+            in.close();
+        }
+        assertEquals("Alamofire", loaded.getProperty("codename1.arg.ios.pods"));
+
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.pods"));
+        assertEquals("# note \\\ncodename1.displayName=Demo\n", read(f));
+    }
+
+    /// A `!` comment is a comment too, and a real continuation still continues.
+    @Test
+    public void onlyCommentsAreExemptFromContinuation() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "! note \\\n"
+                + "codename1.arg.ios.pods=Alamofire,\\\n"
+                + "    SwiftyJSON\n"
+                + "codename1.displayName=Demo\n");
+
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.pods"));
+        assertEquals("! note \\\ncodename1.displayName=Demo\n", read(f));
+    }
 }
