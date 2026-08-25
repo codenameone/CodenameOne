@@ -75,8 +75,11 @@ public class CompileSourceRootsTest {
         // What Maven listed, the conventional Kotlin root, and the dirs the
         // plugin compiles.
         assertTrue(roots.toString(), contains(roots, basedir, "src/main/java"));
-        assertTrue(roots.toString(), contains(roots, basedir, "src/main/kotlin"));
         assertTrue(roots.toString(), contains(roots, basedir, "src/extra/kotlin"));
+        // NOT the conventional Kotlin root: this project says where its Kotlin
+        // sources are, and a configured <sourceDirs> replaces the default. See
+        // theConventionalKotlinRootYieldsToAConfiguredOne.
+        assertFalse(roots.toString(), contains(roots, basedir, "src/main/kotlin"));
         // NOT the plugin-level list: the compile execution supplies its own, and
         // Maven merges by element rather than appending. See
         // aKotlinExecutionsSourceDirsReplaceThePluginLevelOnes.
@@ -214,5 +217,44 @@ public class CompileSourceRootsTest {
         List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
         assertTrue(roots.toString(), contains(roots, basedir, "gen/execution"));
         assertFalse(roots.toString(), contains(roots, basedir, "gen/plugin-level"));
+    }
+
+    /**
+     * A configured `<sourceDirs>` REPLACES the default, so an existing
+     * `src/main/kotlin` beside one is a tree the build does not compile. Adding
+     * it made a stale class whose source still sits there look live, so the
+     * orphan filter kept it and the placement error it carries fired on every
+     * build.
+     */
+    @Test
+    public void theConventionalKotlinRootYieldsToAConfiguredOne() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.addExecution(execution("compile", "<sourceDirs><d>src/app/kotlin</d></sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertTrue(roots.toString(), contains(roots, basedir, "src/app/kotlin"));
+        assertFalse(roots.toString(), contains(roots, basedir, "src/main/kotlin"));
+    }
+
+    /** With nothing configured, the convention is the best answer there is. */
+    @Test
+    public void theConventionalKotlinRootCountsWhenNothingReplacesIt() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.addExecution(execution("compile", "<jvmTarget>17</jvmTarget>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                "src/main/kotlin"));
     }
 }

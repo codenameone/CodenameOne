@@ -1140,15 +1140,21 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (configured != null) {
             roots.addAll(configured);
         }
+        addKotlinSourceDirs(project, roots);
+        // The conventional Kotlin root, but only where the Kotlin plugin has not
+        // said where its sources are. A configured <sourceDirs> REPLACES the
+        // default, so an existing src/main/kotlin beside one is a tree the build
+        // does not compile -- and a stale class whose source still sits there
+        // then looked live, so the orphan filter kept it and the placement error
+        // it carries fired on every build.
         File basedir = project.getBasedir();
-        if (basedir != null) {
+        if (basedir != null && !declaresKotlinSourceDirs(project)) {
             File kotlin = new File(basedir, "src" + File.separator + "main"
                     + File.separator + "kotlin");
             if (kotlin.isDirectory() && !roots.contains(kotlin.getAbsolutePath())) {
                 roots.add(kotlin.getAbsolutePath());
             }
         }
-        addKotlinSourceDirs(project, roots);
         addBuildHelperSources(project, roots);
         return roots;
     }
@@ -1309,6 +1315,30 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             out = out.replace("${project.build.directory}", build);
         }
         return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /** Whether the Kotlin plugin says where its main sources are. */
+    private static boolean declaresKotlinSourceDirs(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            for (Object configuration : configurationsFor(plugin, "compile", "sourceDirs")) {
+                if (has(configuration, "sourceDirs")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
