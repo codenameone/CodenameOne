@@ -83,21 +83,37 @@ public class GcSteadyState {
     static final Object SUM_LOCK = new Object();
     static long checksum = 0;
     /**
-     * Per-worker node counts, one slot each, so counting costs no synchronisation and
-     * loses no increments. A single shared counter cannot be used for this: an
-     * unsynchronised read-modify-write from four workers drops updates at a rate that
-     * depends on CONTENTION, and contention is precisely what differs between the builds
-     * this benchmark compares -- a build whose threads park more would lose fewer
-     * increments and so report a throughput advantage it does not have.
+     * Per-worker node counts, one holder each, so counting costs no synchronisation and
+     * loses no increments. A single shared counter cannot be used: an unsynchronised
+     * read-modify-write from four workers drops updates at a rate that depends on
+     * CONTENTION, and contention is precisely what differs between the builds this
+     * benchmark compares -- a build whose threads park more would lose fewer increments
+     * and report a throughput advantage it has not got.
      *
-     * Each worker republishes its slot once per round under SUM_LOCK, which the sampler
-     * also holds to read them, so the live series is properly published rather than
-     * merely hoped for. NODES= at the end is still the authoritative figure -- it is
-     * summed after join(), which orders it against every worker's last write regardless
-     * -- and the live series remains a progress indicator rather than a measurement,
-     * because a worker that is mid-round has not published yet.
+     * NODES= at the end is the authoritative figure: it is summed after join(), which
+     * orders it against every worker's last write regardless.
      */
-    static long[] nodeCounts;
+    static Progress[] progress;
+
+    /**
+     * One worker's published node count.
+     *
+     * <p>A volatile long, and NOT a synchronized publication, which is what this was
+     * first. monitorEnter is a GC SAFEPOINT in this VM, so taking a lock inside the search
+     * -- even once per million nodes -- let the collector stop the workers far more often
+     * than the workload otherwise would, and the runaway this driver exists to reproduce
+     * stopped happening: peak footprint fell from 1271MB to 126MB with the reserve
+     * compiled out. That is the instrument destroying the experiment, which is the exact
+     * failure this whole change is about, so it is recorded here rather than fixed
+     * quietly.</p>
+     *
+     * <p>A volatile store is neither a safepoint nor a lock, and JLS 17.7 makes volatile
+     * long reads and writes atomic -- so this answers the visibility and tearing a plain
+     * long[] element had, without touching the workload's shape.</p>
+     */
+    static final class Progress {
+        volatile long nodes;
+    }
 
     /** One node of the search: small, short-lived, and REFERENCE-CARRYING. Only a non-leaf
      * object has a mark function, and only such an object is eligible for maturation into
@@ -165,7 +181,10 @@ public class GcSteadyState {
         // table walk costs nothing and this workload cannot tell a cheap drain from an
         // O(heap) one. Reference-carrying, because the rescan skips objects with no mark
         // function.
-        nodeCounts = new long[threads];
+        progress = new Progress[threads];
+        for (int i = 0; i < threads; i++) {
+            progress[i] = new Progress();
+        }
         legacyLiveSet = new Object[legacyBlocks][];
         for (int i = 0; i < legacyBlocks; i++) {
             Object[] block = new Object[LEGACY_BLOCK_REFS];
@@ -192,7 +211,7 @@ public class GcSteadyState {
         Thread[] workers = new Thread[threads];
         for (int t = 0; t < threads; t++) {
             final int seed = t * 7919;
-            final int slot = t;
+            final Progress mine = progress[t];
             workers[t] = new Thread(new Runnable() {
                 public void run() {
                     long sum = 0;
@@ -200,28 +219,19 @@ public class GcSteadyState {
                     int[] root = new int[BOARD_CELLS];
                     int round = 0;
                     while (!stop) {
-                        sum += search(root, depth, seed + round, counter, slot);
-                        // Publish once per round so the SAMPLE series is a live progress
-                        // indicator rather than a row of zeroes. A worker that stalls
-                        // stops publishing, and its slot going flat IS the signal.
-                        //
-                        // Under the lock sumNodes() reads: a plain long[] element write has
-                        // no visibility guarantee against a concurrent reader and Java 8
-                        // permits a 64-bit element to be observed torn, so the series could
-                        // sit stale or jump nonsensically -- precisely when a stalled
-                        // worker is what it is meant to show. Once per round is roughly
-                        // once a second per worker, so the lock costs nothing.
-                        synchronized (SUM_LOCK) {
-                            nodeCounts[slot] = counter[0];
-                        }
+                        sum += search(root, depth, seed + round, counter, mine);
+                        // Publish between rounds as well as inside the search, so a worker
+                        // that stalls stops publishing and its count going flat IS the
+                        // signal.
+                        mine.nodes = counter[0];
                         round++;
                         if (sleepMs > 0) {
                             sleep(sleepMs);
                         }
                     }
+                    mine.nodes = counter[0];
                     // Order-independent, so the checksum does not depend on scheduling.
                     synchronized (SUM_LOCK) {
-                        nodeCounts[slot] = counter[0];
                         checksum += sum;
                     }
                 }
@@ -272,16 +282,16 @@ public class GcSteadyState {
         System.out.println("GC_STEADY_STATE_DONE");
     }
 
-    private static int search(int[] board, int d, int seed, long[] c, int slot) {
+    private static int search(int[] board, int d, int seed, long[] c, Progress p) {
         if (stop) {
             return 0;
         }
         // Thread-private: this array belongs to one worker for the whole run.
         c[0]++;
         if ((c[0] & (PUBLISH_EVERY_NODES - 1)) == 0) {
-            synchronized (SUM_LOCK) {
-                nodeCounts[slot] = c[0];
-            }
+            // A volatile store, NOT a lock: monitorEnter is a GC safepoint here, and one
+            // inside the search changes the workload this driver exists to reproduce.
+            p.nodes = c[0];
         }
         if (d == 0) {
             int s = 0;
@@ -307,7 +317,7 @@ public class GcSteadyState {
                 chain = mv;
             }
             // chain is null when movesPerNode is 0, which is the leaf-only ablation.
-            int v = search(child, d - 1, seed + b + (chain == null ? 0 : chain.to), c, slot);
+            int v = search(child, d - 1, seed + b + (chain == null ? 0 : chain.to), c, p);
             if (v > best) {
                 best = v;
             }
@@ -330,13 +340,11 @@ public class GcSteadyState {
     }
 
     private static long sumNodes() {
-        synchronized (SUM_LOCK) {
-            long total = 0;
-            for (int i = 0; i < nodeCounts.length; i++) {
-                total += nodeCounts[i];
-            }
-            return total;
+        long total = 0;
+        for (int i = 0; i < progress.length; i++) {
+            total += progress[i].nodes;
         }
+        return total;
     }
 
     private static long footprintKb() {

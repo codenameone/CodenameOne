@@ -117,6 +117,12 @@ class GcSteadyStateIntegrationTest {
     private static final int MIN_CYCLES = 24;
 
     /**
+     * Wall-clock samples needed before the second series means anything. The emitter runs
+     * at 1Hz and the workload is tens of seconds, so this is a floor and not a target.
+     */
+    private static final int MIN_WALL_ROWS = 10;
+
+    /**
      * Synthetic per-process budget for the ceiling scenario.
      *
      * Deliberately TIGHT rather than device-sized. The fourth scenario needs the
@@ -228,6 +234,25 @@ class GcSteadyStateIntegrationTest {
         assertTrue(good.secondHalfPageGrowth() <= MAX_SECOND_HALF_PAGE_GROWTH,
                 describe("The page heap is still compounding in the second half of the run",
                         good));
+
+        // The per-cycle series above is blind to the shape this whole gate is really
+        // about: a collector that completes its early cycles and then never finishes
+        // another. [GCPROBE] stops emitting at that point, so its rows can end while the
+        // heap is still growing, and the generated main returns as soon as the workers do
+        // -- the process exits cleanly, prints the marker, and the stall goes unrecorded.
+        // [GCPROBE-T] is 1Hz off atomics and keeps sampling through exactly that state,
+        // which is why it was added; checking it here is what makes it a gate rather than
+        // a convenience.
+        int wallRows = wallSampleCount(clean.output);
+        assertTrue(wallRows >= MIN_WALL_ROWS,
+                "Only " + wallRows + " [GCPROBE-T] samples: the wall-clock emitter did not"
+                        + " run, so the stalled-collector check below measured nothing.");
+        double wallGrowth = wallSecondHalfPageGrowth(clean.output);
+        assertTrue(wallGrowth <= MAX_SECOND_HALF_PAGE_GROWTH,
+                "The page heap is still compounding on the WALL-CLOCK series (second-half"
+                        + " growth " + String.format("%.3f", wallGrowth) + " over " + wallRows
+                        + " samples), which the per-cycle series cannot see if the collector"
+                        + " stopped completing cycles.");
 
         // ---- 2. proof that the gate can fail ----------------------------------
         // CN1_SATB_LOG_FRESH is the escape hatch that restores the pre-fix barrier, so it
@@ -415,6 +440,46 @@ class GcSteadyStateIntegrationTest {
             }
             return (double) (pagesAtEnd - pagesAtMid) / pagesAtMid;
         }
+    }
+
+    /** pgTotal from the 1Hz [GCPROBE-T] series, in emission order. */
+    private static List<Long> wallPages(String output) {
+        List<Long> pages = new ArrayList<>();
+        for (String line : output.split("\\R")) {
+            if (!line.startsWith("[GCPROBE-T] v=1")) {
+                continue;
+            }
+            for (String token : line.split("\\s+")) {
+                if (token.startsWith("pgTotal=")) {
+                    try {
+                        pages.add(Long.parseLong(token.substring("pgTotal=".length())));
+                    } catch (NumberFormatException ignored) {
+                        // a malformed row is not a measurement; skip it
+                    }
+                }
+            }
+        }
+        return pages;
+    }
+
+    private int wallSampleCount(String output) {
+        return wallPages(output).size();
+    }
+
+    /** Second-half page growth measured on wall-clock time rather than on cycles. */
+    private double wallSecondHalfPageGrowth(String output) {
+        List<Long> pages = wallPages(output);
+        if (pages.size() < MIN_WALL_ROWS) {
+            return Double.MAX_VALUE;
+        }
+        // Same windowing as the per-cycle series: drop the first fifth as start-up.
+        int from = pages.size() / 5;
+        int mid = (from + pages.size()) / 2;
+        long atMid = pages.get(mid);
+        if (atMid == 0) {
+            return Double.MAX_VALUE;
+        }
+        return (double) (pages.get(pages.size() - 1) - atMid) / atMid;
     }
 
     private String describe(String what, Series s) {

@@ -4136,14 +4136,19 @@ static long long cn1PacingUncollectedBytes(void) {
 //
 //                     peak footprint   smallest headroom   throughput
 //   no reserve        1271MB, x4       63MB, x4            1.00
-//   reserve limit>>2  1015-1027MB      306-308MB           0.97-1.05, median 0.99
+//   reserve limit>>2  1022-1064MB      272-304MB           0.875-1.035, median 0.90
 //
 // The first two columns are that repeatable because neither is an accident: without the
 // bound, admission converges on ceiling minus CN1_PACING_HEADROOM_MARGIN by construction;
-// with it, the control loop holds the reserve. Throughput is a wash -- two of the four
-// pairs came out faster with the bound on -- which is what a bound that engages only
-// inside the reserve, rather than taxing every allocation, should look like. Note
-// volumeParks in the [PACING] report reads 0 for a run that never enters the reserve.
+// with it, the control loop holds the reserve. volumeParks in the [PACING] report reads 0
+// for a run that never enters the reserve, which is what "engages only inside it" means
+// as a number.
+//
+// The throughput column is the third figure this comment has carried, and the earlier two
+// were both apparatus and not signal: a racy shared node counter, and then a synchronized
+// publication inside the search -- monitorEnter is a GC safepoint here, so the instrument
+// was letting the collector stop the workers and the runaway stopped reproducing at all.
+// About a tenth is the honest cost, measured with a driver that does neither.
 //
 // A single repetition each of the tighter reserves put >> 3 at 1183MB of peak and 150MB
 // of headroom, and >> 4 at 1207MB/127MB: a smaller reserve engages later and closer to
@@ -4174,6 +4179,43 @@ static long long cn1PacingUncollectedBytes(void) {
  */
 static long long cn1PacingReserveBytes(long long limitBytes) {
     return limitBytes >> CN1_PACING_RESERVE_SHIFT;
+}
+#endif
+
+/**
+ * Whether this thread may proceed under the reserve's volume bound.
+ *
+ * ONE definition, called from both the admission test and the wait loop. They started as
+ * two copies and drifted: the loop's copy was guarded on the thread having already been
+ * refused, so it could only ever transition refused->allowed. A thread that parked on
+ * BUDGET while outside the reserve then held a stale "allowed" for the whole wait, and
+ * could be admitted on headroom alone after other mutators had pushed the uncollected
+ * total past the cap and the process into the reserve.
+ *
+ * Returns true where the bound is compiled out, so callers need no #if.
+ */
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
+static JAVA_BOOLEAN cn1PacingVolumeOk(long procHeadroom) {
+    long long footprint = cn1PacingFootprintNow();
+    if(footprint <= 0) {
+        return JAVA_TRUE;               // no probe on this platform; nothing to bound against
+    }
+    if((long long)procHeadroom >= cn1PacingReserveBytes(footprint + (long long)procHeadroom)) {
+        return JAVA_TRUE;               // outside the reserve: full speed, this costs nothing
+    }
+    // Inside the reserve: clamp the mutator to the STATIC cap so the collector gets ahead
+    // and the footprint falls back out of it.
+    {
+        long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
+                                                            memory_order_relaxed);
+        return cn1PacingUncollectedBytes() <= trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER
+               ? JAVA_TRUE : JAVA_FALSE;
+    }
+}
+#else
+static JAVA_BOOLEAN cn1PacingVolumeOk(long procHeadroom) {
+    (void)procHeadroom;
+    return JAVA_TRUE;
 }
 #endif
 
@@ -4284,26 +4326,10 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     // drops inside the reserve. That is what keeps the footprint proportional to the
     // COLLECTOR'S WORK rather than to the device's budget, and it is the bound the
     // unbudgeted branch has always had and this one dropped.
-    JAVA_BOOLEAN volumeOk = JAVA_TRUE;
-#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
-    {
-        long long footprint = cn1PacingFootprintNow();
-        if(footprint > 0
-           && (long long)procHeadroom
-                  < cn1PacingReserveBytes(footprint + (long long)procHeadroom)) {
-            // Inside the reserve: clamp the mutator to the STATIC cap so the collector
-            // gets ahead and the footprint falls back out of it. Gating on HEADROOM
-            // rather than on footprint is what makes this cost nothing until it is
-            // needed -- a process using three quarters of its budget and holding still
-            // is not in danger; one with no headroom left is.
-            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
-                                                                memory_order_relaxed);
-            volumeOk = cn1PacingUncollectedBytes()
-                           <= trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER
-                       ? JAVA_TRUE : JAVA_FALSE;
-        }
-    }
-#endif
+    // Gating on HEADROOM rather than on footprint is what makes this cost nothing until it
+    // is needed -- a process using three quarters of its budget and holding still is not in
+    // danger; one with no headroom left is.
+    JAVA_BOOLEAN volumeOk = cn1PacingVolumeOk(procHeadroom);
     // Short-circuit deliberately: cn1PacingTryAdmit CLAIMS on success, so it must not run
     // while the volume bound is refusing.
     JAVA_BOOLEAN admitted = volumeOk && cn1PacingTryAdmit(procHeadroom, need, pendingBytes);
@@ -4343,22 +4369,12 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         if(headroomNow < 0) {
             break;                       // budget disappeared under us; nothing to honour
         }
-#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
-        if(!volumeOk) {
-            // Re-test the volume bound too, or a thread refused by it would spin out its
-            // whole wait against a budget test that was never the thing blocking it.
-            // bibopBytesSinceGc is exchanged to 0 at cycle START, so this clears as soon
-            // as the collection this park requested begins.
-            long long footprintNow = cn1PacingFootprintNow();
-            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
-                                                                memory_order_relaxed);
-            volumeOk = (footprintNow <= 0
-                        || headroomNow >= cn1PacingReserveBytes(footprintNow + headroomNow)
-                        || cn1PacingUncollectedBytes()
-                               <= trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER)
-                       ? JAVA_TRUE : JAVA_FALSE;
-        }
-#endif
+        // Recomputed EVERY iteration and in both directions. A thread refused by the
+        // volume bound has to see it clear -- bibopBytesSinceGc is exchanged to 0 at cycle
+        // START, so it clears as soon as the collection this park requested begins -- and a
+        // thread that parked on budget alone has to start honouring it if other mutators
+        // push the process into the reserve while it waits.
+        volumeOk = cn1PacingVolumeOk(headroomNow);
         if(volumeOk && cn1PacingTryAdmit(headroomNow, need, pendingBytes)) {
             admitted = JAVA_TRUE;
             break;
