@@ -41,6 +41,54 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 public class SimulatorAnnotationManifestTest {
 
+    /**
+     * The launcher's identity decides, not the settings file's.
+     *
+     * <p><code>process-annotations</code> stamps the manifest with the effective
+     * main class -- the file with any <code>-Dcodename1.mainName</code> applied
+     * -- and <code>SimulatorMojo</code> forwards that same pair to the fork.
+     * Reading only the file disagreed with the stamp on an overridden build, so
+     * the simulator refused the manifest and ran without the hints the device
+     * build applies.</p>
+     */
+    @Test
+    public void theForwardedMainClassOutranksTheSettingsFile(@TempDir File tmp)
+            throws Exception {
+        writeProjectSettings(tmp, "com.example", "FileApp");
+        String mainBefore = System.getProperty("codename1.mainName");
+        String pkgBefore = System.getProperty("codename1.packageName");
+        System.setProperty("codename1.mainName", "OverriddenApp");
+        System.setProperty("codename1.packageName", "com.example");
+        try {
+            assertEquals("com.example.OverriddenApp", Simulator.configuredMainClass(tmp));
+        } finally {
+            restore("codename1.mainName", mainBefore);
+            restore("codename1.packageName", pkgBefore);
+        }
+        assertEquals("com.example.FileApp", Simulator.configuredMainClass(tmp));
+    }
+
+    private static void restore(String key, String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
+    }
+
+    private static void writeProjectSettings(File dir, String pkg, String main) throws Exception {
+        Properties p = new Properties();
+        p.setProperty("codename1.packageName", pkg);
+        p.setProperty("codename1.mainName", main);
+        FileOutputStream os =
+                new FileOutputStream(new File(dir, "codenameone_settings.properties"));
+        try {
+            p.store(os, null);
+        } finally {
+            os.close();
+        }
+    }
+
     /** A manifest that names no main class -- not something the processor writes. */
     private static void unstampedManifestIn(File dir, String hint) throws Exception {
         File out = new File(dir, "META-INF/codenameone");

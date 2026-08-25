@@ -656,42 +656,41 @@ public class Simulator {
     }
 
     /**
-     * The main class this project is configured to launch, or null.    /**
      * The main class this project is configured to launch, or null.
      *
-     * <p>Read from the settings file rather than from the system properties: the
-     * file is what the annotation processor stamped the manifest against, and a
-     * {@code -D} override is a launch choice rather than a change of identity.</p>
+     * <p>The launcher's answer first. {@code process-annotations} stamps the
+     * manifest with the EFFECTIVE identity -- the settings file with any
+     * {@code -Dcodename1.mainName} applied -- and {@code SimulatorMojo} forwards
+     * that same pair. Reading only the file disagreed with the stamp on an
+     * overridden build, so the simulator refused the manifest and silently ran
+     * without the hints the device build applies.</p>
+     *
+     * <p>The pair is taken from one source or the other, never mixed: a
+     * forwarded main class with no package is a project that has none, not one
+     * whose package should be read out of the file.</p>
      */
-    private static String configuredMainClass(File projectDir) {
-        java.util.Properties p = loadProjectSettings(projectDir);
-        if (p == null) {
-            return null;
+    static String configuredMainClass(File projectDir) {
+        String main = System.getProperty("codename1.mainName");
+        String pkg = System.getProperty("codename1.packageName");
+        if (main == null || main.trim().length() == 0) {
+            java.util.Properties p = loadProjectSettings(projectDir);
+            if (p == null) {
+                return null;
+            }
+            main = p.getProperty("codename1.mainName");
+            pkg = p.getProperty("codename1.packageName");
         }
-        String main = p.getProperty("codename1.mainName");
         if (main == null || main.trim().length() == 0) {
             return null;
         }
-        String pkg = p.getProperty("codename1.packageName");
         return (pkg == null || pkg.trim().length() == 0)
                 ? main.trim() : pkg.trim() + "." + main.trim();
     }
 
-    /**
-     * The emitted build hint manifest, or null when there is none.    /**
-     * The emitted build hint manifest, or null when there is none.
-     *
-     * <p>{@code target/classes} is only the default: a module may configure
-     * {@code build/outputDirectory}, and the annotation processor writes where
-     * that says. Hard-coding the conventional path meant the device build applied
-     * the annotated hints and {@code cn1:run} silently ignored them, which is the
-     * asymmetry this whole publishing step exists to remove.</p>
-     *
-     * <p>The configured directory is on the simulator's own classpath, so the
-     * classpath is searched rather than the layout guessed at. The conventional
-     * path is tried first, since it is right for almost every project and costs
-     * one stat.</p>
-     */
+    /** The manifest's path inside a jar, which is its resource path with / separators. */
+    private static final String ANNOTATION_HINTS_ENTRY =
+            "META-INF/codenameone/build-hints.properties";
+
     /**
      * A manifest that was found, and where.
      *
@@ -699,10 +698,6 @@ public class Simulator {
      * build the simulator runs resolves the application's own common module as a
      * dependency artifact, so its manifest has no path of its own.</p>
      */
-    /** The manifest's path inside a jar, which is its resource path with / separators. */
-    private static final String ANNOTATION_HINTS_ENTRY =
-            "META-INF/codenameone/build-hints.properties";
-
     static final class FoundManifest {
         final java.util.Properties hints;
         /** The file on disk, or null when it came out of a jar. */
@@ -719,6 +714,20 @@ public class Simulator {
         }
     }
 
+    /**
+     * The emitted build hint manifest, or null when there is none.
+     *
+     * <p>{@code target/classes} is only the default: a module may configure
+     * {@code build/outputDirectory}, and the annotation processor writes where
+     * that says. Hard-coding the conventional path meant the device build applied
+     * the annotated hints and {@code cn1:run} silently ignored them, which is the
+     * asymmetry this whole publishing step exists to remove.</p>
+     *
+     * <p>The configured directory is on the simulator's own classpath, so the
+     * classpath is searched rather than the layout guessed at. The conventional
+     * path is tried last, so a project that moved its output without running
+     * clean cannot have the leftover tree answer for it.</p>
+     */
     static FoundManifest findAnnotationManifest(File projectDir, String classPathStr,
                                                String expectedMain) {
         String resource = "META-INF" + File.separator + "codenameone"

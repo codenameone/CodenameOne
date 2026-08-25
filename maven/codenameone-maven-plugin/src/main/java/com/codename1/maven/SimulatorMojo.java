@@ -135,6 +135,14 @@ private static final String GROUP_ID="com.codenameone";
             java.setJvmargs(execArgs);
         }
         java.setArgs(properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
+        // The identity process-annotations stamped the build hint manifest with:
+        // the EFFECTIVE one, since `properties` carries any -D override. Without
+        // it the forked simulator reads codename1.mainName back out of the
+        // settings file, disagrees with the stamp on an overridden build, and
+        // refuses the manifest -- so the hints the device build applies would be
+        // silently absent under cn1:run.
+        forwardIdentity(java, "codename1.mainName");
+        forwardIdentity(java, "codename1.packageName");
         java.setDir(getCN1ProjectDir());
         
         Permissions perms = java.createPermissions();
@@ -214,6 +222,19 @@ private static final String GROUP_ID="com.codenameone";
     
    
     
+    /// Passes one settings key to the fork as a system property, when it has a
+    /// value.
+    private void forwardIdentity(Java java, String key) {
+        String value = properties.getProperty(key);
+        if (value == null || value.trim().isEmpty()) {
+            return;
+        }
+        Variable v = new Variable();
+        v.setKey(key);
+        v.setValue(value.trim());
+        java.addSysproperty(v);
+    }
+
     private Path prepareClasspath(Java java) {
         Log log = getLog();
         log.debug("Preparing classpath for Simulator");
