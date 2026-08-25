@@ -1254,6 +1254,25 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      */
     private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
                                                   String goal, String element) {
+        return configurationsFor(plugin, goal, element, true);
+    }
+
+    /**
+     * The same, with {@code runsWithoutExecution} saying whether the goal is
+     * bound when the POM writes no execution for it.
+     *
+     * <p>It is for {@code maven-compiler-plugin}, which the default lifecycle
+     * binds, and for a Kotlin plugin with {@code <extensions>true</extensions>}.
+     * It is NOT for {@code build-helper-maven-plugin}, whose {@code add-source}
+     * runs only where an execution says so: plugin-level {@code <sources>} with
+     * no execution is dormant configuration, and treating it as a compiled root
+     * made a stale class in target/classes look live because its source sits
+     * there -- failing the placement check on every incremental build over a
+     * directory Maven never reads.</p>
+     */
+    private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
+                                                  String goal, String element,
+                                                  boolean runsWithoutExecution) {
         List<Object> out = new ArrayList<Object>();
         boolean bound = false;
         if (plugin.getExecutions() != null) {
@@ -1297,7 +1316,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 }
             }
         }
-        if (!bound && plugin.getConfiguration() != null) {
+        if (!bound && runsWithoutExecution && plugin.getConfiguration() != null) {
             out.add(plugin.getConfiguration());
         }
         return out;
@@ -1363,7 +1382,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // that actually supplies its <sources>. Every such execution adds
             // its own roots, so these accumulate -- but within one execution the
             // levels do not, they override.
-            for (Object configuration : configurationsFor(plugin, "add-source", "sources")) {
+            for (Object configuration
+                    : configurationsFor(plugin, "add-source", "sources", false)) {
                 addSourcesFrom(expressions, configuration, roots);
             }
         }
@@ -1587,23 +1607,35 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            if (plugin.isExtensions()) {
+            boolean disabled = false;
+            if (plugin.getExecutions() != null) {
+                for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                    if (!bindsCompile(execution)) {
+                        continue;
+                    }
+                    if (isDisabled(execution)) {
+                        disabled = true;
+                    } else {
+                        return true;
+                    }
+                }
+            }
+            // The lifecycle binding is what <extensions>true</extensions> buys,
+            // and a POM switches THAT off the same way it switches off any
+            // inherited execution -- <id>default-compile</id><phase>none</phase>.
+            // Returning true on extensions alone claimed src/main/kotlin for a
+            // module whose Kotlin compilation is explicitly disabled.
+            if (plugin.isExtensions() && !disabled) {
                 return true;
-            }
-            if (plugin.getExecutions() == null) {
-                continue;
-            }
-            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                if (isDisabled(execution)) {
-                    continue;
-                }
-                if ((execution.getGoals() != null && execution.getGoals().contains("compile"))
-                        || "default-compile".equals(execution.getId())) {
-                    return true;
-                }
             }
         }
         return false;
+    }
+
+    /// Whether `execution` binds the `compile` goal, disabled or not.
+    private static boolean bindsCompile(org.apache.maven.model.PluginExecution execution) {
+        return (execution.getGoals() != null && execution.getGoals().contains("compile"))
+                || "default-compile".equals(execution.getId());
     }
 
     /** Whether the Kotlin plugin says where its main sources are. */
@@ -1621,7 +1653,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            for (Object configuration : configurationsFor(plugin, "compile", "sourceDirs")) {
+            for (Object configuration
+                    : configurationsFor(plugin, "compile", "sourceDirs", plugin.isExtensions())) {
                 if (has(configuration, "sourceDirs")) {
                     return true;
                 }
@@ -1650,7 +1683,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // friends, and adding them made a deleted production class look
             // like it still had a source -- and within an execution the
             // configuration levels override rather than accumulate.
-            for (Object configuration : configurationsFor(plugin, "compile", "sourceDirs")) {
+            for (Object configuration
+                    : configurationsFor(plugin, "compile", "sourceDirs", plugin.isExtensions())) {
                 addSourceDirsFrom(expressions, configuration, roots);
             }
         }

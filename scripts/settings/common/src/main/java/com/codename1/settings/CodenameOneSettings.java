@@ -2413,12 +2413,28 @@ public class CodenameOneSettings extends Lifecycle {
     /// but it cannot write the duplicate declaration that fails the next build,
     /// which is what including a non-source directory could.
     static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain) {
+        return candidateSourceRoots(projectDir, hasSrcMain, true);
+    }
+
+    /// The same, with `kotlinCompiled` saying whether the build compiles the
+    /// conventional Kotlin root.
+    ///
+    /// It was always offered, and searched BEFORE anything the POM declares. A
+    /// module with no Kotlin plugin, or one that replaces the root with its own
+    /// `<sourceDirs>`, can still have a dormant copy of the main class sitting
+    /// there -- and picking that one over the compiled source is what makes an
+    /// annotation-owned hint look editable, so Add writes the duplicate the next
+    /// build refuses.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
+                                                       boolean kotlinCompiled) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (projectDir == null) {
             return out;
         }
         out.add(projectDir + "/src/main/java");
-        out.add(projectDir + "/src/main/kotlin");
+        if (kotlinCompiled) {
+            out.add(projectDir + "/src/main/kotlin");
+        }
         if (!hasSrcMain) {
             out.add(projectDir + "/src");
         }
@@ -2840,16 +2856,18 @@ public class CodenameOneSettings extends Lifecycle {
             // the roots, not a supplement to an answer.
             return out;
         }
-        java.util.List<String> candidates =
-                new java.util.ArrayList<>(candidateSourceRoots(projectDir, hasSrcMain));
-        // A module may put its sources somewhere else entirely, and the main
-        // class is the one file this list cannot afford to miss: without it
-        // nothing knows which hints an annotation owns, and Add writes the
-        // duplicate the next build refuses.
+        // What the POM DECLARES first, then the conventions. A module may put
+        // its sources somewhere else entirely, and the main class is the one
+        // file this list cannot afford to miss: without it nothing knows which
+        // hints an annotation owns, and Add writes the duplicate the next build
+        // refuses. Searching the conventions first let a dormant copy left at
+        // src/main/java be picked over the root the build really compiles.
+        //
         // Reached only when the launcher said nothing, since the resolved list
         // returns above. Maven applies profile activation, and activating one
         // explicitly DEACTIVATES an activeByDefault profile, so a root read from
         // such a profile is one the build is not compiling.
+        java.util.List<String> candidates = new java.util.ArrayList<>();
         for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom, pomProperties(),
                     chainPluginManagement())) {
@@ -2863,6 +2881,12 @@ public class CodenameOneSettings extends Lifecycle {
                 if (!candidates.contains(path)) {
                     candidates.add(path);
                 }
+            }
+        }
+        for (String conventional
+                : candidateSourceRoots(projectDir, hasSrcMain, compilesKotlinConventionally())) {
+            if (!candidates.contains(conventional)) {
+                candidates.add(conventional);
             }
         }
         for (String candidate : candidates) {
@@ -2990,6 +3014,34 @@ public class CodenameOneSettings extends Lifecycle {
             }
             at = close + name.length() + 3;
         }
+    }
+
+    /// Whether the POM chain says the build compiles `src/main/kotlin`.
+    ///
+    /// The same two conditions the resolved-root side applies: the Kotlin plugin
+    /// has to be bound -- an execution on `compile`, or
+    /// `<extensions>true</extensions>` -- and it must not say where its sources
+    /// are, because a configured `<sourceDirs>` REPLACES the default.
+    private boolean compilesKotlinConventionally() {
+        boolean bound = false;
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String plugin = activePluginBlock(active, "kotlin-maven-plugin", "sourceDir",
+                        chainPluginManagement());
+                if (plugin == null) {
+                    continue;
+                }
+                if (plugin.indexOf("<sourceDir>") >= 0) {
+                    return false;
+                }
+                if (plugin.indexOf("<extensions>true</extensions>") >= 0
+                        || !compileGoalConfiguration(plugin, "compile", "sourceDir").isEmpty()
+                            && plugin.indexOf("<execution>") >= 0) {
+                    bound = true;
+                }
+            }
+        }
+        return bound;
     }
 
     /// Every `<pluginManagement>` section in the POM chain, read once.

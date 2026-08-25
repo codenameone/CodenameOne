@@ -2121,6 +2121,25 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(pom).toString());
     }
 
+    /// The conventional Kotlin root is offered only where the build compiles it.
+    ///
+    /// It used to be in the list unconditionally, and searched BEFORE anything
+    /// the POM declares. A module with no Kotlin plugin, or one that replaces
+    /// the root with its own `<sourceDirs>`, can still have a dormant copy of
+    /// the main class sitting there -- and picking that over the compiled source
+    /// is what makes an annotation-owned hint look editable, so Add writes the
+    /// duplicate the next build refuses.
+    @Test
+    public void theConventionalKotlinRootIsOfferedOnlyWhenCompiled() {
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, true)
+                .contains("/p/common/src/main/kotlin"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, false)
+                .contains("/p/common/src/main/kotlin"));
+        // The Java root is not conditional on it.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false)
+                .contains("/p/common/src/main/java"));
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

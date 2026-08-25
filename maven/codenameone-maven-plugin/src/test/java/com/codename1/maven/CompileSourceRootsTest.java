@@ -243,13 +243,105 @@ public class CompileSourceRootsTest {
         helper.setConfiguration(config("<sources><a>gen/plugin-level</a></sources>"));
         PluginExecution off = execution("add-source",
                 "<sources><b>gen/disabled</b></sources>");
+        off.setId("inherited");
         off.setPhase("none");
         helper.addExecution(off);
+        // A live execution beside it, so the plugin-level configuration is
+        // genuinely in effect and the assertion below says something: with only
+        // the disabled one, add-source never runs and NOTHING is contributed.
+        helper.addExecution(execution("add-source", "<skip>false</skip>"));
         project.getBuild().addPlugin(helper);
 
         List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
         assertFalse(roots.toString(), contains(roots, basedir, "gen/disabled"));
         assertTrue(roots.toString(), contains(roots, basedir, "gen/plugin-level"));
+    }
+
+    /**
+     * Plugin-level `<sources>` with no execution is dormant configuration.
+     *
+     * <p>build-helper's `add-source` runs only where an execution says so, so a
+     * plugin declared with sources and no execution adds nothing. Treating that
+     * as a compiled root made a stale class in `target/classes` look live
+     * because its source sits there -- failing the placement check on every
+     * incremental build over a directory Maven never reads.</p>
+     */
+    @Test
+    public void pluginLevelSourcesNeedABoundGoal() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>gen/dormant</a></sources>"));
+        project.getBuild().addPlugin(helper);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "gen/dormant"));
+    }
+
+    /** ...and the same for a Kotlin plugin that binds nothing. */
+    @Test
+    public void pluginLevelSourceDirsNeedABoundGoal() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setConfiguration(config("<sourceDirs><d>src/dormant/kotlin</d></sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/dormant/kotlin"));
+    }
+
+    /**
+     * ...but `<extensions>true</extensions>` DOES bind it, so the plugin-level
+     * list is in effect with no execution written.
+     */
+    @Test
+    public void anExtensionsEnabledPluginsSourceDirsAreInEffect() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        kotlin.setConfiguration(config("<sourceDirs><d>src/app/kotlin</d></sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/app/kotlin"));
+    }
+
+    /**
+     * An extensions-enabled plugin whose `default-compile` is disabled compiles
+     * nothing.
+     *
+     * <p>The lifecycle binding is what `<extensions>true</extensions>` buys, and
+     * a POM switches that off the way it switches off any inherited execution.
+     * Claiming the root anyway kept a stale annotated class alive over a tree
+     * Kotlin compilation was explicitly turned off for.</p>
+     */
+    @Test
+    public void anExtensionsEnabledPluginHonoursADisabledCompile() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        PluginExecution off = new PluginExecution();
+        off.setId("default-compile");
+        off.setPhase("none");
+        kotlin.addExecution(off);
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
     }
 
     /** A conventional root that does not exist is not invented. */
@@ -332,6 +424,9 @@ public class CompileSourceRootsTest {
                 + "<b>${project.build.directory}/generated-sources</b>"
                 + "<c>${nobody.knows}/x</c>"
                 + "</sourceDirs>"));
+        // Bound, because plugin-level configuration is dormant without an
+        // execution -- Maven never runs the goal that would read it.
+        kotlin.addExecution(execution("compile", "<jvmTarget>17</jvmTarget>"));
         project.getBuild().addPlugin(kotlin);
 
         List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
@@ -368,6 +463,7 @@ public class CompileSourceRootsTest {
                 + "<b>${extra.sources}</b>"
                 + "<c>${shared.root}</c>"
                 + "</sources>"));
+        helper.addExecution(execution("add-source", "<skip>false</skip>"));
         project.getBuild().addPlugin(helper);
 
         List<String> roots = AbstractCN1Mojo.compileSourceRoots(project, user);
@@ -396,6 +492,7 @@ public class CompileSourceRootsTest {
                 + "<a>${generated.sources}</a>"
                 + "<b>${nobody.defines.this}/x</b>"
                 + "</sources>"));
+        helper.addExecution(execution("add-source", "<skip>false</skip>"));
         project.getBuild().addPlugin(helper);
 
         List<String> roots = AbstractCN1Mojo.compileSourceRoots(project, user);
@@ -416,6 +513,7 @@ public class CompileSourceRootsTest {
         Plugin helper = new Plugin();
         helper.setArtifactId("build-helper-maven-plugin");
         helper.setConfiguration(config("<sources><a>gen/dollar$dir</a></sources>"));
+        helper.addExecution(execution("add-source", "<skip>false</skip>"));
         project.getBuild().addPlugin(helper);
 
         assertTrue(contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
