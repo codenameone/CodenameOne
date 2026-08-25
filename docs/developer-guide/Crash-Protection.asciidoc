@@ -91,7 +91,7 @@ The Codename One crash-protection client runs incoming messages through a scrubb
 
 === Crash reports from a hardened build
 
-When a build is hardened (see <<app-hardening>>), the build server retains the cross-platform obfuscation mapping and symbolicates incoming reports against it, so a hardened build's crashes still land as readable, correctly lined issues. Two things follow from how the mapping is retained: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build -- whose mapping never reached the server -- can't be symbolicated at all. The ParparVM ports (iOS, tvOS, watchOS, mac-native, Windows, Linux) report structured `frames`, and also carry the pre-rendered trace in `rawStack`; the JavaScript port has no structured frames, so its report relies on the `rawStack` JavaScript engine stack (`js-error`), symbolicated best-effort through the source map.
+When a build is hardened (see <<app-hardening>>), the build server retains the cross-platform obfuscation mapping and symbolicates incoming reports against it, so a hardened build's crashes still land as readable, correctly lined issues. Two things follow from how the mapping is retained: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build -- whose mapping never reached the server -- can't be symbolicated at all. The ParparVM ports (iOS, tvOS, watchOS, macOS, Windows, Linux) report structured `frames`, and also carry the pre-rendered trace in `rawStack`; the JavaScript port has no structured frames, so its report relies on the `rawStack` JavaScript engine stack (`js-error`), symbolicated best-effort through the source map.
 
 ==== Default scrubber rules
 

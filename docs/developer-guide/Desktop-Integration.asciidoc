@@ -2,7 +2,7 @@
 
 Codename One is mobile-first, but the same app can run on the desktop: as a Java SE
 "`Run as desktop app`" / executable jar, and as a native macOS app via the local
-`mac-source` (Mac Catalyst) build target. By default a desktop build looks like a phone
+`mac-source` (native macOS) build target. By default a desktop build looks like a phone
 app in a window - a mobile-style `Toolbar` at the top of every `Form`, fading touch
 scrollbars, and commands tucked into a hamburger side menu.
 
@@ -64,26 +64,26 @@ Newly generated projects already contain these lines. The generated `<MainName>S
 at startup, so no code is required. Because the stub is the desktop entry point, the settings only
 ever take effect on the desktop.
 
-==== Enabling it on the macOS (Mac Catalyst) build
+==== Enabling it on the native macOS build
 
-The local `mac-source` build runs through ParparVM and the iOS port, where the chrome is provided
-by native `UIWindowScene` / `UIMenuBuilder` code. There it's read as a runtime property and
-defaults to `toolbar`, so existing Catalyst apps are unaffected. Opt in from your app before the
-first `Form` is shown:
+The local `mac-source` build runs through ParparVM, where the chrome is the application's own
+`NSWindow` and `NSMenu`. There it's read as a runtime property and defaults to `toolbar`, so
+existing apps are unaffected. Opt in from your app before the first `Form` is shown:
 
 [source,java]
 -----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava001Snippet.java[tag=desktop-integration-java-001,indent=0]
 -----
 
-NOTE: The native title bar and native menu bar on macOS require iOS 13 / macOS 10.15 (Catalyst)
-or newer. On a phone/tablet iOS build these properties are ignored.
+NOTE: On a phone or tablet iOS build these properties are ignored. The legacy Mac Catalyst target
+also honors them, through `UIWindowScene` and `UIMenuBuilder` rather than AppKit; see
+<<_working_with_mac_catalyst>>.
 
 === Native menu bar and command placement hints
 
 When the `Toolbar` is hidden (`native` or `custom` mode), the commands you add through the
 `Toolbar` / `Form` command API are bridged to the platform's native menu bar - a Swing `JMenuBar`
-(which becomes the macOS screen menu) on the Java SE build, and a `UIMenuBuilder` menu on Catalyst.
+(which becomes the macOS screen menu) on the Java SE build, and an `NSMenu` on the native macOS build.
 Selecting a menu item runs the command's `actionPerformed` on the Codename One EDT, exactly as a
 button press would.
 
@@ -108,9 +108,9 @@ The recognised values are (case-insensitive):
 |Unset |Grouped under a default *Commands* menu.
 |===
 
-Each port maps the hint to its native structure: on Catalyst the command is inserted into the real
-`UIMenuApplication` / `UIMenuFile` / `UIMenuEdit` / ... menus; on the Java SE build a top-level
-`JMenu` is created per hint group.
+Each port maps the hint to its native structure: on the native macOS build the command is inserted
+into the application's real `NSMenu` under the application, File, Edit, View, Window and Help
+submenus; on the Java SE build a top-level `JMenu` is created per hint group.
 
 TIP: The hint is a plain client property (`Command.DESKTOP_MENU`), so it's inert on platforms that
 don't have a native menu bar - it's safe to set it unconditionally in shared code.
@@ -129,7 +129,8 @@ The single-argument form uses the platform's *primary* modifier - Command on mac
 Windows/Linux - which is the right default for most menu shortcuts. The
 two-argument form takes a bit-mask of `Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY`,
 `Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT` and `Command.DESKTOP_SHORTCUT_MODIFIER_ALT`. On the
-Java SE build the accelerator becomes a Swing `KeyStroke`; on Catalyst it becomes a `UIKeyCommand`.
+Java SE build the accelerator becomes a Swing `KeyStroke`; on the native macOS build it becomes the
+menu item's `keyEquivalent` and `keyEquivalentModifierMask`.
 Like the placement hint, the accelerator is inert on platforms without a native menu bar, so it's
 safe to set unconditionally.
 
@@ -178,7 +179,7 @@ UIIDs.
 The standard `com.codename1.notifications.LocalNotification` API works on the desktop. On the
 Java SE desktop build a scheduled notification surfaces as a native OS notification through the
 system tray (Notification Center on macOS, the notification area on Windows/Linux); on the
-macOS / Mac Catalyst build it goes through the same `UNUserNotificationCenter` path as iOS. Clicking
+native macOS build it goes through the same `UNUserNotificationCenter` path as iOS. Clicking
 the notification delivers it to your app's `LocalNotificationCallback`, exactly as on mobile, so the
 same scheduling and handling code is shared across phone and desktop:
 

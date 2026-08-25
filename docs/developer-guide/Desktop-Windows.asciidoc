@@ -39,6 +39,10 @@ Windows are a desktop feature, and the API says so plainly:
 |Yes
 |
 
+|macOS
+|Yes
+|Each window is a real `NSWindow`. See <<macos-windows>>.
+
 |macOS (Mac Catalyst)
 |Opt-in
 |Needs `macNative.multiWindow=true`. See <<mac-catalyst-windows>>.
@@ -392,8 +396,26 @@ and its component hierarchy. Because a plausible image of the right size is exac
 what a silent fallback looks like, the Windows port logs when it happens rather than
 letting a re-render pass for a readback.
 
+[[macos-windows]]
+=== macOS
+
+Windows work on the native macOS build with no configuration and no build hint.
+Each one is a real `NSWindow`: it has the standard title bar and its close,
+minimize and zoom buttons, it takes part in Mission Control and the Window menu,
+and it owns its own GPU surface rather than displaying a raster rendered
+elsewhere.
+
+`Desktop.getMonitors()` reports the real display list from `NSScreen`, including
+each screen's backing scale, so a window restored onto a Retina display and one
+restored onto a non-Retina display each get the right density. Dragging a window
+between them updates it.
+
+Every operation on the windowing API is implemented. That's worth saying
+explicitly because the Mac Catalyst target below can't implement several of
+them, and code written against one target shouldn't surprise you on the other.
+
 [[mac-catalyst-windows]]
-=== Mac Catalyst
+=== Mac Catalyst (legacy)
 
 Windows are opt-in on the macOS (Mac Catalyst) target. Set the `macNative.multiWindow`
 build hint to `true` alongside `macNative.enabled`:
@@ -423,7 +445,7 @@ in a project that was generated once and then hand-edited.
 
 Catalyst differs in one implementation detail worth knowing: a window's Codename One
 content is rendered into an off-screen raster and presented to the scene's view, rather
-than the window owning a second GPU surface. Native peers and text editing still use the
+than the window owning a second GPU surface. The native macOS build doesn't do this. Native peers and text editing still use the
 scene's real view hierarchy, so they behave normally.
 
 Some window controls have no Mac Catalyst equivalent, because AppKit owns the

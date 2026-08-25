@@ -1,0 +1,98 @@
+== Working with Mac Catalyst
+
+[IMPORTANT]
+====
+Mac Catalyst was the previous macOS target. It's superseded by the native
+macOS build described in <<_working_with_macos>>, which produces an AppKit
+application rather than a UIKit one.
+
+Mac Catalyst remains buildable and is still exercised by the compliance suite,
+so existing projects keep working. New projects should use the native macOS
+build.
+====
+
+=== What Mac Catalyst Is
+
+Mac Catalyst isn't a macOS port. It's a slice of the iOS Xcode project: the
+same build pipeline, the same UIKit controls, one additional SDK. Apple's
+compatibility layer runs that UIKit application on macOS.
+
+That's why the behavior differs from a native Mac app in ways no amount of
+configuration reaches:
+
+* Windows are `UIWindowScene` instances rather than `NSWindow` instances.
+* The menu bar is built through `UIMenuBuilder`, and keyboard accelerators are
+  `UIKeyCommand` objects.
+* Controls are UIKit's, drawn by the compatibility layer rather than by AppKit.
+
+=== Build Targets
+
+[cols="1,3", options="header"]
+|===
+| Target | Purpose
+| `mac-catalyst-source` | Generates the Xcode project locally, under `target/<finalName>-mac-catalyst-source/`.
+| `mac-catalyst` | Builds on the Codename One build server.
+|===
+
+Both run with `-Dcodename1.platform=ios`, because Catalyst genuinely is an iOS
+build:
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-004,indent=0]
+----
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/working-with-mac-os-x.sh[tag=working-with-mac-os-x-shell-005,indent=0]
+----
+
+Generating the project locally requires Xcode and the Ruby `xcodeproj` gem. The
+Catalyst path injects its build settings into an already-generated iOS project
+after the fact, and that gem is what performs the injection; the native macOS
+build generates a macOS project directly and needs neither.
+
+=== Build Hints
+
+Mac Catalyst reads the `macNative.*` hint family: `distribution`, `teamId`,
+`bundleId`, `deriveBundleId`, `minDeploymentTarget`, `iosMinDeploymentTarget`,
+`appCategory`, `copyright`, the `signingIdentity.*` pair and the `notarize.*`
+group. They're listed in the build-hint reference under Mac Catalyst builds.
+
+`iosMinDeploymentTarget` exists only here. It sets the iOS half of the Catalyst
+slice, and the native macOS build has no such half.
+
+Deployment floors are macOS 10.15 and Catalyst 13.1.
+
+=== Windows
+
+A Codename One `Window` works on this target, with one difference worth knowing:
+the window's content is rendered into an off-screen raster and presented to the
+scene's view, rather than the window owning its own GPU surface. Native peer
+components and native text editing still use the scene's real view hierarchy and
+behave normally.
+
+Some window controls have no Mac Catalyst equivalent, because AppKit owns the
+behavior and Catalyst doesn't expose it to a `UIWindowScene`. `setAlwaysOnTop`,
+`setUtilityWindow`, `minimize`, `restore` and `toggleMaximize` do nothing here,
+and `setDecorated(false)` is partial: it hides the title bar's title and toolbar
+but the window frame remains. Modality, minimum window size and resizability all
+work. The native macOS build implements every one of them.
+
+=== Moving to the Native macOS Build
+
+What changes:
+
+* The build target becomes `mac-source` or `mac-os-x-native`.
+* The hint family becomes `macos.*`. The `macNative.*` names are still accepted,
+  so an existing configuration keeps working; `iosMinDeploymentTarget` is
+  ignored with a warning, because it no longer describes anything.
+* The deployment floor becomes macOS 11.
+* The window chrome becomes AppKit's, so a Mac user gets the title bar, menu bar
+  and window behavior they expect from any other Mac application.
+
+What doesn't change:
+
+* Your Java and Kotlin source.
+* Your signing certificates and provisioning profiles.
+* Your distribution channels, App Store Connect records and notarization setup.

@@ -696,7 +696,7 @@ arrive on the EDT.
 
 The public API and the unsupported fallback are present on every
 Codename One target. Vision has native implementations on Android, iOS,
-and Mac native (Mac Catalyst); Apple Vision is the default on Apple
+and macOS; Apple Vision is the default on Apple
 targets and Android uses ML Kit. Language services and LiteRT inference
 have native implementations on Android and iOS. JavaSE, JavaScript,
 native Windows, native Linux, watchOS, and tvOS report unsupported for

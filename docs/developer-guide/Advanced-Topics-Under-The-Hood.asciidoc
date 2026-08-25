@@ -563,79 +563,79 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Cloud device builds only. Build-type-specific variants of `ios.appext.NAME.provisioningURL`: point the `debug` variant at the extension's development profile and the `release` variant at its distribution profile. The Maven build resolves the variant matching the build target (`ios-device` and `ios-on-device-debug` are debug, `ios-device-release` is release) into the unqualified hint before submitting the build; the unqualified hint acts as the fallback. The same qualifiers work for the local-path settings `codename1.ios.debug.appext.NAME.provision` / `codename1.ios.release.appext.NAME.provision`.
 
 |codename1.mac.appid
-|Mac Native cloud builds only. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
+|macOS cloud builds. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
 
 |codename1.mac.certificate
-|Mac Native cloud builds only. Path to the `.p12` file containing the Mac signing certificate(s) — _Mac App Distribution_ (3rd Party Mac Developer Application) for App Store builds, _Developer ID Application_ for Developer ID builds, or both bundled into the same P12 when `macNative.distribution=both`. Not interchangeable with the iOS distribution certificate. Required for cloud Mac builds.
+|macOS cloud builds. Path to the `.p12` file containing the Mac signing certificate(s) — _Mac App Distribution_ (3rd Party Mac Developer Application) for App Store builds, _Developer ID Application_ for Developer ID builds, or both bundled into the same P12 when `macNative.distribution=both`. Not interchangeable with the iOS distribution certificate. Required for cloud Mac builds.
 
 |codename1.mac.certificatePassword
-|Mac Native cloud builds only. Password to unlock the P12 referenced by `codename1.mac.certificate`. Required for cloud Mac builds.
+|macOS cloud builds. Password to unlock the P12 referenced by `codename1.mac.certificate`. Required for cloud Mac builds.
 
 |codename1.mac.provision
-|Mac Native cloud builds only. Path to the Mac provisioning profile (`.provisionprofile`). Apple issues distinct provisioning profiles for Mac App Store and Developer ID distribution — pass the one that matches the chosen channel.
+|macOS cloud builds. Path to the Mac provisioning profile (`.provisionprofile`). Apple issues distinct provisioning profiles for Mac App Store and Developer ID distribution — pass the one that matches the chosen channel.
 
-|macNative.distribution
-|Mac Native builds only. `appStore` (default), `developerID`, or `both`. Selects which entitlements + ExportOptions plist + signing certificate to emit. `both` emits parallel `*-AppStore.entitlements` / `*-DeveloperID.entitlements` and matching `ExportOptions-*-Mac.plist` files so a single project can be archived to either channel.
+|macos.distribution
+|macOS builds. Every `macos.*` hint below is also accepted spelled `macNative.*`, which is what the legacy Mac Catalyst target reads, so an existing Catalyst project keeps building unchanged. `appStore` (default), `developerID`, or `both`. Selects which entitlements + ExportOptions plist + signing certificate to emit. `both` emits parallel `*-AppStore.entitlements` / `*-DeveloperID.entitlements` and matching `ExportOptions-*-Mac.plist` files so a single project can be archived to either channel.
 
-|macNative.teamId
-|Mac Native builds only. Apple Developer Team ID (alphanumeric). Falls back to `ios.release.teamId` → `ios.teamId` → `ios.debug.teamId` since most apps share a single Apple Developer Team for iOS and Mac.
+|macos.teamId
+|macOS builds. Apple Developer Team ID (alphanumeric). Falls back to `ios.release.teamId` → `ios.teamId` → `ios.debug.teamId` since most apps share a single Apple Developer Team for iOS and Mac.
 
-|macNative.bundleId
-|Mac Native builds only. Used only when `macNative.deriveBundleId=false`. Default: `<packageName>.mac`.
+|macos.bundleId
+|macOS builds. Used only when `macos.deriveBundleId=false`. Default: `<packageName>.mac`.
 
-|macNative.deriveBundleId
-|Mac Native builds only. `true` (default) maps to Xcode's `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER=YES` (Xcode appends `.maccatalyst` to the iOS bundle ID). Set to `false` to take the bundle ID verbatim from `macNative.bundleId`.
+|macos.deriveBundleId
+|macOS builds. `false` (default) gives the app its own bundle identifier, `<packageName>.mac`, because a macOS app and an iOS app are separate products in App Store Connect. `true` reuses the iOS identifier. On the legacy Mac Catalyst target this maps instead to Xcode's `DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER`, which appends `.maccatalyst`.
 
-|macNative.minDeploymentTarget
-|Mac Native builds only. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default `10.15` — earlier versions don't support Mac Catalyst.
+|macos.minDeploymentTarget
+|macOS builds. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default `11.0` on the native macOS build, which is the floor for a universal Apple silicon binary. The legacy Mac Catalyst target defaults to `10.15`.
 
 |macNative.iosMinDeploymentTarget
-|Mac Native builds only. iOS deployment-target floor for the Catalyst slice (`IPHONEOS_DEPLOYMENT_TARGET`). Default `13.1`. The plugin coerces the iOS slice's minimum upward when set.
+|*Mac Catalyst builds only.* iOS deployment-target floor for the Catalyst slice (`IPHONEOS_DEPLOYMENT_TARGET`). Default `13.1`. Catalyst is an iOS build, so it has an iOS floor; the native macOS build has no iOS half and ignores this hint with a warning.
 
-|macNative.appCategory
-|Mac Native builds only. `LSApplicationCategoryType` in the generated Info.plist. Default `public.app-category.utilities`. See https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype[Apple's category list].
+|macos.appCategory
+|macOS builds. `LSApplicationCategoryType` in the generated Info.plist. Default `public.app-category.utilities`. See https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype[Apple's category list].
 
-|macNative.copyright
-|Mac Native builds only. `NSHumanReadableCopyright` in the Info.plist. Defaults to `Copyright (c) <year> <vendor>`.
+|macos.copyright
+|macOS builds. `NSHumanReadableCopyright` in the Info.plist. Defaults to `Copyright (c) <year> <vendor>`.
 
-|macNative.signing.style
-|Mac Native builds only. `automatic` (default) lets Xcode pick the signing certificate; `manual` forces the certificate identity hints below to be respected verbatim.
+|macos.signing.style
+|macOS builds. `automatic` (default) lets Xcode pick the signing certificate; `manual` forces the certificate identity hints below to be respected verbatim.
 
-|macNative.signingIdentity.appStore
-|Mac Native builds only. Signing certificate identity for the App Store channel. Default `Apple Distribution`.
+|macos.signingIdentity.appStore
+|macOS builds. Signing certificate identity for the App Store channel. Default `Apple Distribution`.
 
-|macNative.signingIdentity.developerID
-|Mac Native builds only. Signing certificate identity for the Developer ID channel. Default `Developer ID Application`.
+|macos.signingIdentity.developerID
+|macOS builds. Signing certificate identity for the Developer ID channel. Default `Developer ID Application`.
 
-|macNative.provisioningProfile.appStore
-|Mac Native builds only. Provisioning profile name for App Store distribution — used only when `macNative.signing.style=manual`.
+|macos.provisioningProfile.appStore
+|macOS builds. Provisioning profile name for App Store distribution — used only when `macNative.signing.style=manual`.
 
-|macNative.provisioningProfile.developerID
-|Mac Native builds only. Provisioning profile name for Developer ID distribution — used only when `macNative.signing.style=manual`.
+|macos.provisioningProfile.developerID
+|macOS builds. Provisioning profile name for Developer ID distribution — used only when `macNative.signing.style=manual`.
 
-|macNative.entitlements.appSandbox
-|Mac Native builds only. `true` enables `com.apple.security.app-sandbox`. Default is `true` for the `appStore` channel (Mac App Store requires the sandbox), `false` for `developerID`.
+|macos.entitlements.appSandbox
+|macOS builds. `true` enables `com.apple.security.app-sandbox`. Default is `true` for the `appStore` channel (Mac App Store requires the sandbox), `false` for `developerID`.
 
-|macNative.entitlements.network.client
-|Mac Native builds only. Toggles `com.apple.security.network.client`. Default `true`.
+|macos.entitlements.network.client
+|macOS builds. Toggles `com.apple.security.network.client`. Default `true`.
 
-|macNative.entitlements.network.server
-|Mac Native builds only. Toggles `com.apple.security.network.server`. Default `false`.
+|macos.entitlements.network.server
+|macOS builds. Toggles `com.apple.security.network.server`. Default `false`.
 
-|macNative.entitlements.files.userSelected
-|Mac Native builds only. `readwrite` (default), `readonly`, or `none`. Sets the matching `com.apple.security.files.user-selected.*` entitlement.
+|macos.entitlements.files.userSelected
+|macOS builds. `readwrite` (default), `readonly`, or `none`. Sets the matching `com.apple.security.files.user-selected.*` entitlement.
 
-|macNative.entitlements.hardenedRuntime
-|Mac Native builds only. `true` enables hardened runtime restrictions. Default is `true` for `developerID` (notarization requires it), `false` for `appStore`.
+|macos.entitlements.hardenedRuntime
+|macOS builds. `true` enables hardened runtime restrictions. Default is `true` for `developerID` (notarization requires it), `false` for `appStore`.
 
-|macNative.entitlements.allowJit
-|Mac Native builds only. `true` enables `com.apple.security.cs.allow-jit` for hardened runtime. ParparVM is AOT-compiled so this is `false` by default; flip when bundling a JIT-using cn1lib.
+|macos.entitlements.allowJit
+|macOS builds. `true` enables `com.apple.security.cs.allow-jit` for hardened runtime. ParparVM is AOT-compiled so this is `false` by default; flip when bundling a JIT-using cn1lib.
 
-|macNative.entitlements.extra
-|Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>…</dict>` of the generated entitlements plist. Use for entitlements Codename One doesn't expose individually.
+|macos.entitlements.extra
+|macOS builds. Free-form XML inserted verbatim inside the `<dict>…</dict>` of the generated entitlements plist. Use for entitlements Codename One doesn't expose individually.
 
-|macNative.fixedWindowSize
-|Mac Native builds only. Opt-in. Format `<width>x<height>` — for example `1024x685`. When set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
+|macos.fixedWindowSize
+|macOS builds. Opt-in. Format `<width>x<height>` — for example `1024x685`. When set, the window's minimum and maximum size are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
 
 |desktop.width
 |Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.

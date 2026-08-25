@@ -14,3 +14,11 @@ xcodebuild -exportArchive \
   -exportOptionsPlist dist/ExportOptions-AppStore-Mac.plist \
   -exportPath build/export
 // end::working-with-mac-os-x-shell-003[]
+
+// tag::working-with-mac-os-x-shell-004[]
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-catalyst-source package
+// end::working-with-mac-os-x-shell-004[]
+
+// tag::working-with-mac-os-x-shell-005[]
+mvn -B -Dcodename1.platform=ios -Dcodename1.buildTarget=mac-catalyst package
+// end::working-with-mac-os-x-shell-005[]
