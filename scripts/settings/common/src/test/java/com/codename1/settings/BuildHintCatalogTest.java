@@ -1692,7 +1692,8 @@ public class BuildHintCatalogTest {
                         + "<sourceDirectory>appsrc</sourceDirectory>"
                         + "<plugins>"
                         + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
-                        + "<executions><execution><configuration><sources>"
+                        + "<executions><execution><goals><goal>add-source</goal></goals>"
+                        + "<configuration><sources>"
                         + "<source>src/generated/java</source>"
                         + "</sources></configuration></execution></executions></plugin>"
                         + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
@@ -1712,7 +1713,8 @@ public class BuildHintCatalogTest {
                         + "<sourceDirectory>appsrc</sourceDirectory>"
                         + "<testSourceDirectory>src/test/java</testSourceDirectory>"
                         + "<plugins><plugin><artifactId>build-helper-maven-plugin</artifactId>"
-                        + "<executions><execution><configuration><sources>"
+                        + "<executions><execution><goals><goal>add-source</goal></goals>"
+                        + "<configuration><sources>"
                         + "<source>src/integrationTest/java</source>"
                         + "</sources></configuration></execution></executions></plugin>"
                         + "</plugins></build></project>");
@@ -1744,10 +1746,39 @@ public class BuildHintCatalogTest {
         assertTrue(helper.contains("gen/main"), helper.toString());
         assertFalse(helper.contains("gen/fixtures"), helper.toString());
 
-        // What it cannot resolve it leaves alone rather than guessing.
+        // The Kotlin plugin's test-compile execution uses the same element, and
+        // a test directory whose NAME does not look like one is otherwise read
+        // as production code.
+        java.util.List<String> kotlin = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "<execution><goals><goal>test-compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>fixtures</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(kotlin.contains("src/main/kt"), kotlin.toString());
+        assertFalse(kotlin.contains("fixtures"), kotlin.toString());
+
+        // A project-directory expression is deterministic, so it is resolved
+        // rather than discarded.
+        java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${project.basedir}/appsrc</sourceDirectory>"
+                        + "</build></project>");
+        assertTrue(expression.contains("${project.basedir}/appsrc"), expression.toString());
+        assertEquals("/p/common/appsrc",
+                CodenameOneSettings.expandProjectPaths("${project.basedir}/appsrc", "/p/common"));
+        assertEquals("/p/common/target/generated",
+                CodenameOneSettings.expandProjectPaths("${project.build.directory}/generated",
+                        "/p/common"));
+
+        // What it still cannot resolve it leaves alone rather than guessing.
         assertTrue(CodenameOneSettings.declaredSourceRoots(
-                "<project><build><sourceDirectory>${basedir}/x</sourceDirectory></build></project>")
-                .isEmpty());
+                "<project><build><sourceDirectory>${custom.dir}/x</sourceDirectory></build>"
+                        + "</project>").isEmpty());
+        assertNull(CodenameOneSettings.expandProjectPaths("${custom.dir}/x", "/p/common"));
         assertTrue(CodenameOneSettings.declaredSourceRoots(null).isEmpty());
     }
 

@@ -2413,25 +2413,69 @@ public class CodenameOneSettings extends Lifecycle {
         // compiled, and treating it as a root put the templates back in the
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), out);
-        collectRoots(elementValues(pluginBlock(pomText, "kotlin-maven-plugin"), "sourceDir"), out);
+        collectRoots(compileGoalConfiguration(pluginBlock(pomText, "kotlin-maven-plugin"),
+                "compile"), "sourceDir", out);
         String helper = pluginBlock(pomText, "build-helper-maven-plugin");
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
             // plugin's compile and test-compile executions need.
-            for (String execution : executionsOf(helper)) {
-                if (execution.indexOf("add-test-source") < 0) {
-                    collectRoots(elementValues(execution, "source"), out);
-                }
-            }
+            collectRoots(compileGoalConfiguration(helper, "add-source"), "source", out);
         }
         return out;
+    }
+
+    /// The parts of a plugin element whose configuration applies to the MAIN
+    /// compilation: its executions bound to `goal`, or the whole element when it
+    /// declares no executions, since plugin-level configuration applies to every
+    /// goal including that one.
+    ///
+    /// The test goals use the same elements -- `test-compile` for Kotlin,
+    /// `add-test-source` for build-helper -- and a test directory whose name
+    /// does not look like one, `fixtures` say, is otherwise read as production
+    /// code and shadows a real annotation.
+    private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
+                                                                   String goal) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        boolean any = false;
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            any = true;
+            String execution = pluginBlock.substring(at, close);
+            // The goal as an ELEMENT: `test-compile` contains `compile`, so a
+            // substring test takes exactly the executions it must not.
+            if (execution.indexOf("<goal>" + goal + "</goal>") >= 0) {
+                out.add(execution);
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        if (!any) {
+            out.add(pluginBlock);
+        }
+        return out;
+    }
+
+    private static void collectRoots(java.util.List<String> blocks, String element,
+                                     java.util.List<String> out) {
+        for (String block : blocks) {
+            collectRoots(elementValues(block, element), out);
+        }
     }
 
     private static void collectRoots(java.util.List<String> values, java.util.List<String> out) {
         for (String value : values) {
             String path = value.trim().replace('\\', '/');
-            if (path.isEmpty() || path.indexOf('$') >= 0 || looksLikeATestRoot(path)) {
+            // A `${project.basedir}` prefix is deterministic and common; only
+            // an expression this reader cannot resolve makes the path unusable.
+            if (path.isEmpty() || expandProjectPaths(path, "/probe") == null
+                    || looksLikeATestRoot(path)) {
                 continue;
             }
             if (!out.contains(path)) {
@@ -2440,23 +2484,32 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
-    /// The `<execution>` blocks in a plugin element, or the whole element when
-    /// it has none -- configuration at plugin level applies to every goal.
-    private static java.util.List<String> executionsOf(String pluginBlock) {
-        java.util.List<String> out = new java.util.ArrayList<>();
-        int at = pluginBlock.indexOf("<execution>");
-        while (at >= 0) {
-            int close = pluginBlock.indexOf("</execution>", at);
-            if (close < 0) {
-                break;
+
+    /// `path` with the project-directory expressions Maven resolves the same way
+    /// every time applied, or null when an expression is left that this reader
+    /// cannot resolve.
+    static String expandProjectPaths(String path, String projectDir) {
+        String out = path;
+        out = replaceLiteral(out, "${project.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.baseDir}", projectDir);
+        out = replaceLiteral(out, "${basedir}", projectDir);
+        out = replaceLiteral(out, "${pom.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.build.directory}", projectDir + "/target");
+        return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    private static String replaceLiteral(String text, String find, String with) {
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = text.indexOf(find, at);
+            if (hit < 0) {
+                out.append(text.substring(at));
+                return out.toString();
             }
-            out.add(pluginBlock.substring(at, close));
-            at = pluginBlock.indexOf("<execution>", close);
+            out.append(text, at, hit).append(with);
+            at = hit + find.length();
         }
-        if (out.isEmpty()) {
-            out.add(pluginBlock);
-        }
-        return out;
     }
 
     /// Whether a declared path is a test tree, by the same convention the source
@@ -2509,8 +2562,12 @@ public class CodenameOneSettings extends Lifecycle {
         // THIS module rather than the module that declared it.
         for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom)) {
-                String path = declared.startsWith("/") || declared.indexOf(':') == 1
-                        ? declared : normalizePath(projectDir + "/" + declared);
+                String expanded = expandProjectPaths(declared, projectDir);
+                if (expanded == null) {
+                    continue;
+                }
+                String path = expanded.startsWith("/") || expanded.indexOf(':') == 1
+                        ? normalizePath(expanded) : normalizePath(projectDir + "/" + expanded);
                 if (!candidates.contains(path)) {
                     candidates.add(path);
                 }
