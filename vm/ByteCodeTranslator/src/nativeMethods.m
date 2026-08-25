@@ -1855,6 +1855,10 @@ JAVA_VOID java_lang_System_gcLight__(CODENAME_ONE_THREAD_STATE) {
 
 JAVA_BOOLEAN firstTimeGcThread = JAVA_TRUE;
 JAVA_BOOLEAN gcCurrentlyRunning = JAVA_FALSE;
+#ifdef CN1_GC_CONFORM
+extern void cn1GcProbeCycle(double markMs, double sweepMs);
+double cn1GcProbeMarkMs = 0, cn1GcProbeSweepMs = 0;
+#endif
 JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     gcCurrentlyRunning = JAVA_TRUE;
     if(firstTimeGcThread) {
@@ -1895,8 +1899,19 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     clock_gettime(CLOCK_MONOTONIC,&_t2);
     markNs  += (_t1.tv_sec-_t0.tv_sec)*1000000000LL+(_t1.tv_nsec-_t0.tv_nsec);
     sweepNs += (_t2.tv_sec-_t1.tv_sec)*1000000000LL+(_t2.tv_nsec-_t1.tv_nsec);
+#ifdef CN1_GC_CONFORM
+    // PER-CYCLE, not cumulative: "the pauses get longer" is a statement about the trend of
+    // one cycle's cost, and a running total cannot express it.
+    cn1GcProbeMarkMs  = ((_t1.tv_sec-_t0.tv_sec)*1000000000LL+(_t1.tv_nsec-_t0.tv_nsec)) / 1e6;
+    cn1GcProbeSweepMs = ((_t2.tv_sec-_t1.tv_sec)*1000000000LL+(_t2.tv_nsec-_t1.tv_nsec)) / 1e6;
+#endif
     gcCount++;
-    if(gcCount==1 || (gcCount % 20)==0) fprintf(stderr,"[GC-INSTR] cycles=%d allocs=%lld heapTableSize=%d markMs=%.0f sweepMs=%.0f\n",
+    // outOfLineAllocs, NOT allocations: cn1_instr_allocCount is bumped in
+    // codenameOneGcMalloc, and CN1_FAST_NEW's inlined bump path never reaches it. On a
+    // small-object workload -- the shape issue 5537 reported -- that is the overwhelming
+    // majority of allocation, so reading this as a total understates it by orders of
+    // magnitude. cn1AllocCensus (CN1_ALLOC_CENSUS) counts at every entry point.
+    if(gcCount==1 || (gcCount % 20)==0) fprintf(stderr,"[GC-INSTR] cycles=%d outOfLineAllocs=%lld heapTableSize=%d markMs=%.0f sweepMs=%.0f\n",
         gcCount, cn1_instr_allocCount, currentSizeOfAllObjectsInHeap, markNs/1e6, sweepNs/1e6);
 #else
     codenameOneGCMark();
@@ -1908,6 +1923,9 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         threadStateData->exception = JAVA_NULL;
     }
     flushReleaseQueue();
+#ifdef CN1_GC_CONFORM
+    cn1GcProbeCycle(cn1GcProbeMarkMs, cn1GcProbeSweepMs);
+#endif
 #ifdef CN1_ALLOC_CENSUS
     {
         // Several points, not one: allocation during startup and allocation once

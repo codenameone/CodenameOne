@@ -67,6 +67,18 @@
 #define CN1_CONSERVATIVE_GC_ROOTS
 #endif
 
+// CN1_GC_CONFORM: the footprint probe and (later) the structural conformance verifier
+// for issue 5537. UNLIKE CN1_GC_VERIFY it changes no allocator behaviour -- in particular
+// it does NOT force cn1BibopReleaseOffset() to 0, so the page-release and major-sweep
+// paths that CN1_GC_VERIFY compiles out entirely are live and measurable under it.
+// It subsumes CN1_GC_INSTRUMENT because the probe reports that flag's counters, and
+// those counters do not exist without it.
+#ifdef CN1_GC_CONFORM
+#ifndef CN1_GC_INSTRUMENT
+#define CN1_GC_INSTRUMENT
+#endif
+#endif
+
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b: conservative native-stack scanning as a REAL GC root source. Needs
 // signal-based universal thread stopping (sig_atomic_t / sigaction / ucontext).
