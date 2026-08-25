@@ -1558,4 +1558,40 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.generatedSourceRootUnder("/p/common", "build"));
         assertNull(CodenameOneSettings.generatedSourceRootUnder("/p/common/src", "test"));
     }
+
+    /// The compiler's source encoding is a project setting this tool does not
+    /// have, and decoding a single-byte source as UTF-8 produced replacement
+    /// characters -- so a non-ASCII package or class name never matched
+    /// `codename1.packageName` and the real main source was rejected.
+    @Test
+    public void aSourceIsReadInTheEncodingItIsWrittenIn() throws Exception {
+        String text = "package com.caf\u00e9;\npublic class MyApp {}\n";
+
+        // A UTF-8 source decodes as UTF-8...
+        byte[] utf8 = text.getBytes("UTF-8");
+        assertTrue(CodenameOneSettings.isValidUtf8(utf8));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(utf8, "UTF-8"), "MyApp", "com.caf\u00e9"));
+
+        // ...and a single-byte one does not, so it is read as ISO-8859-1, which
+        // is what it is.
+        byte[] latin1 = text.getBytes("ISO-8859-1");
+        assertFalse(CodenameOneSettings.isValidUtf8(latin1));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(latin1, "ISO-8859-1"), "MyApp", "com.caf\u00e9"));
+        // Read as UTF-8 instead it is mojibake, which is the bug.
+        assertFalse(CodenameOneSettings.declaresClass(
+                new String(latin1, "UTF-8"), "MyApp", "com.caf\u00e9"));
+
+        // Plain ASCII decodes either way, so nothing about the common case moves.
+        assertTrue(CodenameOneSettings.isValidUtf8("package com.example;\n".getBytes("UTF-8")));
+
+        // The shapes the validity check exists to reject.
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xC3}));
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xC0, (byte) 0xAF}));
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xED, (byte) 0xA0,
+                (byte) 0x80}));
+        assertTrue(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xF0, (byte) 0x9F,
+                (byte) 0x98, (byte) 0x80}));
+    }
 }

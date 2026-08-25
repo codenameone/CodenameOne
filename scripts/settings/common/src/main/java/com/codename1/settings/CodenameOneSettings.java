@@ -2489,19 +2489,19 @@ public class CodenameOneSettings extends Lifecycle {
                 String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
                 String path = dir + "/" + name;
                 if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
-                    // target/ and build/ hold compiled copies of these same
-                    // sources, and walking one would find a generated stub and
-                    // call it the main class.
-                    //
-                    // Unless we are already inside a source tree, where `build` is
-                    // an ordinary package name -- this repository has
-                    // com.codename1.build.shared -- and refusing to descend meant
-                    // a main class living there could not be read at all. An
-                    // output directory is never nested under src/.
-                    boolean output = ("target".equals(name) || "build".equals(name))
-                            && !insideSourceTree(dir);
-                    if (!output && !name.startsWith(".")) {
+                    // The same rules as the peer sweep, and for the same reason:
+                    // a main class generated into target/generated-sources is a
+                    // class the compiler sees, so skipping the whole of target
+                    // left its ownership unknown -- and Settings then offered an
+                    // annotation-owned hint as editable.
+                    if (peerDirectoryHoldsSources(dir, name, insideSourceTree(dir))) {
                         queue.add(path);
+                    } else {
+                        String generated = generatedSourceRootUnder(dir, name);
+                        if (generated != null && FileSystemStorage.getInstance()
+                                .isDirectory(ProjectIO.fsUrl(generated))) {
+                            queue.add(generated);
+                        }
                     }
                     continue;
                 }
@@ -2678,7 +2678,15 @@ public class CodenameOneSettings extends Lifecycle {
                 return null;
             }
             in = fs.openInputStream(url);
-            return Util.readToString(in, "UTF-8");
+            byte[] bytes = Util.readInputStream(in);
+            // UTF-8 where the file is UTF-8, which is the overwhelming case;
+            // ISO-8859-1 where it is not, since that never fails to decode. The
+            // compiler's source encoding is a project setting this tool does not
+            // have, and decoding a single-byte source as UTF-8 produced
+            // replacement characters -- so a non-ASCII package or class name
+            // never matched codename1.packageName, the real main source was
+            // rejected, and a hint an annotation owns read as editable.
+            return new String(bytes, isValidUtf8(bytes) ? "UTF-8" : "ISO-8859-1");
         } catch (Exception ex) {
             Log.e(ex);
             return null;
@@ -3030,6 +3038,56 @@ public class CodenameOneSettings extends Lifecycle {
                 || "sealed".equals(word) || "open".equals(word) || "abstract".equals(word)
                 || "final".equals(word) || "inner".equals(word) || "value".equals(word)
                 || "inline".equals(word) || "external".equals(word);
+    }
+
+    /// Whether `bytes` decode as UTF-8.
+    ///
+    /// Hand-rolled because CharsetDecoder is outside the Codename One API
+    /// subset this class compiles against, the same reason the name predicate
+    /// and the hex reader are.
+    static boolean isValidUtf8(byte[] bytes) {
+        int i = 0;
+        while (i < bytes.length) {
+            int b = bytes[i] & 0xFF;
+            int following;
+            int lowest;
+            int payload;
+            if (b < 0x80) {
+                i++;
+                continue;
+            } else if (b >= 0xC2 && b <= 0xDF) {
+                following = 1;
+                lowest = 0x80;
+                payload = 0x1F;
+            } else if (b >= 0xE0 && b <= 0xEF) {
+                following = 2;
+                lowest = 0x800;
+                payload = 0x0F;
+            } else if (b >= 0xF0 && b <= 0xF4) {
+                following = 3;
+                lowest = 0x10000;
+                payload = 0x07;
+            } else {
+                return false;
+            }
+            if (i + following >= bytes.length) {
+                return false;
+            }
+            int value = b & payload;
+            for (int n = 1; n <= following; n++) {
+                int next = bytes[i + n] & 0xFF;
+                if (next < 0x80 || next > 0xBF) {
+                    return false;
+                }
+                value = (value << 6) | (next & 0x3F);
+            }
+            // Overlong, and the surrogate range, which UTF-8 does not encode.
+            if (value < lowest || value > 0x10FFFF || (value >= 0xD800 && value <= 0xDFFF)) {
+                return false;
+            }
+            i += following + 1;
+        }
+        return true;
     }
 
     /// `source` with its comments and literals replaced by spaces, offsets and
