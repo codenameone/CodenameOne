@@ -1287,49 +1287,6 @@ class WatchNativeBuilder {
     /// A comment is markup, not content: the parser reading the phone's plist drops it, so keeping
     /// it here escaped "<!-- note -->" into the watch's visible string. Inside CDATA the same
     /// characters are data and are left exactly as written.
-    /// The content with the markup a parser drops removed: comments and processing
-    /// instructions.
-    ///
-    /// Either may interrupt element content and neither is read as text, so
-    /// {@code <key>NSMain<?cn1 note?>NibFile</key>} names the same key as the contiguous
-    /// spelling. Leaving a processing instruction in the resolved text made such a key
-    /// unrecognizable, which left an injected main NIB in the Catalyst plist to pair with the
-    /// scene manifest -- the same failure a comment here used to cause.
-    ///
-    /// A declaration is not handled: one cannot appear inside element content.
-    /// {@link #skipMarkupBefore} covers those, where they can.
-    private static String stripIgnoredMarkup(String value) {
-        if (value == null
-                || (value.indexOf(COMMENT_OPEN) < 0 && value.indexOf(PI_OPEN) < 0)) {
-            return value;
-        }
-        StringBuilder out = new StringBuilder(value.length());
-        int i = 0;
-        while (i < value.length()) {
-            int comment = value.indexOf(COMMENT_OPEN, i);
-            int pi = value.indexOf(PI_OPEN, i);
-            // "<!--" never begins a processing instruction and "<?" never begins a comment,
-            // so the two openers cannot collide at one index; the earlier one wins.
-            boolean commentFirst = comment >= 0 && (pi < 0 || comment < pi);
-            int open = commentFirst ? comment : pi;
-            if (open < 0) {
-                out.append(value.substring(i));
-                break;
-            }
-            out.append(value, i, open);
-            String opener = commentFirst ? COMMENT_OPEN : PI_OPEN;
-            String closer = commentFirst ? COMMENT_CLOSE : PI_CLOSE;
-            int close = value.indexOf(closer, open + opener.length());
-            if (close < 0) {
-                // Unterminated: everything after it is inside the construct, so nothing more is
-                // content.
-                break;
-            }
-            i = close + closer.length();
-        }
-        return out.toString();
-    }
-
     private static final String CDATA_OPEN = "<![CDATA[";
 
     private static final String CDATA_CLOSE = "]]>";
@@ -1357,27 +1314,63 @@ class WatchNativeBuilder {
         if (raw == null) {
             return null;
         }
-        if (raw.indexOf(CDATA_OPEN) < 0) {
-            return decodeXmlEntities(stripIgnoredMarkup(raw));
-        }
+        // ONE left-to-right pass over all three constructs, because they nest both ways and
+        // neither order works as a pre-pass. A "<![CDATA[" written inside a comment is comment
+        // text, so finding CDATA first opened a section that never closes and swallowed the
+        // rest of the value; but a "<!--" written inside CDATA is literal data, so stripping
+        // comments first would delete text the author meant to keep. Only interleaving gets
+        // both right: at each step whichever construct starts earliest is the real one.
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
         while (i < raw.length()) {
             int cdata = raw.indexOf(CDATA_OPEN, i);
-            if (cdata < 0) {
-                out.append(decodeXmlEntities(stripIgnoredMarkup(raw.substring(i))));
+            int comment = raw.indexOf(COMMENT_OPEN, i);
+            int pi = raw.indexOf(PI_OPEN, i);
+            int next = -1;
+            String opener = null;
+            String closer = null;
+            boolean isData = false;
+            if (cdata >= 0) {
+                next = cdata;
+                opener = CDATA_OPEN;
+                closer = CDATA_CLOSE;
+                isData = true;
+            }
+            if (comment >= 0 && (next < 0 || comment < next)) {
+                next = comment;
+                opener = COMMENT_OPEN;
+                closer = COMMENT_CLOSE;
+                isData = false;
+            }
+            if (pi >= 0 && (next < 0 || pi < next)) {
+                next = pi;
+                opener = PI_OPEN;
+                closer = PI_CLOSE;
+                isData = false;
+            }
+            if (next < 0) {
+                out.append(decodeXmlEntities(raw.substring(i)));
                 break;
             }
-            out.append(decodeXmlEntities(stripIgnoredMarkup(raw.substring(i, cdata))));
-            int body = cdata + CDATA_OPEN.length();
-            int end = raw.indexOf(CDATA_CLOSE, body);
+            out.append(decodeXmlEntities(raw.substring(i, next)));
+            int body = next + opener.length();
+            int end = raw.indexOf(closer, body);
             if (end < 0) {
-                // Unterminated: take the remainder as data rather than emitting the marker as text.
-                out.append(raw.substring(body));
+                if (isData) {
+                    // Unterminated: take the remainder as data rather than emitting the marker
+                    // as text.
+                    out.append(raw.substring(body));
+                }
+                // An unterminated comment or instruction swallows the rest, which is what a
+                // parser does with it too.
                 break;
             }
-            out.append(raw, body, end);
-            i = end + CDATA_CLOSE.length();
+            if (isData) {
+                // Verbatim: CDATA is not entity-encoded, so decoding it would corrupt an
+                // author's literal "&amp;".
+                out.append(raw, body, end);
+            }
+            i = end + closer.length();
         }
         return out.toString();
     }

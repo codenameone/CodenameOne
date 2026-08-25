@@ -605,6 +605,27 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aCdataMarkerInsideACommentIsNotACdataSection() {
+        // The parser discards the comment whole, so this key reads as NSMainNibFile.
+        // Discovering CDATA with a raw search ran before comments were dropped, so the
+        // marker written inside the comment opened a CDATA section that never closes --
+        // the key went unrecognized and its entry stayed in the Catalyst plist.
+        String shared = document(
+                "    <key>NSMain<!-- <![CDATA[ example -->NibFile</key>\n"
+                + "    <string>MainWindow</string>\n");
+        assertFalse(IPhoneBuilder.plistForMacSlice(shared).contains("MainWindow"),
+                "a CDATA marker inside a comment is comment text, not a section");
+    }
+
+    @Test
+    void aCommentMarkerInsideCdataIsStillLiteralText() {
+        // The converse, which must keep working: inside a real CDATA section "<!--" is
+        // ordinary text, so it must not be treated as a comment and dropped.
+        assertEquals("a<!--b", WatchNativeBuilder.plistStringContent("a<![CDATA[<!--]]>b"),
+                "CDATA content is literal, including markup that looks like a comment");
+    }
+
+    @Test
     void aKeyInterruptedByAProcessingInstructionIsStillThatKey() {
         // A PI inside element content is markup the parser drops, exactly as a comment
         // is, so this key resolves to NSMainNibFile. Leaving the PI in the resolved text
