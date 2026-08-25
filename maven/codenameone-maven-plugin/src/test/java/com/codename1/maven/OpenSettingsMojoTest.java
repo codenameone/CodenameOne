@@ -184,6 +184,31 @@ public class OpenSettingsMojoTest {
         assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
     }
 
+    /// Maven does not copy a plugin parameter into the project's properties, so
+    /// a POM that sets `<encoding>` inside maven-compiler-plugin -- in a profile,
+    /// say -- published nothing and left the tool guessing.
+    @Test
+    public void theCompilerPluginsEncodingIsPublishedToo() throws Exception {
+        File root = tmp.newFolder("plugin-encoding");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        File input = tmp.newFile("plugin-encoding.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test
@@ -245,6 +270,7 @@ public class OpenSettingsMojoTest {
 
     private MavenProject projectAt(File basedir) {
         MavenProject project = new MavenProject();
+        project.setBuild(new org.apache.maven.model.Build());
         project.setFile(new File(basedir, "pom.xml"));
         project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
         return project;

@@ -2644,6 +2644,19 @@ public class CodenameOneSettings extends Lifecycle {
     /// Those of them that are there, plus whatever the POM declares.
     private java.util.List<String> mainSourceRoots(String projectDir) {
         FileSystemStorage fs = FileSystemStorage.getInstance();
+        // What the launcher resolved, when it did. Reading the POM is guesswork
+        // by comparison -- it cannot evaluate a profile activation, follow an
+        // inherited <sourceDirectory> or expand an arbitrary property -- so
+        // where Maven has already answered, that answer is used.
+        java.util.List<String> resolved = new java.util.ArrayList<>();
+        for (String root : splitRoots(binding == null ? null : binding.sourceRoots())) {
+            if (fs.isDirectory(ProjectIO.fsUrl(root))) {
+                resolved.add(root);
+            }
+        }
+        if (!resolved.isEmpty()) {
+            return resolved;
+        }
         boolean hasSrcMain = projectDir != null
                 && fs.isDirectory(ProjectIO.fsUrl(projectDir + "/src/main"));
         java.util.List<String> candidates =
@@ -2750,6 +2763,42 @@ public class CodenameOneSettings extends Lifecycle {
             out.append(parts.get(i));
         }
         return out.toString();
+    }
+
+    /// The roots a binding line names, or empty when it names none.
+    ///
+    /// Path-separated, since a comma is legal in a directory name. Both
+    /// separators are accepted so a binding written on one platform can be read
+    /// on another, and a bare drive letter is rejoined rather than read as a
+    /// root of its own.
+    static java.util.List<String> splitRoots(String joined) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (joined == null || joined.trim().isEmpty()) {
+            return out;
+        }
+        for (String piece : com.codename1.util.StringUtil.tokenize(joined, ":;")) {
+            String root = piece.trim();
+            if (root.isEmpty()) {
+                continue;
+            }
+            // Character.isLetter is outside the Codename One API subset this
+            // class compiles against, the same reason the name predicate and the
+            // hex reader are hand-rolled; a drive letter is ASCII anyway.
+            char first = root.charAt(0);
+            if (root.length() == 1
+                    && ((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z'))) {
+                // `C:/x` tokenizes as `C` then `/x`: the drive letter belongs to
+                // the path that follows it.
+                out.add(root + ":");
+                continue;
+            }
+            if (!out.isEmpty() && out.get(out.size() - 1).endsWith(":")) {
+                out.set(out.size() - 1, out.get(out.size() - 1) + root);
+                continue;
+            }
+            out.add(root);
+        }
+        return out;
     }
 
     /// The build directory the POM chain configures, nearest first, or null for
