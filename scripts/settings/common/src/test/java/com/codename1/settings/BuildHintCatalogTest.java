@@ -1752,4 +1752,37 @@ public class BuildHintCatalogTest {
                 + "</properties>" + resourcesOnly.substring("<project>".length());
         assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(property));
     }
+
+    /// `project.build.sourceEncoding` is normally declared once in the parent,
+    /// which is where a multi-module Codename One project puts it -- so looking
+    /// only at the bound module POM found nothing in the standard layout.
+    @Test
+    public void theParentPomIsPartOfTheChain() {
+        // Maven's own default when a parent is declared without a relativePath.
+        assertEquals("/p/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><artifactId>root</artifactId></parent></project>"));
+
+        // An explicit relativePath, to a file or to a directory.
+        assertEquals("/p/build/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><relativePath>../build/pom.xml</relativePath>"
+                                + "</parent></project>"));
+        assertEquals("/p/build/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><relativePath>../build</relativePath>"
+                                + "</parent></project>"));
+
+        // No parent is the end of the chain, and an empty relativePath means
+        // "from the repository", which this reader cannot follow.
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", "<project></project>"));
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                "<project><parent><relativePath></relativePath></parent></project>"));
+
+        // The path arithmetic the walk depends on.
+        assertEquals("/p/pom.xml", CodenameOneSettings.normalizePath("/p/common/../pom.xml"));
+        assertEquals("/p/a/pom.xml",
+                CodenameOneSettings.normalizePath("/p/common/./../a/pom.xml"));
+        assertEquals("a/pom.xml", CodenameOneSettings.normalizePath("b/../a/pom.xml"));
+    }
 }

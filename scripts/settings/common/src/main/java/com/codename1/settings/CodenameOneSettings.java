@@ -2479,6 +2479,81 @@ public class CodenameOneSettings extends Lifecycle {
         return out;
     }
 
+    /// The bound POM and its ancestors, nearest first.
+    ///
+    /// Bounded: a parent chain is short, and this walks the filesystem.
+    private java.util.List<String> pomChain() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        String path = binding == null ? null : binding.pom();
+        String text = pomText();
+        for (int depth = 0; depth < 8 && path != null && text != null; depth++) {
+            out.add(text);
+            String parent = parentPomPath(path, text);
+            if (parent == null || parent.equals(path)) {
+                break;
+            }
+            path = parent;
+            text = readIfPresentRaw(path);
+        }
+        return out;
+    }
+
+    /// Where `pomText`'s parent POM is, given that it lives at `pomPath`.
+    ///
+    /// `<relativePath>` when it says, `../pom.xml` when it does not, which is
+    /// Maven's own default. Null when the POM declares no parent at all.
+    static String parentPomPath(String pomPath, String pomText) {
+        if (pomPath == null || pomText == null || pomText.indexOf("<parent>") < 0) {
+            return null;
+        }
+        String relative = elementValue(
+                pomText.substring(pomText.indexOf("<parent>")), "relativePath");
+        if (relative == null) {
+            relative = "../pom.xml";
+        }
+        relative = relative.trim().replace('\\', '/');
+        if (relative.isEmpty()) {
+            // An empty relativePath means "resolve from the repository", which
+            // this reader cannot do.
+            return null;
+        }
+        if (!relative.endsWith(".xml")) {
+            relative = relative + "/pom.xml";
+        }
+        int slash = pomPath.replace('\\', '/').lastIndexOf('/');
+        String dir = slash < 0 ? "" : pomPath.replace('\\', '/').substring(0, slash);
+        return normalizePath(dir + "/" + relative);
+    }
+
+    /// A path with its `.` and `..` segments applied.
+    static String normalizePath(String path) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        boolean absolute = path.startsWith("/");
+        for (String segment : com.codename1.util.StringUtil.tokenize(path, "/")) {
+            if (segment.isEmpty() || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment)) {
+                if (!parts.isEmpty() && !"..".equals(parts.get(parts.size() - 1))) {
+                    parts.remove(parts.size() - 1);
+                    continue;
+                }
+                if (absolute) {
+                    continue;
+                }
+            }
+            parts.add(segment);
+        }
+        StringBuilder out = new StringBuilder(absolute ? "/" : "");
+        for (int i = 0; i < parts.size(); i++) {
+            if (i > 0) {
+                out.append('/');
+            }
+            out.append(parts.get(i));
+        }
+        return out.toString();
+    }
+
     /// The bound POM's text, read once per session.
     private String pomText() {
         if (!pomTextRead) {
@@ -3181,7 +3256,16 @@ public class CodenameOneSettings extends Lifecycle {
     private String declaredSourceEncoding() {
         if (!sourceEncodingRead) {
             sourceEncodingRead = true;
-            sourceEncoding = declaredSourceEncoding(pomText());
+            // The chain, not the module alone: `project.build.sourceEncoding`
+            // is normally declared once in the parent, which is where a
+            // multi-module Codename One project puts it -- so looking only at
+            // the bound POM found nothing in the standard layout.
+            for (String pom : pomChain()) {
+                sourceEncoding = declaredSourceEncoding(pom);
+                if (sourceEncoding != null) {
+                    break;
+                }
+            }
         }
         return sourceEncoding;
     }
