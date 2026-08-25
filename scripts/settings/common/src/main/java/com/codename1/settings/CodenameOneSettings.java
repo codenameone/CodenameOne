@@ -2392,19 +2392,106 @@ public class CodenameOneSettings extends Lifecycle {
         return out;
     }
 
-    /// Those of them that are there.
+    /// The roots a POM declares: `<sourceDirectory>`, and the source lists the
+    /// Kotlin and build-helper plugins take.
+    ///
+    /// A string read, like the rest of this tool's POM handling. It is looking
+    /// for plain elements, and what it cannot resolve -- a `${property}` path --
+    /// it leaves alone rather than guessing.
+    ///
+    /// A declared root under a test tree is dropped: those are configured
+    /// through the same elements, and one of them shadowing a production type is
+    /// the failure this list exists to avoid.
+    static java.util.List<String> declaredSourceRoots(String pomText) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pomText == null) {
+            return out;
+        }
+        for (String element : new String[] {"sourceDirectory", "sourceDir", "source"}) {
+            for (String value : elementValues(pomText, element)) {
+                String path = value.trim().replace('\\', '/');
+                if (path.isEmpty() || path.indexOf('$') >= 0 || looksLikeATestRoot(path)) {
+                    continue;
+                }
+                if (!out.contains(path)) {
+                    out.add(path);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether a declared path is a test tree, by the same convention the source
+    /// sets follow: a `test` segment, or one that says test the way
+    /// `testFixtures` and `integrationTest` do.
+    private static boolean looksLikeATestRoot(String path) {
+        for (String segment : com.codename1.util.StringUtil.tokenize(path, "/")) {
+            if ("test".equals(segment)
+                    || (segment.length() > 4 && segment.startsWith("test")
+                        && Character.isUpperCase(segment.charAt(4)))
+                    || segment.endsWith("Test") || segment.endsWith("Tests")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.util.List<String> elementValues(String xml, String name) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        String open = "<" + name + ">";
+        String shut = "</" + name + ">";
+        int at = xml.indexOf(open);
+        while (at >= 0) {
+            int close = xml.indexOf(shut, at + open.length());
+            if (close < 0) {
+                break;
+            }
+            out.add(xml.substring(at + open.length(), close));
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return out;
+    }
+
+    /// Those of them that are there, plus whatever the POM declares.
     private java.util.List<String> mainSourceRoots(String projectDir) {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         boolean hasSrcMain = projectDir != null
                 && fs.isDirectory(ProjectIO.fsUrl(projectDir + "/src/main"));
+        java.util.List<String> candidates =
+                new java.util.ArrayList<>(candidateSourceRoots(projectDir, hasSrcMain));
+        // A module may put its sources somewhere else entirely, and the main
+        // class is the one file this list cannot afford to miss: without it
+        // nothing knows which hints an annotation owns, and Add writes the
+        // duplicate the next build refuses.
+        for (String declared : declaredSourceRoots(pomText())) {
+            String path = declared.startsWith("/") || declared.indexOf(':') == 1
+                    ? declared : projectDir + "/" + declared;
+            if (!candidates.contains(path)) {
+                candidates.add(path);
+            }
+        }
         java.util.List<String> out = new java.util.ArrayList<>();
-        for (String candidate : candidateSourceRoots(projectDir, hasSrcMain)) {
+        for (String candidate : candidates) {
             if (fs.isDirectory(ProjectIO.fsUrl(candidate))) {
                 out.add(candidate);
             }
         }
         return out;
     }
+
+    /// The bound POM's text, read once per session.
+    private String pomText() {
+        if (!pomTextRead) {
+            pomTextRead = true;
+            if (binding != null && binding.pom() != null && !binding.pom().isEmpty()) {
+                pomText = readIfPresentRaw(binding.pom());
+            }
+        }
+        return pomText;
+    }
+
+    private boolean pomTextRead;
+    private String pomText;
 
     /// The text of every OTHER source in the project, bounded.
     ///
@@ -3094,9 +3181,7 @@ public class CodenameOneSettings extends Lifecycle {
     private String declaredSourceEncoding() {
         if (!sourceEncodingRead) {
             sourceEncodingRead = true;
-            if (binding != null && binding.pom() != null && !binding.pom().isEmpty()) {
-                sourceEncoding = declaredSourceEncoding(readIfPresentRaw(binding.pom()));
-            }
+            sourceEncoding = declaredSourceEncoding(pomText());
         }
         return sourceEncoding;
     }
@@ -3119,7 +3204,11 @@ public class CodenameOneSettings extends Lifecycle {
             value = elementValue(pomText, "maven.compiler.encoding");
         }
         if (value == null) {
-            value = elementValue(pomText, "encoding");
+            // Inside the COMPILER plugin. maven-resources-plugin declares an
+            // <encoding> of its own, and taking the first one in the file
+            // adopted the resource charset for every source -- so a UTF-8 source
+            // with a differently encoded resources block was read as neither.
+            value = elementValue(pluginBlock(pomText, "maven-compiler-plugin"), "encoding");
         }
         if (value == null || value.trim().isEmpty() || value.indexOf('$') >= 0) {
             // An unresolved ${property} is not an encoding, and this reader has
@@ -3129,7 +3218,27 @@ public class CodenameOneSettings extends Lifecycle {
         return value.trim();
     }
 
+    /// The `<plugin>` element declaring `artifactId`, or null.
+    static String pluginBlock(String pomText, String artifactId) {
+        if (pomText == null) {
+            return null;
+        }
+        int at = pomText.indexOf("<artifactId>" + artifactId + "</artifactId>");
+        if (at < 0) {
+            return null;
+        }
+        int open = pomText.lastIndexOf("<plugin>", at);
+        int close = pomText.indexOf("</plugin>", at);
+        if (open < 0 || close < 0) {
+            return null;
+        }
+        return pomText.substring(open, close);
+    }
+
     private static String elementValue(String xml, String name) {
+        if (xml == null) {
+            return null;
+        }
         String open = "<" + name + ">";
         int at = xml.indexOf(open);
         if (at < 0) {

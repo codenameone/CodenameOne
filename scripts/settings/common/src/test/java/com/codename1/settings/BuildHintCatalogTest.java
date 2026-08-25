@@ -1654,9 +1654,11 @@ public class BuildHintCatalogTest {
                 "<project><properties>"
                         + "<project.build.sourceEncoding>Shift_JIS</project.build.sourceEncoding>"
                         + "</properties></project>"));
-        // The compiler plugin's own setting counts too.
+        // The compiler plugin's own setting counts too -- and only that
+        // plugin's; see theEncodingIsTheCompilerPluginsOwn.
         assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
                 "<project><build><plugins><plugin>"
+                        + "<artifactId>maven-compiler-plugin</artifactId>"
                         + "<configuration><encoding>Shift_JIS</encoding></configuration>"
                         + "</plugin></plugins></build></project>"));
         // Nothing declared is nothing to use, and the guess stays.
@@ -1677,5 +1679,77 @@ public class BuildHintCatalogTest {
                 new String(sjis, "Shift_JIS"), "MyApp", "com.\u30a2\u30d7\u30ea"));
         assertFalse(CodenameOneSettings.declaresClass(
                 new String(sjis, "ISO-8859-1"), "MyApp", "com.\u30a2\u30d7\u30ea"));
+    }
+
+    /// A module may put its sources somewhere else entirely, and the main class
+    /// is the one file the root list cannot afford to miss: without it nothing
+    /// knows which hints an annotation owns, and Add writes the duplicate the
+    /// next build refuses.
+    @Test
+    public void theRootsThePomDeclaresAreSearchedToo() {
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build>"
+                        + "<sourceDirectory>appsrc</sourceDirectory>"
+                        + "<plugins>"
+                        + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                        + "<executions><execution><configuration><sources>"
+                        + "<source>src/generated/java</source>"
+                        + "</sources></configuration></execution></executions></plugin>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs>"
+                        + "<sourceDir>src/main/kt</sourceDir>"
+                        + "</sourceDirs></configuration></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(roots.contains("appsrc"), roots.toString());
+        assertTrue(roots.contains("src/generated/java"), roots.toString());
+        assertTrue(roots.contains("src/main/kt"), roots.toString());
+
+        // A declared TEST root is dropped: those are configured through the same
+        // elements, and one shadowing a production type is the failure the root
+        // list exists to avoid.
+        java.util.List<String> withTests = CodenameOneSettings.declaredSourceRoots(
+                "<project><build>"
+                        + "<sourceDirectory>appsrc</sourceDirectory>"
+                        + "<testSourceDirectory>src/test/java</testSourceDirectory>"
+                        + "<plugins><plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                        + "<executions><execution><configuration><sources>"
+                        + "<source>src/integrationTest/java</source>"
+                        + "</sources></configuration></execution></executions></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(withTests.contains("appsrc"), withTests.toString());
+        assertFalse(withTests.contains("src/test/java"), withTests.toString());
+        assertFalse(withTests.contains("src/integrationTest/java"), withTests.toString());
+
+        // What it cannot resolve it leaves alone rather than guessing.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${basedir}/x</sourceDirectory></build></project>")
+                .isEmpty());
+        assertTrue(CodenameOneSettings.declaredSourceRoots(null).isEmpty());
+    }
+
+    /// maven-resources-plugin declares an `<encoding>` of its own, and taking
+    /// the first one in the file adopted the resource charset for every source.
+    @Test
+    public void theEncodingIsTheCompilerPluginsOwn() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>UTF-8</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("UTF-8", CodenameOneSettings.declaredSourceEncoding(pom));
+
+        // With no compiler encoding at all, another plugin's is not adopted.
+        String resourcesOnly = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertNull(CodenameOneSettings.declaredSourceEncoding(resourcesOnly));
+
+        // The property still wins, since that is what the convention is.
+        String property = "<project><properties>"
+                + "<project.build.sourceEncoding>Shift_JIS</project.build.sourceEncoding>"
+                + "</properties>" + resourcesOnly.substring("<project>".length());
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(property));
     }
 }
