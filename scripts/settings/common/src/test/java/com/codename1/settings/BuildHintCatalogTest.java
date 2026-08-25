@@ -1914,6 +1914,65 @@ public class BuildHintCatalogTest {
         assertEquals("p", properties.get("only.parent"));
     }
 
+    /// A plugin declared only in `<pluginManagement>` is not one the module runs.
+    ///
+    /// Maven executes a managed plugin only where the module also lists it under
+    /// `<plugins>`, so reading the managed block added `add-source` directories
+    /// the build does not compile. A dormant source in one of those can declare
+    /// a same-package `Ios` or `Android` type, which shadows the real annotation
+    /// and puts an annotation-owned hint back in the editor for Add to declare a
+    /// second time.
+    @Test
+    public void aManagedOnlyPluginIsNotActive() {
+        String managed = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(managed).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(managed).toString());
+
+        // ...and the same plugin listed under <plugins> IS active. The managed
+        // block usually comes first in the file, so the first match in the text
+        // is the wrong one.
+        String activated = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>real/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(activated);
+        assertTrue(roots.contains("real/gen"), roots.toString());
+        assertFalse(roots.contains("managed/gen"), roots.toString());
+    }
+
+    /// The compiler plugin is the exception: it runs from the default lifecycle,
+    /// so a `<pluginManagement>` configuration for it IS in effect -- and an
+    /// explicit `<plugins>` entry still overrides that.
+    @Test
+    public void theManagedCompilerEncodingStillCounts() {
+        String managed = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(managed));
+
+        String both = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("ISO-8859-1", CodenameOneSettings.declaredSourceEncoding(both));
+    }
+
     /// The compiler plugin's own `<encoding>` beats the property.
     ///
     /// The parameter DEFAULTS to `${project.build.sourceEncoding}`, so an
