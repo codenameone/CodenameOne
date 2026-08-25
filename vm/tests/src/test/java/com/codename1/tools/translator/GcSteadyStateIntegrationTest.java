@@ -93,21 +93,37 @@ class GcSteadyStateIntegrationTest {
     private static final int MIN_CYCLES = 24;
 
     /**
-     * Synthetic per-process budget for the ceiling scenario. Well above what this workload
-     * needs, so that whatever the process settles at is the pacing policy's doing and not
-     * the workload's.
+     * Synthetic per-process budget for the ceiling scenario.
+     *
+     * Deliberately TIGHT rather than device-sized. The fourth scenario needs the
+     * no-reserve build to actually reach its ceiling, and how far a mutator outruns the
+     * collector depends on how many cores it has to itself -- on a two-core runner the
+     * single collector thread competes far better than it does on a developer's machine,
+     * so a 1.4GB budget is reached locally and might not be in CI. A budget this size is
+     * reached by any runner that can run the workload at all, because admission converges
+     * on ceiling-minus-margin by construction rather than by winning a race.
+     *
+     * Still comfortably above CN1_PACING_HEADROOM_MARGIN x 4, so the reserve is a
+     * meaningful figure and not swallowed by the admission margin.
      */
-    private static final long CEILING_MB = 1400;
+    private static final long CEILING_MB = 768;
 
     /**
-     * The share of that budget the collector must keep free (CN1_PACING_RESERVE_SHIFT).
-     * Asserted at half, because the assertion is about which REGIME the process is in --
-     * defending a reserve, or converging on the admission margin -- and those are 300MB
-     * and 63MB apart. A tolerance tight enough to distinguish 300 from 280 would be
-     * measuring the runner.
+     * The reserve the collector should defend at that budget (CN1_PACING_RESERVE_SHIFT).
      */
     private static final long RESERVE_MB = CEILING_MB / 4;
-    private static final long MIN_HEADROOM_MB = RESERVE_MB / 2;
+
+    /**
+     * The line between the two regimes: defending a reserve, or converging on the bare
+     * admission margin. Twice CN1_PACING_HEADROOM_MARGIN, i.e. an ABSOLUTE figure rather
+     * than a share of the budget -- the margin does not scale with the budget, so a
+     * proportional threshold silently stops separating the regimes as the budget shrinks
+     * (at a 400MB budget the reserve is 100MB and the margin still 64MB, and half the
+     * reserve falls below it). The two regimes here are 192MB and 63MB, so this sits
+     * clear of both; a tolerance tight enough to distinguish 192 from 180 would be
+     * measuring the runner.
+     */
+    private static final long HEADROOM_THRESHOLD_MB = 128;
 
     @Test
     void aChurningWorkloadReachesAWorkingSetAndStaysThere() throws Exception {
@@ -195,6 +211,7 @@ class GcSteadyStateIntegrationTest {
         // the filter silently compiled out would pass part 1 forever.
         Path faulty = build(distDir, tempDirs, "faulted", "-DCN1_GC_CONFORM -DCN1_SATB_LOG_FRESH");
         Run faulted = run(faulty, distDir);
+        assertHealthy(faulted, "the -DCN1_SATB_LOG_FRESH build");
         Series bad = Series.parse(faulted.output);
         assertTrue(bad.cycles >= MIN_CYCLES,
                 "The faulted build produced no [GCPROBE] series, so CN1_GC_CONFORM is not "
@@ -221,7 +238,7 @@ class GcSteadyStateIntegrationTest {
         assertTrue(boundedHeadroomMb >= 0,
                 "No [PACING] report under a simulated ceiling -- the budgeted path never "
                         + "ran, so this scenario measured nothing. Output: " + tail(bounded.output));
-        assertTrue(boundedHeadroomMb >= MIN_HEADROOM_MB,
+        assertTrue(boundedHeadroomMb >= HEADROOM_THRESHOLD_MB,
                 "Under a " + CEILING_MB + "MB budget the collector should defend about "
                         + RESERVE_MB + "MB of headroom, but the smallest seen was "
                         + boundedHeadroomMb + "MB -- the process is riding the kill line.");
@@ -230,13 +247,27 @@ class GcSteadyStateIntegrationTest {
         Path noReserve = build(distDir, tempDirs, "noreserve",
                 "-DCN1_GC_CONFORM -DCN1_PACING_NO_RESERVE");
         Run unbounded = run(noReserve, distDir, ceiling);
+        assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build");
         long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
         assertTrue(unboundedHeadroomMb >= 0,
                 "No [PACING] report from the no-reserve build. Output: " + tail(unbounded.output));
-        assertTrue(unboundedHeadroomMb < MIN_HEADROOM_MB,
+        assertTrue(unboundedHeadroomMb < HEADROOM_THRESHOLD_MB,
                 "Compiling the reserve out did NOT put the process back on the admission "
                         + "margin (smallest headroom " + unboundedHeadroomMb + "MB), so this "
                         + "scenario is inert.");
+    }
+
+    /**
+     * A fault-injected run's measurements are only admissible if the run itself was
+     * healthy. Without this, a build that crashed or was OOM-killed after emitting enough
+     * probe rows would satisfy the cycle and inflated-SATB assertions and turn a
+     * memory-safety regression into a green gate -- the faults injected here are policy
+     * regressions, not crashes, so a crash means something else is wrong.
+     */
+    private void assertHealthy(Run r, String which) {
+        assertEquals(0, r.exit, which + " must still exit cleanly. Output: " + tail(r.output));
+        assertTrue(r.output.contains("GC_STEADY_STATE_DONE"),
+                which + " must run to completion. Output: " + tail(r.output));
     }
 
     /** Smallest headroom the pacing tracer saw, in MB, or -1 if it never reported. */

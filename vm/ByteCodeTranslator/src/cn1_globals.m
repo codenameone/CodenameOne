@@ -1527,19 +1527,31 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
     // cycle, so mark time and footprint climb together until the collector is continuous
     // -- exactly the reported symptom pair.
     //
-    // Racy read of a GC-thread-owned epoch, deliberately: a stale value can only make the
-    // test fail and log something that did not need logging, which is the conservative
-    // direction. A free slot's sentinel mark is neither value, so it still reaches the
-    // log and is rejected by gcMarkObject exactly as before.
-    if(old->__codenameOneGcMark == -1) {
+    // ATOMIC, and RELAXED rather than acquire. The marker reaches this same field through
+    // __atomic_* accesses, so a plain load here would be a mixed atomic/non-atomic access
+    // to one object -- undefined in C, and the concrete hazard is not tearing but the
+    // compiler CACHING a -1 across several inlined barriers in one loop: the filter would
+    // then keep suppressing after the object had aged into a genuine snapshot object, and
+    // a later reference move would escape the log.
+    //
+    // Relaxed is sufficient and acquire is not wanted. Nothing is published through this
+    // read -- it decides only whether to log -- and both stale answers are safe: a stale
+    // -1 for an object that has since been marked suppresses an entry gcMarkObject would
+    // have dropped anyway, and a stale non-fresh value logs an entry that was not needed.
+    // What relaxed buys is that the load actually happens at each barrier. An acquire
+    // fence on every object store, on the mutator's hottest path, buys nothing over that.
+    //
+    // A free slot's sentinel mark is neither value, so it still reaches the log and is
+    // rejected by gcMarkObject exactly as before.
+    if(__atomic_load_n(&old->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
         return;
     }
 #endif
 #ifdef CN1_GC_CONFORM
     {
-        // Racy read of a GC-thread-owned value on purpose: this is a census, and a stale
-        // read can only misclassify, never corrupt.
-        int __m = old->__codenameOneGcMark;
+        // Same reasoning as the filter above; a census may misclassify but must not be a
+        // mixed atomic/non-atomic access to the field.
+        int __m = __atomic_load_n(&old->__codenameOneGcMark, __ATOMIC_RELAXED);
         if(__m == currentGcMarkValue) {
             atomic_fetch_add_explicit(&cn1GcSatbAlready, 1, memory_order_relaxed);
         } else if(__m == -1) {
@@ -2273,7 +2285,9 @@ void codenameOneGCMark() {
         long before = gcMarkNewObjectCount;
         for(long i = 0 ; i < n ; i++) {
 #ifdef CN1_GC_CONFORM
-            if(batch[i] != JAVA_NULL && batch[i]->__codenameOneGcMark == currentGcMarkValue) {
+            if(batch[i] != JAVA_NULL
+               && __atomic_load_n(&batch[i]->__codenameOneGcMark, __ATOMIC_RELAXED)
+                      == currentGcMarkValue) {
                 cn1GcSatbDrainAlready++;
             }
 #endif
