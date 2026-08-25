@@ -50,6 +50,26 @@ public class ByteCodeTranslator {
             public String extension() {
                 return "m";
             }
+
+            @Override
+            public boolean isApple() {
+                return true;
+            }
+        },
+        /// The native macOS (AppKit) target. Emits Objective-C exactly like
+        /// OUTPUT_TYPE_IOS -- the difference is the Xcode project written around
+        /// it, not the translated code -- so anything keyed on "are we emitting
+        /// .m" must ask isApple() rather than compare against OUTPUT_TYPE_IOS.
+        OUTPUT_TYPE_MACOS {
+            @Override
+            public String extension() {
+                return "m";
+            }
+
+            @Override
+            public boolean isApple() {
+                return true;
+            }
         },
         OUTPUT_TYPE_CLEAN {
             @Override
@@ -67,7 +87,44 @@ public class ByteCodeTranslator {
         };
 
         public abstract String extension();
+
+        /// True for the targets that emit Objective-C into a generated Xcode
+        /// project (iOS and native macOS), false for the C and JavaScript ones.
+        public boolean isApple() {
+            return false;
+        }
     }
+    /// Which Apple platform the generated Xcode project targets.
+    ///
+    /// The translated Objective-C is identical for both -- everything from
+    /// cn1_globals through Parser.writeOutput is shared verbatim. The platform
+    /// only selects the four things that describe the *project*: the pbxproj
+    /// template, the Info.plist template, the asset-catalog Contents.json, and
+    /// whether the iOS-only device-family/launch-image machinery applies.
+    enum ApplePlatform {
+        IOS("/template", true),
+        MACOS("/template-macos", false);
+
+        private final String templateRoot;
+        private final boolean iosDeviceIdioms;
+
+        ApplePlatform(String templateRoot, boolean iosDeviceIdioms) {
+            this.templateRoot = templateRoot;
+            this.iosDeviceIdioms = iosDeviceIdioms;
+        }
+
+        /// Classpath root holding template.xcodeproj/ and template/ for this platform.
+        String templateRoot() {
+            return templateRoot;
+        }
+
+        /// True when TARGETED_DEVICE_FAMILY, launch images and the iPhone/iPad
+        /// app-type distinction mean anything. A Mac app has no device family.
+        boolean hasIosDeviceIdioms() {
+            return iosDeviceIdioms;
+        }
+    }
+
     public static OutputType output = OutputType.OUTPUT_TYPE_IOS;
     public static boolean verbose = true;
     
@@ -258,6 +315,8 @@ public class ByteCodeTranslator {
         boolean recognizedOutputType = true;
         if(args[0].equalsIgnoreCase("ios")) {
             output = OutputType.OUTPUT_TYPE_IOS;
+        } else if(args[0].equalsIgnoreCase("macos")) {
+            output = OutputType.OUTPUT_TYPE_MACOS;
         } else if(args[0].equalsIgnoreCase("clean")) {
             output = OutputType.OUTPUT_TYPE_CLEAN;
         } else if(args[0].equalsIgnoreCase("javascript")) {
@@ -285,10 +344,17 @@ public class ByteCodeTranslator {
         
         // Select which @Concrete attribute the parser honours: the native Windows
         // app type prefers Concrete.win(), the native Linux app type prefers
-        // Concrete.linux(), every other target uses Concrete.name() (the iOS
-        // pipeline). Set before any parsing happens below.
+        // Concrete.linux(), the native macOS app type prefers Concrete.mac(),
+        // every other target uses Concrete.name() (the iOS pipeline). Set before
+        // any parsing happens below.
+        //
+        // Getting this wrong is silent rather than fatal: ParparVM devirtualizes
+        // calls on an annotated type straight to the concrete class, so a macOS
+        // build left on the iOS attribute would bind every CodenameOneImplementation
+        // call to IOSImplementation and never run a MacImplementation override.
         ByteCodeClass.setConcreteTarget("windows".equalsIgnoreCase(appType) ? "win"
-                : "linux".equalsIgnoreCase(appType) ? "linux" : null);
+                : "linux".equalsIgnoreCase(appType) ? "linux"
+                : "mac".equalsIgnoreCase(appType) ? "mac" : null);
 
         ByteCodeTranslator b = new ByteCodeTranslator();
         try {
@@ -298,7 +364,10 @@ public class ByteCodeTranslator {
             }
             switch (output) {
                 case OUTPUT_TYPE_IOS:
-                    handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
+                    handleAppleOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks, ApplePlatform.IOS);
+                    break;
+                case OUTPUT_TYPE_MACOS:
+                    handleAppleOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks, ApplePlatform.MACOS);
                     break;
                 case OUTPUT_TYPE_CLEAN:
                     handleCleanOutput(b, sources, dest, appName, appType);
@@ -627,7 +696,8 @@ public class ByteCodeTranslator {
         Parser.writeOutput(srcRoot);
     }
 
-    private static void handleIosOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks) throws Exception {
+    private static void handleAppleOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks, ApplePlatform platform) throws Exception {
+        final String templateRoot = platform.templateRoot();
         File root = new File(dest, "dist");
         root.mkdirs();
          if(verbose) {
@@ -645,17 +715,26 @@ public class ByteCodeTranslator {
         imagesXcassets.mkdirs();
         //cleanDir(imagesXcassets);
 
-        File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
-        launchImageLaunchimage.mkdirs();
-        //cleanDir(launchImageLaunchimage);
+        // A Mac app has no launch image -- the concept is iOS-only, and an
+        // empty LaunchImage.launchimage in the catalog is an asset-catalog
+        // warning rather than something the platform ever consults.
+        if (platform.hasIosDeviceIdioms()) {
+            File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
+            launchImageLaunchimage.mkdirs();
+            //cleanDir(launchImageLaunchimage);
 
-        copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), Files.newOutputStream(new File(launchImageLaunchimage, "Contents.json").toPath()));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), Files.newOutputStream(new File(launchImageLaunchimage, "Contents.json").toPath()));
+        }
 
         File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
         appIconAppiconset.mkdirs();
         //cleanDir(appIconAppiconset);
 
-        copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), Files.newOutputStream(new File(appIconAppiconset, "Contents.json").toPath()));
+        // The icon idioms differ: iOS wants the phone/pad/marketing sizes, macOS
+        // wants the 16..512 @1x/@2x "mac" idiom ladder.
+        copy(ByteCodeTranslator.class.getResourceAsStream(
+                        platform.hasIosDeviceIdioms() ? "/Icons.json" : "/Icons-macos.json"),
+                Files.newOutputStream(new File(appIconAppiconset, "Contents.json").toPath()));
 
 
         File xcproj = new File(root, appName + ".xcodeproj");
@@ -706,21 +785,21 @@ public class ByteCodeTranslator {
         Parser.writeOutput(srcRoot);
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), Files.newOutputStream(templateInfoPlist.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Info.plist"), Files.newOutputStream(templateInfoPlist.toPath()));
 
         File templatePch = new File(srcRoot, appName + "-Prefix.pch");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), Files.newOutputStream(templatePch.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template/template-Prefix.pch"), Files.newOutputStream(templatePch.toPath()));
 
         File xmlvm = new File(srcRoot, "xmlvm.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), Files.newOutputStream(xmlvm.toPath()));
 
         File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), Files.newOutputStream(projectWorkspaceData.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), Files.newOutputStream(projectWorkspaceData.toPath()));
         replaceInFile(projectWorkspaceData, "KitchenSink", appName);
 
 
         File projectPbx = new File(xcproj, "project.pbxproj");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), Files.newOutputStream(projectPbx.toPath()));
+        copy(ByteCodeTranslator.class.getResourceAsStream(templateRoot + "/template.xcodeproj/project.pbxproj"), Files.newOutputStream(projectPbx.toPath()));
 
         String[] sourceFiles = srcRoot.list((pathname, string) ->
                 string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string));
@@ -906,7 +985,10 @@ public class ByteCodeTranslator {
             }
         }
 
-        if(!appType.equalsIgnoreCase("ios")) {
+        // TARGETED_DEVICE_FAMILY is an iOS idiom. The macOS template never
+        // declares one, so there is no placeholder to rewrite and asking the
+        // app type about iPhone-vs-iPad is meaningless there.
+        if(platform.hasIosDeviceIdioms() && !appType.equalsIgnoreCase("ios")) {
             String devFamily = "TARGETED_DEVICE_FAMILY = \"2\";";
             if(appType.equalsIgnoreCase("iphone")) {
                 devFamily = "TARGETED_DEVICE_FAMILY = \"1\";";

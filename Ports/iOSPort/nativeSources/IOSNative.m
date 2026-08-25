@@ -2415,7 +2415,7 @@ void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THRE
 #import "CN1MacWindows.h"
 #endif
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
         JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
@@ -2431,13 +2431,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowDestroy___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowDestroy(slot);
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowRequestSeq___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowRequestSeq(slot);
 #else
@@ -2445,37 +2445,37 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowRequestSeq___int_R_int(CN1_TH
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowShow(slot, visible ? YES : NO);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetDecorated___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN decorated) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetDecorated(slot, decorated == JAVA_TRUE ? YES : NO);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetMinimumSize___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetMinimumSize(slot, width, height);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetEditingSlot___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetEditingSlot(slot);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetResizable___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN resizable) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetResizable(slot, resizable == JAVA_TRUE ? YES : NO);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
 #else
@@ -2483,19 +2483,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
+void com_codename1_impl_ios_CatalystWindowNative_macMainWindowSetInputEnabled___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN enabled) {
 #if TARGET_OS_MACCATALYST
     CN1MacMainWindowSetInputEnabled(enabled == JAVA_TRUE);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #if TARGET_OS_MACCATALYST
     UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
     return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
@@ -2504,13 +2504,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowAttachPeer___long_int_int
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowWatchScreens();
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetTitle___int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT title) {
 #if TARGET_OS_MACCATALYST
     POOL_BEGIN();
     NSString* t = toNSString(CN1_THREAD_STATE_PASS_ARG title);
@@ -2519,13 +2519,13 @@ void com_codename1_impl_ios_IOSNative_macWindowSetTitle___int_java_lang_String(C
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetBounds___int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetBounds(slot, x, y, width, height);
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macMainWindowGetBounds___int_1ARRAY_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return JAVA_FALSE;
@@ -2536,7 +2536,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMainWindowGetBounds___int_1ARRA
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowGetBounds___int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
@@ -2545,7 +2545,7 @@ void com_codename1_impl_ios_IOSNative_macWindowGetBounds___int_int_1ARRAY(CN1_TH
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowGetWidth___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowGetWidth(slot);
 #else
@@ -2553,7 +2553,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetWidth___int_R_int(CN1_THRE
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macWindowGetHeight___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacWindowGetHeight(slot);
 #else
@@ -2561,13 +2561,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macWindowGetHeight___int_R_int(CN1_THR
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowSetState___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_INT state) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowSetState(slot, state);
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
+void com_codename1_impl_ios_CatalystWindowNative_macWindowPresent___int_int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_OBJECT argb, JAVA_INT width, JAVA_INT height) {
 #if TARGET_OS_MACCATALYST
     if (argb == JAVA_NULL) {
         return;
@@ -2576,7 +2576,7 @@ void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(
 #endif
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMultiWindowSupported() ? JAVA_TRUE : JAVA_FALSE;
 #else
@@ -2584,7 +2584,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolea
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorCount();
 #else
@@ -2592,7 +2592,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STA
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macPrimaryMonitor___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacPrimaryMonitor();
 #else
@@ -2600,7 +2600,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macPrimaryMonitor___R_int(CN1_THREAD_S
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
+void com_codename1_impl_ios_CatalystWindowNative_macMonitorBounds___int_boolean_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor, JAVA_BOOLEAN workArea, JAVA_OBJECT out) {
 #if TARGET_OS_MACCATALYST
     if (out == JAVA_NULL || ((JAVA_ARRAY) out)->length < 4) {
         return;
@@ -2609,7 +2609,7 @@ void com_codename1_impl_ios_IOSNative_macMonitorBounds___int_boolean_int_1ARRAY(
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorDpi___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorDpi(monitor);
 #else
@@ -2617,7 +2617,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorDpi___int_R_int(CN1_THREAD_S
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorScaleTimes100___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT monitor) {
 #if TARGET_OS_MACCATALYST
     /* Scaled by a hundred because the bridge carries ints; the Java side divides
      * it back out. */
@@ -2627,7 +2627,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorScaleTimes100___int_R_int(CN
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorForWindow___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorForWindow(slot);
 #else
@@ -2635,7 +2635,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_TH
 #endif
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_INT com_codename1_impl_ios_CatalystWindowNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorForMainWindow();
 #else

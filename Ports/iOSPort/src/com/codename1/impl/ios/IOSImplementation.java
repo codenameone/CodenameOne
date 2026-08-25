@@ -140,6 +140,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     private boolean disableUIWebView=true;
     private static boolean gallerySelectMultiple;
     public static IOSNative nativeInstance = new IOSNative();
+    /// The Catalyst desktop-windowing natives. Separate from nativeInstance because
+    /// ParparVM mangles the declaring class into every C symbol, which makes the class
+    /// the unit at which a native can be kept out of a port -- and the native macOS
+    /// port shares IOSNative verbatim while implementing its windowing in AppKit.
+    /// See CatalystWindowNative.
+    static CatalystWindowNative catalystWindowNative = new CatalystWindowNative();
     private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
     private static RestoreCallback restoreCallback;
@@ -1049,7 +1055,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // The Info.plist key is the single source of truth: without multiple scenes
         // enabled the system refuses to activate a second one, so reporting supported
         // here would hand back windows that never appear.
-        if (!nativeInstance.macMultiWindowSupported()) {
+        if (!catalystWindowNative.macMultiWindowSupported()) {
             return null;
         }
         if (windowManager == null) {
@@ -1270,7 +1276,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Tell the native side which window is being edited, so the editor is
             // added to that window's view rather than the main surface's. Cleared to
             // -1 for a field on the main form, since the slot is process wide.
-            nativeInstance.macWindowSetEditingSlot(
+            catalystWindowNative.macWindowSetEditingSlot(
                     parentTop instanceof Form ? -1 : MacWindowManager.slotForComponent(cmp));
             if (parentForm.getClientProperty("asyncEditing") != null) {
                 Object async = parentForm.getClientProperty("asyncEditing");
@@ -9743,7 +9749,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // in the same event dispatch turn as show(). The native side queues
                 // it in that case and scene adoption attaches it, so there is nothing
                 // to retry from here.
-                nativeInstance.macWindowAttachPeer(nativePeer, slot,
+                catalystWindowNative.macWindowAttachPeer(nativePeer, slot,
                         getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }

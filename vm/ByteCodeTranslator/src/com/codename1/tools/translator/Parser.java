@@ -1148,7 +1148,11 @@ public class Parser extends ClassVisitor {
 
     private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
         OutputStream outMain =
-                writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
+                // isApple(), not == OUTPUT_TYPE_IOS: the native macOS target emits
+                // the same Objective-C into the same concatenated buffer, and
+                // comparing against the iOS constant alone would silently drop
+                // it back to one file per class.
+                writeBufferInstead != null && ByteCodeTranslator.output.isApple() ?
                         writeBufferInstead :
                         Files.newOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()).toPath());
 
@@ -1334,6 +1338,7 @@ public class Parser extends ClassVisitor {
                 private String defaultConcrete;
                 private String winConcrete;
                 private String linuxConcrete;
+                private String macConcrete;
 
                 @Override
                 public void visit(String name, Object value) {
@@ -1343,6 +1348,8 @@ public class Parser extends ClassVisitor {
                         winConcrete = (String) value;
                     } else if ("linux".equals(name) && value instanceof String) {
                         linuxConcrete = (String) value;
+                    } else if ("mac".equals(name) && value instanceof String) {
+                        macConcrete = (String) value;
                     }
                     super.visit(name, value);
                 }
@@ -1351,18 +1358,25 @@ public class Parser extends ClassVisitor {
                 public void visitEnd() {
                     // Pick the concrete implementation for the active translation
                     // target: the native Windows build uses @Concrete.win(), the
-                    // native Linux build uses @Concrete.linux(), every other target
-                    // uses @Concrete.name() (the iOS pipeline). When building
-                    // Windows/Linux and no win()/linux() is given (e.g. IOSSimd,
-                    // which has only an iOS specialization), leave the concrete
-                    // unset so the portable base class is translated instead of
-                    // pulling in the absent iOS class.
+                    // native Linux build uses @Concrete.linux(), the native macOS
+                    // build uses @Concrete.mac(), every other target uses
+                    // @Concrete.name() (the iOS pipeline). When building
+                    // Windows/Linux/macOS and no win()/linux()/mac() is given,
+                    // leave the concrete unset so the portable base class is
+                    // translated instead of pulling in the absent iOS class.
+                    //
+                    // macOS is the one target that may legitimately name an
+                    // iOS class here: it shares the Apple native binding classes
+                    // with the iOS port, so e.g. IOSSimd is the correct mac()
+                    // value even though it lives in com.codename1.impl.ios.
                     String target = ByteCodeClass.getConcreteTarget();
                     String concrete;
                     if ("win".equals(target)) {
                         concrete = winConcrete;
                     } else if ("linux".equals(target)) {
                         concrete = linuxConcrete;
+                    } else if ("mac".equals(target)) {
+                        concrete = macConcrete;
                     } else {
                         concrete = defaultConcrete;
                     }

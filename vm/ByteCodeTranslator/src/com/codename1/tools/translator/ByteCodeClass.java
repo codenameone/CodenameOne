@@ -106,7 +106,9 @@ public class ByteCodeClass {
     }
 
     /// Selects which {@code @Concrete} attribute the parser honours: {@code "win"}
-    /// for the native Windows build (use {@code Concrete.win()}), {@code null}/
+    /// for the native Windows build (use {@code Concrete.win()}), {@code "linux"}
+    /// for the native Linux build (use {@code Concrete.linux()}), {@code "mac"}
+    /// for the native macOS build (use {@code Concrete.mac()}), {@code null}/
     /// anything else for the default iOS pipeline (use {@code Concrete.name()}).
     /// Set once per translation run from the app type (see ByteCodeTranslator).
     private static String concreteTarget;
@@ -383,6 +385,31 @@ public class ByteCodeClass {
     /** any declaration (abstract or not) of the given method in THIS class. */
     public boolean hasDeclaredMethod(String name, String desc) {
         return findDeclaredMethod(name, desc) != null;
+    }
+
+    /// Walks {@code concrete} and then its superclass chain and returns the first
+    /// class that declares a non-abstract {@code name}/{@code desc}, or null when
+    /// none does.
+    ///
+    /// This is the method the runtime would dispatch to for an instance of
+    /// {@code concrete}, which is precisely what a {@code @Concrete}
+    /// devirtualization is allowed to bind directly. Looking only at
+    /// {@code concrete}'s own declarations -- which is what this replaced -- gave
+    /// up on every method the concrete class inherits rather than overrides. That
+    /// was harmless while every {@code @Concrete} target derived straight from the
+    /// annotated base, and stopped being harmless once a port's implementation
+    /// subclassed another port's (MacImplementation extends IOSImplementation),
+    /// because the ~1,200 inherited methods -- Graphics primitives among them --
+    /// silently fell back to full virtual dispatch.
+    public static ByteCodeClass findConcreteDeclaringClass(ByteCodeClass concrete, String name, String desc) {
+        ByteCodeClass c = concrete;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                return c;
+            }
+            c = c.getBaseClassObject();
+        }
+        return null;
     }
 
     public void unmark() {

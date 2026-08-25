@@ -168,8 +168,13 @@ public class Invoke extends Instruction {
             return null;
         }
         ByteCodeClass concreteClass = Parser.getClassObject(ownerClass.getConcreteClass().replace('/', '_').replace('$', '_'));
-        if (concreteClass != null && concreteClass.hasDeclaredNonAbstractMethod(name, desc)) {
-            return concreteClass.getClsName();
+        // The nearest class in the concrete type's own hierarchy that actually
+        // declares the method -- which is what the runtime would dispatch to for
+        // an instance of it. Resolving against concreteClass's declarations alone
+        // gave up on everything it inherits rather than overrides.
+        ByteCodeClass declaring = ByteCodeClass.findConcreteDeclaringClass(concreteClass, name, desc);
+        if (declaring != null) {
+            return declaring.getClsName();
         }
         return null;
     }

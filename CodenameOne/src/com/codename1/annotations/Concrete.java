@@ -57,4 +57,16 @@ public @interface Concrete {
     /// {@link #win()} so a type with no Linux specialization translates to its
     /// software base instead of pulling in the absent iOS class.
     String linux() default "";
+
+    /// The fully-qualified class name of the concrete implementation to prefer
+    /// when translating for the native macOS (AppKit) port. When empty (the
+    /// default), the native macOS build falls back to the annotated (portable)
+    /// base class -- mirroring {@link #win()} and {@link #linux()}.
+    ///
+    /// Unlike those two, the macOS port shares the Apple native binding classes
+    /// with the iOS port, so a type whose iOS specialization also compiles
+    /// against the macOS SDK should name that same iOS class here rather than
+    /// leave this empty. Leaving it empty silently degrades to the portable
+    /// base, which is a green build with the specialization missing.
+    String mac() default "";
 }
