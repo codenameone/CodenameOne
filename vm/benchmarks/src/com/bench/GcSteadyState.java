@@ -119,15 +119,42 @@ public class GcSteadyState {
         movesPerNode = cfg(CFG_MOVES);
         legacyBlocks = cfg(CFG_LEGACY);
         scrubDepth = cfg(CFG_SCRUB);
-        // CN1_WL_LEGACY=0 is a legitimate ablation -- run without the retained legacy
-        // population -- so it has to work rather than crash, and a negative value must not
-        // reach new Object[n][]. Likewise a thread count below one produces a run that
-        // measures nothing and announces it only by reporting zero.
-        if (legacyBlocks < 0) {
-            legacyBlocks = 0;
+        // Every knob is normalised before the run rather than trusted. These are ablation
+        // switches: someone WILL set one to zero to remove a term, because that is what
+        // they are for, and a driver that answers a legitimate ablation with an NPE, an
+        // unbounded recursion or a silently empty run costs an investigation instead of
+        // informing one. WLCONFIG below prints the normalised values, so the log always
+        // says what actually ran rather than what was asked for.
+        //
+        // Zero is meaningful for two of these and is preserved: no retained legacy
+        // population, and no reference-carrying Move per node (leaf-only allocation, which
+        // is a different workload for the grace pass and for maturation, since only a
+        // non-leaf object reaches either). The rest have a floor because below it the run
+        // measures nothing -- or, for a negative depth, never terminates, since the d == 0
+        // base case would never match.
+        if (seconds < 1) {
+            seconds = 1;
         }
         if (threads < 1) {
             threads = 1;
+        }
+        if (depth < 0) {
+            depth = 0;
+        }
+        if (branch < 1) {
+            branch = 1;
+        }
+        if (sleepMs < 0) {
+            sleepMs = 0;
+        }
+        if (movesPerNode < 0) {
+            movesPerNode = 0;
+        }
+        if (legacyBlocks < 0) {
+            legacyBlocks = 0;
+        }
+        if (scrubDepth < 0) {
+            scrubDepth = 0;
         }
         System.out.println("WLCONFIG seconds=" + seconds + " threads=" + threads
                 + " depth=" + depth + " branch=" + branch + " sleepMs=" + sleepMs
@@ -279,7 +306,8 @@ public class GcSteadyState {
                 mv.next = chain;
                 chain = mv;
             }
-            int v = search(child, d - 1, seed + b + chain.to, c, slot);
+            // chain is null when movesPerNode is 0, which is the leaf-only ablation.
+            int v = search(child, d - 1, seed + b + (chain == null ? 0 : chain.to), c, slot);
             if (v > best) {
                 best = v;
             }
