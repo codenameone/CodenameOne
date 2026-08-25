@@ -66,7 +66,13 @@ Deployment floors are macOS 10.15 and Catalyst 13.1.
 
 === Windows
 
-A Codename One `Window` works on this target, with one difference worth knowing:
+Windows are opt-in here. Set `macNative.multiWindow=true` alongside
+`macNative.enabled=true`; the native macOS build needs no such hint, because
+AppKit is multi-window natively. The opt-in exists because a Catalyst window
+needs a multi-scene `Info.plist` key that shifts every layout in the
+application slightly -- see <<mac-catalyst-windows>> for the measurement.
+
+With it set, a Codename One `Window` works, with one difference worth knowing:
 the window's content is rendered into an off-screen raster and presented to the
 scene's view, rather than the window owning its own GPU surface. Native peer
 components and native text editing still use the scene's real view hierarchy and
