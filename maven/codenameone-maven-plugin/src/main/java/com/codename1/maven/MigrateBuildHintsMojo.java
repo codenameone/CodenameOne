@@ -78,7 +78,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * core has to be looked for across the modules.
      */
     @Parameter(defaultValue = "${session.projects}", readonly = true, required = true)
-    private java.util.List<org.apache.maven.project.MavenProject> reactorProjects;
+    java.util.List<org.apache.maven.project.MavenProject> reactorProjects;
 
     /** Report what would change without writing anything. */
     @Parameter(property = "cn1.migrate.dryRun", defaultValue = "false")
@@ -835,7 +835,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return sb.append(')').toString();
     }
 
-    private String findMainClassSource(File projectDir, Properties settings) {
+    String findMainClassSource(File projectDir, Properties settings) {
         String main = settings.getProperty("codename1.mainName");
         String pkg = settings.getProperty("codename1.packageName");
         if (main == null || main.trim().length() == 0) {
@@ -845,10 +845,53 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 + File.separator) + main.trim();
         String simple = main.trim();
         String expectedPkg = pkg == null ? "" : pkg.trim();
+        String[] extensions = {".java", ".kt"};
+
+        // Maven first. It is the authority on where this module's sources are --
+        // a module may replace src/main/java with a root of its own, and the
+        // Kotlin plugin compiles its own sourceDirs without adding them back.
+        //
+        // The conventional paths used to be tried first, and a dormant copy of
+        // the main class left behind at src/main/java then won over the root the
+        // build actually compiles: the annotations went into a file Maven
+        // ignores, the verification build saw no manifest, and the migration
+        // rolled itself back on a project that is perfectly valid. Which is the
+        // same mistake as trusting the conventional Kotlin root -- a convention
+        // must not outrank a resolved answer.
+        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
+        java.util.List<String> moduleRoots = compileSourceRoots(owner, userProperties());
+        if (moduleRoots != null && !moduleRoots.isEmpty()) {
+            // The named file in each root first, which is exact, then a scan --
+            // Kotlin does not require a file to be named after its class, so the
+            // file is identified by what it DECLARES.
+            for (String root : moduleRoots) {
+                for (String ext : extensions) {
+                    File f = new File(root, path + ext);
+                    if (f.isFile() && declares(f, expectedPkg, simple)) {
+                        return f.getAbsolutePath();
+                    }
+                }
+            }
+            for (String root : moduleRoots) {
+                File dir = new File(root);
+                if (!dir.isDirectory()) {
+                    continue;
+                }
+                File hit = findDeclaringFile(dir, expectedPkg, simple, 0);
+                if (hit != null) {
+                    return hit.getAbsolutePath();
+                }
+            }
+            // Maven answered, so that IS the set. Falling back to the
+            // conventions here is what let the dormant file win.
+            return null;
+        }
+
+        // Nobody resolved the roots -- no reactor to ask, which is how this goal
+        // runs outside a build. The conventions are the only guess there is.
         String[] roots = {"src" + File.separator + "main" + File.separator + "java",
                           "src" + File.separator + "main" + File.separator + "kotlin",
                           "src"};
-        String[] extensions = {".java", ".kt"};
         for (String root : roots) {
             for (String ext : extensions) {
                 File f = new File(projectDir, root + File.separator + path + ext);
@@ -858,30 +901,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 if (f.isFile() && declares(f, expectedPkg, simple)) {
                     return f.getAbsolutePath();
                 }
-            }
-        }
-        // Those three are a convention. Maven is the authority on where this
-        // module's sources are -- a module may add src/app/java or a Kotlin root
-        // -- and Kotlin does not require a file to be named after its class, so
-        // the file is identified by what it DECLARES. Without this the goal
-        // aborted with "Could not find the source" on a project Maven compiles
-        // perfectly well.
-        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
-        // The complete set, since the Kotlin plugin compiles its own sourceDirs
-        // without adding them back -- a main class living only in one of those
-        // is compiled by Maven and was reported here as missing.
-        java.util.List<String> moduleRoots = compileSourceRoots(owner, userProperties());
-        if (moduleRoots == null) {
-            return null;
-        }
-        for (String root : moduleRoots) {
-            File dir = new File(root);
-            if (!dir.isDirectory()) {
-                continue;
-            }
-            File hit = findDeclaringFile(dir, expectedPkg, simple, 0);
-            if (hit != null) {
-                return hit.getAbsolutePath();
             }
         }
         return null;

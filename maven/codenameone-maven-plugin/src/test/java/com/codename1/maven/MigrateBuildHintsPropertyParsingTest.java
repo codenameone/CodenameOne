@@ -26,6 +26,9 @@ import org.junit.Test;
 
 import java.io.File;
 
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -39,6 +42,9 @@ import static org.junit.Assert.assertNull;
 /// duplicate-hint error the goal exists to prevent -- so the parser has to
 /// accept every form `java.util.Properties` does, not just `key=value`.
 public class MigrateBuildHintsPropertyParsingTest {
+
+    @Rule
+    public TemporaryFolder tmp = new TemporaryFolder();
 
     @Test
     public void equalsSeparatorIsRecognized() {
@@ -894,6 +900,81 @@ public class MigrateBuildHintsPropertyParsingTest {
         }
         assertTrue(mojoWithEncoding("Shift_JIS").declares(f, pkg, "\u30a2\u30d7\u30ea"));
         assertFalse(mojoWithEncoding("UTF-8").declares(f, pkg, "\u30a2\u30d7\u30ea"));
+    }
+
+    /// Maven's roots decide which file is the main class, not the conventions.
+    ///
+    /// A module that replaces `src/main/java` with a root of its own can still
+    /// have a dormant copy of the main class at the conventional path. Trying
+    /// the conventions first let that copy win: the annotations went into a file
+    /// Maven ignores, the verification build found no manifest, and the
+    /// migration rolled itself back on a perfectly valid project.
+    @Test
+    public void theSourceComesFromTheRootsMavenCompiles() throws Exception {
+        File basedir = tmp.newFolder();
+        String source = "package com.example;\npublic class MyApp {\n}\n";
+        File dormant = new File(basedir, "src/main/java/com/example");
+        assertTrue(dormant.mkdirs());
+        write(new File(dormant, "MyApp.java"), source);
+        File live = new File(basedir, "appsrc/com/example");
+        assertTrue(live.mkdirs());
+        write(new File(live, "MyApp.java"), source);
+
+        MigrateBuildHintsMojo mojo = mojoAt(basedir);
+        mojo.project.addCompileSourceRoot(new File(basedir, "appsrc").getAbsolutePath());
+
+        String found = mojo.findMainClassSource(basedir, settingsFor("com.example", "MyApp"));
+        assertEquals(new File(live, "MyApp.java").getAbsolutePath(), found);
+    }
+
+    /// ...and when Maven answered, that IS the set: a main class that is in no
+    /// compiled root is not found by falling back to the conventions.
+    @Test
+    public void aMainClassOutsideEveryCompiledRootIsNotFound() throws Exception {
+        File basedir = tmp.newFolder();
+        File dormant = new File(basedir, "src/main/java/com/example");
+        assertTrue(dormant.mkdirs());
+        write(new File(dormant, "MyApp.java"), "package com.example;\npublic class MyApp {\n}\n");
+
+        MigrateBuildHintsMojo mojo = mojoAt(basedir);
+        mojo.project.addCompileSourceRoot(new File(basedir, "appsrc").getAbsolutePath());
+
+        assertNull(mojo.findMainClassSource(basedir, settingsFor("com.example", "MyApp")));
+    }
+
+    /// With no reactor to ask -- which is how this goal runs outside a build --
+    /// the conventions are the only guess there is, and they still work.
+    @Test
+    public void theConventionsAreUsedWhenNobodyResolvedTheRoots() throws Exception {
+        File basedir = tmp.newFolder();
+        File dir = new File(basedir, "src/main/java/com/example");
+        assertTrue(dir.mkdirs());
+        write(new File(dir, "MyApp.java"), "package com.example;\npublic class MyApp {\n}\n");
+
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        mojo.project = new org.apache.maven.project.MavenProject();
+        // No reactorProjects, so moduleAt finds nothing and compileSourceRoots
+        // returns null.
+        assertEquals(new File(dir, "MyApp.java").getAbsolutePath(),
+                mojo.findMainClassSource(basedir, settingsFor("com.example", "MyApp")));
+    }
+
+    private MigrateBuildHintsMojo mojoAt(File basedir) {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        org.apache.maven.project.MavenProject project =
+                new org.apache.maven.project.MavenProject();
+        project.setBuild(new org.apache.maven.model.Build());
+        project.setFile(new File(basedir, "pom.xml"));
+        mojo.project = project;
+        mojo.reactorProjects = java.util.Collections.singletonList(project);
+        return mojo;
+    }
+
+    private static java.util.Properties settingsFor(String pkg, String main) {
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("codename1.packageName", pkg);
+        p.setProperty("codename1.mainName", main);
+        return p;
     }
 
     /// A multibyte name is not readable in the byte-transparent view, and
