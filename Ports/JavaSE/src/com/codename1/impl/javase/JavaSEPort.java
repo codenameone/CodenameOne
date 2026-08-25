@@ -479,6 +479,29 @@ public class JavaSEPort extends CodenameOneImplementation {
         return intentBridge;
     }
 
+    /// Reports the main frame's keyboard focus to `Desktop` as window zero.
+    ///
+    /// Both callbacks were empty, and nothing else in this port ever passed window
+    /// zero, so the main surface was never told it had lost the keyboard. The physical
+    /// key-up goes to whatever gained focus, so a key held on the main form went on
+    /// repeating for as long as it stayed open -- whether focus moved to a secondary
+    /// `com.codename1.ui.Window` or to another application entirely. Activating a
+    /// secondary window reports only that window's gain, so the gain path cannot stand
+    /// in for this: it never fires when the user simply switches apps.
+    ///
+    /// Deliberately not gated on `#isDesktop()`, unlike the window events below: a key
+    /// latches the same way in skin mode, and this only cancels input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gained`: true when the main frame took focus, false when it lost it
+    private void mainSurfaceFocusChanged(boolean gained) {
+        if (!Display.isInitialized()) {
+            return;
+        }
+        com.codename1.ui.Desktop.getInstance().windowFocusChanged(0, gained);
+    }
+
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
@@ -10376,9 +10399,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowActivated(WindowEvent e) {
+                    mainSurfaceFocusChanged(true);
                 }
 
                 public void windowDeactivated(WindowEvent e) {
+                    mainSurfaceFocusChanged(false);
                 }
             });
             window.addComponentListener(new ComponentAdapter() {
