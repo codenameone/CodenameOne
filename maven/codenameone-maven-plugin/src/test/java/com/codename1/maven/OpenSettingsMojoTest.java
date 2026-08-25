@@ -209,6 +209,34 @@ public class OpenSettingsMojoTest {
         assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
     }
 
+    /// The compiler plugin's `<encoding>` parameter DEFAULTS to
+    /// `${project.build.sourceEncoding}`, so an explicit one overrides the
+    /// property. Reading the property first gave a module that sets the plugin
+    /// parameter its parent's value instead of its own.
+    @Test
+    public void anExplicitPluginEncodingBeatsTheProperty() throws Exception {
+        File root = tmp.newFolder("precedence");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        File input = tmp.newFile("precedence.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "UTF-8");
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test

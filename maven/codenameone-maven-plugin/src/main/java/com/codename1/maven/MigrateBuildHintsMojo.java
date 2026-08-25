@@ -821,10 +821,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// Through the annotation processor's helpers rather than a second copy: the
     /// two have already drifted apart once in this change, and "what counts as a
     /// declaration" should have one answer.
-    private boolean declares(File f, String pkg, String simple) {
+    boolean declares(File f, String pkg, String simple) {
         String text;
         try {
-            text = read(f);
+            // IDENTIFYING the file, not editing it, so it is read in the
+            // encoding the compiler uses. The byte-transparent read that the
+            // rewrite depends on cannot answer this for a multibyte encoding:
+            // Shift_JIS bytes are control characters in ISO-8859-1, so the name
+            // is not even readable as an identifier, let alone comparable.
+            text = read(f, sourceCharset());
         } catch (IOException ex) {
             return false;
         }
@@ -835,13 +840,18 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // `class Outer { class Main }` -- the annotations were then inserted on
         // Outer, and the verification build rejected the placement and rolled the
         // migration back.
+        // The plain spelling first, which is what a correctly decoded source
+        // gives. The byte spelling remains as an alternative for a project that
+        // declares no encoding and is not UTF-8 either, where the read above
+        // falls back to byte-transparent.
         String declaredPkg = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .declaredPackageIn(text, kotlin);
         return (pkg.equals(declaredPkg) || asWrittenInSource(pkg).equals(declaredPkg))
                 && (com.codename1.maven.processors.BuildHintAnnotationProcessor
                         .declaresNestedPath(text, new String[] {simple}, kotlin)
                     || com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaresNestedPath(text, new String[] {asWrittenInSource(simple)}, kotlin));
+                        .declaresNestedPath(text, new String[] {asWrittenInSource(simple)},
+                                kotlin));
     }
 
     /// `name` spelled the way a UTF-8 source file reads under the
@@ -861,11 +871,28 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// instead would decide its encoding for it, which is the thing the
     /// byte-transparent read exists to avoid.
     static String asWrittenInSource(String name) {
+        return asWrittenInSource(name, "UTF-8");
+    }
+
+    /// As above, for a source written in `charset`.
+    ///
+    /// The byte spelling depends on the encoding the compiler uses: the UTF-8
+    /// bytes of a name are not its Shift_JIS bytes, so assuming UTF-8 matched
+    /// neither spelling of a non-ASCII name in a multibyte-encoded source and
+    /// the goal refused a migration it could have made.
+    static String asWrittenInSource(String name, String charset) {
         try {
-            return new String(name.getBytes("UTF-8"), SOURCE_BYTE_TRANSPARENT_ENCODING);
+            return new String(name.getBytes(charset == null ? "UTF-8" : charset),
+                    SOURCE_BYTE_TRANSPARENT_ENCODING);
         } catch (java.io.UnsupportedEncodingException ex) {
             return name;
         }
+    }
+
+    /// The encoding this module's sources are compiled with, or UTF-8.
+    private String sourceCharset() {
+        String configured = sourceEncodingOf(project);
+        return configured == null ? "UTF-8" : configured;
     }
 
     /**
@@ -1444,6 +1471,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return fallback;
     }
 
+    /// The name is matched in the byte-transparent text, so a source in a
+    /// multibyte encoding falls back to the FIRST declaration rather than the
+    /// named one -- its bytes are not readable as an identifier here. That is
+    /// the right trade for an INDEX: every offset this returns is written back
+    /// into the file as it is on disk, and for a main source the first
+    /// top-level declaration is the one being annotated anyway. Which file to
+    /// annotate is decided elsewhere, by `declares`, which reads the source in
+    /// its own encoding.
+    ///
     /// One thing this deliberately does NOT do: translate Java's unicode
     /// escapes. `public cl\\u0061ss Main` is a legal spelling of the keyword
     /// (written with two backslashes here because javac would translate a real

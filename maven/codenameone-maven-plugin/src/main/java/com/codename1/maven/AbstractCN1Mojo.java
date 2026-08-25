@@ -1212,5 +1212,82 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
     }
 
+
+    /**
+     * The source encoding Maven compiles `module` with, or null when nothing
+     * says.
+     *
+     * <p>The plugin's own {@code <encoding>} first. The parameter DEFAULTS to
+     * {@code ${project.build.sourceEncoding}}, so an explicit one overrides the
+     * property -- reading the property first meant a module that sets the
+     * plugin parameter got its parent's value instead of its own.</p>
+     *
+     * <p>Read from the effective model, so a profile Maven activated is already
+     * folded in -- which is the part a tool reading POM text cannot do.</p>
+     */
+    protected static String sourceEncodingOf(MavenProject module) {
+        if (module == null) {
+            return null;
+        }
+        String encoding = compilerPluginEncoding(module);
+        if ((encoding == null || encoding.trim().isEmpty()) && module.getProperties() != null) {
+            encoding = module.getProperties().getProperty("project.build.sourceEncoding");
+            if (encoding == null) {
+                encoding = module.getProperties().getProperty("maven.compiler.encoding");
+            }
+        }
+        return encoding == null || encoding.trim().isEmpty() ? null : encoding.trim();
+    }
+
+    /// The `<encoding>` maven-compiler-plugin is configured with, from the
+    /// EFFECTIVE model -- so a profile that Maven activated is already folded in.
+    private static String compilerPluginEncoding(MavenProject module) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = module.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+        if (plugins == null) {
+            return null;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"maven-compiler-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            String fromPlugin = encodingIn(plugin.getConfiguration());
+            if (fromPlugin != null) {
+                return fromPlugin;
+            }
+            if (plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                // The main compilation's, not testCompile's.
+                if (execution.getGoals() != null && execution.getGoals().contains("compile")) {
+                    String fromExecution = encodingIn(execution.getConfiguration());
+                    if (fromExecution != null) {
+                        return fromExecution;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String encodingIn(Object configuration) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return null;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom encoding =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("encoding");
+        if (encoding == null || encoding.getValue() == null) {
+            return null;
+        }
+        String value = encoding.getValue().trim();
+        // An unexpanded ${property} is not an encoding.
+        return value.isEmpty() || value.indexOf('$') >= 0 ? null : value;
+    }
+
 }
     

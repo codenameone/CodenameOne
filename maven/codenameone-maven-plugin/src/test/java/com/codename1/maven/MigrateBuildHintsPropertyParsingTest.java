@@ -851,6 +851,61 @@ public class MigrateBuildHintsPropertyParsingTest {
         return read(f);
     }
 
+    /// The byte spelling depends on the encoding the compiler uses: the UTF-8
+    /// bytes of a name are not its Shift_JIS bytes, so assuming UTF-8 matched
+    /// neither spelling of a non-ASCII name in a multibyte-encoded source and
+    /// the goal refused a migration it could have made.
+    @Test
+    public void theByteSpellingFollowsTheCompilersEncoding() throws Exception {
+        String pkg = "com.\u30a2\u30d7\u30ea";
+        assertEquals(new String(pkg.getBytes("Shift_JIS"), "ISO-8859-1"),
+                MigrateBuildHintsMojo.asWrittenInSource(pkg, "Shift_JIS"));
+        assertEquals(new String(pkg.getBytes("UTF-8"), "ISO-8859-1"),
+                MigrateBuildHintsMojo.asWrittenInSource(pkg, "UTF-8"));
+        // The two disagree, which is the whole point.
+        assertFalse(MigrateBuildHintsMojo.asWrittenInSource(pkg, "Shift_JIS")
+                .equals(MigrateBuildHintsMojo.asWrittenInSource(pkg, "UTF-8")));
+
+        // ASCII is ASCII in every one of them, so the common case is untouched.
+        assertEquals("com.example",
+                MigrateBuildHintsMojo.asWrittenInSource("com.example", "Shift_JIS"));
+
+        // Decoded, the plain name matches -- which is why identifying the file
+        // reads it in its own encoding rather than comparing byte spellings.
+        // Whether a byte spelling happens to be readable as an identifier
+        // depends on the bytes: these katakana are letters in ISO-8859-1, while
+        // the CJK ideographs a page over are control characters. Reading the
+        // source properly does not depend on which.
+        String decoded = "package " + pkg + ";\n\nclass \u30a2\u30d7\u30ea {\n}\n";
+        assertEquals(pkg, com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaredPackageIn(decoded, false));
+        assertTrue(com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaresType(decoded, "\u30a2\u30d7\u30ea", false));
+
+        // So the real source, written in Shift_JIS, is identified by reading it
+        // in Shift_JIS -- and is not identified when UTF-8 is assumed.
+        File f = File.createTempFile("Sjis", ".java");
+        f.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(decoded.getBytes("Shift_JIS"));
+        } finally {
+            os.close();
+        }
+        assertTrue(mojoWithEncoding("Shift_JIS").declares(f, pkg, "\u30a2\u30d7\u30ea"));
+        assertFalse(mojoWithEncoding("UTF-8").declares(f, pkg, "\u30a2\u30d7\u30ea"));
+    }
+
+    /// A mojo whose project compiles with `encoding`.
+    private MigrateBuildHintsMojo mojoWithEncoding(String encoding) {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        org.apache.maven.project.MavenProject project =
+                new org.apache.maven.project.MavenProject();
+        project.getProperties().setProperty("project.build.sourceEncoding", encoding);
+        mojo.project = project;
+        return mojo;
+    }
+
     /// Runs the real insertion over a temporary file and hands back the result.
     private String migrate(String source, String annotations) throws Exception {
         File f = File.createTempFile("MyApp", ".java");
