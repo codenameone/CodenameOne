@@ -92,6 +92,23 @@ class GcSteadyStateIntegrationTest {
     /** Cycles needed before the comparison means anything. Anti-vacuousness. */
     private static final int MIN_CYCLES = 24;
 
+    /**
+     * Synthetic per-process budget for the ceiling scenario. Well above what this workload
+     * needs, so that whatever the process settles at is the pacing policy's doing and not
+     * the workload's.
+     */
+    private static final long CEILING_MB = 1400;
+
+    /**
+     * The share of that budget the collector must keep free (CN1_PACING_RESERVE_SHIFT).
+     * Asserted at half, because the assertion is about which REGIME the process is in --
+     * defending a reserve, or converging on the admission margin -- and those are 300MB
+     * and 63MB apart. A tolerance tight enough to distinguish 300 from 280 would be
+     * measuring the runner.
+     */
+    private static final long RESERVE_MB = CEILING_MB / 4;
+    private static final long MIN_HEADROOM_MB = RESERVE_MB / 2;
+
     @Test
     void aChurningWorkloadReachesAWorkingSetAndStaysThere() throws Exception {
         Parser.cleanup();
@@ -188,6 +205,59 @@ class GcSteadyStateIntegrationTest {
         assertTrue(bad.satbRefsPerLiveObject() > good.satbRefsPerLiveObject() * 10,
                 "The fresh-reference filter should cut the log by orders of magnitude. "
                         + describe("fixed", good) + " " + describe("faulted", bad));
+
+        // ---- 3. under a per-process ceiling, the collector defends a reserve ----
+        // Budget headroom is not a footprint bound: admission answers "is there budget
+        // left", so on its own it keeps saying yes until the budget is gone and the
+        // process converges on ceiling-minus-margin however small its live set is. That
+        // is survivable only until something else spends out of the same budget, which
+        // on iOS the renderer does.
+        Map<String, String> ceiling = new HashMap<>();
+        ceiling.put("CN1_SIMULATE_PROC_MEMORY_LIMIT", Long.toString(CEILING_MB * 1024 * 1024));
+        Run bounded = run(fixed, distDir, ceiling);
+        assertEquals(0, bounded.exit,
+                "The workload must finish under a ceiling. Output: " + tail(bounded.output));
+        long boundedHeadroomMb = minHeadroomMb(bounded.output);
+        assertTrue(boundedHeadroomMb >= 0,
+                "No [PACING] report under a simulated ceiling -- the budgeted path never "
+                        + "ran, so this scenario measured nothing. Output: " + tail(bounded.output));
+        assertTrue(boundedHeadroomMb >= MIN_HEADROOM_MB,
+                "Under a " + CEILING_MB + "MB budget the collector should defend about "
+                        + RESERVE_MB + "MB of headroom, but the smallest seen was "
+                        + boundedHeadroomMb + "MB -- the process is riding the kill line.");
+
+        // ---- 4. proof that scenario 3 can fail ---------------------------------
+        Path noReserve = build(distDir, tempDirs, "noreserve",
+                "-DCN1_GC_CONFORM -DCN1_PACING_NO_RESERVE");
+        Run unbounded = run(noReserve, distDir, ceiling);
+        long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
+        assertTrue(unboundedHeadroomMb >= 0,
+                "No [PACING] report from the no-reserve build. Output: " + tail(unbounded.output));
+        assertTrue(unboundedHeadroomMb < MIN_HEADROOM_MB,
+                "Compiling the reserve out did NOT put the process back on the admission "
+                        + "margin (smallest headroom " + unboundedHeadroomMb + "MB), so this "
+                        + "scenario is inert.");
+    }
+
+    /** Smallest headroom the pacing tracer saw, in MB, or -1 if it never reported. */
+    private long minHeadroomMb(String output) {
+        for (String line : output.split("\\R")) {
+            int at = line.indexOf("minHeadroomKb=");
+            if (at < 0) {
+                continue;
+            }
+            String rest = line.substring(at + "minHeadroomKb=".length());
+            int end = 0;
+            if (end < rest.length() && rest.charAt(end) == '-') {
+                end++;
+            }
+            while (end < rest.length() && Character.isDigit(rest.charAt(end))) {
+                end++;
+            }
+            long kb = Long.parseLong(rest.substring(0, end));
+            return kb < 0 ? -1 : kb / 1024;
+        }
+        return -1;
     }
 
     /** One build of the already-translated project, with its own flags and build dir. */
@@ -297,6 +367,10 @@ class GcSteadyStateIntegrationTest {
     }
 
     private Run run(Path executable, Path workingDir) throws Exception {
+        return run(executable, workingDir, new HashMap<String, String>());
+    }
+
+    private Run run(Path executable, Path workingDir, Map<String, String> env) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toString());
         builder.directory(workingDir.toFile());
         // A developer debugging the collector has CN1_* knobs exported, and several of them
@@ -304,6 +378,8 @@ class GcSteadyStateIntegrationTest {
         // loudly. Start the child from a known state and give it only what this test sets.
         builder.environment().keySet().removeIf(key -> key.startsWith("CN1_"));
         builder.environment().put("CN1_GC_PROBE", "1");
+        builder.environment().put("CN1_LOG_PACING_PARKS", "1");
+        builder.environment().putAll(env);
         builder.redirectErrorStream(true);
         Process process = builder.start();
         String output;

@@ -528,6 +528,10 @@ static _Atomic long cn1PacingMinCap = 0x7fffffffffffffffLL;
 // -- a park count cannot, since the unbudgeted path parks too. minHeadroom is the least
 // remaining budget ever observed; -1 means the bounded path never ran.
 static _Atomic long cn1PacingBoundedChecks = 0;
+// Parks caused by the VOLUME bound rather than by an exhausted budget. Separating them
+// matters: park counts alone cannot tell "the process is near its ceiling" from "the
+// mutator is too far ahead of the collector", and the two call for opposite responses.
+static _Atomic long cn1PacingVolumeParks = 0;
 static _Atomic long cn1PacingMinHeadroom = -1;
 static _Atomic int cn1PacingTrace = -1;
 static int cn1PacingTraceOn(void) {
@@ -546,12 +550,13 @@ static void cn1ReportPacingParks(void) {
     long minCap = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
     long minHead = atomic_load_explicit(&cn1PacingMinHeadroom, memory_order_relaxed);
     fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld minCapKb=%ld"
-                    " boundedChecks=%ld minHeadroomKb=%ld\n",
+                    " boundedChecks=%ld minHeadroomKb=%ld volumeParks=%ld\n",
             atomic_load_explicit(&cn1PacingParksBibop, memory_order_relaxed),
             atomic_load_explicit(&cn1PacingParksLegacy, memory_order_relaxed),
             minCap == 0x7fffffffffffffffLL ? -1L : minCap / 1024,
             atomic_load_explicit(&cn1PacingBoundedChecks, memory_order_relaxed),
-            minHead < 0 ? -1L : minHead / 1024);
+            minHead < 0 ? -1L : minHead / 1024,
+            atomic_load_explicit(&cn1PacingVolumeParks, memory_order_relaxed));
 }
 
 // Mark-worklist overflow accounting, reported by CN1_LOG_GC_OVERFLOW at exit and
@@ -3936,27 +3941,44 @@ static _Atomic JAVA_LONG cn1ProcFootprintStampMs = 0;
 // CN1_PACING_FOOTPRINT_REFRESH_MS across all threads. That bounds how far the mutator can
 // run past the floor before the bound engages to one refresh interval's worth of
 // allocation, instead of one COLLECTION's worth.
-static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
-    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
-            > CN1_PACING_GROWTH_FLOOR_BYTES) {
-        return JAVA_TRUE;
-    }
+/**
+ * The process footprint, refreshed at most once per CN1_PACING_FOOTPRINT_REFRESH_MS
+ * across all threads. Returns the cached figure otherwise, and 0 where the platform has
+ * no probe at all.
+ *
+ * cn1CachedProcFootprint is also refreshed once per cycle by cn1RefreshFreeMemCache, but
+ * a cycle is exactly the interval a runaway happens in -- at a couple of GB/s a 750ms
+ * cycle is more than a gigabyte -- so any bound that has to decide DURING a cycle reads
+ * through here instead.
+ */
+static long long cn1PacingFootprintNow(void) {
+    long long cached = atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed);
     JAVA_LONG now = cn1MonotonicMillis();
     JAVA_LONG last = atomic_load_explicit(&cn1ProcFootprintStampMs, memory_order_relaxed);
     if(now - last < CN1_PACING_FOOTPRINT_REFRESH_MS) {
-        return JAVA_FALSE;      // probed recently and it was under; believe that
+        return cached;          // probed recently; believe that
     }
     if(!atomic_compare_exchange_strong_explicit(&cn1ProcFootprintStampMs, &last, now,
                                                 memory_order_relaxed,
                                                 memory_order_relaxed)) {
-        return JAVA_FALSE;      // another thread is taking this interval's probe
+        return cached;          // another thread is taking this interval's probe
     }
     long long fp = (long long)cn1ProcFootprintBytes();
     if(fp <= 0) {
-        return JAVA_FALSE;      // no probe on this platform; the bound stays off
+        return cached;          // no probe on this platform
     }
     atomic_store_explicit(&cn1CachedProcFootprint, fp, memory_order_relaxed);
-    return fp > CN1_PACING_GROWTH_FLOOR_BYTES;
+    return fp;
+}
+
+static JAVA_BOOLEAN cn1PacingPastGrowthFloor(void) {
+    // Once the cache is over the floor the bound is engaged and a syscall to re-confirm
+    // it buys nothing, so this stays ahead of the probe.
+    if(atomic_load_explicit(&cn1CachedProcFootprint, memory_order_relaxed)
+            > CN1_PACING_GROWTH_FLOOR_BYTES) {
+        return JAVA_TRUE;
+    }
+    return cn1PacingFootprintNow() > CN1_PACING_GROWTH_FLOOR_BYTES;
 }
 
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
@@ -4037,6 +4059,83 @@ static long long cn1PacingVolume(int which) {
     }
     return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
 }
+
+#ifndef CN1_DISABLE_BIBOP
+/**
+ * Uncollected bytes across BOTH allocation paths, as ONE figure.
+ *
+ * Charging them against separate caps is a defect this code has had before: two paths
+ * each running a full cap ahead of a cap derived from the same budget, so the process ran
+ * twice as far ahead as the cap said.
+ */
+static long long cn1PacingUncollectedBytes(void) {
+    return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed)
+         + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+}
+
+// Everything below is derived from the BUDGET, never from the device's free RAM. Sizing
+// backpressure against the device is exactly the defect #5563 fixed -- a high-throughput
+// thread was licensed half of a big iPad's free memory while the process was allowed a
+// fraction of that -- and it is the same defect whether the figure feeds a cap, a claim
+// or a reserve. cn1BibopPacingCap is deliberately NOT reused here for that reason.
+#ifndef CN1_PACING_RESERVE_SHIFT
+// The share of the budget the collector defends as free headroom: limit >> 2, a quarter.
+//
+// What that headroom has to absorb is a NATIVE spike out of the same budget -- the
+// largest single one this codebase knows about is a 30MB screen texture (#5598) -- plus
+// whatever the mutator dirties between deciding to park and parking, which is why it is
+// a share of the budget rather than a fixed figure.
+//
+// Measured on the issue-5537 game-tree shape, four workers, under a simulated 1.4GB
+// ceiling, builds interleaved within one session (-DCN1_PACING_NO_RESERVE is the same
+// binary with this bound compiled out):
+//
+//                     peak footprint   smallest headroom seen
+//   no reserve        1271MB, x7       63MB, x7
+//   reserve limit>>2  1027-1036MB      298-304MB
+//
+// Both columns are that repeatable because neither is an accident: without the bound,
+// admission converges on ceiling minus CN1_PACING_HEADROOM_MARGIN by construction; with
+// it, the control loop holds the reserve. Throughput across seven interleaved pairs came
+// out at 0.90 to 0.99 of the unbounded build, median 0.94 -- the spread is session drift,
+// not the bound, and the sign never changed.
+//
+// A single repetition each of the tighter reserves put >> 3 at 1183MB/150MB and >> 4 at
+// 1207MB/127MB, both slower than >> 2: a smaller reserve engages later and thrashes
+// closer to the edge, so a quarter is the knee rather than a compromise.
+//
+// Roughly 6% for 4.8x the margin is a different trade from the volume brakes #5573 and
+// #5585 measured at 2-4x and rejected, and the reason it is affordable is that it is a
+// control loop that engages only inside the reserve, not a tax on every allocation --
+// volumeParks in the [PACING] report is 0 for a run that never enters it.
+//
+// It cannot touch a platform with no per-process budget at all, because this whole branch
+// is unreachable there; that is why vm/benchmarks measures the same with and without it.
+//
+// The ceiling figure above is not special. Given an 8GB budget instead, the unbounded
+// build rides to 7.5GB and this one holds 5.7GB: admission has no footprint TARGET, so
+// whatever ceiling a process is given is where it ends up. (Those two numbers are peaks
+// only -- at 7.5GB resident the measuring host is itself under pressure, so no throughput
+// conclusion can be drawn from that configuration.)
+#define CN1_PACING_RESERVE_SHIFT 2
+#endif
+
+/**
+ * The headroom, in bytes, that the collector defends for a process whose whole budget is
+ * limitBytes.
+ *
+ * A plain share, with no floor. A floor is tempting and wrong: any absolute one large
+ * enough to matter on an iPad exceeds the whole budget of a tightly-limited process (two
+ * admission margins is 128MB, and an app extension can be limited to less than that),
+ * which would leave the bound permanently engaged there. Below roughly a 256MB budget the
+ * share falls under CN1_PACING_HEADROOM_MARGIN and this bound goes quiet, which is
+ * correct rather than a gap: admission already refuses inside the margin, so the reserve
+ * would have nothing left to defend.
+ */
+static long long cn1PacingReserveBytes(long long limitBytes) {
+    return limitBytes >> CN1_PACING_RESERVE_SHIFT;
+}
+#endif
 
 // Atomically admit this thread if the live budget, minus what other threads have already
 // been admitted to dirty, still covers this block plus the margin. Test and claim must be
@@ -4130,7 +4229,44 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                                                      memory_order_relaxed)) {
         }
     }
-    JAVA_BOOLEAN admitted = cn1PacingTryAdmit(procHeadroom, need, pendingBytes);
+    // BUDGET HEADROOM IS NOT A FOOTPRINT BOUND.
+    //
+    // Admission against os_proc_available_memory answers "is there budget left", so it
+    // keeps saying yes until the budget is GONE, and the process converges on
+    // ceiling-minus-margin however small its live set is. Measured on the issue-5537
+    // game-tree shape against a simulated 1.4GB ceiling, seven times: 1,271MB resident
+    // and 63MB of headroom left, every time, against a live set of a few hundred objects.
+    // That 63MB IS the margin, and the renderer spends out of the same budget -- #5598
+    // measured one screen texture at 30MB -- so anything that spikes lands on the kill
+    // line.
+    //
+    // So also bound how far the mutator may run ahead of the collector once headroom
+    // drops inside the reserve. That is what keeps the footprint proportional to the
+    // COLLECTOR'S WORK rather than to the device's budget, and it is the bound the
+    // unbudgeted branch has always had and this one dropped.
+    JAVA_BOOLEAN volumeOk = JAVA_TRUE;
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
+    {
+        long long footprint = cn1PacingFootprintNow();
+        if(footprint > 0
+           && (long long)procHeadroom
+                  < cn1PacingReserveBytes(footprint + (long long)procHeadroom)) {
+            // Inside the reserve: clamp the mutator to the STATIC cap so the collector
+            // gets ahead and the footprint falls back out of it. Gating on HEADROOM
+            // rather than on footprint is what makes this cost nothing until it is
+            // needed -- a process using three quarters of its budget and holding still
+            // is not in danger; one with no headroom left is.
+            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
+                                                                memory_order_relaxed);
+            volumeOk = cn1PacingUncollectedBytes()
+                           <= trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER
+                       ? JAVA_TRUE : JAVA_FALSE;
+        }
+    }
+#endif
+    // Short-circuit deliberately: cn1PacingTryAdmit CLAIMS on success, so it must not run
+    // while the volume bound is refusing.
+    JAVA_BOOLEAN admitted = volumeOk && cn1PacingTryAdmit(procHeadroom, need, pendingBytes);
     if(admitted) {
         return;
     }
@@ -4138,6 +4274,9 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         atomic_fetch_add_explicit(which == CN1_PACE_LEGACY ? &cn1PacingParksLegacy
                                                            : &cn1PacingParksBibop,
                                   1, memory_order_relaxed);
+        if(!volumeOk) {
+            atomic_fetch_add_explicit(&cn1PacingVolumeParks, 1, memory_order_relaxed);
+        }
     }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     threadStateData->threadActive = JAVA_FALSE;
@@ -4164,7 +4303,23 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         if(headroomNow < 0) {
             break;                       // budget disappeared under us; nothing to honour
         }
-        if(cn1PacingTryAdmit(headroomNow, need, pendingBytes)) {
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_PACING_NO_RESERVE)
+        if(!volumeOk) {
+            // Re-test the volume bound too, or a thread refused by it would spin out its
+            // whole wait against a budget test that was never the thing blocking it.
+            // bibopBytesSinceGc is exchanged to 0 at cycle START, so this clears as soon
+            // as the collection this park requested begins.
+            long long footprintNow = cn1PacingFootprintNow();
+            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
+                                                                memory_order_relaxed);
+            volumeOk = (footprintNow <= 0
+                        || headroomNow >= cn1PacingReserveBytes(footprintNow + headroomNow)
+                        || cn1PacingUncollectedBytes()
+                               <= trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER)
+                       ? JAVA_TRUE : JAVA_FALSE;
+        }
+#endif
+        if(volumeOk && cn1PacingTryAdmit(headroomNow, need, pendingBytes)) {
             admitted = JAVA_TRUE;
             break;
         }

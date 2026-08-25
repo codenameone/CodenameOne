@@ -304,6 +304,22 @@ the live set rather than by the allocation rate, and that the page heap stops gr
 the second half of the run; then it rebuilds with `-DCN1_SATB_LOG_FRESH` and **requires
 both assertions to fail**, so the gate cannot go inert.
 
+**Under a per-process ceiling, budget headroom is not a footprint bound.** Admission
+against `os_proc_available_memory()` answers only "is there budget left", so on its own it
+keeps saying yes until the budget is gone and the process converges on ceiling minus
+`CN1_PACING_HEADROOM_MARGIN` however small its live set is. The collector therefore also
+defends a reserve — `CN1_PACING_RESERVE_SHIFT`, a quarter of the budget — by clamping how
+far the mutator may run ahead of it once headroom drops inside that reserve. It is a
+control loop, not a tax — `volumeParks` in the `[PACING]` report is 0 for a run that never
+enters the reserve — and the whole branch is unreachable on a platform with no per-process
+budget, which is why the `vm/benchmarks` numbers are untouched by it. Note the ceiling is
+not special: given an 8GB budget the unbounded build rides to 7.5GB, because admission has
+no footprint *target*. `-DCN1_PACING_NO_RESERVE` compiles it out for
+A/B, and is what the gate's third scenario re-injects to prove it can fail.
+
+Reach for `CN1_SIMULATE_PROC_MEMORY_LIMIT=<bytes>` to exercise any of this off-device —
+without it the budgeted pacing path never runs, which is how the original bug survived.
+
 ### Working with Native Code
 
 Platform-specific native code locations:
