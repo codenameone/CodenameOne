@@ -213,6 +213,9 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         // cn1.maven.compileClasspathElements -- no change needed in generated poms.
         simulatorProperties.setProperty(CSS_CLI_CLASSPATH_PROPERTY, getCssCliClasspath());
 
+        addCommandLineOverrides(simulatorProperties,
+                getSession() == null ? null : getSession().getUserProperties(), properties);
+
         try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
             if (System.getProperty("ffmpeg.dir") != null) {
                 simulatorProperties.setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
@@ -238,4 +241,51 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
     }
     
     
+    /**
+     * Puts the command line's build hints and the effective entry point into the
+     * simulator's properties.
+     *
+     * <p>The simulator is started by {@code exec:exec} from the generated javase
+     * POM, whose {@code <arguments>} are a fixed list -- no {@code -D} of ours
+     * reaches it, and that POM cannot be changed for a project that already
+     * exists. This file can: {@code Simulator.loadSimulatorProperties} copies
+     * every key here into the system properties, and does it BEFORE the
+     * annotated build hints are published.</p>
+     *
+     * <p>That is what makes the simulator's own guard work. It publishes an
+     * annotated hint only where no system property already claims the key, so
+     * that {@code -D} keeps winning the way it does in a device build -- but
+     * nothing was ever setting one, so the guard never fired and
+     * {@code -Dcodename1.arg.desktop.titleBar=...} did nothing locally while the
+     * same command line changed the device build.</p>
+     *
+     * <p>Only what {@code -D} passed, never the settings file's own hints: a
+     * system property outranks the file in {@code buildHint()}, so publishing
+     * those would hide the both-declared conflict the simulator reports.</p>
+     *
+     * <p>The entry point travels too. It is what {@code process-annotations}
+     * stamped the manifest with, and a simulator reading {@code codename1.mainName}
+     * out of the settings file instead disagreed with that stamp on an
+     * overridden build and refused the manifest outright.</p>
+     */
+    static void addCommandLineOverrides(Properties simulatorProperties,
+                                        Properties userProperties, Properties effective) {
+        Properties commandLine = commandLineBuildHints(userProperties);
+        for (String key : commandLine.stringPropertyNames()) {
+            simulatorProperties.setProperty(key, commandLine.getProperty(key));
+        }
+        copyEffective(simulatorProperties, effective, "codename1.mainName");
+        copyEffective(simulatorProperties, effective, "codename1.packageName");
+    }
+
+    /// Copies one resolved settings key into the simulator's properties, when it
+    /// has a value.
+    private static void copyEffective(Properties simulatorProperties, Properties effective,
+                                      String key) {
+        String value = effective == null ? null : effective.getProperty(key);
+        if (value != null && value.trim().length() > 0) {
+            simulatorProperties.setProperty(key, value.trim());
+        }
+    }
+
 }

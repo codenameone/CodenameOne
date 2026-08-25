@@ -230,6 +230,56 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return session == null ? null : session.getUserProperties();
     }
 
+    /**
+     * What the nested build is invoked with.
+     *
+     * <p>cn1:run is a nested Maven build, and nothing of the outer command line
+     * reached it. So {@code mvn cn1:run -Dcodename1.arg.desktop.titleBar=NATIVE}
+     * -- or {@code -Dcodename1.mainName} -- was accepted, printed, and then
+     * dropped: the inner build overlaid nothing, process-annotations stamped the
+     * manifest for the file's entry point, and the simulator ran on values the
+     * same command line would have changed for a device build.</p>
+     *
+     * <p>Everything in the {@code codename1} namespace, which is the rule
+     * {@code overlayCommandLineBuildHints} applies -- except the platform, which
+     * is set last because this goal IS the javase simulator and a stray
+     * {@code -Dcodename1.platform} must not send the nested build elsewhere.</p>
+     */
+    protected static Properties nestedBuildProperties(Properties userProperties) {
+        Properties props = new Properties();
+        if (userProperties != null) {
+            for (String key : userProperties.stringPropertyNames()) {
+                if (key.startsWith("codename1.")) {
+                    props.setProperty(key, userProperties.getProperty(key));
+                }
+            }
+        }
+        props.setProperty("codename1.platform", "javase");
+        return props;
+    }
+
+    /**
+     * The {@code codename1.arg.*} entries of {@code userProperties}, which is
+     * what {@code -D} actually passed.
+     *
+     * <p>Only those, never every hint in the settings file. The simulator reads
+     * a system property before the file, so publishing the file's own hints that
+     * way would outrank the file itself and hide the both-declared conflict the
+     * simulator is supposed to report.</p>
+     */
+    protected static Properties commandLineBuildHints(Properties userProperties) {
+        Properties out = new Properties();
+        if (userProperties == null) {
+            return out;
+        }
+        for (String key : userProperties.stringPropertyNames()) {
+            if (key.startsWith("codename1.arg.")) {
+                out.setProperty(key, userProperties.getProperty(key));
+            }
+        }
+        return out;
+    }
+
     /** The session this mojo is running in, for a subclass that has to reproduce it. */
     protected MavenSession getSession() {
         return session;

@@ -52,7 +52,7 @@ public class SimulatorOverrideForwardingTest {
         user.setProperty("codename1.mainName", "OverriddenApp");
         user.setProperty("unrelated.property", "no");
 
-        Properties nested = CN1RunMojo.nestedBuildProperties(user);
+        Properties nested = AbstractCN1Mojo.nestedBuildProperties(user);
         assertEquals("NATIVE", nested.getProperty("codename1.arg.desktop.titleBar"));
         assertEquals("OverriddenApp", nested.getProperty("codename1.mainName"));
         // Only the codename1 namespace, the same rule the hint overlay applies.
@@ -66,14 +66,14 @@ public class SimulatorOverrideForwardingTest {
         Properties user = new Properties();
         user.setProperty("codename1.platform", "android");
         assertEquals("javase",
-                CN1RunMojo.nestedBuildProperties(user).getProperty("codename1.platform"));
+                AbstractCN1Mojo.nestedBuildProperties(user).getProperty("codename1.platform"));
     }
 
     /** With no session there is nothing to inherit, and the platform still holds. */
     @Test
     public void withoutASessionThePlatformIsStillSet() {
         assertEquals("javase",
-                CN1RunMojo.nestedBuildProperties(null).getProperty("codename1.platform"));
+                AbstractCN1Mojo.nestedBuildProperties(null).getProperty("codename1.platform"));
     }
 
     /**
@@ -91,7 +91,7 @@ public class SimulatorOverrideForwardingTest {
         user.setProperty("codename1.mainName", "OverriddenApp");
         user.setProperty("maven.test.skip", "true");
 
-        Properties forwarded = SimulatorMojo.commandLineBuildHints(user);
+        Properties forwarded = AbstractCN1Mojo.commandLineBuildHints(user);
         assertEquals("NATIVE", forwarded.getProperty("codename1.arg.desktop.titleBar"));
         // The identity pair travels separately, as its own two properties.
         assertNull(forwarded.getProperty("codename1.mainName"));
@@ -102,6 +102,49 @@ public class SimulatorOverrideForwardingTest {
     /** No session, nothing forwarded -- and no exception. */
     @Test
     public void withoutASessionNothingIsForwarded() {
-        assertEquals(0, SimulatorMojo.commandLineBuildHints(null).size());
+        assertEquals(0, AbstractCN1Mojo.commandLineBuildHints(null).size());
+    }
+
+    /**
+     * The channel that actually reaches the running simulator.
+     *
+     * <p>The simulator is not started by any mojo of ours: the generated javase
+     * POM runs it through {@code exec:exec} with a fixed argument list, and that
+     * POM cannot be changed for a project that already exists.
+     * {@code simulator.properties} can be, and
+     * {@code Simulator.loadSimulatorProperties} copies every key in it into the
+     * system properties before the annotated hints are published.</p>
+     */
+    @Test
+    public void theSimulatorPropertiesCarryTheOverrides() {
+        Properties user = new Properties();
+        user.setProperty("codename1.arg.desktop.titleBar", "NATIVE");
+        user.setProperty("maven.test.skip", "true");
+
+        Properties effective = new Properties();
+        effective.setProperty("codename1.mainName", "OverriddenApp");
+        effective.setProperty("codename1.packageName", "com.example");
+        // The settings file's own hints are in here too, and must NOT travel:
+        // a system property outranks the file in buildHint(), which would hide
+        // the both-declared conflict the simulator reports.
+        effective.setProperty("codename1.arg.ios.pods", "Alamofire");
+
+        Properties simulator = new Properties();
+        PrepareSimulatorClasspathMojo.addCommandLineOverrides(simulator, user, effective);
+
+        assertEquals("NATIVE", simulator.getProperty("codename1.arg.desktop.titleBar"));
+        assertEquals("OverriddenApp", simulator.getProperty("codename1.mainName"));
+        assertEquals("com.example", simulator.getProperty("codename1.packageName"));
+        assertNull(simulator.getProperty("codename1.arg.ios.pods"));
+        assertNull(simulator.getProperty("maven.test.skip"));
+    }
+
+    /** Nothing overridden and nothing resolved leaves the file as it was. */
+    @Test
+    public void theSimulatorPropertiesGainNothingWhenNothingWasOverridden() {
+        Properties simulator = new Properties();
+        simulator.setProperty("cn1.maven.compileClasspathElements", "/a:/b");
+        PrepareSimulatorClasspathMojo.addCommandLineOverrides(simulator, null, null);
+        assertEquals(1, simulator.size());
     }
 }
