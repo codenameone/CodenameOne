@@ -1172,6 +1172,16 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 continue;
             }
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                // The `compile` goal only. A `test-compile` execution's
+                // sourceDirs are src/test/kotlin and friends, and adding them
+                // here made a deleted production class look like it still had a
+                // source -- because a same-named test fixture does -- so a stale
+                // class under target/classes kept failing the build on a
+                // misplaced annotation no production source declares.
+                List<String> goals = execution.getGoals();
+                if (goals == null || !goals.contains("compile")) {
+                    continue;
+                }
                 addSourceDirsFrom(project, execution.getConfiguration(), roots);
             }
         }
