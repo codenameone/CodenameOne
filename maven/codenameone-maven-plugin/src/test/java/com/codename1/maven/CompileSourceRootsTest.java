@@ -344,6 +344,36 @@ public class CompileSourceRootsTest {
                         "src/main/kotlin"));
     }
 
+    /**
+     * A disabled extension lifecycle takes the plugin-level `<sourceDirs>` with
+     * it.
+     *
+     * <p>`<extensions>true</extensions>` is what binds compile with no execution
+     * written, so switching that binding off with
+     * `<id>default-compile</id><phase>none</phase>` leaves nothing bound -- not
+     * the conventional root, and not the configured list either. Returning the
+     * plugin-level configuration anyway put a directory Maven does not compile
+     * into the roots, which is where a stale annotated class keeps a source.</p>
+     */
+    @Test
+    public void aDisabledExtensionLifecycleDropsItsConfiguredRoots() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        kotlin.setConfiguration(config("<sourceDirs><d>src/app/kotlin</d></sourceDirs>"));
+        PluginExecution off = new PluginExecution();
+        off.setId("default-compile");
+        off.setPhase("none");
+        kotlin.addExecution(off);
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/app/kotlin"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {

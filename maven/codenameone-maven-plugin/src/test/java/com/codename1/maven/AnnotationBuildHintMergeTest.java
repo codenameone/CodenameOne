@@ -306,6 +306,65 @@ public class AnnotationBuildHintMergeTest {
         }
     }
 
+    /**
+     * The class's OWN module says where its sources are.
+     *
+     * <p>In the generated layout the application's classes come from `common`
+     * while a platform module runs the build. Asking the running project where
+     * its sources are answers for the wrong module, so every class compiled from
+     * `common` has no backing source, reads as stale, and its misplaced
+     * annotation goes unreported -- with the goal unbound or skipped the build
+     * then succeeds having neither applied the hint nor said anything.</p>
+     */
+    @Test
+    public void theRootsComeFromTheModuleThatProducedTheClasses() throws Exception {
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(classes);
+        File src = writeAnnotatedHelperSource();
+        compileInto(classes, "com.example.Helper", helperSource());
+
+        CN1BuildMojo mojo = new CN1BuildMojo();
+        // The module that RUNS: a platform module, with a source root of its own
+        // that knows nothing about com.example.Helper.
+        org.apache.maven.project.MavenProject running =
+                new org.apache.maven.project.MavenProject();
+        running.addCompileSourceRoot(tmp.newFolder().getAbsolutePath());
+        set(mojo, "project", running);
+        // The module that PRODUCED the classes, which is where the source is.
+        org.apache.maven.project.MavenProject owner =
+                new org.apache.maven.project.MavenProject();
+        owner.setBuild(new org.apache.maven.model.Build());
+        owner.getBuild().setOutputDirectory(classes.getAbsolutePath());
+        owner.addCompileSourceRoot(src.getAbsolutePath());
+        set(mojo, "reactorProjects", java.util.Arrays.asList(running, owner));
+
+        Properties settings = new Properties();
+        settings.setProperty("codename1.mainName", "MyApp");
+        settings.setProperty("codename1.packageName", "com.example");
+        set(mojo, "properties", settings);
+
+        Method m = findMethod(mojo.getClass(), "mergeAnnotationBuildHints",
+                Properties.class, List.class);
+        m.setAccessible(true);
+        try {
+            m.invoke(mojo, new Properties(),
+                    Collections.singletonList(classes.getAbsolutePath()));
+            fail("expected the misplaced annotation to be refused");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("com.example.Helper"));
+        }
+    }
+
+    private static void set(Object target, String field, Object value) throws Exception {
+        Field f = findField(target.getClass(), field);
+        f.setAccessible(true);
+        f.set(target, value);
+    }
+
     /** The main class carrying them is the whole point, so it is not a misplacement. */
     @Test
     public void theMainClassCarryingAnnotationsIsNotAMisplacement() throws Exception {

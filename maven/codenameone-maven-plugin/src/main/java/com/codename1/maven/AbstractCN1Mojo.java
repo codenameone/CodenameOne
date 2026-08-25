@@ -222,6 +222,43 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
+    /// The modules this build is running over, for resolving which one produced
+    /// a classpath element.
+    @Parameter(defaultValue = "${reactorProjects}", readonly = true)
+    private List<MavenProject> reactorProjects;
+
+    /**
+     * The reactor module whose compiled output is `element`, or null.
+     *
+     * <p>In the generated layout the application's classes come from `common`
+     * while a platform module is what runs: asking the RUNNING project where its
+     * sources are answers for the wrong module, and a class compiled from
+     * `common` then has no backing source and reads as stale.</p>
+     */
+    protected MavenProject moduleProducing(File element) {
+        if (reactorProjects == null || element == null || !element.isDirectory()) {
+            return null;
+        }
+        String wanted = canonicalPath(element);
+        for (MavenProject candidate : reactorProjects) {
+            if (candidate.getBuild() == null || candidate.getBuild().getOutputDirectory() == null) {
+                continue;
+            }
+            if (wanted.equals(canonicalPath(new File(candidate.getBuild().getOutputDirectory())))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static String canonicalPath(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException ex) {
+            return f.getAbsolutePath();
+        }
+    }
+
     /**
      * The `-D` properties this build was invoked with, or null when there is no
      * session -- which is what the tests run without.
@@ -1607,29 +1644,46 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            boolean disabled = false;
-            if (plugin.getExecutions() != null) {
+            if (kotlinRunsWithoutExecution(plugin)) {
+                return true;
+            }
+            if (plugin.getExecutions() == null) {
+                continue;
+            }
+            {
                 for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                    if (!bindsCompile(execution)) {
-                        continue;
-                    }
-                    if (isDisabled(execution)) {
-                        disabled = true;
-                    } else {
+                    if (bindsCompile(execution) && !isDisabled(execution)) {
                         return true;
                     }
                 }
             }
-            // The lifecycle binding is what <extensions>true</extensions> buys,
-            // and a POM switches THAT off the same way it switches off any
-            // inherited execution -- <id>default-compile</id><phase>none</phase>.
-            // Returning true on extensions alone claimed src/main/kotlin for a
-            // module whose Kotlin compilation is explicitly disabled.
-            if (plugin.isExtensions() && !disabled) {
-                return true;
-            }
         }
         return false;
+    }
+
+    /**
+     * Whether this Kotlin plugin compiles with no execution written for it.
+     *
+     * <p>That is what {@code <extensions>true</extensions>} buys -- the plugin
+     * contributes its own lifecycle. A POM switches THAT off the way it switches
+     * off any inherited execution, {@code <id>default-compile</id>} with
+     * {@code <phase>none</phase>}, and then nothing is bound: not the
+     * conventional root, and not the plugin-level {@code <sourceDirs>} either,
+     * which is a directory Maven does not compile and a place a stale annotated
+     * class can keep a source.</p>
+     */
+    private static boolean kotlinRunsWithoutExecution(org.apache.maven.model.Plugin plugin) {
+        if (!plugin.isExtensions()) {
+            return false;
+        }
+        if (plugin.getExecutions() != null) {
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                if (bindsCompile(execution) && isDisabled(execution)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /// Whether `execution` binds the `compile` goal, disabled or not.
@@ -1654,7 +1708,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 continue;
             }
             for (Object configuration
-                    : configurationsFor(plugin, "compile", "sourceDirs", plugin.isExtensions())) {
+                    : configurationsFor(plugin, "compile", "sourceDirs",
+                            kotlinRunsWithoutExecution(plugin))) {
                 if (has(configuration, "sourceDirs")) {
                     return true;
                 }
@@ -1684,7 +1739,8 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // like it still had a source -- and within an execution the
             // configuration levels override rather than accumulate.
             for (Object configuration
-                    : configurationsFor(plugin, "compile", "sourceDirs", plugin.isExtensions())) {
+                    : configurationsFor(plugin, "compile", "sourceDirs",
+                            kotlinRunsWithoutExecution(plugin))) {
                 addSourceDirsFrom(expressions, configuration, roots);
             }
         }

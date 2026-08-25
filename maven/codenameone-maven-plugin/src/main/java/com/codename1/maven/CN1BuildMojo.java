@@ -2991,10 +2991,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                                       String exclude) {
         List<String> roots;
         try {
+            // The module that PRODUCED this element, not the one running. In the
+            // generated layout the application's classes come from `common`
+            // while a platform module runs the build, so asking the running
+            // project where its sources are answered for the wrong module: every
+            // class compiled from `common` had no backing source, read as stale,
+            // and its misplaced annotation went unreported -- which is exactly
+            // the silence this check exists to break.
+            //
             // The complete set, not only what getCompileSourceRoots lists: the
             // Kotlin plugin compiles its own sourceDirs without adding them
             // back, and this list is used to decide that a source is ABSENT.
-            roots = compileSourceRoots(project, userProperties());
+            org.apache.maven.project.MavenProject owner = moduleProducing(element);
+            roots = compileSourceRoots(owner == null ? project : owner, userProperties());
         } catch (RuntimeException ex) {
             return null;
         }
