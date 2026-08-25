@@ -2881,6 +2881,37 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// `source` with its comments and literals replaced by spaces, offsets and
+    /// line breaks preserved.
+    ///
+    /// For reading BACKWARDS, which the forward scanner cannot help with:
+    /// `private /* note */ typealias AppIos = Ios` is legal, and a backward walk
+    /// that skips only whitespace stops at the comment and reports the
+    /// declaration as public.
+    private static String blanked(String source, boolean kotlin) {
+        char[] out = source.toCharArray();
+        int i = 0;
+        while (i < out.length) {
+            char c = out[i];
+            if (c != '"' && c != '\'' && c != '/' && c != '`') {
+                i++;
+                continue;
+            }
+            int end = skipNonCode(source, i, kotlin);
+            if (end <= i) {
+                i++;
+                continue;
+            }
+            while (i < end) {
+                if (out[i] != '\n' && out[i] != '\r') {
+                    out[i] = ' ';
+                }
+                i++;
+            }
+        }
+        return new String(out);
+    }
+
     /// Whether the declaration at `at` carries the `private` modifier.
     ///
     /// Read backwards over the modifiers that may precede the keyword, stopping
@@ -3125,7 +3156,8 @@ public class CodenameOneSettings extends Lifecycle {
                         int eq = nextLiveChar(source, end, kotlin);
                         if (eq >= 0 && source.charAt(eq) == '=') {
                             out.add(new String[] {name, qualifiedNameAt(source, eq + 1, kotlin),
-                                    declaredPrivate(source, at) ? "private" : ""});
+                                    declaredPrivate(blanked(source, kotlin), at)
+                                            ? "private" : ""});
                         }
                     }
                 }
@@ -3185,6 +3217,11 @@ public class CodenameOneSettings extends Lifecycle {
     static void collectAnnotationOwnedHints(String source, java.util.Map<String, String> out,
                                             boolean kotlin,
                                             java.util.List<String> otherSources) {
+        // Once, not once per hint: which aliases exist and what the main file
+        // calls them does not depend on which hint is being asked about.
+        java.util.List<AliasDeclaration> declaredAliases =
+                kotlin ? visibleTypeAliases(source, otherSources)
+                       : new java.util.ArrayList<AliasDeclaration>();
         for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
             if (!h.isAnnotated()) {
                 continue;
@@ -3202,8 +3239,7 @@ public class CodenameOneSettings extends Lifecycle {
             // One closure over every source, not one per file: a chain may cross
             // files, with the link that names our annotation in one and the link
             // that the main class writes in another.
-            aliases.addAll(kotlinTypeAliases(visibleTypeAliases(source, otherSources),
-                    simple, kotlin));
+            aliases.addAll(kotlinTypeAliases(declaredAliases, simple, kotlin));
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as

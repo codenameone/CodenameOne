@@ -670,4 +670,30 @@ public class MigrateBuildHintsPropertyParsingTest {
                 java.util.Arrays.asList("codename1.arg.ios.teamId"));
         assertEquals("codename1.displayName=Demo\n", read(f));
     }
+
+    /// A continuation marker with nothing after it is still a marker: a file
+    /// whose last byte is that backslash reads as an empty value to
+    /// `Properties.load`, while leaving it in produced a key ending in `\` that
+    /// matched nothing -- so the declaration stayed and the verification build
+    /// failed on the duplicate.
+    @Test
+    public void aContinuationMarkerAtTheEndOfTheFileIsStillAMarker() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "codename1.displayName=Demo\n"
+                + "codename1.arg.ios.teamId\\");
+
+        java.util.Properties loaded = new java.util.Properties();
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            loaded.load(in);
+        } finally {
+            in.close();
+        }
+        assertEquals("", loaded.getProperty("codename1.arg.ios.teamId"));
+
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.teamId"));
+        assertEquals("codename1.displayName=Demo\n", read(f));
+    }
 }

@@ -1407,6 +1407,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 last++;
                 logical.append(withoutTerminator(lines.get(last)).replaceFirst("^\\s+", ""));
             }
+            // A marker with nothing after it is still a marker: a file whose
+            // last byte is that backslash reads as an empty value to
+            // Properties.load, while leaving it in produced a key ending in `\`
+            // that matched nothing -- so the declaration stayed and the
+            // verification build failed on the duplicate.
+            if (continues(logical.toString())) {
+                logical.setLength(logical.length() - 1);
+            }
             String key = propertyKeyOf(logical.toString());
             if (key != null && wanted.containsKey(key)) {
                 i = last;

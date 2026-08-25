@@ -1370,6 +1370,16 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(privateHere, owned, true);
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
 
+        // A comment between the modifier and the keyword is legal, and the
+        // backward walk skips only whitespace -- so it is read over blanked
+        // code, where the comment is spaces.
+        String commented = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private /* note */ typealias AppIos = Ios\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main,
+                        java.util.Collections.singletonList(commented)), "Ios", true).isEmpty());
+
         // `internal` is module-wide, so it is not this file's alone.
         String internal = "package com.example\n"
                 + "import com.codename1.annotations.buildhints.Ios\n"
