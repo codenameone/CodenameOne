@@ -371,8 +371,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (!kotlin) {
             text = decodeUnicodeEscapes(text);
         }
-        if (!pkg.equals(declaredPackageIn(text, kotlin))) {
-            return false;
+        String declaredPkg = declaredPackageIn(text, kotlin);
+        if (!pkg.equals(declaredPkg)) {
+            // A name outside ASCII cannot be judged without the compiler's
+            // source encoding, which this scan cannot see -- so a mismatch
+            // involving one is "cannot tell", not "somewhere else". Concluding
+            // otherwise dropped a live annotated class and lost its placement
+            // error, which is the failure this whole guard exists to prevent.
+            return !isAscii(pkg) || !isAscii(declaredPkg);
         }
         // The name as spelled, before it is read as a nesting path: `$` is legal
         // in a Java type name, so a top-level `class Wrong$Type` really is
@@ -381,7 +387,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             return true;
         }
         if (!declaresType(text, simple, kotlin)) {
-            return false;
+            // Same reasoning as the package: an unreadable name is unjudgeable.
+            return !isAscii(simple) || !isAscii(text);
         }
         // The whole nesting PATH has to be there, in order. Checking only the
         // innermost name let an unrelated Main.B.Wrong vouch for a deleted
@@ -389,6 +396,17 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // every incremental build. Checking only the outer class was the same bug
         // one level out.
         return nested == null || declaresNestedPath(text, nested, kotlin);
+    }
+
+    /// Whether every character of `s` is ASCII, which is where this scan can
+    /// read a source without knowing its encoding.
+    private static boolean isAscii(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) > 0x7F) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Whether `text` declares the chain `path` -- {"Main", "A", "Wrong"} -- each
@@ -1218,13 +1236,56 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// a budget: 4MB is far past any hand-written Java or Kotlin file, and
     /// exceeding it returns null, which the caller reads as "cannot tell" and so
     /// keeps the class.
-    private static String readHead(File f) {
+    /// The charset to read `f` as: UTF-8 when it decodes as UTF-8, ISO-8859-1
+    /// otherwise.
+    ///
+    /// The compiler's source encoding is a project setting this scan cannot see.
+    /// Guessing it from the bytes is not exact, but decoding everything as UTF-8
+    /// produced replacement characters for a source that was never UTF-8, and a
+    /// name that cannot be read never matches.
+    private static java.nio.charset.Charset decoderFor(File f) {
+        try {
+            byte[] bytes = new byte[(int) Math.min(f.length(), 64L * 1024)];
+            InputStream in = new FileInputStream(f);
+            try {
+                int read = 0;
+                while (read < bytes.length) {
+                    int n = in.read(bytes, read, bytes.length - read);
+                    if (n < 0) {
+                        break;
+                    }
+                    read += n;
+                }
+                java.nio.charset.CharsetDecoder decoder =
+                        java.nio.charset.Charset.forName("UTF-8").newDecoder();
+                decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT);
+                decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+                decoder.decode(java.nio.ByteBuffer.wrap(bytes, 0, read));
+                return java.nio.charset.Charset.forName("UTF-8");
+            } finally {
+                in.close();
+            }
+        } catch (java.nio.charset.CharacterCodingException notUtf8) {
+            return java.nio.charset.Charset.forName("ISO-8859-1");
+        } catch (IOException ex) {
+            return java.nio.charset.Charset.forName("UTF-8");
+        }
+    }
+
+    static String readHead(File f) {
         if (f.length() > 4L * 1024 * 1024) {
             return null;
         }
         BufferedReader r = null;
         try {
-            r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+            // UTF-8 where the file is UTF-8, which is the overwhelming case and
+            // what a name from the class file can be compared against directly.
+            // Where it is not, ISO-8859-1: it never fails to decode, so a source
+            // in a single-byte encoding is read correctly rather than turned
+            // into replacement characters. What neither reading can settle -- a
+            // non-ASCII name in some third encoding -- is left inconclusive by
+            // the caller rather than called an orphan.
+            r = new BufferedReader(new InputStreamReader(new FileInputStream(f), decoderFor(f)));
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = r.readLine()) != null) {

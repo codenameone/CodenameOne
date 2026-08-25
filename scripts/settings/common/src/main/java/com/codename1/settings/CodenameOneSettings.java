@@ -2892,6 +2892,21 @@ public class CodenameOneSettings extends Lifecycle {
     /// with `annotation class` in Kotlin and `@interface` in Java, and any of
     /// those shadows an on-demand import of the same name.
     static boolean declaresTypeNamed(String text, String simple, boolean kotlin) {
+        return declaresTypeNamed(text, simple, kotlin, true);
+    }
+
+    /// As above; `includePrivate` is false for a peer, where a file-private
+    /// declaration is not a name the main source can see.
+    ///
+    /// On a top-level Kotlin declaration `private` means this FILE only, so
+    /// another file's `private annotation class Ios` shadows nothing -- counting
+    /// it made a real `@Ios` read as somebody else's, so the hint looked unowned
+    /// and Add wrote the duplicate the next build refuses. In the main file
+    /// itself a private type does shadow, because that is the file it belongs
+    /// to.
+    static boolean declaresTypeNamed(String text, String simple, boolean kotlin,
+                                     boolean includePrivate) {
+        String modifiers = !includePrivate && kotlin ? blanked(text, kotlin) : null;
         int depth = 0;
         int i = 0;
         while (i < text.length()) {
@@ -2928,7 +2943,8 @@ public class CodenameOneSettings extends Lifecycle {
                 int n = nextLiveChar(text, wordEnd, kotlin);
                 if (n >= 0) {
                     int end = componentEnd(text, n, kotlin);
-                    if (end > n && componentText(text, n, end, kotlin).equals(simple)) {
+                    if (end > n && componentText(text, n, end, kotlin).equals(simple)
+                            && (modifiers == null || !declaredPrivate(modifiers, i))) {
                         return true;
                     }
                 }
@@ -3000,6 +3016,22 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// Whether `word` is a modifier that may sit between `private` and the
+    /// keyword it belongs to.
+    ///
+    /// A class carries more of them than a typealias does -- `private
+    /// annotation class Ios` is the shape that matters here -- and stopping at
+    /// the first one not on this list is what keeps a `private` belonging to an
+    /// earlier declaration from being read as this one's.
+    private static boolean isDeclarationModifier(String word) {
+        return "public".equals(word) || "internal".equals(word) || "protected".equals(word)
+                || "actual".equals(word) || "expect".equals(word)
+                || "annotation".equals(word) || "data".equals(word) || "enum".equals(word)
+                || "sealed".equals(word) || "open".equals(word) || "abstract".equals(word)
+                || "final".equals(word) || "inner".equals(word) || "value".equals(word)
+                || "inline".equals(word) || "external".equals(word);
+    }
+
     /// `source` with its comments and literals replaced by spaces, offsets and
     /// line breaks preserved.
     ///
@@ -3038,7 +3070,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// before this declaration is not read as this one's.
     private static boolean declaredPrivate(String source, int at) {
         int i = at;
-        for (int word = 0; word < 4; word++) {
+        for (int word = 0; word < 8; word++) {
             int end = i;
             while (end > 0 && (source.charAt(end - 1) == ' ' || source.charAt(end - 1) == '\t'
                     || source.charAt(end - 1) == '\n' || source.charAt(end - 1) == '\r')) {
@@ -3055,9 +3087,7 @@ public class CodenameOneSettings extends Lifecycle {
             if ("private".equals(modifier)) {
                 return true;
             }
-            if (!"public".equals(modifier) && !"internal".equals(modifier)
-                    && !"protected".equals(modifier) && !"actual".equals(modifier)
-                    && !"expect".equals(modifier)) {
+            if (!isDeclarationModifier(modifier)) {
                 return false;
             }
             i = start;
@@ -3424,8 +3454,13 @@ public class CodenameOneSettings extends Lifecycle {
             // processor never emits, which is indistinguishable from the tool
             // being broken.
             boolean shadowed = false;
+            boolean first = true;
             for (PeerSource peer : samePackage) {
-                if (declaresTypeNamed(peer.text, simple, peer.kotlin)) {
+                // The first entry is the main source itself, where a private
+                // type is in the file it belongs to and does shadow.
+                boolean own = first;
+                first = false;
+                if (declaresTypeNamed(peer.text, simple, peer.kotlin, own)) {
                     shadowed = true;
                     break;
                 }

@@ -1469,6 +1469,39 @@ public class BuildHintCatalogTest {
                         new CodenameOneSettings.PeerSource(javaPeer, true)));
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
 
+        // A file-private Kotlin type in a PEER shadows nothing either: on a
+        // top-level declaration `private` means that file only.
+        String privatePeer = "package com.example\n"
+                + "private annotation class Ios(val teamId: String)\n";
+        String ktMain = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(ktMain, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(privatePeer, true)));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Without the modifier the same peer shadows.
+        String sharedPeer = "package com.example\n"
+                + "annotation class Ios(val teamId: String)\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(ktMain, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(sharedPeer, true)));
+        assertNull(owned.get("ios.teamId"));
+
+        // A private type in the MAIN file is in the file it belongs to.
+        String privateHere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "private annotation class Ios(val teamId: String)\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(privateHere, owned, true, null);
+        assertNull(owned.get("ios.teamId"));
+
         // A peer in ANOTHER package shadows nothing.
         String elsewherePeer = "package com.other;\n@interface Ios { String teamId(); }\n";
         owned.clear();

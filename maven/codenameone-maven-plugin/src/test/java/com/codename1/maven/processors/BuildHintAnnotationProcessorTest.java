@@ -745,6 +745,47 @@ public class BuildHintAnnotationProcessorTest {
         assertFalse(BuildHintAnnotationProcessor.declaresType(raw, "Fake", true));
     }
 
+    /// The compiler's source encoding is a project setting this scan cannot
+    /// see, and decoding an ISO-8859-1 source as UTF-8 produced replacement
+    /// characters -- so a name with a non-ASCII character never matched, the
+    /// class read as an orphan, and its misplaced annotation went unreported.
+    @Test
+    public void aSourceEncodingThatIsNotUtf8StillMatches() throws Exception {
+        String pkg = "com.caf\u00e9";
+        for (String charset : new String[] {"UTF-8", "ISO-8859-1"}) {
+            File src = tmp.newFolder();
+            File dir = new File(src, "com/cafe");
+            dir.mkdirs();
+            java.io.OutputStream os =
+                    new java.io.FileOutputStream(new File(dir, "Accented.java"));
+            try {
+                os.write(("package " + pkg + ";\npublic class Accented {\n}\n")
+                        .getBytes(charset));
+            } finally {
+                os.close();
+            }
+
+            File classes = tmp.newFolder();
+            JavaSourceCompiler.compile(
+                    JavaSourceCompiler.singleSource(pkg + ".Accented",
+                            "package " + pkg + ";\npublic class Accented {\n}\n"),
+                    classes, Arrays.asList(testClassesDir(), coreJar()));
+            AnnotatedClass cls = ClassScanner.scan(classes)
+                    .get(pkg.replace('.', '/') + "/Accented");
+            assertTrue("the class under test must have been compiled", cls != null);
+
+            assertTrue("not matched when the source is " + charset,
+                    BuildHintAnnotationProcessor.hasBackingSource(cls,
+                            java.util.Collections.singletonList(src.getAbsolutePath())));
+
+            // Read correctly, not merely judged unreadable: the name comes back
+            // as it was written, whichever of the two encodings the file is in.
+            assertTrue("misread when the source is " + charset,
+                    BuildHintAnnotationProcessor.readHead(new File(dir, "Accented.java"))
+                            .contains(pkg));
+        }
+    }
+
     /// Running out of search budget is "cannot tell", not "no such source".
     /// Answering no dropped a live annotated class silently, with its placement
     /// error lost, for the sake of a bound -- which is the wrong way round:
