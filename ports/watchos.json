@@ -1,36 +1,36 @@
 {
-  "commit": "d6651206ae8fcbd48a17eae600d94c9ebfacabef",
-  "generated_at": "2026-08-25T07:28:47Z",
+  "commit": "e1065051c0b032ed08c97ec19b23fce4268d8dae",
+  "generated_at": "2026-08-25T22:31:50Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 450604000
+        "duration_ns": 384767000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 186647000
+        "duration_ns": 198825000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 210668000
+        "duration_ns": 230036000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 139876000
+        "duration_ns": 136690000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 568517000
+        "duration_ns": 569472000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 544352000
+        "duration_ns": 369223000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1137239000
+        "duration_ns": 771334000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "watchos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32801126557",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32881093018",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 167,
+    "pass": 168,
     "skip": 13
   },
   "tests": {
@@ -512,6 +512,10 @@
     },
     "MultiButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "MultiWindowApiTest": {
+      "feature": "multi-window",
       "status": "pass"
     },
     "MutableImageClipReadbackTest": {
