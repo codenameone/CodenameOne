@@ -41,6 +41,10 @@ extern "C" {
 /// XIBs.
 void CN1MacInstallMainMenu(void);
 
+/// Installs the NSApplicationDelegate. Called from the generated main alongside
+/// the menu bar, before [NSApp run].
+void CN1MacInstallAppDelegate(void);
+
 #ifdef __cplusplus
 }
 #endif

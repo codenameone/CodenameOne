@@ -133,3 +133,46 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_Stri
     NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
     session.selectedRange = NSMakeRange(start, end - start);
 }
+
+/// Pushes the framework's text into the live session without disturbing the
+/// caret any more than it has to. Called from the shared
+/// updateNativeEditorText native, which on the UIKit ports writes into a
+/// UITextView standing beside the rendering surface; here the surface is the
+/// editor, so there is nowhere else for the text to go.
+void CN1MacTextInputSetText(NSString *text) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.active || text == nil) {
+        return;
+    }
+    if (session.markedRange.location != NSNotFound) {
+        // Mid composition the input method owns the text; see the matching
+        // guard in updateTextInputState.
+        return;
+    }
+    if ([text isEqualToString:session.text]) {
+        return;
+    }
+    NSUInteger caret = MIN(NSMaxRange(session.selectedRange), text.length);
+    session.text = text;
+    session.selectedRange = NSMakeRange(caret, 0);
+}
+
+/// Starts an editing session for the legacy TextField / TextArea path.
+///
+/// Called from the shared editStringAt native. Unlike startTextInput, which the
+/// pure editor engine drives with an explicit selection, this one is handed only
+/// the text -- so the caret goes to the end, which is where a Mac puts it when a
+/// field takes focus by being clicked into rather than tabbed into.
+void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    NSString *initial = text != nil ? text : @"";
+    session.editorBounds = bounds;
+    // A caret rectangle is needed before the first updateTextInputState arrives,
+    // or an input method opened on the first keystroke has nowhere to put its
+    // candidate window. The editor's own top left is the honest guess.
+    session.caretRect = CGRectMake(bounds.origin.x, bounds.origin.y, 1, bounds.size.height);
+    [session startWithText:initial
+                  selStart:(NSInteger)initial.length
+                    selEnd:(NSInteger)initial.length
+                 multiline:multiline];
+}

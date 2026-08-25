@@ -101,6 +101,13 @@ static const CGFloat CN1_MAC_DEFAULT_HEIGHT = 685;
     _renderingView = [[METALView alloc] initWithFrame:frame];
     _renderingView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _window.contentView = _renderingView;
+    // The shared Apple code converts between Codename One's device pixels and
+    // AppKit's points through this global. It is initialised to one and set on
+    // iOS from the screen scale; without setting it here every peer component
+    // would be laid out at pixel coordinates read as points, so on a Retina
+    // display each one lands at twice its size in the wrong place.
+    extern float scaleValue;
+    scaleValue = (float)_window.backingScaleFactor;
     [_window center];
     [_window makeKeyAndOrderFront:nil];
     [_window makeFirstResponder:_renderingView];

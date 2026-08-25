@@ -1220,6 +1220,7 @@ public class ByteCodeClass {
                         b.append("    [NSApplication sharedApplication];\n");
                         b.append("    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];\n");
                         b.append("    CN1MacInstallMainMenu();\n");
+                        b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
                         b.append("        ");
                         b.append(clsName);
