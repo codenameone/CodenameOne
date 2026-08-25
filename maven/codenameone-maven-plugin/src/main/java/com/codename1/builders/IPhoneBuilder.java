@@ -7749,7 +7749,8 @@ public class IPhoneBuilder extends Executor {
             afterKey++;
             // The key's CONTENT resolved, so a name spelled with CDATA or wrapped in a comment
             // still matches -- an XML parser reads all of those as the same key.
-            String name = WatchNativeBuilder.plistStringContent(plist.substring(openEnd + 1, close));
+            String name = WatchNativeBuilder.plistStringContentExact(
+                    plist.substring(openEnd + 1, close));
             if (key.equals(name)) {
                 return afterKey;
             }
@@ -11489,7 +11490,7 @@ public class IPhoneBuilder extends Executor {
             // injected key spelled that way was reported absent -- and the caller then left
             // it in place, or appended a second one beside it. plistKeyEnd already resolved
             // through the same helper, so this was two answers to one question.
-            if (key.equals(WatchNativeBuilder.plistStringContent(
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
                     plist.substring(contentStart, close)))) {
                 return at;
             }
@@ -12053,7 +12054,7 @@ public class IPhoneBuilder extends Executor {
             // injected key spelled that way was reported absent -- and the caller then left
             // it in place, or appended a second one beside it. plistKeyEnd already resolved
             // through the same helper, so this was two answers to one question.
-            if (key.equals(WatchNativeBuilder.plistStringContent(
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
                     plist.substring(contentStart, close)))) {
                 return new int[] {keyIndex, valueEnd};
             }
@@ -12203,7 +12204,7 @@ public class IPhoneBuilder extends Executor {
             // injected key spelled that way was reported absent -- and the caller then left
             // it in place, or appended a second one beside it. plistKeyEnd already resolved
             // through the same helper, so this was two answers to one question.
-            if (key.equals(WatchNativeBuilder.plistStringContent(
+            if (key.equals(WatchNativeBuilder.plistStringContentExact(
                     plist.substring(contentStart, close)))) {
                 return new int[] {valueStart, valueEnd};
             }
@@ -12493,7 +12494,7 @@ public class IPhoneBuilder extends Executor {
         // correctly configured manifest. Same helper the key comparisons use, so the
         // two sides of a member agree about what its text is. It trims on both of its
         // paths, so the explicit trim is not lost.
-        return WatchNativeBuilder.plistStringContent(plist.substring(contentStart, close));
+        return WatchNativeBuilder.plistStringContentExact(plist.substring(contentStart, close));
     }
 
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request)

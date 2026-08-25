@@ -1075,24 +1075,47 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
-    void aKeyElementMayCarryWhitespaceAroundItsName() {
-        // Valid XML. Requiring the tags and the name to be contiguous reported the key
-        // absent, and the build then appended a second UIApplicationSceneManifest beside
-        // the application's own -- duplicate keys in an ordinary iOS build, not just a
-        // Catalyst one.
-        assertTrue(IPhoneBuilder.plistDeclaresKey(
+    void aKeyElementsWhitespaceIsPartOfItsName() {
+        // Verified against Foundation itself rather than assumed. plutil on
+        //   <key> PaddedKey </key><string>padded</string>
+        //   <key>\n\tMultilineKey\n\t</key><string>multiline</string>
+        // yields {" PaddedKey ":"padded", "\n\tMultilineKey\n\t":"multiline"} -- the
+        // padding is part of the key. So a padded UIApplicationSceneManifest is a
+        // DIFFERENT key that UIKit never reads, and the app has no manifest.
+        //
+        // This test previously asserted the opposite, on the belief that such a key was
+        // "still that key". Trimming to match it meant validation and plistForMacSlice
+        // took a padded custom key for the real manifest and rewrote that instead of
+        // adding a root one, so the Catalyst build succeeded with no effective manifest
+        // and Window unsupported.
+        assertFalse(IPhoneBuilder.plistDeclaresKey(
                 "<key>\n    UIApplicationSceneManifest\n</key><dict/>",
                 "UIApplicationSceneManifest"),
-                "a key element with whitespace around its name is still that key");
-        assertTrue(keyIsTrueAnywhere(
+                "padding is part of the name, so this is not that key");
+        assertFalse(keyIsTrueAnywhere(
                 "<key> UIApplicationSupportsMultipleScenes </key><true/>",
                 "UIApplicationSupportsMultipleScenes"),
-                "and its value is still readable");
-        assertTrue(wiresWindowSceneDelegateAnywhere(
+                "nor is a padded support key");
+        assertFalse(wiresWindowSceneDelegateAnywhere(
                 "<key>\n UIWindowSceneSessionRoleApplication \n</key><array><dict>"
                         + "<key> UISceneDelegateClassName </key>"
                         + "<string>CodenameOne_GLSceneDelegate</string></dict></array>"),
-                "and so is the delegate beneath it");
+                "nor a padded role or delegate key");
+    }
+
+    @Test
+    void aPaddedManifestKeyGetsARealOneAddedBesideIt() {
+        // The consequence that matters. The application's padded key is inert, so the
+        // Mac slice must not rewrite it and call the job done -- it has to add a real,
+        // exactly spelled root manifest. There is no duplicate-key hazard in doing so,
+        // because Foundation reads the two as different keys.
+        String shared = document(
+                "    <key> UIApplicationSceneManifest </key>\n    <string>inert</string>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "the Mac copy has to gain a manifest UIKit will actually read");
+        assertTrue(mac.contains("<key> UIApplicationSceneManifest </key>"),
+                "and the application's own key is left exactly as written");
     }
 
     @Test
