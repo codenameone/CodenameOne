@@ -569,6 +569,21 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void markupInsideAProcessingInstructionIsNotADeclaration() {
+        // A processing instruction's data is not element content -- a plist parser
+        // ignores the whole PI. Scanning that looked only past comments and CDATA, so
+        // a PI whose data resembles a manifest was read as one: the validation approved
+        // it, and plistForMacSlice rewrote the PI instead of adding a real root
+        // manifest, producing a build with no scene configuration for Window at all.
+        String inject = "<key>Unrelated</key>\n    <string>x</string>\n"
+                + "    <?cn1 <key>UIApplicationSceneManifest</key><dict/> ?>\n";
+        assertNull(IPhoneBuilder.sceneManifestRejection(inject),
+                "a processing instruction declares nothing");
+        assertFalse(IPhoneBuilder.plistDeclaresKey(inject, "UIApplicationSceneManifest"),
+                "and the key inside it is not a declaration either");
+    }
+
+    @Test
     void aDelegateNameSpelledWithCharacterDataStillNamesThatDelegate() {
         // The value side of the same question. A plist parser reads both of these as
         // CodenameOne_GLSceneDelegate, so the manifest is correctly wired; comparing the
