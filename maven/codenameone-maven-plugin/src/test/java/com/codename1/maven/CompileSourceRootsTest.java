@@ -257,4 +257,51 @@ public class CompileSourceRootsTest {
         assertTrue(contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
                 "src/main/kotlin"));
     }
+
+    /**
+     * `combine.self="override"` discards the inherited configuration wholesale,
+     * so an execution that says it and omits the element has none -- reporting
+     * the plugin-level value there named a setting the build does not use.
+     */
+    @Test
+    public void anOverridingExecutionInheritsNothing() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/plugin-level").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>src/plugin-level</a></sources>"));
+        PluginExecution execution = new PluginExecution();
+        execution.setGoals(Arrays.asList("add-source"));
+        execution.setConfiguration(Xpp3DomBuilder.build(new StringReader(
+                "<configuration combine.self=\"override\"><skip>false</skip></configuration>")));
+        helper.addExecution(execution);
+        project.getBuild().addPlugin(helper);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/plugin-level"));
+    }
+
+    /** Without the attribute the plugin-level configuration still applies. */
+    @Test
+    public void anExecutionWithoutTheElementInheritsIt() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/plugin-level").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>src/plugin-level</a></sources>"));
+        PluginExecution execution = new PluginExecution();
+        execution.setGoals(Arrays.asList("add-source"));
+        execution.setConfiguration(Xpp3DomBuilder.build(new StringReader(
+                "<configuration><skip>false</skip></configuration>")));
+        helper.addExecution(execution);
+        project.getBuild().addPlugin(helper);
+
+        assertTrue(contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                "src/plugin-level"));
+    }
 }

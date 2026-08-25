@@ -397,6 +397,32 @@ public class OpenSettingsMojoTest {
         assertFalse(binding, binding.contains(javase.getAbsolutePath() + "/src"));
     }
 
+    /// `getCN1ProjectDir()` hands back paths shaped like `javase/../common`,
+    /// which an absolute-path comparison never matches against a reactor
+    /// module's own basedir -- so the module WAS in the session and the binding
+    /// still said nothing about it.
+    @Test
+    public void aModuleIsMatchedThroughAnUnnormalizedPath() throws Exception {
+        File root = tmp.newFolder("unnormalized");
+        File common = new File(root, "common");
+        File javase = new File(root, "javase");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(javase.mkdirs());
+        File input = tmp.newFile("unnormalized.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        // The shape getCN1ProjectDir returns when it walks from a sibling.
+        File viaSibling = new File(javase, ".." + File.separator + "common");
+        mojo.writeBinding(input, viaSibling);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertTrue(binding, binding.contains("sourceRoot="));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test

@@ -289,9 +289,22 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         return isAt(project, projectDir) ? project : null;
     }
 
+    /// Canonical, not merely absolute. `getCN1ProjectDir()` hands back paths
+    /// shaped like `javase/../common`, which an absolute-path comparison never
+    /// matches against a reactor module's own basedir -- so the module WAS in
+    /// the session and the binding still said nothing about it, sending the tool
+    /// back to a POM reading that cannot see an activated profile.
     private static boolean isAt(MavenProject candidate, File dir) {
         return candidate != null && candidate.getBasedir() != null
-                && candidate.getBasedir().getAbsolutePath().equals(dir.getAbsolutePath());
+                && canonical(candidate.getBasedir()).equals(canonical(dir));
+    }
+
+    private static String canonical(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException ex) {
+            return f.getAbsolutePath();
+        }
     }
 
     private static String bindingValue(String key, String value) {

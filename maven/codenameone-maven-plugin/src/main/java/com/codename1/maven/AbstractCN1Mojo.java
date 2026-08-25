@@ -1198,7 +1198,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 // Unless the POM DOES say so: `combine.children="append"` is how
                 // it asks for both, and then both are in effect.
                 if (!has(execution.getConfiguration(), element)) {
-                    out.add(plugin.getConfiguration());
+                    // `combine.self="override"` discards the inherited
+                    // configuration wholesale, so an execution that says it and
+                    // omits the element is not falling back to the plugin's --
+                    // it has none. Reporting the plugin-level value there named
+                    // a setting the build does not use.
+                    if (!overrides(execution.getConfiguration())) {
+                        out.add(plugin.getConfiguration());
+                    }
                     continue;
                 }
                 out.add(execution.getConfiguration());
@@ -1228,6 +1235,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return "append".equals(root.getAttribute("combine.children"))
                 || (root.getChild(element) != null
                     && "append".equals(root.getChild(element).getAttribute("combine.children")));
+    }
+
+    /// Whether the POM asked for this configuration to replace the inherited
+    /// one entirely rather than merge with it.
+    private static boolean overrides(Object configuration) {
+        return configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom
+                && "override".equals(((org.codehaus.plexus.util.xml.Xpp3Dom) configuration)
+                        .getAttribute("combine.self"));
     }
 
     private static boolean has(Object configuration, String element) {
