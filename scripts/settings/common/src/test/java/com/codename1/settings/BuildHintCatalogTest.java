@@ -1643,4 +1643,39 @@ public class BuildHintCatalogTest {
                 + "class MyApp\n";
         assertTrue(CodenameOneSettings.importsAnnotation(elsewhere, "Ios", true));
     }
+
+    /// The guess can only tell UTF-8 from a single-byte encoding, so a
+    /// multibyte one such as Shift_JIS came back as mojibake and its non-ASCII
+    /// names never matched. What the project SAYS it is written in settles it,
+    /// when it says.
+    @Test
+    public void thePomsDeclaredSourceEncodingIsUsed() throws Exception {
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties>"
+                        + "<project.build.sourceEncoding>Shift_JIS</project.build.sourceEncoding>"
+                        + "</properties></project>"));
+        // The compiler plugin's own setting counts too.
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><build><plugins><plugin>"
+                        + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                        + "</plugin></plugins></build></project>"));
+        // Nothing declared is nothing to use, and the guess stays.
+        assertNull(CodenameOneSettings.declaredSourceEncoding("<project></project>"));
+        assertNull(CodenameOneSettings.declaredSourceEncoding(null));
+        // An unresolved property is not an encoding: this reader has no model to
+        // resolve it against, and passing it on would throw on every file.
+        assertNull(CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties><project.build.sourceEncoding>${enc}"
+                        + "</project.build.sourceEncoding></properties></project>"));
+
+        // And it decodes what the guess could not: a multibyte source whose
+        // package name is only readable in its own encoding.
+        String text = "package com.\u30a2\u30d7\u30ea;\npublic class MyApp {}\n";
+        byte[] sjis = text.getBytes("Shift_JIS");
+        assertFalse(CodenameOneSettings.isValidUtf8(sjis));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(sjis, "Shift_JIS"), "MyApp", "com.\u30a2\u30d7\u30ea"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                new String(sjis, "ISO-8859-1"), "MyApp", "com.\u30a2\u30d7\u30ea"));
+    }
 }

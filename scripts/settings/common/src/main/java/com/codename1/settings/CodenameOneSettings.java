@@ -2665,6 +2665,25 @@ public class CodenameOneSettings extends Lifecycle {
         return false;
     }
 
+    /// The POM as bytes-to-ISO-8859-1, used only to find the encoding
+    /// declaration -- which is ASCII wherever it appears.
+    private String readIfPresentRaw(String path) {
+        InputStream in = null;
+        try {
+            String url = ProjectIO.fsUrl(path);
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            if (!fs.exists(url)) {
+                return null;
+            }
+            in = fs.openInputStream(url);
+            return new String(Util.readInputStream(in), "ISO-8859-1");
+        } catch (Exception ex) {
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
     private String readIfPresent(String path) {
         InputStream in = null;
         try {
@@ -2675,6 +2694,19 @@ public class CodenameOneSettings extends Lifecycle {
             }
             in = fs.openInputStream(url);
             byte[] bytes = Util.readInputStream(in);
+            // What the project SAYS it is written in, when it says. The guess
+            // below can only tell UTF-8 from a single-byte encoding, so a
+            // multibyte one such as Shift_JIS came back as mojibake and its
+            // non-ASCII names never matched.
+            String declared = declaredSourceEncoding();
+            if (declared != null) {
+                try {
+                    return new String(bytes, declared);
+                } catch (Exception unsupported) {
+                    // Named an encoding this runtime does not have. Guessing is
+                    // better than failing to read the file at all.
+                }
+            }
             // UTF-8 where the file is UTF-8, which is the overwhelming case;
             // ISO-8859-1 where it is not, since that never fails to decode. The
             // compiler's source encoding is a project setting this tool does not
@@ -3053,6 +3085,58 @@ public class CodenameOneSettings extends Lifecycle {
                 || "sealed".equals(word) || "open".equals(word) || "abstract".equals(word)
                 || "final".equals(word) || "inner".equals(word) || "value".equals(word)
                 || "inline".equals(word) || "external".equals(word);
+    }
+
+    /// The source encoding the POM declares, or null when it declares none.
+    ///
+    /// Read once per session: this is asked for every source file the sweeps
+    /// open, and the answer cannot change while the project is bound.
+    private String declaredSourceEncoding() {
+        if (!sourceEncodingRead) {
+            sourceEncodingRead = true;
+            if (binding != null && binding.pom() != null && !binding.pom().isEmpty()) {
+                sourceEncoding = declaredSourceEncoding(readIfPresentRaw(binding.pom()));
+            }
+        }
+        return sourceEncoding;
+    }
+
+    private boolean sourceEncodingRead;
+    private String sourceEncoding;
+
+    /// The encoding `pomText` declares: the conventional property first, then
+    /// the compiler plugin's own setting.
+    ///
+    /// A string read rather than an XML model, which is how this tool handles
+    /// POMs everywhere else. It is looking for one value that is written as a
+    /// plain element in both places.
+    static String declaredSourceEncoding(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        String value = elementValue(pomText, "project.build.sourceEncoding");
+        if (value == null) {
+            value = elementValue(pomText, "maven.compiler.encoding");
+        }
+        if (value == null) {
+            value = elementValue(pomText, "encoding");
+        }
+        if (value == null || value.trim().isEmpty() || value.indexOf('$') >= 0) {
+            // An unresolved ${property} is not an encoding, and this reader has
+            // no model to resolve it against.
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static String elementValue(String xml, String name) {
+        String open = "<" + name + ">";
+        int at = xml.indexOf(open);
+        if (at < 0) {
+            return null;
+        }
+        int close = xml.indexOf("</" + name + ">", at + open.length());
+        return close < 0 ? null : xml.substring(at + open.length(), close);
     }
 
     /// Whether `bytes` decode as UTF-8.
