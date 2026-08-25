@@ -1154,6 +1154,42 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /**
+     * The configurations that apply to {@code goal}, most specific first: each
+     * execution bound to it, then the plugin-level one.
+     *
+     * <p>Maven merges plugin-level configuration into every execution, so a
+     * parameter written once outside them applies to this goal too -- and an
+     * execution's own value overrides it. Reading only one of the two got both
+     * halves wrong in turn: the build-helper roots missed a plugin-level
+     * {@code <sources>}, and the compiler encoding reported the plugin-level
+     * value over an execution that overrides it.</p>
+     *
+     * <p>An execution that names no goal but carries Maven's own id for one --
+     * {@code default-compile} -- is bound to it: that is how a POM overrides a
+     * lifecycle-injected execution.</p>
+     */
+    private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
+                                                  String goal) {
+        List<Object> out = new ArrayList<Object>();
+        if (plugin.getExecutions() != null) {
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                boolean bound = execution.getGoals() != null
+                        && execution.getGoals().contains(goal);
+                if (!bound && ("default-" + goal).equals(execution.getId())) {
+                    bound = true;
+                }
+                if (bound && execution.getConfiguration() != null) {
+                    out.add(execution.getConfiguration());
+                }
+            }
+        }
+        if (plugin.getConfiguration() != null) {
+            out.add(plugin.getConfiguration());
+        }
+        return out;
+    }
+
+    /**
      * build-helper's {@code add-source} directories.
      *
      * <p>That goal runs at {@code generate-sources} and adds them to the project
@@ -1177,14 +1213,15 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         for (org.apache.maven.model.Plugin plugin : plugins) {
-            if (!"build-helper-maven-plugin".equals(plugin.getArtifactId())
-                    || plugin.getExecutions() == null) {
+            if (!"build-helper-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                if (execution.getGoals() != null && execution.getGoals().contains("add-source")) {
-                    addSourcesFrom(project, execution.getConfiguration(), roots);
-                }
+            // Every configuration that applies to add-source, including the
+            // plugin-level one. Collected rather than overridden: this list is
+            // used to decide where a source COULD be, so a root named at either
+            // level is a root.
+            for (Object configuration : configurationsFor(plugin, "add-source")) {
+                addSourcesFrom(project, configuration, roots);
             }
         }
     }
@@ -1310,20 +1347,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"maven-compiler-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            String fromPlugin = encodingIn(plugin.getConfiguration());
-            if (fromPlugin != null) {
-                return fromPlugin;
-            }
-            if (plugin.getExecutions() == null) {
-                continue;
-            }
-            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                // The main compilation's, not testCompile's.
-                if (execution.getGoals() != null && execution.getGoals().contains("compile")) {
-                    String fromExecution = encodingIn(execution.getConfiguration());
-                    if (fromExecution != null) {
-                        return fromExecution;
-                    }
+            // Most specific first: an execution bound to `compile` overrides
+            // the plugin-level value, and testCompile's is not this one.
+            for (Object configuration : configurationsFor(plugin, "compile")) {
+                String encoding = encodingIn(configuration);
+                if (encoding != null) {
+                    return encoding;
                 }
             }
         }

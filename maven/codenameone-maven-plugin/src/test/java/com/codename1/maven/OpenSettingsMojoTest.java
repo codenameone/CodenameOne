@@ -281,6 +281,60 @@ public class OpenSettingsMojoTest {
         return execution;
     }
 
+    /// Maven merges plugin-level configuration into every execution, so a
+    /// `<sources>` written once outside them applies to the `add-source`
+    /// execution too -- and an execution's own value overrides a plugin-level
+    /// `<encoding>`. Reading only one of the two got both halves wrong in turn.
+    @Test
+    public void configurationAtEitherLevelIsApplied() throws Exception {
+        File root = tmp.newFolder("levels");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/shared").mkdirs());
+        File input = tmp.newFile("levels.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+
+        // build-helper: the root is named at PLUGIN level, the goal in the
+        // execution.
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><sources><source>gen/shared</source></sources>"
+                                + "</configuration>")));
+        org.apache.maven.model.PluginExecution add =
+                new org.apache.maven.model.PluginExecution();
+        add.setGoals(Arrays.asList("add-source"));
+        helper.addExecution(add);
+        mojo.project.getBuild().addPlugin(helper);
+
+        // compiler: the EXECUTION overrides the plugin-level encoding, and it
+        // names the goal only through Maven's own execution id.
+        org.apache.maven.model.Plugin compiler = new org.apache.maven.model.Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>UTF-8</encoding></configuration>")));
+        org.apache.maven.model.PluginExecution defaultCompile =
+                new org.apache.maven.model.PluginExecution();
+        defaultCompile.setId("default-compile");
+        defaultCompile.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><encoding>Shift_JIS</encoding></configuration>")));
+        compiler.addExecution(defaultCompile);
+        mojo.project.getBuild().addPlugin(compiler);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/shared").getAbsolutePath() + "\n"));
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+        assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test
