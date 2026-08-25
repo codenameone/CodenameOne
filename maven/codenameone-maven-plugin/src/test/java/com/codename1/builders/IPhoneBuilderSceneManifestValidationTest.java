@@ -569,6 +569,29 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void theMacSliceDropsAnInjectedMainNibThatShadowsTheTemplateOne() {
+        // ios.plistInject appends its members after the template's, so a project that
+        // injects its own NSMainNibFile produces a root dictionary carrying the key
+        // twice. CFPropertyList resolves a duplicate to the LAST entry, so the injected
+        // one is the effective one -- while every lookup in this file finds the first.
+        // Dropping a single match would therefore delete the entry iOS was already
+        // ignoring and leave the live one to pair with the manifest added below.
+        String shared = document(
+                "    <key>NSMainNibFile</key>\n    <string>MainWindow</string>\n"
+                + "    <key>NSMainNibFile</key>\n    <string>InjectedWindow</string>\n");
+
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertFalse(mac.contains("NSMainNibFile"),
+                "both entries have to go, not just the one that was being ignored");
+        assertFalse(mac.contains("InjectedWindow"),
+                "the injected entry is the effective one and is what actually breaks launch");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(mac)),
+                "and the Mac copy still gains the manifest that made the NIB fatal");
+        assertTrue(mac.contains("<key>CFBundleName</key>"),
+                "nothing else is disturbed");
+    }
+
+    @Test
     void aPlistWithNoMainNibIsUnharmed() {
         String mac = IPhoneBuilder.plistForMacSlice(document(
                 "    <key>UILaunchStoryboardName</key>\n    <string>LaunchScreen</string>\n"));

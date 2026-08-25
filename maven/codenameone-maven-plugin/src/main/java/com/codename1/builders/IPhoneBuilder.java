@@ -11806,7 +11806,7 @@ public class IPhoneBuilder extends Executor {
         //
         // The Mac build settings exclude MainWindow.xib from compilation anyway, so the
         // key names a NIB that is not in this bundle even before the lifecycle argument.
-        plist = plistWithoutRootMember(plist, "NSMainNibFile");
+        plist = plistWithoutRootMembers(plist, "NSMainNibFile");
         int[] root = plistRootDictBody(plist);
         if (root == null) {
             return plist;
@@ -12037,7 +12037,41 @@ public class IPhoneBuilder extends Executor {
         return null;
     }
 
-    /// The same plist without `key` as a member of its root dictionary.
+    /// The same plist without any root-dictionary member named `key`.
+    ///
+    /// Every occurrence goes, not only the first. A plist may legitimately carry the
+    /// same root key twice: `ios.plistInject` appends its members after the template's,
+    /// so a project that injects its own `NSMainNibFile` ends up with the template's
+    /// entry followed by its own. CFPropertyList resolves a duplicate key to the LAST
+    /// one, while every lookup here finds the first -- so removing a single match would
+    /// delete the entry that was already being ignored and leave the effective one
+    /// behind. On the Mac slice that means the scene manifest added afterwards pairs
+    /// with a live main NIB, which is the orphan window FrontBoard terminates at
+    /// launch: exactly what this transform exists to prevent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: a whole plist document
+    ///
+    /// - `key`: the member to drop
+    ///
+    /// #### Returns
+    ///
+    /// the plist without any such member, or unchanged when it has none
+    static String plistWithoutRootMembers(String plist, String key) {
+        String previous;
+        do {
+            previous = plist;
+            plist = plistWithoutRootMember(plist, key);
+        } while (!plist.equals(previous));
+        return plist;
+    }
+
+    /// The same plist without the FIRST `key` member of its root dictionary.
+    ///
+    /// Callers that must be sure the key is gone want `plistWithoutRootMembers`: a
+    /// duplicate root key resolves to the last one, so dropping one match can leave
+    /// the effective entry in place.
     ///
     /// #### Parameters
     ///
