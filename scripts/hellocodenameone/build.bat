@@ -26,6 +26,10 @@ goto :EOF
 !MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-os-x-native -U -e
 
 goto :EOF
+:mac_catalyst
+!MVNW! package -DskipTests -Dcodename1.platform^=ios -Dcodename1.buildTarget^=mac-catalyst -U -e
+
+goto :EOF
 :windows_desktop
 !MVNW! package -DskipTests -Dcodename1.platform^=javase -Dcodename1.buildTarget^=windows-desktop -U -e
 
