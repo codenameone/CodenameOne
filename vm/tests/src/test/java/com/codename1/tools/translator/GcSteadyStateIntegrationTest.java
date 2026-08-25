@@ -291,7 +291,8 @@ class GcSteadyStateIntegrationTest {
         assertTrue(boundedHeadroomMb >= HEADROOM_THRESHOLD_MB,
                 "Under a " + CEILING_MB + "MB budget the collector should defend about "
                         + RESERVE_MB + "MB of headroom, but the smallest seen was "
-                        + boundedHeadroomMb + "MB -- the process is riding the kill line.");
+                        + boundedHeadroomMb + "MB -- the process is riding the kill line."
+                        + evidence(bounded));
 
         // ---- 4. proof that scenario 3 can fail ---------------------------------
         Path noReserve = build(distDir, tempDirs, "noreserve",
@@ -304,7 +305,7 @@ class GcSteadyStateIntegrationTest {
         assertTrue(unboundedHeadroomMb < HEADROOM_THRESHOLD_MB,
                 "Compiling the reserve out did NOT put the process back on the admission "
                         + "margin (smallest headroom " + unboundedHeadroomMb + "MB), so this "
-                        + "scenario is inert.");
+                        + "scenario is inert." + evidence(unbounded));
     }
 
     /**
@@ -440,6 +441,34 @@ class GcSteadyStateIntegrationTest {
             }
             return (double) (pagesAtEnd - pagesAtMid) / pagesAtMid;
         }
+    }
+
+    /**
+     * The evidence a failing ceiling assertion needs: what the pacing tracer counted, and
+     * the last footprint partition the probe emitted.
+     *
+     * <p>Without this the only ceiling assertion that can fail reports a single number and
+     * nothing to explain it -- which is how the first CI failure of this gate arrived, and
+     * the probe rows it would have needed were captured and then discarded.</p>
+     */
+    private String evidence(Run r) {
+        StringBuilder sb = new StringBuilder("\n--- evidence ---\n");
+        String pacing = null;
+        String lastProbe = null;
+        for (String line : r.output.split("\\R")) {
+            if (line.startsWith("[PACING]")) {
+                pacing = line;
+            } else if (line.startsWith("[GCPROBE] v=1")) {
+                lastProbe = line;
+            }
+        }
+        sb.append(pacing == null ? "(no [PACING] line)" : pacing).append('\n');
+        sb.append(lastProbe == null ? "(no [GCPROBE] rows)" : lastProbe).append('\n');
+        sb.append("wall samples=").append(wallSampleCount(r.output))
+          .append(" secondHalfPageGrowth=")
+          .append(String.format("%.3f", wallSecondHalfPageGrowth(r.output))).append('\n');
+        sb.append(tail(r.output));
+        return sb.toString();
     }
 
     /** pgTotal from the 1Hz [GCPROBE-T] series, in emission order. */
