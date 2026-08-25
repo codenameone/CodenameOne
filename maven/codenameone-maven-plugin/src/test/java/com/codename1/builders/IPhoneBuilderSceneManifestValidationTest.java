@@ -348,6 +348,24 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aNestedManifestKeyDoesNotMakeTheFragmentDeclareOne() {
+        // The companion to the test below, on the entry guard rather than the scope
+        // helpers. A fragment whose only UIApplicationSceneManifest sits inside some
+        // unrelated dictionary declares no manifest at all -- plistForMacSlice will add
+        // the root member it needs. Searching the whole fragment made the guard say
+        // otherwise, the scope lookup then came back empty, and the build was refused
+        // for a non-dictionary manifest it never had.
+        String fragment = "<key>CN1Metadata</key>\n<dict>\n"
+                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                        + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                        + WINDOW_ROLE
+                        + "    </dict>\n")
+                + "\n</dict>";
+        assertNull(IPhoneBuilder.sceneManifestRejection(fragment),
+                "a nested manifest key is not a declaration and must not fail the build");
+    }
+
+    @Test
     void aManifestNestedInAnotherDictionaryIsNotTheManifest() {
         // UIKit reads members of the plist root. A manifest parked inside some other
         // dictionary configures nothing, so accepting it would pass a build whose

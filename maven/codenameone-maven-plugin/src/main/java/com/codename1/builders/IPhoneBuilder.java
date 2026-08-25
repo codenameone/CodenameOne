@@ -11707,7 +11707,13 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the reason to refuse, or null to proceed
     static String sceneManifestRejection(String inject) {
-        if (!plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
+        // The fragment's OWN level, which is the level plistManifestScope answers from
+        // and the level UIKit reads. A UIApplicationSceneManifest key sitting inside some
+        // unrelated nested dictionary declares nothing; searching the whole fragment made
+        // this guard say otherwise, plistManifestScope then correctly came back empty, and
+        // the check below refused the build for a non-dictionary manifest it never had --
+        // one plistForMacSlice would simply have added the root member to.
+        if (plistMemberRange(inject, 0, inject.length(), "UIApplicationSceneManifest") == null) {
             return null;
         }
         // Two of the same reserved key at one level. A property list resolves
