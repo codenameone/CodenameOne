@@ -7603,6 +7603,18 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
     }
     id<MTLTexture> src = mv.screenTexture;
     if (src == nil) {
+        // Direct-to-drawable mode (CN1_DIRECT_DRAWABLE, opt-in) keeps no
+        // retained screen texture, so there is nothing here to read back and
+        // the caller falls through to drawViewHierarchyInRect:. That is correct
+        // on device but samples the CALayer's presented drawable, so it can lag
+        // a frame -- exactly the staleness this readback exists to avoid, and
+        // on headless Catalyst (no display link) it can be stale indefinitely.
+        //
+        // Reading the live drawable instead is not the fix: retaining it past
+        // present starves nextDrawable, and after present the buffer is
+        // recycled for the following frame. A deterministic capture needs a
+        // one-shot render into a scratch target, which is worth doing when the
+        // mode stops being opt-in. Until then the default path is unaffected.
         return NULL;
     }
     NSUInteger w = src.width;
@@ -14893,6 +14905,115 @@ static void cn1_resetContext(void) {
     }
 }
 #endif // !TARGET_OS_TV
+
+#if !TARGET_OS_WATCH
+BOOL cn1AccessibilityEagerLatched(void);
+void cn1RegisterAccessibilityStatusObservers(void);
+
+// A technology STARTING is not a component mutation, so nothing in the portable
+// layer would schedule the projection it needs and the native tree would stay
+// empty until some unrelated UI change happened to invalidate something. These
+// notifications are the trigger for that transition.
+//
+// Once any of them fires we latch eager projection on for the rest of the
+// process rather than flipping it back and forth. The technologies UIKit will
+// not report at all are handled by cn1AccessibilityNoteClientQuery below, which
+// does not depend on flags or notifications.
+static BOOL cn1A11yLatched = NO;
+
+BOOL cn1AccessibilityEagerLatched(void) {
+    return cn1A11yLatched;
+}
+
+static void cn1AccessibilityStatusChanged(CFNotificationCenterRef center, void *observer,
+                                          CFStringRef name, const void *object,
+                                          CFDictionaryRef userInfo) {
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+// Called from the METALView / EAGLView accessibilityElements getters: a real
+// client asked for
+// the tree. This, not the running flags, is what makes the gate correct for the
+// technologies UIKit will not report -- see the comment on that getter.
+void cn1AccessibilityNoteClientQuery(void) {
+    if(cn1A11yLatched) {
+        return;   // one transition only; this is on a UIKit query path
+    }
+    cn1A11yLatched = YES;
+    com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void cn1RegisterAccessibilityStatusObservers(void) {
+    static BOOL done = NO;
+    if(done) {
+        return;
+    }
+    done = YES;
+    // Built up rather than written as a literal: the AssistiveTouch notification
+    // is iOS 10, and ios.deployment_target lets IPhoneBuilder emit older
+    // targets, where the weakly-linked constant is nil -- and a nil inside an
+    // @[] literal raises. Same reason the running check below is guarded.
+    NSMutableArray *names = [NSMutableArray arrayWithCapacity:3];
+    if(UIAccessibilityVoiceOverStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityVoiceOverStatusDidChangeNotification];
+    }
+    if(UIAccessibilitySwitchControlStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilitySwitchControlStatusDidChangeNotification];
+    }
+    if(UIAccessibilityAssistiveTouchStatusDidChangeNotification != nil) {
+        [names addObject:UIAccessibilityAssistiveTouchStatusDidChangeNotification];
+    }
+    for(NSString *n in names) {
+        CFNotificationCenterAddObserver(CFNotificationCenterGetLocalCenter(), NULL,
+                                        cn1AccessibilityStatusChanged,
+                                        (__bridge CFStringRef)n, NULL,
+                                        CFNotificationSuspensionBehaviorDeliverImmediately);
+    }
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // CN1_EAGER_A11Y=1 restores the old always-project behaviour for an A/B.
+    if(getenv("CN1_EAGER_A11Y") != NULL) {
+        return JAVA_TRUE;
+    }
+#if !TARGET_OS_WATCH
+    // These three are the ENTIRE public surface for "is an assistive technology
+    // running": UIKit exposes IsVoiceOverRunning, IsSwitchControlRunning and
+    // IsAssistiveTouchRunning and nothing else. In particular there is no
+    // public running flag for Voice Control or Full Keyboard Access, so this
+    // cannot detect them -- see cn1AccessibilityStatusChanged for how that gap
+    // is covered rather than ignored.
+    cn1RegisterAccessibilityStatusObservers();
+    if(cn1AccessibilityEagerLatched()) {
+        return JAVA_TRUE;
+    }
+    if(UIAccessibilityIsVoiceOverRunning() || UIAccessibilityIsSwitchControlRunning()) {
+        return JAVA_TRUE;
+    }
+    // iOS 10. Weakly linked, so on an older deployment target the symbol is
+    // null and calling it jumps through nothing -- test the pointer first.
+    if(UIAccessibilityIsAssistiveTouchRunning != NULL &&
+       UIAccessibilityIsAssistiveTouchRunning()) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDirectToDrawable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_USE_METAL
+    extern int cn1DirectToDrawableEnabled(void);
+    return cn1DirectToDrawableEnabled() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV

@@ -1367,6 +1367,7 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize);
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 extern int recursionKey; // force-mark pass epoch (defined below, near gcMarkObject)
+static void cn1ForceVisitedPrune(int key); // force-visited side table sweep (defined with the table)
 
 // ---- SATB (snapshot-at-the-beginning) deletion-barrier log -------------------
 // gcSatbActive is set for the whole concurrent mark and read by CN1_SATB_DELETE on
@@ -1572,6 +1573,9 @@ void codenameOneGCMark() {
     // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
     // read as not-visited (relocated from the old per-object __codenameOneReferenceCount).
     recursionKey++;
+    // Release the force-visited entries for objects that were not force-visited in
+    // the cycle just finished -- most of them for objects the last sweep freed.
+    cn1ForceVisitedPrune(recursionKey);
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // PHASE 3b: ensure the universal thread-stop signal handler is installed (idempotent,
     // first GC only). Used to stop+scan threads we cannot cooperatively park.
@@ -1829,7 +1833,14 @@ void codenameOneGCMark() {
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "constant-pool"; }
 #endif
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
-        gcMarkObject(d, (JAVA_OBJECT)constantPoolObjects[iter], JAVA_TRUE);
+        // Most entries are JAVA_NULL now (the pool fills on first use); the
+        // explicit test skips the call rather than paying it per empty slot.
+        // Acquire for the same reason: the collector marks through this pointer
+        // and must see a fully constructed String behind it.
+        JAVA_OBJECT poolEntry = (JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[iter], __ATOMIC_ACQUIRE);
+        if(poolEntry != JAVA_NULL) {
+            gcMarkObject(d, poolEntry, JAVA_TRUE);
+        }
     }
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -2295,6 +2306,75 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
  */
 #ifndef CN1_DISABLE_BIBOP
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE);
+#endif
+#ifdef CN1_HEAP_HISTOGRAM
+/**
+ * Names what is actually ON the heap, biggest first.
+ *
+ * "The heap is 65MB" is not a thing anyone can fix; "there are 90,000 of THIS
+ * class" is. Every live object carries a pointer to its clazz, and the
+ * collector already has to walk the whole registry, so a census costs one pass
+ * and answers the only question that matters when a heap is bigger than it
+ * should be. Compiled out unless CN1_HEAP_HISTOGRAM is defined; print it from a
+ * diagnostic build, read it, and take the top of the list.
+ */
+static void cn1HeapHistogram(void) {
+    #define CN1_HIST_MAX 512
+    static const char* names[CN1_HIST_MAX];
+    static long counts[CN1_HIST_MAX];
+    int used = 0;
+    long total = 0;
+    int t = currentSizeOfAllObjectsInHeap;
+    for(int iter = 0 ; iter < t ; iter++) {
+        JAVA_OBJECT o = allObjectsInHeap[iter];
+        if(o == JAVA_NULL || o->__codenameOneParentClsReference == 0) {
+            continue;
+        }
+        total++;
+        const char* n = o->__codenameOneParentClsReference->clsName;
+        if(n == 0) {
+            n = "?";
+        }
+        int found = -1;
+        for(int i = 0 ; i < used ; i++) {
+            if(names[i] == n) {   // clsName is a static literal: pointer identity is enough
+                found = i;
+                break;
+            }
+        }
+        if(found < 0) {
+            if(used < CN1_HIST_MAX) {
+                found = used++;
+                names[found] = n;
+                counts[found] = 0;
+            } else {
+                continue;
+            }
+        }
+        counts[found]++;
+    }
+    fprintf(stderr, "[HEAP] %ld live objects in %d classes\n", total, used);
+    for(int shown = 0 ; shown < 25 ; shown++) {
+        int best = -1;
+        for(int i = 0 ; i < used ; i++) {
+            if(counts[i] > 0 && (best < 0 || counts[i] > counts[best])) {
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        fprintf(stderr, "[HEAP]   %8ld  %s\n", counts[best], names[best]);
+        counts[best] = 0;
+    }
+    fflush(stderr);
+}
+#endif
+
+#ifdef CN1_HEAP_HISTOGRAM
+void cn1HeapHistogramPublic(void) {
+    cn1HeapHistogram();
+}
 #endif
 // Release the threads the mark parked as aggressive allocators. Called on both exits
 // from codenameOneGCSweep -- see the one that skips the reclaim.
@@ -4180,6 +4260,129 @@ void cn1GcRegisterClazz(struct clazz* c) {
     // side fast-path skip; the GC never reads it (it probes the table).
     c->cn1ClazzRegistered = JAVA_TRUE;
 }
+
+#if defined(CN1_ALLOC_CENSUS) && defined(__APPLE__)
+// cn1HeapAccounting weighs legacy-heap blocks with malloc_size (the object
+// header does not record instance size). The other include of this header is
+// scoped to CN1_GC_VERIFY builds, so the census needs its own.
+#include <malloc/malloc.h>
+#endif
+
+#ifdef CN1_ALLOC_CENSUS
+/**
+ * Prints allocation volume by class, biggest first.
+ *
+ * Deliberately a census of what was ALLOCATED rather than of what is live: churn
+ * is what costs, and a live-object walk cannot see the BiBOP or nursery objects
+ * at all (they never enter allObjectsInHeap), which is exactly where the small
+ * high-turnover objects sit. Counters are read without synchronisation; a
+ * diagnostic wants the shape, not the last digit.
+ */
+/**
+ * Separates the JAVA heap from native allocation.
+ *
+ * vmmap cannot do this: BiBOP arenas are posix_memalign'd so they land in
+ * MALLOC_LARGE and the legacy heap in MALLOC_SMALL, side by side with every
+ * Metal, CoreGraphics and image buffer the process owns. Comparing "our malloc
+ * total" against another runtime's figures therefore compares a heap against a
+ * heap PLUS a renderer. These numbers are the heap on its own.
+ *
+ * Reserved is what BiBOP has taken from the allocator; live is what objects
+ * actually occupy. The difference is the honest cost of the page pool: BiBOP
+ * never frees a page back per-object, it pools swept pages by size class.
+ */
+void cn1HeapAccounting(const char* label) {
+    long long pages = 0, capBytes = 0, liveBytes = 0, ownedPages = 0, emptyPages = 0;
+    CN1BibopPage* p = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(p != 0) {
+        pages++;
+        capBytes += CN1_BIBOP_PAGE_SIZE;
+        int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
+        int live = bi - p->freeCount;
+        if(live < 0) {
+            live = 0;
+        }
+        if(live == 0) {
+            emptyPages++;
+        }
+        liveBytes += (long long)live * (long long)p->slotSize;
+        if(p->owned) {
+            ownedPages++;
+        }
+        p = atomic_load_explicit(&p->nextAll, memory_order_acquire);
+    }
+    // The legacy heap is NOT part of the BiBOP figures above and is easy to
+    // forget: objects too big for the largest size class go through calloc and
+    // the allObjectsInHeap table instead. Reporting only the BiBOP total
+    // understates the Java heap by whatever these weigh, so weigh them --
+    // malloc_size gives the true block size for a calloc'd pointer.
+    long long legacyBytes = 0, legacyLive = 0;
+    int nHeap = currentSizeOfAllObjectsInHeap;
+    for(int i = 0 ; i < nHeap ; i++) {
+        JAVA_OBJECT o = allObjectsInHeap[i];
+        if(o == JAVA_NULL) {
+            continue;
+        }
+        legacyLive++;
+#if defined(__APPLE__)
+        legacyBytes += (long long)malloc_size((void*)o);
+#endif
+    }
+    fprintf(stderr,
+            "[JHEAP:%s] bibop pages=%lld reserved=%.2fMB live=%.2fMB slack=%.2fMB "
+            "(owned=%lld empty=%lld) | legacy objects=%lld bytes=%.2fMB | "
+            "JAVA TOTAL live=%.2fMB resident=%.2fMB\n",
+            label, pages, capBytes / 1048576.0, liveBytes / 1048576.0,
+            (capBytes - liveBytes) / 1048576.0, ownedPages, emptyPages,
+            legacyLive, legacyBytes / 1048576.0,
+            (liveBytes + legacyBytes) / 1048576.0,
+            (capBytes + legacyBytes) / 1048576.0);
+    fflush(stderr);
+}
+
+void cn1AllocCensus(const char* label) {
+    struct Row { const char* name; long count; long bytes; };
+    static struct Row rows[4096];
+    int used = 0;
+    long long totalBytes = 0, totalCount = 0;
+    for(int i = 0 ; i < CN1_CLAZZ_SET_SIZE ; i++) {
+        uintptr_t v = atomic_load_explicit(&cn1ClazzSet[i], memory_order_relaxed);
+        if(v == 0) {
+            continue;
+        }
+        struct clazz* c = (struct clazz*)v;
+        if(c->cn1AllocBytes == 0 && c->cn1AllocCount == 0) {
+            continue;
+        }
+        totalBytes += c->cn1AllocBytes;
+        totalCount += c->cn1AllocCount;
+        if(used < 4096) {
+            rows[used].name = c->clsName ? c->clsName : "?";
+            rows[used].count = c->cn1AllocCount;
+            rows[used].bytes = c->cn1AllocBytes;
+            used++;
+        }
+    }
+    fprintf(stderr, "[ALLOC:%s] %lld objects, %lld bytes (%.1fMB) across %d classes\n",
+            label, totalCount, totalBytes, totalBytes / (1024.0 * 1024.0), used);
+    for(int shown = 0 ; shown < 30 ; shown++) {
+        int best = -1;
+        for(int i = 0 ; i < used ; i++) {
+            if(rows[i].bytes > 0 && (best < 0 || rows[i].bytes > rows[best].bytes)) {
+                best = i;
+            }
+        }
+        if(best < 0) {
+            break;
+        }
+        fprintf(stderr, "[ALLOC:%s]   %10ld bytes %9ld objs  %s\n",
+                label, rows[best].bytes, rows[best].count, rows[best].name);
+        rows[best].bytes = 0;
+    }
+    fflush(stderr);
+}
+#endif
+
 
 // ========================== Immortal object registry ==========================
 // Objects deliberately REMOVED from the heap table (interned constant-pool
@@ -6536,6 +6739,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     }
     allocationsSinceLastGC += size;
     totalAllocations += size;
+    CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; cn1_instr_allocCount++;
 #endif
@@ -6910,6 +7114,36 @@ int recursionKey = 1;
 struct CN1FVEntry { JAVA_OBJECT key; int epoch; struct CN1FVEntry* next; };
 #define CN1_FV_BUCKETS 4096
 static struct CN1FVEntry* cn1FVBuckets[CN1_FV_BUCKETS];
+// Entries currently in the buckets, so the sweep below can decide whether the
+// table is worth walking at all.
+static long cn1FVLive = 0;
+// Entries the sweep has taken out of the buckets, kept for re-use instead of
+// being handed back to the allocator. An allocation storm collects constantly and
+// force-visits a different set of objects every time, so the same entries are
+// retired and re-created cycle after cycle: freeing them made the sweep 13% of
+// the objectAllocation benchmark all by itself (44.5ms against 38.8ms with the
+// sweep taken out). Recycling keeps the table's memory at the high-water mark of
+// objects force-visited at once -- which is the bound that matters -- and takes
+// the allocator out of the collector's inner loop entirely.
+static struct CN1FVEntry* cn1FVRecycle = 0;
+// Entries come from ARENA BLOCKS, not from one malloc each. Nothing ever frees
+// an entry individually -- the sweep moves it to the recycle list above -- so
+// per-entry allocation buys nothing and costs a great deal: measured on the
+// gallery, this table held 74,443 live entries, which was HALF of the 150,836
+// malloc nodes in the whole process. Every one carries allocator bookkeeping and
+// scatters through the small-block regions, and on this platform the pages a
+// peak of them touched are never given back. One block per 4096 entries turns
+// 74,443 allocations into eighteen.
+//
+// Blocks are never freed. The table's high-water mark is the bound that matters
+// and the recycle list already caps reuse; handing a block back would only be
+// possible if every entry in it were free at once, which is not worth tracking.
+#define CN1_FV_ARENA_ENTRIES 4096
+static struct CN1FVEntry* cn1FVArena = 0;
+static int cn1FVArenaUsed = CN1_FV_ARENA_ENTRIES;   // forces the first block
+// Sweep only once the table has actually grown; the table has to be BOUNDED, not
+// minimal, and a sweep of a small table is pure cost.
+#define CN1_FV_PRUNE_THRESHOLD 8192
 
 static inline unsigned cn1FVHash(JAVA_OBJECT o) {
     uintptr_t p = (uintptr_t)o; p >>= 4;
@@ -6928,10 +7162,65 @@ static int cn1ForceVisitedTestAndSet(JAVA_OBJECT obj, int key) {
         }
         e = e->next;
     }
-    e = (struct CN1FVEntry*)malloc(sizeof(struct CN1FVEntry));
+    if(cn1FVRecycle != 0) {
+        e = cn1FVRecycle;
+        cn1FVRecycle = e->next;
+    } else {
+        if(cn1FVArenaUsed >= CN1_FV_ARENA_ENTRIES) {
+            struct CN1FVEntry* block = (struct CN1FVEntry*)malloc(
+                    sizeof(struct CN1FVEntry) * CN1_FV_ARENA_ENTRIES);
+            if(block == 0) {
+                // Out of memory for the guard table. Returning 0 says "not
+                // visited", which costs a re-traversal and terminates anyway
+                // because the mark bit is already set -- slower, never wrong.
+                return 0;
+            }
+            cn1FVArena = block;
+            cn1FVArenaUsed = 0;
+        }
+        e = &cn1FVArena[cn1FVArenaUsed++];
+    }
     e->key = obj; e->epoch = key; e->next = cn1FVBuckets[h];
     cn1FVBuckets[h] = e;
+    cn1FVLive++;
     return 0;
+}
+
+// Drop entries no longer in use. Nothing ever removed from this table: an entry
+// was allocated the first time an object was force-visited and then kept for the
+// life of the process, keyed by an object pointer that the very next sweep could
+// free. Two costs, both unbounded. The obvious one is 32 bytes of malloc per
+// distinct object ever force-visited -- measured at 134,619 live 32-byte blocks
+// in a gallery application that had 113,824 live Java objects, i.e. the table had
+// outgrown the heap it was describing. The one that hurts more is the bucket
+// chains: lookup is a linear walk, so every force-visit in every later cycle pays
+// for every object that died in an earlier one, and the collector gets slower the
+// longer the application runs -- exactly the shape that never shows up in a
+// benchmark and always shows up in a long session.
+//
+// Called once per cycle from codenameOneGCMark, right after recursionKey is
+// bumped, on the GC thread with no marking in flight. An entry survives if it was
+// force-visited in the cycle that just finished (epoch == key - 1), so a working
+// set that keeps being force-visited is never reallocated and the table settles at
+// the size of that working set instead of the size of all history.
+static void cn1ForceVisitedPrune(int key) {
+    if(cn1FVLive < CN1_FV_PRUNE_THRESHOLD) {
+        return;
+    }
+    for(int b = 0 ; b < CN1_FV_BUCKETS ; b++) {
+        struct CN1FVEntry** pp = &cn1FVBuckets[b];
+        while(*pp) {
+            struct CN1FVEntry* e = *pp;
+            if(e->epoch < key - 1) {
+                *pp = e->next;
+                e->next = cn1FVRecycle;
+                cn1FVRecycle = e;
+                cn1FVLive--;
+            } else {
+                pp = &e->next;
+            }
+        }
+    }
 }
 
 // Iterative mark using an explicit worklist. The previous implementation recursed
@@ -8474,7 +8763,77 @@ void cn1ThrowStackOverflow(CODENAME_ONE_THREAD_STATE) {
     throwException(threadStateData, soe);
 }
 
+static pthread_mutex_t constantPoolMutex = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * Builds the String for a literal the first time anything asks for it.
+ *
+ * Serialised and double-checked so that a literal has exactly ONE String for
+ * the life of the process: Java guarantees `"x" == "x"`, and generated code
+ * compares literals by identity. The new object is reachable from this thread's
+ * pending allocations until it is stored into the pool array, which is itself a
+ * GC root, so there is no window in which it can be collected.
+ */
+JAVA_OBJECT cn1MaterializeConstantPoolString(int off) {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    pthread_mutex_lock(&constantPoolMutex);
+    JAVA_OBJECT o = (JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE);
+    if(o == JAVA_NULL) {
+        o = newStringFromCString(threadStateData, constantPool[off]);
+        // RELEASE so a reader that sees this pointer also sees the String's
+        // fields. The mutex orders writers against each other and nothing else:
+        // the fast path in STRING_FROM_CONSTANT_POOL_OFFSET never acquires it.
+        __atomic_store_n(&constantPoolObjects[off], o, __ATOMIC_RELEASE);
+    }
+    pthread_mutex_unlock(&constantPoolMutex);
+    return o;
+}
+
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#include <sys/time.h>
+/**
+ * Milliseconds since this PROCESS was forked, for start-up attribution.
+ *
+ * Measured against the KERNEL's record of process start, not a mark taken inside
+ * the application, because the interesting part of a slow launch is what happens
+ * before any of our code runs. Gated on CN1_STARTUP_PHASES: a shipping build
+ * pays one getenv and nothing else.
+ */
+static int cn1StartupPhasesOn(void) {
+    static int on = -1;
+    if(on < 0) {
+        on = getenv("CN1_STARTUP_PHASES") ? 1 : 0;
+    }
+    return on;
+}
+
+double cn1MillisSinceProcessStart(void) {
+    struct kinfo_proc info;
+    size_t len = sizeof(info);
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    if(sysctl(mib, 4, &info, &len, NULL, 0) != 0) {
+        return -1.0;
+    }
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    struct timeval start = info.kp_proc.p_starttime;
+    return (now.tv_sec - start.tv_sec) * 1000.0 + (now.tv_usec - start.tv_usec) / 1000.0;
+}
+
+void cn1StartupPhase(const char* name) {
+    if(!cn1StartupPhasesOn()) {
+        return;
+    }
+    fprintf(stderr, "BENCH:PHASE-AT %-28s %8.1f ms\n", name, cn1MillisSinceProcessStart());
+    fflush(stderr);
+}
+#else
+void cn1StartupPhase(const char* name) { }
+#endif
+
 void initConstantPool() {
+    cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     enteringNativeAllocations();
@@ -8492,13 +8851,15 @@ void initConstantPool() {
     //int cStringSize = CN1_CONSTANT_POOL_SIZE * sizeof(char*);
     //int jStringSize = CN1_CONSTANT_POOL_SIZE * sizeof(JAVA_ARRAY);
     //JAVA_OBJECT internedStrings = get_static_java_lang_String_str();
+    // The pool starts EMPTY. Every literal used to be built right here, before
+    // main ran: on a large transpiled application that was 38,238 String objects
+    // plus their backing arrays, 61% of every live object in the process, for an
+    // application that reads a few thousand of them. They are built on first use
+    // now -- see cn1MaterializeConstantPoolString. The array itself is still
+    // allocated eagerly because a non-null constantPoolObjects is what the rest
+    // of the runtime tests to decide the VM is up.
     for(int iter = 0 ; iter < CN1_CONSTANT_POOL_SIZE ; iter++) {
-        //long length = strlen(constantPool[iter]);
-        //cStringSize += length + 1;
-        //jStringSize += length * sizeof(JAVA_ARRAY_CHAR) + sizeof(struct JavaArrayPrototype) + sizeof(struct obj__java_lang_String);
-        JAVA_OBJECT oo = newStringFromCString(threadStateData, constantPool[iter]);
-        tmpConstantPoolObjects[iter] = oo;
-       // java_util_ArrayList_add___java_lang_Object_R_boolean(threadStateData, internedStrings, oo);
+        tmpConstantPoolObjects[iter] = JAVA_NULL;
     }
     #if defined(__OBJC__)
     //NSLog(@"Size of constant pool in c: %i and j: %i", cStringSize, jStringSize);
