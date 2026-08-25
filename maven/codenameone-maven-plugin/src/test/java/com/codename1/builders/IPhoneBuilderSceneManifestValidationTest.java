@@ -569,6 +569,19 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aKeyInterruptedByAProcessingInstructionIsStillThatKey() {
+        // A PI inside element content is markup the parser drops, exactly as a comment
+        // is, so this key resolves to NSMainNibFile. Leaving the PI in the resolved text
+        // meant the key was not recognized, the entry stayed in the Catalyst plist, and
+        // it paired with the scene manifest added below.
+        String shared = document(
+                "    <key>NSMain<?cn1 note?>NibFile</key>\n    <string>MainWindow</string>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertFalse(mac.contains("MainWindow"),
+                "a PI inside the key does not change which key it is");
+    }
+
+    @Test
     void markupInsideAProcessingInstructionIsNotADeclaration() {
         // A processing instruction's data is not element content -- a plist parser
         // ignores the whole PI. Scanning that looked only past comments and CDATA, so
