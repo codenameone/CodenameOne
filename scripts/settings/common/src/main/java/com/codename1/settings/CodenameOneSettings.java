@@ -2303,19 +2303,24 @@ public class CodenameOneSettings extends Lifecycle {
             return out;
         }
         String rel = (pkg == null || pkg.isEmpty() ? "" : pkg.replace('.', '/') + "/") + main;
+        // Where the class would be if it is named after its file, looked for in
+        // the roots the build actually compiles rather than at three
+        // conventional paths. A project that moves its sources can leave an
+        // older copy of the main class at the conventional path, and reading
+        // that one reported the annotations it does not carry as absent.
         for (String ext : new String[]{".java", ".kt"}) {
-            for (String root : new String[]{"/src/main/java/", "/src/main/kotlin/", "/src/"}) {
-                String path = binding.projectDir() + root + rel + ext;
+            for (String root : mainSourceRoots(binding.projectDir())) {
+                String path = root + "/" + rel + ext;
                 String text = readIfPresent(path);
                 if (text != null && ext.equals(".java")) {
                     text = decodeUnicodeEscapes(text);
                 }
-                // The conventional path has to DECLARE the class, not merely
-                // exist. Moving a Kotlin main class into a differently named file
-                // can leave the old Main.kt behind holding something else, and
-                // returning on its mere existence skipped the search below --
-                // reporting the annotated hints as unowned, which is the state
-                // that lets Add write the duplicate.
+                // The path has to DECLARE the class, not merely exist. Moving a
+                // Kotlin main class into a differently named file can leave the
+                // old Main.kt behind holding something else, and returning on
+                // its mere existence skipped the search below -- reporting the
+                // annotated hints as unowned, which is the state that lets Add
+                // write the duplicate.
                 if (text == null || !declaresClass(text, main, pkg, ext.equals(".kt"))) {
                     continue;
                 }
@@ -2324,12 +2329,11 @@ public class CodenameOneSettings extends Lifecycle {
                 return out;
             }
         }
-        // Those three roots are a convention, not the truth: a module can add a
-        // source root, and Kotlin does not require a file to be named after the
-        // class it declares. Falling straight through to null here let the caller
-        // trust a stale manifest -- which is the bug the source scan was added to
-        // fix, reappearing for anyone whose layout is merely unusual. So look
-        // properly before giving up.
+        // A file named after its class is a convention, not the truth: Kotlin
+        // does not require it. Falling straight through to null here let the
+        // caller trust a stale manifest -- which is the bug the source scan was
+        // added to fix, reappearing for anyone whose layout is merely unusual.
+        // So look properly before giving up.
         String found = findMainClassSource(binding.projectDir(), main, pkg);
         if (found != null) {
             collectOwnedHints(found, out, lastSourceWasKotlin,
