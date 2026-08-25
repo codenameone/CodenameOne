@@ -738,4 +738,56 @@ public class MigrateBuildHintsPropertyParsingTest {
                 java.util.Arrays.asList("codename1.arg.ios.pods"));
         assertEquals("! note \\\ncodename1.displayName=Demo\n", read(f));
     }
+
+    /// A wildcard import loses to an explicit `import com.example.Build;` and to
+    /// a type in the file's own package, so the generated `@Build` referred to
+    /// theirs and the verification build failed. Named imports are written
+    /// instead, and the fully qualified name for any simple name the file has
+    /// already given away.
+    @Test
+    public void theGeneratedAnnotationsNameOurAnnotations() throws Exception {
+        String migrated = migrate("package com.example;\n"
+                        + "import com.example.other.Build;\n"
+                        + "public class MyApp {\n}\n",
+                "@Build(nativeTheme = NativeThemeMode.MODERN)\n@Ios(teamId = \"X\")\n");
+
+        // The taken name is qualified and not imported...
+        assertTrue(migrated,
+                migrated.contains("@com.codename1.annotations.buildhints.Build(nativeTheme"));
+        assertFalse(migrated,
+                migrated.contains("import com.codename1.annotations.buildhints.Build;"));
+        // ...the free one is imported and written plainly...
+        assertTrue(migrated, migrated.contains("import com.codename1.annotations.buildhints.Ios;"));
+        assertTrue(migrated, migrated.contains("@Ios(teamId"));
+        // ...and the package is never imported on demand.
+        assertFalse(migrated, migrated.contains("buildhints.*"));
+    }
+
+    /// A type in the file's own package is beaten by the named import, so it is
+    /// not a collision; a type in THIS file cannot be imported at all.
+    @Test
+    public void onlyThisFilesOwnDeclarationForcesTheQualifiedName() throws Exception {
+        String plain = migrate("package com.example;\npublic class MyApp {\n}\n",
+                "@Ios(teamId = \"X\")\n");
+        assertTrue(plain, plain.contains("import com.codename1.annotations.buildhints.Ios;"));
+        assertTrue(plain, plain.contains("@Ios(teamId"));
+
+        String declaresIt = migrate("package com.example;\n"
+                        + "@interface Ios { String teamId(); }\n"
+                        + "public class MyApp {\n}\n",
+                "@Ios(teamId = \"X\")\n");
+        assertTrue(declaresIt,
+                declaresIt.contains("@com.codename1.annotations.buildhints.Ios(teamId"));
+        assertFalse(declaresIt,
+                declaresIt.contains("import com.codename1.annotations.buildhints.Ios;"));
+    }
+
+    /// Runs the real insertion over a temporary file and hands back the result.
+    private String migrate(String source, String annotations) throws Exception {
+        File f = File.createTempFile("MyApp", ".java");
+        f.deleteOnExit();
+        write(f, source);
+        new MigrateBuildHintsMojo().insertAnnotations(f, annotations, "MyApp");
+        return read(f);
+    }
 }

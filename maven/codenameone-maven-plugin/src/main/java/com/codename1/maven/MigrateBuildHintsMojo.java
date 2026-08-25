@@ -871,13 +871,10 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * any formatting, and rewriting it through a parser would reformat code the
      * developer did not ask to have touched.</p>
      */
-    private void insertAnnotations(File source, String annotations, String simpleName)
+    void insertAnnotations(File source, String annotations, String simpleName)
             throws IOException {
         String text = read(source);
         boolean kotlin = source.getName().endsWith(".kt");
-        String importLine = kotlin
-                ? "import com.codename1.annotations.buildhints.*"
-                : "import com.codename1.annotations.buildhints.*;";
         String blanked = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .blankNonCode(text, kotlin);
         // A live import, not the words anywhere in the file. A comment or a
@@ -889,6 +886,37 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + "annotations; migrate the remaining hints by hand so nothing is "
                     + "overwritten.");
         }
+
+        // Named imports, one per annotation written, rather than the package on
+        // demand -- and the fully qualified name instead for any whose simple
+        // name the file has already given to something else. A wildcard import
+        // loses to an explicit `import com.example.Build;` and to a type in the
+        // file's own package, so the generated `@Build` referred to theirs, the
+        // verification build failed, and an otherwise valid migration rolled
+        // back. A named import beats a same-package type; only a type declared
+        // in this very file cannot be imported at all, so that one is qualified.
+        StringBuilder importLines = new StringBuilder();
+        StringBuilder written = new StringBuilder();
+        for (String line : annotations.split("\n", -1)) {
+            String name = annotationNameOf(line);
+            if (name == null) {
+                written.append(line).append('\n');
+                continue;
+            }
+            if (simpleNameIsTaken(text, blanked, name, kotlin)) {
+                written.append("@").append(ANNOTATION_PACKAGE).append('.')
+                        .append(line.substring(1)).append('\n');
+                continue;
+            }
+            if (importLines.indexOf(importOf(name, kotlin)) < 0) {
+                importLines.append(importOf(name, kotlin)).append('\n');
+            }
+            written.append(line).append('\n');
+        }
+        // split(-1) keeps the trailing empty piece, which put a blank line back.
+        annotations = written.substring(0, Math.max(0, written.length() - 1));
+        String importLine = importLines.length() == 0 ? null
+                : importLines.substring(0, importLines.length() - 1);
 
         int declaration = classDeclarationIndex(text, kotlin, simpleName);
         if (declaration < 0) {
@@ -906,8 +934,10 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // there spliced the new import into the middle of the old one and the
             // verification build rolled a correct migration back.
             int at = endOfImportDeclaration(blankedHead, lastImport);
-            head = head.substring(0, at) + importLine + "\n" + head.substring(at);
-        } else {
+            if (importLine != null) {
+                head = head.substring(0, at) + importLine + "\n" + head.substring(at);
+            }
+        } else if (importLine != null) {
             // No existing import. Anchor after the package declaration, and when
             // the class is in the default package anchor above any annotation it
             // already carries: indexOf returns -1 there, and the old arithmetic
@@ -926,6 +956,71 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
         write(source, head + annotations + tail);
+    }
+
+    /** The package the generated annotations live in. */
+    private static final String ANNOTATION_PACKAGE = "com.codename1.annotations.buildhints";
+
+    /** The import statement for one of them, in the right language. */
+    private static String importOf(String simple, boolean kotlin) {
+        return "import " + ANNOTATION_PACKAGE + "." + simple + (kotlin ? "" : ";");
+    }
+
+    /// The annotation a generated line writes, or null when the line is not one.
+    ///
+    /// The text being read here is the text this goal just rendered, one
+    /// annotation to a line, so this recognises that shape rather than parsing
+    /// the language.
+    private static String annotationNameOf(String line) {
+        if (!line.startsWith("@")) {
+            return null;
+        }
+        int end = 1;
+        while (end < line.length() && Character.isJavaIdentifierPart(line.charAt(end))) {
+            end++;
+        }
+        return end > 1 ? line.substring(1, end) : null;
+    }
+
+    /// Whether `simple` already names something else in this file: a type it
+    /// declares, or a type it imports from elsewhere.
+    ///
+    /// A same-package type is NOT taken, because the named import this goal
+    /// writes beats it. A type declared in this very file is, because importing
+    /// a name the compilation unit declares is an error rather than a shadowing.
+    private static boolean simpleNameIsTaken(String text, String blanked, String simple,
+                                             boolean kotlin) {
+        if (com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaresType(text, simple, kotlin)) {
+            return true;
+        }
+        for (int at = importKeywordAt(blanked, 0); at >= 0;
+                at = importKeywordAt(blanked, at + "import".length())) {
+            int end = endOfImportDeclaration(blanked, at);
+            String statement = blanked.substring(at, Math.min(end, blanked.length()));
+            String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .qualifiedNameAt(blanked, at + "import".length());
+            int dot = name.lastIndexOf('.');
+            String last = dot < 0 ? name : name.substring(dot + 1);
+            if ("*".equals(last)) {
+                // On demand, which the named import this goal writes beats.
+                continue;
+            }
+            int as = statement.indexOf(" as ");
+            if (kotlin && as >= 0) {
+                String alias = statement.substring(as + 4).trim();
+                int stop = 0;
+                while (stop < alias.length()
+                        && Character.isJavaIdentifierPart(alias.charAt(stop))) {
+                    stop++;
+                }
+                last = alias.substring(0, stop);
+            }
+            if (simple.equals(last)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
