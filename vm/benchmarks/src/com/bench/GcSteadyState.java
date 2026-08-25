@@ -64,6 +64,17 @@ public class GcSteadyState {
     private static final int CFG_SLEEP_MS = 4, CFG_MOVES = 5, CFG_LEGACY = 6, CFG_SCRUB = 7;
 
     private static final int BOARD_CELLS = 64;
+
+    /**
+     * Publish the running node count every this-many nodes, as well as between rounds.
+     * Between rounds alone is not enough: one depth-14 traversal is millions of nodes, and
+     * if the collector stalls badly enough that no round completes inside the window then
+     * nothing is ever published and the series reads zero -- silent in exactly the case it
+     * exists to show. A power of two so the test is an AND, and coarse enough (about a
+     * fifth of a second of work) that the lock traffic stays negligible against the
+     * sampler's 4Hz.
+     */
+    private static final int PUBLISH_EVERY_NODES = 1 << 20;
     private static final int LEGACY_BLOCK_REFS = 128;
 
     static int seconds, threads, depth, branch, sleepMs, movesPerNode, legacyBlocks, scrubDepth;
@@ -152,7 +163,7 @@ public class GcSteadyState {
                     int[] root = new int[BOARD_CELLS];
                     int round = 0;
                     while (!stop) {
-                        sum += search(root, depth, seed + round, counter);
+                        sum += search(root, depth, seed + round, counter, slot);
                         // Publish once per round so the SAMPLE series is a live progress
                         // indicator rather than a row of zeroes. A worker that stalls
                         // stops publishing, and its slot going flat IS the signal.
@@ -216,12 +227,17 @@ public class GcSteadyState {
         System.out.println("GC_STEADY_STATE_DONE");
     }
 
-    private static int search(int[] board, int d, int seed, long[] c) {
+    private static int search(int[] board, int d, int seed, long[] c, int slot) {
         if (stop) {
             return 0;
         }
         // Thread-private: this array belongs to one worker for the whole run.
         c[0]++;
+        if ((c[0] & (PUBLISH_EVERY_NODES - 1)) == 0) {
+            synchronized (SUM_LOCK) {
+                nodeCounts[slot] = c[0];
+            }
+        }
         if (d == 0) {
             int s = 0;
             for (int i = 0; i < BOARD_CELLS; i++) {
@@ -245,7 +261,7 @@ public class GcSteadyState {
                 mv.next = chain;
                 chain = mv;
             }
-            int v = search(child, d - 1, seed + b + chain.to, c);
+            int v = search(child, d - 1, seed + b + chain.to, c, slot);
             if (v > best) {
                 best = v;
             }

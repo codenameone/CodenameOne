@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -101,6 +102,16 @@ class GcSteadyStateIntegrationTest {
      * merely asserted.</p>
      */
     private static final double MAX_SECOND_HALF_PAGE_GROWTH = 0.25;
+
+    /**
+     * Ceiling on one translated run. A stalled collector is one of the failure modes this
+     * gate exists to catch, and reading the child's output to EOF on this thread would
+     * block until it closed stdout -- so a stall would hang the surefire fork until the
+     * CI job's global timeout, and the guard would stop reporting a regression and start
+     * eating the build. Generous: the four runs here are a fixed 24 rounds each, a few
+     * minutes on a slow runner.
+     */
+    private static final long VM_RUN_TIMEOUT_SECONDS = 600;
 
     /** Cycles needed before the comparison means anything. Anti-vacuousness. */
     private static final int MIN_CYCLES = 24;
@@ -427,13 +438,50 @@ class GcSteadyStateIntegrationTest {
         builder.environment().put("CN1_LOG_PACING_PARKS", "1");
         builder.environment().putAll(env);
         builder.redirectErrorStream(true);
-        Process process = builder.start();
-        String output;
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            output = reader.lines().collect(Collectors.joining("\n"));
+        final Process process = builder.start();
+
+        // Drained CONCURRENTLY and waited for with a bound, as GcOverflowSpiralIntegration
+        // Test and ProcessBudgetPacingIntegrationTest already do. Concurrently, because a
+        // child that fills the pipe buffer blocks in write() while we block in waitFor();
+        // bounded, because a stalled collector is a thing this gate is meant to CATCH, and
+        // blocking on EOF would turn that into a hung build instead of a failed test.
+        // Draining as we go also means a killed run still yields whatever it printed, which
+        // is the only diagnostic a stalled run leaves behind.
+        final StringBuilder captured = new StringBuilder();
+        Thread drain = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    synchronized (captured) {
+                        captured.append(line).append('\n');
+                    }
+                }
+            } catch (Exception e) {
+                // The stream ends abruptly when a timed-out child is destroyed. Whatever
+                // was captured before that is exactly what should be reported.
+            }
+        });
+        drain.setDaemon(true);
+        drain.start();
+
+        boolean exited = process.waitFor(VM_RUN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        if (!exited) {
+            process.destroyForcibly();
+            process.waitFor(10, TimeUnit.SECONDS);
         }
-        return new Run(process.waitFor(), output);
+        drain.join(10_000);
+        String output;
+        synchronized (captured) {
+            output = captured.toString();
+        }
+        assertTrue(exited,
+                "The workload did not finish within " + VM_RUN_TIMEOUT_SECONDS + "s (env "
+                        + env + "). For this gate that is a result and not an"
+                        + " infrastructure problem -- a collector that stops finishing"
+                        + " cycles is one of the regressions it watches for. Output so far:\n"
+                        + tail(output));
+        return new Run(exited ? process.exitValue() : -1, output);
     }
 
     private String tail(String output) {
