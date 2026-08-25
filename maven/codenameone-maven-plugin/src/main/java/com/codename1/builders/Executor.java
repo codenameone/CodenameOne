@@ -1765,6 +1765,39 @@ public abstract class Executor {
         return "";
     }
 
+    /**
+     * The Objective-C type the generated bridge sends and receives for a Java
+     * type.
+     *
+     * <p>Derived the same way the bridge body is: an array crosses as
+     * {@code NSData}, a String as {@code NSString}, a PeerComponent as the
+     * native handle, and everything else keeps its ParparVM C typedef.</p>
+     */
+    /// The marker every generated placeholder header carries, so a later build
+    /// can tell its own file from one the developer wrote.
+    private static final String PLACEHOLDER_MARKER = "Auto-generated placeholder: the native interface";
+
+    private static boolean isGeneratedPlaceholderHeader(File header) {
+        try {
+            String body = new String(java.nio.file.Files.readAllBytes(header.toPath()), StandardCharsets.UTF_8);
+            return body.contains(PLACEHOLDER_MARKER);
+        } catch (IOException ex) {
+            // Unreadable means "not ours": overwriting a file we cannot inspect
+            // would be the one outcome worth avoiding here.
+            return false;
+        }
+    }
+
+    protected String objectiveCTypeFor(Class type) {
+        if (type.isArray()) {
+            return "NSData*";
+        }
+        if (String.class == type) {
+            return "NSString*";
+        }
+        return typeToXMLVMName(type);
+    }
+
     protected String nativeInterfaceFrameworkImports() {
         return "#import \"CodenameOne_GLViewController.h\"\n"
                 + "#import <UIKit/UIKit.h>\n";
@@ -1988,17 +2021,52 @@ public abstract class Executor {
                     // call into this native interface from Java would have
                     // failed to resolve a peer regardless.
                     File implHeader = new File(resDir, classNameWithUnderscores + "Impl.h");
-                    if (!implHeader.exists()) {
+                    // Rewritten when the file on disk is one of ours, not only
+                    // when it is missing. The build directory survives between
+                    // runs, so a placeholder written by an earlier build would
+                    // otherwise be kept forever -- including after the interface
+                    // gained a method, which is a stale declaration set standing
+                    // in front of the real one.
+                    if (!implHeader.exists() || isGeneratedPlaceholderHeader(implHeader)) {
                         String guard = classNameWithUnderscores.toUpperCase() + "_IMPL_H";
+                        // The methods are declared, not just the class. The
+                        // generated bridge sends them to a receiver typed as this
+                        // class, so an empty @interface makes every one of those
+                        // an unchecked send -- and a build that treats an
+                        // unchecked send as an error, which the macOS one does
+                        // because that is how a UIKit-to-AppKit port crashes,
+                        // cannot tell this apart from a real mistake.
+                        StringBuilder decls = new StringBuilder();
+                        for (Method placeholderMethod : currentNative.getMethods()) {
+                            String placeholderName = placeholderMethod.getName();
+                            if (placeholderName.equals("hashCode") || placeholderName.equals("equals")
+                                    || placeholderName.equals("toString")) {
+                                continue;
+                            }
+                            decls.append("- (")
+                                 .append(objectiveCTypeFor(placeholderMethod.getReturnType()))
+                                 .append(")").append(placeholderName);
+                            Class[] placeholderParams = placeholderMethod.getParameterTypes();
+                            for (int iter = 0; iter < placeholderParams.length; iter++) {
+                                if (iter > 0) {
+                                    decls.append(" param").append(iter);
+                                }
+                                decls.append(":(").append(objectiveCTypeFor(placeholderParams[iter]))
+                                     .append(")param").append(iter);
+                            }
+                            decls.append(";\n");
+                        }
                         String hStub = "#ifndef " + guard + "\n"
                                 + "#define " + guard + "\n"
-                                + "// Auto-generated placeholder: the native interface "
+                                + "// " + PLACEHOLDER_MARKER + " "
                                 + currentNative.getName() + " has no user-provided\n"
                                 + "// Objective-C implementation in this project. The CN1\n"
                                 + "// runtime returns nil from cn1_createNativeInterfacePeer\n"
                                 + "// in that case; calls into the peer no-op silently.\n"
+                                + "#include \"cn1_globals.h\"\n"
                                 + "#import <Foundation/Foundation.h>\n"
                                 + "@interface " + classNameWithUnderscores + "Impl : NSObject\n"
+                                + decls
                                 + "@end\n"
                                 + "#endif\n";
                         try (FileOutputStream out = new FileOutputStream(implHeader)) {

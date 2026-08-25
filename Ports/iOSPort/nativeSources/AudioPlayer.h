@@ -52,5 +52,9 @@
 + (float)getVolume;
 + (void)setVolume:(float)vol;
 + (void)stop;
+/// Stops this player. Declared because only the class method was, so every
+/// caller sending it to an instance compiled on a warning and resolved at
+/// runtime -- which happens to work, and hides the next such mistake.
+- (void)stop;
 
 @end

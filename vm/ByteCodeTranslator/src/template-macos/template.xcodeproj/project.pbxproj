@@ -298,6 +298,17 @@
 				   @import, and the iOS builder flips this on when it enables Metal;
 				   this port is Metal-only, so there is nothing to flip. */
 				CLANG_ENABLE_MODULES = YES;
+				/* A message whose selector the RECEIVER'S CLASS does not declare is a
+				   warning by default and a crash at runtime, and it is the whole failure
+				   mode of porting UIKit code to AppKit: imageWithCGImage:,
+				   preferredFontForTextStyle: and lineHeight all compiled here and
+				   trapped on the device. So it is an error.
+				   Not -Wundeclared-selector, deliberately: a menu item routed through
+				   the responder chain names a selector no class in scope declares, and
+				   that is correct rather than a mistake. */
+				WARNING_CFLAGS = (
+					"-Werror=objc-method-access",
+				);
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
@@ -354,6 +365,17 @@
 				   @import, and the iOS builder flips this on when it enables Metal;
 				   this port is Metal-only, so there is nothing to flip. */
 				CLANG_ENABLE_MODULES = YES;
+				/* A message whose selector the RECEIVER'S CLASS does not declare is a
+				   warning by default and a crash at runtime, and it is the whole failure
+				   mode of porting UIKit code to AppKit: imageWithCGImage:,
+				   preferredFontForTextStyle: and lineHeight all compiled here and
+				   trapped on the device. So it is an error.
+				   Not -Wundeclared-selector, deliberately: a menu item routed through
+				   the responder chain names a selector no class in scope declares, and
+				   that is correct rather than a mistake. */
+				WARNING_CFLAGS = (
+					"-Werror=objc-method-access",
+				);
 				CLANG_ENABLE_OBJC_ARC = NO;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;

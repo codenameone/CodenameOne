@@ -61,6 +61,9 @@ typedef NSImage CN1Image;
 typedef NSFont CN1Font;
 typedef NSView CN1View;
 #else
+/// The UIKit arm of the image-from-data helper the shared code calls.
+#define CN1AppleImageWithDataCompat(d) ((d) != nil ? [UIImage imageWithData:(d)] : nil)
+#define CN1AppleCGImageOfCompat(i) [(i) CGImage]
 typedef UIImage CN1Image;
 typedef UIFont CN1Font;
 typedef UIView CN1View;
@@ -139,6 +142,53 @@ static inline void UIGraphicsEndImageContext(void) {
  * the whole of the port for the call sites that use them -- unlike UIImage and
  * NSImage, which are genuinely different ideas and are converted per site.
  */
+/// NSFont spells the lookup with an options argument, and has no no-argument
+/// form. macOS has no Dynamic Type setting behind it, so this answers the
+/// standard size -- which is what the callers then read as "larger text is off",
+/// correctly.
+/*
+ * The image constructors and the CGImage accessor. UIImage offers these as class
+ * methods and a property; NSImage offers initializers and a method that takes
+ * the rect being drawn, because it holds representations rather than one bitmap.
+ * Wrapping them keeps the shared call sites identical -- and, unlike a blanket
+ * typedef, each wrapper is a place to answer the "which representation" question
+ * once.
+ */
+static inline NSImage * _Nullable CN1AppleImageWithCGImage(CGImageRef _Nullable cg) {
+    if (cg == NULL) {
+        return nil;
+    }
+    return [[NSImage alloc] initWithCGImage:cg
+                                       size:NSMakeSize(CGImageGetWidth(cg), CGImageGetHeight(cg))];
+}
+
+static inline NSImage * _Nullable CN1AppleImageWithData(NSData * _Nullable data) {
+    return data == nil ? nil : [[NSImage alloc] initWithData:data];
+}
+
+static inline CGImageRef _Nullable CN1AppleCGImageOf(NSImage * _Nullable image) {
+    return image == nil ? NULL
+        : [image CGImageForProposedRect:NULL context:nil hints:nil];
+}
+
+/// NSFont has no lineHeight. This is the same quantity UIFont reports: the
+/// distance between two baselines.
+static inline CGFloat CN1AppleFontLineHeight(NSFont * _Nullable font) {
+    return font == nil ? 0 : (font.ascender - font.descender + font.leading);
+}
+
+/*
+ * The two-arm shims. The shared call sites read the same on both platforms; only
+ * these two lines differ, which is a smaller surface than a per-site guard and
+ * keeps the diff against the UIKit backend readable.
+ */
+#define CN1AppleImageWithDataCompat(d) CN1AppleImageWithData(d)
+#define CN1AppleCGImageOfCompat(i)     CN1AppleCGImageOf(i)
+
+static inline NSFont * _Nullable CN1ApplePreferredFontForTextStyle(NSFontTextStyle style) {
+    return [NSFont preferredFontForTextStyle:style options:@{}];
+}
+
 #define UIFontTextStyleBody          NSFontTextStyleBody
 #define UIFontTextStyleHeadline      NSFontTextStyleHeadline
 #define UIFontTextStyleSubheadline   NSFontTextStyleSubheadline

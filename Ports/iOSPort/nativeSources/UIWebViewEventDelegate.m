@@ -41,6 +41,8 @@
 #endif
 extern int connections;
 
+const void *CN1FollowTargetBlankKey = &CN1FollowTargetBlankKey;
+
 @implementation UIWebViewEventDelegate
 
 - (id)initWithCallback:(void*)callback {
@@ -109,7 +111,7 @@ extern int connections;
 
 #ifdef ENABLE_WKWEBVIEW
 - (BOOL)shouldFollowTargetBlank:(id)webView {
-    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    NSNumber *value = objc_getAssociatedObject(webView, CN1FollowTargetBlankKey);
     if (value == nil) {
         return YES;
     }

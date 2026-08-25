@@ -1467,7 +1467,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     POOL_BEGIN();
     
     NSData* nd = (BRIDGE_CAST NSData*) ((void*)nsData);
-    CN1Image* img = [CN1Image imageWithData:nd];
+    CN1Image* img = CN1AppleImageWithDataCompat(nd);
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -1693,7 +1693,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     // taken from: http://stackoverflow.com/a/19433086/756809
     CIFilter *gaussianBlurFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
     [gaussianBlurFilter setDefaults];
+#if TARGET_OS_OSX
+    CIImage *inputImage = [CIImage imageWithCGImage:CN1AppleCGImageOf(original)];
+#else
     CIImage *inputImage = [CIImage imageWithCGImage:[original CGImage]];
+#endif
     [gaussianBlurFilter setValue:inputImage forKey:kCIInputImageKey];
     NSNumber *radiusNumber = [NSNumber numberWithFloat:radius];
     [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
@@ -1701,7 +1705,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     CIImage *outputImage = [gaussianBlurFilter outputImage];
     CIContext *context   = [CIContext contextWithOptions:nil];
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
+#if TARGET_OS_OSX
+    CN1Image *image       = CN1AppleImageWithCGImage(cgimg);
+#else
     CN1Image *image       = [CN1Image imageWithCGImage:cgimg];
+#endif
     CGImageRelease(cgimg);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
 
@@ -4846,11 +4854,11 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 #endif
 static void cn1_setBrowserFollowTargetBlank(id webView, BOOL follow) {
-    objc_setAssociatedObject(webView, @selector(cn1FollowTargetBlank), [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(webView, CN1FollowTargetBlankKey, [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 static BOOL cn1_shouldFollowTargetBlank(id webView) {
-    NSNumber *value = objc_getAssociatedObject(webView, @selector(cn1FollowTargetBlank));
+    NSNumber *value = objc_getAssociatedObject(webView, CN1FollowTargetBlankKey);
     if (value == nil) {
         return YES;
     }
@@ -5863,7 +5871,12 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
             //[moviePlayerInstance prepareToPlay];
     #ifdef AUTO_PLAY_VIDEO
             addPlaybackToAudioSession();
+#if TARGET_OS_OSX
+            // An AVPlayerView has no play of its own; it is the player that plays.
+            [moviePlayerInstance.player play];
+#else
             [moviePlayerInstance play];
+#endif
     #endif
             POOL_END();
         });
@@ -6033,7 +6046,12 @@ JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCa
             
     #ifdef AUTO_PLAY_VIDEO
             addPlaybackToAudioSession();
+#if TARGET_OS_OSX
+            // An AVPlayerView has no play of its own; it is the player that plays.
+            [moviePlayerInstance.player play];
+#else
             [moviePlayerInstance play];
+#endif
     #endif
             POOL_END();
         });
@@ -7412,7 +7430,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];
+#if TARGET_OS_OSX
+        CN1Font *preferred = CN1ApplePreferredFontForTextStyle(UIFontTextStyleBody);
+#else
         CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
+#endif
         return preferred.pointSize > (baseSize + 0.5f);
     } else {
         return JAVA_FALSE;
@@ -7427,7 +7449,11 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THR
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
         CGFloat baseSize = [CN1Font systemFontSize];
+#if TARGET_OS_OSX
+        CN1Font *preferred = CN1ApplePreferredFontForTextStyle(UIFontTextStyleBody);
+#else
         CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
+#endif
         if (baseSize <= 0.0f) {
             return 1.0f;
         }
@@ -9896,7 +9922,11 @@ void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULT
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH && !TARGET_OS_TV
 static NSMutableArray<UNNotificationAction *>* pushActions;
 static NSMutableArray<UNNotificationAction *>* currentCategoryActions;
-static NSSet<UNNotificationCategory *>* pushCategories;
+// Mutable: endPushActionCategory adds to it as each category is closed.
+// Declared immutable it compiled anyway -- addObject: is only a warning on an
+// NSSet -- and would have thrown the first time an application registered a
+// push action.
+static NSMutableSet<UNNotificationCategory *>* pushCategories;
 static NSString* currentCategoryId;
 #endif
 void com_codename1_impl_ios_IOSNative_registerPushAction___java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT identifier, JAVA_OBJECT title, JAVA_OBJECT placeholderText, JAVA_OBJECT replyButtonText) {

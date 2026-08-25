@@ -1983,7 +1983,11 @@ CN1Image *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     CGDataProviderRelease(provider);
     CGColorSpaceRelease(cs);
     if (cgImg == NULL) return nil;
+#if TARGET_OS_OSX
+    CN1Image *out = CN1AppleImageWithCGImage(cgImg);
+#else
     CN1Image *out = [CN1Image imageWithCGImage:cgImg];
+#endif
     CGImageRelease(cgImg);
     return out;
 }

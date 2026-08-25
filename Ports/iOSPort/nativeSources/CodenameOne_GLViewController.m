@@ -795,7 +795,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
     // websocket callback can arrive off-main, so decode synchronously on the
     // main queue instead of returning a zero-size GLUIImage.
     void (^decodeImageData)(void) = ^{
-        img = nd != nil ? [CN1Image imageWithData:nd] : nil;
+        img = CN1AppleImageWithDataCompat(nd);
 #ifndef CN1_USE_ARC
         [img retain];
 #endif
@@ -806,7 +806,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
         dispatch_sync(dispatch_get_main_queue(), decodeImageData);
     }
 #else
-    img = nd != nil ? [CN1Image imageWithData:nd] : nil;
+    img = CN1AppleImageWithDataCompat(nd);
 #endif
     if (img == nil) {
 #if TARGET_OS_WATCH
@@ -1508,7 +1508,11 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
         
         CGImageRef imageRef = CGBitmapContextCreateImage(context);
         
+#if TARGET_OS_OSX
+        image = CN1AppleImageWithCGImage(imageRef);
+#else
         image = [CN1Image imageWithCGImage:imageRef];
+#endif
         
         CGImageRelease(imageRef);
         CGContextRelease(context);
@@ -2127,7 +2131,11 @@ static CN1Image* cn1ImageWithBits(UInt8* bits, int width, int height) {
     CGImageRef imageRef = CGBitmapContextCreateImage(context);
     free(CGBitmapContextGetData(context));
     CGContextRelease(context);
+#if TARGET_OS_OSX
+    CN1Image* newImage = CN1AppleImageWithCGImage(imageRef);
+#else
     CN1Image* newImage = [CN1Image imageWithCGImage:imageRef];
+#endif
     CFRelease(imageRef);
     return newImage;
     
@@ -2203,7 +2211,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
     if (alpha == 255) {
         [i drawInRect:CGRectMake(x, y, width, height)];
     } else {
-        [i drawInRect:CGRectMake(x, y, width, height) blendMode:kCGBlendModeNormal alpha:alpha/(CGFloat)255];
+    #if TARGET_OS_OSX
+    // NSImage takes the source rect and a compositing operation where UIImage
+    // takes a blend mode; NSZeroRect means the whole image, and SourceOver is
+    // what kCGBlendModeNormal means.
+    [i drawInRect:CGRectMake(x, y, width, height) fromRect:NSZeroRect
+        operation:NSCompositingOperationSourceOver fraction:alpha/(CGFloat)255];
+#else
+    [i drawInRect:CGRectMake(x, y, width, height) blendMode:kCGBlendModeNormal alpha:alpha/(CGFloat)255];
+#endif
     }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
@@ -2251,7 +2267,11 @@ int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 int Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl
 (void* peer) {
     CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
+#if TARGET_OS_OSX
+    return (int)CN1AppleFontLineHeight(f);
+#else
     return (int)[f lineHeight];
+#endif
 }
 
 int Java_com_codename1_impl_ios_IOSImplementation_getFontAscentNativeImpl
@@ -2835,7 +2855,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     CN1Image* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
-        [original drawAtPoint:CGPointZero];
+    #if TARGET_OS_OSX
+    [original drawAtPoint:CGPointZero fromRect:NSZeroRect
+                operation:NSCompositingOperationSourceOver fraction:1.0];
+#else
+    [original drawAtPoint:CGPointZero];
+#endif
     }
 
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -2936,7 +2961,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     float scaleX = ((float)imgWidth)/((float)img.size.width);
     float scaleY = ((float)imgHeight)/((float)img.size.height);
     CGRect r = CGRectMake(-x / scaleX, -(imgHeight - y - height) / scaleY, img.size.width * scaleX, img.size.height * scaleY);
+#if TARGET_OS_OSX
+    CGImageRef cgImg = CN1AppleCGImageOf(img);
+#else
     CGImageRef cgImg = [img CGImage];
+#endif
     CGContextDrawImage(context, r, cgImg);
     
     CGColorSpaceRelease(coloSpaceRgb);
@@ -4084,7 +4113,7 @@ EAGLView* lastFoundEaglView;
         }
         if(isPortrait) {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
-            CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, wi, he));
+            CGImageRef imageRef = CGImageCreateWithImageInRect(CN1AppleCGImageOfCompat(img), CGRectMake(0, statusbarHeight * scale, wi, he));
             img = [CN1Image imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
@@ -4096,7 +4125,7 @@ EAGLView* lastFoundEaglView;
             
             CGImageRef imageRef;
             if (isIOS8()){
-                imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, wi, he));
+                imageRef = CGImageCreateWithImageInRect(CN1AppleCGImageOfCompat(img), CGRectMake(0, statusbarHeight * scale, wi, he));
             } else {
                 imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, he, wi));
 
