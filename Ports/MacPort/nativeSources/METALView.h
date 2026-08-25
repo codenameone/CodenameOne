@@ -20,26 +20,33 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#ifndef CN1AppKitMetalView_h
-#define CN1AppKitMetalView_h
+#ifndef METALView_h
+#define METALView_h
 #import <TargetConditionals.h>
 #if TARGET_OS_OSX
 
 #import <AppKit/AppKit.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import "CN1RenderingView.h"
 @import Metal;
 @import simd;
 
 /// The rendering surface of one Codename One window on the native macOS port.
 ///
+/// Named `METALView` on purpose. The iOS port's Metal backend has that name, and
+/// the shared drawing sources -- BlurRegion, CN1Metalcompat, IOSNative -- refer
+/// to it by name. Reusing it means those compile here unchanged, exactly as the
+/// watch slice reuses `CodenameOne_GLViewController` for a class that shares
+/// nothing with the iOS one but its role.
+///
 /// Layer-hosted rather than layer-backed: `makeBackingLayer` returns the
 /// `CAMetalLayer` itself, so AppKit never draws into it and the only thing that
 /// touches those pixels is Metal.
 ///
-/// #### Why this is a separate class from METALView
+/// #### Why this is a separate implementation rather than a guarded one
 ///
-/// `METALView` is a `UIView`, and the roughly fifty UIKit references in it are
-/// not all mechanical: `NSImage` is a resolution-independent representation
+/// The iOS `METALView` is a `UIView`, and the roughly fifty UIKit references in
+/// it are not all mechanical: `NSImage` is a resolution-independent representation
 /// container rather than a bitmap, `NSView` is not flipped by default, and the
 /// keyboard and text-delegate half of that file has no macOS meaning at all.
 /// Guarding it would put the iOS renderer -- the code every existing iOS app
@@ -65,7 +72,7 @@
 /// locations, tracking areas, peer frames, the text input client's rects --
 /// then needs no vertical flip. The alternative is a conversion at each of
 /// those sites and a permanent tax on every new one.
-@interface CN1AppKitMetalView : NSView {
+@interface METALView : NSView<CN1RenderingView> {
 @private
     int framebufferWidth;
     int framebufferHeight;
@@ -88,7 +95,7 @@
 /// clips.
 @property (nonatomic, retain) id<MTLTexture> stencilTexture;
 /// Host for native peer components, above the Metal layer.
-@property (nonatomic, retain) NSView *peerComponentsLayer;
+@property (nonatomic, retain) CN1View *peerComponentsLayer;
 @property (nonatomic, readonly) int framebufferWidth;
 @property (nonatomic, readonly) int framebufferHeight;
 @property (nonatomic, readonly) simd_float4x4 projectionMatrix;
@@ -98,9 +105,24 @@
 
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
+- (void)deleteFramebuffer;
 - (void)updateFrameBufferSize:(int)w h:(int)h;
 - (void)invalidateRetainedFramebuffer;
-- (void)addPeerComponent:(NSView *)view;
+- (void)prepareRetainedFramebufferForDrawRect:(CGRect)rect displayWidth:(int)displayWidth displayHeight:(int)displayHeight;
+- (void)addPeerComponent:(CN1View *)view;
+// The CN1RenderingView protocol carries three keyboard hooks from the UIKit
+// ports. AppKit has no software keyboard and no UITextField delegate, so they
+// exist here to satisfy the protocol and do nothing.
+- (void)keyboardDoneClicked;
+- (void)keyboardNextClicked;
+- (void)textFieldDidChange;
+// The blur / glass / lens materials the shared BlurRegion op calls into.
+- (void)blurScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius;
+- (void)glassScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius
+              cornerRadius:(float)cornerRadius sat:(float)sat scale:(float)scale
+                    offset:(float)offset refract:(float)refract specular:(float)specular;
+- (void)lensScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h cornerRadius:(float)cornerRadius
+                  magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength;
 /// Reads the finished frame back as an ARGB raster. Used by the screenshot
 /// pipeline and by Window.capture().
 - (BOOL)readbackInto:(unsigned int *)argb width:(int)w height:(int)h;

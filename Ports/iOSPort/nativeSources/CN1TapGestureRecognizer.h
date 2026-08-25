@@ -23,14 +23,14 @@
 
 #import <Foundation/Foundation.h>
 #include "TargetConditionals.h"
-// UIGestureRecognizer / UIView are unavailable on watchOS; the tap peer is
+// UIGestureRecognizer / CN1View are unavailable on watchOS; the tap peer is
 // excluded from the watch slice and this header is empty there.
 #if !TARGET_OS_WATCH
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #import "CodenameOne_GLViewController.h"
 
 @interface CN1TapGestureRecognizer : UIGestureRecognizer<UIGestureRecognizerDelegate> {
-    UIView* pressedView;
+    CN1View* pressedView;
 }
 - (void) install:(CodenameOne_GLViewController*)ctrl;
 

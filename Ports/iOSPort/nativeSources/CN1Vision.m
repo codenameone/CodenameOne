@@ -29,7 +29,7 @@
 #endif
 
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <Vision/Vision.h>
 #import <CoreImage/CoreImage.h>
 #import <CoreVideo/CoreVideo.h>
@@ -266,7 +266,7 @@ static UIImageOrientation cn1UIImageOrientation(int rotation) {
     }
 }
 
-static MLKVisionImage *cn1MLKitImage(UIImage *image, int rotation) {
+static MLKVisionImage *cn1MLKitImage(CN1Image *image, int rotation) {
     MLKVisionImage *vision = [[MLKVisionImage alloc] initWithImage:image];
     vision.orientation = cn1UIImageOrientation(rotation);
     return vision;
@@ -330,8 +330,8 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
                                        int feature, int rotation,
                                        NSString *textScript) {
 #if defined(CN1_HAS_MLKIT_VISION)
-    UIImage *image = rawImage == NULL ? [UIImage imageWithData:data]
-            : [UIImage imageWithCGImage:rawImage];
+    CN1Image *image = rawImage == NULL ? [CN1Image imageWithData:data]
+            : [CN1Image imageWithCGImage:rawImage];
     if (image == nil) {
         return cn1VisionJSON(@{@"error": @"Could not decode ML Kit image"});
     }
@@ -862,8 +862,8 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
             });
         }
     } else if (feature == 6) {
-        UIImage *image = rawImage == NULL ? [UIImage imageWithData:data]
-                : [UIImage imageWithCGImage:rawImage];
+        CN1Image *image = rawImage == NULL ? [CN1Image imageWithData:data]
+                : [CN1Image imageWithCGImage:rawImage];
         if (image == nil) {
             return cn1VisionJSON(@{@"error": @"Could not decode document image"});
         }
@@ -892,7 +892,7 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
         }
         CGImageRef outputImage = [context createCGImage:corrected
                                                fromRect:corrected.extent];
-        UIImage *output = [UIImage imageWithCGImage:outputImage];
+        CN1Image *output = [CN1Image imageWithCGImage:outputImage];
         CGImageRelease(outputImage);
         NSData *jpeg = UIImageJPEGRepresentation(output, 0.92);
         return cn1VisionJSON(@{

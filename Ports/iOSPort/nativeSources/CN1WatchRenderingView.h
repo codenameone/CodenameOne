@@ -29,7 +29,7 @@
  * and notifies the host (a SpriteKit WKInterfaceSKScene texture or a SwiftUI
  * Image) to display it.
  *
- * This is NOT a UIView (watchOS has no view hierarchy) - it is a plain
+ * This is NOT a CN1View (watchOS has no view hierarchy) - it is a plain
  * NSObject that conforms to the CN1RenderingView protocol so the shared
  * CodenameOne_GLViewController drive code works unchanged.
  */
@@ -41,12 +41,12 @@
 #if TARGET_OS_WATCH
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import "CN1RenderingView.h"
 
 // Notified on the main thread whenever a freshly rendered frame is available.
 @protocol CN1WatchFramePresenter <NSObject>
-- (void)presentWatchFrame:(UIImage *)frame;
+- (void)presentWatchFrame:(CN1Image *)frame;
 @end
 
 @interface CN1WatchRenderingView : NSObject <CN1RenderingView> {
@@ -68,7 +68,7 @@
 - (int)logicalHeight;
 
 // The most recent rendered frame, or nil before the first present.
-- (UIImage *)currentFrame;
+- (CN1Image *)currentFrame;
 
 @end
 

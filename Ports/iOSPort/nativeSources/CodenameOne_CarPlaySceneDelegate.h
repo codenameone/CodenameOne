@@ -30,7 +30,10 @@
 #import "CodenameOne_GLViewController.h"
 #ifdef CN1_USE_CARPLAY
 #import <Foundation/Foundation.h>
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <CarPlay/CarPlay.h>
+#endif
 
 // Singleton that owns the CarPlay CPInterfaceController, the registered image
 // table and the JSON -> CPTemplate translation. The C trampolines in IOSNative.m

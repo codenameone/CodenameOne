@@ -26,6 +26,9 @@
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
 #import "CN1Metalcompat.h"
+#if TARGET_OS_OSX
+#import "CN1AppKitCompat.h"
+#endif
 #import "CN1MetalPipelineCache.h"
 #import "CN1MetalGlyphAtlas.h"
 #import "METALView.h"
@@ -224,7 +227,7 @@ int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 
 // Process-lifetime device + command queue cache. The original implementation
 // dereferenced [[GLViewController instance] eaglView].layer to fetch the
-// CAMetalLayer's device on every call, but -[UIView layer] is a main-thread-
+// CAMetalLayer's device on every call, but -[CN1View layer] is a main-thread-
 // only API. Paint runs on the Codename One EDT (a GCD background queue), and
 // any drawShape → createAlphaMask → nativePathRendererCreateTexture path
 // reaches CN1MetalDevice() from that thread. With Main Thread Checker
@@ -232,7 +235,7 @@ int CN1MetalFramebufferHeight(void) { return currentFramebufferHeight; }
 //
 // METALView publishes its device + command queue once at initWithCoder time
 // (main thread) via CN1MetalSetDeviceAndCommandQueue; thereafter the two
-// accessors return those statics without touching any UIView property. The
+// accessors return those statics without touching any CN1View property. The
 // queue identity must remain the same one METALView uses for screen
 // rendering: mutable-image setup command buffers commit to this queue and
 // rely on FIFO ordering with the screen render command buffer so subsequent
@@ -762,7 +765,7 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
         (float)(x+width), (float)(y+height)
     };
     // V=0-at-top sampling: memory_row_0 lands at the top vertex. For
-    // UIImage-backed sources, CN1MetalTextureFromUIImage stores them in the
+    // CN1Image-backed sources, CN1MetalTextureFromUIImage stores them in the
     // GL-compatible layout (memory_row_0 = source's visual BOTTOM), so this
     // mapping renders the source upside-down vs. its natural orientation —
     // matching what GL does for assets designed against its V=1-at-top
@@ -889,7 +892,7 @@ static inline float currentTransformGlyphScale(void) {
     float sy = sqrtf(c1x * c1x + c1y * c1y);
     float s = (sx + sy) * 0.5f;
     // Reject NaN / inf / non-positive values: any of those would
-    // poison `font.pointSize * s` below and produce a UIFont with
+    // poison `font.pointSize * s` below and produce a CN1Font with
     // bad metrics that hangs the CTLine layout. `isfinite` is true
     // only for finite numbers; treat anything else as "use unscaled
     // font" by returning 1.0 (the `useScaledFont` gate at the call
@@ -904,7 +907,7 @@ static inline float currentTransformGlyphScale(void) {
     return s;
 }
 
-void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x, int y) {
+void CN1MetalDrawString(NSString *str, CN1Font *font, int color, int alpha, int x, int y) {
     if (str == nil || font == nil || str.length == 0) return;
 
     // CoreText shapes glyphs and the atlas rasterises them at font.pointSize
@@ -921,7 +924,7 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // for free and the final on-screen position matches the unscaled path.
     float glyphScale = currentTransformGlyphScale();
     BOOL useScaledFont = (glyphScale > 1.01f);
-    UIFont *renderFont = useScaledFont
+    CN1Font *renderFont = useScaledFont
         ? [font fontWithSize:font.pointSize * glyphScale]
         : font;
     if (renderFont == nil) {
@@ -937,8 +940,8 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // "random Chinese characters" emoji bug). Each run now rasterises against
     // the font CoreText actually resolved for it.
 
-    // Pass the UIFont directly as the kCTFontAttributeName value. CoreText
-    // accepts UIFont here and uses it to drive glyph mapping and positions
+    // Pass the CN1Font directly as the kCTFontAttributeName value. CoreText
+    // accepts CN1Font here and uses it to drive glyph mapping and positions
     // -- keeping the CTLine completely consistent with how UIKit's
     // drawAtPoint:withAttributes: shapes the same string. Bridging through
     // atlas.ctFont (built via CTFontCreateWithFontDescriptor) was producing
@@ -966,7 +969,7 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
     // approach where drawAtPoint:withAttributes: puts line TOP at the given
     // point). UIKit's drawAtPoint then places the baseline at point.y +
     // font.ascender; we mirror that exactly so per-glyph positioning lines
-    // up with the Phase-2 fallback and with GL output. Using UIFont.ascender
+    // up with the Phase-2 fallback and with GL output. Using CN1Font.ascender
     // (not CTFontGetAscent) is intentional — UIKit's metric is what
     // drawAtPoint references and the values can disagree slightly across
     // fonts.
@@ -997,18 +1000,18 @@ void CN1MetalDrawString(NSString *str, UIFont *font, int color, int alpha, int x
         // Resolve the atlas for the font CoreText chose for THIS run. The
         // kCTFontAttributeName value is a CTFontRef for runs CoreText
         // font-substituted (the fallback font — emoji/CJK/etc.), but for the
-        // base run it can be the very UIFont we passed in as the shaping
-        // attribute. UIFont and CTFontRef are NOT toll-free bridged, so probe
+        // base run it can be the very CN1Font we passed in as the shaping
+        // attribute. CN1Font and CTFontRef are NOT toll-free bridged, so probe
         // the CF type before calling CTFont C functions on it; fall back to
-        // the UIFont entry point (and finally renderFont) otherwise.
+        // the CN1Font entry point (and finally renderFont) otherwise.
         CFDictionaryRef runAttrs = CTRunGetAttributes(run);
         CFTypeRef fontVal = (runAttrs != NULL)
             ? CFDictionaryGetValue(runAttrs, kCTFontAttributeName) : NULL;
         CN1MetalGlyphAtlas *atlas;
         if (fontVal != NULL && CFGetTypeID(fontVal) == CTFontGetTypeID()) {
             atlas = [CN1MetalGlyphAtlas atlasForCTFont:(CTFontRef)fontVal];
-        } else if (fontVal != NULL && [(__bridge id)fontVal isKindOfClass:[UIFont class]]) {
-            atlas = [CN1MetalGlyphAtlas atlasForFont:(__bridge UIFont *)fontVal];
+        } else if (fontVal != NULL && [(__bridge id)fontVal isKindOfClass:[CN1Font class]]) {
+            atlas = [CN1MetalGlyphAtlas atlasForFont:(__bridge CN1Font *)fontVal];
         } else {
             atlas = [CN1MetalGlyphAtlas atlasForFont:renderFont];
         }
@@ -1425,15 +1428,29 @@ void CN1MetalDrawAlphaMaskRadial(id<MTLTexture> texture,
 
 // --------------- Texture helpers ---------------
 
-id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
+id<MTLTexture> CN1MetalTextureFromUIImage(CN1Image *image) {
     if (image == nil) return nil;
     id<MTLDevice> device = CN1MetalDevice();
     if (device == nil) return nil;
-    int w = (int)image.size.width * image.scale;
-    int h = (int)image.size.height * image.scale;
+    // Pixel dimensions, which the two platforms answer differently. UIImage
+    // reports point size and carries a separate scale; NSImage has no scale at
+    // all, because it is a container of representations rather than one bitmap,
+    // and the honest pixel size is the one its CGImage actually has. Multiplying
+    // an NSImage's size by a scale it does not have would silently produce a
+    // half-resolution texture on every Retina Mac.
+    int w, h;
+#if TARGET_OS_OSX
+    CGImageRef probe = CN1AppKitCGImageFromNSImage(image);
+    if (probe == NULL) return nil;
+    w = (int)CGImageGetWidth(probe);
+    h = (int)CGImageGetHeight(probe);
+#else
+    w = (int)image.size.width * image.scale;
+    h = (int)image.size.height * image.scale;
+#endif
     if (w <= 0 || h <= 0) return nil;
 
-    // Rasterize UIImage into a CGBitmapContext, then upload as MTLTexture.
+    // Rasterize CN1Image into a CGBitmapContext, then upload as MTLTexture.
     // No CTM flip: with default CG (Y-up) coords, CGContextDrawImage lays the
     // source's row 0 at the BOTTOM of memory and the source's last row at
     // memory_row_0 — i.e. the texture is stored upside-down in memory order.
@@ -1450,7 +1467,13 @@ id<MTLTexture> CN1MetalTextureFromUIImage(UIImage *image) {
     CGContextRef ctx = CGBitmapContextCreate(rawData, w, h, 8, w * 4, cs,
         kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(cs);
+    // NSImage has no CGImage property, for the same reason it has no scale: it
+    // holds representations and has to be asked which one, for what rect.
+#if TARGET_OS_OSX
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), CN1AppKitCGImageFromNSImage(image));
+#else
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), image.CGImage);
+#endif
     CGContextRelease(ctx);
 
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
@@ -1534,7 +1557,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     // blue arcs visible through the green mutableWithAlpha box: GL renders
     // them blue with a faint green wash; pre-fix Metal rendered them
     // turquoise.)
-    // Single command buffer combining clear + (optional) UIImage seed.
+    // Single command buffer combining clear + (optional) CN1Image seed.
     // The seed render pass loadAction=Load reads the cleared bg from the
     // earlier subpass within the same cb -- using two separate cb's
     // would race because cb commit is async on the queue and the seed
@@ -1544,7 +1567,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
     // blit would copy raw bytes and swap R/B, the textured pipeline's
     // sampler does the format conversion automatically.
     id<MTLCommandQueue> queue = CN1MetalCommandQueue();
-    UIImage *existingUI = [image getImage];
+    CN1Image *existingUI = [image getImage];
     if (queue != nil) {
         id<MTLCommandBuffer> setupCb = [queue commandBuffer];
 
@@ -1556,7 +1579,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         clearPass.colorAttachments[0].clearColor = MTLClearColorMake(r * a, g * a, b * a, a);
         [[setupCb renderCommandEncoderWithDescriptor:clearPass] endEncoding];
 
-        // Pass 2: if the GLUIImage has an existing UIImage (e.g. it was
+        // Pass 2: if the GLUIImage has an existing CN1Image (e.g. it was
         // returned by gausianBlurImage / FontImage / etc.), seed the
         // freshly-cleared mutable texture with those pixels so subsequent
         // draws layer on top. Without this seed gausianBlurImage's blurred
@@ -1564,7 +1587,7 @@ void CN1MetalEnsureMutableTexture(GLUIImage *image, int width, int height) {
         // moment the next draw triggers EnsureMutableTexture, and the
         // composited Switch ends up with no outline halo around the thumb.
         // GL's startDrawingOnImageImpl gets this implicitly by drawing the
-        // existing UIImage into the CG context.
+        // existing CN1Image into the CG context.
         ensurePipelineCache();
         id<MTLRenderPipelineState> seedState = (existingUI != nil && pipelineCache != nil)
             ? [pipelineCache pipelineFor:CN1MetalPipelineTexturedRGBA]
@@ -1895,7 +1918,7 @@ static void cn1MetalReadbackFreeData(void * __unused info, const void *data, siz
     free((void *)data);
 }
 
-UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
+CN1Image *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     if (image == nil) return nil;
     id<MTLTexture> tex = [image mtlMutableTexture];
     if (tex == nil) return nil;
@@ -1911,7 +1934,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     if (device == nil || queue == nil) return nil;
 
     // Same blit-to-shared dance as CN1MetalReadMutableImagePixels: private
-    // textures aren't getBytes'able directly. Build the UIImage from the
+    // textures aren't getBytes'able directly. Build the CN1Image from the
     // shared scratch's bytes.
     MTLTextureDescriptor *desc = [MTLTextureDescriptor
         texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
@@ -1949,7 +1972,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     [shared release];
 #endif
 
-    // Wrap the BGRA buffer as a CGImage / UIImage. The provider takes
+    // Wrap the BGRA buffer as a CGImage / CN1Image. The provider takes
     // ownership of the malloc'd bytes via the freeData callback below.
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, bytes, byteCount,
@@ -1960,7 +1983,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
     CGDataProviderRelease(provider);
     CGColorSpaceRelease(cs);
     if (cgImg == NULL) return nil;
-    UIImage *out = [UIImage imageWithCGImage:cgImg];
+    CN1Image *out = [CN1Image imageWithCGImage:cgImg];
     CGImageRelease(cgImg);
     return out;
 }
@@ -1972,7 +1995,7 @@ UIImage *CN1MetalReadMutableImageAsUIImage(GLUIImage *image) {
 // RoundBorder drop shadow under a FloatingActionButton) would sample garbage
 // on resume and render as a violet fill. We keep a weak registry of every
 // live mutable image and, on applicationWillResignActive, read each one back
-// into its UIImage backing and drop the volatile texture. The texture is
+// into its CN1Image backing and drop the volatile texture. The texture is
 // transparently rebuilt from that backing the next time the image is painted
 // or sampled (CN1MetalEnsureMutableTexture / GLUIImage.getMTLTexture both
 // re-seed from getImage), so the pixels survive the round trip.
@@ -2013,7 +2036,7 @@ void CN1MetalUnregisterMutableImage(GLUIImage *image) {
 //
 // A monotonically increasing generation, bumped on foreground and on memory
 // warning. GLUIImage.getMTLTexture re-decodes its read-only texture from the
-// retained UIImage the first time it is sampled in a newer generation. This is
+// retained CN1Image the first time it is sampled in a newer generation. This is
 // the only safe recovery signal: probing the OS purgeable state per-draw
 // (setPurgeableState) trips Metal's commit-time lockPurgeableObjects validation
 // on textures already referenced by an in-flight command buffer.
@@ -2040,18 +2063,18 @@ void CN1MetalBackupMutableImagesForSuspend(void) {
     for (GLUIImage *image in snapshot) {
         if ([image mtlMutableTexture] == nil) {
             // Layer B (issue #5349): a plain read-only image whose texture was
-            // uploaded from a UIImage. Drop it now so it re-decodes from that
-            // retained UIImage after resume instead of sampling the contents
+            // uploaded from a CN1Image. Drop it now so it re-decodes from that
+            // retained CN1Image after resume instead of sampling the contents
             // iOS discards during suspend. (Also frees GPU memory before we go
             // to the background.) getMTLTexture's generation check is the
             // primary guard; this just reclaims eagerly.
             [image dropReadOnlyCachedTexture];
             continue;
         }
-        // Read the current GPU pixels back into a UIImage *before* dropping
+        // Read the current GPU pixels back into a CN1Image *before* dropping
         // the texture or its pending command buffer (the readback waits on
         // that command buffer).
-        UIImage *backup = CN1MetalReadMutableImageAsUIImage(image);
+        CN1Image *backup = CN1MetalReadMutableImageAsUIImage(image);
         if (backup == nil) {
             // Readback failed -- keep the existing texture rather than lose
             // the content outright; nothing better we can do here.
@@ -2090,7 +2113,7 @@ void CN1MetalReleaseCaches(void) {
     CN1MetalGlyphAtlasReleaseAll();
     // issue #5349: a memory warning means the OS is (or is about to start)
     // reclaiming resources -- bump the generation so cached read-only image
-    // textures re-decode from their UIImage on next use rather than risk
+    // textures re-decode from their CN1Image on next use rather than risk
     // sampling contents the OS discarded.
     CN1MetalBumpTextureValidateGeneration();
 }

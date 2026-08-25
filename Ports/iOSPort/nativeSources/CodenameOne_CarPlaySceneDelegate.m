@@ -39,7 +39,7 @@ static void cn1CarPlayFireSelect(int screenId, NSString *elementId) {
 }
 
 @implementation CN1CarPlayManager {
-    NSMutableDictionary<NSString *, UIImage *> *_imageTable;
+    NSMutableDictionary<NSString *, CN1Image *> *_imageTable;
 }
 
 + (instancetype)sharedManager {
@@ -76,13 +76,13 @@ static void cn1CarPlayFireSelect(int screenId, NSString *elementId) {
     if (key == nil || data == nil) {
         return;
     }
-    UIImage *img = [UIImage imageWithData:data];
+    CN1Image *img = [CN1Image imageWithData:data];
     if (img != nil) {
         _imageTable[key] = img;
     }
 }
 
-- (UIImage *)imageForKey:(id)key {
+- (CN1Image *)imageForKey:(id)key {
     if (![key isKindOfClass:[NSString class]]) {
         return nil;
     }
@@ -177,7 +177,7 @@ static void cn1CarPlayFireSelect(int screenId, NSString *elementId) {
         for (NSDictionary *row in sec[@"rows"]) {
             NSString *title = [self str:row[@"title"]];
             NSString *detail = [self str:row[@"text"]];
-            UIImage *img = [self imageForKey:row[@"image"]];
+            CN1Image *img = [self imageForKey:row[@"image"]];
             CPListItem *item = [[CPListItem alloc] initWithText:(title ?: @"")
                                                      detailText:detail
                                                           image:img];
@@ -205,7 +205,7 @@ static void cn1CarPlayFireSelect(int screenId, NSString *elementId) {
 - (CPGridTemplate *)buildGrid:(int)screenId dict:(NSDictionary *)d {
     NSMutableArray<CPGridButton *> *buttons = [NSMutableArray array];
     for (NSDictionary *it in d[@"items"]) {
-        UIImage *img = [self imageForKey:it[@"image"]];
+        CN1Image *img = [self imageForKey:it[@"image"]];
         if (img == nil) {
             // CPGridButton requires a non-nil image; skip image-less items to avoid a runtime throw.
             continue;

@@ -21,11 +21,11 @@
  * need additional information or have any questions.
  */
 #include "TargetConditionals.h"
-// EAGLView is a CAEAGLLayer-backed UIView (OpenGL ES). Both UIView and OpenGL ES
+// EAGLView is a CAEAGLLayer-backed CN1View (OpenGL ES). Both CN1View and OpenGL ES
 // are unavailable on watchOS; the watch slice renders via CN1WatchRenderingView
 // instead, so this header is empty there.
 #if !TARGET_OS_WATCH
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
@@ -36,10 +36,10 @@
 
 @class EAGLContext;
 
-// This class wraps the CAEAGLLayer from CoreAnimation into a convenient UIView subclass.
+// This class wraps the CAEAGLLayer from CoreAnimation into a convenient CN1View subclass.
 // The view content is basically an EAGL surface you render your OpenGL scene into.
 // Note that setting the view non-opaque will only work if the EAGL surface has an alpha channel.
-@interface EAGLView : UIView<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
+@interface EAGLView : CN1View<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
 @private
     // The pixel dimensions of the CAEAGLLayer.
     GLint framebufferWidth;
@@ -51,7 +51,7 @@
 }
 
 @property (nonatomic, retain) EAGLContext *context;
-@property (nonatomic, retain) UIView* peerComponentsLayer;
+@property (nonatomic, retain) CN1View* peerComponentsLayer;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;
@@ -61,6 +61,6 @@
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;
--(void) addPeerComponent:(UIView*) view;
+-(void) addPeerComponent:(CN1View*) view;
 @end
 #endif // !TARGET_OS_WATCH

@@ -26,7 +26,7 @@
 #ifndef NEW_CODENAME_ONE_VM
 #include "xmlvm-util.h"
 #endif
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
 
 #ifdef INCLUDE_GOOGLE_CONNECT

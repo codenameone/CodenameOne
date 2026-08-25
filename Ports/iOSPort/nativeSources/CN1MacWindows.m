@@ -60,7 +60,7 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
  * renders into its own raster and hands it here; setting layer.contents is the
  * cheapest way to get that on screen without standing up a second Metal surface.
  */
-@interface CN1MacWindowView : UIView
+@interface CN1MacWindowView : CN1View
 @property (nonatomic, assign) int windowId;
 @end
 
@@ -382,7 +382,7 @@ static CN1MacWindow g_macWindows[CN1_MAC_MAX_WINDOWS];
 
 /* Defined further down, beside the main-window helpers that first needed it. */
 static void CN1MacRunOnMainSync(void (^block)(void));
-extern void CN1MacWindowReattachEditor(UIView* host);
+extern void CN1MacWindowReattachEditor(CN1View* host);
 extern void CN1MacWindowDeliverContentReady(int windowId);
 /* Defined below, beside the editing host lookup. */
 static int g_editingSlot;
@@ -559,7 +559,7 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
 static CGSize CN1MacWindowContentSize(UIWindow* window) {
     /* The root view controller's view, because that is the same thing
      * viewDidLayoutSubviews reports to the framework as the window's size. */
-    UIView* rootView = window.rootViewController.view;
+    CN1View* rootView = window.rootViewController.view;
     return rootView != nil ? rootView.bounds.size : window.bounds.size;
 }
 
@@ -1583,14 +1583,14 @@ void CN1MacWindowSetState(int slot, int state) {
  * Returns NO when the slot has no content view yet, so the caller can leave the peer
  * where it is rather than lose it.
  */
-BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height) {
+BOOL CN1MacWindowAttachPeer(int slot, CN1View* peer, int x, int y, int width, int height) {
     __block BOOL attached = NO;
     if (peer == nil || slot < 0) {
         return NO;
     }
     CN1MacRunOnMainSync(^{
         CN1MacWindow* w;
-        UIView* host;
+        CN1View* host;
         CGFloat scale;
         pthread_mutex_lock(&g_slotLock);
         w = slotAt(slot);
@@ -1619,7 +1619,7 @@ BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int
     return attached;
 }
 
-UIView* CN1MacWindowContentView(int slot) {
+CN1View* CN1MacWindowContentView(int slot) {
     CN1MacWindow* w = slotAt(slot);
     return w == NULL ? nil : w->content;
 }
@@ -2011,9 +2011,9 @@ double CN1MacWindowEditingScale(void) {
     return scale;
 }
 
-UIView* CN1MacWindowEditingHostView(void) {
+CN1View* CN1MacWindowEditingHostView(void) {
     CN1MacWindow* w;
-    UIView* content;
+    CN1View* content;
     /* Under the lock like every other slot read: this runs on the event dispatch
      * thread while adoption can be replacing the content view. */
     pthread_mutex_lock(&g_slotLock);

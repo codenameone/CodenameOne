@@ -69,7 +69,7 @@
 // there and isBlePeripheralSupported reports false.
 #if !TARGET_OS_TV && !TARGET_OS_WATCH
 #define CN1_BT_PERIPHERAL_ROLE 1
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #endif
 
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);

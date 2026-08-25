@@ -26,7 +26,10 @@
 
 #ifdef CN1_INCLUDE_HOMEKIT
 
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <HomeKit/HomeKit.h>
+#endif
 #include "com_codename1_impl_ios_IOSHomeCallbacks.h"
 
 // ---------------------------------------------------------------------

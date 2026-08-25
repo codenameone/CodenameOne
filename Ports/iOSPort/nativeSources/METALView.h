@@ -22,7 +22,7 @@
  */
 #import "CN1ES2compat.h"
 #ifdef CN1_USE_METAL
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <QuartzCore/CAMetalLayer.h>
 
 @import Metal;
@@ -31,9 +31,9 @@
 #import "CN1RenderingView.h"
 
 
-// Metal-backed rendering view. Wraps a CAMetalLayer into a UIView subclass.
+// Metal-backed rendering view. Wraps a CAMetalLayer into a CN1View subclass.
 // Gated by CN1_USE_METAL; the OpenGL ES 2 backend (EAGLView) is the default.
-@interface METALView : UIView<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
+@interface METALView : CN1View<UITextViewDelegate, UITextFieldDelegate, CN1RenderingView> {
 @private
     // The pixel dimensions of the CAMetalLayer's drawable.
     int framebufferWidth;
@@ -84,7 +84,7 @@
 // engages the stencil via ClipRect.m's CN1MetalApplyPolygonStencilClip
 // helper.
 @property (nonatomic, retain) id<MTLTexture> stencilTexture;
-@property (nonatomic, retain) UIView* peerComponentsLayer;
+@property (nonatomic, retain) CN1View* peerComponentsLayer;
 @property (nonatomic, readonly) int framebufferWidth;
 @property (nonatomic, readonly) int framebufferHeight;
 @property (nonatomic, readonly) simd_float4x4 projectionMatrix;
@@ -106,6 +106,6 @@
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;
--(void) addPeerComponent:(UIView*) view;
+-(void) addPeerComponent:(CN1View*) view;
 @end
 #endif

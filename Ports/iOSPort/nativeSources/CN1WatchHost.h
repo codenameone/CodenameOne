@@ -47,12 +47,12 @@
 
 #if TARGET_OS_WATCH
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import "CN1WatchRenderingView.h"
 
 // Implemented by the generated watch app to display rendered CN1 frames.
 @protocol CN1WatchSurface <NSObject>
-- (void)displayFrame:(UIImage *)frame;
+- (void)displayFrame:(CN1Image *)frame;
 @end
 
 @interface CN1WatchHost : NSObject <CN1WatchFramePresenter>

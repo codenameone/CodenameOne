@@ -21,7 +21,7 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <AVFoundation/AVFoundation.h>
 #include "TargetConditionals.h"
 #if !TARGET_OS_WATCH

@@ -21,14 +21,19 @@
  * need additional information or have any questions.
  */
 #import "CN1ES2compat.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
+// OpenGL ES does not exist on macOS, and the native macOS port is Metal-only,
+// so none of this is reachable there. Mac Catalyst gets to the same place via
+// fabricated stub headers; here the imports are simply skipped.
+#if !TARGET_OS_OSX
 #import <OpenGLES/EAGL.h>
 #import "EAGLView.h"
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#endif
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
@@ -39,8 +44,11 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // guarded the same way in IOSNative.m, and the matching delegate conformances
 // below are likewise dropped on those slices.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
+#endif
 #endif
 #import <CoreLocation/CoreLocation.h>
 //#define CN1_USE_STOREKIT
@@ -446,19 +454,27 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // and the first EDT-painted frame; see CodenameOne_GLViewController.m. UIWindow
 // is unavailable on watchOS and the launch placeholder is iOS-only.
 #if !TARGET_OS_WATCH
+#if !TARGET_OS_OSX
 void CN1ShowLaunchPlaceholder(UIWindow *window);
+#endif
 void CN1DismissLaunchPlaceholder(void);
 #endif
 
 //ADD_INCLUDE
 
-#if TARGET_OS_WATCH
-// watchOS has no UIViewController/UIView/CADisplayLink (the SDK marks them
+#if TARGET_OS_WATCH || TARGET_OS_OSX
+// watchOS has no UIViewController/CN1View/CADisplayLink (the SDK marks them
 // API_UNAVAILABLE(watchos)). The watch slice replaces the GL view controller
 // with a plain NSObject render-driver (CN1WatchViewController.m) that owns the
 // same ExecutableOp queue and drives drawFrame into the Core Graphics surface
 // (CN1WatchRenderingView). Same class name so the ~10 callers + the translated
 // runtime resolve unchanged.
+//
+// The native macOS port takes the same shape for a different reason: AppKit has
+// no UIViewController either, and its render driver (CN1MacViewController.m)
+// owns the same queue and drives it into a CN1AppKitMetalView. Sharing the watch
+// arm rather than adding a third is deliberate -- the declaration these two need
+// is identical, and the alternative is two copies that drift.
 @interface CodenameOne_GLViewController : NSObject {
 @private
     GLUIImage* currentMutableImage;
@@ -479,8 +495,8 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)upcomingAdd:(ExecutableOp*)op;
 -(void)upcomingAddClip:(ExecutableOp*)op;
 -(BOOL)isPaintFinished;
--(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
+-(void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
+-(void)drawString:(int)color alpha:(int)alpha font:(CN1Font*)font str:(NSString*)str x:(int)x y:(int)y;
 -(void)drawScreen;
 -(void)drawFrame:(CGRect)rect;
 -(void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
@@ -572,9 +588,9 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 +(void)upcoming:(ExecutableOp*)op;
 -(void)upcomingAdd:(ExecutableOp*)op;
 -(BOOL)isPaintFinished;
--(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
+-(void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height;
 
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
+-(void)drawString:(int)color alpha:(int)alpha font:(CN1Font*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;

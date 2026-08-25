@@ -66,7 +66,7 @@ static BOOL cn1IsHiddenInBackground = NO;
 //GL_APP_DELEGATE_IMPORT
 //GL_APP_DELEGATE_INCLUDE
 
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 
 #define INCLUDE_CN1_PUSH
 
@@ -154,7 +154,7 @@ static void installSignalHandlers() {
         // view-controller XIBs, so the file is excluded from the Mac
         // slice via EXCLUDED_SOURCE_FILE_NAMES[sdk=macosx*]. Pass nil as
         // the NIB name on Mac so UIViewController synthesises a plain
-        // UIView; the Metal layer is attached programmatically further
+        // CN1View; the Metal layer is attached programmatically further
         // down the init chain, so the XIB's IBOutlet wiring isn't needed.
         // tvOS excludes the iOS XIBs from its bundle too (TvNativeBuilder's
         // EXCLUDED_SOURCE_FILE_NAMES), so loading 'CodenameOne_GLViewController'
@@ -399,7 +399,7 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
         // issue #5349: iOS may have discarded the contents of our private-storage
         // image/glyph textures while suspended. Bump the texture-validate
         // generation so every cached read-only image texture re-decodes from its
-        // retained UIImage on next sample instead of rendering the discarded
+        // retained CN1Image on next sample instead of rendering the discarded
         // garbage (a violet/magenta fill) on surfaces the diff-painter does not
         // fully repaint this frame. Pairs with the screenTexture clear above.
         extern void CN1MetalBumpTextureValidateGeneration(void);

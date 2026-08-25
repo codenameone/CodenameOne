@@ -47,7 +47,7 @@
 #if TARGET_OS_WATCH
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <UIKit/UIKit.h>   // value types only on watchOS: UIImage, UIFont, UIColor
+#import "CN1AppleUI.h"   // value types only on watchOS: UIImage, UIFont, UIColor
 
 // Frame lifecycle ----------------------------------------------------------
 
@@ -90,7 +90,7 @@ typedef struct {
 
 // Draw str at (x,y) (top-left baseline-independent) in the given font/color
 // via Core Text, honoring the active clip + transform.
-void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, UIFont *font);
+void CN1CGDrawString(int color, int alpha, int x, int y, NSString *str, CN1Font *font);
 
 // Linear/radial gradient fill of the x,y,w,h rect. type matches DrawGradient:
 // 1=radial, 2=horizontal, 3=vertical.

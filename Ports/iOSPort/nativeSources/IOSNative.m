@@ -52,7 +52,7 @@
 #include "cn1_globals.h"
 #endif
 #import "CN1AudioUnit.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #include <sys/sysctl.h>
 #import "CodenameOne_GLViewController.h"
 #import <QuartzCore/QuartzCore.h>
@@ -88,7 +88,10 @@
 #if !TARGET_OS_TV
 #import <CoreMotion/CoreMotion.h>
 #endif
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/UTCoreTypes.h>
+#endif
 #import <Foundation/Foundation.h>
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 //#define CN1_USE_CALENDAR
@@ -112,16 +115,25 @@
 // and AddressBookUI is absent. The native methods that use them are guarded to
 // no-ops on those slices.
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMailComposeViewController.h>
+#endif
 #endif
 #if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
 // AddressBookUI and the legacy AddressBook C API are unavailable on Mac
 // Catalyst and tvOS. Skip the import; the contacts path falls back to
 // Contacts.framework (handled via INCLUDE_CONTACTS_USAGE undef below).
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <AddressBookUI/AddressBookUI.h>
 #endif
+#endif
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MessageUI/MFMessageComposeViewController.h>
+#endif
 #endif
 
 #if TARGET_OS_MACCATALYST
@@ -144,7 +156,10 @@
 #include "com_codename1_util_SuccessCallback.h"
 #import "SocketImpl.h"
 #import "com_codename1_ui_geom_Rectangle.h"
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/MobileCoreServices.h>
+#endif
 #include "com_codename1_ui_plaf_Style.h"
 #import "RadialGradientPaint.h"
 #include "java_io_IOException.h"
@@ -216,13 +231,18 @@ extern int popoverSupported();
 // use that signal to temporarily cover the app view with a black overlay.
 static BOOL cn1_disableScreenshots = NO;
 #if !TARGET_OS_WATCH
-static UIView *cn1ScreenCaptureView = nil;
+static CN1View *cn1ScreenCaptureView = nil;
 static id cn1ScreenCaptureObserver = nil;
 
-static UIView *cn1_screenCaptureContainer() {
+static CN1View *cn1_screenCaptureContainer() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     // Prefer the GL view controller's view. Fall back to the key window so
     // we can still cover the app if the controller isn't ready yet.
-    UIView *container = [[CodenameOne_GLViewController instance] view];
+    CN1View *container = [[CodenameOne_GLViewController instance] view];
     if (container == nil) {
         container = [UIApplication sharedApplication].keyWindow;
         if (container == nil && [[UIApplication sharedApplication].windows count] > 0) {
@@ -230,6 +250,7 @@ static UIView *cn1_screenCaptureContainer() {
         }
     }
     return container;
+#endif
 }
 
 static void cn1_updateScreenCaptureBlocker() {
@@ -253,12 +274,12 @@ static void cn1_updateScreenCaptureBlocker() {
     }
     if (captured) {
         // If screen capture is active, hide the UI behind an overlay view.
-        UIView *container = cn1_screenCaptureContainer();
+        CN1View *container = cn1_screenCaptureContainer();
         if (container == nil) {
             return;
         }
         if (cn1ScreenCaptureView == nil) {
-            cn1ScreenCaptureView = [[UIView alloc] initWithFrame:container.bounds];
+            cn1ScreenCaptureView = [[CN1View alloc] initWithFrame:container.bounds];
             cn1ScreenCaptureView.backgroundColor = [UIColor blackColor];
             cn1ScreenCaptureView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             cn1ScreenCaptureView.userInteractionEnabled = NO;
@@ -281,7 +302,7 @@ static void cn1_updateScreenCaptureBlocker() {
     }
 #endif
 }
-#else // TARGET_OS_WATCH: no UIView/UIApplication/UIScreen overlay on the watch.
+#else // TARGET_OS_WATCH: no CN1View/UIApplication/UIScreen overlay on the watch.
 static void cn1_updateScreenCaptureBlocker() {}
 #endif // !TARGET_OS_WATCH
 
@@ -305,7 +326,7 @@ static void cn1_updateScreenCaptureBlocker() {}
  }*/
 
 #if !TARGET_OS_WATCH
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 #endif // !TARGET_OS_WATCH
 
 extern void initVMImpl();
@@ -536,6 +557,16 @@ const char* stringToUTF8(JAVA_OBJECT str) {
 
 void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
@@ -568,6 +599,7 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
         [NSThread sleepForTimeInterval:3600];
     }
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMetalRendering__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
@@ -822,6 +854,17 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
@@ -832,9 +875,20 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString___R_java_lang_St
     // watchOS/tvOS have no UIPasteboard.
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
@@ -844,6 +898,7 @@ void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_
 #else
     // watchOS/tvOS have no UIPasteboard.
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
@@ -885,6 +940,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_realPath___java_lang_String_R_java_
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
@@ -896,12 +962,23 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
 #else
     return JAVA_NULL;
 #endif
+#endif
 }
 
 extern NSData* arrayToData(JAVA_OBJECT arr);
 extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 
 void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     NSMutableDictionary* item = [NSMutableDictionary dictionary];
@@ -931,15 +1008,27 @@ void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_jav
     [UIPasteboard generalPasteboard].items = items;
     POOL_END();
 #endif
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard* pb = [UIPasteboard generalPasteboard];
     NSData* data = [pb dataForPasteboardType:@"public.png"];
     if (data == nil && pb.hasImages) {
-        UIImage* img = pb.image;
+        CN1Image* img = pb.image;
         if (img != nil) data = UIImagePNGRepresentation(img);
     }
     JAVA_OBJECT result = (data == nil || data.length == 0) ? JAVA_NULL : nsDataToByteArr(data);
@@ -948,9 +1037,21 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(C
 #else
     return JAVA_NULL;
 #endif
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     POOL_BEGIN();
     UIPasteboard* pb = [UIPasteboard generalPasteboard];
@@ -967,6 +1068,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_
     return result;
 #else
     return JAVA_NULL;
+#endif
 #endif
 }
 
@@ -987,11 +1089,17 @@ JAVA_OBJECT getClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString
 }
 
 BOOL getBooleanClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     JAVA_OBJECT val = getClientProperty(CN1_THREAD_STATE_PASS_ARG o, key);
     if(val == JAVA_NULL){
         return NO;
     }
     return val == get_static_java_lang_Boolean_TRUE(threadStateData);
+#endif
 }
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -1036,6 +1144,16 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                                                                                                                                                                          JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_INT hintColor, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste,
                                                                                                                                                                          JAVA_INT alignment, JAVA_INT verticalAlignment, JAVA_BOOLEAN returnExitsEditing)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
     int l = strlen(chr) + 1;
@@ -1044,11 +1162,22 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
                                                                    padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), hintColor, showToolbar, blockCopyPaste, alignment, verticalAlignment, returnExitsEditing);
     POOL_END();
+#endif
 }
 extern float scaleValue;
 extern int editComponentPadTop, editComponentPadLeft;
 extern float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
 void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT padTop, JAVA_INT padRight, JAVA_INT padBottom, JAVA_INT padLeft) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1091,6 +1220,7 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 #else
     // watchOS has no inline native text editing peer.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 #ifdef INCLUDE_CN1_PUSH_2
 typedef void (^CN1PushCompletionHandlerType)();
@@ -1197,6 +1327,17 @@ void com_codename1_impl_ios_IOSNative_imageRgbToIntArray___long_int_1ARRAY_int_i
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_INT n2, JAVA_INT n3)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = n1;
@@ -1207,6 +1348,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFromARGB___int_1ARRAY_int_
     JAVA_ARRAY_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl((void *)data, n2, n3);
     POOL_END();
     return i;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT n2)
@@ -1232,10 +1374,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImage___byte_1ARRAY_int_1ARRAY(
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_OBJECT n2)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     POOL_BEGIN();
     
     NSData* nd = (BRIDGE_CAST NSData*) ((void*)nsData);
-    UIImage* img = [UIImage imageWithData:nd];
+    CN1Image* img = [CN1Image imageWithData:nd];
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = n2;
     JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -1249,14 +1402,26 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
 
     POOL_END();
     return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
+#endif
 }
 
-// Renders an Apple SF Symbol (iOS 13+) into a tinted UIImage and wraps it in a
+// Renders an Apple SF Symbol (iOS 13+) into a tinted CN1Image and wraps it in a
 // GLUIImage peer, mirroring createImageNSData. Returns 0 when SF Symbols are
 // unavailable or the named symbol does not exist; the caller falls back to the
 // Material icon font. widthHeight[0/1] receive the image size in PIXELS.
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_String_int_float_int_int_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_INT color, JAVA_FLOAT size, JAVA_INT weight, JAVA_OBJECT n2)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if TARGET_OS_WATCH
     // watchOS marks UIScreen and UIGraphicsImageRenderer unavailable; returning
     // 0 makes FontImage fall back to the Material icon font, same as pre-iOS-13.
@@ -1270,13 +1435,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
             return 0;
         }
         // `size` arrives in CN1 device pixels (the same units as the Material glyph
-        // it replaces). UIImage symbol point size is in POINTS, so divide by the
+        // it replaces). CN1Image symbol point size is in POINTS, so divide by the
         // screen scale; the rendered bitmap is then ~`size` pixels tall, matching.
         CGFloat scale = [UIScreen mainScreen].scale;
         if (scale < 1) { scale = 1; }
         CGFloat pointSize = size / scale;
         UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:(weight >= 1 ? UIImageSymbolWeightBold : UIImageSymbolWeightRegular)];
-        UIImage* sym = [UIImage systemImageNamed:nameStr withConfiguration:cfg];
+        CN1Image* sym = [CN1Image systemImageNamed:nameStr withConfiguration:cfg];
         if (sym == nil) {
             POOL_END();
             return 0;
@@ -1324,9 +1489,9 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         rfmt.scale = scale;
         rfmt.opaque = NO;
         UIGraphicsImageRenderer* rndr = [[UIGraphicsImageRenderer alloc] initWithSize:szPt format:rfmt];
-        UIImage* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
+        CN1Image* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
             [c set];
-            UIImage* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            CN1Image* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
             [templ drawInRect:CGRectMake(0, glyphYpt, glyphWpt, glyphHpt)];
         }];
         data2[0] = (int)(flat.size.width * flat.scale);
@@ -1340,19 +1505,43 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_Stri
         return 0;
     }
 #endif
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_scale___long_int_int]
     POOL_BEGIN();
     JAVA_LONG i = (JAVA_LONG)Java_com_codename1_impl_ios_IOSImplementation_scaleImpl(n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_FLOAT radius) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
 
@@ -1372,7 +1561,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     // CIFilter path is already correct and the read-back cost is paid
     // once per blur invocation (not per frame).
 
-    UIImage* original = nil;
+    CN1Image* original = nil;
 #ifdef CN1_USE_METAL
     if ([glu mtlMutableTexture] != nil) {
         extern int displayWidth;
@@ -1398,7 +1587,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     CIImage *outputImage = [gaussianBlurFilter outputImage];
     CIContext *context   = [CIContext contextWithOptions:nil];
     CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
-    UIImage *image       = [UIImage imageWithCGImage:cgimg];
+    CN1Image *image       = [CN1Image imageWithCGImage:cgimg];
     CGImageRelease(cgimg);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
 
@@ -1412,7 +1601,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == glu) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
-    UIImage *original = [glu getImage];
+    CN1Image *original = [glu getImage];
     if (original == nil || original.CGImage == NULL) { POOL_END(); return n1; }
     CGImageRef cg = original.CGImage;
     size_t w = CGImageGetWidth(cg), h = CGImageGetHeight(cg);
@@ -1438,7 +1627,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
         if (outCtx != NULL) {
             CGImageRef outImg = CGBitmapContextCreateImage(outCtx);
             if (outImg != NULL) {
-                resultGl = [[GLUIImage alloc] initWithImage:[UIImage imageWithCGImage:outImg]];
+                resultGl = [[GLUIImage alloc] initWithImage:[CN1Image imageWithCGImage:outImg]];
                 CGImageRelease(outImg);
             }
             CGContextRelease(outCtx);
@@ -1450,6 +1639,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THR
     POOL_END();
     return resultGl != nil ? (BRIDGE_CAST void*)resultGl : n1;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
@@ -1792,20 +1982,42 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
 
 void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int]
     POOL_BEGIN();
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl(n1, n2, n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
     POOL_END();
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawStringGlobal___int_int_long_java_lang_String_int_int]
     POOL_BEGIN();
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl(n1, n2, n3, toNSString(CN1_THREAD_STATE_PASS_ARG n4), n5, n6);
     POOL_END();
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_nativeDrawImageMutable___long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT alpha, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT renderingHints)
@@ -1889,12 +2101,24 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fontDescentNative___long(CN1_THREAD_ST
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createSystemFont___int_int_int]
     POOL_BEGIN();
     JAVA_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl((void *)n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getResourceSize___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1, JAVA_OBJECT n2)
@@ -1952,12 +2176,24 @@ void com_codename1_impl_ios_IOSNative_loadResource___java_lang_String_java_lang_
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_createNativeMutableImage___int_int_int]
     POOL_BEGIN();
     JAVA_LONG i = Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl((void *)n1, n2, n3);
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3)
@@ -1971,12 +2207,24 @@ void com_codename1_impl_ios_IOSNative_startDrawingOnImage___int_int_long(CN1_THR
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_finishDrawingOnImage__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_finishDrawingOnImage__]
     POOL_BEGIN();
     JAVA_LONG i = (void *)Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     POOL_END();
     return i;
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_deleteNativePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1)
@@ -2049,7 +2297,15 @@ void com_codename1_impl_ios_IOSNative_shearGlobal___float_float(CN1_THREAD_STATE
 // touch handlers and the CN1TapGestureRecognizer. UITouch is unavailable on
 // watchOS, so the helper (and its callers) are compiled out there.
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 void cn1CapturePointerMetadata(UITouch* touch) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (touch == nil) {
         return;
     }
@@ -2083,7 +2339,9 @@ void cn1CapturePointerMetadata(UITouch* touch) {
         contactSize = (float)touch.majorRadius;
     }
     com_codename1_impl_ios_IOSImplementation_pointerMetadataCallback___int_float_float_float_float(CN1_THREAD_GET_STATE_PASS_ARG pointerType, pressure, tiltX, tiltY, contactSize);
+#endif
 }
+#endif
 #endif // !TARGET_OS_WATCH
 
 #if TARGET_OS_MACCATALYST
@@ -2151,6 +2409,10 @@ void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
 #endif
 
 void pointerPressed(int* x, int* y, int length) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerPressedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
     } else {
@@ -2171,9 +2433,14 @@ void pointerPressed(int* x, int* y, int length) {
         finishedNativeAllocations();
 #endif
     }
+#endif
 }
 
 void pointerDragged(int* x, int* y, int length) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerDraggedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
     } else {
@@ -2195,9 +2462,14 @@ void pointerDragged(int* x, int* y, int length) {
         finishedNativeAllocations();
 #endif
     }
+#endif
 }
 
 void pointerReleased(int* x, int* y, int length) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if(length == 1) {
         com_codename1_impl_ios_IOSImplementation_pointerReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x[0], y[0]);
     } else {
@@ -2219,6 +2491,7 @@ void pointerReleased(int* x, int* y, int length) {
         finishedNativeAllocations();
 #endif
     }
+#endif
 }
 
 void screenSizeChanged(int width, int height) {
@@ -2497,7 +2770,7 @@ void com_codename1_impl_ios_CatalystWindowNative_macMainWindowSetInputEnabled___
 
 JAVA_BOOLEAN com_codename1_impl_ios_CatalystWindowNative_macWindowAttachPeer___long_int_int_int_int_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #if TARGET_OS_MACCATALYST
-    UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+    CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
     return CN1MacWindowAttachPeer(slot, v, x, y, w, h) ? JAVA_TRUE : JAVA_FALSE;
 #else
     return JAVA_FALSE;
@@ -2933,6 +3206,16 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
 }
 
 void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dir) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     NSFileManager* fm = [[NSFileManager alloc] init];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
@@ -2943,6 +3226,7 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THR
     [fm release];
 #endif
     POOL_END();
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT src, JAVA_OBJECT dest) {
@@ -3167,11 +3451,16 @@ void connectionReceivedData(void* peer, NSData* data) {
 }
 
 void connectionError(void* peer, NSString* message) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG message);
     com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG peer, str);
     POOL_END();
+#endif
 }
 
 
@@ -3183,6 +3472,17 @@ void com_codename1_impl_ios_IOSNative_closeConnection___long(CN1_THREAD_STATE_MU
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT url) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if !TARGET_OS_WATCH
     __block JAVA_BOOLEAN result;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -3200,10 +3500,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
     // watchOS has no UIApplication openURL pipeline.
     return NO;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT n1)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG n1);
 #ifdef CN1_USE_ARC
@@ -3238,6 +3549,7 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
 #else
     // watchOS/tvOS have no UIDocumentInteractionController.
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_flashBacklight___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1)
@@ -3271,6 +3583,16 @@ void com_codename1_impl_ios_IOSNative_restoreMinimizedApplication__(CN1_THREAD_S
 extern int orientationLock;
 void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN n1)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_lockOrientation___boolean]
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if(n1) {
@@ -3299,6 +3621,7 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE
     orientationLock = n1 ? 1 : 2;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
     //XMLVM_END_WRAPPER
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
@@ -3308,27 +3631,49 @@ void com_codename1_impl_ios_IOSNative_unlockOrientation__(CN1_THREAD_STATE_MULTI
 
 void com_codename1_impl_ios_IOSNative_lockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = YES;
     });
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication sharedApplication].idleTimerDisabled = NO;
     });
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)
 {
     BOOL shouldDisable = disable ? YES : NO;
 #if TARGET_OS_WATCH
-    // No screen-capture overlay on watchOS (no UIView/UIScreen capture APIs).
+    // No screen-capture overlay on watchOS (no CN1View/UIScreen capture APIs).
     cn1_disableScreenshots = shouldDisable;
 #else
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -3375,16 +3720,43 @@ void com_codename1_impl_ios_IOSNative_vibrate___int(CN1_THREAD_STATE_MULTI_ARG J
 #define CN1_MOTION_G 9.80665
 
 #if !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 static CMMotionManager *cn1MotionManager = nil;
+#endif
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 static CMMotionManager *cn1GetMotionManager() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     if(cn1MotionManager == nil) {
         cn1MotionManager = [[CMMotionManager alloc] init];
     }
     return cn1MotionManager;
+#endif
 }
+#endif
 #endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if TARGET_OS_TV
     return JAVA_FALSE;
 #else
@@ -3400,12 +3772,23 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_
             return JAVA_FALSE;
     }
 #endif
+#endif
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
     return com_codename1_impl_ios_IOSNative_isMotionSensorSupported___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
 }
 
 void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_INT rateMillis) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     CMMotionManager *m = cn1GetMotionManager();
     NSTimeInterval interval = ((double)rateMillis) / 1000.0;
@@ -3426,9 +3809,20 @@ void com_codename1_impl_ios_IOSNative_startMotionSensor___int_int(CN1_THREAD_STA
             break;
     }
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     CMMotionManager *m = cn1GetMotionManager();
     switch(type) {
@@ -3445,9 +3839,21 @@ void com_codename1_impl_ios_IOSNative_stopMotionSensor___int(CN1_THREAD_STATE_MU
             break;
     }
 #endif
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if TARGET_OS_TV
     return JAVA_FALSE;
 #else
@@ -3463,6 +3869,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STA
             return JAVA_FALSE;
     }
 #endif
+#endif
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
     return com_codename1_impl_ios_IOSNative_hasMotionData___int(CN1_THREAD_STATE_PASS_ARG instanceObject, type);
@@ -3471,6 +3878,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_hasMotionData___int_R_boolean(CN1_
 #if !TARGET_OS_TV
 // axis: 0 = x, 1 = y, 2 = z
 static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     CMMotionManager *m = cn1GetMotionManager();
     switch(type) {
         case CN1_MOTION_ACCELEROMETER: {
@@ -3506,6 +3918,7 @@ static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
         default:
             return 0;
     }
+#endif
 }
 #else
 static JAVA_FLOAT cn1ReadMotionAxis(JAVA_INT type, int axis) {
@@ -3537,10 +3950,20 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int_R_float(CN1_T
 // Peer Component methods
 
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         CGSize s = [v sizeThatFits:CGSizeMake(w, h)];
 #ifndef NEW_CODENAME_ONE_VM
         org_xmlvm_runtime_XMLVMArray* intArray = response;
@@ -3553,17 +3976,28 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 extern float scaleValue;
 
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         float scale = scaleValue;
         float xpos = x / scale;
         float ypos = y / scale;
@@ -3574,15 +4008,16 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN b) {
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(!b) {
             if([v superview] != nil) {
                 [v removeFromSuperview];
@@ -3595,11 +4030,22 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT arr) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* intArray = arr;
@@ -3610,12 +4056,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
     __block GLUIImage* g = nil;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(v.bounds.size.width > 0 && v.bounds.size.height > 0) {
             UIGraphicsBeginImageContextWithOptions(v.bounds.size, v.opaque, 0.0);
             [v.layer renderInContext:UIGraphicsGetCurrentContext()];
 
-            UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
+            CN1Image* image = UIGraphicsGetImageFromCurrentImageContext();
 
             UIGraphicsEndImageContext();
             g = [[GLUIImage alloc] initWithImage:image];
@@ -3626,16 +4072,27 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
     });
     return (JAVA_LONG)((BRIDGE_CAST void*)g);
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
     return 0;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if([v superview] == nil) {
             [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
         }
@@ -3653,8 +4110,9 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 extern JAVA_OBJECT com_codename1_ui_Display_getInstance__(CN1_THREAD_STATE_SINGLE_ARG);
@@ -3679,7 +4137,7 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_
 #if !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
+        CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
         if(v.superview != nil) {
             [v removeFromSuperview];
             repaintUI();
@@ -3687,7 +4145,7 @@ void com_codename1_impl_ios_IOSNative_peerDeinitialized___long(CN1_THREAD_STATE_
         POOL_END();
     });
 #else
-    // watchOS has no UIView peer components.
+    // watchOS has no CN1View peer components.
 #endif // !TARGET_OS_WATCH
 }
 
@@ -3752,6 +4210,16 @@ void com_codename1_impl_ios_IOSNative_setAudioTime___long_int(CN1_THREAD_STATE_M
 }
 
 void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         AudioPlayer* pl = (BRIDGE_CAST AudioPlayer*)((void *)peer);
@@ -3763,6 +4231,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI
 #endif
         POOL_END();
     });
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio = 0;
@@ -3960,6 +4429,16 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int
 }
 
 void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_int_int_int_int_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_FLOAT relativeX, JAVA_FLOAT relativeY, JAVA_FLOAT relativeSize) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #ifdef CN1_USE_METAL
     {
         // Phase 3 v2: route through ExecutableOp queue. type=1 is
@@ -4020,9 +4499,20 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
     CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     POOL_END();
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN n7) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #ifdef CN1_USE_METAL
     {
         // Phase 3 v2: route the mutable linear-gradient through the
@@ -4092,6 +4582,7 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     POOL_END();
+#endif
 }
 
 // Multi-stop gradient bridge. Metal builds queue a DrawMultiStopGradient op so
@@ -4297,6 +4788,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Ob
 WKWebView* com_codename1_impl_ios_IOSNative_createWKBrowserComponent = nil;
 #endif
 JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_Object_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #ifdef supportsWKWebKit
     if (@available(iOS 8, *)) {
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -4348,6 +4850,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
     }
 #else
     return com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(threadStateData, instanceObject, obj);
+#endif
 #endif
 }
 
@@ -4417,11 +4920,21 @@ void com_codename1_impl_ios_IOSNative_setBrowserFollowTargetBlank___long_boolean
 // default backgrounds / form controls, so a page that adapts to dark mode can be
 // kept light (or dark) regardless of the user's system appearance.
 void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT style) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (@available(iOS 13.0, *)) {
-            UIView* w = (BRIDGE_CAST UIView*)((void *)peer);
+            CN1View* w = (BRIDGE_CAST CN1View*)((void *)peer);
             UIUserInterfaceStyle uiStyle = UIUserInterfaceStyleUnspecified;
             if (style == 1) {
                 uiStyle = UIUserInterfaceStyleLight;
@@ -4433,8 +4946,9 @@ void com_codename1_impl_ios_IOSNative_setBrowserInterfaceStyle___long_int(CN1_TH
         POOL_END();
     });
 #else
-    // watchOS has no UIView / UIUserInterfaceStyle.
+    // watchOS has no CN1View / UIUserInterfaceStyle.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 
@@ -4460,6 +4974,16 @@ void com_codename1_impl_ios_IOSNative_setPinchToZoomEnabled___long_boolean(CN1_T
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN enabled) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (isWKWebView(peer)) {
@@ -4480,6 +5004,7 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
         
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url) {
@@ -4842,7 +5367,15 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getBrowserURL___long(CN1_THREAD_STA
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *moviePlayer, JAVA_INT callbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     id observer = [[NSNotificationCenter defaultCenter] addObserverForName:MPMoviePlayerPlaybackDidFinishNotification object:moviePlayer
     queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *notification) {
         /*
@@ -4860,7 +5393,9 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+#endif
 }
+#endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (registerVideoCallback / MPMoviePlayerController)
 
 void registerVideoCallbackAV(CN1_THREAD_STATE_MULTI_ARG AVPlayer *moviePlayer, JAVA_INT callbackId) {
@@ -4927,6 +5462,11 @@ BOOL useAVKit() {
     return NO;
 }
 JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
      __block MPMoviePlayerController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -4957,8 +5497,13 @@ JAVA_LONG createVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletio
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 void addPlaybackToAudioSession() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     AVAudioSessionCategory cat = [[AVAudioSession sharedInstance] category];
     if (cat == AVAudioSessionCategoryPlayback) {
         return;
@@ -4968,6 +5513,7 @@ void addPlaybackToAudioSession() {
         return;
     }
     [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
+#endif
 }
 
 JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
@@ -5018,6 +5564,11 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
 
 
 JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5040,6 +5591,7 @@ JAVA_LONG createNativeVideoComponentFromStringMP(JAVA_OBJECT str, JAVA_INT onCom
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
 #ifdef CN1_USE_AVKIT
@@ -5079,6 +5631,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lan
 }
 
 JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5118,6 +5675,7 @@ JAVA_LONG createVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
 #ifdef CN1_USE_AVKIT
@@ -5198,6 +5756,11 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
 #endif
 }
 JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5233,6 +5796,7 @@ JAVA_LONG createNativeVideoComponentMP(JAVA_OBJECT dataObject, JAVA_INT onComple
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT dataObject, JAVA_INT onCompletionCallbackId) {
@@ -5248,6 +5812,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
 }
 
 JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5282,6 +5851,7 @@ JAVA_LONG createVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCa
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -5324,6 +5894,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int
 }
 
 JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     __block MPMoviePlayerViewController* moviePlayerInstance;
         dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5352,6 +5927,7 @@ JAVA_LONG createNativeVideoComponentNSDataMP(JAVA_LONG nsData, JAVA_INT onComple
 #else
         return 0;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
@@ -5396,6 +5972,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     // Recipient.
     NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
 
@@ -5419,11 +5999,22 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
         [[UIApplication sharedApplication] openURL:[NSURL URLWithString:email]];
     });
 
+#endif
 }
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (launchMailAppOnDevice)
 
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if TARGET_OS_WATCH || TARGET_OS_TV
     // No MessageUI on watchOS/tvOS; email composition is a no-op.
     return;
@@ -5515,10 +6106,20 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
         POOL_END();
     });
 #endif // !(TARGET_OS_WATCH || TARGET_OS_TV) (sendEmailMessage)
+#endif
 }
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     MPMoviePlayerController* m = nil;;
     if([obj isKindOfClass:[MPMoviePlayerController class]]) {
@@ -5528,9 +6129,16 @@ MPMoviePlayerController* getMPPlayer(JAVA_LONG peer) {
         m = mv.moviePlayer;
     }
     return m;
+#endif
 }
+#endif
 
 AVPlayer* getAVPlayer(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
 #ifdef CN1_USE_AVKIT
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
     AVPlayer* m = nil;;
@@ -5543,6 +6151,7 @@ AVPlayer* getAVPlayer(JAVA_LONG peer) {
     return m;
 #else
     return nil;
+#endif
 #endif
 }
 
@@ -5565,12 +6174,17 @@ CN1_AVPLAYERVIEWCONTROLLER getAVPlayerController(JAVA_LONG peer) {
 
 
 void startVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         
         [getMPPlayer(peer) play];
         POOL_END();
     });
+#endif
 }
 
 void startVideoComponentAV(JAVA_LONG peer) {
@@ -5595,6 +6209,10 @@ void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STAT
 }
 
 void stopVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -5602,6 +6220,7 @@ void stopVideoComponentMP(JAVA_LONG peer) {
         [getMPPlayer(peer) stop];
         POOL_END();
     });
+#endif
 }
 void stopVideoComponentAV(JAVA_LONG peer) {
 #ifdef CN1_USE_AVKIT
@@ -5623,6 +6242,10 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE
 }
 
 void pauseVideoComponentMP(JAVA_LONG peer) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSObject* obj = (BRIDGE_CAST NSObject*)peer;
@@ -5639,6 +6262,7 @@ void pauseVideoComponentMP(JAVA_LONG peer) {
         [m pause];
         POOL_END();
     });
+#endif
 }
 void pauseVideoComponentAV(JAVA_LONG peer) {
 #ifdef CN1_USE_AVKIT
@@ -5659,6 +6283,13 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
     }
 }
 void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit and
+// AppKit's equivalent is a different API rather than a renamed one. The
+// symbol still has to exist -- ParparVM keeps a native method alive BY its
+// symbol appearing in the native sources -- so this returns an unsupported
+// value and lets the caller take its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5668,9 +6299,18 @@ void com_codename1_impl_ios_IOSNative_prepareVideoComponent___long(CN1_THREAD_ST
         }
         POOL_END();
     });
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit and
+// AppKit's equivalent is a different API rather than a renamed one. The
+// symbol still has to exist -- ParparVM keeps a native method alive BY its
+// symbol appearing in the native sources -- so this returns an unsupported
+// value and lets the caller take its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         AVPlayer* m = getAVPlayer(peer);
@@ -5686,9 +6326,18 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE
     }
     
 
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
+// Not implemented on the native macOS port: the body below is UIKit and
+// AppKit's equivalent is a different API rather than a renamed one. The
+// symbol still has to exist -- ParparVM keeps a native method alive BY its
+// symbol appearing in the native sources -- so this returns an unsupported
+// value and lets the caller take its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         [getAVPlayer(peer) seekToTime:CMTimeMakeWithSeconds(time/1000, 1000)];
@@ -5702,10 +6351,19 @@ JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_S
     }
     
     return 0;
+#endif
 }
 
 int responseGetMediaDuration = 0;
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit and
+// AppKit's equivalent is a different API rather than a renamed one. The
+// symbol still has to exist -- ParparVM keeps a native method alive BY its
+// symbol appearing in the native sources -- so this returns an unsupported
+// value and lets the caller take its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5720,6 +6378,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getMediaDuration___long(CN1_THREAD_STA
         POOL_END();
     });
     return responseGetMediaDuration;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgArtist___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT artist) {
@@ -5817,6 +6476,16 @@ void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN value) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5845,15 +6514,26 @@ void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_bool
         
         POOL_END();
     });
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
        
         if ([MPNowPlayingInfoCenter class])  {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithImage:i];
             NSArray *keys = [NSArray arrayWithObjects:
                              MPMediaItemPropertyArtwork,
@@ -5870,11 +6550,23 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
         
         POOL_END();
     });
+#endif
 }
 
 
 JAVA_BOOLEAN responseIsVideoPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     if (peer == 0) {
         return JAVA_FALSE;
     }
@@ -5904,9 +6596,20 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
         POOL_END();
     });
     return responseIsVideoPlaying;
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5930,10 +6633,22 @@ void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THRE
         
         POOL_END();
     });
+#endif
 }
 
 JAVA_BOOLEAN responseIsVideoFullScreen = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -5958,9 +6673,21 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREA
         POOL_END();
     });
     return responseIsVideoFullScreen;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
         AVPlayerViewController *m = getAVPlayerController(peer);
@@ -5973,9 +6700,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_ST
         return (JAVA_LONG)((BRIDGE_CAST void*)m.view);
     }
     
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if (useAVKit()) {
@@ -5992,6 +6730,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 
         POOL_END();
     });
+#endif
 }
 #else // TARGET_OS_WATCH: no MPMoviePlayer / AVKit video playback peers on the watch.
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {}
@@ -6015,6 +6754,17 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MPMoviePlayer / AVKit video peer functions)
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if !TARGET_OS_WATCH
     if (@available(iOS 13.0, *)) {
         return [UIScreen mainScreen].traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
@@ -6025,6 +6775,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkMode___R_boolean(CN1_THREAD_
     // watchOS has no UIScreen trait-collection capture here.
     return JAVA_FALSE;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -6115,6 +6866,11 @@ void com_codename1_impl_ios_IOSNative_wifiUninstallTypeListener__(CN1_THREAD_STA
 static SCNetworkReachabilityRef cn1ReachabilityRef = NULL;
 
 static int cn1NetworkTypeFromFlags(SCNetworkReachabilityFlags flags) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
         return 0; // NETWORK_TYPE_NONE
     }
@@ -6122,6 +6878,7 @@ static int cn1NetworkTypeFromFlags(SCNetworkReachabilityFlags flags) {
         return 2; // NETWORK_TYPE_CELLULAR
     }
     return 1; // NETWORK_TYPE_WIFI -- iOS treats everything non-WWAN as wifi
+#endif
 }
 
 static int cn1ReadNetworkType() {
@@ -6494,25 +7251,48 @@ void com_codename1_impl_ios_IOSNative_bonjourPublishStop___long(CN1_THREAD_STATE
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
-        CGFloat baseSize = [UIFont systemFontSize];
-        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        CGFloat baseSize = [CN1Font systemFontSize];
+        CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
         return preferred.pointSize > (baseSize + 0.5f);
     } else {
         return JAVA_FALSE;
     }
 #else
-    // watchOS/tvOS have no UIFont systemFontSize.
+    // watchOS/tvOS have no CN1Font systemFontSize.
     return JAVA_FALSE;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 7.0, *)) {
-        CGFloat baseSize = [UIFont systemFontSize];
-        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        CGFloat baseSize = [CN1Font systemFontSize];
+        CN1Font *preferred = [CN1Font preferredFontForTextStyle:UIFontTextStyleBody];
         if (baseSize <= 0.0f) {
             return 1.0f;
         }
@@ -6521,9 +7301,10 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THR
         return 1.0f;
     }
 #else
-    // watchOS/tvOS have no UIFont systemFontSize.
+    // watchOS/tvOS have no CN1Font systemFontSize.
     return 1.0f;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 #if TARGET_OS_WATCH
@@ -6567,45 +7348,153 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(
 #else
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isHighContrastEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityDarkerSystemColorsEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDifferentiateWithoutColorEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     if (@available(iOS 13.0, macCatalyst 13.1, *)) {
         return UIAccessibilityShouldDifferentiateWithoutColor() ? 1 : 0;
     }
     return 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceMotionEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsReduceMotionEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceTransparencyEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsReduceTransparencyEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBoldTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsBoldTextEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isInvertColorsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsInvertColorsEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGrayscaleEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsGrayscaleEnabled() ? 1 : 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isOnOffSwitchLabelsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     if (@available(iOS 13.0, macCatalyst 13.1, *)) {
         return UIAccessibilityIsOnOffSwitchLabelsEnabled() ? 1 : 0;
     }
     return 0;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return UIAccessibilityIsVoiceOverRunning() ? 1 : 0;
+#endif
 }
 
 #endif // TARGET_OS_WATCH
@@ -6680,12 +7569,24 @@ JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAltitude___long(CN1_THRE
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationLongtitude___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #ifdef INCLUDE_LOCATION_USAGE
     CLLocation* loc = (BRIDGE_CAST CLLocation*)((void *)peer);
     return loc.coordinate.longitude;
 #else
     return 0;
 #endif;
+#endif
 }
 
 JAVA_DOUBLE com_codename1_impl_ios_IOSNative_getLocationAccuracy___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -6730,7 +7631,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getLocationTimeStamp___long(CN1_THREA
 // UIPopoverController is unavailable on tvOS; hold it as id (the pickers/popovers it backs are tvOS-absent).
 id popoverController;
 #else
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 UIPopoverController* popoverController;
+#endif
 #endif
 #endif // !TARGET_OS_WATCH
 void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN movie, JAVA_INT quality, JAVA_INT duration) {
@@ -6838,6 +7744,16 @@ static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
 #endif
 
 void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
     NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
@@ -6860,6 +7776,7 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
     });
 #else
     com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+#endif
 #endif
 }
 
@@ -7051,12 +7968,18 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
 }
 int popoverSupported()
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH
     return ( NSClassFromString(@"UIPopoverController") != nil) &&  (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad);
 #else
     // watchOS has no UIPopoverController / interface idiom.
     return 0;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -7064,19 +7987,43 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getUDID__(CN1_THREAD_STATE_MULTI_AR
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] systemVersion]);
 #else
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
 #if !TARGET_OS_WATCH
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
 #else
     return JAVA_NULL;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isSimulator___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -7165,6 +8112,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_S
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT priority) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
     switch (priority) {
@@ -7233,6 +8190,7 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
 #if !TARGET_OS_TV
     [l startUpdatingLocation];
 #endif // !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -7243,12 +8201,23 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingLocation___long(CN1_THREAD_STA
 }
 
 void com_codename1_impl_ios_IOSNative_startUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
 
     [l startMonitoringSignificantLocationChanges];
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -7261,6 +8230,16 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_
 
 //native void addGeofencing(long peer, double lat, double lng, double radius, long expiration, String id);
 void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj, JAVA_LONG peer, JAVA_DOUBLE lat, JAVA_DOUBLE lng, JAVA_DOUBLE radius, JAVA_LONG expires, JAVA_OBJECT geoId) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     CLLocationManager* l = (BRIDGE_CAST CLLocationManager*)((void *)peer);
     l.delegate = [CodenameOne_GLViewController instance];
@@ -7273,6 +8252,7 @@ void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_
     [region release];
 #endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif
 }
 
 
@@ -7670,7 +8650,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPersonPhotoImage___long(CN1_THR
     ABRecordRef i = (ABRecordRef)peer;
     GLUIImage* g = nil;
     if(ABPersonHasImageData(i)){
-        UIImage* img = [UIImage imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageData(i)];
+        CN1Image* img = [CN1Image imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageData(i)];
         g = [[GLUIImage alloc] initWithImage:img];
     }
     POOL_END();
@@ -7857,7 +8837,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
     if(includesPicture) {
         GLUIImage* g = nil;
         if(ABPersonHasImageData(i)){
-            UIImage* img = [UIImage imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
+            CN1Image* img = [CN1Image imageWithData:(BRIDGE_CAST NSData *)ABPersonCopyImageDataWithFormat(i, kABPersonImageFormatThumbnail)];
             g = [[GLUIImage alloc] initWithImage:img];
 #ifndef NEW_CODENAME_ONE_VM
             com_codename1_impl_ios_IOSImplementation_NativeImage* nativeImage = (com_codename1_impl_ios_IOSImplementation_NativeImage*)__NEW_com_codename1_impl_ios_IOSImplementation_NativeImage();
@@ -7997,7 +8977,12 @@ static CGImageRef cn1_copyMetalScreenTextureImage(METALView *mv) {
 #endif
 
 #if !TARGET_OS_WATCH
-static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGContextRef ctx) {
+static BOOL cn1_renderViewIntoContext(CN1View *renderView, CN1View *rootView, CGContextRef ctx) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (renderView == nil || rootView == nil || ctx == NULL) {
         return NO;
     }
@@ -8048,9 +9033,9 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
 #endif
                 }
 #endif
-                __block UIImage *snapshotImage = nil;
+                __block CN1Image *snapshotImage = nil;
                 __block BOOL snapshotComplete = NO;
-                [webView takeSnapshotWithConfiguration:config completionHandler:^(UIImage * _Nullable image, NSError * _Nullable error) {
+                [webView takeSnapshotWithConfiguration:config completionHandler:^(CN1Image * _Nullable image, NSError * _Nullable error) {
                     if (image != nil) {
                         snapshotImage = image;
                     } else if (error != nil) {
@@ -8090,7 +9075,7 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
         }
 #endif
         if (!drawn) {
-            UIView *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
+            CN1View *snapshotView = [renderView snapshotViewAfterScreenUpdates:YES];
             if (snapshotView != nil) {
                 BOOL snapshotDrawn = NO;
                 if ([snapshotView respondsToSelector:@selector(drawViewHierarchyInRect:afterScreenUpdates:)]) {
@@ -8159,17 +9144,22 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
     }
     CGContextRestoreGState(ctx);
     return drawn;
+#endif
 }
 
-static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
+static void cn1_renderPeerComponents(CN1View *rootView, CGContextRef ctx) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
     EAGLView *glView = [controller eaglView];
     if (glView == nil || rootView == nil || ctx == NULL) {
         return;
     }
 
-    UIView *peerLayer = glView.peerComponentsLayer;
-    NSArray<UIView *> *peerCandidates = nil;
+    CN1View *peerLayer = glView.peerComponentsLayer;
+    NSArray<CN1View *> *peerCandidates = nil;
     if (peerLayer != nil) {
         [peerLayer layoutIfNeeded];
         peerCandidates = peerLayer.subviews;
@@ -8182,20 +9172,26 @@ static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
         return;
     }
 
-    for (UIView *peerView in peerCandidates) {
-        if (![peerView isKindOfClass:[UIView class]]) {
+    for (CN1View *peerView in peerCandidates) {
+        if (![peerView isKindOfClass:[CN1View class]]) {
             continue;
         }
         cn1_renderViewIntoContext(peerView, rootView, ctx);
     }
+#endif
 }
 
-static UIView* cn1_rootViewForCapture(UIView *view) {
+static CN1View* cn1_rootViewForCapture(CN1View *view) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     if (view == nil) {
         return nil;
     }
 
-    UIView *rootView = view;
+    CN1View *rootView = view;
     UIWindow *window = view.window;
 
     if (window == nil) {
@@ -8244,7 +9240,7 @@ static UIView* cn1_rootViewForCapture(UIView *view) {
     if (window != nil) {
         rootView = window;
     } else {
-        UIView *candidate = view;
+        CN1View *candidate = view;
         while (candidate.superview != nil) {
             candidate = candidate.superview;
         }
@@ -8252,10 +9248,16 @@ static UIView* cn1_rootViewForCapture(UIView *view) {
     }
 
     return rootView;
+#endif
 }
 
-static UIImage* cn1_captureView(UIView *view) {
-    UIView *rootView = cn1_rootViewForCapture(view);
+static CN1Image* cn1_captureView(CN1View *view) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
+    CN1View *rootView = cn1_rootViewForCapture(view);
     if (rootView == nil) {
         return nil;
     }
@@ -8284,7 +9286,7 @@ static UIImage* cn1_captureView(UIView *view) {
 
     cn1_renderPeerComponents(rootView, ctx);
 
-    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
 
     if (rootView != view) {
@@ -8298,7 +9300,7 @@ static UIImage* cn1_captureView(UIView *view) {
                                           integralTarget.size.height * image.scale);
             CGImageRef cropped = CGImageCreateWithImageInRect(image.CGImage, pixelRect);
             if (cropped != nil) {
-                UIImage *croppedImage = [UIImage imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
+                CN1Image *croppedImage = [CN1Image imageWithCGImage:cropped scale:image.scale orientation:image.imageOrientation];
                 CGImageRelease(cropped);
                 image = croppedImage;
             }
@@ -8306,10 +9308,21 @@ static UIImage* cn1_captureView(UIView *view) {
     }
 
     return image;
+#endif
 }
-#endif // !TARGET_OS_WATCH (UIView screen-capture helpers)
+#endif // !TARGET_OS_WATCH (CN1View screen-capture helpers)
 
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
@@ -8321,7 +9334,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     // main-queue dispatch only starves the render pump and every frame comes
     // back nil -- 1x1 placeholders for the whole suite.
     __block CN1WatchRenderingView *wv = nil;
-    __block UIImage *wimg = nil;
+    __block CN1Image *wimg = nil;
     __block NSData *wpng = nil;
     void (^captureWatchFrame)(void) = ^{
         // Use master's default drawFrame: (allowInactive:NO). During a headless
@@ -8391,8 +9404,8 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         // display-link/active-state path would skip a frame during synchronous
         // test capture.
         [controller flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
-        UIView *view = controller.view;
-        UIImage *img = cn1_captureView(view);
+        CN1View *view = controller.view;
+        CN1Image *img = cn1_captureView(view);
         if (img != nil) {
             NSData *png = UIImagePNGRepresentation(img);
             if (png != nil) {
@@ -8431,6 +9444,7 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 
     com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG byteArr);
 #endif // TARGET_OS_WATCH
+#endif
 }
 
 
@@ -8570,6 +9584,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkNFCReaderUsage___R_boolean(CN
 }
 
 void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT phone) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     POOL_BEGIN();
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:toNSString(CN1_THREAD_STATE_PASS_ARG phone)] options:@{} completionHandler:nil];
@@ -8577,6 +9601,7 @@ void com_codename1_impl_ios_IOSNative_dial___java_lang_String(CN1_THREAD_STATE_M
 #else
     // watchOS has no UIApplication openURL dialer.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
@@ -8599,6 +9624,16 @@ void com_codename1_impl_ios_IOSNative_requestAppStoreReview__(CN1_THREAD_STATE_M
 
 void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  number, JAVA_OBJECT  text) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if TARGET_OS_MACCATALYST || TARGET_OS_WATCH || TARGET_OS_TV
     // SMS hardware is absent on Mac / watchOS (no MessageUI on watch);
     // MFMessageComposeViewController canSendText returns NO. Short-circuit.
@@ -8631,11 +9666,22 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
         POOL_END();
     });
 #endif // !TARGET_OS_MACCATALYST
+#endif
 }
 
 extern int pendingRemoteNotificationRegistrations;
 
 void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         if (@available(iOS 10, *)) {
@@ -8702,17 +9748,39 @@ void com_codename1_impl_ios_IOSNative_registerPush__(CN1_THREAD_STATE_MULTI_ARG 
         }
     });
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_deregisterPush__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH
     dispatch_async(dispatch_get_main_queue(), ^{
         [[UIApplication sharedApplication] unregisterForRemoteNotifications];
     });
 #endif
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT number) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 // Removed this ifdef because we may need to badge the application even if push isn't supported.
 //#ifdef INCLUDE_CN1_PUSH2
 #if !TARGET_OS_WATCH
@@ -8725,6 +9793,7 @@ void com_codename1_impl_ios_IOSNative_setBadgeNumber___int(CN1_THREAD_STATE_MULT
     });
 #endif // !TARGET_OS_WATCH
 //#endif
+#endif
 }
 
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH && !TARGET_OS_TV
@@ -8768,6 +9837,16 @@ void com_codename1_impl_ios_IOSNative_startPushActionCategory___java_lang_String
 }
 
 void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if defined(INCLUDE_CN1_PUSH2) && !TARGET_OS_WATCH && !TARGET_OS_TV
     if (@available(iOS 10, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
@@ -8777,6 +9856,7 @@ void com_codename1_impl_ios_IOSNative_endPushActionCategory__(CN1_THREAD_STATE_M
         }
         [pushCategories addObject:category];
     }
+#endif
 #endif
 }
 
@@ -8811,8 +9891,13 @@ void com_codename1_impl_ios_IOSNative_registerPushCategories__(CN1_THREAD_STATE_
 #endif
 }
 
-UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
-    UIImage* scaledInstance = nil;
+CN1Image* scaleImage(int destWidth, int destHeight, CN1Image *img) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
+    CN1Image* scaledInstance = nil;
     const size_t originalWidth = img.size.width;
     const size_t originalHeight = img.size.height;
     
@@ -8838,17 +9923,29 @@ UIImage* scaleImage(int destWidth, int destHeight, UIImage *img) {
         CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), img.CGImage);
         
         CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
-        scaledInstance = [UIImage imageWithCGImage:scaledImageRef];
+        scaledInstance = [CN1Image imageWithCGImage:scaledImageRef];
         
         CGImageRelease(scaledImageRef);
         CGContextRelease(bmContext);
     }
-    UIImage* scaled = scaledInstance;
+    CN1Image* scaled = scaledInstance;
     scaledInstance = nil;
     return scaled;
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG imagePeer, JAVA_BOOLEAN jpeg, int width, int height, JAVA_FLOAT quality) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     __block int blockWidth = width;
     __block int blockHeight = height;
     __block NSData* data = nil;
@@ -8857,10 +9954,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
 #endif
 #ifdef CN1_USE_METAL
     // Phase 3 v2: PNG/JPEG encoding sources from [GLUIImage getImage] which
-    // is the original UIImage backing — initial-fill colour for any mutable
+    // is the original CN1Image backing — initial-fill colour for any mutable
     // that's been drawn into via Metal. Drain the op queue first so the
     // mutable's MTLTexture has the latest pixels, then read those pixels
-    // into a fresh UIImage and encode that. flushBuffer already dispatches
+    // into a fresh CN1Image and encode that. flushBuffer already dispatches
     // sync to the main thread and runs drawFrame; doing it OUTSIDE the
     // dispatch_sync block below avoids the nested-dispatch_sync deadlock
     // that would otherwise occur (we'd be waiting on main to run drawFrame
@@ -8886,11 +9983,11 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-        UIImage* i = nil;
+        CN1Image* i = nil;
 #ifdef CN1_USE_METAL
         // If the image has live Metal pixels, blit-and-read into a fresh
-        // UIImage so PNG/JPEG encoding sees post-draw content rather than
-        // the stale UIImage initial-fill backing.
+        // CN1Image so PNG/JPEG encoding sees post-draw content rather than
+        // the stale CN1Image initial-fill backing.
         if ([glll mtlMutableTexture] != nil) {
             int srcW = [glll mtlMutableWidth];
             int srcH = [glll mtlMutableHeight];
@@ -8910,7 +10007,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
                             CGImageRef cgImg = CGBitmapContextCreateImage(ctx);
                             CGContextRelease(ctx);
                             if (cgImg != NULL) {
-                                i = [UIImage imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
+                                i = [CN1Image imageWithCGImage:cgImg scale:1.0 orientation:UIImageOrientationUp];
                                 CGImageRelease(cgImg);
                             }
                         }
@@ -8949,6 +10046,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageFile___long_boolean_int_in
     [(BRIDGE_CAST GLUIImage*)((void *)imagePeer) release];
 #endif
     return (JAVA_LONG)((BRIDGE_CAST void*)data);
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getNSDataSize___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData) {
@@ -9031,6 +10129,16 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_in
 
 
 void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -9042,6 +10150,7 @@ void com_codename1_impl_ios_IOSNative_startAudioUnit___long(CN1_THREAD_STATE_MUL
     CN1AudioUnit* audioUnit = (BRIDGE_CAST CN1AudioUnit*)((void *)peer);
     [audioUnit start];
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 
@@ -10411,7 +11520,7 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
 #endif // NEW_CODENAME_ONE_VM
 
 // Register every .ttf bundled in the app (notably material-design-font.ttf for
-// FontImage glyphs) with the process font manager so [UIFont fontWithName:] and
+// FontImage glyphs) with the process font manager so [CN1Font fontWithName:] and
 // CTFontCreateWithName can resolve them by name. The iOS app also lists these in
 // UIAppFonts, but the Metal/tvOS and Core-Graphics/watchOS slices do not reliably
 // register fonts from the Info.plist, so without this the Material font fails to
@@ -10462,6 +11571,17 @@ static void cn1RegisterBundledFontsOnce() {
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     int pSize = 14;
 
     pSize *= scaleValue;
@@ -10469,32 +11589,32 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     cn1RegisterBundledFontsOnce();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
 
-    UIFont* fnt;
+    CN1Font* fnt;
     if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
-            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightUltraLight];
+            fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightUltraLight];
         } else {
             if([str isEqualToString:@"HelveticaNeue-Light"]) {
-                fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightLight];
+                fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightLight];
             } else {
                 if([str isEqualToString:@"HelveticaNeue-Medium"]) {
-                    fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightMedium];
+                    fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightMedium];
                 } else {
                     if([str isEqualToString:@"HelveticaNeue-Bold"]) {
-                        fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightBold];
+                        fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightBold];
                     } else {
                         if([str isEqualToString:@"HelveticaNeue-CondensedBlack"]) {
-                            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightHeavy];
+                            fnt = [CN1Font systemFontOfSize:pSize weight:UIFontWeightHeavy];
                         } else {
                             // this is probably an italic font, fallback to regular code...
-                            fnt = [UIFont fontWithName:str size:pSize];
+                            fnt = [CN1Font fontWithName:str size:pSize];
                         }
                     }
                 }
             }
         }
     } else {
-        fnt = [UIFont fontWithName:str size:pSize];
+        fnt = [CN1Font fontWithName:str size:pSize];
     }
     
 #ifndef CN1_USE_ARC
@@ -10502,12 +11622,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
 #endif
     POOL_END();
     return (JAVA_LONG)((BRIDGE_CAST void*)fnt);
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boolean_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG uiFont, JAVA_BOOLEAN bold, JAVA_BOOLEAN italic, JAVA_FLOAT size) {
     POOL_BEGIN();
-    UIFont* original = (BRIDGE_CAST UIFont*)((void *)uiFont);
-    UIFont* fnt = [original fontWithSize:size];
+    CN1Font* original = (BRIDGE_CAST CN1Font*)((void *)uiFont);
+    CN1Font* fnt = [original fontWithSize:size];
 #ifndef CN1_USE_ARC
     [fnt retain];
 #endif
@@ -10753,16 +11874,25 @@ int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 extern UIPopoverController* popoverControllerInstance;
-extern UIView *currentActionSheet;
+#endif
+extern CN1View *currentActionSheet;
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 JAVA_LONG defaultDatePickerDate;
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
-void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
+void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG CN1View *pickerView) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
     int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
-    UIView* fakeActionSheet = [[UIView alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-246, SCREEN_WIDTH, 246)];
+    CN1View* fakeActionSheet = [[CN1View alloc] initWithFrame:CGRectMake(0, SCREEN_HEIGHT-246, SCREEN_WIDTH, 246)];
     [fakeActionSheet setBackgroundColor:[UIColor colorWithRed:240/255.0 green:240/255.0 blue:240/255.0 alpha:1.0]];
     [fakeActionSheet setAutoresizesSubviews:YES];
     UIToolbar *pickerToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, [CodenameOne_GLViewController instance].view.frame.size.width, 64)];
@@ -10831,8 +11961,19 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
         [(UIPickerView*)pickerView selectRow: stringPickerSelection inComponent:0 animated: NO];
     }
     repaintUI();
+#endif
 }
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 
     if (preferredWidth == 0) {
         preferredWidth = 320 * scaleValue;
@@ -10878,7 +12019,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             datepickerPopover = YES;
             stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
-            UIView *popoverView = [[UIView alloc] init];
+            CN1View *popoverView = [[CN1View alloc] init];
             [vc setView:popoverView];
             
 #ifndef CN1_USE_ARC
@@ -10974,10 +12115,21 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg, JAVA_INT minuteStep) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
@@ -11064,7 +12216,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             stringPickerSelection = 0;
             UIViewController *vc = [[UIViewController alloc] init];
             
-            UIView *popoverView = [[UIView alloc] init];
+            CN1View *popoverView = [[CN1View alloc] init];
             [vc setView:popoverView];
             [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
             
@@ -11154,6 +12306,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 
@@ -11176,6 +12329,16 @@ CGRect cn1RectToCGRect(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT rect){
 }
 
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
@@ -11191,7 +12354,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         NSArray* dataToShare;
         if(imagePeer != 0) {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
             } else {
@@ -11240,6 +12403,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 // Same as socialShare but installs a completionWithItemsHandler block on
@@ -11247,6 +12411,16 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 // activity type (UIActivityType*), cancellation, or error. Status codes
 // mirror com.codename1.share.ShareResult: 1=SHARED_TO, 2=DISMISSED, 3=FAILED.
 void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String_long_com_codename1_ui_geom_Rectangle_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle, JAVA_INT callbackId) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     NSString* someText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
     BOOL useRect = rectangle ? YES:NO;
     __block CGRect cgrect = CGRectMake(0,0,0,0);
@@ -11263,7 +12437,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         NSArray* dataToShare;
         if(imagePeer != 0) {
             GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
-            UIImage* i = [glll getImage];
+            CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
             } else {
@@ -11333,10 +12507,23 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         POOL_END();
         repaintUI();
     });
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_FALSE;
+#else
     return [UIPrintInteractionController isPrintingAvailable];
+#endif
 }
 
 // Prints the file at path through UIPrintInteractionController and reports
@@ -11344,6 +12531,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN
 // callbackId. Status codes mirror com.codename1.printing.PrintResult:
 // 1=COMPLETED, 2=CANCELLED, 3=FAILED.
 void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_INT callbackId) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     NSString* filePath = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     NSString* mime = toNSString(CN1_THREAD_STATE_PASS_ARG mimeType);
     int cbId = (int)callbackId;
@@ -11378,7 +12575,7 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
             com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jErrMsg);
         };
         if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
-            UIView* view = [CodenameOne_GLViewController instance].view;
+            CN1View* view = [CodenameOne_GLViewController instance].view;
             CGRect sourceRect = CGRectMake(view.bounds.size.width / 2, view.bounds.size.height / 2, 1, 1);
             [printController presentFromRect:sourceRect inView:view animated:YES completionHandler:completionHandler];
         } else {
@@ -11387,6 +12584,7 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
         POOL_END();
         repaintUI();
     });
+#endif
 }
 #else // TARGET_OS_WATCH || TARGET_OS_TV: no UIPickerView / UIDatePicker / UIActivityViewController / UIPrintInteractionController on the watch/tv.
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {}
@@ -11468,6 +12666,16 @@ void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean
 }
 
 void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (editingComponent == nil) {
         return;
     }
@@ -11501,6 +12709,7 @@ void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(
         POOL_END();
     });
 
+#endif
 }
 #else // TARGET_OS_WATCH: no inline native text-editing peer on the watch.
 void com_codename1_impl_ios_IOSNative_foldVKB__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {}
@@ -11852,8 +13061,20 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_i
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     //CN1Log(@"In getConsumer()");
     return &(((Renderer*)ptr)->consumer);
+#endif
 }
 
 //native void nativePathConsumerMoveTo(long ptr, double x, double y);
@@ -11945,6 +13166,17 @@ void com_codename1_impl_ios_IOSNative_nativeDeleteTexture___long(CN1_THREAD_STAT
 #define CN1_PATH_MASK_MAX_DIM 8192
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int(JAVA_OBJECT instanceObject, JAVA_LONG renderer, JAVA_INT color)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return JAVA_NULL;
+#else
     Renderer *r = (Renderer*)renderer;
     JAVA_INT outputBounds[4];
     
@@ -12005,11 +13237,23 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     
     return (JAVA_OBJECT)idata;
     
+#endif
 }
 
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___long(JAVA_OBJECT instanceObject, JAVA_LONG renderer)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if TARGET_OS_WATCH
     {
         JAVA_INT outputBounds[4];
@@ -12197,6 +13441,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
     return 0;
 #endif
     
+#endif
 }
 
 
@@ -13518,6 +14763,17 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_setNSFileOffset___long_int(CN1_THREAD
 
 /*native int readNSFile(long nsFileHandle);*/
 JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance, JAVA_LONG fileHandle) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
     POOL_BEGIN();
     NSFileHandle* fh = (BRIDGE_CAST NSFileHandle*)((void*)fileHandle);
     NSData* d =[fh readDataOfLength:1];
@@ -13525,6 +14781,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_readNSFile___long_R_int(CN1_THREAD_STA
     JAVA_INT out = n[0];
     POOL_END();
     return out;
+#endif
 }
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -13896,6 +15153,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {}
 #else
 JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         [[BGTaskScheduler sharedScheduler] registerForTaskWithIdentifier:taskId usingQueue:nil launchHandler:^(BGTask * _Nonnull task) {
@@ -13908,9 +15175,20 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_registerBackgroundProcessingTask___ja
             });
         }];
     }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java_lang_String_double_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier, JAVA_DOUBLE earliest, JAVA_BOOLEAN requiresNetwork, JAVA_BOOLEAN requiresPower) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         BGProcessingTaskRequest *request = [[BGProcessingTaskRequest alloc] initWithIdentifier:taskId];
@@ -13925,13 +15203,25 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_submitBackgroundProcessingTask___java
             CN1Log(@"Failed to submit background processing task %@: %@", taskId, submitError.localizedDescription);
         }
     }
+#endif
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT identifier) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.0, *)) {
         NSString *taskId = toNSString(CN1_THREAD_STATE_PASS_ARG identifier);
         [[BGTaskScheduler sharedScheduler] cancelTaskRequestWithIdentifier:taskId];
     }
+#endif
 }
 #endif // !TARGET_OS_WATCH (BackgroundTasks)
 
@@ -14728,6 +16018,17 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
    
 JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if !TARGET_OS_WATCH
     __block UIBackgroundTaskIdentifier bgTask = UIBackgroundTaskInvalid;
     bgTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
@@ -14741,6 +16042,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT ins
     // watchOS has no UIApplication background-task API.
     return 0;
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -14752,9 +16054,20 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THRE
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
 {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT javaString)
@@ -14805,6 +16118,16 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_b
 }
 
 void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (text == JAVA_NULL) {
         return;
     }
@@ -14816,20 +16139,36 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
 #else
     // watchOS has no UIAccessibilityPostNotification.
 #endif // !TARGET_OS_WATCH
+#endif
 }
 
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @interface CN1AccessibilityCustomAction : UIAccessibilityCustomAction
 @property(nonatomic, retain) NSString *cn1ActionId;
 @end
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @implementation CN1AccessibilityCustomAction
 @end
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @interface CN1AccessibilityElement : UIAccessibilityElement
 @property(nonatomic, assign) long long cn1NodeId;
 @property(nonatomic, retain) NSArray *cn1Actions;
 @end
+#endif
 
 static NSString *CN1AccessibilityActionId(NSArray *actions, NSString *wanted) {
     for (NSDictionary *action in actions) {
@@ -14849,6 +16188,10 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
             CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)nodeId, javaAction, javaArgument);
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body. Guarding only the body
+// would leave a signature naming a type the compiler has never heard of.
+#if !TARGET_OS_OSX
 @implementation CN1AccessibilityElement
 - (BOOL)accessibilityActivate {
     NSString *action = CN1AccessibilityActionId(self.cn1Actions, @"activate");
@@ -14876,6 +16219,11 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
 }
 
 - (BOOL)accessibilityScroll:(UIAccessibilityScrollDirection)direction {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     NSString *action = nil;
     if (direction == UIAccessibilityScrollDirectionDown || direction == UIAccessibilityScrollDirectionRight
             || direction == UIAccessibilityScrollDirectionNext) {
@@ -14886,6 +16234,7 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
     if (action == nil) return NO;
     CN1PerformAccessibilityAction(self.cn1NodeId, action, nil);
     return YES;
+#endif
 }
 
 - (BOOL)cn1PerformCustomAction:(CN1AccessibilityCustomAction *)action {
@@ -14894,6 +16243,7 @@ static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, 
     return YES;
 }
 @end
+#endif
 
 static NSMutableDictionary *cn1AccessibilityLiveValues;
 
@@ -14902,7 +16252,14 @@ static id CN1JSONValue(NSDictionary *node, NSString *key) {
     return value == [NSNull null] ? nil : value;
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole thing goes rather than just the body.
+#if !TARGET_OS_OSX
 static UIAccessibilityTraits CN1AccessibilityTraitsForNode(NSDictionary *node) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     NSString *role = CN1JSONValue(node, @"role");
     UIAccessibilityTraits traits = UIAccessibilityTraitNone;
     if ([role isEqualToString:@"BUTTON"] || [role isEqualToString:@"TOGGLE_BUTTON"]
@@ -14923,7 +16280,9 @@ static UIAccessibilityTraits CN1AccessibilityTraitsForNode(NSDictionary *node) {
     if (![[CN1JSONValue(node, @"liveRegion") description] isEqualToString:@"OFF"])
         traits |= UIAccessibilityTraitUpdatesFrequently;
     return traits;
+#endif
 }
+#endif
 
 static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
     NSString *value = CN1JSONValue(node, @"value");
@@ -14948,6 +16307,16 @@ static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
 
 void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     if (json == JAVA_NULL) return;
     POOL_BEGIN();
     NSString *jsonString = toNSString(CN1_THREAD_STATE_PASS_ARG json);
@@ -14955,7 +16324,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
     NSDictionary *tree = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     NSArray *nodes = [tree objectForKey:@"nodes"];
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIView *container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
+        CN1View *container = (CN1View *)[[CodenameOne_GLViewController instance] eaglView];
         if (container == nil) return;
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
         NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
@@ -15021,6 +16390,7 @@ void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String
         }
     });
     POOL_END();
+#endif
 }
 #else
 void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
@@ -16394,7 +17764,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
 // Builds without the define compile the stub branch and link neither framework.
 #ifdef CN1_USE_INTENTS
 #import <CoreSpotlight/CoreSpotlight.h>
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/MobileCoreServices.h>
+#endif
 
 // PNG blobs staged by Java ahead of an index/complete call, keyed by the name the serializer
 // embedded in the JSON. Guarded because staging happens on the caller's thread while the
@@ -17348,6 +18721,16 @@ static BOOL cn1_secureStorageHasLegacyService(NSString *current, NSString *legac
 }
 
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
@@ -17389,9 +18772,14 @@ void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_ja
         }
     });
     POOL_END();
+#endif
 }
 
 static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString *nsAccount, NSString *nsValue, NSString *appName, NSString *accessGroup) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     NSMutableDictionary *q = [NSMutableDictionary dictionary];
     [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
     [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
@@ -17409,9 +18797,20 @@ static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString 
         JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
         com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
     }
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account, JAVA_OBJECT value) {
+// Not implemented on the native macOS port: the body below is UIKit -- a
+// picker, an action sheet, a movie player, a pasteboard or a UIApplication
+// service -- and AppKit's equivalent is a different API rather than a
+// renamed one. The symbol still has to exist: ParparVM keeps a native method
+// alive BY its symbol appearing in the native sources, so removing it would
+// make the dead-code pass drop the Java side and ship green with the feature
+// silently gone. Returning an unsupported value instead lets the caller take
+// its unsupported path.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
@@ -17461,6 +18860,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_ja
         }
     });
     POOL_END();
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
@@ -17732,7 +19132,10 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_la
 // CLANG_ENABLE_OBJC_ARC=NO -- see "cn1 iOS port runs without ARC" memory.
 
 #ifdef CN1_INCLUDE_NFC
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <CoreNFC/CoreNFC.h>
+#endif
 #endif
 
 #ifdef CN1_INCLUDE_NFC

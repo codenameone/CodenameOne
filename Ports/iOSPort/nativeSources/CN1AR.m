@@ -89,7 +89,7 @@ static void cn1arRunOnMain(void (^block)(void)) {
 }
 
 - (void)addReferenceImage:(NSData *)encoded name:(NSString *)name width:(float)widthMeters {
-    UIImage *img = [UIImage imageWithData:encoded];
+    CN1Image *img = [CN1Image imageWithData:encoded];
     if (img == nil || img.CGImage == nil) {
         return;
     }
@@ -145,7 +145,7 @@ static void cn1arRunOnMain(void (^block)(void)) {
     [self.sceneView.session runWithConfiguration:config options:options];
 }
 
-- (UIView *)createView {
+- (CN1View *)createView {
     return self.sceneView;
 }
 
@@ -314,7 +314,7 @@ static void cn1arRunOnMain(void (^block)(void)) {
     SCNMaterial *material = [SCNMaterial material];
     material.lightingModelName = SCNLightingModelBlinn;
     if (encodedTexture != nil && encodedTexture.length > 0) {
-        UIImage *tex = [UIImage imageWithData:encodedTexture];
+        CN1Image *tex = [CN1Image imageWithData:encodedTexture];
         if (tex != nil) {
             material.diffuse.contents = tex;
         }
@@ -653,7 +653,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_cn1ArStart___long_int_int_boolean_
 JAVA_LONG com_codename1_impl_ios_IOSNative_cn1ArCreateView___long_R_long(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG sessionPeer) {
 #if defined(INCLUDE_CN1_AR) && !TARGET_OS_TV && !TARGET_OS_WATCH
-    UIView *v = [CN1AR_PEER(sessionPeer) createView];
+    CN1View *v = [CN1AR_PEER(sessionPeer) createView];
 #ifndef CN1_USE_ARC
     return (JAVA_LONG)[v retain];
 #else

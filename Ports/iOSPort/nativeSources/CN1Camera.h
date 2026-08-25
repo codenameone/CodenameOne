@@ -25,7 +25,7 @@
 #import <Foundation/Foundation.h>
 
 #ifdef INCLUDE_CN1_CAMERA
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #import <AVFoundation/AVFoundation.h>
 
 /// AVFoundation-backed camera session owned by `IOSCameraImpl` on the Java
@@ -49,7 +49,7 @@
 @property (nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property (nonatomic, strong) AVCaptureMovieFileOutput *movieOutput;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
-@property (nonatomic, strong) UIView *previewView;
+@property (nonatomic, strong) CN1View *previewView;
 @property (nonatomic, strong) dispatch_queue_t videoQueue;
 @property (nonatomic, assign) BOOL frameDeliveryEnabled;
 @property (nonatomic, assign) int frameMaxFps;
@@ -62,7 +62,7 @@
                 previewW:(int)previewW
                 previewH:(int)previewH
             captureAudio:(BOOL)captureAudio;
-- (UIView *)createPreviewView;
+- (CN1View *)createPreviewView;
 - (void)takePhotoWithWidth:(int)width height:(int)height
                    quality:(int)quality filePath:(NSString *)filePath
                 callbackId:(int)callbackId;

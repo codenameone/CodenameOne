@@ -22,7 +22,7 @@
  */
 #import "NetworkConnectionImpl.h"
 #import "com_codename1_io_NetworkManager.h"
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 #include "xmlvm.h"
 #include "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
@@ -53,7 +53,9 @@ int connections = 0;
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
     dispatch_async(dispatch_get_main_queue(), ^{
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
+// The status-bar network spinner. There is no status bar on macOS, and the API
+// is UIKit-only (and deprecated even on iOS).
+#if !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
 #endif
     });
@@ -398,7 +400,7 @@ extern void connectionError(void* peer, NSString* message);
     connectionError((BRIDGE_CAST void*)self, [error localizedDescription]);
     connections--;
     if(connections < 1) {
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
 #endif
     }
@@ -412,7 +414,7 @@ extern void connectionError(void* peer, NSString* message);
     connectionComplete((BRIDGE_CAST void*)self);
     connections--;
     if(connections < 1) {
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
 #endif
     }

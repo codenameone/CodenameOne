@@ -827,13 +827,20 @@ public class ByteCodeTranslator {
         optionalFrameworks.add("UserNotifications.framework");
         includeFrameworks.add("libiconv.dylib");
         //includeFrameworks.add("AdSupport.framework");
-        includeFrameworks.add("AddressBookUI.framework");
+        // AddressBookUI and AddressBook are iOS-only. On macOS the contacts API
+        // is Contacts.framework, and linking the iOS ones fails outright rather
+        // than merely going unused.
+        if (platform.hasIosDeviceIdioms()) {
+            includeFrameworks.add("AddressBookUI.framework");
+            includeFrameworks.add("AddressBook.framework");
+        } else {
+            includeFrameworks.add("Contacts.framework");
+        }
         includeFrameworks.add("SystemConfiguration.framework");
         includeFrameworks.add("MapKit.framework");
         includeFrameworks.add("AudioToolbox.framework");
         includeFrameworks.add("libxml2.dylib");
         includeFrameworks.add("QuartzCore.framework");
-        includeFrameworks.add("AddressBook.framework");
         if (!isBundledSqliteCipherEnabled()) {
             // The system libsqlite3 has no cipher support, so an application that encrypts
             // databases links the bundled engine instead. Linking both would put two SQLite
@@ -845,10 +852,20 @@ public class ByteCodeTranslator {
         includeFrameworks.add("GameKit.framework");
         includeFrameworks.add("Security.framework");
         //includeFrameworks.add("StoreKit.framework");
-        includeFrameworks.add("CoreMotion.framework");
+        // CoreMotion has no macOS implementation -- a Mac has no accelerometer to
+        // report -- MessageUI and MediaPlayer are UIKit composers, and
+        // MobileCoreServices is the iOS spelling of what macOS calls
+        // UniformTypeIdentifiers. Each of these is a link failure rather than
+        // dead weight if it stays.
+        if (platform.hasIosDeviceIdioms()) {
+            includeFrameworks.add("CoreMotion.framework");
+            includeFrameworks.add("MessageUI.framework");
+            includeFrameworks.add("MediaPlayer.framework");
+            includeFrameworks.add("MobileCoreServices.framework");
+        } else {
+            includeFrameworks.add("UniformTypeIdentifiers.framework");
+        }
         includeFrameworks.add("CoreLocation.framework");
-        includeFrameworks.add("MessageUI.framework");
-        includeFrameworks.add("MediaPlayer.framework");
         includeFrameworks.add("AVFoundation.framework");
         includeFrameworks.add("CoreText.framework");
         includeFrameworks.add("CoreVideo.framework");
@@ -856,7 +873,6 @@ public class ByteCodeTranslator {
         //includeFrameworks.add("iAd.framework");
         includeFrameworks.add("CoreMedia.framework");
         includeFrameworks.add("libz.dylib");
-        includeFrameworks.add("MobileCoreServices.framework");
         includeFrameworks.add("AVKit.framework");
         if(!addFrameworks.equalsIgnoreCase("none")) {
             includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));

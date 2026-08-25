@@ -1207,9 +1207,30 @@ public class ByteCodeClass {
                     // nursery while a minor collection runs). Lightweight threads are the
                     // ones the GC pauses; mark the main thread lightweight too.
                     b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
-                    b.append("    ");
-                    b.append(clsName);
-                    b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                    // On the native macOS target the application's main method
+                    // runs on a background thread and AppKit owns the main one.
+                    // That is not a preference: the main thread has to be free to
+                    // run the event loop, and Codename One's own code marshals to
+                    // it synchronously to touch the UI -- so calling the app's
+                    // main directly here deadlocks the first time it does, in
+                    // dispatch_sync waiting for a queue that is waiting for it.
+                    // The generated main becoming the AppKit main is what puts
+                    // each on the right thread.
+                    if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_MACOS) {
+                        b.append("    [NSApplication sharedApplication];\n");
+                        b.append("    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];\n");
+                        b.append("    CN1MacInstallMainMenu();\n");
+                        b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
+                        b.append("        ");
+                        b.append(clsName);
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");
+                        b.append("    });\n");
+                        b.append("    [NSApp run];\n}\n\n");
+                    } else {
+                        b.append("    ");
+                        b.append(clsName);
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                    }
                 }
             }
         }

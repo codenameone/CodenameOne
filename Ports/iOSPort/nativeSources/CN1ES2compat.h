@@ -30,6 +30,16 @@
 #if !TARGET_OS_WATCH
 //#define CN1_USE_METAL
 #endif
+// The native macOS port is Metal-only: OpenGL ES does not exist on macOS at all,
+// so there is no second backend for the builder's uncomment to choose between.
+// Defining it here rather than leaving it to the builder means the OpenGL ES
+// branches below and in every ExecutableOp are compiled out on this platform,
+// which is what lets the shared drawing sources build against the macOS SDK.
+#if TARGET_OS_OSX
+#ifndef CN1_USE_METAL
+#define CN1_USE_METAL
+#endif
+#endif
 // IPhoneBuilder.java replaces the line below with one of:
 //   #define CN1_METAL_COLORSPACE_SRGB
 //   #define CN1_METAL_COLORSPACE_DISPLAY_P3
@@ -53,7 +63,15 @@ enum CN1GLenum {
 // IPhoneBuilder when macNative.enabled=true). On iOS the real SDK headers
 // are picked up.
 #import <GLKit/GLKit.h>
+// GLKit exists on macOS (deprecated, but present) and its matrix and vector
+// types are used by the Metal path too -- CN1MetalSetTransform takes a
+// GLKMatrix4. OpenGL ES does not exist on macOS, and with CN1_USE_METAL forced
+// on above every use of it is already compiled out, so the import is simply
+// skipped rather than satisfied by a stub. Mac Catalyst reaches the same place
+// by a different route: the builder fabricates empty stub headers for it.
+#if !TARGET_OS_OSX
 #import <OpenGLES/ES2/gl.h>
+#endif
 #import "ExecutableOp.h"
 
 
@@ -97,7 +115,9 @@ extern void glLoadIdentityES2();
 #define _glDisableCN1State(state) glDisableCN1StateES2(state)
 #define _glAlphaMaskTexCoordPointer(size,type,stride,pointer) glAlphaMaskTexCoordPointerES2(size,type,stride,pointer)
 #else
+#if !TARGET_OS_OSX
 #import <OpenGLES/ES1/gl.h>
+#endif
 extern void glEnableCN1StateES1(enum CN1GLenum);
 extern void glDisableCN1StateES1(enum CN1GLenum);
 extern void glAlphaMaskTexCoordPointerES1( GLint , GLenum , GLsizei , const GLvoid *);

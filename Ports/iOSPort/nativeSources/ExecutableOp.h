@@ -39,13 +39,29 @@ extern int nextPowerOf2(int val);
 ((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, (((rgbValue >> 24) & 0xff) /255.0)); GLErrorLog;
 
 
+// NSColor is the AppKit spelling; the component initializer is otherwise the
+// same call with the same arguments. Kept as one macro per platform rather than
+// aliasing the class, because the two disagree about colour spaces in general
+// even where they agree here -- calibrated versus device RGB -- and hiding that
+// behind a typedef would make the next colour question harder rather than
+// easier to answer.
+#if TARGET_OS_OSX
+#define UIColorFromRGB(rgbValue,alphaColor) [NSColor colorWithSRGBRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
+green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:alphaColor/255.0]
+#else
 #define UIColorFromRGB(rgbValue,alphaColor) [UIColor colorWithRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
 green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:alphaColor/255.0]
+#endif
 
 #define CGColorFromRGB(context,rgbValue,alphaColor) CGContextSetRGBStrokeColor(context, ((float)((rgbValue >> 16) & 0xFF))/255.0, ((float)((rgbValue >> 8) & 0xff))/255.0, ((float)(rgbValue & 0xff))/255.0, alphaColor/255.0);
 
+#if TARGET_OS_OSX
+#define UIColorFromARGB(rgbValue) [NSColor colorWithSRGBRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
+green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue >> 24) & 0xff) /255.0)]
+#else
 #define UIColorFromARGB(rgbValue) [UIColor colorWithRed:((float)((rgbValue >> 16) & 0xFF))/255.0 \
 green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/255.0 alpha:(((rgbValue >> 24) & 0xff) /255.0)]
+#endif
 
 #ifdef USE_ES2
 #define GLKVector4FromRGB(rgbValue,alphaColor) GLKVector4Make(((float)((rgbValue >> 16) & 0xff))/255.0, \

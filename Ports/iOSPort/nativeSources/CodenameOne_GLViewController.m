@@ -23,10 +23,16 @@
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 #import "CodenameOne_GLViewController.h"
+#if TARGET_OS_OSX
+#import "CN1MacHost.h"
+#endif
 #if TARGET_OS_MACCATALYST
 #import "CN1MacWindows.h"
 #endif
+// The OpenGL ES backend. Absent on macOS, where this port is Metal-only.
+#if !TARGET_OS_OSX
 #import "EAGLView.h"
+#endif
 #ifdef CN1_USE_METAL
 #import "METALView.h"
 #import "CN1Metalcompat.h"
@@ -51,8 +57,14 @@
 #import "Rotate.h"
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
+// Not compiled on the native macOS port.
+#if !TARGET_OS_OSX
 #import "CN1UITextView.h"
+#endif
+// Not compiled on the native macOS port.
+#if !TARGET_OS_OSX
 #import "CN1UITextField.h"
+#endif
 #if !TARGET_OS_WATCH
 #import <AudioToolbox/AudioToolbox.h>
 #else
@@ -63,7 +75,10 @@
 #import "DrawStringTextureCache.h"
 #import <CoreLocation/CoreLocation.h>
 #include "com_codename1_impl_ios_IOSImplementation.h"
+// Not available on macOS.
+#if !TARGET_OS_OSX
 #import <MobileCoreServices/UTCoreTypes.h>
+#endif
 #include "com_codename1_payment_Product.h"
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
@@ -121,17 +136,21 @@ void cn1RunSyncOnMainQueue(void (^block)(void)) {
 // drawFrame presents the first frame that actually executed draw ops.
 // Opt out with the ios.launchPlaceholder=false build hint.
 #if !TARGET_OS_WATCH
-static UIView *cn1LaunchPlaceholderView = nil;
+static CN1View *cn1LaunchPlaceholderView = nil;
 static BOOL cn1LaunchPlaceholderDone = NO;
 
 void CN1DismissLaunchPlaceholder(void) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     cn1LaunchPlaceholderDone = YES;
     if (cn1LaunchPlaceholderView == nil) {
         return;
     }
-    UIView *placeholder = cn1LaunchPlaceholderView;
+    CN1View *placeholder = cn1LaunchPlaceholderView;
     cn1LaunchPlaceholderView = nil;
-    [UIView animateWithDuration:0.15 animations:^{
+    [CN1View animateWithDuration:0.15 animations:^{
         placeholder.alpha = 0;
     } completion:^(BOOL finished) {
         [placeholder removeFromSuperview];
@@ -139,6 +158,7 @@ void CN1DismissLaunchPlaceholder(void) {
         [placeholder release];
 #endif
     }];
+#endif
 }
 #else
 void CN1DismissLaunchPlaceholder(void) {
@@ -146,7 +166,15 @@ void CN1DismissLaunchPlaceholder(void) {
 #endif
 
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 void CN1ShowLaunchPlaceholder(UIWindow *window) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #if defined(CN1_DISABLE_LAUNCH_PLACEHOLDER) || defined(CN1_USE_SPLASH_SCREEN) || TARGET_OS_MACCATALYST
     // A Mac window appears instantly, and CN1_USE_SPLASH_SCREEN draws its own
     // splash directly into the GL surface; in both cases the placeholder
@@ -155,7 +183,7 @@ void CN1ShowLaunchPlaceholder(UIWindow *window) {
     if (cn1LaunchPlaceholderDone || cn1LaunchPlaceholderView != nil || window == nil) {
         return;
     }
-    UIView *placeholder = [[UIView alloc] initWithFrame:window.bounds];
+    CN1View *placeholder = [[CN1View alloc] initWithFrame:window.bounds];
     placeholder.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     placeholder.userInteractionEnabled = NO;
     if (@available(iOS 13.0, *)) {
@@ -171,13 +199,13 @@ void CN1ShowLaunchPlaceholder(UIWindow *window) {
     // (centered at natural size, matching its contentMode=center image view)
     // so the handoff from the system launch screen is seamless. Fall back to
     // the primary app icon when it isn't bundled, e.g. a custom storyboard.
-    UIImage *icon = [UIImage imageNamed:@"Launch.Foreground.png"];
+    CN1Image *icon = [CN1Image imageNamed:@"Launch.Foreground.png"];
     BOOL isRawIcon = NO;
     if (icon == nil) {
         NSDictionary *icons = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
         NSArray *iconFiles = [[icons objectForKey:@"CFBundlePrimaryIcon"] objectForKey:@"CFBundleIconFiles"];
         if ([iconFiles isKindOfClass:[NSArray class]] && [iconFiles count] > 0) {
-            icon = [UIImage imageNamed:(NSString*)[iconFiles lastObject]];
+            icon = [CN1Image imageNamed:(NSString*)[iconFiles lastObject]];
         }
         isRawIcon = YES;
     }
@@ -213,7 +241,9 @@ void CN1ShowLaunchPlaceholder(UIWindow *window) {
         CN1DismissLaunchPlaceholder();
     });
 #endif
+#endif
 }
+#endif
 #endif
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
@@ -284,7 +314,7 @@ JAVA_INT getSafeTop() {
 }
 
 #if !TARGET_OS_WATCH
-UIView *editingComponent;
+CN1View *editingComponent;
 
 #if TARGET_OS_MACCATALYST
 /*
@@ -296,7 +326,7 @@ UIView *editingComponent;
  * controller's view and stayed there, visible and typeable in the wrong window,
  * because adoption never revisited it. Called from CN1MacWindowSceneConnected.
  */
-void CN1MacWindowReattachEditor(UIView* host) {
+void CN1MacWindowReattachEditor(CN1View* host) {
     if (host == nil || editingComponent == nil) {
         return;
     }
@@ -314,7 +344,7 @@ void CN1MacWindowReattachEditor(UIView* host) {
 // other things.  A persistent reference to the action sheet
 // so that it can be resized and manipulated as necessary
 // on things like orientation changes.
-UIView *currentActionSheet;
+CN1View *currentActionSheet;
 #endif
 
 float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
@@ -325,7 +355,7 @@ float scaleValue = 1;
 extern BOOL isAppSuspended;
 
 #if !TARGET_OS_WATCH
-static void updateDisplayMetricsFromView(UIView *view) {
+static void updateDisplayMetricsFromView(CN1View *view) {
     if (view == nil) {
         return;
     }
@@ -342,7 +372,7 @@ static void updateDisplayMetricsFromView(UIView *view) {
 // during the foreground transition publishes a swapped-dimension
 // screenSizeChanged event between stop and start (issue #4767).
 #if !TARGET_OS_WATCH
-static CGSize cn1OrientationCorrectSize(UIView *view) {
+static CGSize cn1OrientationCorrectSize(CN1View *view) {
     CGSize size = view.bounds.size;
 #if TARGET_OS_MACCATALYST || TARGET_OS_TV
     // Mac Catalyst windows are user-resizable and don't have a true device
@@ -402,10 +432,23 @@ BOOL forceSlideUpField;
 // "must be scrollable" check passes regardless of how the strip resizes
 // on rotation / safe-area changes.
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 @interface CN1StatusBarTapProxyView : UIScrollView
 @end
+#endif
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 @implementation CN1StatusBarTapProxyView
 - (void)layoutSubviews {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [super layoutSubviews];
     CGSize sz = self.bounds.size;
     if (sz.width < 1) sz.width = 1;
@@ -414,11 +457,15 @@ BOOL forceSlideUpField;
     if (self.contentOffset.y <= 0) {
         self.contentOffset = CGPointMake(0, 1);
     }
+#endif
 }
 @end
 #endif
+#endif
 
-#if !TARGET_OS_WATCH
+// The status-bar tap proxy is a UIScrollView subclass, and macOS has no status
+// bar for it to sit under -- the same reason watchOS falls back to id here.
+#if !TARGET_OS_WATCH && !TARGET_OS_OSX
 static CN1StatusBarTapProxyView *cn1StatusBarTapProxy = nil;
 #else
 static id cn1StatusBarTapProxy = nil;
@@ -439,10 +486,16 @@ double cn1GetStatusBarTapLastEpochMillis() { return cn1StatusBarTapLastEpochMill
 int cn1GetStatusBarTapLastX() { return cn1StatusBarTapLastX; }
 int cn1GetStatusBarTapLastY() { return cn1StatusBarTapLastY; }
 BOOL cn1IsStatusBarTapProxyInstalled() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
 #if TARGET_OS_WATCH
     return NO;
 #else
     return cn1StatusBarTapProxy != nil && cn1StatusBarTapProxy.superview != nil;
+#endif
 #endif
 }
 
@@ -458,6 +511,10 @@ extern void pointerReleasedC(int* x, int* y, int length);
 // instrumented native interface can drive the path from a screenshot test
 // without waiting for a real status-bar tap.
 void cn1FireStatusBarTap() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     int xArray[1];
     int yArray[1];
     xArray[0] = displayWidth / 2;
@@ -507,6 +564,7 @@ void cn1FireStatusBarTap() {
         }
     });
 #endif
+#endif
 }
 
 
@@ -527,8 +585,13 @@ void initVMImpl() {
 }
 
 void deinitVMImpl() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #ifndef CN1_USE_ARC
     [globalCodenameOnePool release];
+#endif
 #endif
 }
 
@@ -536,7 +599,12 @@ extern void pointerPressed(int* x, int* y, int length);
 extern void pointerDragged(int* x, int* y, int length);
 extern void pointerReleased(int* x, int* y, int length);
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 extern void cn1CapturePointerMetadata(UITouch* touch);
+#endif
 #endif
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
 extern void pinchMagnifyCallback(float scale, int x, int y);
@@ -586,6 +654,11 @@ extern void pointerHoverReleasedNative(int x, int y);
 // delivers these via UIPress.type rather than UIPress.key. Menu maps to the back/escape key,
 // Select to enter, the directional buttons to the arrow keys and play/pause to the media key.
 static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     switch (type) {
         case UIPressTypeUpArrow:
             return CN1_IOS_KEY_UP;
@@ -604,6 +677,7 @@ static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
         default:
             return 0;
     }
+#endif
 }
 #endif
 
@@ -613,7 +687,16 @@ static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
 #if !TARGET_OS_WATCH
 /* Not static: the Mac Catalyst window controller needs the same mapping, and
  * duplicating a hundred-case switch would let the two drift apart. */
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     switch (key.keyCode) {
         case UIKeyboardHIDUsageKeyboardReturnOrEnter:
         case UIKeyboardHIDUsageKeypadEnter:
@@ -670,7 +753,9 @@ int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
             return (int)c;
         }
     }
+#endif
 }
+#endif
 #endif
 
 void pointerPressedC(int* x, int* y, int length) {
@@ -703,13 +788,13 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
         widthAndHeightReturnValue[1] = 0;
     }
     NSData* nd = data != NULL && dataLength > 0 ? [NSData dataWithBytes:data length:dataLength] : nil;
-    __block UIImage* img = nil;
+    __block CN1Image* img = nil;
 #if TARGET_OS_WATCH
     // watchOS image decoding is main-thread-affine in this host. The CN1SS
     // websocket callback can arrive off-main, so decode synchronously on the
     // main queue instead of returning a zero-size GLUIImage.
     void (^decodeImageData)(void) = ^{
-        img = nd != nil ? [UIImage imageWithData:nd] : nil;
+        img = nd != nil ? [CN1Image imageWithData:nd] : nil;
 #ifndef CN1_USE_ARC
         [img retain];
 #endif
@@ -720,7 +805,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
         dispatch_sync(dispatch_get_main_queue(), decodeImageData);
     }
 #else
-    img = nd != nil ? [UIImage imageWithData:nd] : nil;
+    img = nd != nil ? [CN1Image imageWithData:nd] : nil;
 #endif
     if (img == nil) {
 #if TARGET_OS_WATCH
@@ -771,10 +856,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_setImageName(void* nativeImag
 }
 
 int isIPad() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #if TARGET_OS_WATCH
     return 0;
 #else
     return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
+#endif
 #endif
 }
 
@@ -788,26 +879,49 @@ int cn1IsIOS8 = -1;
 int cn1IsIOS8_2 = -1;
 int cn1IsIOS10 = -1;
 BOOL isIOS10() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (cn1IsIOS10 < 0) {
         cn1IsIOS10 = !SYSTEM_VERSION_LESS_THAN(@"10.0") ? 1:0;
     }
     return cn1IsIOS10 > 0;
+#endif
 }
 
 BOOL isIOS8() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (cn1IsIOS8 < 0) {
         cn1IsIOS8 = !SYSTEM_VERSION_LESS_THAN(@"8.0") ? 1:0;
     }
     return cn1IsIOS8 > 0;
+#endif
 }
 BOOL isIOS8_2() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (cn1IsIOS8_2 < 0) {
         cn1IsIOS8_2 = !SYSTEM_VERSION_LESS_THAN(@"8.2") ? 1:0;
     }
     return cn1IsIOS8_2 > 0;
+#endif
 }
 
 BOOL isVKBAlwaysOpen() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if(vkbAlwaysOpen) {
         if(isIOS8() && !isIPad() && displayWidth > displayHeight) {
             return NO;
@@ -821,11 +935,20 @@ BOOL isVKBAlwaysOpen() {
         return YES;
     }
     return NO;
+#endif
 }
 
 
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     enteringNativeAllocations();
     JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(threadStateData);
     JAVA_OBJECT pkey = fromNSString(threadStateData, @"ios.doneButtonColor");
@@ -836,7 +959,9 @@ void cn1_setStyleDoneButton(CN1_THREAD_STATE_MULTI_ARG UIBarButtonItem* btn) {
         btn.tintColor = UIColorFromRGB([nstr intValue], 255);
     }
     finishedNativeAllocations();
+#endif
 }
+#endif
 #endif
 
 
@@ -844,6 +969,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
  int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, int hintColor, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment, BOOL returnExitsEditing) {
+    // Native text editing is not wired up on the native macOS port yet: this
+    // body builds a UITextField or UITextView and drives it through the UIKit
+    // keyboard, and AppKit's equivalent is NSTextInputClient on the rendering
+    // view rather than a renamed control. Doing nothing here leaves the
+    // framework's own editing path in charge, and the pure
+    // com.codename1.ui.editor engine needs no native editor at all.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_WATCH
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
@@ -987,10 +1120,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 }
             }
             if(scale != 1) {
-                float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
-                utf.font = [((BRIDGE_CAST UIFont*)font) fontWithSize:s];
+                float s = ((BRIDGE_CAST CN1Font*)font).pointSize / scale;
+                utf.font = [((BRIDGE_CAST CN1Font*)font) fontWithSize:s];
             } else {
-                utf.font = (BRIDGE_CAST UIFont*)font;
+                utf.font = (BRIDGE_CAST CN1Font*)font;
             }
             utf.text = [NSString stringWithUTF8String:str];
             utf.delegate = [[CodenameOne_GLViewController instance] eaglView];
@@ -1121,10 +1254,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utv.tintColor = UIColorFromRGB(color, 255);
             editingComponent = utv;
             if(scale != 1) {
-                float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
-                utv.font = [((BRIDGE_CAST UIFont*)font) fontWithSize:s];
+                float s = ((BRIDGE_CAST CN1Font*)font).pointSize / scale;
+                utv.font = [((BRIDGE_CAST CN1Font*)font) fontWithSize:s];
             } else {
-                utv.font = (BRIDGE_CAST UIFont*)font;
+                utv.font = (BRIDGE_CAST CN1Font*)font;
             }
             utv.text = [NSString stringWithUTF8String:str];
             utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
@@ -1267,14 +1400,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 #endif
         }
         editingComponent.opaque = NO;
-        UIView* editHost = [CodenameOne_GLViewController instance].view;
+        CN1View* editHost = [CodenameOne_GLViewController instance].view;
 #if TARGET_OS_MACCATALYST
         {
             /* A field inside a Codename One window belongs in that window's view.
              * Added to the main controller's view unconditionally, the editor stayed
              * on the main surface while the user typed into a secondary window. iOS
              * keeps the original path exactly. */
-            UIView* windowHost = CN1MacWindowEditingHostView();
+            CN1View* windowHost = CN1MacWindowEditingHostView();
             if (windowHost != nil) {
                 editHost = windowHost;
             }
@@ -1293,18 +1426,30 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
     });
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl finished");
+#endif
 }
 
 
 BOOL isRetinaBug() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
 #if TARGET_OS_WATCH
     return NO;
 #else
     return isIPad() && [[UIScreen mainScreen] scale] == 2 && SYSTEM_VERSION_LESS_THAN(@"6.0");
 #endif
+#endif
 }
 
 BOOL isRetina() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
 #if TARGET_OS_WATCH
     return YES;
 #else
@@ -1313,10 +1458,17 @@ BOOL isRetina() {
     }
     return NO;
 #endif
+#endif
 }
 
 BOOL isIOS7() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     return !SYSTEM_VERSION_LESS_THAN(@"7.0");
+#endif
 }
 
 
@@ -1378,14 +1530,14 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
         return NULL;
     }
     
-    UIImage *image = nil;
+    CN1Image *image = nil;
     if(context) {
         
         CGContextDrawImage(context, CGRectMake(0.0f, 0.0f, width, height), iref);
         
         CGImageRef imageRef = CGBitmapContextCreateImage(context);
         
-        image = [UIImage imageWithCGImage:imageRef];
+        image = [CN1Image imageWithCGImage:imageRef];
         
         CGImageRelease(imageRef);
         CGContextRelease(context);
@@ -1404,6 +1556,11 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 
 void* Java_com_codename1_impl_ios_createImageFromAlphaMask(JAVA_BYTE* buffer, int width, int height, int color)
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     size_t obufferLength = width * height * 4;
     size_t obitsPerComponent = 8;
     size_t obitsPerPixel = 32;
@@ -1420,12 +1577,13 @@ void* Java_com_codename1_impl_ios_createImageFromAlphaMask(JAVA_BYTE* buffer, in
     void* out = Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl(opixels, width, height);
     free(opixels);
     return out;
+#endif
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_scaleImpl
 (void* peer, int width, int height) {
     // NOT used
-    //UIImage* img = (UIImage*)peer;
+    //CN1Image* img = (CN1Image*)peer;
     return 0;
 }
 
@@ -1514,7 +1672,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image* img = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
 
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
@@ -1554,7 +1712,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image* img = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
 
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
@@ -1956,7 +2114,12 @@ static CGContextRef cn1CreateARGBBitmapContext(CGSize size) {
     return context;
 }
 
-static UInt8* cn1CreateBitmap(UIImage* image) {
+static UInt8* cn1CreateBitmap(CN1Image* image) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     CGContextRef context = cn1CreateARGBBitmapContext(image.size);
     if (context == NULL) return NULL;
     CGRect rect = CGRectMake(0.0f, 0.0f, image.size.width, image.size.height);
@@ -1965,6 +2128,7 @@ static UInt8* cn1CreateBitmap(UIImage* image) {
     UInt8* data = CGBitmapContextGetData(context);
     CGContextRelease(context);
     return data;
+#endif
 }
 
 static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
@@ -1976,7 +2140,12 @@ static void cn1MaskifyBitmap(UInt8* bits, int width, int height) {
     }
 }
 
-static UIImage* cn1ImageWithBits(UInt8* bits, int width, int height) {
+static CN1Image* cn1ImageWithBits(UInt8* bits, int width, int height) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     if (colorSpace == NULL) {
         CN1Log(@"Error allocating color space");
@@ -1992,16 +2161,21 @@ static UIImage* cn1ImageWithBits(UInt8* bits, int width, int height) {
     CGImageRef imageRef = CGBitmapContextCreateImage(context);
     free(CGBitmapContextGetData(context));
     CGContextRelease(context);
-    UIImage* newImage = [UIImage imageWithCGImage:imageRef];
+    CN1Image* newImage = [CN1Image imageWithCGImage:imageRef];
     CFRelease(imageRef);
     return newImage;
     
     
+#endif
 }
 void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_STATE_MULTI_ARG JAVA_LONG image, 
     JAVA_INT x, JAVA_INT y, JAVA_INT offsetX, JAVA_INT offsetY, JAVA_INT blurRadius, JAVA_INT spreadRadius, JAVA_INT color, JAVA_FLOAT opacity) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     
-    UIImage* i = [(BRIDGE_CAST GLUIImage*)image getImage];
+    CN1Image* i = [(BRIDGE_CAST GLUIImage*)image getImage];
     
     UInt8 *inbits = cn1CreateBitmap(i);
     if (inbits == NULL) {
@@ -2010,7 +2184,7 @@ void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_ST
     }
     cn1MaskifyBitmap(inbits, floor(i.size.width), floor(i.size.height));
     
-    UIImage* mask = cn1ImageWithBits(inbits, floor(i.size.width), floor(i.size.height));
+    CN1Image* mask = cn1ImageWithBits(inbits, floor(i.size.width), floor(i.size.height));
     //free(inbits);
     if (mask == NULL) {
         CN1Log(@"Error: Failed to generate image for shadow from bitmap");
@@ -2035,6 +2209,7 @@ void Java_com_codename1_impl_ios_IOSNative_nativeDrawShadowMutable(CN1_THREAD_ST
     
     
 
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
@@ -2054,7 +2229,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
     }
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
-    UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    CN1Image* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
         CGContextSaveGState(context);
@@ -2077,14 +2252,16 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
     if(len == 0 || str == NULL) {
         return 0;
     }
-    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
 	NSString* s = [NSString stringWithUTF8String:str];
     //CN1Log(@"String is %@", s);
     //CN1Log(@"Font is %i", (int)f);
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl finished");
-#if TARGET_OS_WATCH || TARGET_OS_TV
+// macOS never had -[NSString sizeWithFont:] either; the attributed-string
+// measurement below is the same answer for a plain font.
+#if TARGET_OS_WATCH || TARGET_OS_TV || TARGET_OS_OSX
     if (s == nil) { return 0; }
-    if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
+    if (f == nil) { f = [CN1Font systemFontOfSize:16.0]; }
     return (int)[s sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
     return (int)[s sizeWithFont:f].width;
@@ -2094,9 +2271,11 @@ int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
 
 int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 (void* peer, int chr) {
-    UIFont* f = (BRIDGE_CAST UIFont*)peer;
-#if TARGET_OS_WATCH || TARGET_OS_TV
-    if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
+    CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
+// macOS never had -[NSString sizeWithFont:] either; the attributed-string
+// measurement below is the same answer for a plain font.
+#if TARGET_OS_WATCH || TARGET_OS_TV || TARGET_OS_OSX
+    if (f == nil) { f = [CN1Font systemFontOfSize:16.0]; }
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithAttributes:@{NSFontAttributeName: f}].width;
 #else
     return [[NSString stringWithCharacters:((const unichar *)&chr) length:1] sizeWithFont:f].width;
@@ -2106,19 +2285,19 @@ int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 
 int Java_com_codename1_impl_ios_IOSImplementation_getFontHeightNativeImpl
 (void* peer) {
-    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
     return (int)[f lineHeight];
 }
 
 int Java_com_codename1_impl_ios_IOSImplementation_getFontAscentNativeImpl
 (void* peer){
-    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
     return (int)roundf([f ascender]);
 }
 
 int Java_com_codename1_impl_ios_IOSImplementation_getFontDescentNativeImpl
 (void* peer){
-    UIFont* f = (BRIDGE_CAST UIFont*)peer;
+    CN1Font* f = (BRIDGE_CAST CN1Font*)peer;
     return (int)roundf([f descender]);
 }
 
@@ -2146,21 +2325,21 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
     
     pSize *= scaleValue;
     
-    UIFont* fnt;
+    CN1Font* fnt;
     
     // if this is a monospace font
     if((face & 32) == 32) {
-        fnt = [UIFont fontWithName:@"Courier" size:pSize];
+        fnt = [CN1Font fontWithName:@"Courier" size:pSize];
     } else {
         // bold
         if((style & 1) == 1) {
-            fnt = [UIFont boldSystemFontOfSize:pSize];
+            fnt = [CN1Font boldSystemFontOfSize:pSize];
         } else {
             // italic
             if((style & 2) == 2) {
-                fnt = [UIFont italicSystemFontOfSize:pSize];
+                fnt = [CN1Font italicSystemFontOfSize:pSize];
             } else {
-                fnt = [UIFont systemFontOfSize:pSize];
+                fnt = [CN1Font systemFontOfSize:pSize];
             }
         }
     }
@@ -2180,14 +2359,23 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 #if TARGET_OS_WATCH
-    // No UIView metrics on watchOS; the CG surface is the source of truth.
+    // No CN1View metrics on watchOS; the CG surface is the source of truth.
     // scaleValue is 1 on the watch slice, so logical points == CN1 pixels.
     CN1WatchRenderingView *v = [CN1WatchHost sharedHost].renderingView;
     if (v != nil && [v logicalWidth] > 0) {
         return [v logicalWidth];
     }
 #endif
+#if TARGET_OS_OSX
+    // The window is the source of truth on macOS, and this is where it gets
+    // built: the framework asks for the display size before it lays anything
+    // out, which makes it the earliest point that is both on a real thread and
+    // certain to happen. There is no fixed screen to fall back on the way a
+    // phone has one.
+    return [CN1MacHost sharedHost].displayWidth;
+#else
     return displayWidth;
+#endif
 }
 
 /*
@@ -2204,14 +2392,18 @@ Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
         return [v logicalHeight];
     }
 #endif
+#if TARGET_OS_OSX
+    return [CN1MacHost sharedHost].displayHeight;
+#else
     return displayHeight;
+#endif
 }
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 (void* peer, int x, int y, int width, int height) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl started");
-    [[CodenameOne_GLViewController instance] flushBuffer:(BRIDGE_CAST UIImage *)peer x:x y:y width:width height:height];
+    [[CodenameOne_GLViewController instance] flushBuffer:(BRIDGE_CAST CN1Image *)peer x:x y:y width:width height:height];
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");
 }
 
@@ -2333,6 +2525,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalIm
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGlobalImpl(JAVA_OBJECT points)
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* pArray = points;
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)pArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -2357,6 +2553,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
     [[CodenameOne_GLViewController instance] upcomingAddClip:f];
 #ifndef CN1_USE_ARC
     [f release];
+#endif
 #endif
 }
 
@@ -2477,6 +2674,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #ifdef CN1_USE_METAL
     {
         GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
@@ -2500,6 +2701,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
         CGContextRestoreGState(context);
     }
 
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
@@ -2567,7 +2769,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
     {
         GLUIImage *target = [CodenameOne_GLViewController instance].currentMutableImage;
         if (target == nil) return;
-        DrawString *f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST UIFont*)fontPeer];
+        DrawString *f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST CN1Font*)fontPeer];
         [f setTarget:target];
         [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
@@ -2584,8 +2786,8 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
     {
         CGContextRef context = UIGraphicsGetCurrentContext();
         if (context == NULL) { return; }
-        UIFont *f = (BRIDGE_CAST UIFont*)fontPeer;
-        if (f == nil) { f = [UIFont systemFontOfSize:16.0]; }
+        CN1Font *f = (BRIDGE_CAST CN1Font*)fontPeer;
+        if (f == nil) { f = [CN1Font systemFontOfSize:16.0]; }
         if (str == nil) { return; }
         CGContextSaveGState(context);
         if (currentMutableTransformSet) {
@@ -2603,7 +2805,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
     }
     return;
 #else
-    [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
+    [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST CN1Font*)fontPeer str:str x:x y:y];
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
 }
@@ -2611,7 +2813,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl started");
-    DrawString* f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST UIFont*)fontPeer];
+    DrawString* f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST CN1Font*)fontPeer];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
@@ -2626,7 +2828,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), opaque, 1.0);
     [UIColorFromARGB(argb) set];
     UIRectFill(CGRectMake(0, 0, width, height));
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image* img = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     //[img retain];
     //CN1Log(@"createNativeMutableImageImpl finished %i ", (int)img);
@@ -2660,7 +2862,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     }
 #endif
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
-    UIImage* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    CN1Image* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
         [original drawAtPoint:CGPointZero];
@@ -2674,6 +2876,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
 #ifdef CN1_USE_METAL
     {
         // Phase 3 v2: clear the current mutable target. Pending ops (queued
@@ -2687,7 +2894,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
         return (BRIDGE_CAST void*)gl;
     }
 #endif
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
+    CN1Image* img = UIGraphicsGetImageFromCurrentImageContext();
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
     GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
@@ -2695,6 +2902,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     [CodenameOne_GLViewController instance].currentMutableImage = nil;
     currentMutableTransformSet = NO;
     return (BRIDGE_CAST void*)gl;
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
@@ -2703,7 +2911,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     {
         // Phase 3 v2 readback. Was disabled in 9b2aaf11d on suspicion of a
         // DrawImage-test hang (GPU memory pressure → nextDrawable wedge),
-        // but the legacy CG-from-UIImage fallback returns the stale
+        // but the legacy CG-from-CN1Image fallback returns the stale
         // initial-fill pixels for any mutable that's been drawn into via
         // Metal — animation/transition tests added in master #4821 then
         // emit empty grids and downstream EDT scheduling stalls trying
@@ -2755,7 +2963,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     /*for(int iter = 0 ; iter < width * height ; iter++) {
         arr[iter] = 0xffffff;
     }*/
-    UIImage* img = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    CN1Image* img = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
                                                  coloSpaceRgb,
@@ -2827,7 +3035,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_deleteNativePeerImpl(void* pe
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_deleteNativeFontPeerImpl(void* peer) {
-    UIFont* original = (BRIDGE_CAST UIFont*)peer;
+    CN1Font* original = (BRIDGE_CAST CN1Font*)peer;
     //CN1Log(@"deleteNativeFontPeerImpl retainCount: %i", [original retainCount]);
 #ifndef CN1_USE_ARC
     [original release];
@@ -2844,6 +3052,11 @@ void loadResourceFile
 }
 
 int getResourceSize(const char* name, int nameLen, const char* type, int typeLen) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     NSString* nameNS = [NSString stringWithUTF8String:name];
     NSString* typeNS = type == NULL ? nil : [NSString stringWithUTF8String:type];
     //CN1Log(@"getResourceSize %@ %@ started", nameNS, typeNS);
@@ -2855,6 +3068,7 @@ int getResourceSize(const char* name, int nameLen, const char* type, int typeLen
     int size = [iData length];
     //CN1Log(@"getResourceSize %i finished", size);
     return size;
+#endif
 }
 
 
@@ -2880,6 +3094,10 @@ enum {
 };
 
 #if !TARGET_OS_WATCH
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 @interface CodenameOne_GLViewController ()
 @property (nonatomic, retain) EAGLContext *context;
 @property (nonatomic, assign) CADisplayLink *displayLink;
@@ -2888,13 +3106,24 @@ enum {
 - (BOOL)linkProgram:(GLuint)prog;
 - (BOOL)validateProgram:(GLuint)prog;
 @end
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 @implementation CodenameOne_GLViewController
 
 @synthesize context, displayLink, currentMutableImage, animating;
 static CodenameOne_GLViewController *sharedSingleton;
 +(BOOL)isDrawTextureSupported {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     return sharedSingleton->drawTextureSupported;
+#endif
 }
 
 +(BOOL)isCurrentMutableTransformSet {
@@ -2911,7 +3140,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 // entirely (TvNativeBuilder), so both pass nil to initWithNibName: and the
 // on it under Xcode 26), so CodenameOne_GLAppDelegate.m passes nil to
 // initWithNibName: and the default loadView would hand us a plain
-// UIView. The rendering pipeline expects [eaglView] to find a METALView
+// CN1View. The rendering pipeline expects [eaglView] to find a METALView
 // in self.view or its subviews; without one CN1MetalSetDeviceAndCommand-
 // Queue never runs and CN1MetalGlyphAtlas+atlasForFont: returns nil for
 // every font ("no atlas available" on every CN1MetalDrawString). Build
@@ -3016,6 +3245,10 @@ static CodenameOne_GLViewController *sharedSingleton;
 }
 #else
 - (void)viewDidLoad {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [super viewDidLoad];
     updateDisplayMetricsFromView(self.view);
     [self cn1InstallStatusBarTapProxy];
@@ -3025,10 +3258,15 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self cn1InstallRotationRecognizer];
     //replaceViewDidLoad
     [self initGoogleConnect];
+#endif
 }
 #endif
 
 - (void)cn1InstallStatusBarTapProxy {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     // Install the proxy as a sibling of self.view at the UIWindow level (not
     // as a descendant of self.view). iOS still walks the entire window
     // hierarchy when routing UIStatusBarTapAction → scrollViewShouldScrollToTop:,
@@ -3084,9 +3322,14 @@ static CodenameOne_GLViewController *sharedSingleton;
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
     [window addSubview:cn1StatusBarTapProxy];
     [self cn1UpdateStatusBarTapProxyFrame];
+#endif
 }
 
 - (void)cn1UpdateStatusBarTapProxyFrame {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (cn1StatusBarTapProxy == nil) return;
     UIWindow *window = cn1StatusBarTapProxy.window;
     if (window == nil) window = self.view.window;
@@ -3120,15 +3363,27 @@ static CodenameOne_GLViewController *sharedSingleton;
     cn1StatusBarTapProxy.frame = CGRectMake(0, 0, width, statusBarHeight);
     cn1StatusBarTapProxy.contentSize = CGSizeMake(width, statusBarHeight + 1);
     cn1StatusBarTapProxy.contentOffset = CGPointMake(0, 1);
+#endif
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     if (scrollView == cn1StatusBarTapProxy) {
         cn1FireStatusBarTap();
         return NO;
     }
     return YES;
+#endif
 }
+#endif
 
 - (void)initGoogleConnect {
 #ifdef INCLUDE_GOOGLE_CONNECT
@@ -3176,6 +3431,10 @@ extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2A
 
 bool lockDrawing;
 - (void)viewDidAppear:(BOOL)animated {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [super viewDidAppear:animated];
 #if defined(CN1_USE_METAL) && TARGET_OS_MACCATALYST
     // Reapply displayWidth / displayHeight once the view is attached to
@@ -3207,6 +3466,7 @@ bool lockDrawing;
     // sibling scroll views into the hierarchy.
     [self cn1InstallStatusBarTapProxy];
     //replaceViewDidAppear
+#endif
 }
 
 -(void)updateCanvas:(BOOL)animated {
@@ -3243,7 +3503,15 @@ bool lockDrawing;
     return YES;
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)remoteControlReceivedWithEvent:(UIEvent *)receivedEvent {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (receivedEvent.type == UIEventTypeRemoteControl) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
@@ -3277,13 +3545,23 @@ bool lockDrawing;
 
         }
     }
+#endif
 }
+#endif
 
 // Hardware keyboard support (BT keyboard on iPad/iPhone, Magic Keyboard,
 // Mac Catalyst host keyboard, hardware keyboard in the iOS simulator via
 // Cmd-Shift-K). UIKey arrived in iOS 13.4 -- on older versions the
 // responder chain falls back to the existing UITextField editing path.
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3316,9 +3594,19 @@ bool lockDrawing;
         }
     }
     [super pressesBegan:presses withEvent:event];
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.4, *)) {
         BOOL handled = NO;
         NSMutableSet *passthrough = nil;
@@ -3351,9 +3639,19 @@ bool lockDrawing;
         }
     }
     [super pressesEnded:presses withEvent:event];
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (@available(iOS 13.4, *)) {
         for (UIPress *press in presses) {
             UIKey *key = press.key;
@@ -3372,12 +3670,18 @@ bool lockDrawing;
         }
     }
     [super pressesCancelled:presses withEvent:event];
+#endif
 }
+#endif
 
 // Hover support for BT mouse / iPad trackpad / Apple Pencil hover. Wired up
 // once viewDidLoad has run; only attaches on iOS 13.0+ where
 // UIHoverGestureRecognizer exists.
 - (void)cn1InstallHoverRecognizer {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     if (@available(iOS 13.0, *)) {
         UIHoverGestureRecognizer *hover = [[UIHoverGestureRecognizer alloc]
@@ -3396,9 +3700,18 @@ bool lockDrawing;
 #endif
     }
 #endif
+#endif
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)cn1HandleHover:(UIGestureRecognizer *)recognizer API_AVAILABLE(ios(13.0)) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     CGPoint p = [recognizer locationInView:self.view];
     int x = (int)(p.x * scaleValue);
     int y = (int)(p.y * scaleValue);
@@ -3417,7 +3730,9 @@ bool lockDrawing;
         default:
             break;
     }
+#endif
 }
+#endif
 
 // Trackpad / Magic Mouse / mouse wheel scroll support. A pan recognizer with
 // maximumNumberOfTouches == 0 only fires for indirect-pointer scrolling (no
@@ -3427,6 +3742,10 @@ bool lockDrawing;
 // pipeline as the desktop and Android ports so WheelEvent is one universal
 // scroll-gesture API across every platform. Requires iOS 13.4+.
 - (void)cn1InstallScrollRecognizer {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #if !TARGET_OS_TV
     if (@available(iOS 13.4, *)) {
         UIPanGestureRecognizer *scroll = [[UIPanGestureRecognizer alloc]
@@ -3443,9 +3762,18 @@ bool lockDrawing;
 #endif
     }
 #endif
+#endif
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)cn1HandleScroll:(UIPanGestureRecognizer *)recognizer API_AVAILABLE(ios(13.4)) {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (recognizer.state == UIGestureRecognizerStateBegan
             || recognizer.state == UIGestureRecognizerStateChanged) {
         CGPoint loc = [recognizer locationInView:self.view];
@@ -3460,7 +3788,9 @@ bool lockDrawing;
             [recognizer setTranslation:CGPointZero inView:self.view];
         }
     }
+#endif
 }
+#endif
 
 // Magnify (pinch) and rotation gesture recognizers for the Mac Catalyst trackpad. These are scoped
 // to Mac Catalyst on purpose: on iOS a two finger pinch already drives the existing multi-touch
@@ -3533,77 +3863,83 @@ extern int CN1transformMatrixVersion;
 extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 
--(UIImage*)createSplashImage {
+-(CN1Image*)createSplashImage {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
 #if !TARGET_OS_TV
     UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
     bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
     
-    UIImage *img = nil;
+    CN1Image *img = nil;
     if(isIPad()) {
         if(scaleValue > 1) {
             if(!isPortrait) {
-                img = [UIImage imageNamed:@"Default-Landscape@2x.png"];
+                img = [CN1Image imageNamed:@"Default-Landscape@2x.png"];
             } else {
-                img = [UIImage imageNamed:@"Default-Portrait@2x.png"];
+                img = [CN1Image imageNamed:@"Default-Portrait@2x.png"];
             }
         } else {
             if(!isPortrait) {
                 NSString* str = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Default-Landscape.png"];
                 NSData* iData = [NSData dataWithContentsOfFile:str];
-                img = [[UIImage alloc] initWithData:iData];
+                img = [[CN1Image alloc] initWithData:iData];
             } else {
                 NSString* str = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"Default-Portrait.png"];
                 NSData* iData = [NSData dataWithContentsOfFile:str];
-                img = [[UIImage alloc] initWithData:iData];
+                img = [[CN1Image alloc] initWithData:iData];
             }
         }
     } else {
         /*if([UIScreen mainScreen].scale > 1) {
          if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
-         img = [UIImage imageNamed:@"Default@2x.png"];
+         img = [CN1Image imageNamed:@"Default@2x.png"];
          } else {
-         img = [UIImage imageNamed:@"Default@2x.png"];
+         img = [CN1Image imageNamed:@"Default@2x.png"];
          }
          } else {
-         img = [UIImage imageNamed:@"Default.png"];
+         img = [CN1Image imageNamed:@"Default.png"];
          }*/
         if(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() > 960) {
             int largest = MAX(Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl(), Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl());
             
             // iphone 5x
             if(largest < 1200) {
-                img = [UIImage imageNamed:@"Default-568h@2x.png"];
+                img = [CN1Image imageNamed:@"Default-568h@2x.png"];
             } else {
                 // iphone 6
                 if(largest < 1400) {
-                    img = [UIImage imageNamed:@"Default-667h@2x.png"];
+                    img = [CN1Image imageNamed:@"Default-667h@2x.png"];
                 } else {
                     if (largest == 2436) {
                         // iPhone X
                         bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
                         if(isPortrait) {
-                            img = [UIImage imageNamed:@"Default-iPhoneX@3.png"];
+                            img = [CN1Image imageNamed:@"Default-iPhoneX@3.png"];
                         } else {
-                            img = [UIImage imageNamed:@"Default-iPhoneX-Landscape@3.png"];
+                            img = [CN1Image imageNamed:@"Default-iPhoneX-Landscape@3.png"];
                         }
                     } else {
                         bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
                         // iphone 6+
                         if(isPortrait) {
-                            img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                            img = [CN1Image imageNamed:@"Default-736h@3x.png"];
                         } else {
-                            img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                            img = [CN1Image imageNamed:@"Default-736h-Landscape@3x.png"];
                         }
                     }
                 }
             }
         } else {
-            img = [UIImage imageNamed:@"Default.png"];
+            img = [CN1Image imageNamed:@"Default.png"];
         }
     }
     return img;
 #else
     return nil;
+#endif
 #endif
 }
 
@@ -3614,7 +3950,16 @@ EAGLView* lastFoundEaglView;
  * is re-rooted with a parent.  This method is a convenience method in cases where
  * we need to obtain the EAGLView.
  */
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(EAGLView*) eaglView {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     // Under CN1_USE_METAL the rendering view is a METALView, not an EAGLView.
     // Both classes conform to CN1RenderingView, so the return value is used
     // through the shared protocol surface (setFramebuffer, presentFramebuffer,
@@ -3631,7 +3976,7 @@ EAGLView* lastFoundEaglView;
         lastFoundEaglView = (EAGLView*)self.view;
         return (EAGLView*)self.view;
     }
-    for (UIView* child in self.view.subviews) {
+    for (CN1View* child in self.view.subviews) {
 
         if ([child class] == renderingClass) {
             lastFoundEaglView = (EAGLView*)child;
@@ -3645,8 +3990,8 @@ EAGLView* lastFoundEaglView;
         // AutoLayoutView has the original EAGL view added to it, but our view controller
         // would lose the reference to the eagl view.
         // We need to re-do the re-rooting of the EAGL view and peer components layer in this case.
-        UIView* parent = [lastFoundEaglView superview];
-        UIView* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
+        CN1View* parent = [lastFoundEaglView superview];
+        CN1View* newRoot = [lastFoundEaglView.peerComponentsLayer superview];
         [lastFoundEaglView removeFromSuperview];
         [newRoot addSubview:lastFoundEaglView];
         [parent addSubview:newRoot];
@@ -3655,10 +4000,16 @@ EAGLView* lastFoundEaglView;
     }
     NSLog(@"EAGLView not found.  This is not good!!");
     return nil;
+#endif
 }
+#endif
 
 - (void)awakeFromNib
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #if defined(USE_ES2) && !defined(CN1_USE_METAL)
     // CN1transformMatrix/version + cn1CompareMatrices live in CN1ES2compat.m
     // which is excluded from the Mac Catalyst slice. Skip them on Metal —
@@ -3751,9 +4102,9 @@ EAGLView* lastFoundEaglView;
     bool isPortrait = NO;
 #endif
 #ifdef CN1_USE_SPLASH_SCREEN
-    UIImage *img = [self createSplashImage];
+    CN1Image *img = [self createSplashImage];
 #else
-    UIImage* img = nil;
+    CN1Image* img = nil;
 #endif
     
     #if !TARGET_OS_TV
@@ -3776,7 +4127,7 @@ EAGLView* lastFoundEaglView;
         if(isPortrait) {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
             CGImageRef imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, wi, he));
-            img = [UIImage imageWithCGImage:imageRef];
+            img = [CN1Image imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
             gl = [[GLUIImage alloc] initWithImage:img];
@@ -3792,7 +4143,7 @@ EAGLView* lastFoundEaglView;
                 imageRef = CGImageCreateWithImageInRect([img CGImage], CGRectMake(0, statusbarHeight * scale, he, wi));
 
             }
-            img = [UIImage imageWithCGImage:imageRef];
+            img = [CN1Image imageWithCGImage:imageRef];
             CGImageRelease(imageRef);
             
             gl = [[GLUIImage alloc] initWithImage:img];
@@ -3843,9 +4194,15 @@ EAGLView* lastFoundEaglView;
 #ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
 #endif
+#endif
 }
 
 CGFloat getOriginY() {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     int statusbarHeight = 20;
     if(isIOS7()) {
         statusbarHeight = 0;
@@ -3859,6 +4216,7 @@ CGFloat getOriginY() {
             return -[CodenameOne_GLViewController instance].view.frame.origin.x * upsideDownMultiplier - ((upsideDownMultiplier == 1) ? 0 : statusbarHeight);
         }
     }
+#endif
 }
 
 CGRect setOriginY(CGFloat y, CGRect frame) {
@@ -3886,6 +4244,10 @@ int keyboardHeight;
 
 - (void)keyboardWillHide:(NSNotification *)n
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     @synchronized([CodenameOne_GLViewController instance]) {
         [currentTarget removeAllObjects];
     }
@@ -3920,11 +4282,11 @@ int keyboardHeight;
             #endif
         }
 #endif
-        [UIView beginAnimations:nil context:NULL];
-        [UIView setAnimationBeginsFromCurrentState:YES];
-        [UIView setAnimationDuration:0.3];
+        [CN1View beginAnimations:nil context:NULL];
+        [CN1View setAnimationBeginsFromCurrentState:YES];
+        [CN1View setAnimationDuration:0.3];
         [self.view setFrame:viewFrame];
-        [UIView commitAnimations];
+        [CN1View commitAnimations];
         
     }
     
@@ -3932,6 +4294,7 @@ int keyboardHeight;
     repaintUI();
 #else
     com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+#endif
 #endif
  }
 
@@ -3945,6 +4308,10 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)keyboardWillShow:(NSNotification *)n
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     // Hide the datepicker if it is currently showing.
     [self datePickerCancel];
     
@@ -3998,20 +4365,25 @@ BOOL prefersStatusBarHidden = NO;
             }
 #endif
             viewFrame = setOriginY(keyboardSlideOffset, viewFrame);
-            [UIView beginAnimations:nil context:NULL];
-            [UIView setAnimationBeginsFromCurrentState:YES];
-            [UIView setAnimationDuration:0.3];
+            [CN1View beginAnimations:nil context:NULL];
+            [CN1View setAnimationBeginsFromCurrentState:YES];
+            [CN1View setAnimationDuration:0.3];
             [self.view setFrame:viewFrame];
-            [UIView commitAnimations];  
+            [CN1View commitAnimations];  
         } else {
             keyboardSlideOffset = 0;
         }
     }
     keyboardIsShown = YES;
+#endif
 }
 
 - (void)dealloc
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #ifndef CN1_USE_METAL
     if (program) {
         glDeleteProgram(program);
@@ -4041,6 +4413,7 @@ BOOL prefersStatusBarHidden = NO;
 #ifndef CN1_USE_ARC
     [super dealloc];
 #endif
+#endif
 }
 
 - (void)didReceiveMemoryWarning
@@ -4060,19 +4433,33 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)viewWillAppear:(BOOL)animated
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [self startAnimation];
     [super viewWillAppear:animated];
+#endif
 }
 
 - (void)viewWillDisappear:(BOOL)animated
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [self stopAnimation];
     
     [super viewWillDisappear:animated];
+#endif
 }
 
 - (void)viewDidUnload
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 	[super viewDidUnload];
 
 #ifndef CN1_USE_METAL
@@ -4088,15 +4475,26 @@ BOOL prefersStatusBarHidden = NO;
         [EAGLContext setCurrentContext:nil];
 #endif
 	self.context = nil;
+#endif
 }
 
 - (NSInteger)animationFrameInterval
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     return animationFrameInterval;
+#endif
 }
 
 - (void)setAnimationFrameInterval:(NSInteger)frameInterval
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (frameInterval >= 1) {
         animationFrameInterval = frameInterval;
         
@@ -4105,6 +4503,7 @@ BOOL prefersStatusBarHidden = NO;
             [self startAnimation];
         }
     }
+#endif
 }
 
 - (void)startAnimation
@@ -4121,20 +4520,38 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)stopAnimation
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (animating) {
         [self.displayLink invalidate];
         self.displayLink = nil;
         animating = FALSE;
     }
+#endif
 }
 
 - (void)drawScreen {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
+#endif
 }
 
 // NOTE:  This is deprecated.  It is no longer called at all in iOS 11.3 (at least!) and higher.
 // You should handle device rotation in the viewWillTransitionToSize method.
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if(firstTime) {
         return;
     }
@@ -4170,10 +4587,17 @@ BOOL prefersStatusBarHidden = NO;
 #ifdef INCLUDE_MOPUB
     [self.adView rotateToOrientation:toInterfaceOrientation];
 #endif
+#endif
 }
+#endif
 
 
 - (BOOL)shouldAutorotate {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     UIInterfaceOrientation interfaceOrientation = [[UIDevice currentDevice] orientation];
     upsideDownMultiplier = 1;
     
@@ -4199,11 +4623,21 @@ BOOL prefersStatusBarHidden = NO;
     // is not supported by the mask (which effectively prevents programmatic rotation).
     // The supportedInterfaceOrientations method will ensure the app stays locked if needed.
     return YES;
+#endif
 }
 
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return NO;
+#else
     upsideDownMultiplier = 1;
     switch (orientationLock) {
         case 0:
@@ -4230,9 +4664,20 @@ BOOL prefersStatusBarHidden = NO;
             }
     }
     return NO;
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     switch (orientationLock) {
         case 1:
             return UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown;
@@ -4241,9 +4686,15 @@ BOOL prefersStatusBarHidden = NO;
         default:
             return UIInterfaceOrientationMaskAll;
     }
+#endif
 }
+#endif
 
 -(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     // iOS fires this during its background snapshot pass on iPad with the
     // opposite-orientation size. Publishing that would deliver a swapped
     // screenSizeChanged to the EDT between stop and start.
@@ -4291,12 +4742,12 @@ BOOL prefersStatusBarHidden = NO;
     repaintUI();
     
     if ( currentActionSheet != nil ){
-        [UIView beginAnimations:nil context:nil];
-        [UIView setAnimationDuration:0.5];
-        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        [CN1View beginAnimations:nil context:nil];
+        [CN1View setAnimationDuration:0.5];
+        [CN1View setAnimationCurve:UIViewAnimationCurveEaseOut];
         
         currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
-        [UIView commitAnimations];
+        [CN1View commitAnimations];
     }
 #ifdef INCLUDE_MOPUB
     CGSize adsize = [self.adView adContentViewSize];
@@ -4304,9 +4755,14 @@ BOOL prefersStatusBarHidden = NO;
     CGFloat bottomAlignedY =size.height - size.height;
     self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
 #endif
+#endif
 }
 
 - (void)viewSafeAreaInsetsDidChange {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     [super viewSafeAreaInsetsDidChange];
     safeLeft = (JAVA_INT)self.view.window.safeAreaInsets.left * scaleValue;
     safeRight = (JAVA_INT)self.view.window.safeAreaInsets.right * scaleValue;
@@ -4321,9 +4777,18 @@ BOOL prefersStatusBarHidden = NO;
 
     lockDrawing = NO;
     repaintUI();
+#endif
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (isAppSuspended) {
         return;
     }
@@ -4340,12 +4805,12 @@ BOOL prefersStatusBarHidden = NO;
     repaintUI();
     
     if ( currentActionSheet != nil ){
-        [UIView beginAnimations:nil context:nil];
-        [UIView setAnimationDuration:0.5];
-        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        [CN1View beginAnimations:nil context:nil];
+        [CN1View setAnimationDuration:0.5];
+        [CN1View setAnimationCurve:UIViewAnimationCurveEaseOut];
         
         currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
-        [UIView commitAnimations];
+        [CN1View commitAnimations];
     }
 #ifdef INCLUDE_MOPUB
     CGSize size = [self.adView adContentViewSize];
@@ -4355,11 +4820,13 @@ BOOL prefersStatusBarHidden = NO;
 #endif
     
     //DID_ROTATE_FROM_INTERFACE_MARKER
+#endif
 }
+#endif
 
 //INJECT_METHODS_MARKER
 
-//static UIImage *img = nil;
+//static CN1Image *img = nil;
 //static GLUIImage* glut = nil;
 
 - (void)drawFrame:(CGRect)rect
@@ -4369,6 +4836,10 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #if TARGET_OS_MACCATALYST
     // A Mac app keeps rendering its window while it isn't the focused
     // application -- only a truly backgrounded/occluded app stops. iOS, by
@@ -4536,7 +5007,7 @@ BOOL prefersStatusBarHidden = NO;
                     {
                         NSString* windowDescription = [[window class] description];
                         if([windowDescription isEqualToString:@"UITextEffectsWindow"]) {
-                            for(UIView *v in window.subviews) {
+                            for(CN1View *v in window.subviews) {
                                 if([[[v class] description] isEqualToString:@"UIAutocorrectInlinePrompt"]) {
                                     v.frame = CGRectMake(newEditCompoentX,
                                                          newEditCompoentY,
@@ -4570,12 +5041,13 @@ BOOL prefersStatusBarHidden = NO;
         // placeholder installed by cn1InstallRootViewControllerIntoWindow.
         CN1DismissLaunchPlaceholder();
     }
+#endif
 }
 
 
--(void)searchHierarchy:(UIView*)view {
+-(void)searchHierarchy:(CN1View*)view {
     if(view.subviews != nil) {
-        for(UIView *v in view.subviews) {
+        for(CN1View *v in view.subviews) {
             CN1Log(@"Found entry: %@", [[v class] description]);
             [self searchHierarchy:v];
         }
@@ -4764,7 +5236,7 @@ BOOL prefersStatusBarHidden = NO;
     return painted;
 }
 
--(void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
+-(void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
     /*if(editingComponent != nil) {
      return;
      }*/
@@ -4821,7 +5293,11 @@ BOOL prefersStatusBarHidden = NO;
     cn1RunSyncOnMainQueue(flushBlock);
 }
 
--(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y {
+-(void)drawString:(int)color alpha:(int)alpha font:(CN1Font*)font str:(NSString*)str x:(int)x y:(int)y {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 	POOL_BEGIN();
     UIColor* col = UIColorFromRGB(color,alpha);
     [col set];
@@ -4840,6 +5316,7 @@ BOOL prefersStatusBarHidden = NO;
     }
     //CN1Log(@"Drawing the string %@ at %i, %i", str, x, y);
 	POOL_END();
+#endif
 }
 
 
@@ -4874,6 +5351,10 @@ BOOL prefersStatusBarHidden = NO;
 }
 
 -(void)upcomingAddClip:(ExecutableOp*)op {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     @synchronized([CodenameOne_GLViewController instance]) {
         int count = upcomingTarget.count;
         if(count > 0 && [[upcomingTarget lastObject] isKindOfClass:[ClipRect class]]) {
@@ -4882,11 +5363,20 @@ BOOL prefersStatusBarHidden = NO;
             [upcomingTarget addObject:op];
         }
     }
+#endif
 }
 
 
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (CN1useTapGestureRecognizer) {
         // We moved to using a CN1TapGestureRecognizer to handle pointer
         // events rather than the view controller because it is able to 
@@ -4921,9 +5411,15 @@ BOOL prefersStatusBarHidden = NO;
     cn1CapturePointerMetadata(touch);
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
+#endif
 }
+#endif
 
 -(void)foldKeyboard:(CGPoint) point {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     if(editingComponent != nil) {
         if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
@@ -4951,9 +5447,18 @@ BOOL prefersStatusBarHidden = NO;
         }
     }
     POOL_END();
+#endif
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (CN1useTapGestureRecognizer) {
         // We moved to using a CN1TapGestureRecognizer to handle pointer
         // events rather than the view controller because it is able to 
@@ -4988,9 +5493,19 @@ BOOL prefersStatusBarHidden = NO;
     cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (CN1useTapGestureRecognizer) {
         // We moved to using a CN1TapGestureRecognizer to handle pointer
         // events rather than the view controller because it is able to 
@@ -5031,9 +5546,19 @@ BOOL prefersStatusBarHidden = NO;
     cn1CapturePointerMetadata(touch);
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (CN1useTapGestureRecognizer) {
         // We moved to using a CN1TapGestureRecognizer to handle pointer
         // events rather than the view controller because it is able to 
@@ -5064,7 +5589,9 @@ BOOL prefersStatusBarHidden = NO;
         pointerDraggedC(xArray, yArray, [touches count]);
     }
     POOL_END();
+#endif
 }
+#endif
 
 - (void) locationManager:(CLLocationManager *)manager
      didUpdateToLocation:(CLLocation *)newLocation
@@ -5083,7 +5610,12 @@ BOOL prefersStatusBarHidden = NO;
 #if TARGET_OS_TV
 extern id popoverController;
 #else
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 extern UIPopoverController* popoverController;
+#endif
 #endif
 extern int popoverSupported();
 
@@ -5120,8 +5652,8 @@ void cn1_addSelectedImagePath(NSString* path) {
                                   targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
                                  contentMode:PHImageContentModeDefault
                                      options:options
-                               resultHandler:^(UIImage *originalImage, NSDictionary *info) {
-                    UIImage* image = originalImage;
+                               resultHandler:^(CN1Image *originalImage, NSDictionary *info) {
+                    CN1Image* image = originalImage;
                     if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
                         return;
                     }
@@ -5198,6 +5730,10 @@ void cn1_addSelectedImagePath(NSString* path) {
 #ifdef USE_PHOTOKIT_FOR_MULTIGALLERY
 - (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_UNAVAILABLE(watchos)
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (cn1_waitingForImages == NULL) {
         cn1_waitingForImages = [[NSMutableString alloc] init];
     } else {
@@ -5225,8 +5761,8 @@ void cn1_addSelectedImagePath(NSString* path) {
                                   targetSize:CGSizeMake(asset.pixelWidth, asset.pixelHeight)
                                  contentMode:PHImageContentModeDefault
                                      options:options
-                               resultHandler:^(UIImage *originalImage, NSDictionary *info) {
-                    UIImage* image = originalImage;
+                               resultHandler:^(CN1Image *originalImage, NSDictionary *info) {
+                    CN1Image* image = originalImage;
                     if (([(NSNumber*)[info valueForKey:PHImageResultIsDegradedKey] boolValue] == YES)) {
                         return;
                     }
@@ -5290,6 +5826,7 @@ void cn1_addSelectedImagePath(NSString* path) {
     popoverController = nil;
     popoverControllerInstance = nil;
     galleryPopover = NO;
+#endif
 }
 #endif
 
@@ -5331,7 +5868,15 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
     }
 }
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     NSString *path = nil;
     if ([urls count] > 0) {
         path = cn1CopyPickedDocumentToTemp([urls objectAtIndex:0]);
@@ -5340,44 +5885,84 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
     if (controller.presentingViewController != nil) {
         [controller dismissViewControllerAnimated:YES completion:nil];
     }
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     NSString *path = cn1CopyPickedDocumentToTemp(url);
     com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG path == nil ? nil : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
     if (controller.presentingViewController != nil) {
         [controller dismissViewControllerAnimated:YES completion:nil];
     }
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     if (controller.presentingViewController != nil) {
         [controller dismissViewControllerAnimated:YES completion:nil];
     }
+#endif
 }
+#endif
 #endif
 
 #if !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     //[self dismissModalViewControllerAnimated:YES];
     com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
     [picker dismissModalViewControllerAnimated:YES];
     popoverController = nil;
     popoverControllerInstance = nil;
     galleryPopover = NO;
+#endif
 }
+#endif
 
 //#define LOW_MEM_CAMERA
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 
     NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
     NSURL* mediaURL = [info objectForKey:@"UIImagePickerControllerImageURL"];
     if ([mediaType isEqualToString:@"public.image"]) {
         // get the image
-        UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
+        CN1Image* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
 
-        UIImage* image = originalImage;
+        CN1Image* image = originalImage;
 
 #ifndef LOW_MEM_CAMERA
         if (image.imageOrientation != UIImageOrientationUp) {
@@ -5427,23 +6012,49 @@ static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
     popoverControllerInstance = nil;
     galleryPopover = NO;
 
+#endif
 }
+#endif
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 #endif // !TARGET_OS_TV (UIImagePickerController delegates)
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 	[self dismissModalViewControllerAnimated:YES];
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 -(void) messageComposeViewController:(MFMessageComposeViewController*)controller didFinishWithResult:(MessageComposeResult)result {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 	[self dismissModalViewControllerAnimated:YES];
+#endif
 }
+#endif
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (MessageUI delegates)
 
 extern JAVA_OBJECT productsArrayPending;
 
 #ifdef CN1_USE_STOREKIT
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 	POOL_BEGIN();
     if(productsArrayPending != nil) {
 #ifndef NEW_CODENAME_ONE_VM
@@ -5475,20 +6086,30 @@ extern JAVA_OBJECT productsArrayPending;
     productsArrayPending = nil;
     com_codename1_impl_ios_ZoozPurchase_fetchProductsComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     POOL_END();
+#endif
 }
 
 
 -(void)request:(SKRequest *)request didFailWithError:(NSError *)error
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     POOL_BEGIN();
     com_codename1_impl_ios_ZoozPurchase_fetchProductsCanceledOrFailed___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
     
     POOL_END();
+#endif
 }
 
 extern SKPayment *paymentInstance;
 - (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray *)transactions
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     for (SKPaymentTransaction *transaction in transactions)
     {
         switch (transaction.transactionState)
@@ -5538,6 +6159,7 @@ extern SKPayment *paymentInstance;
                 continue;
         }
     }
+#endif
 }
 
 -(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
@@ -5602,7 +6224,15 @@ extern SKPayment *paymentInstance;
 #if TARGET_OS_TV
 - (void) popoverControllerDidDismissPopover:(id) popoverController {
 #else
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
 #endif
     if(datepickerPopover) {
         if(currentDatePickerDate != nil) {
@@ -5620,7 +6250,9 @@ extern SKPayment *paymentInstance;
         popoverControllerInstance = nil;
         galleryPopover = NO;
     }
+#endif
 }
+#endif
 
 // These picker-state globals are defined (unguarded) in IOSNative.m; declare
 // them above the tvOS guard so the non-guarded picker-dismiss code still links.
@@ -5628,7 +6260,15 @@ extern int stringPickerSelection;
 extern JAVA_OBJECT pickerStringArray;
 extern JAVA_LONG defaultDatePickerDate;
 #if !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)datePickerChangeDate:(UIDatePicker *)sender {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (sender.datePickerMode == UIDatePickerModeCountDownTimer) {
         currentDatePickerDuration = sender.countDownDuration * 1000;
         return;
@@ -5643,7 +6283,9 @@ extern JAVA_LONG defaultDatePickerDate;
 #ifndef CN1_USE_ARC
     [currentDatePickerDate retain];
 #endif
+#endif
 }
+#endif
 
 extern int stringPickerSelection;
 #ifndef NEW_CODENAME_ONE_VM
@@ -5652,7 +6294,15 @@ extern org_xmlvm_runtime_XMLVMArray* pickerStringArray;
 extern JAVA_OBJECT pickerStringArray;
 #endif
 extern JAVA_LONG defaultDatePickerDate;
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (currentDatePickerDuration >= 0) {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
         currentDatePickerDuration = -1;
@@ -5676,23 +6326,34 @@ extern JAVA_LONG defaultDatePickerDate;
 #endif
         currentDatePickerDate = nil;
     }
+#endif
 }
+#endif
 
 - (void)datePickerCancel {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (currentActionSheet != nil) {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         currentDatePickerDate = nil;
         currentDatePickerDuration = -1;
         pickerStringArray = nil;
         //NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
-        //UIView* v = (UIView*)[arr objectAtIndex:0];
+        //CN1View* v = (CN1View*)[arr objectAtIndex:0];
         [currentActionSheet removeFromSuperview];
         currentActionSheet = nil;
         repaintUI();
     }
+#endif
 }
 
 - (void)datePickerDismiss {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if (currentDatePickerDuration >= 0) {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
         currentDatePickerDuration = -1;
@@ -5717,7 +6378,7 @@ extern JAVA_LONG defaultDatePickerDate;
         currentDatePickerDate = nil;
     }
     NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
-    UIView* v = (UIView*)[arr objectAtIndex:0];
+    CN1View* v = (CN1View*)[arr objectAtIndex:0];
     if(currentActionSheet != nil) {
         v = currentActionSheet;
     }
@@ -5725,9 +6386,14 @@ extern JAVA_LONG defaultDatePickerDate;
     currentActionSheet = nil;
     repaintUI();
     
+#endif
 }
 
 - (void)datePickerDismissActionSheet:(id)sender {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     UISegmentedControl* s = sender;
     UIActionSheet* sheet = (UIActionSheet*)[s superview];
     [sheet dismissWithClickedButtonIndex:0 animated:YES];
@@ -5749,6 +6415,7 @@ extern JAVA_LONG defaultDatePickerDate;
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG [currentDatePickerDate timeIntervalSince1970] * 1000);
         currentDatePickerDate = nil;
     }
+#endif
 }
 #endif // !TARGET_OS_TV (UIDatePicker / UIActionSheet)
 
@@ -5758,6 +6425,10 @@ id popoverControllerInstance;
 UIPopoverController* popoverControllerInstance;
 #endif
 - (void)pickerComponentDismiss {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     if(popoverControllerInstance != nil) {
         [popoverControllerInstance dismissPopoverAnimated:YES];
         popoverControllerInstance = nil;
@@ -5790,6 +6461,7 @@ UIPopoverController* popoverControllerInstance;
             currentDatePickerDate = nil;
         }
     }
+#endif
 }
 
 // Doesn't work for some reason
@@ -5797,12 +6469,31 @@ UIPopoverController* popoverControllerInstance;
 //}
 
 #if !TARGET_OS_TV
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow: (NSInteger)row inComponent:(NSInteger)component {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
     stringPickerSelection = row;
+#endif
 }
+#endif
 
 // tell the picker how many rows are available for a given component
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     return pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
@@ -5810,15 +6501,37 @@ UIPopoverController* popoverControllerInstance;
     JAVA_ARRAY arr = (JAVA_ARRAY)pickerStringArray;
     return arr->length;
 #endif
+#endif
 }
+#endif
 
 // tell the picker how many components it will have
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     return 1;
+#endif
 }
+#endif
 
 // tell the picker the title for a given component
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)pickerStringArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     return toNSString(data[row]);
@@ -5827,27 +6540,62 @@ UIPopoverController* popoverControllerInstance;
     JAVA_ARRAY_OBJECT* o = (JAVA_ARRAY_OBJECT*)arr->data;
     return toNSString(CN1_THREAD_GET_STATE_PASS_ARG o[row]);
 #endif
+#endif
 }
+#endif
 
 // tell the picker the width of each row for a given component
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (CGFloat)pickerView:(UIPickerView *)pickerView widthForComponent:(NSInteger)component {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return 0;
+#else
     int sectionWidth = 300;
     return sectionWidth;
+#endif
 }
+#endif
 
 
 
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (void)documentInteractionControllerDidEndPreview:(UIDocumentInteractionController *)controller
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+#else
+#endif
 }
+#endif
 
+// UIKit-only declaration: the type in its signature does not exist on macOS,
+// so the whole declaration is dropped rather than just its body. Guarding
+// only the body would leave a signature naming an unknown type.
+#if !TARGET_OS_OSX
 - (UIViewController *) documentInteractionControllerViewControllerForPreview: (UIDocumentInteractionController *) controller
 {
+// UIKit-only helper. AppKit's equivalent is a different API rather than a
+// renamed one, so this is inert on the native macOS port until it is ported.
+#if TARGET_OS_OSX
+    return nil;
+#else
     return self;
+#endif
 }
+#endif
 
 
 #endif // !TARGET_OS_TV (UIPickerView / UIDocumentInteractionController)
 @end
+#endif
 #endif

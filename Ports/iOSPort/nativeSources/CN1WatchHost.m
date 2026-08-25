@@ -150,7 +150,7 @@ static void cn1PublishWatchSafeArea(int w, int h) {
 
 #pragma mark - CN1WatchFramePresenter
 
-- (void)presentWatchFrame:(UIImage *)frame {
+- (void)presentWatchFrame:(CN1Image *)frame {
     id<CN1WatchSurface> s = self.surface;
     if (s != nil && frame != nil) {
         [s displayFrame:frame];

@@ -159,9 +159,9 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
     return YES;
 }
 
-- (UIView *)createPreviewView {
+- (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
-    UIView *v = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+    CN1View *v = [[CN1View alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
     v.backgroundColor = [UIColor blackColor];
     AVCaptureVideoPreviewLayer *layer =
         [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
@@ -224,7 +224,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
         [self firePhotoFailed:cbId withMessage:@"No data from AVCapturePhoto"];
         return;
     }
-    UIImage *img = [UIImage imageWithData:jpeg];
+    CN1Image *img = [CN1Image imageWithData:jpeg];
     int w = (int)img.size.width;
     int h = (int)img.size.height;
     NSString *path = self.pendingPhotoFilePath;
@@ -305,7 +305,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     if (!ctx) ctx = [CIContext contextWithOptions:nil];
     CGImageRef cg = [ctx createCGImage:ci fromRect:rect];
     if (!cg) return;
-    UIImage *img = [UIImage imageWithCGImage:cg];
+    CN1Image *img = [CN1Image imageWithCGImage:cg];
     CGImageRelease(cg);
     NSData *jpeg = UIImageJPEGRepresentation(img, 0.8);
     if (!jpeg) return;
@@ -451,7 +451,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_cn1CameraCreatePreviewView___long_R_l
 #else
     CN1Camera *cam = (__bridge CN1Camera *)(void *)sessionPeer;
 #endif
-    UIView *v = [cam createPreviewView];
+    CN1View *v = [cam createPreviewView];
 #ifndef CN1_USE_ARC
     return (JAVA_LONG)[v retain];
 #else

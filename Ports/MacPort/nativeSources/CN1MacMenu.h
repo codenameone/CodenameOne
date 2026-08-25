@@ -1,54 +1,49 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import <Foundation/Foundation.h>
+#ifndef CN1MacMenu_h
+#define CN1MacMenu_h
+#import <TargetConditionals.h>
+#if TARGET_OS_OSX
 
-// OpenGL ES does not exist on macOS; this port is Metal-only.
-#if !TARGET_OS_OSX
-#import <OpenGLES/EAGL.h>
-
-#import <OpenGLES/ES1/gl.h>
-#import <OpenGLES/ES1/glext.h>
-#import <OpenGLES/ES2/gl.h>
-#import <OpenGLES/ES2/glext.h>
+#ifdef __cplusplus
+extern "C" {
 #endif
-#import "CN1AppleUI.h"
 
-@interface DrawStringTextureCache : NSObject {
-    NSDate *lastAccess;
-    GLuint textureName;
-    NSString *str;
-    CN1Font *font;
-    int color;
-    int alpha;
-    int stringWidth;
+/// Builds the application's menu bar.
+///
+/// Called from the generated `main` before the run loop starts, because an app
+/// with no menu bar has no Quit item, and an app with no Quit item does not pass
+/// App Store review and cannot be closed from the keyboard.
+///
+/// Built in code rather than loaded from a nib, which is what lets this port
+/// ship no `.xib` at all -- and with it no Interface Builder in the build, and
+/// none of the failure that made the Mac Catalyst slice exclude all four of its
+/// XIBs.
+void CN1MacInstallMainMenu(void);
+
+#ifdef __cplusplus
 }
+#endif
 
--(BOOL)isEqual:(id)object;
--(id)initWithString:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a;
-+(void)cache:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a;
-+(DrawStringTextureCache*)checkCache:(NSString*)s f:(CN1Font*)f c:(int)c a:(int)a;
-+(void)flushDeleted;
--(int)stringWidth;
--(GLuint)textureName;
-
-@end
+#endif
+#endif

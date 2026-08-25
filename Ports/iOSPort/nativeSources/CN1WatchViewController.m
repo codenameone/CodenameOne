@@ -109,7 +109,7 @@ static CGRect watchFlushRect;
 - (void)startAnimation {}
 - (void)stopAnimation {}
 
-- (void)drawString:(int)color alpha:(int)alpha font:(UIFont *)font str:(NSString *)str x:(int)x y:(int)y {
+- (void)drawString:(int)color alpha:(int)alpha font:(CN1Font *)font str:(NSString *)str x:(int)x y:(int)y {
     DrawString *op = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:font];
     [self upcomingAdd:op];
 #ifndef CN1_USE_ARC
@@ -119,7 +119,7 @@ static CGRect watchFlushRect;
 
 // flushBuffer hands the accumulated op queue to the renderer and requests a
 // paint; the actual rasterization happens in drawFrame (driven by CN1WatchHost).
-- (void)flushBuffer:(UIImage *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
+- (void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
     @synchronized (self) {
         if ([upcomingTarget count] > 0) {
             // Issue #5273: APPEND the accumulated ops to the not-yet-drawn set

@@ -30,7 +30,7 @@
 
 @implementation DrawStringTextureCache
 static int MAX_CACHE_SIZE = 100;
--(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
+-(id)initWithString:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a {
     stringWidth = -1;
     str = s;
     font = f;
@@ -44,9 +44,15 @@ static int MAX_CACHE_SIZE = 100;
     textureName = t;
     color = c;
     alpha = a;
+    // A bigger glyph cache on the roomier device. macOS has no interface idiom
+    // -- every Mac is the roomy one -- so it takes the larger size directly.
+#if TARGET_OS_OSX
+    MAX_CACHE_SIZE = 200;
+#else
     if(UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
         MAX_CACHE_SIZE = 200;
     }
+#endif
     return self;
 }
 
@@ -55,9 +61,11 @@ static NSMutableArray* pendingDeleteStrings = nil;
 
 -(int)stringWidth {
     if (stringWidth == -1) {
-#if TARGET_OS_TV
-        // -[NSString sizeWithFont:] was removed on tvOS; use the modern
-        // attributed-string measurement (equivalent for a plain font).
+#if TARGET_OS_TV || TARGET_OS_OSX
+        // -[NSString sizeWithFont:] was removed on tvOS and never existed on
+        // macOS, where the same selector belongs to AppKit with different
+        // semantics. The attributed-string measurement is equivalent for a plain
+        // font and is what both platforms use.
         stringWidth = [str sizeWithAttributes:@{NSFontAttributeName: font}].width;
 #else
         stringWidth = [str sizeWithFont:font].width;
@@ -70,7 +78,7 @@ static NSMutableArray* pendingDeleteStrings = nil;
     return textureName;
 }
 
-+(void)cache:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
++(void)cache:(NSString*)s f:(CN1Font*)f t:(GLuint)t c:(int)c a:(int)a {
     DrawStringTextureCache* d = [[DrawStringTextureCache alloc] initWithString:s f:f t:t c:c a:a];
     if(cachedStrings == nil) {
         cachedStrings = [[NSMutableArray alloc] init];
@@ -117,7 +125,7 @@ static NSMutableArray* pendingDeleteStrings = nil;
     [font isEqual:o->font];
 }
 
-+(DrawStringTextureCache*)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a {
++(DrawStringTextureCache*)checkCache:(NSString*)s f:(CN1Font*)f c:(int)c a:(int)a {
     DrawStringTextureCache* tmp = [[DrawStringTextureCache alloc] initWithString:s f:f t:0 c:c a:a];
     for(DrawStringTextureCache* d in cachedStrings) {
         if([tmp isEqual:d]) {

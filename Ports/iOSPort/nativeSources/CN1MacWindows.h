@@ -28,13 +28,13 @@
  * file an iPhone or iPad build produces from CN1MacWindows.m is empty and the
  * plain iOS binary is byte-for-byte what it was.
  *
- * A Codename One Window becomes a UIWindowScene. The scene hosts a plain UIView
+ * A Codename One Window becomes a UIWindowScene. The scene hosts a plain CN1View
  * whose layer contents are set from a raster the framework renders on its own
  * side, rather than a second Metal or GL surface. That is deliberate: the render
  * path caches its device, pipeline state and glyph atlas against the one
  * rendering view, and making those per-scene is a large refactor of the hottest
  * code in the product -- with manual retain and release, since this port builds
- * without ARC. Because the scene still owns a real UIView hierarchy, native peers
+ * without ARC. Because the scene still owns a real CN1View hierarchy, native peers
  * and native text editing work normally inside a window; only the Codename One
  * drawing arrives as a bitmap.
  *
@@ -52,7 +52,7 @@
 
 #if TARGET_OS_MACCATALYST
 
-#import <UIKit/UIKit.h>
+#import "CN1AppleUI.h"
 
 /* Creates a window scene and returns its slot, or -1 on failure. windowId is the
  * framework's own id, stored so every callback can echo it back. */
@@ -74,9 +74,9 @@ void CN1MacWindowSetState(int slot, int state);
  * which is what the framework's mutable image hands back. */
 void CN1MacWindowPresent(int slot, void* argb, int width, int height);
 
-/* The UIView a native peer or text editor should be added to. */
-UIView* CN1MacWindowContentView(int slot);
-BOOL CN1MacWindowAttachPeer(int slot, UIView* peer, int x, int y, int width, int height);
+/* The CN1View a native peer or text editor should be added to. */
+CN1View* CN1MacWindowContentView(int slot);
+BOOL CN1MacWindowAttachPeer(int slot, CN1View* peer, int x, int y, int width, int height);
 
 /* True when the app's Info.plist actually enables multiple scenes. This is the
  * single source of truth for whether windows can work: without the key the
@@ -107,7 +107,7 @@ void CN1MacWindowSetMinimumSize(int slot, int width, int height);
 void CN1MacWindowSetEditingSlot(int slot);
 
 /** The view the native editor belongs in, or nil for the application's main view. */
-UIView* CN1MacWindowEditingHostView(void);
+CN1View* CN1MacWindowEditingHostView(void);
 
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */

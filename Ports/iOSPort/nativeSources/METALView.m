@@ -41,7 +41,7 @@
 static BOOL firstTime=YES;
 extern float scaleValue;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
-extern UIView *editingComponent;
+extern CN1View *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
@@ -361,13 +361,13 @@ extern BOOL isRetinaBug();
 }
 
 // Adds a peer component to the view.  Peer components are added to the peerComponentsLayer subview
--(void) addPeerComponent:(UIView*) view {
+-(void) addPeerComponent:(CN1View*) view {
     if ([self isPaintPeersBehindEnabled]) {
         if (self.peerComponentsLayer == nil) {
-            UIView *newRoot = [[UIView alloc] initWithFrame:self.bounds];
+            CN1View *newRoot = [[CN1View alloc] initWithFrame:self.bounds];
             newRoot.autoresizesSubviews = YES;
             newRoot.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
+            self.peerComponentsLayer = [[CN1View alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer.opaque = TRUE;
             self.peerComponentsLayer.userInteractionEnabled = TRUE;
@@ -375,7 +375,7 @@ extern BOOL isRetinaBug();
             metalLayer.opaque = FALSE;
             self.opaque = FALSE;
             self.backgroundColor = [UIColor clearColor];
-            UIView* parent = [self superview];
+            CN1View* parent = [self superview];
             [CodenameOne_GLViewController instance].view = newRoot;
             [self removeFromSuperview];
             [newRoot addSubview:self.peerComponentsLayer];
@@ -601,7 +601,7 @@ int cn1DirectToDrawableEnabled(void) {
                        dispatch_get_main_queue(), ^{ cn1TextureCensusDump("t35"); });
 #endif
         // Publish the device + queue to CN1Metalcompat so its global
-        // accessors don't have to dereference our (UIView) layer from
+        // accessors don't have to dereference our (CN1View) layer from
         // background threads. Doing it on the main thread, exactly once,
         // means CN1MetalDevice / CN1MetalCommandQueue become cheap static
         // reads safe to invoke from the EDT and any background GCD queue.
@@ -651,7 +651,7 @@ int cn1DirectToDrawableEnabled(void) {
 // platform where the iOS XIB is unavailable): CodenameOne_GLView-
 // Controller's loadView allocates a METALView via initWithFrame:
 // instead of loading from the NIB. Without this override the
-// UIView default initWithFrame: runs, which skips cn1SetupMetal and
+// CN1View default initWithFrame: runs, which skips cn1SetupMetal and
 // leaves CN1MetalDevice() returning nil for the lifetime of the
 // process -- the runtime failure mode that surfaced in CI as "no
 // atlas available for font" on every CN1MetalDrawString call.
@@ -1180,7 +1180,7 @@ int cn1DirectToDrawableEnabled(void) {
 #endif
     }
     CGImageRef outCg = [ciCtx createCGImage:clamped fromRect:CGRectMake(0, 0, fw, fh)];
-    UIImage *blurredImage = outCg ? [UIImage imageWithCGImage:outCg] : nil;
+    CN1Image *blurredImage = outCg ? [CN1Image imageWithCGImage:outCg] : nil;
     if (srcCg) { CGImageRelease(srcCg); }
     if (outCg) { CGImageRelease(outCg); }
     CGContextRelease(bmp);
@@ -1409,7 +1409,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
         kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
     CGImageRef outCg = bmp ? CGBitmapContextCreateImage(bmp) : NULL;
     if (outCg != NULL) {
-        UIImage *glassImage = [UIImage imageWithCGImage:outCg];
+        CN1Image *glassImage = [CN1Image imageWithCGImage:outCg];
         id<MTLTexture> glassTex = CN1MetalTextureFromUIImage(glassImage);
         if (glassTex != nil) { CN1MetalDrawImage(glassTex, 255, x, y, w, h); }
         CGImageRelease(outCg);
@@ -1440,7 +1440,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 
     // GPU LENS: blit the bar region to a scratch texture and draw the drop quad with the
     // cn1_fs_lens shader sampling it -- entirely on the GPU. The old path read the region
-    // back to the CPU (2x waitUntilCompleted stalls + getBytes + a UIImage->texture upload)
+    // back to the CPU (2x waitUntilCompleted stalls + getBytes + a CN1Image->texture upload)
     // EVERY frame, capping the morph at ~6fps; this keeps it at frame rate.
     //
     // 1) End the current render encoder so the bar draws are flushed into screenTexture, but

@@ -25,13 +25,29 @@ CodenameOne_GLAppDelegate.h
 CodenameOne_GLAppDelegate.m
 CodenameOne_GLSceneDelegate.h
 CodenameOne_GLSceneDelegate.m
-CodenameOne_GLViewController.h
-CodenameOne_GLViewController.m
+# CodenameOne_GLViewController.h STAYS: it is where the shared macros every
+# native source depends on live (POOL_BEGIN, the CN1_THREAD_STATE family, the
+# path segment and join constants) and it already carries a watchOS arm that
+# declares the controller as a plain NSObject render driver rather than a
+# UIViewController. macOS shares that arm.
+# CodenameOne_GLViewController.m stays too, and is guarded internally rather
+# than dropped -- which is what the watch slice already does with it. It holds
+# ~114 of the Java_com_codename1_impl_ios_IOSImplementation_* graphics entry
+# points, and most of that file is ExecutableOp queue management rather than
+# UIKit. Excluding it left those symbols undefined at link.
 
 # XIBs. The AppKit shell builds its menu bar in code and owns no nib at all,
 # which is also what keeps Interface Builder out of the build.
 **/*.xib
 **/*.storyboard
+
+# ---- The Metal rendering view ---------------------------------------------
+# Ports/MacPort/nativeSources supplies its own METALView, an NSView with the same
+# class name and the same CN1RenderingView surface, so the shared drawing sources
+# that refer to it by name -- BlurRegion, CN1Metalcompat, IOSNative -- compile
+# here unchanged. Same trick the watch slice uses for CodenameOne_GLViewController.
+METALView.h
+METALView.m
 
 # ---- UIKit input and text -------------------------------------------------
 # Replaced by NSEvent handling and NSTextInputClient.
@@ -43,17 +59,21 @@ CN1UITextField.h
 CN1UITextField.m
 CN1UITextView.h
 CN1UITextView.m
-UIWebViewEventDelegate.h
-UIWebViewEventDelegate.m
+# UIWebViewEventDelegate stays: macOS has WebKit, and the header already
+# selects between the UIWebView and WKWebView delegates with macros. macOS is
+# WKWebView only, which the header now says for itself.
 
 # ---- OpenGL ES ------------------------------------------------------------
-# This port is Metal-only, and OpenGL ES does not exist on macOS at all.
+# This port is Metal-only, and OpenGL ES does not exist on macOS at all. Only the
+# IMPLEMENTATIONS go: CN1ES2compat.h stays, because it is the header that decides
+# whether the Metal backend is active and every ExecutableOp includes it through
+# ExecutableOp.h. With CN1_USE_METAL forced on for this platform the OpenGL ES
+# branches inside those ops are compiled out, so the header costs nothing and its
+# absence would take the entire drawing layer with it.
 EAGLView.h
 EAGLView.m
 CN1ES1compat.m
-CN1ES2compat.h
 CN1ES2compat.m
-CN1GL3D.h
 CN1GL3D.m
 
 # ---- Mac Catalyst windowing ----------------------------------------------

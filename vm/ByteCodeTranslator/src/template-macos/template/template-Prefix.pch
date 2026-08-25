@@ -13,6 +13,11 @@
 #ifdef __OBJC__
     #import <AppKit/AppKit.h>
     #import <Foundation/Foundation.h>
+    // The generated main is the AppKit entry point on this target, so it
+    // needs the menu-bar builder in scope. Declared through the prefix
+    // rather than by an include in the generated file, because the
+    // translator writes that file and the port owns this header.
+    #import "CN1MacMenu.h"
 #endif
 
 #include "cn1_globals.h"
