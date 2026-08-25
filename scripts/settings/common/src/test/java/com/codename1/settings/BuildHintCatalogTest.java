@@ -1656,4 +1656,35 @@ public class BuildHintCatalogTest {
         assertFalse(CodenameOneSettings.importsAnnotation(staticky, "Ios", false));
         assertEquals("staticky.Ios", CodenameOneSettings.importsIn(staticky, false).get(0).name);
     }
+
+    /// `import com.example.Other as Ios` makes `@Ios` mean Other, so it shadows
+    /// a wildcard import of ours. Ignoring every aliased import let the wildcard
+    /// be trusted, hiding the editor for a hint the processor never emits.
+    @Test
+    public void anImportAliasedToOurNameShadowsTheWildcard() {
+        String shadowed = "package com.example\n"
+                + "import com.example.other.Other as Ios\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(shadowed, "Ios", true));
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(shadowed, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // OUR annotation aliased to its own name is still ours.
+        String ours = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(ours, "Ios", true));
+
+        // An alias to some OTHER name shadows nothing.
+        String elsewhere = "package com.example\n"
+                + "import com.example.other.Other as Something\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(elsewhere, "Ios", true));
+    }
 }

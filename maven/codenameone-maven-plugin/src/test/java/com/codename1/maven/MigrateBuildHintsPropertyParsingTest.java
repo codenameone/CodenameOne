@@ -805,6 +805,44 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertTrue(free, free.contains("@Ios(teamId"));
     }
 
+    /// An enum-valued hint renders as `IosThemeMode.MODERN`, which is a second
+    /// type to account for: without its own import the generated annotation does
+    /// not compile, so every enum-valued migration was rolled back by its own
+    /// verification build.
+    @Test
+    public void anEnumValueBringsItsOwnType() throws Exception {
+        String migrated = migrate("package com.example;\npublic class MyApp {\n}\n",
+                "@Ios(themeMode = IosThemeMode.MODERN)\n");
+        assertTrue(migrated,
+                migrated.contains("import com.codename1.annotations.buildhints.IosThemeMode;"));
+        assertTrue(migrated, migrated.contains("@Ios(themeMode = IosThemeMode.MODERN)"));
+
+        // A file that has given that name away gets the qualified form instead.
+        String taken = migrate("package com.example;\n"
+                        + "import com.example.other.IosThemeMode;\n"
+                        + "public class MyApp {\n}\n",
+                "@Ios(themeMode = IosThemeMode.MODERN)\n");
+        assertTrue(taken, taken.contains(
+                "themeMode = com.codename1.annotations.buildhints.IosThemeMode.MODERN"));
+        assertFalse(taken,
+                taken.contains("import com.codename1.annotations.buildhints.IosThemeMode;"));
+    }
+
+    /// A `typealias` is a declaration this file makes, so it takes the name as
+    /// surely as a class does. Writing a named import beside one gives the same
+    /// local name twice, which does not compile.
+    @Test
+    public void aTypeAliasTakesTheNameTheImportWouldWant() throws Exception {
+        String migrated = migrateKotlin("package com.example\n"
+                        + "typealias Ios = com.example.other.Ios\n"
+                        + "class MyApp\n",
+                "@Ios(teamId = \"X\")\n");
+        assertTrue(migrated,
+                migrated.contains("@com.codename1.annotations.buildhints.Ios(teamId"));
+        assertFalse(migrated,
+                migrated.contains("import com.codename1.annotations.buildhints.Ios"));
+    }
+
     private String migrateKotlin(String source, String annotations) throws Exception {
         File f = File.createTempFile("MyApp", ".kt");
         f.deleteOnExit();

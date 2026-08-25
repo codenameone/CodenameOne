@@ -907,15 +907,18 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 written.append(line).append('\n');
                 continue;
             }
+            String body = line;
             if (simpleNameIsTaken(text, blanked, name, kotlin)) {
-                written.append("@").append(ANNOTATION_PACKAGE).append('.')
-                        .append(line.substring(1)).append('\n');
-                continue;
-            }
-            if (importLines.indexOf(importOf(name, kotlin)) < 0) {
+                body = "@" + ANNOTATION_PACKAGE + "." + line.substring(1);
+            } else if (importLines.indexOf(importOf(name, kotlin)) < 0) {
                 importLines.append(importOf(name, kotlin)).append('\n');
             }
-            written.append(line).append('\n');
+            // An enum-valued hint renders as `IosThemeMode.MODERN`, which is a
+            // second type to account for -- without its own import the generated
+            // annotation does not compile, so every enum-valued migration was
+            // rolled back by its own verification build.
+            written.append(withEnumsResolved(body, text, blanked, kotlin, importLines))
+                    .append('\n');
         }
         // split(-1) keeps the trailing empty piece, which put a blank line back.
         annotations = written.substring(0, Math.max(0, written.length() - 1));
@@ -962,6 +965,56 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         write(source, head + annotations + tail);
     }
 
+    /// `line` with every enum type it names either imported or written out in
+    /// full, by the same rule the annotation names follow.
+    private static String withEnumsResolved(String line, String text, String blanked,
+                                            boolean kotlin, StringBuilder importLines) {
+        java.util.Set<String> enums = enumTypeNames();
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < line.length()) {
+            char c = line.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(line.charAt(i - 1)))) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end < line.length() && Character.isJavaIdentifierPart(line.charAt(end))) {
+                end++;
+            }
+            String word = line.substring(i, end);
+            if (!enums.contains(word) || end >= line.length() || line.charAt(end) != '.') {
+                out.append(word);
+                i = end;
+                continue;
+            }
+            if (simpleNameIsTaken(text, blanked, word, kotlin)) {
+                out.append(ANNOTATION_PACKAGE).append('.').append(word);
+            } else {
+                if (importLines.indexOf(importOf(word, kotlin)) < 0) {
+                    importLines.append(importOf(word, kotlin)).append('\n');
+                }
+                out.append(word);
+            }
+            i = end;
+        }
+        return out.toString();
+    }
+
+    /// Every enum type the catalog can render a value as.
+    private static java.util.Set<String> enumTypeNames() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<String>();
+        for (com.codename1.build.shared.BuildHints.Hint h
+                : com.codename1.build.shared.BuildHints.entries()) {
+            if (h.enumName() != null && h.enumName().length() > 0) {
+                out.add(h.enumName());
+            }
+        }
+        return out;
+    }
+
     /** The package the generated annotations live in. */
     private static final String ANNOTATION_PACKAGE = "com.codename1.annotations.buildhints";
 
@@ -998,6 +1051,9 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 .declaresType(text, simple, kotlin)) {
             return true;
         }
+        if (kotlin && declaresTypeAlias(blanked, simple)) {
+            return true;
+        }
         for (int at = importKeywordAt(blanked, 0); at >= 0;
                 at = importKeywordAt(blanked, at + "import".length())) {
             if (simple.equals(importedSimpleName(blanked, at, kotlin))) {
@@ -1005,6 +1061,49 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             }
         }
         return false;
+    }
+
+    /// Whether blanked `code` declares `typealias simple = ...`.
+    ///
+    /// A typealias is a declaration this file makes, so it takes the name as
+    /// surely as a class does -- and the type lookup only knows about class,
+    /// object, interface, enum and record. Writing a named import beside one
+    /// gives the same local name twice, which does not compile.
+    private static boolean declaresTypeAlias(String code, String simple) {
+        int at = 0;
+        while (true) {
+            at = code.indexOf("typealias", at);
+            if (at < 0) {
+                return false;
+            }
+            int after = at + "typealias".length();
+            boolean whole = (at == 0 || !Character.isJavaIdentifierPart(code.charAt(at - 1)))
+                    && after < code.length()
+                    && !Character.isJavaIdentifierPart(code.charAt(after));
+            if (whole) {
+                int n = after;
+                while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .escapedIdentifierEnd(code, n);
+                String name;
+                if (escaped > n) {
+                    name = code.substring(n + 1, escaped - 1);
+                } else {
+                    int stop = n;
+                    while (stop < code.length()
+                            && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                        stop++;
+                    }
+                    name = code.substring(n, stop);
+                }
+                if (simple.equals(name)) {
+                    return true;
+                }
+            }
+            at = after;
+        }
     }
 
     /// The name the import at `at` makes available, or null when it makes none

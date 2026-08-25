@@ -2930,8 +2930,15 @@ public class CodenameOneSettings extends Lifecycle {
         boolean ours = false;
         for (Imported imported : importsIn(source, kotlin)) {
             if (imported.alias != null) {
-                // Introduces its alias, not this name, so it neither grants the
-                // simple spelling nor shadows it.
+                // Introduces its ALIAS rather than its own name -- so it neither
+                // grants nor shadows the simple spelling, unless the alias IS
+                // that spelling. `import com.example.Other as Ios` makes `@Ios`
+                // mean Other, and ignoring it let a wildcard import of ours be
+                // trusted instead, hiding the editor for a hint the processor
+                // never emits.
+                if (imported.alias.equals(simple)) {
+                    return imported.name.startsWith(pkg);
+                }
                 continue;
             }
             if (imported.name.equals(pkg + simple)) {
