@@ -697,6 +697,30 @@ public class BuildHintAnnotationProcessorTest {
                 + "}\n";
         assertFalse(BuildHintAnnotationProcessor.declaresType(braced, "Fake", true));
 
+        // The expression is ordinary code, so it holds ordinary comments and
+        // char literals, and a quote inside one of those is not a nested string.
+        String commented = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${ /* \\\" */ 1 }\"\n"
+                + "}\n"
+                + "class After\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(commented, "After", true));
+
+        String charLiteral = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${ if (c == '\\\"') 1 else 2 }\"\n"
+                + "}\n"
+                + "class After\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(charLiteral, "After", true));
+
+        // A brace inside a comment there must not close the expression either.
+        String bracedComment = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${ /* } */ 1 }\"\n"
+                + "}\n"
+                + "class After\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(bracedComment, "After", true));
+
         // A raw string carries templates too.
         String raw = "package com.example\n"
                 + "class Real {\n"

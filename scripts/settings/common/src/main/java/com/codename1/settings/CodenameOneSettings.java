@@ -3269,6 +3269,17 @@ public class CodenameOneSettings extends Lifecycle {
                 j = s.startsWith("\"\"\"", j) ? endOfKotlinRawString(s, j) : endOfKotlinString(s, j);
                 continue;
             }
+            // The expression is ordinary code, so it holds ordinary comments and
+            // char literals -- and a quote inside one of those is not a nested
+            // string. Reading `${ /* " */ 1 }` as if it were swallowed the rest
+            // of the file, hiding every annotation after it.
+            if (ch == '\'' || ch == '/') {
+                int skipped = skipNonCode(s, j, true);
+                if (skipped > j) {
+                    j = skipped;
+                    continue;
+                }
+            }
             if (ch == '{') {
                 depth++;
             } else if (ch == '}') {

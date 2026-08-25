@@ -1071,6 +1071,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 j = run - j >= 3 ? endOfKotlinRawString(c, j) : endOfKotlinString(c, j);
                 continue;
             }
+            // The expression is ordinary code, so it holds ordinary comments and
+            // char literals -- and a quote inside one of those is not a nested
+            // string. Reading `${ /* " */ 1 }` as if it were swallowed the rest
+            // of the file, so a live declaration after it was blanked and its
+            // class dropped as an orphan.
+            int nonCode = endOfKotlinNonCode(c, j);
+            if (nonCode > j) {
+                j = nonCode;
+                continue;
+            }
             if (ch == '{') {
                 depth++;
             } else if (ch == '}') {
@@ -1082,6 +1092,55 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             j++;
         }
         return -1;
+    }
+
+    /// The offset just past a comment or char literal at `i`, or `i` when there
+    /// is neither.
+    private static int endOfKotlinNonCode(char[] c, int i) {
+        if (i + 1 < c.length && c[i] == '/' && c[i + 1] == '/') {
+            int j = i;
+            while (j < c.length && c[j] != '\n') {
+                j++;
+            }
+            return j;
+        }
+        if (i + 1 < c.length && c[i] == '/' && c[i + 1] == '*') {
+            // Kotlin block comments NEST.
+            int depth = 0;
+            int j = i;
+            while (j < c.length) {
+                if (c[j] == '/' && j + 1 < c.length && c[j + 1] == '*') {
+                    depth++;
+                    j += 2;
+                    continue;
+                }
+                if (c[j] == '*' && j + 1 < c.length && c[j + 1] == '/') {
+                    depth--;
+                    j += 2;
+                    if (depth == 0) {
+                        return j;
+                    }
+                    continue;
+                }
+                j++;
+            }
+            return c.length;
+        }
+        if (c[i] == '\'') {
+            int j = i + 1;
+            while (j < c.length) {
+                if (c[j] == '\\') {
+                    j += 2;
+                    continue;
+                }
+                if (c[j] == '\'') {
+                    return j + 1;
+                }
+                j++;
+            }
+            return c.length;
+        }
+        return i;
     }
 
     /// The offset just past an ordinary Kotlin string starting at `i`.

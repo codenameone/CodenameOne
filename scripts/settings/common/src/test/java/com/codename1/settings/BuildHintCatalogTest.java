@@ -1138,6 +1138,19 @@ public class BuildHintCatalogTest {
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
         assertNull(owned.get("ios.pods"));
 
+        // The expression is ordinary code, so it holds ordinary comments and
+        // char literals, and a quote inside one of those is not a nested string.
+        String commented = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class Helper {\n"
+                + "    val note = \"${ /* \\\" */ 1 }\"\n"
+                + "}\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(commented, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
         // A brace inside the nested literal must not close the expression early.
         String braced = "package com.example\n"
                 + "import com.codename1.annotations.buildhints.Ios\n"
