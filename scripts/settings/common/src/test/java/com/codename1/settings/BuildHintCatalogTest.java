@@ -2107,6 +2107,20 @@ public class BuildHintCatalogTest {
         assertEquals("UTF-8", CodenameOneSettings.declaredSourceEncoding(testOnly));
     }
 
+    /// `<phase>none</phase>` switches an inherited execution off here too.
+    @Test
+    public void aDisabledExecutionDeclaresNoRoots() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-compile</id><phase>none</phase>"
+                + "<goals><goal>add-source</goal></goals><configuration>"
+                + "<sources><source>gen/disabled</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

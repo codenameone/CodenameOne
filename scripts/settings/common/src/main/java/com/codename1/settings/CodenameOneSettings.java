@@ -2570,8 +2570,12 @@ public class CodenameOneSettings extends Lifecycle {
             // execution that names no goal but carries Maven's own id for one is
             // bound to it -- that is how a POM overrides a lifecycle-injected
             // execution.
-            if (execution.indexOf("<goal>" + goal + "</goal>") >= 0
-                    || execution.indexOf("<id>default-" + goal + "</id>") >= 0) {
+            // <phase>none</phase> is the conventional way to switch off an
+            // execution inherited from a parent while leaving its goal in place,
+            // so the goal alone does not mean the build runs it.
+            if (execution.indexOf("<phase>none</phase>") < 0
+                    && (execution.indexOf("<goal>" + goal + "</goal>") >= 0
+                        || execution.indexOf("<id>default-" + goal + "</id>") >= 0)) {
                 bound = true;
                 if (execution.indexOf("<" + element + ">") < 0) {
                     if (execution.indexOf("combine.self=\"override\"") < 0) {

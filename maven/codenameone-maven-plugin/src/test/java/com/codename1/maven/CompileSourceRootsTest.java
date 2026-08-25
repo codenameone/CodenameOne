@@ -201,6 +201,57 @@ public class CompileSourceRootsTest {
                         "src/main/kotlin"));
     }
 
+    /**
+     * `<phase>none</phase>` switches an inherited execution off.
+     *
+     * <p>It is the conventional way to disable an execution a parent declares
+     * while leaving its goal in place, so the goal alone does not mean the build
+     * runs it. Counting a disabled one made a stale class in `target/classes`
+     * look current because its source is still on disk, and an annotation on
+     * that class then failed the placement check on every incremental build.</p>
+     */
+    @Test
+    public void aDisabledKotlinExecutionDoesNotClaimTheRoot() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        PluginExecution off = execution("compile", "<jvmTarget>17</jvmTarget>");
+        off.setId("default-compile");
+        off.setPhase("none");
+        kotlin.addExecution(off);
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
+    /**
+     * ...and a disabled execution contributes no configuration either, without
+     * hiding the plugin-level configuration that still applies to the goal.
+     */
+    @Test
+    public void aDisabledExecutionDoesNotSupplyOrHideConfiguration() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>gen/plugin-level</a></sources>"));
+        PluginExecution off = execution("add-source",
+                "<sources><b>gen/disabled</b></sources>");
+        off.setPhase("none");
+        helper.addExecution(off);
+        project.getBuild().addPlugin(helper);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertFalse(roots.toString(), contains(roots, basedir, "gen/disabled"));
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/plugin-level"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {

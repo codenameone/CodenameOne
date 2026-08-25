@@ -1263,7 +1263,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 if (!thisOne && ("default-" + goal).equals(execution.getId())) {
                     thisOne = true;
                 }
-                if (!thisOne) {
+                if (!thisOne || isDisabled(execution)) {
+                    // A disabled execution contributes no configuration and does
+                    // not count as binding the goal -- with `bound` set, an
+                    // execution switched off with <phase>none</phase> would hide
+                    // the plugin-level configuration that still applies.
                     continue;
                 }
                 bound = true;
@@ -1541,6 +1545,25 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /**
+     * Whether `execution` was switched off with `<phase>none</phase>`.
+     *
+     * <p>That is the conventional way to disable an execution inherited from a
+     * parent while leaving its goal in place, so the goal alone does not mean
+     * the build runs it. Treating a disabled one as live made a stale class in
+     * target/classes look current because its source is still on disk, and a
+     * build hint annotation on that class then failed the placement check on
+     * every incremental build.</p>
+     *
+     * <p>Only `none`. Maven ignores any phase outside the lifecycle, but naming
+     * the others needs a lifecycle model this does not have, and `none` is the
+     * spelling every POM uses.</p>
+     */
+    private static boolean isDisabled(org.apache.maven.model.PluginExecution execution) {
+        String phase = execution == null ? null : execution.getPhase();
+        return phase != null && "none".equalsIgnoreCase(phase.trim());
+    }
+
+    /**
      * Whether the Kotlin plugin compiles this module's main sources.
      *
      * <p>An execution bound to {@code compile}, or {@code <extensions>true</extensions>}
@@ -1571,6 +1594,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 continue;
             }
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                if (isDisabled(execution)) {
+                    continue;
+                }
                 if ((execution.getGoals() != null && execution.getGoals().contains("compile"))
                         || "default-compile".equals(execution.getId())) {
                     return true;
