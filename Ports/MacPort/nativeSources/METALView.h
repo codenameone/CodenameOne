@@ -78,6 +78,13 @@
     int framebufferHeight;
     simd_float4x4 projectionMatrix;
     BOOL clearRetainedFramebufferOnNextFrame;
+    /// Whether the retained target's contents are known stale and a clear is
+    /// owed. Distinct from the flag above: that one says "clear the next frame",
+    /// this one says "a clear is still owed". Without it, prepare...ForDrawRect
+    /// treats every full-screen repaint as licence to wipe, and a component that
+    /// painted in an earlier frame and did not repaint in this one reads back as
+    /// nothing.
+    BOOL retainedFramebufferInvalid;
 }
 
 @property (nonatomic, retain) id<MTLCommandQueue> commandQueue;

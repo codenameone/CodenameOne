@@ -224,8 +224,14 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     }
 
     [v setFramebuffer];
-    // Clamp a screen clip to the region actually being repainted.
-    [ClipRect setDrawRect:flushRect];
+    // Clamp a screen clip to the region actually being repainted. Set per
+    // operation below rather than once for the drain: the clamp exists to stop
+    // a clip escaping the flushed sub-region of the SCREEN, and the screen's
+    // flush region means nothing to an image being painted into. Applied to a
+    // mutable-image operation it clips that image to whatever part of the
+    // screen happened to be dirty, which is how a painter that fills its whole
+    // image came back unpainted in the middle.
+    CGRect screenClampRect = flushRect;
 
     // The queue is not all screen drawing. An operation that paints into a
     // mutable image carries that image as its target, and it needs an encoder
@@ -254,6 +260,7 @@ static CodenameOne_GLViewController *singletonInstance = nil;
         if (opTarget != nil && !mutableEncoderOpen) {
             continue;
         }
+        [ClipRect setDrawRect:opTarget == nil ? screenClampRect : CGRectZero];
         @try {
             [op executeWithClipping];
         } @catch (NSException *e) {

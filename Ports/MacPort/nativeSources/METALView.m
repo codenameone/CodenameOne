@@ -340,16 +340,37 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 }
 
 - (void)invalidateRetainedFramebuffer {
+    retainedFramebufferInvalid = YES;
+    // Cleared unconditionally on the next frame rather than waiting for a
+    // repaint that covers the whole screen: a partial repaint routinely lands
+    // first, loads the stale texture, and pins whatever the discarded contents
+    // left behind until something dirties the region again.
     clearRetainedFramebufferOnNextFrame = YES;
 }
 
 - (void)prepareRetainedFramebufferForDrawRect:(CGRect)rect displayWidth:(int)displayWidth
                                 displayHeight:(int)displayHeight {
-    // A full-screen repaint is the only case where the retained target's
-    // contents are known to be about to be replaced entirely.
+    // Only when a clear is actually owed. A full-screen repaint is the moment
+    // it is safe to take one, not a reason to: the framework queues only the
+    // operations that changed, so wiping on every full repaint erases
+    // everything drawn in an earlier frame that this one does not touch.
+    if (!retainedFramebufferInvalid) {
+        return;
+    }
+    // The retained target's own size, not the reported display size: the two
+    // can disagree briefly while a resize settles, and consuming the
+    // invalidation against the wrong one clears a target the repaint does not
+    // actually cover.
+    int targetWidth = framebufferWidth > 0 ? framebufferWidth : displayWidth;
+    int targetHeight = framebufferHeight > 0 ? framebufferHeight : displayHeight;
+    if (targetWidth <= 0 || targetHeight <= 0) {
+        return;
+    }
     if (rect.origin.x <= 0 && rect.origin.y <= 0
-            && rect.size.width >= displayWidth && rect.size.height >= displayHeight) {
+            && rect.origin.x + rect.size.width >= targetWidth
+            && rect.origin.y + rect.size.height >= targetHeight) {
         clearRetainedFramebufferOnNextFrame = YES;
+        retainedFramebufferInvalid = NO;
     }
 }
 
