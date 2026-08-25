@@ -2493,42 +2493,51 @@ public class CodenameOneSettings extends Lifecycle {
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
         collectRoots(compileGoalConfiguration(pluginBlock(pomText, "kotlin-maven-plugin"),
-                "compile"), "sourceDir", properties, out);
+                "compile", "sourceDir"), "sourceDir", properties, out);
         String helper = pluginBlock(pomText, "build-helper-maven-plugin");
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
             // plugin's compile and test-compile executions need.
-            collectRoots(compileGoalConfiguration(helper, "add-source"), "source",
+            collectRoots(compileGoalConfiguration(helper, "add-source", "source"), "source",
                     properties, out);
         }
     }
 
     /// The parts of a plugin element whose configuration applies to the MAIN
-    /// compilation: its executions bound to `goal`, or the whole element when it
-    /// declares no executions, since plugin-level configuration applies to every
-    /// goal including that one.
+    /// compilation, most specific first.
     ///
     /// The test goals use the same elements -- `test-compile` for Kotlin,
     /// `add-test-source` for build-helper -- and a test directory whose name
     /// does not look like one, `fixtures` say, is otherwise read as production
     /// code and shadows a real annotation.
+    ///
+    /// Maven's merge rules, which this used to ignore by returning both levels
+    /// unconditionally: an execution's own value REPLACES the plugin-level one,
+    /// unless the POM asks for both with `combine.children="append"`;
+    /// `combine.self="override"` discards the inherited configuration wholesale;
+    /// and plugin-level configuration applies on its own when no execution is
+    /// bound to the goal. Returning the replaced list as well made this scan
+    /// read a directory the build does not compile, where a dormant copy of the
+    /// main class can be picked before the real one -- and then its
+    /// annotation-owned hints look editable and Add writes the duplicate the
+    /// next build refuses.
+    ///
+    /// `element` is what the caller is about to read out of these blocks, since
+    /// the rules are per element rather than per configuration.
     private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
-                                                                   String goal) {
+                                                                   String goal,
+                                                                   String element) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (pluginBlock == null) {
             return out;
         }
-        // Plugin-level configuration applies to every execution, so it counts
-        // whether or not there are any -- returning only the matching executions
-        // dropped a `<sourceDirs>` written once outside them, and a main class
-        // compiled from there became invisible.
         int executions = pluginBlock.indexOf("<executions>");
         int endOfExecutions = pluginBlock.indexOf("</executions>");
-        out.add(executions >= 0 && endOfExecutions > executions
-                ? pluginBlock.substring(0, executions)
-                        + pluginBlock.substring(endOfExecutions)
-                : pluginBlock);
+        String pluginLevel = executions >= 0 && endOfExecutions > executions
+                ? pluginBlock.substring(0, executions) + pluginBlock.substring(endOfExecutions)
+                : pluginBlock;
+        boolean bound = false;
         int at = pluginBlock.indexOf("<execution>");
         while (at >= 0) {
             int close = pluginBlock.indexOf("</execution>", at);
@@ -2537,11 +2546,32 @@ public class CodenameOneSettings extends Lifecycle {
             }
             String execution = pluginBlock.substring(at, close);
             // The goal as an ELEMENT: `test-compile` contains `compile`, so a
-            // substring test takes exactly the executions it must not.
-            if (execution.indexOf("<goal>" + goal + "</goal>") >= 0) {
-                out.add(execution);
+            // substring test takes exactly the executions it must not. An
+            // execution that names no goal but carries Maven's own id for one is
+            // bound to it -- that is how a POM overrides a lifecycle-injected
+            // execution.
+            if (execution.indexOf("<goal>" + goal + "</goal>") >= 0
+                    || execution.indexOf("<id>default-" + goal + "</id>") >= 0) {
+                bound = true;
+                if (execution.indexOf("<" + element + ">") < 0) {
+                    if (execution.indexOf("combine.self=\"override\"") < 0) {
+                        out.add(pluginLevel);
+                    }
+                } else {
+                    out.add(execution);
+                    if (execution.indexOf("combine.children=\"append\"") >= 0) {
+                        out.add(pluginLevel);
+                    }
+                }
             }
             at = pluginBlock.indexOf("<execution>", close);
+        }
+        if (!bound) {
+            // Plugin-level configuration applies to every execution, so it
+            // counts when there is none bound to this goal -- dropping it lost a
+            // `<sourceDirs>` written once outside them, and a main class
+            // compiled from there became invisible.
+            out.add(pluginLevel);
         }
         return out;
     }
@@ -3813,16 +3843,30 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomText == null) {
             return null;
         }
-        String value = elementValue(pomText, "project.build.sourceEncoding");
-        if (value == null) {
-            value = elementValue(pomText, "maven.compiler.encoding");
+        // The compiler plugin's own <encoding> FIRST. The parameter defaults to
+        // ${project.build.sourceEncoding}, so an explicit one overrides the
+        // property -- reading the property first meant a module that sets the
+        // plugin parameter was decoded with the value it overrides.
+        //
+        // Inside the COMPILER plugin, and scoped to the compile goal.
+        // maven-resources-plugin declares an <encoding> of its own, and taking
+        // the first one in the file adopted the resource charset for every
+        // source -- so a UTF-8 source with a differently encoded resources block
+        // was read as neither.
+        String value = null;
+        for (String block : compileGoalConfiguration(
+                pluginBlock(pomText, "maven-compiler-plugin"), "compile", "encoding")) {
+            value = elementValue(block, "encoding");
+            if (value != null && value.trim().length() > 0) {
+                break;
+            }
+            value = null;
         }
         if (value == null) {
-            // Inside the COMPILER plugin. maven-resources-plugin declares an
-            // <encoding> of its own, and taking the first one in the file
-            // adopted the resource charset for every source -- so a UTF-8 source
-            // with a differently encoded resources block was read as neither.
-            value = elementValue(pluginBlock(pomText, "maven-compiler-plugin"), "encoding");
+            value = elementValue(pomText, "project.build.sourceEncoding");
+        }
+        if (value == null) {
+            value = elementValue(pomText, "maven.compiler.encoding");
         }
         value = resolveDeclaredProperties(value, properties);
         if (value == null || value.trim().isEmpty() || value.indexOf("${") >= 0) {

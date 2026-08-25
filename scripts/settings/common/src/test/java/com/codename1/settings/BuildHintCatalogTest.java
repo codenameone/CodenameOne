@@ -1762,9 +1762,14 @@ public class BuildHintCatalogTest {
         assertTrue(kotlin.contains("src/main/kt"), kotlin.toString());
         assertFalse(kotlin.contains("fixtures"), kotlin.toString());
 
-        // Plugin-level configuration applies to every execution, so it counts
-        // alongside them rather than being dropped when executions exist.
-        java.util.List<String> both = CodenameOneSettings.declaredSourceRoots(
+        // Maven merges by element, so the execution's <sourceDirs> REPLACES the
+        // plugin-level list. This used to assert that both count, which is the
+        // rule the plugin's own reader had already rejected: scanning a
+        // directory the build does not compile lets a dormant copy of the main
+        // class be picked before the real one, and then its annotation-owned
+        // hints look editable and Add writes the duplicate the next build
+        // refuses.
+        java.util.List<String> replaced = CodenameOneSettings.declaredSourceRoots(
                 "<project><build><plugins>"
                         + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
                         + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
@@ -1777,9 +1782,51 @@ public class BuildHintCatalogTest {
                         + "<sourceDirs><sourceDir>fixtures</sourceDir></sourceDirs>"
                         + "</configuration></execution>"
                         + "</executions></plugin></plugins></build></project>");
-        assertTrue(both.contains("src/shared/kt"), both.toString());
-        assertTrue(both.contains("src/main/kt"), both.toString());
-        assertFalse(both.contains("fixtures"), both.toString());
+        assertTrue(replaced.contains("src/main/kt"), replaced.toString());
+        assertFalse(replaced.contains("src/shared/kt"), replaced.toString());
+        assertFalse(replaced.contains("fixtures"), replaced.toString());
+
+        // `combine.children="append"` is how a POM asks for both lists, and then
+        // both are in effect.
+        java.util.List<String> appended = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs combine.children=\"append\">"
+                        + "<sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(appended.contains("src/main/kt"), appended.toString());
+        assertTrue(appended.contains("src/shared/kt"), appended.toString());
+
+        // An execution that says nothing about sources still inherits the
+        // plugin-level list...
+        java.util.List<String> inherited = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals>"
+                        + "<configuration><jvmTarget>17</jvmTarget></configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(inherited.contains("src/shared/kt"), inherited.toString());
+
+        // ...unless it says combine.self="override", which discards it.
+        java.util.List<String> overridden = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals>"
+                        + "<configuration combine.self=\"override\">"
+                        + "<jvmTarget>17</jvmTarget></configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertFalse(overridden.contains("src/shared/kt"), overridden.toString());
 
         // A project-directory expression is deterministic, so it is resolved
         // rather than discarded.
@@ -1865,6 +1912,47 @@ public class BuildHintCatalogTest {
                         + "<only.parent>p</only.parent></properties></project>", properties);
         assertEquals("module", properties.get("gen"));
         assertEquals("p", properties.get("only.parent"));
+    }
+
+    /// The compiler plugin's own `<encoding>` beats the property.
+    ///
+    /// The parameter DEFAULTS to `${project.build.sourceEncoding}`, so an
+    /// explicit one overrides the property. Reading the property first decoded a
+    /// module's sources with the value it overrides, and a non-ASCII package or
+    /// main-class name read that way is not found -- so its annotation-owned
+    /// hints look editable and Add writes the duplicate the next build refuses.
+    @Test
+    public void theCompilerPluginsEncodingBeatsTheProperty() {
+        String pom = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(pom));
+
+        // ...and an execution bound to compile beats the plugin-level value.
+        String execution = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration>"
+                + "<executions><execution><goals><goal>compile</goal></goals>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(execution));
+
+        // A testCompile execution's encoding is not this one.
+        String testOnly = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<executions><execution><goals><goal>testCompile</goal></goals>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("UTF-8", CodenameOneSettings.declaredSourceEncoding(testOnly));
     }
 
     /// A deprecated alias is not a second thing to set.
