@@ -235,7 +235,7 @@ class GcSteadyStateIntegrationTest {
         // the filter silently compiled out would pass part 1 forever.
         Path faulty = build(distDir, tempDirs, "faulted", "-DCN1_GC_CONFORM -DCN1_SATB_LOG_FRESH");
         Run faulted = run(faulty, distDir);
-        assertHealthy(faulted, "the -DCN1_SATB_LOG_FRESH build");
+        assertHealthy(faulted, "the -DCN1_SATB_LOG_FRESH build", javaResult);
         Series bad = Series.parse(faulted.output);
         assertTrue(bad.cycles >= MIN_CYCLES,
                 "The faulted build produced no [GCPROBE] series, so CN1_GC_CONFORM is not "
@@ -258,8 +258,7 @@ class GcSteadyStateIntegrationTest {
         Map<String, String> ceiling = new HashMap<>();
         ceiling.put("CN1_SIMULATE_PROC_MEMORY_LIMIT", Long.toString(CEILING_MB * 1024 * 1024));
         Run bounded = run(fixed, distDir, ceiling);
-        assertEquals(0, bounded.exit,
-                "The workload must finish under a ceiling. Output: " + tail(bounded.output));
+        assertHealthy(bounded, "the run under a simulated ceiling", javaResult);
         long boundedHeadroomMb = minHeadroomMb(bounded.output);
         assertTrue(boundedHeadroomMb >= 0,
                 "No [PACING] report under a simulated ceiling -- the budgeted path never "
@@ -273,7 +272,7 @@ class GcSteadyStateIntegrationTest {
         Path noReserve = build(distDir, tempDirs, "noreserve",
                 "-DCN1_GC_CONFORM -DCN1_PACING_NO_RESERVE");
         Run unbounded = run(noReserve, distDir, ceiling);
-        assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build");
+        assertHealthy(unbounded, "the -DCN1_PACING_NO_RESERVE build", javaResult);
         long unboundedHeadroomMb = minHeadroomMb(unbounded.output);
         assertTrue(unboundedHeadroomMb >= 0,
                 "No [PACING] report from the no-reserve build. Output: " + tail(unbounded.output));
@@ -284,16 +283,29 @@ class GcSteadyStateIntegrationTest {
     }
 
     /**
-     * A fault-injected run's measurements are only admissible if the run itself was
-     * healthy. Without this, a build that crashed or was OOM-killed after emitting enough
-     * probe rows would satisfy the cycle and inflated-SATB assertions and turn a
-     * memory-safety regression into a green gate -- the faults injected here are policy
-     * regressions, not crashes, so a crash means something else is wrong.
+     * A run's measurements are only admissible if the run itself was healthy AND still
+     * computed the right answer.
+     *
+     * <p>Exit status and the completion marker rule out a build that crashed or was
+     * OOM-killed after emitting enough probe rows, which would otherwise satisfy the
+     * cycle and inflated-SATB assertions and turn a memory-safety regression into a green
+     * gate. None of the variants here changes what the program computes -- the faults are
+     * a barrier filter and a pacing bound -- so RESULT must match the host JVM in every
+     * one of them.</p>
+     *
+     * <p>That last check is what covers the ceiling scenarios. They run the budgeted
+     * pacing path, which is the code this change touches most, under an environment the
+     * clean run never sees; without a parity check a worker could die early or compute
+     * the wrong sum while the process still exited cleanly and emitted plenty of
+     * [PACING] telemetry for the policy assertions to pass.</p>
      */
-    private void assertHealthy(Run r, String which) {
+    private void assertHealthy(Run r, String which, String expectedResult) {
         assertEquals(0, r.exit, which + " must still exit cleanly. Output: " + tail(r.output));
         assertTrue(r.output.contains("GC_STEADY_STATE_DONE"),
                 which + " must run to completion. Output: " + tail(r.output));
+        assertEquals(expectedResult, extractLine(r.output, "RESULT="),
+                which + " must still compute the same answer as the host JVM. Output: "
+                        + tail(r.output));
     }
 
     /** Smallest headroom the pacing tracer saw, in MB, or -1 if it never reported. */
