@@ -3252,9 +3252,67 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// Index just past a Kotlin raw string opening at `i`. No escapes, and a run
     /// of quotes closes at its last three, so the extra ones belong to the value.
+    /// The offset just past a `${ ... }` template expression at `i`, or -1 when
+    /// one does not start there.
+    ///
+    /// Braces are matched, and a nested literal inside the expression is stepped
+    /// over so that a `}` inside it does not close the expression early.
+    private static int endOfKotlinTemplate(String s, int i) {
+        if (i + 1 >= s.length() || s.charAt(i) != '$' || s.charAt(i + 1) != '{') {
+            return -1;
+        }
+        int depth = 0;
+        int j = i + 1;
+        while (j < s.length()) {
+            char ch = s.charAt(j);
+            if (ch == '"') {
+                j = s.startsWith("\"\"\"", j) ? endOfKotlinRawString(s, j) : endOfKotlinString(s, j);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return j + 1;
+                }
+            }
+            j++;
+        }
+        return -1;
+    }
+
+    /// The offset just past an ordinary Kotlin string starting at `i`.
+    private static int endOfKotlinString(String s, int i) {
+        int j = i + 1;
+        while (j < s.length()) {
+            if (s.charAt(j) == '\\') {
+                j += 2;
+                continue;
+            }
+            int template = endOfKotlinTemplate(s, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
+            if (s.charAt(j) == '"') {
+                return j + 1;
+            }
+            j++;
+        }
+        return s.length();
+    }
+
     private static int endOfKotlinRawString(String s, int i) {
         int j = i + 3;
         while (j < s.length()) {
+            // A template expression here too: a `"""` inside one is a nested
+            // literal, not this string's terminator.
+            int template = endOfKotlinTemplate(s, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
             if (s.charAt(j) != '"') {
                 j++;
                 continue;
@@ -3291,7 +3349,20 @@ public class CodenameOneSettings extends Lifecycle {
             for (int j = i + 1; j < s.length(); j++) {
                 if (s.charAt(j) == '\\') {
                     j++;
-                } else if (s.charAt(j) == '"') {
+                    continue;
+                }
+                // A Kotlin template expression opens a fresh nesting level, and
+                // the first quote inside it starts a NEW literal rather than
+                // closing this one -- so `"${"@Ios(teamId = x)"}"` ended the
+                // string early and exposed its contents as live code, which read
+                // as an annotation nobody wrote and hid the editor for a hint
+                // nothing owns.
+                int template = kotlin ? endOfKotlinTemplate(s, j) : -1;
+                if (template > j) {
+                    j = template - 1;
+                    continue;
+                }
+                if (s.charAt(j) == '"') {
                     return j + 1;
                 }
             }

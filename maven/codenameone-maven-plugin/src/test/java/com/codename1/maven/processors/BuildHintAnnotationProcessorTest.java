@@ -677,6 +677,34 @@ public class BuildHintAnnotationProcessorTest {
                 "package com.example\n\nfun `package helper`() {}\n", true));
     }
 
+    /// Inside a Kotlin template expression the first quote starts a NEW literal
+    /// rather than closing the outer one, so a `class` written inside one was
+    /// exposed as live code and read as a declaration nobody wrote.
+    @Test
+    public void aStringInsideAKotlinTemplateIsStillAString() {
+        String kt = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${\"class Fake\"}\"\n"
+                + "}\n";
+        assertFalse(BuildHintAnnotationProcessor.declaresType(kt, "Fake", true));
+        assertTrue(BuildHintAnnotationProcessor.declaresType(kt, "Real", true));
+
+        // A brace inside the nested literal must not close the expression early,
+        // or the nesting scan loses its place from there on.
+        String braced = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${\"} class Fake\"}\"\n"
+                + "}\n";
+        assertFalse(BuildHintAnnotationProcessor.declaresType(braced, "Fake", true));
+
+        // A raw string carries templates too.
+        String raw = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"\"\"${\"class Fake\"}\"\"\"\n"
+                + "}\n";
+        assertFalse(BuildHintAnnotationProcessor.declaresType(raw, "Fake", true));
+    }
+
     /// Running out of search budget is "cannot tell", not "no such source".
     /// Answering no dropped a live annotated class silently, with its placement
     /// error lost, for the sake of a bound -- which is the wrong way round:

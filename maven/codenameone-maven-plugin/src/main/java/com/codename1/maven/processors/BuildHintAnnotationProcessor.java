@@ -1000,6 +1000,21 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                         out[i++] = ' ';
                         continue;
                     }
+                    // A Kotlin template expression opens a fresh nesting level,
+                    // and the first quote inside it starts a NEW literal rather
+                    // than closing this one -- so `"${"@Ios(teamId = x)"}"` ended
+                    // the string early and exposed its contents as code, which
+                    // read as a declaration nobody wrote.
+                    int template = kotlin ? endOfKotlinTemplate(out, i) : -1;
+                    if (template > i) {
+                        while (i < template) {
+                            if (out[i] != '\n') {
+                                out[i] = ' ';
+                            }
+                            i++;
+                        }
+                        continue;
+                    }
                     boolean closing = out[i] == '"';
                     if (out[i] != '\n') {
                         out[i] = ' ';
@@ -1035,9 +1050,71 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     /// Index just past a Kotlin raw string opening at `i`. No escapes, and a run
     /// of quotes closes at its LAST three, so the extra ones belong to the value.
+    /// The offset just past a `${ ... }` template expression at `i`, or -1 when
+    /// one does not start there.
+    ///
+    /// Braces are matched, and a nested literal inside the expression is stepped
+    /// over so that a `}` inside it does not close the expression early.
+    private static int endOfKotlinTemplate(char[] c, int i) {
+        if (i + 1 >= c.length || c[i] != '$' || c[i + 1] != '{') {
+            return -1;
+        }
+        int depth = 0;
+        int j = i + 1;
+        while (j < c.length) {
+            char ch = c[j];
+            if (ch == '"') {
+                int run = j;
+                while (run < c.length && c[run] == '"') {
+                    run++;
+                }
+                j = run - j >= 3 ? endOfKotlinRawString(c, j) : endOfKotlinString(c, j);
+                continue;
+            }
+            if (ch == '{') {
+                depth++;
+            } else if (ch == '}') {
+                depth--;
+                if (depth == 0) {
+                    return j + 1;
+                }
+            }
+            j++;
+        }
+        return -1;
+    }
+
+    /// The offset just past an ordinary Kotlin string starting at `i`.
+    private static int endOfKotlinString(char[] c, int i) {
+        int j = i + 1;
+        while (j < c.length) {
+            if (c[j] == '\\') {
+                j += 2;
+                continue;
+            }
+            int template = endOfKotlinTemplate(c, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
+            if (c[j] == '"') {
+                return j + 1;
+            }
+            j++;
+        }
+        return c.length;
+    }
+
     private static int endOfKotlinRawString(char[] c, int i) {
         int j = i + 3;
         while (j < c.length) {
+            // A template expression here too: a `"""` inside one is a nested
+            // literal, not this string's terminator.
+            int template = endOfKotlinTemplate(c, j);
+            if (template > j) {
+                j = template;
+                continue;
+            }
             if (c[j] != '"') {
                 j++;
                 continue;

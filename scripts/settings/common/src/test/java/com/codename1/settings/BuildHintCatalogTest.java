@@ -1110,4 +1110,42 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(theirs, owned, true);
         assertNull(owned.get("ios.teamId"));
     }
+
+    /// Inside a Kotlin template expression the first quote starts a NEW literal
+    /// rather than closing the outer one, so `"${"@Ios(teamId = x)"}"` ended the
+    /// string early and exposed its contents as live code -- an annotation
+    /// nobody wrote, which hid the editor for a hint nothing owns.
+    @Test
+    public void aStringInsideATemplateIsStillAString() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"@Ios(teamId = fake)\"}\"\n"
+                + "}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // A real annotation in the same file is still found.
+        String real = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"@Ios(pods = fake)\"}\"\n"
+                + "}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(real, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertNull(owned.get("ios.pods"));
+
+        // A brace inside the nested literal must not close the expression early.
+        String braced = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"} @Ios(teamId = fake)\"}\"\n"
+                + "}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(braced, owned, true);
+        assertNull(owned.get("ios.teamId"));
+    }
 }
