@@ -896,6 +896,36 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertFalse(mojoWithEncoding("UTF-8").declares(f, pkg, "\u30a2\u30d7\u30ea"));
     }
 
+    /// A multibyte name is not readable in the byte-transparent view, and
+    /// falling back to the first top-level declaration put the annotations on
+    /// an ASCII helper that happened to come first -- which the verification
+    /// build then rejected.
+    @Test
+    public void theNamedDeclarationIsFoundInAMultibyteSource() throws Exception {
+        String main = "\u30a2\u30d7\u30ea";
+        String decoded = "package com.example;\n"
+                + "class Helper {\n}\n"
+                + "class " + main + " {\n}\n";
+        File f = File.createTempFile("Sjis", ".java");
+        f.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(decoded.getBytes("Shift_JIS"));
+        } finally {
+            os.close();
+        }
+
+        MigrateBuildHintsMojo mojo = mojoWithEncoding("Shift_JIS");
+        mojo.insertAnnotations(f, "@Ios(teamId = \"X\")\n", main);
+
+        String migrated = new String(java.nio.file.Files.readAllBytes(f.toPath()), "Shift_JIS");
+        // Above the main class, not above the helper that precedes it.
+        assertTrue(migrated, migrated.indexOf("@Ios(teamId") > migrated.indexOf("class Helper"));
+        assertTrue(migrated, migrated.indexOf("@Ios(teamId") < migrated.indexOf("class " + main));
+        // ...and the rest of the file survives its own encoding intact.
+        assertTrue(migrated, migrated.contains("class " + main));
+    }
+
     /// A mojo whose project compiles with `encoding`.
     private MigrateBuildHintsMojo mojoWithEncoding(String encoding) {
         MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();

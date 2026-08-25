@@ -20,7 +20,10 @@ set -uo pipefail
 # race this repo requires to be root-caused. With it set, a failure that does not
 # match is returned on the first attempt, so only the transient-resolution case
 # gets a second chance. Leave it unset for steps that merely download and build.
-attempts="${RETRY_ATTEMPTS:-3}"
+# Four, not three. With the growing wait below that is 30s, 2m and 5m of
+# coverage -- the same 30/120/300 the Windows cross-compile workflow settled on.
+# Three attempts spanned four minutes and still lost to a 429 window.
+attempts="${RETRY_ATTEMPTS:-4}"
 delay="${RETRY_DELAY_SECONDS:-30}"
 # The wait GROWS. A flat retry spends all its attempts inside the same window
 # Central is still refusing in -- observed as three 403s in sixty seconds, which

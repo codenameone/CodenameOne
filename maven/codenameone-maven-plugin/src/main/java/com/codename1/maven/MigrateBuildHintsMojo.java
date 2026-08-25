@@ -483,6 +483,22 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     /** The reactor module whose basedir is {@code dir}, or null when none is. */    /** The reactor module whose basedir is {@code dir}, or null when none is. */
+    /// The nearest reactor module a file belongs to, walking up from it, or
+    /// null when it is under none.
+    ///
+    /// A source sits several package directories below its module, so an exact
+    /// basedir match on its parent finds nothing.
+    private org.apache.maven.project.MavenProject moduleOwning(File file) {
+        for (File at = file == null ? null : file.getParentFile(); at != null;
+                at = at.getParentFile()) {
+            org.apache.maven.project.MavenProject owner = moduleAt(at);
+            if (owner != null) {
+                return owner;
+            }
+        }
+        return null;
+    }
+
     private org.apache.maven.project.MavenProject moduleAt(File dir) {
         if (reactorProjects == null || dir == null) {
             return null;
@@ -829,7 +845,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             // rewrite depends on cannot answer this for a multibyte encoding:
             // Shift_JIS bytes are control characters in ISO-8859-1, so the name
             // is not even readable as an identifier, let alone comparable.
-            text = read(f, sourceCharset());
+            text = read(f, sourceCharset(f));
         } catch (IOException ex) {
             return false;
         }
@@ -890,8 +906,14 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     /// The encoding this module's sources are compiled with, or UTF-8.
-    private String sourceCharset() {
-        String configured = sourceEncodingOf(project);
+    private String sourceCharset(File source) {
+        // The module that OWNS the file, not the reactor root. `cn1:migrate-
+        // build-hints` runs from the root of a multi-module project while the
+        // sources live in common, and a module may set an encoding the root
+        // does not -- asking the root decoded the file with somebody else's
+        // charset, which is the bug this was added to fix, one level out.
+        org.apache.maven.project.MavenProject owner = moduleOwning(source);
+        String configured = sourceEncodingOf(owner == null ? project : owner);
         return configured == null ? "UTF-8" : configured;
     }
 
@@ -952,7 +974,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String importLine = importLines.length() == 0 ? null
                 : importLines.substring(0, importLines.length() - 1);
 
-        int declaration = classDeclarationIndex(text, kotlin, simpleName);
+        int declaration = declarationOffsetIn(source, text, kotlin, simpleName);
         if (declaration < 0) {
             throw new IOException("Could not find the class declaration in " + source.getName());
         }
@@ -1469,6 +1491,36 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             }
         }
         return fallback;
+    }
+
+    /// Where the named declaration starts, as an offset into the BYTE-
+    /// TRANSPARENT text that gets rewritten.
+    ///
+    /// The name is found in the source decoded properly -- a multibyte name is
+    /// not readable in the byte-transparent view, and falling back to the first
+    /// top-level declaration put the annotations on an ASCII helper that
+    /// happened to come first, which the verification build then rejected. The
+    /// offset is carried back by measuring how many bytes the decoded prefix
+    /// occupies, which is exactly its index in a text of one char per byte.
+    ///
+    /// Only when the decoded text round-trips to the same bytes: a file that is
+    /// not in the encoding the project claims cannot be measured this way, and
+    /// the byte-transparent scan stays the answer for it.
+    private int declarationOffsetIn(File source, String text, boolean kotlin, String simpleName) {
+        String charset = sourceCharset(source);
+        try {
+            String decoded = read(source, charset);
+            byte[] round = decoded.getBytes(charset);
+            if (round.length == text.length()) {
+                int at = classDeclarationIndex(decoded, kotlin, simpleName);
+                if (at >= 0) {
+                    return decoded.substring(0, at).getBytes(charset).length;
+                }
+            }
+        } catch (IOException | RuntimeException ex) {
+            getLog().debug("cn1: could not read " + source + " as " + charset, ex);
+        }
+        return classDeclarationIndex(text, kotlin, simpleName);
     }
 
     /// The name is matched in the byte-transparent text, so a source in a
