@@ -2689,11 +2689,24 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 continue;
             }
             String stamped = found.getProperty("cn1.buildHints.mainClass");
-            if (expectedMain != null && stamped != null && !expectedMain.equals(stamped)) {
-                // A cn1lib that bound the goal itself, or a stale artifact. Merging it
-                // would apply another project's build configuration to this one.
+            if (expectedMain != null && !expectedMain.equals(stamped)) {
+                // A cn1lib that bound the goal itself, a stale artifact, or a
+                // file a project keeps in src/main/resources -- anything on the
+                // classpath can carry this name. It has to say it was generated
+                // for THIS main class: an unstamped one used to be accepted, and
+                // then it both applied somebody else's hints and counted as
+                // proof that the processor ran, which is what suppresses the
+                // refusal below when the goal is not bound at all.
                 getLog().debug("cn1: ignoring build hints from " + element
                         + " -- they were generated for " + stamped);
+                continue;
+            }
+            if (found.getProperty(com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .SOURCE_DIGEST_KEY) == null) {
+                // The processor always records one. A manifest without it was
+                // written by something else.
+                getLog().debug("cn1: ignoring build hints from " + element
+                        + " -- no processor fingerprint");
                 continue;
             }
             // The stamp says which class produced this file, not when. Nothing

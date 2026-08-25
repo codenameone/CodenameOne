@@ -62,7 +62,9 @@ public class AnnotationBuildHintMergeTest {
     @Test
     public void hintsFromTheManifestReachTheBuildRequest() throws Exception {
         File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
-                + "codename1.arg.ios.pods=Alamofire\n");
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios(teamId = \"ABCDE12345\")")
+                + "\ncodename1.arg.ios.pods=Alamofire\n");
+        writeAnnotatedClass(classes);
         Properties target = new Properties();
 
         merge(target, classes, "MyApp", "com.example");
@@ -78,7 +80,9 @@ public class AnnotationBuildHintMergeTest {
      */
     @Test
     public void anEmptyManifestIsProofTheProcessorRan() throws Exception {
-        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n");
+        File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios(teamId = \"ABCDE12345\")")
+                + "\n");
         // The annotated class has to be there too -- that is the whole situation:
         // an annotation the compiler recorded and a manifest that carries no hint
         // for it. Without the class the refusal path has nothing to trip on and
@@ -171,19 +175,56 @@ public class AnnotationBuildHintMergeTest {
     }
 
     /**
-     * A manifest with no fingerprint in it cannot be judged, so it is taken at
-     * face value rather than refused on a guess.
+     * A manifest with no fingerprint was not written by the processor, which
+     * always records one.
+     *
+     * <p>Anything on the classpath can carry this file name -- a dependency, or
+     * a copy a project keeps in {@code src/main/resources} -- and taking one at
+     * face value both applied somebody else's hints and counted as proof that
+     * the processor ran, which is what suppresses the refusal when the goal is
+     * not bound at all. So the build refuses rather than shipping an app whose
+     * annotated hints are silently missing.</p>
      */
     @Test
-    public void aManifestWithNoFingerprintIsStillTrusted() throws Exception {
+    public void aManifestWithNoFingerprintIsNotAnnotationOutput() throws Exception {
         File classes = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
                 + "codename1.arg.ios.teamId=OLD\n");
         writeAnnotatedClass(classes);
 
         Properties target = new Properties();
-        merge(target, classes, "MyApp", "com.example");
+        try {
+            merge(target, classes, "MyApp", "com.example");
+            fail("expected the build to be refused");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("process-annotations"));
+        }
+        assertNull("somebody else's value must not have been applied",
+                target.getProperty("codename1.arg.ios.teamId"));
+    }
 
-        assertEquals("OLD", target.getProperty("codename1.arg.ios.teamId"));
+    /**
+     * ...and one that names no main class is not ours either.
+     *
+     * <p>The digest here MATCHES the compiled class, so the fingerprint check
+     * cannot be what rejects it -- this is the stamp doing the work.</p>
+     */
+    @Test
+    public void aManifestWithNoStampIsNotAnnotationOutput() throws Exception {
+        File classes = manifest("cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        try {
+            merge(target, classes, "MyApp", "com.example");
+            fail("expected the build to be refused");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("process-annotations"));
+        }
+        assertNull(target.getProperty("codename1.arg.ios.teamId"));
     }
 
     /**
