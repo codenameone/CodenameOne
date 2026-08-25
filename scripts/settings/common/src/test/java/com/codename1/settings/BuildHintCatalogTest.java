@@ -1941,20 +1941,4 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.expandBasedir("${custom.dir}/x", "/p/common"));
     }
 
-    /// The roots the launcher resolved are read, not merely carried. Path
-    /// separated, since a comma is legal in a directory name.
-    @Test
-    public void theResolvedRootsAreParsed() {
-        assertEquals(java.util.Arrays.asList("/p/common/src/main/java", "/p/common/appsrc"),
-                CodenameOneSettings.splitRoots("/p/common/src/main/java:/p/common/appsrc"));
-        assertEquals(java.util.Arrays.asList("/a", "/b"),
-                CodenameOneSettings.splitRoots("/a;/b"));
-
-        // A Windows drive letter belongs to the path that follows it.
-        assertEquals(java.util.Arrays.asList("C:/p/src", "D:/other"),
-                CodenameOneSettings.splitRoots("C:/p/src;D:/other"));
-
-        assertTrue(CodenameOneSettings.splitRoots(null).isEmpty());
-        assertTrue(CodenameOneSettings.splitRoots("   ").isEmpty());
-    }
 }

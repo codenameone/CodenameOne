@@ -1149,7 +1149,59 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
         }
         addKotlinSourceDirs(project, roots);
+        addBuildHelperSources(project, roots);
         return roots;
+    }
+
+    /**
+     * build-helper's {@code add-source} directories.
+     *
+     * <p>That goal runs at {@code generate-sources} and adds them to the project
+     * itself, so a mojo bound after it sees them already. A goal invoked
+     * DIRECTLY -- {@code mvn cn1:settings} -- runs no lifecycle at all, so the
+     * list it reads is missing them, and a main class living only in an added
+     * root looked absent.</p>
+     *
+     * <p>{@code add-test-source} uses the same element and is passed over, the
+     * same distinction the Kotlin plugin's compile and test-compile executions
+     * need.</p>
+     */
+    private static void addBuildHelperSources(MavenProject project, List<String> roots) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return;
+        }
+        if (plugins == null) {
+            return;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"build-helper-maven-plugin".equals(plugin.getArtifactId())
+                    || plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                if (execution.getGoals() != null && execution.getGoals().contains("add-source")) {
+                    addSourcesFrom(project, execution.getConfiguration(), roots);
+                }
+            }
+        }
+    }
+
+    private static void addSourcesFrom(MavenProject project, Object configuration,
+                                       List<String> roots) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom sources =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("sources");
+        if (sources == null) {
+            return;
+        }
+        for (org.codehaus.plexus.util.xml.Xpp3Dom source : sources.getChildren()) {
+            addRoot(project, source.getValue(), roots);
+        }
     }
 
     /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
@@ -1198,17 +1250,20 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         for (org.codehaus.plexus.util.xml.Xpp3Dom dir : dirs.getChildren()) {
-            String value = dir.getValue();
-            if (value == null || value.trim().isEmpty()) {
-                continue;
-            }
-            File f = new File(value.trim());
-            if (!f.isAbsolute() && project.getBasedir() != null) {
-                f = new File(project.getBasedir(), value.trim());
-            }
-            if (!roots.contains(f.getAbsolutePath())) {
-                roots.add(f.getAbsolutePath());
-            }
+            addRoot(project, dir.getValue(), roots);
+        }
+    }
+
+    private static void addRoot(MavenProject project, String value, List<String> roots) {
+        if (value == null || value.trim().isEmpty() || value.indexOf('$') >= 0) {
+            return;
+        }
+        File f = new File(value.trim());
+        if (!f.isAbsolute() && project.getBasedir() != null) {
+            f = new File(project.getBasedir(), value.trim());
+        }
+        if (!roots.contains(f.getAbsolutePath())) {
+            roots.add(f.getAbsolutePath());
         }
     }
 

@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ProjectIOTest {
     @Test
@@ -72,19 +73,24 @@ public class ProjectIOTest {
     /// class and then offer an annotation-owned hint for editing.
     @Test
     public void theBindingCarriesTheResolvedSourceRootsAndEncoding() {
+        // One line per root. Every delimiter is legal in a path -- a colon in a
+        // Unix directory name, a semicolon in either -- so a joined list would
+        // have split such a path into two roots that exist nowhere.
         ProjectBinding b = ProjectBinding.parse(
                 "projectDir=/p/common\n"
                         + "settings=/p/common/codenameone_settings.properties\n"
-                        + "sourceRoots=/p/common/src/main/java:/p/common/appsrc\n"
+                        + "sourceRoot=/p/common/src/main/java\n"
+                        + "sourceRoot=/p/common/od:d name\n"
                         + "sourceEncoding=Shift_JIS\n");
-        assertEquals("/p/common/src/main/java:/p/common/appsrc", b.sourceRoots());
+        assertEquals(java.util.Arrays.asList("/p/common/src/main/java", "/p/common/od:d name"),
+                b.sourceRoots());
         assertEquals("Shift_JIS", b.sourceEncoding());
 
         // A binding written by an older plugin says neither, and the tool falls
         // back to reading the POM itself.
         ProjectBinding older = ProjectBinding.parse(
                 "projectDir=/p/common\nsettings=/p/common/codenameone_settings.properties\n");
-        assertNull(older.sourceRoots());
+        assertTrue(older.sourceRoots().isEmpty());
         assertNull(older.sourceEncoding());
     }
 }

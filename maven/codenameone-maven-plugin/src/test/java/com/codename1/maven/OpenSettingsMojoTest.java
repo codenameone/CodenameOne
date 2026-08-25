@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -178,9 +179,11 @@ public class OpenSettingsMojoTest {
         mojo.writeBinding(input, common);
 
         String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
-        assertTrue(binding, binding.contains("sourceRoots="));
-        assertTrue(binding, binding.contains(new File(common, "src/main/java").getAbsolutePath()));
-        assertTrue(binding, binding.contains(new File(common, "appsrc").getAbsolutePath()));
+        // One line per root, so a path containing a separator survives.
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "src/main/java").getAbsolutePath() + "\n"));
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "appsrc").getAbsolutePath() + "\n"));
         assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
     }
 
@@ -237,6 +240,47 @@ public class OpenSettingsMojoTest {
         assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
     }
 
+    /// `add-source` runs at generate-sources and adds its directories to the
+    /// project, so a mojo bound after it sees them. A goal invoked DIRECTLY --
+    /// `mvn cn1:settings` -- runs no lifecycle at all, so they are missing and a
+    /// main class living only in an added root looked absent.
+    @Test
+    public void buildHelperSourcesAreResolvedWithoutTheLifecycle() throws Exception {
+        File root = tmp.newFolder("helper-roots");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/main").mkdirs());
+        assertTrue(new File(common, "gen/fixtures").mkdirs());
+        File input = tmp.newFile("helper-roots.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.addExecution(sourceExecution("add-source", "gen/main"));
+        helper.addExecution(sourceExecution("add-test-source", "gen/fixtures"));
+        mojo.project.getBuild().addPlugin(helper);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/main").getAbsolutePath() + "\n"));
+        // The test goal's directories are not main sources.
+        assertFalse(binding, binding.contains(new File(common, "gen/fixtures").getAbsolutePath()));
+    }
+
+    private static org.apache.maven.model.PluginExecution sourceExecution(String goal, String dir)
+            throws Exception {
+        org.apache.maven.model.PluginExecution execution =
+                new org.apache.maven.model.PluginExecution();
+        execution.setGoals(Arrays.asList(goal));
+        execution.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader("<configuration><sources><source>" + dir
+                        + "</source></sources></configuration>")));
+        return execution;
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test
@@ -249,7 +293,7 @@ public class OpenSettingsMojoTest {
         new OpenSettingsMojo().writeBinding(input, common);
 
         String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
-        assertFalse(binding, binding.contains("sourceRoots="));
+        assertFalse(binding, binding.contains("sourceRoot="));
         assertFalse(binding, binding.contains("sourceEncoding="));
     }
 

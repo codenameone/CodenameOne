@@ -251,7 +251,7 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 // editing. Its own reading stays as the fallback for a Settings
                 // launched without these -- an older plugin, or the standalone
                 // app.
-                + bindingList("sourceRoots", compileSourceRoots(moduleAt(projectDir)))
+                + bindingLines("sourceRoot", compileSourceRoots(moduleAt(projectDir)))
                 + bindingValue("sourceEncoding", sourceEncodingOf(moduleAt(projectDir)));
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
@@ -288,23 +288,23 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         return value == null ? "" : key + "=" + value + "\n";
     }
 
-    private static String bindingList(String key, List<String> values) {
-        if (values == null || values.isEmpty()) {
+    /// One line per value.
+    ///
+    /// Not a delimited list: every delimiter is legal in a path -- a colon in a
+    /// Unix directory name, a semicolon in either -- so joining them means
+    /// choosing an escaping scheme, and a path that happened to contain the
+    /// separator would have been split into two roots that exist nowhere.
+    private static String bindingLines(String key, List<String> values) {
+        if (values == null) {
             return "";
         }
-        StringBuilder joined = new StringBuilder();
+        StringBuilder out = new StringBuilder();
         for (String value : values) {
-            if (value == null || value.trim().isEmpty()) {
-                continue;
+            if (value != null && !value.trim().isEmpty()) {
+                out.append(key).append('=').append(value.trim()).append('\n');
             }
-            if (joined.length() > 0) {
-                // A path separator, since these are paths and a comma is legal
-                // in a directory name.
-                joined.append(File.pathSeparatorChar);
-            }
-            joined.append(value.trim());
         }
-        return joined.length() == 0 ? "" : key + "=" + joined + "\n";
+        return out.toString();
     }
 
     File multimoduleRoot(File projectDir) {
