@@ -505,14 +505,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     /**
      * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
-     * whose {@code codename1.platform} does not name their real hardening platform. The native-Mac
-     * targets (mac-source / mac-os-x-native) run with platform=ios but harden as "mac", so their
-     * opt-out is {@code harden.mac.enabled}. Returns {@code null} when the target carries no such
-     * override and the platform value should be used.
+     * whose {@code codename1.platform} does not name their real hardening platform. Every Mac
+     * target hardens as "mac", so its opt-out is {@code harden.mac.enabled}: the legacy Catalyst
+     * ones (mac-catalyst / mac-catalyst-source) because they run with platform=ios, and the AppKit
+     * ones (mac-source / mac-os-x-native) so that a project moving between the two keeps the same
+     * opt-out key. Returns {@code null} when the target carries no such override and the platform
+     * value should be used.
      */
     private static String hardenPlatformForBuildTarget(String buildTarget) {
         if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_CATALYST.equals(buildTarget)
+                || BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)) {
             return "mac";
         }
         return null;
@@ -1174,6 +1178,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     public static final String BUILD_TARGET_MAC_NATIVE_PROJECT = Executor.BUILD_TARGET_MAC_NATIVE_PROJECT;
     public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
+    public static final String BUILD_TARGET_MAC_CATALYST = Executor.BUILD_TARGET_MAC_CATALYST;
+    public static final String BUILD_TARGET_MAC_CATALYST_PROJECT = Executor.BUILD_TARGET_MAC_CATALYST_PROJECT;
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
     /**
@@ -1273,6 +1279,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return (buildTarget.startsWith("local-") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget));
     }
 
@@ -1673,10 +1680,17 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     doLinuxNativeLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("android") || BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                     doAndroidLocalBuild(antProject, cn1SettingsProps, antDistJar);
+                } else if (BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)) {
+                    // Legacy Mac Catalyst: rides the iOS pipeline with the
+                    // macNative.enabled build hint forced on, and IPhoneBuilder
+                    // delegates the Catalyst-specific emission when it sees it.
+                    cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
+                    doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)) {
-                    // mac-source rides the iOS pipeline with the macNative.enabled
-                    // build hint forced on. The IPhoneBuilder delegates Mac-specific
-                    // emission to MacNativeBuilder when that hint is set.
+                    // mac-source is the native AppKit project. It still rides the
+                    // iOS local-build entry point for now; the AppKit builder takes
+                    // over in a later step of this series. Until then it behaves as
+                    // it did before, so the target is never broken mid-series.
                     cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
                     doIOSLocalBuild(antProject, cn1SettingsProps, antDistJar);
                 } else if (buildTarget.contains("ios") || BUILD_TARGET_XCODE_PROJECT.equals(buildTarget)) {
@@ -1694,7 +1708,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 // -- previously only mac-source did, so the cloud mac-os-x-native
                 // target rode the plain iOS pipeline instead of emitting a Mac app.
                 if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
-                        || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
+                        || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                        || BUILD_TARGET_MAC_CATALYST.equals(buildTarget)
+                        || BUILD_TARGET_MAC_CATALYST_PROJECT.equals(buildTarget)) {
                     cn1SettingsProps.setProperty("codename1.arg.macNative.enabled", "true");
                 }
                 if (automated) {

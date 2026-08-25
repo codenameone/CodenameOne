@@ -27,20 +27,19 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 
 /**
- * Build wrapper for the native Mac cloud target ({@code mac-os-x-native}), which
- * produces a native macOS {@code .app} -- the Mac analog of the iOS and Windows
- * device builds.
+ * Build wrapper for the legacy Mac Catalyst cloud target ({@code mac-catalyst}).
  *
- * <p>Distinct from {@link BuildMacDesktopMojo}, which bundles the JVM/JavaSE app
- * ({@code mac-os-x-desktop}), and from {@link BuildMacCatalystMojo}, which builds
- * the legacy Mac Catalyst slice ({@code mac-catalyst}).</p>
+ * <p>Catalyst is a slice of the iOS Xcode project rather than a port of its own,
+ * so this rides the iOS pipeline with {@code macNative.enabled} (set by the build
+ * mojo for this target) and its platform is {@code ios}.</p>
  *
- * <p>Filled a uniformity gap: {@code windows-device} had a wrapper mojo + IDE entry
- * but the equivalent native-Mac target was reachable only by hand.</p>
+ * <p>Superseded by {@link BuildMacNativeMojo}, which builds the native AppKit app
+ * on {@code mac-os-x-native}. Both are distinct from {@link BuildMacDesktopMojo},
+ * which bundles the JVM/JavaSE app on {@code mac-os-x-desktop}.</p>
  */
-@Mojo(name="buildMacNative", requiresDependencyResolution = ResolutionScope.NONE,
+@Mojo(name="buildMacCatalyst", requiresDependencyResolution = ResolutionScope.NONE,
         requiresDependencyCollection = ResolutionScope.NONE)
-public class BuildMacNativeMojo extends AbstractBuildWrapperMojo {
+public class BuildMacCatalystMojo extends AbstractBuildWrapperMojo {
     @Override
     protected String getPlatform() {
         return "ios";
@@ -48,6 +47,6 @@ public class BuildMacNativeMojo extends AbstractBuildWrapperMojo {
 
     @Override
     protected String getBuildTarget() {
-        return "mac-os-x-native";
+        return "mac-catalyst";
     }
 }

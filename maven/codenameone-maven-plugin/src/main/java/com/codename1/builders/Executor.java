@@ -86,9 +86,17 @@ public abstract class Executor {
     // JVM/JavaSE executable jar. The cloud target submits to the "linux" queue; the
     // local "local-linux-device" target builds on the developer's own machine.
     public static final String BUILD_TARGET_LINUX_NATIVE = "linux-device";
-    // Native Mac (ParparVM Catalyst slice, rides the iOS pipeline with
-    // macNative.enabled). The cloud target name; "mac-source" is the local project.
+    // Native Mac (AppKit). The cloud target name; "mac-source" is the local
+    // Xcode project. Both names are inherited from the Mac Catalyst target that
+    // preceded this port, so an existing project keeps building without an edit
+    // and simply gets the AppKit app instead.
     public static final String BUILD_TARGET_MAC_NATIVE = "mac-os-x-native";
+    // Legacy Mac Catalyst. The Catalyst slice rides the iOS pipeline with the
+    // macNative.enabled build hint, exactly as it always did; it moved off
+    // "mac-os-x-native" onto its own names so a project that depends on the
+    // Catalyst behaviour has somewhere to say so.
+    public static final String BUILD_TARGET_MAC_CATALYST = "mac-catalyst";
+    public static final String BUILD_TARGET_MAC_CATALYST_PROJECT = "mac-catalyst-source";
     private String buildTarget;
 
     private static boolean disableDelete;
