@@ -268,20 +268,30 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
     /// the one whose sources matter.
     private MavenProject moduleAt(File projectDir) {
         if (projectDir == null) {
-            return project;
+            return null;
         }
         MavenSession session = getSession();
         List<MavenProject> projects = session == null ? null : session.getProjects();
         if (projects != null) {
             for (MavenProject candidate : projects) {
-                File basedir = candidate.getBasedir();
-                if (basedir != null
-                        && basedir.getAbsolutePath().equals(projectDir.getAbsolutePath())) {
+                if (isAt(candidate, projectDir)) {
                     return candidate;
                 }
             }
         }
-        return project;
+        // The project being built, but only when it IS this directory. Falling
+        // back to it regardless published the platform module's compile roots as
+        // the common module's -- `cn1:settings` run from javase or android
+        // resolves the sibling common directory, which the reactor need not
+        // contain -- and Settings takes resolved roots as authoritative, so it
+        // never looked at the real POM and missed the annotated main source.
+        // Saying nothing sends it back to its own reading, which is right.
+        return isAt(project, projectDir) ? project : null;
+    }
+
+    private static boolean isAt(MavenProject candidate, File dir) {
+        return candidate != null && candidate.getBasedir() != null
+                && candidate.getBasedir().getAbsolutePath().equals(dir.getAbsolutePath());
     }
 
     private static String bindingValue(String key, String value) {

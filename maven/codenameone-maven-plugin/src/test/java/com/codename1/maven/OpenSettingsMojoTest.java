@@ -368,6 +368,35 @@ public class OpenSettingsMojoTest {
                 binding.contains(new File(common, "gen/plugin-level").getAbsolutePath()));
     }
 
+    /// `cn1:settings` run from a platform module resolves the sibling common
+    /// directory, which the reactor need not contain. Publishing the platform
+    /// module's roots as common's sent Settings an authoritative-looking answer
+    /// about the wrong module, so it never read the real POM and missed the
+    /// annotated main source.
+    @Test
+    public void aModuleWeDoNotHaveIsNotDescribed() throws Exception {
+        File root = tmp.newFolder("platform");
+        File common = new File(root, "common");
+        File javase = new File(root, "javase");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(javase, "src/main/java").mkdirs());
+        File input = tmp.newFile("platform.input");
+
+        // The project being built is javase; the directory being edited is
+        // common, and no reactor module describes it.
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(javase);
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("projectDir=" + common.getAbsolutePath()));
+        assertFalse(binding, binding.contains("sourceRoot="));
+        assertFalse(binding, binding.contains("sourceEncoding="));
+        assertFalse(binding, binding.contains(javase.getAbsolutePath() + "/src"));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test
