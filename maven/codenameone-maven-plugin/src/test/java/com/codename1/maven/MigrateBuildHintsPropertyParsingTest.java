@@ -641,4 +641,33 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(source.indexOf("class "),
                 MigrateBuildHintsMojo.classDeclarationIndex(source, false, "\u5e94\u7528"));
     }
+
+    /// The continuation backslash is a MARKER, not part of the value.
+    /// `Properties.load` drops it, so leaving it in made `key\` + ` =value` read
+    /// as an escaped `=`; the key never matched the one being migrated, the
+    /// declaration stayed behind, and the verification build failed on the
+    /// duplicate the goal had just created.
+    @Test
+    public void aSeparatorOnAContinuationLineStillNamesItsKey() throws Exception {
+        File f = File.createTempFile("cn1-settings", ".properties");
+        f.deleteOnExit();
+        write(f, "codename1.arg.ios.teamId\\\n"
+                + " =ABCDE12345\n"
+                + "codename1.displayName=Demo\n");
+
+        // Exactly what Properties.load calls the key, so the plan and the
+        // removal cannot disagree about it.
+        java.util.Properties loaded = new java.util.Properties();
+        java.io.InputStream in = new java.io.FileInputStream(f);
+        try {
+            loaded.load(in);
+        } finally {
+            in.close();
+        }
+        assertEquals("ABCDE12345", loaded.getProperty("codename1.arg.ios.teamId"));
+
+        MigrateBuildHintsMojo.removeMigratedLines(f,
+                java.util.Arrays.asList("codename1.arg.ios.teamId"));
+        assertEquals("codename1.displayName=Demo\n", read(f));
+    }
 }

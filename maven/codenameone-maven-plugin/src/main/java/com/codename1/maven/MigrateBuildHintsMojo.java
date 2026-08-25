@@ -1397,6 +1397,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             int last = i;
             StringBuilder logical = new StringBuilder(withoutTerminator(lines.get(i)));
             while (continues(withoutTerminator(lines.get(last))) && last + 1 < lines.size()) {
+                // The continuation backslash is a MARKER, not part of the value:
+                // Properties.load drops it, so leaving it in made
+                // `codename1.arg.ios.teamId\` + ` =ABCDE` read as an escaped `=`
+                // and the key never matched the one being migrated. The
+                // declaration stayed behind, and the verification build then
+                // failed on the duplicate the goal had just created.
+                logical.setLength(logical.length() - 1);
                 last++;
                 logical.append(withoutTerminator(lines.get(last)).replaceFirst("^\\s+", ""));
             }

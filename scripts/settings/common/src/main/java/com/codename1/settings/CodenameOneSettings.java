@@ -2824,12 +2824,68 @@ public class CodenameOneSettings extends Lifecycle {
     /// and use only the second.
     static java.util.List<String> kotlinTypeAliases(String source, String simple,
                                                     boolean kotlin) {
+        return kotlinTypeAliases(java.util.Collections.singletonList(source), simple, kotlin);
+    }
+
+    /// Every name that resolves to `simple`, across all of `sources`, following
+    /// a CHAIN of aliases.
+    ///
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. Resolved by closure rather than by recursion so that a cycle --
+    /// which the compiler rejects, but this reader must not hang on -- simply
+    /// stops adding names.
+    static java.util.List<String> kotlinTypeAliases(java.util.List<String> sources, String simple,
+                                                    boolean kotlin) {
         java.util.List<String> out = new java.util.ArrayList<String>();
-        if (!kotlin) {
+        if (!kotlin || sources == null) {
             return out;
         }
         String qualified = "com.codename1.annotations.buildhints." + simple;
-        boolean imported = importsAnnotation(source, simple, kotlin);
+        java.util.List<String[]> declarations = new java.util.ArrayList<String[]>();
+        for (String source : sources) {
+            if (source == null) {
+                continue;
+            }
+            // The bare name counts only where an import makes it ours, and that
+            // import is file-scoped -- so it is decided per source, here, rather
+            // than once for the whole sweep.
+            boolean imported = importsAnnotation(source, simple, kotlin);
+            for (String[] declared : typeAliasDeclarations(source, kotlin)) {
+                if (declared[1].equals(qualified) || (imported && declared[1].equals(simple))) {
+                    if (!out.contains(declared[0])) {
+                        out.add(declared[0]);
+                    }
+                } else {
+                    declarations.add(declared);
+                }
+            }
+        }
+        // Each pass can only resolve one more link, so the number of passes is
+        // bounded by the number of declarations left over.
+        for (int pass = 0; pass < declarations.size(); pass++) {
+            boolean grew = false;
+            for (String[] declared : declarations) {
+                if (!out.contains(declared[0]) && out.contains(declared[1])) {
+                    out.add(declared[0]);
+                    grew = true;
+                }
+            }
+            if (!grew) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /// Every `typealias Name = Target` in `source`, as {name, target}.
+    static java.util.List<String[]> typeAliasDeclarations(String source, boolean kotlin) {
+        java.util.List<String[]> out = new java.util.ArrayList<String[]>();
+        if (!kotlin || source == null) {
+            return out;
+        }
         int at = nextMarker(source, "typealias", 0, kotlin);
         while (at >= 0) {
             int after = at + "typealias".length();
@@ -2843,10 +2899,7 @@ public class CodenameOneSettings extends Lifecycle {
                         String name = componentText(source, n, end, kotlin);
                         int eq = nextLiveChar(source, end, kotlin);
                         if (eq >= 0 && source.charAt(eq) == '=') {
-                            String target = qualifiedNameAt(source, eq + 1, kotlin);
-                            if (target.equals(qualified) || (imported && target.equals(simple))) {
-                                out.add(name);
-                            }
+                            out.add(new String[] {name, qualifiedNameAt(source, eq + 1, kotlin)});
                         }
                     }
                 }
@@ -2920,12 +2973,15 @@ public class CodenameOneSettings extends Lifecycle {
             // involved -- `typealias AppIos = Ios` and then `@AppIos(...)`. The
             // compiled annotation is still ours, so missing it left the hint
             // editable and Add wrote the duplicate the next build refuses.
-            aliases.addAll(kotlinTypeAliases(source, simple, kotlin));
+            // One closure over every source, not one per file: a chain may cross
+            // files, with the link that names our annotation in one and the link
+            // that the main class writes in another.
+            java.util.List<String> forAliases = new java.util.ArrayList<String>();
+            forAliases.add(source);
             if (otherSources != null) {
-                for (String other : otherSources) {
-                    aliases.addAll(kotlinTypeAliases(other, simple, kotlin));
-                }
+                forAliases.addAll(otherSources);
             }
+            aliases.addAll(kotlinTypeAliases(forAliases, simple, kotlin));
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as

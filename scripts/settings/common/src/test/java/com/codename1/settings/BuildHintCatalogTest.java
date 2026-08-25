@@ -1066,4 +1066,48 @@ public class BuildHintCatalogTest {
         assertEquals("\\uZZZZ", CodenameOneSettings.decodeUnicodeEscapes("\\uZZZZ"));
         assertEquals("\\n", CodenameOneSettings.decodeUnicodeEscapes("\\n"));
     }
+
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate the next build refuses.
+    @Test
+    public void aChainOfTypeAliasesIsFollowed() {
+        String main = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "typealias CustomIos = AppIos\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The chain may cross files: the link naming our annotation in one, the
+        // link the main class writes in another.
+        String usesIt = "package com.example\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String declaresIt = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "typealias CustomIos = AppIos\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(usesIt, owned, true,
+                java.util.Collections.singletonList(declaresIt));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A chain that never reaches our annotation is not ours, and a cycle
+        // must not hang the reader.
+        String theirs = "package com.example\n"
+                + "typealias AppIos = com.other.Ios\n"
+                + "typealias CustomIos = AppIos\n"
+                + "typealias A = B\n"
+                + "typealias B = A\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(theirs, owned, true);
+        assertNull(owned.get("ios.teamId"));
+    }
 }
