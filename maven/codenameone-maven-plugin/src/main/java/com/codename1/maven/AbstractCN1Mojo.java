@@ -1169,7 +1169,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         // then looked live, so the orphan filter kept it and the placement error
         // it carries fired on every build.
         File basedir = project.getBasedir();
-        if (basedir != null && !declaresKotlinSourceDirs(project)) {
+        // ...and only where the build compiles Kotlin at all. A module that
+        // never had the plugin, or had it removed, does not compile
+        // src/main/kotlin however many .kt files are sitting in it. Adding it
+        // anyway made a stale class in target/classes look LIVE because its old
+        // source was still on disk, and a build hint annotation on that class
+        // then failed the placement check on every incremental build -- a hard
+        // error nothing in the project could clear except deleting files.
+        if (basedir != null && compilesTheConventionalKotlinRoot(project)) {
             File kotlin = new File(basedir, "src" + File.separator + "main"
                     + File.separator + "kotlin");
             if (kotlin.isDirectory() && !roots.contains(kotlin.getAbsolutePath())) {
@@ -1468,6 +1475,45 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
             return null;
         }
+    }
+
+    /**
+     * Whether {@code src/main/kotlin} is a root this module actually compiles.
+     *
+     * <p>Two conditions, and both are about what Maven does rather than what is
+     * on disk: the Kotlin plugin has to be bound to the {@code compile} goal --
+     * a {@code test-compile} execution compiles the test tree, not this one --
+     * and it must not say where its sources are, because a configured
+     * {@code <sourceDirs>} REPLACES the default.</p>
+     */
+    private static boolean compilesTheConventionalKotlinRoot(MavenProject project) {
+        return hasKotlinCompileExecution(project) && !declaresKotlinSourceDirs(project);
+    }
+
+    /** Whether the Kotlin plugin is bound to `compile` in this module. */
+    private static boolean hasKotlinCompileExecution(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())
+                    || plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                if ((execution.getGoals() != null && execution.getGoals().contains("compile"))
+                        || "default-compile".equals(execution.getId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether the Kotlin plugin says where its main sources are. */

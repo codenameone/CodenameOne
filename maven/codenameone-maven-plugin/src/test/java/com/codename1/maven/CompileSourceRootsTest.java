@@ -92,6 +92,71 @@ public class CompileSourceRootsTest {
         assertFalse(roots.toString(), contains(roots, basedir, "src/test/kotlin"));
     }
 
+    /**
+     * A module with no Kotlin plugin does not compile `src/main/kotlin`, however
+     * many .kt files are sitting in it.
+     *
+     * <p>That is the shape a project is left in when Kotlin support is removed
+     * and the tree is not deleted. Counting the directory as a root made a stale
+     * class in `target/classes` look LIVE, because its old source was still
+     * there -- and a build hint annotation on that class then failed the
+     * placement check on every incremental build, a hard error nothing in the
+     * project could clear except deleting files.</p>
+     */
+    @Test
+    public void theConventionalKotlinRootNeedsAKotlinPlugin() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
+    /**
+     * ...and neither does one whose Kotlin plugin only compiles the TEST tree.
+     * That execution compiles `src/test/kotlin`, which this list must not
+     * contain either.
+     */
+    @Test
+    public void aTestOnlyKotlinExecutionDoesNotClaimTheMainRoot() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.addExecution(execution("test-compile", "<jvmTarget>17</jvmTarget>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
+    /**
+     * A POM that overrides Maven's own injected execution binds the goal through
+     * its ID rather than naming it, and that still compiles the root.
+     */
+    @Test
+    public void theDefaultCompileExecutionIdBindsTheGoalToo() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        PluginExecution execution = new PluginExecution();
+        execution.setId("default-compile");
+        kotlin.addExecution(execution);
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {
