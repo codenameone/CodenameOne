@@ -4090,32 +4090,28 @@ static long long cn1PacingUncollectedBytes(void) {
 // ceiling, builds interleaved within one session (-DCN1_PACING_NO_RESERVE is the same
 // binary with this bound compiled out):
 //
-//                     peak footprint   smallest headroom seen
-//   no reserve        1271MB, x7       63MB, x7
-//   reserve limit>>2  1027-1036MB      298-304MB
+//                     peak footprint   smallest headroom   throughput
+//   no reserve        1271MB, x4       63MB, x4            1.00
+//   reserve limit>>2  1015-1027MB      306-308MB           0.97-1.05, median 0.99
 //
-// Both columns are that repeatable because neither is an accident: without the bound,
-// admission converges on ceiling minus CN1_PACING_HEADROOM_MARGIN by construction; with
-// it, the control loop holds the reserve. Throughput across seven interleaved pairs came
-// out at 0.90 to 0.99 of the unbounded build, median 0.94 -- the spread is session drift,
-// not the bound, and the sign never changed.
+// The first two columns are that repeatable because neither is an accident: without the
+// bound, admission converges on ceiling minus CN1_PACING_HEADROOM_MARGIN by construction;
+// with it, the control loop holds the reserve. Throughput is a wash -- two of the four
+// pairs came out faster with the bound on -- which is what a bound that engages only
+// inside the reserve, rather than taxing every allocation, should look like. Note
+// volumeParks in the [PACING] report reads 0 for a run that never enters the reserve.
 //
-// A single repetition each of the tighter reserves put >> 3 at 1183MB/150MB and >> 4 at
-// 1207MB/127MB, both slower than >> 2: a smaller reserve engages later and thrashes
-// closer to the edge, so a quarter is the knee rather than a compromise.
-//
-// Roughly 6% for 4.8x the margin is a different trade from the volume brakes #5573 and
-// #5585 measured at 2-4x and rejected, and the reason it is affordable is that it is a
-// control loop that engages only inside the reserve, not a tax on every allocation --
-// volumeParks in the [PACING] report is 0 for a run that never enters it.
+// A single repetition each of the tighter reserves put >> 3 at 1183MB of peak and 150MB
+// of headroom, and >> 4 at 1207MB/127MB: a smaller reserve engages later and closer to
+// the edge, buying less on both axes, so a quarter is a knee rather than a compromise.
 //
 // It cannot touch a platform with no per-process budget at all, because this whole branch
 // is unreachable there; that is why vm/benchmarks measures the same with and without it.
 //
 // The ceiling figure above is not special. Given an 8GB budget instead, the unbounded
 // build rides to 7.5GB and this one holds 5.7GB: admission has no footprint TARGET, so
-// whatever ceiling a process is given is where it ends up. (Those two numbers are peaks
-// only -- at 7.5GB resident the measuring host is itself under pressure, so no throughput
+// whatever ceiling a process is given is where it ends up. (Those two are peaks only --
+// at 7.5GB resident the measuring host is itself under pressure, so no throughput
 // conclusion can be drawn from that configuration.)
 #define CN1_PACING_RESERVE_SHIFT 2
 #endif
@@ -9295,9 +9291,40 @@ static long long cn1GcProbeSideBytes(void) {
 // That is the only point in the program where no mark is in flight and no mutator owns a
 // retired page, which is what makes walking bibopAllPages here safe -- the 1Hz emitter
 // below must never do it (cn1BibopFormatPage rewrites page geometry underneath a reader).
+/**
+ * Clear the phase accumulators. Runs on EVERY cycle, printed or not.
+ *
+ * The cumulative counters (matured, consWords, staleSkips, ...) are deliberately left
+ * alone: they are running totals and the reader diffs them. These are per-cycle, and they
+ * have to be cleared on a skipped cycle too -- markMs and sweepMs describe only the cycle
+ * that just ran, so letting the phase figures accumulate over a whole CN1_GC_PROBE>1
+ * interval would put two different time bases in one row and attribute an interval's worth
+ * of a phase to a single cycle's pause.
+ */
+static void cn1GcProbeResetPhases(void) {
+    cn1GcSnapNs = 0;
+    cn1GcGraceNs = 0;
+    cn1GcDrainNs = 0;
+    cn1GcWaitNs = 0;
+    cn1GcStackNs = 0;
+    cn1GcTDrainNs = 0;
+    cn1GcMigrateNs = 0;
+    cn1GcMigrated = 0;
+    cn1GcSatbNs = 0;
+    cn1GcSatbEntries = 0;
+    cn1GcSatbDrainAlready = 0;
+    atomic_store_explicit(&cn1GcSatbAlready, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1GcSatbFresh, 0, memory_order_relaxed);
+    cn1GcPoolNs = 0;
+}
+
 void cn1GcProbeCycle(double markMs, double sweepMs) {
     int every = cn1GcProbeEvery();
-    if(every == 0 || (currentGcMarkValue % every) != 0) {
+    if(every == 0) {
+        return;
+    }
+    if((currentGcMarkValue % every) != 0) {
+        cn1GcProbeResetPhases();
         return;
     }
     long long pgTotal = 0, pgEmpty = 0, pgReleased = 0, pgAdopted = 0, pgMon = 0;
@@ -9396,20 +9423,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
         sideBytes / 1024, residKb);
     fflush(stderr);
     // Per-CYCLE, so reset after reporting. A running total cannot show a trend.
-    cn1GcSnapNs = 0;
-    cn1GcGraceNs = 0;
-    cn1GcDrainNs = 0;
-    cn1GcWaitNs = 0;
-    cn1GcStackNs = 0;
-    cn1GcTDrainNs = 0;
-    cn1GcMigrateNs = 0;
-    cn1GcMigrated = 0;
-    cn1GcSatbNs = 0;
-    cn1GcSatbEntries = 0;
-    cn1GcSatbDrainAlready = 0;
-    atomic_store_explicit(&cn1GcSatbAlready, 0, memory_order_relaxed);
-    atomic_store_explicit(&cn1GcSatbFresh, 0, memory_order_relaxed);
-    cn1GcPoolNs = 0;
+    cn1GcProbeResetPhases();
 }
 
 // 1Hz wall-clock series. ATOMICS ONLY -- it must never walk bibopAllPages. This is the

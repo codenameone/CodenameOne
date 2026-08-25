@@ -79,10 +79,11 @@ public class GcSteadyState {
      * this benchmark compares -- a build whose threads park more would lose fewer
      * increments and so report a throughput advantage it does not have.
      *
-     * NODES= at the end is the authoritative figure: it is summed after join(), which
-     * gives it a happens-before edge to every worker's last write. The SAMPLE series sums
-     * the same slots while they are still being written, so it is a progress indicator
-     * and not a measurement.
+     * Each worker republishes its slot once per round, so the SAMPLE series tracks
+     * progress live. NODES= at the end is the authoritative figure: it is summed after
+     * join(), which gives it a happens-before edge to every worker's last write. The
+     * SAMPLE series reads the same slots while they are still being written, so it is a
+     * progress indicator and not a measurement.
      */
     static long[] nodeCounts;
 
@@ -151,6 +152,10 @@ public class GcSteadyState {
                     int round = 0;
                     while (!stop) {
                         sum += search(root, depth, seed + round, counter);
+                        // Publish once per round so the SAMPLE series is a live progress
+                        // indicator rather than a row of zeroes. A worker that stalls
+                        // stops publishing, and its slot going flat IS the signal.
+                        nodeCounts[slot] = counter[0];
                         round++;
                         if (sleepMs > 0) {
                             sleep(sleepMs);
