@@ -460,6 +460,64 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void twoSceneManifestsAreRejectedRatherThanHalfHandled() {
+        // A property list resolves a duplicated key to the LAST value, while every
+        // lookup here answers with the first -- so validating and rewriting the first
+        // would leave the second in force on the device.
+        String plist = manifest(
+                        "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                        + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                        + WINDOW_ROLE
+                        + "    </dict>\n")
+                + "\n"
+                + manifest("    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n");
+        // The first one is perfectly good, which is what makes this dangerous: every
+        // question below answers yes while the bundle ends up with the second.
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(plist));
+
+        String rejection = IPhoneBuilder.sceneManifestRejection(plist);
+        assertNotNull(rejection, "two manifests have to be refused, not half handled");
+        assertTrue(rejection.contains("twice"), rejection);
+    }
+
+    @Test
+    void twoSceneConfigurationsAreRejected() {
+        String rejection = IPhoneBuilder.sceneManifestRejection(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n    </dict>\n"));
+        assertNotNull(rejection, "two scene configuration dictionaries have to be refused");
+        assertTrue(rejection.contains("UISceneConfigurations"), rejection);
+    }
+
+    @Test
+    void twoWindowRolesAreRejected() {
+        String foreign = WINDOW_ROLE.replace("CodenameOne_GLSceneDelegate", "SomebodyElse");
+        String rejection = IPhoneBuilder.sceneManifestRejection(manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + foreign
+                + "    </dict>\n"));
+        assertNotNull(rejection, "two window roles have to be refused");
+        assertTrue(rejection.contains("UIWindowSceneSessionRoleApplication"), rejection);
+    }
+
+    @Test
+    void oneOfEachReservedKeyIsStillAccepted() {
+        // The duplicate checks must not fire on a well formed manifest, which is the
+        // way a rejection rule usually goes wrong.
+        assertNull(IPhoneBuilder.sceneManifestRejection(manifest(
+                        "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                        + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                        + WINDOW_ROLE
+                        + "    </dict>\n")));
+    }
+
+    @Test
     void aKeySetToFalseIsNotAcceptedAsTrue() {
         assertFalse(keyIsTrueAnywhere(
                 "<key>UIApplicationSupportsMultipleScenes</key><false/>",

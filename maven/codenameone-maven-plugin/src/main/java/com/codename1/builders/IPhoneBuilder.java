@@ -11698,11 +11698,30 @@ public class IPhoneBuilder extends Executor {
         if (!plistDeclaresKey(inject, "UIApplicationSceneManifest")) {
             return null;
         }
+        // Two of the same reserved key at one level. A property list resolves
+        // duplicates to the LAST value, while every lookup here answers with the
+        // first -- so validating and rewriting the first would leave the second in
+        // force on the device: a build that succeeds and a Window that is
+        // unsupported. Fragments composed by more than one injector are how this
+        // arises, and there is no safe pick between them, so it is reported.
+        if (plistMemberDuplicated(inject, 0, inject.length(), "UIApplicationSceneManifest")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but "
+                    + "ios.plistInject declares UIApplicationSceneManifest twice. A property "
+                    + "list takes the last of a duplicated key, so the two disagree about "
+                    + "what the bundle ends up with. Compose them into one manifest.";
+        }
         String manifest = plistManifestScope(inject);
         if (!"dict".equals(nextElementName(manifest, 0))) {
             return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
                     + "UIApplicationSceneManifest in ios.plistInject is not a <dict>. UIKit "
                     + "reads it as a dictionary of scene settings, so it has to be one.";
+        }
+        if (plistDictDuplicated(manifest, "UISceneConfigurations")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject declares "
+                    + "UISceneConfigurations twice. A property list takes the last of a "
+                    + "duplicated key, so the two disagree about which scenes the bundle "
+                    + "configures. Compose them into one dictionary.";
         }
         String configurations = plistDictMember(manifest, "UISceneConfigurations");
         if (configurations != null && !"dict".equals(nextElementName(configurations, 0))) {
@@ -11710,6 +11729,13 @@ public class IPhoneBuilder extends Executor {
                     + "UISceneConfigurations in the UIApplicationSceneManifest from "
                     + "ios.plistInject is not a <dict>. UIKit reads it as a dictionary keyed "
                     + "by scene role, so it has to be one.";
+        }
+        if (plistDictDuplicated(configurations, "UIWindowSceneSessionRoleApplication")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UISceneConfigurations in ios.plistInject declares "
+                    + "UIWindowSceneSessionRoleApplication twice. A property list takes the "
+                    + "last of a duplicated key, so the two disagree about which delegate "
+                    + "adopts a window. Compose them into one role.";
         }
         String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
         if (role != null && !plistManifestWiresWindowScene(inject)) {
@@ -11942,6 +11968,46 @@ public class IPhoneBuilder extends Executor {
             end = dict.length();
         }
         return plistMemberRange(dict, at, end, key);
+    }
+
+    /// Whether `key` appears more than once as a member at the level between `from`
+    /// and `to`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the text to search
+    ///
+    /// - `from`: where this level starts
+    ///
+    /// - `to`: where this level ends
+    ///
+    /// - `key`: the member name to count
+    ///
+    /// #### Returns
+    ///
+    /// true when there are two or more
+    static boolean plistMemberDuplicated(String plist, int from, int to, String key) {
+        int[] first = plistMemberRange(plist, from, to, key);
+        return first != null && plistMemberRange(plist, first[1], to, key) != null;
+    }
+
+    /// Whether `key` appears more than once as a member of the dictionary `dict`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dict`: a `<dict>` element, or null
+    ///
+    /// - `key`: the member name to count
+    ///
+    /// #### Returns
+    ///
+    /// true when there are two or more
+    static boolean plistDictDuplicated(String dict, String key) {
+        if (dict == null) {
+            return false;
+        }
+        int[] body = plistRootDictBody(dict);
+        return body != null && plistMemberDuplicated(dict, body[0], body[1], key);
     }
 
     /// The `{start, end}` offsets of `key`'s value element between `from` and `to`,
