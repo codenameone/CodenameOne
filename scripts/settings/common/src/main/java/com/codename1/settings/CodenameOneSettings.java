@@ -2526,16 +2526,18 @@ public class CodenameOneSettings extends Lifecycle {
         // compiled, and treating it as a root put the templates back in the
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
-        collectRoots(compileGoalConfiguration(
-                activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir", managedFromChain),
-                "compile", "sourceDir"), "sourceDir", properties, out);
+        String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
+                managedFromChain);
+        collectRoots(compileGoalConfiguration(kotlin, "compile", "sourceDir",
+                kotlinRunsWithoutExecution(kotlin)), "sourceDir", properties, out);
         String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source",
                 managedFromChain);
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
             // plugin's compile and test-compile executions need.
-            collectRoots(compileGoalConfiguration(helper, "add-source", "source"), "source",
+            // add-source runs only where an execution says so.
+            collectRoots(compileGoalConfiguration(helper, "add-source", "source", false), "source",
                     properties, out);
         }
     }
@@ -2564,6 +2566,23 @@ public class CodenameOneSettings extends Lifecycle {
     private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
                                                                    String goal,
                                                                    String element) {
+        return compileGoalConfiguration(pluginBlock, goal, element, true);
+    }
+
+    /// The same, with `runsWithoutExecution` saying whether the goal is bound
+    /// when the POM writes no execution for it.
+    ///
+    /// True for maven-compiler-plugin, which the default lifecycle binds, and
+    /// for a Kotlin plugin with `<extensions>true</extensions>`. NOT for
+    /// build-helper, whose `add-source` runs only where an execution says so:
+    /// plugin-level `<sources>` with no execution is dormant configuration, and
+    /// reading it as a compiled root put a directory the build never touches
+    /// ahead of the real one -- where a dormant copy of the main class hides the
+    /// compiled source and its annotation-owned hints look editable.
+    private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
+                                                                   String goal,
+                                                                   String element,
+                                                                   boolean runsWithoutExecution) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (pluginBlock == null) {
             return out;
@@ -2606,9 +2625,9 @@ public class CodenameOneSettings extends Lifecycle {
             }
             at = pluginBlock.indexOf("<execution>", close);
         }
-        if (!bound) {
+        if (!bound && runsWithoutExecution) {
             // Plugin-level configuration applies to every execution, so it
-            // counts when there is none bound to this goal -- dropping it lost a
+            // counts when the goal runs without one -- dropping it lost a
             // `<sourceDirs>` written once outside them, and a main class
             // compiled from there became invisible.
             out.add(pluginLevel);
@@ -3031,14 +3050,12 @@ public class CodenameOneSettings extends Lifecycle {
                 if (plugin == null) {
                     continue;
                 }
+                // A configured <sourceDirs> REPLACES the default, so the
+                // convention is not a root at all.
                 if (plugin.indexOf("<sourceDir>") >= 0) {
                     return false;
                 }
-                if (plugin.indexOf("<extensions>true</extensions>") >= 0
-                        || !compileGoalConfiguration(plugin, "compile", "sourceDir").isEmpty()
-                            && plugin.indexOf("<execution>") >= 0) {
-                    bound = true;
-                }
+                bound |= bindsKotlinCompile(plugin);
             }
         }
         return bound;
@@ -3986,6 +4003,56 @@ public class CodenameOneSettings extends Lifecycle {
             return null;
         }
         return value.trim();
+    }
+
+    /// Whether this Kotlin plugin block compiles with no execution written.
+    ///
+    /// `<extensions>true</extensions>` is what binds compile without one, and a
+    /// POM switches that off the way it switches off any inherited execution --
+    /// `<id>default-compile</id>` with `<phase>none</phase>`.
+    static boolean kotlinRunsWithoutExecution(String pluginBlock) {
+        if (pluginBlock == null
+                || pluginBlock.indexOf("<extensions>true</extensions>") < 0) {
+            return false;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (execution.indexOf("<phase>none</phase>") >= 0
+                    && (execution.indexOf("<goal>compile</goal>") >= 0
+                        || execution.indexOf("<id>default-compile</id>") >= 0)) {
+                return false;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return true;
+    }
+
+    /// Whether this Kotlin plugin block compiles at all -- an enabled execution
+    /// on `compile`, or the lifecycle extension.
+    static boolean bindsKotlinCompile(String pluginBlock) {
+        if (pluginBlock == null) {
+            return false;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                break;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (execution.indexOf("<phase>none</phase>") < 0
+                    && (execution.indexOf("<goal>compile</goal>") >= 0
+                        || execution.indexOf("<id>default-compile</id>") >= 0)) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return kotlinRunsWithoutExecution(pluginBlock);
     }
 
     /// The `<plugin>` element that supplies `element` for the plugins the module

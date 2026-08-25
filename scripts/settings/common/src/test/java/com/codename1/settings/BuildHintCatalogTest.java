@@ -1699,7 +1699,11 @@ public class BuildHintCatalogTest {
                         + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
                         + "<configuration><sourceDirs>"
                         + "<sourceDir>src/main/kt</sourceDir>"
-                        + "</sourceDirs></configuration></plugin>"
+                        + "</sourceDirs></configuration>"
+                        // Bound, because plugin-level configuration is dormant
+                        // without one -- Maven never runs the goal that reads it.
+                        + "<executions><execution><goals><goal>compile</goal></goals>"
+                        + "</execution></executions></plugin>"
                         + "</plugins></build></project>");
         assertTrue(roots.contains("appsrc"), roots.toString());
         assertTrue(roots.contains("src/generated/java"), roots.toString());
@@ -2138,6 +2142,51 @@ public class BuildHintCatalogTest {
         // The Java root is not conditional on it.
         assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false)
                 .contains("/p/common/src/main/java"));
+    }
+
+    /// Plugin-level configuration with no execution is dormant here too.
+    ///
+    /// `add-source` and the Kotlin `compile` goal run only where an execution
+    /// says so. This fallback searches POM-declared roots BEFORE the
+    /// conventions, so a directory the build never compiles was being consulted
+    /// first -- and a dormant copy of the main class there hides the compiled
+    /// source, which is what makes an annotation-owned hint look editable.
+    @Test
+    public void pluginLevelRootsNeedABoundGoalHereToo() {
+        String helper = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/dormant</source></sources>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(helper).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(helper).toString());
+
+        String kotlin = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><sourceDir>src/dormant/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(kotlin).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(kotlin).toString());
+
+        // ...but <extensions>true</extensions> binds compile with no execution,
+        // so that list IS in effect.
+        String extensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(extensions).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(extensions).toString());
+
+        // ...unless the POM switches that binding off.
+        String disabled = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration>"
+                + "<executions><execution><id>default-compile</id><phase>none</phase>"
+                + "</execution></executions></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(disabled).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(disabled).toString());
     }
 
     /// A deprecated alias is not a second thing to set.
