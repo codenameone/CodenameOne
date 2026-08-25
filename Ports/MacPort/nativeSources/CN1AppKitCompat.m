@@ -102,9 +102,15 @@ NSImage * _Nullable CN1AppKitNSImageFromARGB(const unsigned int * _Nonnull argb,
     if (space == NULL) {
         return nil;
     }
+    // Little-endian, to match how the pixels are written below: as native
+    // uint32 values in ARGB order. Declared big-endian the bytes are read back
+    // in the reverse order, which turns an opaque red into a mostly
+    // transparent one -- and the only place that shows is a screenshot, where
+    // it reads as garbage rather than as an obviously wrong colour. Every
+    // other ARGB context in the shared code uses Little for the same reason.
     CGContextRef ctx = CGBitmapContextCreate(NULL, width, height, 8, width * 4, space,
                                              kCGImageAlphaPremultipliedFirst
-                                             | kCGBitmapByteOrder32Big);
+                                             | kCGBitmapByteOrder32Little);
     CGColorSpaceRelease(space);
     if (ctx == NULL) {
         return nil;

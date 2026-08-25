@@ -264,7 +264,6 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     if (mutableEncoderOpen) {
         CN1MetalEndMutableImageDraw(currentDrainTarget);
     }
-
     [ClipRect setDrawRect:CGRectZero];
     // Textures retired during the drain are freed here, after the last
     // operation that could still reference one has run. Without this the
