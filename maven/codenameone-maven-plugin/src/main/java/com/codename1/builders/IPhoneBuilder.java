@@ -11716,6 +11716,13 @@ public class IPhoneBuilder extends Executor {
                     + "UIApplicationSceneManifest in ios.plistInject is not a <dict>. UIKit "
                     + "reads it as a dictionary of scene settings, so it has to be one.";
         }
+        if (plistDictDuplicated(manifest, "UIApplicationSupportsMultipleScenes")) {
+            return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
+                    + "UIApplicationSceneManifest in ios.plistInject declares "
+                    + "UIApplicationSupportsMultipleScenes twice. A property list takes the "
+                    + "last of a duplicated key, so setting the first to true would leave a "
+                    + "later false in force. Compose them into one entry.";
+        }
         if (plistDictDuplicated(manifest, "UISceneConfigurations")) {
             return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
                     + "UIApplicationSceneManifest in ios.plistInject declares "
@@ -11738,6 +11745,16 @@ public class IPhoneBuilder extends Executor {
                     + "adopts a window. Compose them into one role.";
         }
         String role = plistDictMember(configurations, "UIWindowSceneSessionRoleApplication");
+        for (String configuration : plistArrayMembers(role)) {
+            if (plistDictDuplicated(configuration, "UISceneDelegateClassName")) {
+                return "macNative.enabled=true asks for com.codename1.ui.Window support, but a "
+                        + "UIWindowSceneSessionRoleApplication configuration in "
+                        + "ios.plistInject declares UISceneDelegateClassName twice. A property "
+                        + "list takes the last of a duplicated key, so naming "
+                        + "CodenameOne_GLSceneDelegate first would leave a later delegate in "
+                        + "force and no scene adopting a window. Compose them into one entry.";
+            }
+        }
         if (role != null && !plistManifestWiresWindowScene(inject)) {
             return "macNative.enabled=true asks for com.codename1.ui.Window support, but the "
                     + "UIApplicationSceneManifest in ios.plistInject already declares a "

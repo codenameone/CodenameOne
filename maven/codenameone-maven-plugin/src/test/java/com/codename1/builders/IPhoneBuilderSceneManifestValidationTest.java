@@ -507,6 +507,47 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void twoSupportKeysAreRejected() {
+        // True first, false last. The rewrite sets the first and the bundle takes the
+        // last, so the build succeeds without the support a Window needs.
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UIApplicationSupportsMultipleScenes</key>\n    <false/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + WINDOW_ROLE
+                + "    </dict>\n");
+        assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist),
+                "the first entry answers yes, which is why answering from it was unsafe");
+        String rejection = IPhoneBuilder.sceneManifestRejection(plist);
+        assertNotNull(rejection, "two support keys have to be refused");
+        assertTrue(rejection.contains("UIApplicationSupportsMultipleScenes"), rejection);
+    }
+
+    @Test
+    void twoSceneDelegatesInOneConfigurationAreRejected() {
+        // Ours first, somebody else's last. The wiring check reads the first and the
+        // bundle takes the last, so no scene adopts a window.
+        String plist = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                + "        <array>\n"
+                + "            <dict>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string>CodenameOne_GLSceneDelegate</string>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string>SomebodyElse</string>\n"
+                + "            </dict>\n"
+                + "        </array>\n"
+                + "    </dict>\n");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(plist),
+                "the first delegate answers yes, which is why answering from it was unsafe");
+        String rejection = IPhoneBuilder.sceneManifestRejection(plist);
+        assertNotNull(rejection, "two delegates in one configuration have to be refused");
+        assertTrue(rejection.contains("UISceneDelegateClassName"), rejection);
+    }
+
+    @Test
     void oneOfEachReservedKeyIsStillAccepted() {
         // The duplicate checks must not fire on a well formed manifest, which is the
         // way a rejection rule usually goes wrong.
