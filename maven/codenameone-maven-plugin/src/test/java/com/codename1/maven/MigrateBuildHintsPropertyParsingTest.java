@@ -931,6 +931,40 @@ public class MigrateBuildHintsPropertyParsingTest {
                 mojo.declares(f, pkg, main));
     }
 
+    /// The rewrite uses the charset the read used.
+    ///
+    /// These were two chains: the read fell back to the platform default and the
+    /// rewrite to byte-transparent. On a platform whose default is UTF-16 the
+    /// migration therefore identified the main class correctly and then spliced
+    /// single-byte ASCII into it -- the verification build failed and every
+    /// migration rolled back.
+    @Test
+    public void theRewriteUsesTheCharsetTheReadUsed() throws Exception {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        mojo.project = new org.apache.maven.project.MavenProject();
+
+        // Nothing declares an encoding, and the file is plain ASCII, so the
+        // platform default decodes it and the two must agree on that.
+        File ascii = File.createTempFile("Ascii", ".java");
+        ascii.deleteOnExit();
+        write(ascii, "package com.example;\npublic class MyApp {\n}\n");
+        assertEquals(mojo.sourceCharset(ascii), mojo.rewriteCharset(ascii));
+
+        // ...and a file the platform charset cannot decode falls to
+        // byte-transparent on BOTH paths rather than one of them.
+        File broken = File.createTempFile("Broken", ".java");
+        broken.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(broken);
+        try {
+            os.write("package com.example;\n// ".getBytes("ISO-8859-1"));
+            os.write(0xFF);
+            os.write("\npublic class MyApp {\n}\n".getBytes("ISO-8859-1"));
+        } finally {
+            os.close();
+        }
+        assertEquals(mojo.sourceCharset(broken), mojo.rewriteCharset(broken));
+    }
+
     /// A -Dcodename1.mainName override decides the entry point for the whole
     /// migration, and only the entry point.
     ///

@@ -1045,7 +1045,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// round-trips through it, else byte-transparent -- which never fails to
     /// decode, and which `declares` already knows how to compare against by
     /// spelling the name it is looking for in the file's own bytes.
-    private String sourceCharset(File source) {
+    String sourceCharset(File source) {
         // The module that OWNS the file, not the reactor root. `cn1:migrate-
         // build-hints` runs from the root of a multi-module project while the
         // sources live in common, and a module may set an encoding the root
@@ -1187,15 +1187,21 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * would corrupt every non-ASCII character in it, which is worse than
      * refusing the migration.</p>
      */
-    private String rewriteCharset(File source) {
-        org.apache.maven.project.MavenProject owner = moduleOwning(source);
-        String declared = sourceEncodingOf(owner == null ? project : owner, userProperties());
-        if (declared == null || declared.trim().isEmpty()
-                || SOURCE_BYTE_TRANSPARENT_ENCODING.equalsIgnoreCase(declared.trim())) {
-            return SOURCE_BYTE_TRANSPARENT_ENCODING;
+    String rewriteCharset(File source) {
+        // The SAME answer the read uses. These were two chains: the read fell
+        // back to the platform default and the rewrite to byte-transparent, so
+        // on a platform whose default is UTF-16 the migration identified the
+        // main class correctly and then spliced single-byte ASCII into it.
+        //
+        // The round trip is checked here and not there because only the rewrite
+        // needs it: reading a name is a comparison, writing the file back is
+        // destructive, and a charset that does not reproduce the bytes exactly
+        // would lose whatever it could not decode.
+        String charset = sourceCharset(source);
+        if (SOURCE_BYTE_TRANSPARENT_ENCODING.equals(charset)) {
+            return charset;
         }
-        return roundTripsThrough(source, declared.trim())
-                ? declared.trim() : SOURCE_BYTE_TRANSPARENT_ENCODING;
+        return roundTripsThrough(source, charset) ? charset : SOURCE_BYTE_TRANSPARENT_ENCODING;
     }
 
     /// Whether decoding `f` as `charset` and encoding it back reproduces the

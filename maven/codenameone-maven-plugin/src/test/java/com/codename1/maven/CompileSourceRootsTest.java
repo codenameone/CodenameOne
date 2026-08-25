@@ -157,6 +157,50 @@ public class CompileSourceRootsTest {
                         "src/main/kotlin"));
     }
 
+    /**
+     * `<extensions>true</extensions>` compiles Kotlin with no execution written.
+     *
+     * <p>It is the documented way to let the plugin contribute its own
+     * lifecycle, and then there is nothing in `<executions>` to find. Reading
+     * only the executions called such a module Kotlin-less, so an existing
+     * `src/main/kotlin` was left out and a Kotlin main class living there could
+     * not be found -- which is what makes the migration give up and Settings
+     * offer an annotation-owned hint for editing.</p>
+     */
+    @Test
+    public void anExtensionsEnabledKotlinPluginCompilesTheConventionalRoot() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
+    /** ...and a configured `<sourceDirs>` still replaces the convention. */
+    @Test
+    public void anExtensionsEnabledPluginStillYieldsToConfiguredSourceDirs() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setExtensions(true);
+        kotlin.setConfiguration(config("<sourceDirs><d>src/app/kotlin</d></sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {

@@ -1540,7 +1540,16 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return hasKotlinCompileExecution(project) && !declaresKotlinSourceDirs(project);
     }
 
-    /** Whether the Kotlin plugin is bound to `compile` in this module. */
+    /**
+     * Whether the Kotlin plugin compiles this module's main sources.
+     *
+     * <p>An execution bound to {@code compile}, or {@code <extensions>true</extensions>}
+     * -- which is the documented way to let the plugin contribute its own
+     * lifecycle, and then it compiles with no execution written at all. Reading
+     * only the executions called such a module Kotlin-less, so an existing
+     * {@code src/main/kotlin} was left out of the roots and a Kotlin main class
+     * living there could not be found.</p>
+     */
     private static boolean hasKotlinCompileExecution(MavenProject project) {
         List<org.apache.maven.model.Plugin> plugins;
         try {
@@ -1552,8 +1561,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return false;
         }
         for (org.apache.maven.model.Plugin plugin : plugins) {
-            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())
-                    || plugin.getExecutions() == null) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            if (plugin.isExtensions()) {
+                return true;
+            }
+            if (plugin.getExecutions() == null) {
                 continue;
             }
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
