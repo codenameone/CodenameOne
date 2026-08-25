@@ -9373,7 +9373,17 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
     }
 #endif
     // The legacy heap is a separate malloc'd population that no page figure can see.
-    long long legUsed = 0, legBlockBytes = 0;
+    // Only an object the table INDEXES (__heapPosition >= 0) owns an individual malloc
+    // block. A matured one carries CN1_BIBOP_ADOPTED and its storage is a slot inside a
+    // BiBOP page, so it must not be sized here for two separate reasons: the pointer is
+    // interior to a posix_memalign'd arena, which makes it an invalid argument to
+    // malloc_size / malloc_usable_size (glibc reads the chunk header immediately below
+    // the pointer and would hand back a garbage figure), and its bytes are already
+    // counted in residentPgBytes, so adding them again would corrupt the residual that
+    // is this probe's whole point. Counted separately instead -- legAdopted is the same
+    // population as matured minus maturedDied, measured from the table rather than from
+    // the counters, so the two disagreeing is itself a finding.
+    long long legUsed = 0, legAdopted = 0, legBlockBytes = 0;
     int legCap = currentSizeOfAllObjectsInHeap;
     for(int i = 0 ; i < legCap ; i++) {
         JAVA_OBJECT o = allObjectsInHeap[i];
@@ -9381,7 +9391,11 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
             continue;
         }
         legUsed++;
-        legBlockBytes += CN1_CONFORM_BLOCK_SIZE(o);
+        if(o->__heapPosition >= 0) {
+            legBlockBytes += CN1_CONFORM_BLOCK_SIZE(o);
+        } else {
+            legAdopted++;
+        }
     }
     long long legTableBytes = (long long)sizeOfAllObjectsInHeap * (long long)sizeof(JAVA_OBJECT);
     long long sideBytes = cn1GcProbeSideBytes();
@@ -9393,7 +9407,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
         "[GCPROBE] v=1 cyc=%d tMs=%lld fpKb=%lld"
         " pgTotal=%lld pgEmpty=%lld pgReleased=%lld pgAdopted=%lld pgMon=%lld pgOwned=%lld pgGrace=%lld"
         " resvKb=%lld residentPgKb=%lld liveSlotKb=%lld deadSlotKb=%lld"
-        " legCap=%d legUsed=%lld legTableKb=%lld legBlockKb=%lld"
+        " legCap=%d legUsed=%lld legAdopted=%lld legTableKb=%lld legBlockKb=%lld"
         " matured=%ld maturedDied=%ld maturedPages=%ld"
         " triggerKb=%ld bypassActs=%ld bypassAllocs=%ld occKb=%ld liveKb=%ld reclKb=%ld"
         " markMs=%.1f sweepMs=%.1f snapMs=%.1f graceMs=%.1f drainMs=%.1f"
@@ -9405,7 +9419,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs) {
         currentGcMarkValue, cn1GcProbeElapsedMs(), fpKb,
         pgTotal, pgEmpty, pgReleased, pgAdopted, pgMon, pgOwned, pgGrace,
         resvBytes / 1024, residentPgBytes / 1024, liveSlots / 1024, deadSlots / 1024,
-        legCap, legUsed, legTableBytes / 1024, legBlockBytes / 1024,
+        legCap, legUsed, legAdopted, legTableBytes / 1024, legBlockBytes / 1024,
         atomic_load_explicit(&cn1GcMaturedTotal, memory_order_relaxed),
         atomic_load_explicit(&cn1GcMaturedDied, memory_order_relaxed),
         atomic_load_explicit(&cn1GcMaturedPages, memory_order_relaxed),
