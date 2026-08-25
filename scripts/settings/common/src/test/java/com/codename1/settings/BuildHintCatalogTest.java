@@ -1399,4 +1399,60 @@ public class BuildHintCatalogTest {
                         CodenameOneSettings.visibleTypeAliases(main,
                                 java.util.Collections.singletonList(before)), "Ios", true));
     }
+
+    /// A same-package type beats an ON-DEMAND import in both languages, so a
+    /// project with its own `Ios` and a wildcard import of ours writes its own.
+    /// Reading that as ours hid the editor for a hint the processor never emits.
+    @Test
+    public void aSamePackageTypeBeatsAWildcardImport() {
+        String ownAnnotation = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@interface Ios { String teamId(); }\n";
+        String main = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false,
+                java.util.Collections.singletonList(ownAnnotation));
+        assertNull(owned.get("ios.teamId"));
+
+        // Declared in the main file itself, which is the same rule one step in.
+        String declaresItHere = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@interface Ios { String teamId(); }\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp {}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(declaresItHere, owned, false);
+        assertNull(owned.get("ios.teamId"));
+
+        // With no such type the wildcard import is ours, as before.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A NAMED import is the more specific statement and still wins.
+        String named = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(named, owned, false,
+                java.util.Collections.singletonList(ownAnnotation));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Kotlin declares an annotation with `annotation class`.
+        String kotlinOwn = "package com.example\n"
+                + "annotation class Ios(val teamId: String)\n";
+        String kotlinMain = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(kotlinMain, owned, true,
+                java.util.Collections.singletonList(kotlinOwn));
+        assertNull(owned.get("ios.teamId"));
+    }
 }

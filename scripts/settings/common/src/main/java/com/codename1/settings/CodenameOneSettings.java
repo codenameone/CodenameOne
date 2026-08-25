@@ -2802,6 +2802,18 @@ public class CodenameOneSettings extends Lifecycle {
     /// import shadows an on-demand one, so their `Ios` beats our wildcard. That
     /// is the language's rule, not a preference.
     static boolean importsAnnotation(String source, String simple, boolean kotlin) {
+        return importsAnnotation(source, simple, kotlin, false);
+    }
+
+    /// As above; `shadowed` says the same package declares a type of that name.
+    ///
+    /// A same-package type beats an ON-DEMAND import in both languages, so a
+    /// project with its own `Ios` and a wildcard import of ours writes its own
+    /// -- and reading that as ours hid the editor for a hint the processor never
+    /// emits. A NAMED import still wins, since it is the more specific statement
+    /// and a file may not both import a name and declare it.
+    static boolean importsAnnotation(String source, String simple, boolean kotlin,
+                                     boolean shadowed) {
         String pkg = "com.codename1.annotations.buildhints.";
         boolean ours = false;
         for (Imported imported : importsIn(source, kotlin)) {
@@ -2810,13 +2822,68 @@ public class CodenameOneSettings extends Lifecycle {
                 // simple spelling nor shadows it.
                 continue;
             }
-            if (imported.name.equals(pkg + simple) || imported.name.equals(pkg + "*")) {
-                ours = true;
+            if (imported.name.equals(pkg + simple)) {
+                return true;
+            }
+            if (imported.name.equals(pkg + "*")) {
+                ours = !shadowed;
             } else if (imported.name.endsWith("." + simple)) {
                 return false;
             }
         }
         return ours;
+    }
+
+    /// Whether a top-level type named `simple` is declared in `text`.
+    ///
+    /// Wider than the main-class lookup on purpose: an annotation is declared
+    /// with `annotation class` in Kotlin and `@interface` in Java, and any of
+    /// those shadows an on-demand import of the same name.
+    static boolean declaresTypeNamed(String text, String simple, boolean kotlin) {
+        int depth = 0;
+        int i = 0;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (c == '"' || c == '\'' || c == '/' || c == '`') {
+                int skipped = skipNonCode(text, i, kotlin);
+                if (skipped > i) {
+                    i = skipped;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !continuesAName(c)
+                    || (i > 0 && continuesAName(text.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < text.length() && continuesAName(text.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = text.substring(i, wordEnd);
+            if ("class".equals(word) || "object".equals(word) || "interface".equals(word)
+                    || "enum".equals(word) || "record".equals(word)) {
+                int n = nextLiveChar(text, wordEnd, kotlin);
+                if (n >= 0) {
+                    int end = componentEnd(text, n, kotlin);
+                    if (end > n && componentText(text, n, end, kotlin).equals(simple)) {
+                        return true;
+                    }
+                }
+            }
+            i = wordEnd;
+        }
+        return false;
     }
 
 
@@ -3222,6 +3289,21 @@ public class CodenameOneSettings extends Lifecycle {
         java.util.List<AliasDeclaration> declaredAliases =
                 kotlin ? visibleTypeAliases(source, otherSources)
                        : new java.util.ArrayList<AliasDeclaration>();
+        // The sources whose top-level types could shadow an on-demand import:
+        // this file, and the rest of its package. Limited to what has been read
+        // -- the sweep exists for typealiases and so is Kotlin-only -- which
+        // costs a false "owned" for a same-named type declared in a file nobody
+        // opened, exactly as before this check existed.
+        java.util.List<String> samePackage = new java.util.ArrayList<>();
+        samePackage.add(source);
+        if (otherSources != null) {
+            String mainPkg = declaredPackageIn(source, kotlin);
+            for (String other : otherSources) {
+                if (other != null && declaredPackageIn(other, kotlin).equals(mainPkg)) {
+                    samePackage.add(other);
+                }
+            }
+        }
         for (com.codename1.build.shared.BuildHints.Hint h : com.codename1.build.shared.BuildHints.entries()) {
             if (!h.isAnnotated()) {
                 continue;
@@ -3246,7 +3328,14 @@ public class CodenameOneSettings extends Lifecycle {
             // ownership -- and Settings would hide the editor for a hint the
             // processor never emits, which is indistinguishable from the tool
             // being broken.
-            boolean imported = importsAnnotation(source, simple, kotlin);
+            boolean shadowed = false;
+            for (String text : samePackage) {
+                if (declaresTypeNamed(text, simple, kotlin)) {
+                    shadowed = true;
+                    break;
+                }
+            }
+            boolean imported = importsAnnotation(source, simple, kotlin, shadowed);
             String qualified = "com.codename1.annotations.buildhints." + simple;
 
             // Every `@` that is real code, with the name after it read component
