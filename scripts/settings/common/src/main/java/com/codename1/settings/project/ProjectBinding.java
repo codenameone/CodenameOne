@@ -27,6 +27,8 @@ public final class ProjectBinding {
     private String settings;
     private String pom;
     private String multimoduleRoot;
+    private String sourceRoots;
+    private String sourceEncoding;
 
     public String projectDir() {
         return projectDir;
@@ -42,6 +44,23 @@ public final class ProjectBinding {
 
     public String multimoduleRoot() {
         return multimoduleRoot;
+    }
+
+    /// The compile source roots Maven RESOLVED, path-separator joined, or null
+    /// when the launcher did not say.
+    ///
+    /// The tool can read a POM but it has no model: it cannot evaluate a profile
+    /// activation, follow an inherited `<sourceDirectory>` or expand an
+    /// arbitrary property. Where the launcher knows, it says, and the tool's own
+    /// reading is the fallback.
+    public String sourceRoots() {
+        return sourceRoots;
+    }
+
+    /// The source encoding Maven resolved, or null when the launcher did not
+    /// say.
+    public String sourceEncoding() {
+        return sourceEncoding;
     }
 
     public boolean isValid() {
@@ -70,6 +89,8 @@ public final class ProjectBinding {
                 case "settings" -> b.settings = val;
                 case "pom" -> b.pom = val;
                 case "multimoduleRoot" -> b.multimoduleRoot = val;
+                case "sourceRoots" -> b.sourceRoots = val;
+                case "sourceEncoding" -> b.sourceEncoding = val;
                 default -> {
                 }
             }

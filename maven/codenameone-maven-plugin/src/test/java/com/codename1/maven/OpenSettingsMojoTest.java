@@ -157,6 +157,49 @@ public class OpenSettingsMojoTest {
         assertTrue(binding.contains("multimoduleRoot=" + root.getAbsolutePath()));
     }
 
+    /// What Maven RESOLVED, so the Settings tool does not have to infer it from
+    /// POM text. It has no model: it cannot evaluate a profile activation,
+    /// follow an inherited `<sourceDirectory>` or expand a property, and each of
+    /// those has been a way for it to miss the main class and then offer an
+    /// annotation-owned hint for editing.
+    @Test
+    public void bindingCarriesTheResolvedSourceRootsAndEncoding() throws Exception {
+        File root = tmp.newFolder("resolved");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "appsrc").mkdirs());
+        File input = tmp.newFile("resolved.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        mojo.project.addCompileSourceRoot(new File(common, "appsrc").getAbsolutePath());
+        mojo.project.getProperties().setProperty("project.build.sourceEncoding", "Shift_JIS");
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains("sourceRoots="));
+        assertTrue(binding, binding.contains(new File(common, "src/main/java").getAbsolutePath()));
+        assertTrue(binding, binding.contains(new File(common, "appsrc").getAbsolutePath()));
+        assertTrue(binding, binding.contains("sourceEncoding=Shift_JIS"));
+    }
+
+    /// A project that resolves neither says neither, and the tool falls back to
+    /// reading the POM itself rather than being handed an empty answer.
+    @Test
+    public void bindingOmitsWhatItCannotResolve() throws Exception {
+        File root = tmp.newFolder("unresolved");
+        File common = new File(root, "common");
+        assertTrue(common.mkdirs());
+        File input = tmp.newFile("unresolved.input");
+
+        new OpenSettingsMojo().writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertFalse(binding, binding.contains("sourceRoots="));
+        assertFalse(binding, binding.contains("sourceEncoding="));
+    }
+
     @Test
     public void pluginVersionUsesCodenameOneVersionInsteadOfApplicationVersion() {
         OpenSettingsMojo mojo = new OpenSettingsMojo();

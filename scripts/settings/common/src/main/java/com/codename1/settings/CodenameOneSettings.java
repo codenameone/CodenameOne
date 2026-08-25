@@ -3492,6 +3492,14 @@ public class CodenameOneSettings extends Lifecycle {
     private String declaredSourceEncoding() {
         if (!sourceEncodingRead) {
             sourceEncodingRead = true;
+            // What the launcher resolved, when it did: Maven has already applied
+            // the profiles, the inheritance and the properties that this reader
+            // can only approximate.
+            if (binding != null && binding.sourceEncoding() != null
+                    && !binding.sourceEncoding().isEmpty()) {
+                sourceEncoding = binding.sourceEncoding();
+                return sourceEncoding;
+            }
             // The chain, not the module alone: `project.build.sourceEncoding`
             // is normally declared once in the parent, which is where a
             // multi-module Codename One project puts it -- so looking only at

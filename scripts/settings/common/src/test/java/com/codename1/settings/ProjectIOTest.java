@@ -65,4 +65,26 @@ public class ProjectIOTest {
         assertEquals("C:\\Users\\John Smith\\My App", b.projectDir());
         assertEquals("C:\\Users\\John Smith\\My App\\codenameone_settings.properties", b.settings());
     }
+
+    /// What Maven RESOLVED, so the tool does not have to infer it from POM
+    /// text: it has no model for profile activation, inheritance or property
+    /// expansion, and each of those has been a way for it to miss the main
+    /// class and then offer an annotation-owned hint for editing.
+    @Test
+    public void theBindingCarriesTheResolvedSourceRootsAndEncoding() {
+        ProjectBinding b = ProjectBinding.parse(
+                "projectDir=/p/common\n"
+                        + "settings=/p/common/codenameone_settings.properties\n"
+                        + "sourceRoots=/p/common/src/main/java:/p/common/appsrc\n"
+                        + "sourceEncoding=Shift_JIS\n");
+        assertEquals("/p/common/src/main/java:/p/common/appsrc", b.sourceRoots());
+        assertEquals("Shift_JIS", b.sourceEncoding());
+
+        // A binding written by an older plugin says neither, and the tool falls
+        // back to reading the POM itself.
+        ProjectBinding older = ProjectBinding.parse(
+                "projectDir=/p/common\nsettings=/p/common/codenameone_settings.properties\n");
+        assertNull(older.sourceRoots());
+        assertNull(older.sourceEncoding());
+    }
 }

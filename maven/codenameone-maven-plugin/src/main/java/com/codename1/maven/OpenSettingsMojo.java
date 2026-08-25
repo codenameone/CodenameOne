@@ -40,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.project.MavenProject;
 import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -239,12 +242,81 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 + "projectDir=" + projectDir.getAbsolutePath() + "\n"
                 + "settings=" + new File(projectDir, "codenameone_settings.properties").getAbsolutePath() + "\n"
                 + "pom=" + new File(projectDir, "pom.xml").getAbsolutePath() + "\n"
-                + "multimoduleRoot=" + root.getAbsolutePath() + "\n";
+                + "multimoduleRoot=" + root.getAbsolutePath() + "\n"
+                // What Maven RESOLVED, so the tool does not have to infer it
+                // from POM text. It has no model: it cannot evaluate a profile
+                // activation, follow an inherited <sourceDirectory> or expand a
+                // property, and every one of those has been a way for it to miss
+                // the main class and then offer an annotation-owned hint for
+                // editing. Its own reading stays as the fallback for a Settings
+                // launched without these -- an older plugin, or the standalone
+                // app.
+                + bindingList("sourceRoots", compileSourceRoots(moduleAt(projectDir)))
+                + bindingValue("sourceEncoding", sourceEncodingOf(moduleAt(projectDir)));
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to write Settings binding", ex);
         }
+    }
+
+    /// The reactor module whose directory is `projectDir`, or the project being
+    /// built when the reactor has no such module.
+    ///
+    /// `cn1:settings` is normally run from the root of a multi-module project
+    /// while the module being EDITED is common, so the project in scope is not
+    /// the one whose sources matter.
+    private MavenProject moduleAt(File projectDir) {
+        if (projectDir == null) {
+            return project;
+        }
+        MavenSession session = getSession();
+        List<MavenProject> projects = session == null ? null : session.getProjects();
+        if (projects != null) {
+            for (MavenProject candidate : projects) {
+                File basedir = candidate.getBasedir();
+                if (basedir != null
+                        && basedir.getAbsolutePath().equals(projectDir.getAbsolutePath())) {
+                    return candidate;
+                }
+            }
+        }
+        return project;
+    }
+
+    /// The source encoding Maven resolved for `module`, or null.
+    private static String sourceEncodingOf(MavenProject module) {
+        if (module == null || module.getProperties() == null) {
+            return null;
+        }
+        String encoding = module.getProperties().getProperty("project.build.sourceEncoding");
+        if (encoding == null) {
+            encoding = module.getProperties().getProperty("maven.compiler.encoding");
+        }
+        return encoding == null || encoding.trim().isEmpty() ? null : encoding.trim();
+    }
+
+    private static String bindingValue(String key, String value) {
+        return value == null ? "" : key + "=" + value + "\n";
+    }
+
+    private static String bindingList(String key, List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.trim().isEmpty()) {
+                continue;
+            }
+            if (joined.length() > 0) {
+                // A path separator, since these are paths and a comma is legal
+                // in a directory name.
+                joined.append(File.pathSeparatorChar);
+            }
+            joined.append(value.trim());
+        }
+        return joined.length() == 0 ? "" : key + "=" + joined + "\n";
     }
 
     File multimoduleRoot(File projectDir) {
