@@ -11476,7 +11476,7 @@ public class IPhoneBuilder extends Executor {
             // "</key>" does, and matching the literal reported such a key absent --
             // which makes the injection append a second one beside the application's
             // own and the validation reject a correctly configured build.
-            int close = plistCloseElementIndex(plist, "key", at);
+            int close = plistKeyContentEnd(plist, at, contentStart);
             if (close < 0 || contentStart < 0) {
                 return -1;
             }
@@ -11513,8 +11513,17 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index just past `</key>`, or -1
     static int plistKeyEnd(String plist, int keyIndex) {
-        int close = plistCloseElementIndex(plist, "key", keyIndex);
-        return close < 0 ? -1 : plistOpenTagEnd(plist, close);
+        int contentStart = plistOpenTagEnd(plist, keyIndex);
+        if (contentStart < 0) {
+            return -1;
+        }
+        int close = plistKeyContentEnd(plist, keyIndex, contentStart);
+        if (close < 0) {
+            return -1;
+        }
+        // A self-closing <key/> has no closing tag to step past: its content ends where
+        // the element does, so that position is already the answer.
+        return close == contentStart ? contentStart : plistOpenTagEnd(plist, close);
     }
 
     /// Index of the next live element with this name at or after `from`, or -1.
@@ -12039,7 +12048,7 @@ public class IPhoneBuilder extends Executor {
                 return null;
             }
             int contentStart = plistOpenTagEnd(plist, keyIndex);
-            int close = plistCloseElementIndex(plist, "key", keyIndex);
+            int close = plistKeyContentEnd(plist, keyIndex, contentStart);
             int valueStart = plistKeyEnd(plist, keyIndex);
             if (contentStart < 0 || close < 0 || valueStart < 0) {
                 return null;
@@ -12189,7 +12198,7 @@ public class IPhoneBuilder extends Executor {
                 return null;
             }
             int contentStart = plistOpenTagEnd(plist, keyIndex);
-            int close = plistCloseElementIndex(plist, "key", keyIndex);
+            int close = plistKeyContentEnd(plist, keyIndex, contentStart);
             int valueStart = plistKeyEnd(plist, keyIndex);
             if (contentStart < 0 || close < 0 || valueStart < 0) {
                 return null;
@@ -12417,6 +12426,39 @@ public class IPhoneBuilder extends Executor {
             at = plistElementIndex(plist, name, end);
         }
         return -1;
+    }
+
+    /// Where a `<key>` element's content ends: the `<` of its closing tag, or -- for the
+    /// self-closing `<key/>` -- the position just past the tag, where its empty content
+    /// both starts and ends.
+    ///
+    /// `<key/>` is a valid empty key and Foundation reads the members after it normally:
+    /// plutil turns `<key/><string>metadata</string><key>NSMainNibFile</key>...` into
+    /// `{"":"metadata","NSMainNibFile":"MainWindow"}`. Every walker here looked for a
+    /// `</key>` that does not exist, gave up, and stopped dead at that entry -- so a
+    /// later root NSMainNibFile was invisible and survived into the Catalyst plist.
+    ///
+    /// Returning `contentStart` rather than a special case at each call site is what
+    /// makes the four walkers agree: the empty substring matches no real key, and they
+    /// carry on from just past the tag exactly as they would from a closing one.
+    /// `#plistValueElementEnd(String, int)` already did this for self-closing values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `plist`: the plist text
+    ///
+    /// - `keyIndex`: the `<` of the key element
+    ///
+    /// - `contentStart`: the position just past its opening tag
+    ///
+    /// #### Returns
+    ///
+    /// the end of the key's content, or -1 when the element never closes
+    static int plistKeyContentEnd(String plist, int keyIndex, int contentStart) {
+        if (contentStart >= 2 && plist.charAt(contentStart - 2) == '/') {
+            return contentStart;
+        }
+        return plistCloseElementIndex(plist, "key", keyIndex);
     }
 
     /// The next live closing element of the given name.

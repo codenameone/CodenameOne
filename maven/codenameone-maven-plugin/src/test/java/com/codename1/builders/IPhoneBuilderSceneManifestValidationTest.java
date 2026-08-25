@@ -1104,6 +1104,24 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aSelfClosingKeyDoesNotStopTheMemberWalk() {
+        // <key/> is a valid empty key. Confirmed against Foundation:
+        //   plutil on <key/><string>metadata</string><key>NSMainNibFile</key>...
+        //   yields {"":"metadata","NSMainNibFile":"MainWindow"} -- the members after it
+        // are still read. Searching for a "</key>" that does not exist made every member
+        // walker stop dead at that entry, so a later root NSMainNibFile was invisible and
+        // survived into the Catalyst plist to pair with the scene manifest.
+        String shared = document(
+                "    <key/>\n    <string>metadata</string>\n"
+                + "    <key>NSMainNibFile</key>\n    <string>MainWindow</string>\n");
+        String mac = IPhoneBuilder.plistForMacSlice(shared);
+        assertFalse(mac.contains("NSMainNibFile"),
+                "an empty key before it must not hide the main NIB");
+        assertTrue(mac.contains("<string>metadata</string>"),
+                "and the empty key's own entry is left alone");
+    }
+
+    @Test
     void aPaddedManifestKeyGetsARealOneAddedBesideIt() {
         // The consequence that matters. The application's padded key is inert, so the
         // Mac slice must not rewrite it and call the job done -- it has to add a real,
