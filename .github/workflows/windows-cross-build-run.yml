@@ -276,15 +276,21 @@ jobs:
       # binary instead of building one. ~112 PNGs land in CN1_SHOT_OUTPUT_DIR.
       - name: Run cross-built suite + capture screenshots
         working-directory: vm
-        shell: pwsh
+        shell: bash
         env:
           CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
           CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          # Narrowed to resolution failures because the second mvn RUNS A TEST;
+          # a blanket retry would launder an intermittent product bug into a
+          # green attempt two. Both commands share the pattern because the
+          # package step has died on the runner's cold cache hitting a
+          # Maven Central 403 on maven-clean-plugin/maven-resources-plugin.
+          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|Connection reset|Premature end of Content-Length'
         run: |
-          mvn -B clean package -pl JavaAPI -am -DskipTests
-          mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+          bash ../scripts/ci/retry.sh mvn -B clean package -pl JavaAPI -am -DskipTests
+          bash ../scripts/ci/retry.sh mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
 
       - name: Upload screenshot artifact (cross-compiled, x64)
         if: always()
