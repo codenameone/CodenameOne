@@ -1081,6 +1081,22 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 j = nonCode;
                 continue;
             }
+            // An escaped identifier is code, and everything inside it is part of
+            // the name -- a quote there does not open a string and a brace does
+            // not close the expression. `${ `"` }` left the template looking
+            // unterminated, so the rest of the file was blanked and a live
+            // declaration after it dropped as an orphan.
+            if (c[j] == '`') {
+                int close = j + 1;
+                while (close < c.length && c[close] != '`') {
+                    close++;
+                }
+                if (close >= c.length) {
+                    return -1;
+                }
+                j = close + 1;
+                continue;
+            }
             if (ch == '{') {
                 depth++;
             } else if (ch == '}') {

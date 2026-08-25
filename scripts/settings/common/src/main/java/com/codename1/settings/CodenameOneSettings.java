@@ -2853,8 +2853,18 @@ public class CodenameOneSettings extends Lifecycle {
             // import is file-scoped -- so it is decided per source, here, rather
             // than once for the whole sweep.
             boolean imported = importsAnnotation(source, simple, kotlin);
+            // `import ...Ios as Base` then `typealias AppIos = Base` is legal,
+            // and the compiled annotation is still ours. Collecting the two
+            // kinds of alias into one list left the typealias unresolved,
+            // because its right-hand side names the IMPORT alias rather than the
+            // annotation -- so the closure is seeded with them instead.
+            //
+            // Per source, since an import applies only to the file that writes
+            // it: a typealias elsewhere naming the same word is not this one.
+            java.util.List<String> importedAs = kotlinImportAliases(source, simple, kotlin);
             for (String[] declared : typeAliasDeclarations(source, kotlin)) {
-                if (declared[1].equals(qualified) || (imported && declared[1].equals(simple))) {
+                if (declared[1].equals(qualified) || (imported && declared[1].equals(simple))
+                        || importedAs.contains(declared[1])) {
                     if (!out.contains(declared[0])) {
                         out.add(declared[0]);
                     }
@@ -3273,7 +3283,10 @@ public class CodenameOneSettings extends Lifecycle {
             // char literals -- and a quote inside one of those is not a nested
             // string. Reading `${ /* " */ 1 }` as if it were swallowed the rest
             // of the file, hiding every annotation after it.
-            if (ch == '\'' || ch == '/') {
+            // An escaped identifier belongs here too: everything inside it is
+            // part of the name, so a quote there does not open a string and a
+            // brace does not close the expression.
+            if (ch == '\'' || ch == '/' || ch == '`') {
                 int skipped = skipNonCode(s, j, true);
                 if (skipped > j) {
                     j = skipped;

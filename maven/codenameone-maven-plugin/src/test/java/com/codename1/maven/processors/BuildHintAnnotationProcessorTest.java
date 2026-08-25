@@ -721,6 +721,22 @@ public class BuildHintAnnotationProcessorTest {
                 + "class After\n";
         assertTrue(BuildHintAnnotationProcessor.declaresType(bracedComment, "After", true));
 
+        // An escaped identifier inside the expression is a NAME: a quote in it
+        // does not open a string and a brace does not close the expression.
+        String escapedName = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${ `\\\"` }\"\n"
+                + "}\n"
+                + "class After\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(escapedName, "After", true));
+
+        String bracedName = "package com.example\n"
+                + "class Real {\n"
+                + "    val note = \"${ `}` }\"\n"
+                + "}\n"
+                + "class After\n";
+        assertTrue(BuildHintAnnotationProcessor.declaresType(bracedName, "After", true));
+
         // A raw string carries templates too.
         String raw = "package com.example\n"
                 + "class Real {\n"

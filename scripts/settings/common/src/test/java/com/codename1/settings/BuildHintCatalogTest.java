@@ -1161,4 +1161,49 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(braced, owned, true);
         assertNull(owned.get("ios.teamId"));
     }
+
+    /// `import ...Ios as Base` then `typealias AppIos = Base` is legal, and the
+    /// compiled annotation is still ours. Collecting the two kinds of alias into
+    /// one list left the typealias unresolved, because its right-hand side names
+    /// the IMPORT alias rather than the annotation.
+    @Test
+    public void aTypeAliasOfAnImportAliasIsFollowed() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Base\n"
+                + "typealias AppIos = Base\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // An import alias applies only to the file that writes it, so a
+        // typealias in ANOTHER file naming the same word is not this one.
+        String usesIt = "package com.example\n"
+                + "typealias AppIos = Base\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String importsIt = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Base\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(usesIt, owned, true,
+                java.util.Collections.singletonList(importsIt));
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// An escaped identifier inside a template expression is a NAME: a quote in
+    /// it does not open a string and a brace does not close the expression.
+    @Test
+    public void anEscapedIdentifierInsideATemplateIsNotAString() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class Helper {\n"
+                + "    val note = \"${ `\\\"` }\"\n"
+                + "}\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
 }
