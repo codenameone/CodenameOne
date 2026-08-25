@@ -1611,4 +1611,39 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xF0, (byte) 0x9F,
                 (byte) 0x98, (byte) 0x80}));
     }
+
+    /// `static` is a modifier, not the imported name. Reading it as the name
+    /// recorded an import called `static`, so
+    /// `import static com.example.Types.Ios;` never registered as giving `Ios`
+    /// away -- a wildcard import of ours was trusted instead and the editor was
+    /// hidden for a hint the processor never emits.
+    @Test
+    public void aSingleStaticImportTakesTheNameToo() {
+        String src = "package com.example;\n"
+                + "import static com.example.Types.Ios;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, false);
+        assertNull(owned.get("ios.teamId"));
+
+        // A static import of something else leaves our wildcard alone.
+        String other = "package com.example;\n"
+                + "import static com.example.Types.OTHER;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(other, "Ios", false));
+
+        // A name that merely starts with `static` is a name.
+        String staticky = "package com.example;\n"
+                + "import staticky.Ios;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(staticky, "Ios", false));
+        assertEquals("staticky.Ios", CodenameOneSettings.importsIn(staticky, false).get(0).name);
+    }
 }

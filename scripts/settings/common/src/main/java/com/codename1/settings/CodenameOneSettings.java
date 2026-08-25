@@ -2824,6 +2824,18 @@ public class CodenameOneSettings extends Lifecycle {
             if (i < 0) {
                 return out;
             }
+            // Java's optional `static`, which is a modifier and not the imported
+            // name. Reading it as the name recorded an import called `static`,
+            // so `import static com.example.Types.Ios;` never registered as
+            // giving `Ios` away -- a wildcard import of ours was trusted instead
+            // and the editor was hidden for a hint the processor never emits.
+            if (!kotlin && source.startsWith("static", i)
+                    && i + 6 < source.length() && !continuesAName(source.charAt(i + 6))) {
+                int afterStatic = nextLiveChar(source, i + 6, kotlin);
+                if (afterStatic >= 0) {
+                    i = afterStatic;
+                }
+            }
             // Component by component, stepping over whitespace and comments
             // around each dot. `import com.codename1.annotations. /* x */
             // buildhints.Ios;` is legal, and reading the name as one contiguous
