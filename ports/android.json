@@ -1,48 +1,48 @@
 {
-  "commit": "d6651206ae8fcbd48a17eae600d94c9ebfacabef",
-  "generated_at": "2026-08-25T02:42:51Z",
+  "commit": "e1065051c0b032ed08c97ec19b23fce4268d8dae",
+  "generated_at": "2026-08-25T18:22:16Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 293821291
+        "duration_ns": 286739544
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 34999356
+        "duration_ns": 34213242
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 324160424
+        "duration_ns": 308810022
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 245176298
+        "duration_ns": 220732300
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 160875373
+        "duration_ns": 208612135
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 4111488877
+        "duration_ns": 5070752074
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 153510612
+        "duration_ns": 146068923
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 170164660
+        "duration_ns": 155225767
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 762757295
+        "duration_ns": 728487439
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 293950062
+        "duration_ns": 321333728
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "android",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32801085839",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32881092686",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 179,
+    "pass": 180,
     "skip": 1
   },
   "tests": {
@@ -511,6 +511,10 @@
     },
     "MultiButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "MultiWindowApiTest": {
+      "feature": "multi-window",
       "status": "pass"
     },
     "MutableImageClipReadbackTest": {
