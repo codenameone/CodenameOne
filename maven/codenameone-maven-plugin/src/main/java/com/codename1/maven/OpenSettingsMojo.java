@@ -251,8 +251,10 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
                 // editing. Its own reading stays as the fallback for a Settings
                 // launched without these -- an older plugin, or the standalone
                 // app.
-                + bindingLines("sourceRoot", compileSourceRoots(moduleAt(projectDir)))
-                + bindingValue("sourceEncoding", sourceEncodingOf(moduleAt(projectDir)));
+                + bindingLines("sourceRoot",
+                        compileSourceRoots(moduleAt(projectDir), userProperties()))
+                + bindingValue("sourceEncoding",
+                        sourceEncodingOf(moduleAt(projectDir), userProperties()));
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {

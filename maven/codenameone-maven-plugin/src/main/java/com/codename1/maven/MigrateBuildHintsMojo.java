@@ -870,7 +870,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // The complete set, since the Kotlin plugin compiles its own sourceDirs
         // without adding them back -- a main class living only in one of those
         // is compiled by Maven and was reported here as missing.
-        java.util.List<String> moduleRoots = compileSourceRoots(owner);
+        java.util.List<String> moduleRoots = compileSourceRoots(owner, userProperties());
         if (moduleRoots == null) {
             return null;
         }
@@ -991,7 +991,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // does not -- asking the root decoded the file with somebody else's
         // charset, which is the bug this was added to fix, one level out.
         org.apache.maven.project.MavenProject owner = moduleOwning(source);
-        String configured = sourceEncodingOf(owner == null ? project : owner);
+        String configured = sourceEncodingOf(owner == null ? project : owner, userProperties());
         return configured == null ? "UTF-8" : configured;
     }
 

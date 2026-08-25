@@ -37,7 +37,9 @@ import java.io.File;
 import java.io.StringReader;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -177,6 +179,149 @@ public class CompileSourceRootsTest {
         assertTrue(roots.toString(), contains(roots, basedir, "out/generated-sources"));
         // What it cannot resolve it still leaves alone rather than guessing.
         assertFalse(roots.toString(), roots.toString().contains("nobody.knows"));
+    }
+
+    /**
+     * A root written as an ordinary property -- `${generated.sources}` defined
+     * in the POM, or handed in with `-D` -- is one Maven compiles from. Only
+     * the project's own expressions used to be resolved, so such a root was
+     * discarded, and on a direct `cn1:settings` or `cn1:migrate-build-hints`
+     * invocation no lifecycle has added it back: a main class living there was
+     * undiscoverable, and Settings would then offer its annotation-owned hints
+     * as properties to set a second time.
+     */
+    @Test
+    public void anOrdinaryPropertyInAConfiguredRootIsResolved() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getProperties().setProperty("generated.sources", "gen/from-pom");
+        // A property written in terms of another one resolves too.
+        project.getProperties().setProperty("shared.root", "${generated.sources}/nested");
+
+        Properties user = new Properties();
+        user.setProperty("extra.sources", "gen/from-command-line");
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources>"
+                + "<a>${generated.sources}</a>"
+                + "<b>${extra.sources}</b>"
+                + "<c>${shared.root}</c>"
+                + "</sources>"));
+        project.getBuild().addPlugin(helper);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project, user);
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/from-pom"));
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/from-command-line"));
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/from-pom/nested"));
+    }
+
+    /**
+     * `-D` wins over the POM's own value, the way it does everywhere else, and
+     * a name nothing defines is still dropped rather than guessed at.
+     */
+    @Test
+    public void commandLinePropertiesOverrideThePomsAndUnknownOnesAreStillDropped()
+            throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getProperties().setProperty("generated.sources", "gen/from-pom");
+
+        Properties user = new Properties();
+        user.setProperty("generated.sources", "gen/overridden");
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources>"
+                + "<a>${generated.sources}</a>"
+                + "<b>${nobody.defines.this}/x</b>"
+                + "</sources>"));
+        project.getBuild().addPlugin(helper);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project, user);
+        assertTrue(roots.toString(), contains(roots, basedir, "gen/overridden"));
+        assertFalse(roots.toString(), contains(roots, basedir, "gen/from-pom"));
+        assertFalse(roots.toString(), roots.toString().contains("nobody.defines.this"));
+    }
+
+    /**
+     * A `$` that opens nothing is an ordinary character in a path, not an
+     * expression -- dropping such a root lost a real source directory.
+     */
+    @Test
+    public void aDollarThatOpensNothingIsPartOfThePath() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(config("<sources><a>gen/dollar$dir</a></sources>"));
+        project.getBuild().addPlugin(helper);
+
+        assertTrue(contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                "gen/dollar$dir"));
+    }
+
+    /**
+     * The compiler's `<encoding>${source.charset}</encoding>` is the charset
+     * Maven really compiles with. Discarding it fell back to an inherited
+     * `project.build.sourceEncoding` that is not the one in force, and the
+     * migration then decoded a non-ASCII package or main-class name with the
+     * wrong charset -- missing the annotated source altogether.
+     */
+    @Test
+    public void anEncodingWrittenAsAPropertyIsResolved() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getProperties().setProperty("project.build.sourceEncoding", "UTF-8");
+        project.getProperties().setProperty("source.charset", "Shift_JIS");
+
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(config("<encoding>${source.charset}</encoding>"));
+        project.getBuild().addPlugin(compiler);
+
+        assertEquals("Shift_JIS", AbstractCN1Mojo.sourceEncodingOf(project));
+
+        Properties user = new Properties();
+        user.setProperty("source.charset", "ISO-8859-1");
+        assertEquals("ISO-8859-1", AbstractCN1Mojo.sourceEncodingOf(project, user));
+    }
+
+    /**
+     * ...and one nothing defines is still not an encoding, so the caller falls
+     * back rather than compiling the name of a property as a charset.
+     */
+    @Test
+    public void anEncodingExpressionNothingDefinesIsNotAnEncoding() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getProperties().setProperty("project.build.sourceEncoding", "UTF-8");
+
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        compiler.setConfiguration(config("<encoding>${nobody.defines.this}</encoding>"));
+        project.getBuild().addPlugin(compiler);
+
+        assertEquals("UTF-8", AbstractCN1Mojo.sourceEncodingOf(project));
+    }
+
+    /**
+     * `project.build.sourceEncoding` itself can be written as a property, and
+     * can be supplied with `-D`.
+     */
+    @Test
+    public void theSourceEncodingPropertyIsResolvedToo() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getProperties().setProperty("project.build.sourceEncoding", "${my.charset}");
+        project.getProperties().setProperty("my.charset", "Shift_JIS");
+
+        assertEquals("Shift_JIS", AbstractCN1Mojo.sourceEncodingOf(project));
+
+        Properties user = new Properties();
+        user.setProperty("project.build.sourceEncoding", "ISO-8859-1");
+        assertEquals("ISO-8859-1", AbstractCN1Mojo.sourceEncodingOf(project, user));
     }
 
     /**

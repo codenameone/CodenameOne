@@ -222,6 +222,14 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
+    /**
+     * The `-D` properties this build was invoked with, or null when there is no
+     * session -- which is what the tests run without.
+     */
+    protected Properties userProperties() {
+        return session == null ? null : session.getUserProperties();
+    }
+
     /** The session this mojo is running in, for a subclass that has to reproduce it. */
     protected MavenSession getSession() {
         return session;
@@ -1132,15 +1140,28 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * a list that is merely incomplete must not be read as that.</p>
      */
     protected static List<String> compileSourceRoots(MavenProject project) {
+        return compileSourceRoots(project, null);
+    }
+
+    /**
+     * The same list, resolving `${...}` against the `-D` properties the build
+     * was invoked with as well as the module's own.
+     *
+     * @param userProperties the session's user properties, or null when there
+     *                       is no session to read them from
+     */
+    protected static List<String> compileSourceRoots(MavenProject project,
+                                                     Properties userProperties) {
         if (project == null) {
             return null;
         }
+        Interpolation expressions = new Interpolation(project, userProperties);
         List<String> roots = new ArrayList<String>();
         List<String> configured = project.getCompileSourceRoots();
         if (configured != null) {
             roots.addAll(configured);
         }
-        addKotlinSourceDirs(project, roots);
+        addKotlinSourceDirs(expressions, roots);
         // The conventional Kotlin root, but only where the Kotlin plugin has not
         // said where its sources are. A configured <sourceDirs> REPLACES the
         // default, so an existing src/main/kotlin beside one is a tree the build
@@ -1155,7 +1176,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 roots.add(kotlin.getAbsolutePath());
             }
         }
-        addBuildHelperSources(project, roots);
+        addBuildHelperSources(expressions, roots);
         return roots;
     }
 
@@ -1263,10 +1284,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * same distinction the Kotlin plugin's compile and test-compile executions
      * need.</p>
      */
-    private static void addBuildHelperSources(MavenProject project, List<String> roots) {
+    private static void addBuildHelperSources(Interpolation expressions, List<String> roots) {
         List<org.apache.maven.model.Plugin> plugins;
         try {
-            plugins = project.getBuildPlugins();
+            plugins = expressions.project.getBuildPlugins();
         } catch (RuntimeException ex) {
             return;
         }
@@ -1282,12 +1303,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // its own roots, so these accumulate -- but within one execution the
             // levels do not, they override.
             for (Object configuration : configurationsFor(plugin, "add-source", "sources")) {
-                addSourcesFrom(project, configuration, roots);
+                addSourcesFrom(expressions, configuration, roots);
             }
         }
     }
 
-    private static void addSourcesFrom(MavenProject project, Object configuration,
+    private static void addSourcesFrom(Interpolation expressions, Object configuration,
                                        List<String> roots) {
         if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
             return;
@@ -1298,38 +1319,155 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         for (org.codehaus.plexus.util.xml.Xpp3Dom source : sources.getChildren()) {
-            addRoot(project, source.getValue(), roots);
+            addRoot(expressions, source.getValue(), roots);
         }
     }
 
     /**
-     * A configured path with the project expressions Maven resolves the same
-     * way every time applied, or null when it is empty or still holds one this
-     * cannot resolve.
+     * A configured path with every expression this can resolve applied, or null
+     * when it is empty or still holds one it could not.
      *
      * <p>Maven usually interpolates these while building the model, so this is
      * normally a no-op -- but a value that arrives unexpanded was being dropped
      * outright, and `${project.basedir}/appsrc` is an ordinary way to write a
      * root. A root dropped here is a main class the migration cannot find.</p>
+     *
+     * <p>A `$` that opens nothing is an ordinary character in a path and is
+     * left alone; only an unresolved `${...}` makes the value unusable.</p>
      */
-    private static String expandProjectExpressions(MavenProject project, String value) {
+    private static String expandProjectExpressions(Interpolation expressions, String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
-        String out = value.trim();
-        String basedir = project.getBasedir() == null ? null
-                : project.getBasedir().getAbsolutePath();
-        String build = project.getBuild() == null ? null : project.getBuild().getDirectory();
-        if (basedir != null) {
-            out = out.replace("${project.basedir}", basedir)
-                    .replace("${project.baseDir}", basedir)
-                    .replace("${basedir}", basedir)
-                    .replace("${pom.basedir}", basedir);
+        String out = expressions.resolve(value.trim());
+        return out.indexOf("${") >= 0 ? null : out;
+    }
+
+    /**
+     * Resolves `${...}` the way Maven does when it hands a plugin its
+     * configuration: the project's own expressions, then the `-D` properties
+     * the build was invoked with, then the module's properties -- which is
+     * where a profile Maven activated has already put its own.
+     *
+     * <p>Only the project expressions used to be resolved, so a root or an
+     * encoding written as `${generated.sources}` or `${source.charset}` was
+     * discarded even though Maven compiles with it. Discarding a root loses a
+     * main class; discarding an encoding decodes a non-ASCII name with the
+     * wrong charset, or reports an inherited encoding that is not the one in
+     * force.</p>
+     */
+    private static final class Interpolation {
+
+        /** Long enough for a property defined in terms of another; a cycle stops here. */
+        private static final int PASSES = 8;
+
+        private final MavenProject project;
+        private final Properties user;
+
+        Interpolation(MavenProject project, Properties user) {
+            this.project = project;
+            this.user = user;
         }
-        if (build != null) {
-            out = out.replace("${project.build.directory}", build);
+
+        String resolve(String value) {
+            if (value == null) {
+                return null;
+            }
+            String out = value;
+            for (int pass = 0; pass < PASSES && out.indexOf("${") >= 0; pass++) {
+                StringBuilder expanded = new StringBuilder();
+                boolean changed = false;
+                int at = 0;
+                while (true) {
+                    int open = out.indexOf("${", at);
+                    if (open < 0) {
+                        expanded.append(out.substring(at));
+                        break;
+                    }
+                    int close = out.indexOf('}', open + 2);
+                    if (close < 0) {
+                        // Not an expression, just a stray `${`.
+                        expanded.append(out.substring(at));
+                        break;
+                    }
+                    expanded.append(out, at, open);
+                    String resolved = valueOf(out.substring(open + 2, close));
+                    if (resolved == null) {
+                        expanded.append(out, open, close + 1);
+                    } else {
+                        expanded.append(resolved);
+                        changed = true;
+                    }
+                    at = close + 1;
+                }
+                out = expanded.toString();
+                if (!changed) {
+                    // Everything left is a name nothing defines; another pass
+                    // would produce the same string.
+                    break;
+                }
+            }
+            return out;
         }
-        return out.indexOf('$') >= 0 ? null : out;
+
+        private String valueOf(String key) {
+            if (key.isEmpty()) {
+                return null;
+            }
+            // The project's own expressions first: a property named
+            // `project.basedir` does not shadow the real basedir in Maven
+            // either.
+            String standard = standard(key);
+            if (standard != null) {
+                return standard;
+            }
+            if (user != null) {
+                String value = user.getProperty(key);
+                if (value != null) {
+                    return value;
+                }
+            }
+            if (project != null && project.getProperties() != null) {
+                String value = project.getProperties().getProperty(key);
+                if (value != null) {
+                    return value;
+                }
+            }
+            return System.getProperty(key);
+        }
+
+        private String standard(String key) {
+            if (project == null) {
+                return null;
+            }
+            File basedir = project.getBasedir();
+            if (basedir != null
+                    && ("project.basedir".equals(key) || "project.baseDir".equals(key)
+                        || "basedir".equals(key) || "pom.basedir".equals(key))) {
+                return basedir.getAbsolutePath();
+            }
+            if (project.getBuild() != null) {
+                if ("project.build.directory".equals(key)) {
+                    return project.getBuild().getDirectory();
+                }
+                if ("project.build.outputDirectory".equals(key)) {
+                    return project.getBuild().getOutputDirectory();
+                }
+                if ("project.build.sourceDirectory".equals(key)) {
+                    return project.getBuild().getSourceDirectory();
+                }
+            }
+            if ("project.groupId".equals(key)) {
+                return project.getGroupId();
+            }
+            if ("project.artifactId".equals(key)) {
+                return project.getArtifactId();
+            }
+            if ("project.version".equals(key)) {
+                return project.getVersion();
+            }
+            return null;
+        }
     }
 
     /** Whether the Kotlin plugin says where its main sources are. */
@@ -1357,10 +1495,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
-    private static void addKotlinSourceDirs(MavenProject project, List<String> roots) {
+    private static void addKotlinSourceDirs(Interpolation expressions, List<String> roots) {
         List<org.apache.maven.model.Plugin> plugins;
         try {
-            plugins = project.getBuildPlugins();
+            plugins = expressions.project.getBuildPlugins();
         } catch (RuntimeException ex) {
             return;
         }
@@ -1377,12 +1515,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // like it still had a source -- and within an execution the
             // configuration levels override rather than accumulate.
             for (Object configuration : configurationsFor(plugin, "compile", "sourceDirs")) {
-                addSourceDirsFrom(project, configuration, roots);
+                addSourceDirsFrom(expressions, configuration, roots);
             }
         }
     }
 
-    private static void addSourceDirsFrom(MavenProject project, Object configuration,
+    private static void addSourceDirsFrom(Interpolation expressions, Object configuration,
                                           List<String> roots) {
         if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
             return;
@@ -1393,18 +1531,18 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
         for (org.codehaus.plexus.util.xml.Xpp3Dom dir : dirs.getChildren()) {
-            addRoot(project, dir.getValue(), roots);
+            addRoot(expressions, dir.getValue(), roots);
         }
     }
 
-    private static void addRoot(MavenProject project, String value, List<String> roots) {
-        String path = expandProjectExpressions(project, value);
+    private static void addRoot(Interpolation expressions, String value, List<String> roots) {
+        String path = expandProjectExpressions(expressions, value);
         if (path == null) {
             return;
         }
         File f = new File(path);
-        if (!f.isAbsolute() && project.getBasedir() != null) {
-            f = new File(project.getBasedir(), path);
+        if (!f.isAbsolute() && expressions.project.getBasedir() != null) {
+            f = new File(expressions.project.getBasedir(), path);
         }
         if (!roots.contains(f.getAbsolutePath())) {
             roots.add(f.getAbsolutePath());
@@ -1425,14 +1563,31 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * folded in -- which is the part a tool reading POM text cannot do.</p>
      */
     protected static String sourceEncodingOf(MavenProject module) {
+        return sourceEncodingOf(module, null);
+    }
+
+    /**
+     * The same answer, resolving `${...}` against the `-D` properties the build
+     * was invoked with as well as the module's own.
+     *
+     * @param userProperties the session's user properties, or null when there
+     *                       is no session to read them from
+     */
+    protected static String sourceEncodingOf(MavenProject module, Properties userProperties) {
         if (module == null) {
             return null;
         }
-        String encoding = compilerPluginEncoding(module);
-        if ((encoding == null || encoding.trim().isEmpty()) && module.getProperties() != null) {
-            encoding = module.getProperties().getProperty("project.build.sourceEncoding");
+        Interpolation expressions = new Interpolation(module, userProperties);
+        String encoding = compilerPluginEncoding(expressions);
+        if (encoding == null || encoding.trim().isEmpty()) {
+            encoding = expressions.valueOf("project.build.sourceEncoding");
             if (encoding == null) {
-                encoding = module.getProperties().getProperty("maven.compiler.encoding");
+                encoding = expressions.valueOf("maven.compiler.encoding");
+            }
+            // A property can be written in terms of another one.
+            encoding = expressions.resolve(encoding);
+            if (encoding != null && encoding.indexOf("${") >= 0) {
+                encoding = null;
             }
         }
         return encoding == null || encoding.trim().isEmpty() ? null : encoding.trim();
@@ -1440,10 +1595,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     /// The `<encoding>` maven-compiler-plugin is configured with, from the
     /// EFFECTIVE model -- so a profile that Maven activated is already folded in.
-    private static String compilerPluginEncoding(MavenProject module) {
+    private static String compilerPluginEncoding(Interpolation expressions) {
         List<org.apache.maven.model.Plugin> plugins;
         try {
-            plugins = module.getBuildPlugins();
+            plugins = expressions.project.getBuildPlugins();
         } catch (RuntimeException ex) {
             return null;
         }
@@ -1457,7 +1612,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             // Most specific first: an execution bound to `compile` overrides
             // the plugin-level value, and testCompile's is not this one.
             for (Object configuration : configurationsFor(plugin, "compile", "encoding")) {
-                String encoding = encodingIn(configuration);
+                String encoding = encodingIn(expressions, configuration);
                 if (encoding != null) {
                     return encoding;
                 }
@@ -1466,7 +1621,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return null;
     }
 
-    private static String encodingIn(Object configuration) {
+    private static String encodingIn(Interpolation expressions, Object configuration) {
         if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
             return null;
         }
@@ -1475,9 +1630,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         if (encoding == null || encoding.getValue() == null) {
             return null;
         }
-        String value = encoding.getValue().trim();
-        // An unexpanded ${property} is not an encoding.
-        return value.isEmpty() || value.indexOf('$') >= 0 ? null : value;
+        String value = expressions.resolve(encoding.getValue().trim());
+        // An expression nothing defines is not an encoding -- but a `$` that
+        // opens nothing is just a character, and a resolved one is the charset
+        // Maven really compiles with.
+        return value.isEmpty() || value.indexOf("${") >= 0 ? null : value;
     }
 
 }

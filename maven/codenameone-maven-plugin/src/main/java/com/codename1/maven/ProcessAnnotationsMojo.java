@@ -110,7 +110,7 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                 // The roots Maven is actually compiling, so a processor asking
                 // whether a class still has a source is not guessing at the
                 // layout.
-                compileSourceRoots(project));
+                compileSourceRoots(project, userProperties()));
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
