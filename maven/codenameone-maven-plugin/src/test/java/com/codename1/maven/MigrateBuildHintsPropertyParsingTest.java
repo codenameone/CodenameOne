@@ -926,6 +926,39 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertTrue(migrated, migrated.contains("class " + main));
     }
 
+    /// The manifest's presence proves nothing on its own: a project can keep
+    /// one in `src/main/resources`, and any resource-producing plugin then
+    /// recreates it whether or not the processor ran -- so the keys are all
+    /// there, the migration is reported as verified, and the properties lines
+    /// are deleted for good although nothing processed the annotations.
+    @Test
+    public void aManifestTheProcessorDidNotWriteIsNotVerification() throws Exception {
+        File out = File.createTempFile("classes", "");
+        assertTrue(out.delete() && out.mkdirs());
+        out.deleteOnExit();
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+
+        // A copied resource: the hints are there, the fingerprint is not.
+        java.util.Properties copied = new java.util.Properties();
+        copied.setProperty("codename1.arg.ios.pods", "Alamofire");
+        assertTrue(String.valueOf(mojo.notWrittenByTheProcessor(copied, out, "com.example.MyApp"))
+                .contains("sourceDigest"));
+
+        // Somebody else's output, which the stamp gives away.
+        java.util.Properties theirs = new java.util.Properties();
+        theirs.setProperty("cn1.buildHints.mainClass", "com.other.TheirApp");
+        theirs.setProperty("cn1.buildHints.sourceDigest", "whatever");
+        assertTrue(String.valueOf(mojo.notWrittenByTheProcessor(theirs, out, "com.example.MyApp"))
+                .contains("com.other.TheirApp"));
+
+        // A fingerprint with no class to check it against cannot be judged, and
+        // is not called a failure on a guess.
+        java.util.Properties ours = new java.util.Properties();
+        ours.setProperty("cn1.buildHints.mainClass", "com.example.MyApp");
+        ours.setProperty("cn1.buildHints.sourceDigest", "whatever");
+        assertNull(mojo.notWrittenByTheProcessor(ours, out, "com.example.MyApp"));
+    }
+
     /// A mojo whose project compiles with `encoding`.
     private MigrateBuildHintsMojo mojoWithEncoding(String encoding) {
         MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();

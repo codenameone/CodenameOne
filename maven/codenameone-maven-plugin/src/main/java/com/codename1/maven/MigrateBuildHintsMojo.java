@@ -312,7 +312,11 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + restore(source, originalSource, settingsFile, originalSettings), ex);
         }
 
-        String missing = verifyAnnotationsAreProcessed(projectDir, verifiedKeys);
+        String pkgName = settings.getProperty("codename1.packageName", "").trim();
+        String mainName = settings.getProperty("codename1.mainName", "").trim();
+        String missing = verifyAnnotationsAreProcessed(projectDir, verifiedKeys,
+                mainName.isEmpty() ? null
+                        : (pkgName.isEmpty() ? mainName : pkgName + "." + mainName));
         if (missing != null) {
             String restoreFailed = restore(source, originalSource, settingsFile, originalSettings);
             throw new MojoFailureException("The annotations were added but the build did not turn "
@@ -366,7 +370,8 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      * @return null when all of them did, otherwise a description of what is
      *         missing, suitable for showing to the developer
      */
-    private String verifyAnnotationsAreProcessed(File projectDir, List<String> migratedKeys) {
+    private String verifyAnnotationsAreProcessed(File projectDir, List<String> migratedKeys,
+                                                 String mainBinaryName) {
         getLog().info("cn1: building " + projectDir.getName()
                 + " to confirm the annotations produce the hints...");
         // Delete any manifest an earlier build left behind first. Checking that
@@ -446,6 +451,10 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         } catch (IOException ex) {
             return "Could not read " + emitted + ": " + ex.getMessage();
         }
+        String notOurs = notWrittenByTheProcessor(produced, outputDir, mainBinaryName);
+        if (notOurs != null) {
+            return notOurs;
+        }
         List<String> absent = new ArrayList<String>();
         for (String key : migratedKeys) {
             if (produced.getProperty(key) == null) {
@@ -454,6 +463,62 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
         if (!absent.isEmpty()) {
             return "These hints were annotated but did not come back out of the build: " + absent;
+        }
+        return null;
+    }
+
+    /**
+     * Why the manifest is not this build's processor output, or null when it is.
+     *
+     * <p>Its presence proves nothing on its own. A project can keep a
+     * {@code META-INF/codenameone/build-hints.properties} in
+     * {@code src/main/resources}, and any resource-producing plugin then
+     * recreates it in the output directory whether or not the processor ran --
+     * so the keys are all there, the migration is reported as verified, and the
+     * properties lines are deleted for good although nothing processed the
+     * annotations.</p>
+     *
+     * <p>The fingerprint is what tells them apart: the processor records the
+     * main class it read and a digest of the annotations it found on it, so
+     * recomputing that digest from the compiled class answers whether THIS
+     * build produced THIS file.</p>
+     */
+    String notWrittenByTheProcessor(Properties produced, File outputDir,
+                                    String mainBinaryName) {
+        String stamped = produced.getProperty("cn1.buildHints.mainClass");
+        if (mainBinaryName != null && stamped != null && !mainBinaryName.equals(stamped)) {
+            return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " was generated for "
+                    + stamped + " rather than " + mainBinaryName
+                    + ", so it is not this build's output.";
+        }
+        String recorded = produced.getProperty(
+                com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY);
+        if (recorded == null) {
+            return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " carries no "
+                    + com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY
+                    + ", so it was not written by the annotation processor -- check that the cn1 "
+                    + "process-annotations goal runs on the module that compiles the main class.";
+        }
+        if (mainBinaryName == null) {
+            return null;
+        }
+        File classFile = new File(outputDir,
+                mainBinaryName.replace('.', File.separatorChar) + ".class");
+        if (!classFile.isFile()) {
+            return null;
+        }
+        try {
+            String actual = com.codename1.maven.processors.BuildHintAnnotationProcessor.sourceDigest(
+                    com.codename1.maven.annotations.ClassScanner.readClass(classFile));
+            if (!actual.equals(recorded)) {
+                return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " does not describe the "
+                        + "annotations on " + mainBinaryName + ", so it is left over rather than "
+                        + "written by this build.";
+            }
+        } catch (com.codename1.maven.annotations.ProcessingException ex) {
+            // Unreadable class: this check cannot answer, and the key presence
+            // below is what is left. Not a verification failure on its own.
+            getLog().debug("cn1: could not fingerprint " + classFile, ex);
         }
         return null;
     }
