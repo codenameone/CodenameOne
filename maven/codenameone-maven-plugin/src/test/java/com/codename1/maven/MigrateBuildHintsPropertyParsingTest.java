@@ -902,6 +902,45 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertFalse(mojoWithEncoding("UTF-8").declares(f, pkg, "\u30a2\u30d7\u30ea"));
     }
 
+    /// A -Dcodename1.mainName override decides the entry point for the whole
+    /// migration, and only the entry point.
+    ///
+    /// The verification build is a nested Maven run that inherits the
+    /// developer's command line, so it applies the override whether or not the
+    /// migration does. Annotating the file's entry point while the verification
+    /// expected the overridden one made process-annotations call the placement
+    /// misplaced, and the migration rolled back a change that was correct.
+    @Test
+    public void theEntryPointOverrideAppliesToTheWholeMigration() throws Exception {
+        java.util.Properties settings = settingsFor("com.example", "FileApp");
+        settings.setProperty("codename1.arg.ios.pods", "FromTheFile");
+
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        mojo.properties = new java.util.Properties();
+        mojo.properties.setProperty("codename1.mainName", "OverriddenApp");
+        mojo.properties.setProperty("codename1.packageName", "com.other");
+        // What -D also carried, and what must NOT become a migrated hint: an
+        // override of a value for one build is not a declaration in the project.
+        mojo.properties.setProperty("codename1.arg.desktop.titleBar", "NATIVE");
+
+        mojo.overlayEffectiveIdentity(settings);
+
+        assertEquals("OverriddenApp", settings.getProperty("codename1.mainName"));
+        assertEquals("com.other", settings.getProperty("codename1.packageName"));
+        assertEquals("FromTheFile", settings.getProperty("codename1.arg.ios.pods"));
+        assertNull(settings.getProperty("codename1.arg.desktop.titleBar"));
+    }
+
+    /// With nothing overridden the file still decides.
+    @Test
+    public void theFileDecidesTheEntryPointWhenNothingOverrodeIt() throws Exception {
+        java.util.Properties settings = settingsFor("com.example", "FileApp");
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        mojo.overlayEffectiveIdentity(settings);
+        assertEquals("FileApp", settings.getProperty("codename1.mainName"));
+        assertEquals("com.example", settings.getProperty("codename1.packageName"));
+    }
+
     /// Maven's roots decide which file is the main class, not the conventions.
     ///
     /// A module that replaces `src/main/java` with a root of its own can still

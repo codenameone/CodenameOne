@@ -120,6 +120,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         } catch (IOException ex) {
             throw new MojoExecutionException("Could not read " + settingsFile, ex);
         }
+        overlayEffectiveIdentity(settings);
 
         List<String> kept = new ArrayList<String>();
         kept.add("java.version");
@@ -833,6 +834,36 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             sb.append(e.getKey()).append(" = ").append(e.getValue());
         }
         return sb.append(')').toString();
+    }
+
+    /**
+     * Applies a {@code -Dcodename1.mainName} / {@code -Dcodename1.packageName}
+     * override to the settings this migration works from.
+     *
+     * <p>The entry point has to be the same one end to end. The source lookup,
+     * the class the annotations are written above and the class the verification
+     * build expects all read it from here -- and the verification build is a
+     * nested Maven run that inherits the developer's command line, so it applies
+     * the override whether or not this does. Without this, an overridden
+     * invocation annotated the file's entry point, {@code process-annotations}
+     * called that placement misplaced relative to the overridden one, and the
+     * migration rolled back a change that was otherwise correct.</p>
+     *
+     * <p>The identity ONLY. A {@code -Dcodename1.arg.*} stays out of the
+     * settings this reads: it is an override of a value for one build, not a
+     * declaration in the project, and migrating it would write an annotation for
+     * a hint the file never carried.</p>
+     */
+    void overlayEffectiveIdentity(Properties settings) {
+        overlayEffective(settings, "codename1.mainName");
+        overlayEffective(settings, "codename1.packageName");
+    }
+
+    private void overlayEffective(Properties settings, String key) {
+        String value = properties == null ? null : properties.getProperty(key);
+        if (value != null && value.trim().length() > 0) {
+            settings.setProperty(key, value.trim());
+        }
     }
 
     String findMainClassSource(File projectDir, Properties settings) {
