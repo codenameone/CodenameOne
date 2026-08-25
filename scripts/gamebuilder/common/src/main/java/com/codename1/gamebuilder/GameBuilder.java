@@ -85,7 +85,7 @@ import com.codename1.annotations.buildhints.*;
 /// (EditorControllerTest, GameBuilderStructureHarness).
 @Android(themeMode = AndroidThemeMode.MODERN)
 @Build(nativeTheme = NativeThemeMode.MODERN)
-@Desktop(height = 800, titleBar = DesktopTitleBar.NATIVE, width = 1280)
+@DesktopBuild(height = 800, titleBar = DesktopTitleBar.NATIVE, width = 1280)
 @Ios(themeMode = IosThemeMode.MODERN)
 public class GameBuilder extends Lifecycle {
 

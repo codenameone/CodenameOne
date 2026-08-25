@@ -67,6 +67,18 @@
 #define CN1_CONSERVATIVE_GC_ROOTS
 #endif
 
+// CN1_GC_CONFORM: the footprint probe and (later) the structural conformance verifier
+// for issue 5537. UNLIKE CN1_GC_VERIFY it changes no allocator behaviour -- in particular
+// it does NOT force cn1BibopReleaseOffset() to 0, so the page-release and major-sweep
+// paths that CN1_GC_VERIFY compiles out entirely are live and measurable under it.
+// It subsumes CN1_GC_INSTRUMENT because the probe reports that flag's counters, and
+// those counters do not exist without it.
+#ifdef CN1_GC_CONFORM
+#ifndef CN1_GC_INSTRUMENT
+#define CN1_GC_INSTRUMENT
+#endif
+#endif
+
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // PHASE 3b: conservative native-stack scanning as a REAL GC root source. Needs
 // signal-based universal thread stopping (sig_atomic_t / sigaction / ucontext).
@@ -225,6 +237,15 @@ struct clazz {
     // an exact registry instead of a distance heuristic (see gcMarkObject). Only
     // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
     JAVA_BOOLEAN cn1ClazzRegistered;
+#ifdef CN1_ALLOC_CENSUS
+    // TRAILING for the same reason as cn1ClazzRegistered above: the generated
+    // clazz initializers are positional and never name these, so C zero-fills
+    // them and no translator change is needed. Plain non-atomic counters -- this
+    // is a diagnostic build only, and an increment lost to a race costs nothing
+    // a census is meant to answer.
+    long cn1AllocCount;
+    long cn1AllocBytes;
+#endif
 };
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
@@ -241,6 +262,21 @@ extern void cn1GcRegisterClazz(struct clazz* c);
     } while(0)
 #else
 #define CN1_CLAZZ_REGISTER(cptr) do {} while(0)
+#endif
+
+// Allocation volume BY CLASS. "The heap is 60MB" names nothing anyone can act
+// on; "3.1MB of java_lang_Long" names a fix. Counted at every allocation path
+// (both inline BiBOP bump paths and the out-of-line codenameOneGcMalloc), so
+// unlike a walk of allObjectsInHeap it does not silently miss the BiBOP and
+// nursery objects -- which is precisely where small, high-churn objects such as
+// boxed values live.
+#ifdef CN1_ALLOC_CENSUS
+#define CN1_ALLOC_CENSUS_COUNT(cptr, sz) do { \
+        struct clazz* __cc = (struct clazz*)(cptr); \
+        if(__cc != 0) { __cc->cn1AllocCount++; __cc->cn1AllocBytes += (long)(sz); } \
+    } while(0)
+#else
+#define CN1_ALLOC_CENSUS_COUNT(cptr, sz) do {} while(0)
 #endif
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)
@@ -733,8 +769,36 @@ extern JAVA_OBJECT* constantPoolObjects;
 extern int classListSize;
 extern struct clazz* classesList[];
 
-// this needs to be fixed to actually return a JAVA_OBJECT...
-#define STRING_FROM_CONSTANT_POOL_OFFSET(off) constantPoolObjects[off]
+/**
+ * The String object for a literal, materialised on FIRST USE.
+ *
+ * initConstantPool used to build every literal in the application before main
+ * ran. On a large transpiled application that was 38,238 java.lang.String
+ * objects and their backing arrays -- 61% of every live object in the process --
+ * for an application that touches a few thousand of them: every localisation of
+ * every string for every locale, every UIID, every demo description, all
+ * allocated, all pinned by the pool's own GC root, none of them ever read.
+ *
+ * The fast path is a load and a predicted-taken branch, which is what the old
+ * macro compiled to anyway. Literal IDENTITY is preserved -- the slow path is
+ * serialised and double-checked, so "x" == "x" stays true, which Java requires
+ * and generated code relies on.
+ */
+extern JAVA_OBJECT cn1MaterializeConstantPoolString(int off);
+/// Start-up attribution probe; prints elapsed-since-process-start when
+/// CN1_STARTUP_PHASES is set, and costs one cached getenv otherwise.
+extern void cn1StartupPhase(const char* name);
+/// ACQUIRE, paired with the RELEASE store in cn1MaterializeConstantPoolString.
+/// The mutex there serialises writers and keeps literal identity, but it
+/// establishes nothing with these readers -- they never take it. Without the
+/// pairing a thread may observe the published pointer while the String's fields
+/// are still invisible to it (a plain concurrent read/write is a data race in
+/// any case, and on arm64 it is one that actually reorders).
+#define CN1_CONSTANT_POOL_LOAD(off) \
+    ((JAVA_OBJECT)__atomic_load_n(&constantPoolObjects[off], __ATOMIC_ACQUIRE))
+#define STRING_FROM_CONSTANT_POOL_OFFSET(off) \
+    (__builtin_expect(CN1_CONSTANT_POOL_LOAD(off) != JAVA_NULL, 1) \
+        ? CN1_CONSTANT_POOL_LOAD(off) : cn1MaterializeConstantPoolString(off))
 
 #define BC_IINC(val, num) ilocals_##val##_ += num;
 
@@ -1575,6 +1639,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // __codenameOneReferenceCount + __codenameOneThreadData relocated out of the
             // header (force-visited / monitor side tables); no per-object stores.
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -1664,6 +1729,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             // class pointer.
             o->__codenameOneParentClsReference = (struct clazz*)0;
             o->__heapPosition = CN1_BIBOP_HEAP_POS;
+            CN1_ALLOC_CENSUS_COUNT(parent, size);
 #ifdef DEBUG_GC_ALLOCATIONS
             o->className = threadStateData->callStackClass[threadStateData->callStackOffset - 1];
             o->line = threadStateData->callStackLine[threadStateData->callStackOffset - 1];
@@ -2117,7 +2183,7 @@ extern JAVA_OBJECT cn1AllocFused(CODENAME_ONE_THREAD_STATE, int totalSize, struc
 static inline JAVA_OBJECT cn1FusedInstallPrimArray(JAVA_OBJECT owner, int off, struct clazz* acls, int esz, int len) {
     struct JavaArrayPrototype* a = (struct JavaArrayPrototype*)((char*)owner + off);
     a->__codenameOneParentClsReference = acls;
-    a->__codenameOneGcMark = -1;
+    a->__codenameOneGcMark = -1;   // not yet published; see codenameOneGcMalloc
     a->__heapPosition = -1;
     a->length = len;
     a->dimensions = 1;

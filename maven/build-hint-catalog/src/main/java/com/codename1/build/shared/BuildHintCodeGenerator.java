@@ -374,7 +374,7 @@ public final class BuildHintCodeGenerator {
         sb.append("/// ```java\n");
         sb.append("/// @Ios(newStorageLocation = true, themeMode = IosThemeMode.MODERN)\n");
         sb.append("/// @Android(themeMode = AndroidThemeMode.MODERN)\n");
-        sb.append("/// @Desktop(titleBar = DesktopTitleBar.NATIVE)\n");
+        sb.append("/// @DesktopBuild(titleBar = DesktopTitleBar.NATIVE)\n");
         sb.append("/// public class MyApplication {\n");
         sb.append("/// }\n");
         sb.append("/// ```\n");

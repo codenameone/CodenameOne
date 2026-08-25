@@ -63,6 +63,8 @@ class MacNativeBuilder {
 
     // Parsed hints.
     private boolean enabled;
+
+    private boolean multiWindow;
     private String distribution;       // appStore | developerID | both
     private String teamId;
     private String bundleId;
@@ -94,6 +96,22 @@ class MacNativeBuilder {
         return enabled;
     }
 
+    /// Whether this build asks for `com.codename1.ui.Window` support.
+    ///
+    /// Opt-in, and deliberately not implied by `macNative.enabled`. Supporting windows
+    /// means declaring `UIApplicationSupportsMultipleScenes`, which puts the app on the
+    /// UIScene lifecycle -- and a Catalyst window opens four points shorter under it, so
+    /// every existing Mac Catalyst application would have re-laid out slightly on the
+    /// next build. Measured, not assumed: the conformance suite renders 1024x685 without
+    /// the manifest and 1024x681 with it, and the 148 goldens recorded before windows
+    /// existed match the former exactly.
+    ///
+    /// So an application that does not ask for windows gets the bundle it always got,
+    /// and one that does accepts the relayout knowingly.
+    boolean isMultiWindow() {
+        return enabled && multiWindow;
+    }
+
     /**
      * Parse the {@code macNative.*} hint family off the request and
      * stash the values for later. Caller is expected to flip {@code
@@ -102,6 +120,7 @@ class MacNativeBuilder {
      */
     void parseHints(BuildRequest request) {
         enabled = "true".equals(request.getArg("macNative.enabled", "false"));
+        multiWindow = "true".equals(request.getArg("macNative.multiWindow", "false"));
         if (!enabled) {
             return;
         }
@@ -602,7 +621,27 @@ class MacNativeBuilder {
                 .append("') unless target\n")
                 .append("target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
-                .append("  bs['SUPPORTS_MACCATALYST'] = 'YES'\n")
+                .append("  bs['SUPPORTS_MACCATALYST'] = 'YES'\n");
+        // SDK-qualified, like PRODUCT_BUNDLE_IDENTIFIER and DEVELOPMENT_TEAM below.
+        // This is one target and the same build still ships the iPhone/iPad slice, so
+        // it is the only place the two destinations can be told apart:
+        // com.codename1.ui.Window needs UIApplicationSupportsMultipleScenes true, and
+        // turning that on in the shared plist would opt every iPad build into
+        // multi-window behaviour it never asked for.
+        //
+        // Set unconditionally rather than only when the key needs flipping, because
+        // this runs before the plist is written in one of the two builders that share
+        // this code and so cannot look at it. IPhoneBuilder.writeCatalystInfoPlist
+        // always writes the file for a Mac build, copying the finished plist and
+        // ensuring the key -- so when the application already asked for multiple
+        // scenes the copy is simply identical.
+        if (multiWindow) {
+            s.append("  bs['INFOPLIST_FILE[sdk=macosx*]'] = '")
+                    .append(IPhoneBuilder.escapeRubyStr(
+                            IPhoneBuilder.catalystInfoPlistRelativePath(mainClass)))
+                    .append("'\n");
+        }
+        s
                 .append("  bs['SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD'] = 'NO'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '1,2,6'\n")
                 .append("  bs['DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER'] = '")

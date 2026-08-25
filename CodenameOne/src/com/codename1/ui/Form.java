@@ -65,8 +65,7 @@ import java.util.Set;
 /// will work whereas `form.animateLayout(200)` will fail.
 ///
 /// @author Chen Fishbein
-public class Form extends Container {
-    private static final String Z_INDEX_PROP = "cn1$_zIndex";
+public class Form extends Container implements TopLevelContainer {
     static int activePeerCount;
     static int rippleX;
     static int rippleY;
@@ -103,6 +102,12 @@ public class Form extends Container {
     ///
     /// Used in `Container#revalidate()`.
     boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+
+    /// {@inheritDoc}
+    @Override
+    boolean isRevalidateFromRoot() {
+        return revalidateFromRoot;
+    }
     private Command sourceCommand;
     private boolean globalAnimationLock;
     private Painter glassPane;
@@ -331,6 +336,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cnt`: The container to schedule for revalidation
+    @Override
     void revalidateLater(Container cnt) {
         if (!pendingRevalidateQueue.contains(cnt)) {
             // It doesn't need to be in queue more than once.
@@ -361,10 +367,12 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cnt`: The container to remove from the queue.
+    @Override
     void removeFromRevalidateQueue(Container cnt) {
         pendingRevalidateQueue.remove(cnt);
     }
 
+    @Override
     void flushRevalidateQueue() {
 
         if (!pendingRevalidateQueue.isEmpty()) {
@@ -403,6 +411,7 @@ public class Form extends Container {
     ///
     /// The text selection support for this form.
     ///
+    @Override
     public TextSelection getTextSelection() {
         if (textSelection == null) {
             textSelection = new TextSelection(getContentPane());
@@ -422,6 +431,7 @@ public class Form extends Container {
     /// - #setEnableCursors(boolean)
     ///
     /// - Component#setCursor(int)
+    @Override
     public boolean isEnableCursors() {
         return enableCursors;
     }
@@ -435,6 +445,7 @@ public class Form extends Container {
     /// #### See also
     ///
     /// - Component#setCursor(int)
+    @Override
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
     }
@@ -470,6 +481,7 @@ public class Form extends Container {
     /// #### See also
     ///
     /// - #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+    @Override
     public VirtualInputDevice getCurrentInputDevice() {
         return currentInputDevice;
     }
@@ -486,6 +498,7 @@ public class Form extends Container {
     /// #### Throws
     ///
     /// - `Exception`
+    @Override
     public void setCurrentInputDevice(VirtualInputDevice device) throws Exception {
         if (currentInputDevice != null) {
             currentInputDevice.close();
@@ -526,6 +539,7 @@ public class Form extends Container {
     /// #### See also
     ///
     /// - #setOverrideInvisibleAreaUnderVKB(int)
+    @Override
     public int getInvisibleAreaUnderVKB() {
         if (bottomPaddingMode) {
             return 0;
@@ -588,6 +602,7 @@ public class Form extends Container {
     /// - Container#setSafeArea(boolean)
     ///
     /// - Container#isSafeArea()
+    @Override
     public Rectangle getSafeArea() {
         if (safeAreaDirty) {
             Display.impl.getDisplaySafeArea(safeArea);
@@ -767,6 +782,7 @@ public class Form extends Container {
     /// #### Deprecated
     ///
     /// this is effectively invalidated by the newer animation framework
+    @Override
     public boolean grabAnimationLock() {
         if (globalAnimationLock) {
             return false;
@@ -780,6 +796,7 @@ public class Form extends Container {
     /// #### Deprecated
     ///
     /// this is effectively invalidated by the newer animation framework
+    @Override
     public void releaseAnimationLock() {
         globalAnimationLock = false;
     }
@@ -794,6 +811,7 @@ public class Form extends Container {
     /// #### See also
     ///
     /// - Component#isEditing()
+    @Override
     public Component findCurrentlyEditingComponent() {
         return ComponentSelector.select("*", this).filter(new CurrentlyEditingFilter()).asComponent();
     }
@@ -870,6 +888,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: listener
+    @Override
     public void addShowListener(ActionListener l) {
         if (showListener == null) {
             showListener = new EventDispatcher();
@@ -882,6 +901,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: the listener
+    @Override
     public void removeShowListener(ActionListener l) {
         if (showListener == null) {
             return;
@@ -926,6 +946,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: listener
+    @Override
     public void addSizeChangedListener(ActionListener l) {
         if (sizeChangedListener == null) {
             sizeChangedListener = new EventDispatcher();
@@ -938,6 +959,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: the listener
+    @Override
     public void removeSizeChangedListener(ActionListener l) {
         if (sizeChangedListener == null) {
             return;
@@ -948,6 +970,7 @@ public class Form extends Container {
     /// This method is only invoked when the underlying canvas for the form is hidden
     /// this method isn't called for form based events and is generally usable for
     /// suspend/resume based behavior
+    @Override
     protected void hideNotify() {
         setVisible(false);
     }
@@ -955,6 +978,7 @@ public class Form extends Container {
     /// This method is only invoked when the underlying canvas for the form is shown
     /// this method isn't called for form based events and is generally usable for
     /// suspend/resume based behavior
+    @Override
     protected void showNotify() {
         setVisible(true);
     }
@@ -991,6 +1015,7 @@ public class Form extends Container {
     /// - `w`: the new width of the Form
     ///
     /// - `h`: the new height of the Form
+    @Override
     void sizeChangedInternal(int w, int h) {
         int oldWidth = getWidth();
         int oldHeight = getHeight();
@@ -1175,6 +1200,7 @@ public class Form extends Container {
     /// #### See also
     ///
     /// - com.codename1.ui.painter.PainterChain#installGlassPane(Form, com.codename1.ui.Painter)
+    @Override
     public Painter getGlassPane() {
         return glassPane;
     }
@@ -1212,6 +1238,7 @@ public class Form extends Container {
     ///
     /// - `glassPane`: @param glassPane a new glass pane to install. It is generally recommended to
     /// use a painter chain if more than one painter is required.
+    @Override
     public void setGlassPane(Painter glassPane) {
         this.glassPane = glassPane;
         repaint();
@@ -1259,6 +1286,7 @@ public class Form extends Container {
     /// - `keyCode`: code on which to send the event
     ///
     /// - `listener`: listener to invoke when the key code released.
+    @Override
     public void addKeyListener(int keyCode, ActionListener listener) {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
@@ -1273,6 +1301,7 @@ public class Form extends Container {
     /// - `keyCode`: code on which the event is sent
     ///
     /// - `listener`: listener instance to remove
+    @Override
     public void removeKeyListener(int keyCode, ActionListener listener) {
         if (keyListeners == null) {
             return;
@@ -1475,32 +1504,31 @@ public class Form extends Container {
     }
 
     /// Gets the current dragged Component
+    @Override
     Component getDraggedComponent() {
         return dragged;
     }
 
     /// Sets the current dragged Component
+    @Override
     void setDraggedComponent(Component dragged) {
         this.dragged = LeadUtil.leadParentImpl(dragged);
     }
 
-    /// Returns true if the given dest component is in the column of the source component
-    private boolean isInSameColumn(Component source, Component dest) {
-        // workaround for NPE
-        if (source == null || dest == null) {
-            return false;
-        }
-        return Rectangle.intersects(source.getAbsoluteX(), 0,
-                source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),
-                dest.getWidth(), dest.getHeight());
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressX() {
+        return initialPressX;
     }
 
-    /// Returns true if the given dest component is in the row of the source component
-    private boolean isInSameRow(Component source, Component dest) {
-        return Rectangle.intersects(0, source.getAbsoluteY(),
-                Integer.MAX_VALUE, source.getHeight(), dest.getAbsoluteX(), dest.getAbsoluteY(),
-                dest.getWidth(), dest.getHeight());
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressY() {
+        return initialPressY;
     }
+
+
+
 
     /// Default command is invoked when a user presses fire, this functionality works
     /// well in some situations but might collide with elements such as navigation
@@ -1645,8 +1673,15 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// a content pane instance
+    @Override
     public Container getContentPane() {
         return contentPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Container asContainer() {
+        return this;
     }
 
     /// This method returns the layered pane of the Form, the layered pane is laid
@@ -1656,6 +1691,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the LayeredPane
+    @Override
     public Container getLayeredPane() {
         return getLayeredPane(null, false);
     }
@@ -1672,56 +1708,9 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getLayeredPane(Class c, boolean top) {
-        Container layeredPaneImpl = getLayeredPaneImpl();
-        if (c == null) {
-            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-            // over layeredPaneImpl because the latter won't find components while an animation
-            // is in progress.... We could end up adding a whole bunch of layered panes
-            // by accident
-            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                if (cmp != null && cmp.getClientProperty("cn1$_cls") == null) {
-                    return (Container) cmp;
-                }
-            }
-        }
-        String n = c != null ? c.getName() : null;
-        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-        // over layeredPaneImpl because the latter won't find components while an animation
-        // is in progress.... We could end up adding a whole bunch of layered panes
-        // by accident
-        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        if (n != null) {
-            for (Component cmp : children) {
-                if (cmp != null && n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                    return (Container) cmp;
-                }
-            }
-        }
-
-        Container cnt = new Container();
-        int zIndex = 0;
-        int componentCount = children.size();
-        if (top) {
-            if (componentCount > 0) {
-                Integer z = (Integer) children.get(componentCount - 1).getClientProperty(Z_INDEX_PROP);
-                if (z != null) {
-                    zIndex = z.intValue();
-                }
-            }
-            layeredPaneImpl.add(cnt);
-        } else {
-            if (componentCount > 0) {
-                Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
-                if (z != null) {
-                    zIndex = z.intValue();
-                }
-            }
-            layeredPaneImpl.addComponent(0, cnt);
-        }
-        cnt.putClientProperty("cn1$_cls", n);
-        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        return cnt;
+        return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, top);
     }
 
     /// Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
@@ -1736,56 +1725,9 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getLayeredPane(Class c, int zIndex) {
-        Container layeredPaneImpl = getLayeredPaneImpl();
-
-        if (c == null) {
-            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-            // over layeredPaneImpl because the latter won't find components while an animation
-            // is in progress.... We could end up adding a whole bunch of layered panes
-            // by accident
-            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                if (cmp != null && cmp.getClientProperty("cn1$_cls") == null) {
-                    return (Container) cmp;
-                }
-            }
-        }
-        String n = c != null ? c.getName() : null;
-        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-        // over layeredPaneImpl because the latter won't find components while an animation
-        // is in progress.... We could end up adding a whole bunch of layered panes
-        // by accident
-        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        if (n != null) {
-            for (Component cmp : children) {
-                if (cmp != null && n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                    return (Container) cmp;
-                }
-            }
-        }
-
-        Container cnt = new Container();
-        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        int len = children.size();
-        int insertIndex = -1;
-
-        for (int i = 0; i < len; i++) {
-            Component cmp = children.get(i);
-            Integer cmpZIndex = (Integer) cmp.getClientProperty(Z_INDEX_PROP);
-            int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
-            if (cmpZ >= zIndex) {
-                insertIndex = i;
-                break;
-            }
-        }
-
-        if (insertIndex == -1) {
-            layeredPaneImpl.add(cnt);
-        } else {
-            layeredPaneImpl.addComponent(insertIndex, cnt);
-        }
-        cnt.putClientProperty("cn1$_cls", n);
-        return cnt;
+        return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, zIndex);
     }
 
     /// Returns the layered pane for the class and if one doesn't exist a new one is created
@@ -1802,6 +1744,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getFormLayeredPane(Class c, boolean top) {
         if (formLayeredPane == null) {
             formLayeredPane = new Container(new LayeredLayout()) {
@@ -1909,6 +1852,7 @@ public class Form extends Container {
         return layeredPane;
     }
 
+    @Override
     Container getActualPane() {
         if (layeredPane != null) {
             return layeredPane.getParent();
@@ -1999,6 +1943,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// returns the form title
+    @Override
     public String getTitle() {
         if (toolbar != null) {
             Component cmp = toolbar.getTitleComponent();
@@ -2015,6 +1960,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `title`: the form title
+    @Override
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
@@ -2178,6 +2124,46 @@ public class Form extends Container {
         super.removeComponent(cmp);
     }
 
+    @Override
+    void addComponentToTopLevel(Object constraints, Component cmp) {
+        addComponentToForm(constraints, cmp);
+    }
+
+    @Override
+    void removeComponentFromTopLevel(Component cmp) {
+        removeComponentFromForm(cmp);
+    }
+
+    @Override
+    boolean isTopLevelShowing() {
+        return Display.getInstance().getCurrent() == this; //NOPMD CompareObjectsWithEquals
+    }
+
+    @Override
+    int titleAreaHeight() {
+        return getTitleArea().getHeight();
+    }
+
+    @Override
+    boolean showsSelectionFor(Component c) {
+        return Display.getInstance().mainSurfacePressIsOver(c);
+    }
+
+    @Override
+    void commandActivatedFromList(Command cmd, ActionEvent ev) {
+        actionCommandImpl(cmd);
+    }
+
+    @Override
+    void commandActivatedFromComponent(Command cmd, ActionEvent ev) {
+        actionCommandImplNoRecurseComponent(cmd, ev);
+    }
+
+    @Override
+    void setClearCommandInternal(Command cmd) {
+        setClearCommand(cmd);
+    }
+
     /// Registering media component to this Form, that like to receive
     /// animation events
     ///
@@ -2218,6 +2204,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cmp`: component that would be animated
+    @Override
     public final void registerAnimated(Animation cmp) {
         if (animatableComponents == null) {
             animatableComponents = new ArrayList<Animation>();
@@ -2241,6 +2228,7 @@ public class Form extends Container {
     /// Identical to the none-internal version, the difference between the internal/none-internal
     /// is that it references a different vector that is unaffected by the user actions.
     /// That is why we can dynamically register/deregister without interfering with user interaction.
+    @Override
     void registerAnimatedInternal(Animation cmp) {
         if (cmp instanceof Component) {
             Component c = (Component) cmp;
@@ -2261,6 +2249,7 @@ public class Form extends Container {
     /// Identical to the none-internal version, the difference between the internal/none-internal
     /// is that it references a different vector that is unaffected by the user actions.
     /// That is why we can dynamically register/deregister without interfering with user interaction.
+    @Override
     void deregisterAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents != null) {
             if (cmp instanceof Component) {
@@ -2279,6 +2268,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cmp`: component that would no longer receive animation events
+    @Override
     public void deregisterAnimated(Animation cmp) {
         if (animatableComponents != null) {
             animatableComponents.remove(cmp);
@@ -2468,6 +2458,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: the command action listener
+    @Override
     public void addCommandListener(ActionListener l) {
         if (commandListener == null) {
             commandListener = new EventDispatcher();
@@ -2481,6 +2472,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: the command action listener
+    @Override
     public void removeCommandListener(ActionListener l) {
         commandListener.removeListener(l);
     }
@@ -2502,6 +2494,7 @@ public class Form extends Container {
     /// - `cmd`: The command to dispatch
     ///
     /// - `ev`: the event to dispatch
+    @Override
     public void dispatchCommand(Command cmd, ActionEvent ev) {
         cmd.actionPerformed(ev);
         if (!ev.isConsumed()) {
@@ -2604,6 +2597,7 @@ public class Form extends Container {
     }
 
     /// Displays the current form on the screen
+    @Override
     public void show() {
         Display.impl.onShow(this);
         show(false);
@@ -2967,6 +2961,18 @@ public class Form extends Container {
         return this;
     }
 
+    /// {@inheritDoc}
+    ///
+    /// A `Form` terminates the walk unless it is itself embedded in another
+    /// hierarchy, exactly as `#getComponentForm()` does.
+    @Override
+    public TopLevelContainer getTopLevelContainer() {
+        if (getParent() != null) {
+            return super.getTopLevelContainer();
+        }
+        return this;
+    }
+
     /// Invoked by display to hide the menu during transition
     ///
     /// #### See also
@@ -2985,6 +2991,7 @@ public class Form extends Container {
         menuBar.installMenuBar();
     }
 
+    @Override
     void setFocusedInternal(Component focused) {
         this.focused = focused;
     }
@@ -3038,13 +3045,15 @@ public class Form extends Container {
             fireFocusLost(cmp);
         }
 
-        //if the styles are different there is a chance the preffered size is
-        //still the same therefore make sure there is a real need to preform
-        //a revalidate
+        // The styles can differ without the preferred size actually moving, so only
+        // revalidate when it really did. The test used to be inverted -- it cleared
+        // the trigger when the size *changed*, which dropped the revalidate in
+        // exactly the case that needs one and left neighbouring components at their
+        // old positions until some unrelated layout came along.
         if (trigger) {
             cmp.setShouldCalcPreferredSize(true);
             Dimension d = cmp.getPreferredSize();
-            if (prefW != d.getWidth() || prefH != d.getHeight()) {
+            if (prefW == d.getWidth() && prefH == d.getHeight()) {
                 cmp.setShouldCalcPreferredSize(false);
                 trigger = false;
             }
@@ -3058,6 +3067,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the current focus component for this form
+    @Override
     public Component getFocused() {
         return focused;
     }
@@ -3067,6 +3077,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `focused`: the newly focused component or null for no focus
+    @Override
     public void setFocused(Component focused) {
         if (this.focused == focused && focused != null) { //NOPMD CompareObjectsWithEquals
             this.focused.repaint();
@@ -3137,6 +3148,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// false by default
+    @Override
     protected boolean shouldSendPointerReleaseToOtherForm() {
         return false;
     }
@@ -3193,10 +3205,27 @@ public class Form extends Container {
     /// - Component#getPreferredTabIndex()
     ///
     /// - Component#setPreferredTabIndex(int)
+    @Override
     public TabIterator getTabIterator(Component start) {
-        updateTabIndices(0);
+        return buildTabIterator(this, start);
+    }
+
+    /// Builds the traversal order for a top level. Shared with `Window`, which needs
+    /// the identical ordering rules but is not a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the top level to walk
+    ///
+    /// - `start`: the component to start from
+    ///
+    /// #### Returns
+    ///
+    /// the traversal iterator
+    static TabIterator buildTabIterator(Container root, Component start) {
+        root.updateTabIndices(0);
         java.util.List<Component> out = new ArrayList<Component>();
-        out.addAll(ComponentSelector.select("*", this).filter(new TabIteratorFilter()));
+        out.addAll(ComponentSelector.select("*", root).filter(new TabIteratorFilter()));
         Collections.sort(out, new TabIteratorComparator());
         return new TabIterator(out, start);
     }
@@ -3448,6 +3477,7 @@ public class Form extends Container {
     /// Gets the handle for the current pointer press event.  A new object
     /// is generated for each pointer press.
     ///
+    @Override
     Object getCurrentPointerPress() {
         return currentPointerPress;
     }
@@ -3617,6 +3647,7 @@ public class Form extends Container {
     }
 
 
+    @Override
     public <C extends Component> void addComponentAwaitingRelease(C c) {
         if (componentsAwaitingRelease == null) {
             componentsAwaitingRelease = new ArrayList<Component>();
@@ -3624,12 +3655,14 @@ public class Form extends Container {
         componentsAwaitingRelease.add(c);
     }
 
+    @Override
     public <C extends Component> void removeComponentAwaitingRelease(C c) {
         if (componentsAwaitingRelease != null) {
             componentsAwaitingRelease.remove(c);
         }
     }
 
+    @Override
     public void clearComponentsAwaitingRelease() {
         if (componentsAwaitingRelease != null) {
             componentsAwaitingRelease.clear(); //componentsAwatingRelease = null;  //can be set to null or cleared, would be the same. clear may save some unnecessary GC operations when some releasable components are pressed multiple times
@@ -3937,6 +3970,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// true if there is one focusable component in this form, false for 0 or more
+    @Override
     public boolean isSingleFocusMode() {
         if (formLayeredPane != null) {
             return countFocusables(formLayeredPane) + countFocusables(getActualPane()) < 2;
@@ -4235,6 +4269,7 @@ public class Form extends Container {
     /// #### Deprecated
     ///
     /// Please use `Toolbar#getComponentCount()` or similar methods
+    @Override
     public int getCommandCount() {
         return menuBar.getCommandCount();
     }
@@ -4248,6 +4283,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// the command at the given index
+    @Override
     public Command getCommand(int index) {
         return menuBar.getCommand(index);
     }
@@ -4267,6 +4303,7 @@ public class Form extends Container {
     /// #### Deprecated
     ///
     /// Please use `Toolbar#addCommandToLeftBar(com.codename1.ui.Command)` or similar methods
+    @Override
     public final void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);
         addCommand(cmd, 0);
@@ -4277,100 +4314,12 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cmd`: the Form command to be removed
+    @Override
     public void removeCommand(Command cmd) {
         menuBar.removeCommand(cmd);
     }
 
-    private Component findNextFocusHorizontal(Component focused, Component bestCandidate, Container root, boolean right) {
-        int count = root.getComponentCount();
-        for (int iter = 0; iter < count; iter++) {
-            Component current = root.getComponentAt(iter);
-            if (current.isFocusable()) {
-                if (isInSameRow(focused, current)) {
-                    int currentX = current.getAbsoluteX();
-                    int focusedX = focused.getAbsoluteX();
-                    if (right) {
-                        if (focusedX < currentX) {
-                            if (bestCandidate != null) {
-                                if (bestCandidate.getAbsoluteX() < currentX) {
-                                    continue;
-                                }
-                            }
-                            bestCandidate = current;
-                        }
-                    } else {
-                        if (focusedX > currentX) {
-                            if (bestCandidate != null) {
-                                if (bestCandidate.getAbsoluteX() > currentX) {
-                                    continue;
-                                }
-                            }
-                            bestCandidate = current;
-                        }
-                    }
-                }
-            }
-            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
-                bestCandidate = findNextFocusHorizontal(focused, bestCandidate, (Container) current, right);
-            }
-        }
-        return bestCandidate;
-    }
 
-    private Component findNextFocusVertical(Component focused, Component bestCandidate, Container root, boolean down) {
-        int count = root.getComponentCount();
-        for (int iter = 0; iter < count; iter++) {
-            Component current = root.getComponentAt(iter);
-            if (current.isFocusable()) {
-                int currentY = current.getAbsoluteY();
-                int focusedY = 0;
-                if (focused != null) {
-                    focusedY = focused.getAbsoluteY();
-                }
-                if (down) {
-                    if (focusedY < currentY) {
-                        if (bestCandidate != null) {
-                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if (bestCandidate.getAbsoluteY() < currentY) {
-                                if (exitingInSame) {
-                                    continue;
-                                }
-                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
-                                    continue;
-                                }
-                            }
-                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
-                                continue;
-                            }
-                        }
-                        bestCandidate = current;
-                    }
-                } else {
-                    if (focusedY > currentY) {
-                        if (bestCandidate != null) {
-                            boolean exitingInSame = isInSameColumn(focused, bestCandidate);
-                            if (bestCandidate.getAbsoluteY() > currentY) {
-                                if (exitingInSame) {
-                                    continue;
-                                }
-                                if (isInSameRow(current, bestCandidate) && !isInSameColumn(focused, current)) {
-                                    continue;
-                                }
-                            }
-                            if (exitingInSame && isInSameRow(current, bestCandidate)) {
-                                continue;
-                            }
-                        }
-                        bestCandidate = current;
-                    }
-                }
-            }
-            if (current instanceof Container && !(((Container) current).isBlockFocus())) {
-                bestCandidate = findNextFocusVertical(focused, bestCandidate, (Container) current, down);
-            }
-        }
-        return bestCandidate;
-    }
 
     /// This method returns the next focusable Component vertically
     ///
@@ -4388,23 +4337,23 @@ public class Form extends Container {
     public Component findNextFocusVertical(boolean down) {
         Component c = null;
         if (formLayeredPane != null) {
-            c = findNextFocusVertical(focused, null, formLayeredPane, down);
+            c = TopLevelSupport.findNextFocusVertical(focused, null, formLayeredPane, down);
             if (c != null) {
                 return c;
             }
         }
         Container actual = getActualPane();
-        c = findNextFocusVertical(focused, null, actual, down);
+        c = TopLevelSupport.findNextFocusVertical(focused, null, actual, down);
         if (c != null) {
             return c;
         }
         if (cyclicFocus) {
-            c = findNextFocusVertical(focused, null, actual, !down);
+            c = TopLevelSupport.findNextFocusVertical(focused, null, actual, !down);
             if (c != null) {
-                Component current = findNextFocusVertical(c, null, actual, !down);
+                Component current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
                 while (current != null) {
                     c = current;
-                    current = findNextFocusVertical(c, null, actual, !down);
+                    current = TopLevelSupport.findNextFocusVertical(c, null, actual, !down);
                 }
                 return c;
             }
@@ -4428,23 +4377,23 @@ public class Form extends Container {
     public Component findNextFocusHorizontal(boolean right) {
         Component c = null;
         if (formLayeredPane != null) {
-            c = findNextFocusHorizontal(focused, null, formLayeredPane, right);
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, formLayeredPane, right);
             if (c != null) {
                 return c;
             }
         }
         Container actual = getActualPane();
-        c = findNextFocusHorizontal(focused, null, actual, right);
+        c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, right);
         if (c != null) {
             return c;
         }
         if (cyclicFocus) {
-            c = findNextFocusHorizontal(focused, null, actual, !right);
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, actual, !right);
             if (c != null) {
-                Component current = findNextFocusHorizontal(c, null, actual, !right);
+                Component current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
                 while (current != null) {
                     c = current;
-                    current = findNextFocusHorizontal(c, null, actual, !right);
+                    current = TopLevelSupport.findNextFocusHorizontal(c, null, actual, !right);
                 }
                 return c;
             }
@@ -4454,6 +4403,7 @@ public class Form extends Container {
 
     /// Finds next focusable component.  This will first check `Component#getNextFocusDown()`
     /// on the currently focused component.  Failing that it will scan the form based on Y-coord.
+    @Override
     Component findNextFocusDown() {
         if (focused != null) {
             if (focused.getNextFocusDown() != null) {
@@ -4466,6 +4416,7 @@ public class Form extends Container {
 
     /// Finds next focusable component in upward direction.  This will first check `Component#getNextFocusUp()`
     /// on the currently focused component.  Failing that it will scan the form based on Y-coord.
+    @Override
     Component findNextFocusUp() {
         if (focused != null) {
             if (focused.getNextFocusUp() != null) {
@@ -4478,6 +4429,7 @@ public class Form extends Container {
 
     /// Finds next focusable component in rightward direction.  This will first check `Component#getNextFocusRight()`
     /// on the currently focused component.  Failing that it will scan the form based on X-coord.
+    @Override
     Component findNextFocusRight() {
         if (focused != null) {
             if (focused.getNextFocusRight() != null) {
@@ -4490,6 +4442,7 @@ public class Form extends Container {
 
     /// Finds next focusable component in leftward direction.  This will first check `Component#getNextFocusLeft()`
     /// on the currently focused component.  Failing that it will scan the form based on X-coord.
+    @Override
     Component findNextFocusLeft() {
         if (focused != null) {
             if (focused.getNextFocusLeft() != null) {
@@ -4505,6 +4458,7 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// true if focus should cycle
+    @Override
     public boolean isCyclicFocus() {
         return cyclicFocus;
     }
@@ -4514,6 +4468,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cyclicFocus`: marks whether focus should cycle
+    @Override
     public void setCyclicFocus(boolean cyclicFocus) {
         this.cyclicFocus = cyclicFocus;
     }
@@ -4650,6 +4605,7 @@ public class Form extends Container {
     }
 
     /// Clear menu commands from the menu bar
+    @Override
     public void removeAllCommands() {
         menuBar.removeAllCommands();
     }
@@ -4659,6 +4615,7 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `cmp`: the form child component
+    @Override
     void requestFocus(Component cmp) {
         if (cmp.isFocusable() && contains(cmp)) {
             scrollComponentToVisible(cmp);

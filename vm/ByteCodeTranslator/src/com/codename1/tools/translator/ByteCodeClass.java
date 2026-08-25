@@ -1065,8 +1065,17 @@ public class ByteCodeClass {
             b.append(baseClass.replace('/', '_').replace('$', '_'));
             b.append("(threadStateData, objToMark, force);\n");
         } else {
-            // we can do this in Object.java only since all code will reach here eventually
-            b.append("    objToMark->__codenameOneGcMark = currentGcMarkValue;\n");
+            // we can do this in Object.java only since all code will reach here eventually.
+            //
+            // ATOMIC, and it has to be: this is the root of every generated mark chain, so
+            // it is THE collector-side write of the mark word, and the SATB barrier
+            // (cn1SatbEnqueue) atomically loads the same field from mutator threads while
+            // the mark is running. A plain store here would leave that pair a mixed
+            // atomic/non-atomic access, which is undefined in C -- the same defect the
+            // hand-written stores in cn1_globals.m were converted for. Relaxed is the same
+            // instruction on every target we build; what it buys is that the write is one
+            // the reader is allowed to observe.
+            b.append("    __atomic_store_n(&objToMark->__codenameOneGcMark, currentGcMarkValue, __ATOMIC_RELAXED);\n");
         }
         b.append("}\n\n");
 

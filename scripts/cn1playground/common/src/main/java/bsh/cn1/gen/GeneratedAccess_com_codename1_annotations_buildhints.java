@@ -62,7 +62,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
             return com.codename1.annotations.buildhints.Build.class;
         }
         if ("Desktop".equals(simpleName)) {
-            return com.codename1.annotations.buildhints.Desktop.class;
+            return com.codename1.annotations.buildhints.DesktopBuild.class;
         }
         if ("DesktopTitleBar".equals(simpleName)) {
             return com.codename1.annotations.buildhints.DesktopTitleBar.class;
@@ -202,9 +202,9 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
                 unsupported = ex;
             }
         }
-        if (target instanceof com.codename1.annotations.buildhints.Desktop) {
+        if (target instanceof com.codename1.annotations.buildhints.DesktopBuild) {
             try {
-                return invoke12((com.codename1.annotations.buildhints.Desktop) target, name, safeArgs);
+                return invoke12((com.codename1.annotations.buildhints.DesktopBuild) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -481,7 +481,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.annotations.buildhints.Desktop typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.annotations.buildhints.DesktopBuild typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("adaptToRetina".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.adaptToRetina();

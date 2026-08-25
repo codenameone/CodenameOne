@@ -37,6 +37,15 @@ on:
       - 'scripts/build-hint-catalog-baseline.txt'
       - 'scripts/build-hint-computed-sites.txt'
       - 'scripts/gen-build-hint-annotations.sh'
+      # Same reasoning for the cn1lib native gates: they run from this workflow
+      # and nowhere else, and the stubs are the API surface their Android check
+      # compiles against, so excluding scripts/ wholesale would let a change to
+      # any of them merge without the gate it belongs to ever running.
+      - 'scripts/check-native-peer-returns.py'
+      - 'scripts/check-cn1lib-android-api.py'
+      - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/check-cn1lib-native-sources.py'
+      - 'scripts/cn1lib-api-check/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -79,6 +88,15 @@ on:
       - 'scripts/build-hint-catalog-baseline.txt'
       - 'scripts/build-hint-computed-sites.txt'
       - 'scripts/gen-build-hint-annotations.sh'
+      # Same reasoning for the cn1lib native gates: they run from this workflow
+      # and nowhere else, and the stubs are the API surface their Android check
+      # compiles against, so excluding scripts/ wholesale would let a change to
+      # any of them merge without the gate it belongs to ever running.
+      - 'scripts/check-native-peer-returns.py'
+      - 'scripts/check-cn1lib-android-api.py'
+      - 'scripts/check-cn1lib-native-coverage.py'
+      - 'scripts/check-cn1lib-native-sources.py'
+      - 'scripts/cn1lib-api-check/**'
       - '!docs/**'
       - '!**/*.md'
       - '!.github/workflows/developer-guide-docs.yml'
@@ -160,7 +178,7 @@ jobs:
         # RETRY_ONLY_MATCHING keeps a failing test failing on the first attempt
         # rather than letting a re-run launder a flake into a pass.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM'
+          RETRY_ONLY_MATCHING: transient
         run: |
           MVN_GOAL="verify"
           MVN_ARGS=""
@@ -465,6 +483,51 @@ jobs:
       # that as "unused" and drops the Java method, and the feature ships inert.
       # ios/core come from the SpotBugs step and JavaAPI from the cast step; the
       # two desktop ports are not built yet, so compile them here.
+      # A NativeInterface method returning PeerComponent is wrapped by the
+      # generated stub, so an implementation that returns a peer of its own is
+      # wrapped twice and blows up with IllegalArgumentException the first time
+      # the component is shown -- valid Java that no compiler objects to, which
+      # is how all three ad cn1libs shipped with it.
+      - name: Check native peer return types
+        if: ${{ matrix.java-version == 8 }}
+        run: python3 scripts/check-native-peer-returns.py
+      # A cn1lib ships its native sources; the customer's build is the first
+      # compiler that sees them. Two workflows close that gap, but only for the
+      # libraries their matrices name, so this fails when a library is in
+      # neither -- the state cn1-admob and cn1-unity-levelplay were in.
+      - name: Check cn1lib native CI coverage
+        if: ${{ matrix.java-version == 8 }}
+        run: python3 scripts/check-cn1lib-native-coverage.py
+      - name: Install C compilers for the cn1lib native source check
+        if: ${{ matrix.java-version == 8 }}
+        # gcc for the Linux glue and the mingw-w64 cross compiler for the
+        # Windows glue, whose _WIN32 half (windows.h, LoadLibraryA,
+        # GetProcAddress) does not exist for a host target -- compiled as host
+        # C it parses the #else branch and reports success. Both are baked into
+        # the pr-ci-container image (.ci/container/Dockerfile); this step
+        # covers running against the previously published container before the
+        # rebuild propagates. Bounded for the same reason as the libdbus step
+        # above.
+        run: |
+          timeout 300 apt-get update -qq \
+            && timeout 300 apt-get install -y -qq gcc gcc-mingw-w64-x86-64
+      # The two platforms whose cn1lib sources need no SDK to check: the C
+      # glue the native win32/Linux ports compile into the app, and the
+      # JavaScript port implementations, which have no build step at all.
+      - name: Check cn1lib desktop and JavaScript native sources
+        if: ${{ matrix.java-version == 8 }}
+        run: python3 scripts/check-cn1lib-native-sources.py --require-all
+      # The Android half of the same gap: compile every cn1lib's Android
+      # sources against the artifacts its android.gradleDep pins. Runs on the
+      # JDK the Android build uses, because the pinned SDKs ship class files
+      # javac 8 cannot read.
+      - name: Check cn1lib Android sources against pinned SDKs
+        if: ${{ matrix.java-version == 8 }}
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          JAVA17_HOME="${JAVA_HOME_17}" \
+            python3 scripts/check-cn1lib-android-api.py --require-all
       - name: Check native method signatures
         if: ${{ matrix.java-version == 8 }}
         env:
@@ -483,7 +546,7 @@ jobs:
         # could not be resolved" before a single test had run -- a Maven Central failure, which a
         # missing plugin version fails identically on every attempt anyway.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: transient
           # Five attempts a minute apart rather than three at thirty seconds: Central
           # refused two different jobs on this branch today, and a window of about a
           # minute is shorter than the incidents have been. It costs nothing on a real

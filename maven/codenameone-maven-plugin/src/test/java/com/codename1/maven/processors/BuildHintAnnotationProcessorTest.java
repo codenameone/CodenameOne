@@ -76,7 +76,7 @@ public class BuildHintAnnotationProcessorTest {
 
     @Test
     public void anIntAttributeIsStringified() throws Exception {
-        Properties p = hintsOf("@Desktop(width = 1280, height = 720)");
+        Properties p = hintsOf("@DesktopBuild(width = 1280, height = 720)");
         assertEquals("1280", p.getProperty("codename1.arg.desktop.width"));
         assertEquals("720", p.getProperty("codename1.arg.desktop.height"));
     }
@@ -100,7 +100,7 @@ public class BuildHintAnnotationProcessorTest {
         p = hintsOf("@Ios(themeMode = IosThemeMode.IOS7)");
         assertEquals("ios7", p.getProperty("codename1.arg.ios.themeMode"));
 
-        p = hintsOf("@Desktop(titleBar = DesktopTitleBar.TOOLBAR)");
+        p = hintsOf("@DesktopBuild(titleBar = DesktopTitleBar.TOOLBAR)");
         assertEquals("toolbar", p.getProperty("codename1.arg.desktop.titleBar"));
     }
 
@@ -156,7 +156,7 @@ public class BuildHintAnnotationProcessorTest {
 
     @Test
     public void theEmittedResourceIsByteStableAcrossRuns() throws Exception {
-        String src = "@Ios(pods = {\"A\", \"B\"}, teamId = \"T\")\n@Desktop(width = 640)";
+        String src = "@Ios(pods = {\"A\", \"B\"}, teamId = \"T\")\n@DesktopBuild(width = 640)";
         byte[] first = rawResource(src);
         byte[] second = rawResource(src);
         assertTrue("the emitted resource must not change between identical builds",

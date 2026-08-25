@@ -343,10 +343,182 @@ WCHAR* cn1WinJavaStringToWide(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, UINT32
 /* ------------------------------------------------------------ event queue */
 
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
+    cn1WinPushWindowEvent(0, type, x, y, keyCode);
+}
+
+/* Events the framework cannot reconstruct if they are lost, of which there are two
+ * kinds.
+ *
+ * Lifecycle: a lost hide leaves a window the framework believes is on screen, painting
+ * and animating until something else happens to it, and a lost close leaves it
+ * registered with no native window behind it.
+ *
+ * Terminations: a release ends something a press started. Lose it and the component
+ * the press went to stays in that state for good -- the key goes on repeating, the
+ * button stays down, the drag never finishes -- and the focus change that would
+ * otherwise cancel a held gesture is no use as a backstop if it is droppable too.
+ *
+ * Note the asymmetry with presses, which stay droppable: a release that arrives with
+ * no press behind it finds no recorded target and is discarded harmlessly, so when
+ * something has to go it must never be the release. */
+static int cn1WinIsProtectedEvent(CN1EventType type) {
+    return type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN
+            || type == CN1_EVENT_WINDOW_CLOSE
+            || type == CN1_EVENT_KEY_RELEASED
+            || type == CN1_EVENT_POINTER_RELEASED
+            || type == CN1_EVENT_WINDOW_FOCUS
+            || type == CN1_EVENT_SIZE_CHANGED;
+}
+
+/* Visibility only. A close request is protected from eviction like any other
+ * lifecycle event, but it is not a state that a later one supersedes: WM_CLOSE does
+ * not destroy the window, so a close that a subsequent minimize overwrote would take
+ * the close listener and the close operation with it. */
+static int cn1WinStateClass(CN1EventType type) {
+    if (type == CN1_EVENT_WINDOW_SHOWN || type == CN1_EVENT_WINDOW_HIDDEN) {
+        return 1;
+    }
+    if (type == CN1_EVENT_SIZE_CHANGED) {
+        return 2;
+    }
+    return 0;
+}
+
+/* Replaces a queued visibility event for the same window with this newer one. The
+ * latest state is the one that matters -- a hide followed by a show leaves the window
+ * shown -- so superseding costs nothing and needs no room. */
+static int cn1WinCoalesceLifecycleLocked(int windowId, CN1EventType type, int x, int y,
+        int keyCode) {
+    LONG idx = cn1Win.eventHead;
+    LONG newest = -1;
+    int cls = cn1WinStateClass(type);
+    if (cls == 0) {
+        return 0;
+    }
+    /* The *newest* match, not the first one found. A window can already have more than
+     * one transition queued -- a hide then a show -- and replacing the older of the two
+     * leaves the newer one as the last word, so the framework would end up believing a
+     * window that is natively hidden is on screen, and go on painting it. */
+    while (idx != cn1Win.eventTail) {
+        CN1Event* e = &cn1Win.events[idx];
+        if (e->windowId == windowId && cn1WinStateClass((CN1EventType) e->type) == cls) {
+            newest = idx;
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    if (newest < 0) {
+        return 0;
+    }
+    cn1Win.events[newest].type = (JAVA_INT) type;
+    cn1Win.events[newest].x = x;
+    cn1Win.events[newest].y = y;
+    cn1Win.events[newest].keyCode = keyCode;
+    return 1;
+}
+
+/* Removes the oldest droppable event, closing the gap. Used to make room for a
+ * protected one: advancing the head instead would evict whatever is oldest, and that
+ * can be a protected event itself -- which is the very thing being kept. */
+static void cn1WinRemoveAtLocked(LONG idx) {
+    LONG cur = idx;
+    LONG follow = (cur + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    while (follow != cn1Win.eventTail) {
+        cn1Win.events[cur] = cn1Win.events[follow];
+        cur = follow;
+        follow = (follow + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    cn1Win.eventTail = cur;
+}
+
+static int cn1WinEvictInputLocked(void) {
+    LONG idx = cn1Win.eventHead;
+    while (idx != cn1Win.eventTail) {
+        if (!cn1WinIsProtectedEvent((CN1EventType) cn1Win.events[idx].type)) {
+            cn1WinRemoveAtLocked(idx);
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    return 0;
+}
+
+/* Last resort when the queue holds nothing but lifecycle events and so has no input to
+ * give up. A window that toggled visibility several times before the framework drained
+ * anything has more than one transition queued, and every one but its last is already
+ * superseded, so dropping the oldest of them frees a slot without changing what any
+ * window ends up as. Without this a close arriving for a *different* window has nowhere
+ * to go and is dropped, which is the one outcome this whole path exists to prevent. */
+static int cn1WinEvictSupersededVisibilityLocked(void) {
+    LONG idx = cn1Win.eventHead;
+    while (idx != cn1Win.eventTail) {
+        CN1Event* e = &cn1Win.events[idx];
+        int cls = cn1WinStateClass((CN1EventType) e->type);
+        if (cls != 0) {
+            LONG scan = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            while (scan != cn1Win.eventTail) {
+                CN1Event* later = &cn1Win.events[scan];
+                if (later->windowId == e->windowId
+                        && cn1WinStateClass((CN1EventType) later->type) == cls) {
+                    cn1WinRemoveAtLocked(idx);
+                    return 1;
+                }
+                scan = (scan + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            }
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    return 0;
+}
+
+/* Last resort before giving up an entry outright: drop the oldest *termination*.
+ *
+ * When the queue cannot grow, the question is only which loss costs least, and the
+ * order is droppable input, then a state a later event already supersedes, then a
+ * termination, then a lifecycle event. A lost release latches one component; a lost
+ * close or hide loses a whole window -- the close operation never runs, or the
+ * framework goes on painting a window that is not on screen. So a queued close or
+ * visibility transition outranks any number of releases behind it. */
+static int cn1WinEvictOldestTerminationLocked(void) {
+    LONG idx = cn1Win.eventHead;
+    while (idx != cn1Win.eventTail) {
+        CN1EventType t = (CN1EventType) cn1Win.events[idx].type;
+        if (t == CN1_EVENT_KEY_RELEASED || t == CN1_EVENT_POINTER_RELEASED
+                || t == CN1_EVENT_WINDOW_FOCUS) {
+            cn1WinRemoveAtLocked(idx);
+            return 1;
+        }
+        idx = (idx + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    }
+    return 0;
+}
+
+void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
+    if (next == cn1Win.eventHead && cn1WinIsProtectedEvent(type)) {
+        /* Full, and this one must not be the casualty. Supersede this window's own
+         * queued transition if it has one, otherwise take the room from an input event,
+         * and failing that from a transition that a later one already supersedes. Never
+         * from a transition that is still some window's last word. */
+        if (cn1WinCoalesceLifecycleLocked(windowId, type, x, y, keyCode)) {
+            LeaveCriticalSection(&cn1Win.eventLock);
+            return;
+        }
+        if (cn1WinEvictInputLocked() || cn1WinEvictSupersededVisibilityLocked()
+                || cn1WinEvictOldestTerminationLocked()) {
+            next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
+        } else {
+            /* Nothing left but lifecycle events -- closes and visibility transitions
+             * for more distinct windows than the queue can hold, which needs more
+             * windows open than any application has. Giving up the oldest is all that
+             * remains, and the newer event at least describes the more recent state. */
+            cn1Win.eventHead = (cn1Win.eventHead + 1) % CN1_EVENT_QUEUE_CAPACITY;
+            next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
+        }
+    }
     if (next != cn1Win.eventHead) {
         CN1Event* e = &cn1Win.events[cn1Win.eventTail];
+        e->windowId = windowId;
         e->type = (JAVA_INT) type;
         e->x = x;
         e->y = y;
@@ -354,8 +526,9 @@ void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
         cn1Win.eventTail = next;
         SetEvent(cn1Win.eventSignal);
     }
-    /* On overflow the oldest unread events are kept and the newest dropped;
-     * the EDT drains continuously so this is only a backstop. */
+    /* On overflow a droppable event is simply lost -- the newest is dropped and the
+     * queued ones kept, and the EDT drains continuously so this is only a backstop. A
+     * protected event never reaches here without room, having taken it above. */
     LeaveCriticalSection(&cn1Win.eventLock);
 }
 
@@ -410,7 +583,9 @@ static int cn1WinMoveMask(WPARAM wParam) {
  * MI_WP_SIGNATURE 0xFF515700, with bit 0x80 distinguishing pen from touch). We
  * use it to flag the synthesized mouse event as a touch / pen so the
  * cross-platform PointerEvent type is correct on touch-enabled PCs. */
-static int cn1WinTouchFlag(void) {
+/* Shared with the desktop window proc so a touch or pen contact keeps its source
+ * inside a Window, rather than arriving classified as a mouse. */
+int cn1WinTouchFlag(void) {
     LONG_PTR extra = GetMessageExtraInfo();
     if ((extra & 0xFFFFFF00) == 0xFF515700) {
         return (extra & 0x80) ? CN1_PE_PEN_FLAG : CN1_PE_TOUCH_FLAG;
@@ -422,11 +597,16 @@ static int cn1WinTouchFlag(void) {
 /* macOS-style trackpad / touchscreen pinch and rotate via the Win32 gesture API.
  * GID_ZOOM reports the absolute distance between the fingers and GID_ROTATE the
  * absolute angle (radians); we forward the incremental scale / radians since the
- * cross-platform pinch() / rotation() callbacks expect deltas like the Mac. */
+ * cross-platform pinch() / rotation() callbacks expect deltas like the Mac.
+ * The baselines are process wide rather than per window, which is correct because
+ * there is one touchpad: a gesture that starts over another window sends GF_BEGIN
+ * first, which is what resets them. Shared by the main window proc and the desktop
+ * window proc, so a pinch over a secondary window produces a gesture too -- the
+ * windowId is what decides whose component tree it reaches. */
 static double cn1WinZoomLast = 0.0;
 static double cn1WinRotateLast = 0.0;
 
-static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
+int cn1WinHandleGesture(HWND hwnd, int windowId, LPARAM lParam) {
     GESTUREINFO gi;
     ZeroMemory(&gi, sizeof(gi));
     gi.cbSize = sizeof(gi);
@@ -445,7 +625,8 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
         } else if (cn1WinZoomLast > 0.0 && dist > 0.0) {
             double scale = dist / cn1WinZoomLast;
             cn1WinZoomLast = dist;
-            cn1WinPushEvent(CN1_EVENT_PINCH, pt.x, pt.y, (int) (scale * CN1_GESTURE_FIXED + 0.5));
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_PINCH, pt.x, pt.y,
+                    (int) (scale * CN1_GESTURE_FIXED + 0.5));
         }
         handled = 1;
     } else if (gi.dwID == GID_ROTATE) {
@@ -455,7 +636,7 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
             double angle = GID_ROTATE_ANGLE_FROM_ARGUMENT(gi.ullArguments);
             double delta = angle - cn1WinRotateLast;
             cn1WinRotateLast = angle;
-            cn1WinPushEvent(CN1_EVENT_ROTATE, pt.x, pt.y,
+            cn1WinPushWindowEvent(windowId, CN1_EVENT_ROTATE, pt.x, pt.y,
                     (int) (delta * CN1_GESTURE_FIXED + (delta >= 0 ? 0.5 : -0.5)));
         }
         handled = 1;
@@ -527,7 +708,7 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
         }
 #ifdef WM_GESTURE
         case WM_GESTURE:
-            if (cn1WinHandleGesture(hwnd, lParam)) {
+            if (cn1WinHandleGesture(hwnd, 0, lParam)) {
                 return 0;
             }
             return DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -552,6 +733,12 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
             return 0;
         case WM_KEYUP:
             cn1WinPushEvent(CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
+            return 0;
+        case WM_DISPLAYCHANGE:
+            /* Handled on the main window too, not only on the desktop windows: an
+             * application can attach a monitor listener before it has opened any
+             * secondary window, and a display change has to reach it either way. */
+            cn1WinPushEvent(CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
             return 0;
         case WM_SIZE:
             cn1Win.width = LOWORD(lParam);
@@ -603,6 +790,14 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
              * while the printing worker blocks in SendMessage
              * (cn1_windows_print.cpp). */
             return cn1WinPrintDialogHandleMessage(wParam);
+        case WM_CN1_DESKTOPWINDOW:
+            /* Additional desktop window create/destroy, marshaled from the EDT.
+             * The pump thread must own the HWND, so this is where they are made
+             * (cn1_windows_desktopwindow.cpp). Secondary windows have their own
+             * WndProc; only the op dispatch lives here, because an op arrives
+             * before its window exists. */
+            cn1WinDesktopHandleMessage(wParam, lParam);
+            return 0;
         case WM_CN1_WIDGET:
             /* Floating widget window op (create/pixels/pos/hit-rects/destroy)
              * marshaled from the EDT (cn1_windows_widgets.cpp). The widget
@@ -943,6 +1138,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
     if (len > 1) { out[1] = ev.x; }
     if (len > 2) { out[2] = ev.y; }
     if (len > 3) { out[3] = ev.keyCode; }
+    if (len > 4) { out[4] = ev.windowId; }
     return JAVA_TRUE;
 }
 

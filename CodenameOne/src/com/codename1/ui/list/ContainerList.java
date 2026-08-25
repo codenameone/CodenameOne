@@ -26,7 +26,6 @@ package com.codename1.ui.list;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -36,6 +35,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Collection;
 import java.util.Vector;
@@ -129,9 +129,9 @@ public class ContainerList extends Container {
                     removeComponent(getComponentAt(getComponentCount() - 1));
                 }
             }
-            Form f = getComponentForm();
+            TopLevelContainer f = getTopLevelContainer();
             if (f != null) {
-                f.revalidate();
+                f.asContainer().revalidate();
             }
         }
     }

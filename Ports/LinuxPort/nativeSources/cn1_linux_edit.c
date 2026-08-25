@@ -45,6 +45,9 @@ typedef struct {
     int singleLine;
     volatile int done;
     char* text;             /* latest committed/changed text (heap) */
+    /* The window whose overlay hosts this editor, so teardown removes it from the
+     * same place it was added. */
+    int slot;
     pthread_mutex_t lock;
 } CN1Edit;
 
@@ -56,6 +59,8 @@ typedef struct {
     int maxSize;
     CN1Font* font;
     int fg, bg, align;
+    /* Which window's overlay the editor belongs in. */
+    int slot;
     CN1Edit* result;
 } CN1EditReq;
 
@@ -159,12 +164,18 @@ static void cn1EditCreateOnMain(void* p) {
         g_signal_connect(tv, "focus-out-event", G_CALLBACK(cn1EditFocusOut), e);
     }
 
-    cn1LinuxOverlayAdd(e->container, req->x, req->y, req->w, req->h);
+    e->slot = req->slot;
+    /* A reference of our own, held for the life of the CN1Edit, for the same reason
+     * the browser takes one: the overlay's reference disappears with the window that
+     * hosts the editor, and Java can still close or re-host it afterwards. */
+    g_object_ref_sink(e->container);
+
+    cn1LinuxOverlayAdd(req->slot, e->container, req->x, req->y, req->w, req->h);
     gtk_widget_grab_focus(e->container);
     req->result = e;
 }
 
-JAVA_LONG com_codename1_impl_linux_LinuxNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_long_int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_OBJECT text, JAVA_BOOLEAN singleLine, JAVA_INT maxSize, JAVA_LONG fontPeer, JAVA_INT fgColor, JAVA_INT bgColor, JAVA_INT align) {
+JAVA_LONG com_codename1_impl_linux_LinuxNative_editStringAt___int_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_R_long(CODENAME_ONE_THREAD_STATE, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_OBJECT text, JAVA_BOOLEAN singleLine, JAVA_INT maxSize, JAVA_LONG fontPeer, JAVA_INT fgColor, JAVA_INT bgColor, JAVA_INT align, JAVA_INT slot) {
     CN1EditReq req;
     if (cn1LinuxWindowWidget() == 0) {
         return 0; /* headless: no native edit */
@@ -180,6 +191,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_editStringAt___int_int_int_int_ja
     req.fg = fgColor;
     req.bg = bgColor;
     req.align = align;
+    req.slot = slot;
     req.result = 0;
     cn1LinuxRunOnMainAndWait(cn1EditCreateOnMain, &req);
     return (JAVA_LONG) (intptr_t) req.result;
@@ -205,8 +217,10 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_editGetText___long_R_java_lang_
 static void cn1EditCloseOnMain(void* p) {
     CN1Edit* e = (CN1Edit*) p;
     if (e->container) {
-        cn1LinuxOverlayRemove(e->container);
+        cn1LinuxOverlayRemove(e->slot, e->container);
         gtk_widget_destroy(e->container);
+        /* The reference taken at creation, dropped last. */
+        g_object_unref(e->container);
         e->container = 0;
     }
 }

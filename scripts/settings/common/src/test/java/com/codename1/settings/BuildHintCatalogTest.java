@@ -87,7 +87,7 @@ public class BuildHintCatalogTest {
     public void annotatedHintsNameTheirAnnotation() {
         BuildHintCatalog catalog = BuildHintCatalog.load();
         assertEquals("@Ios(pods)", catalog.get("ios.pods").annotation());
-        assertEquals("@Desktop(titleBar)", catalog.get("desktop.titleBar").annotation());
+        assertEquals("@DesktopBuild(titleBar)", catalog.get("desktop.titleBar").annotation());
         // Not every hint has one; the properties file remains the way to set those.
         assertEquals(null, catalog.get("android.xmanifest").annotation());
     }
@@ -169,13 +169,13 @@ public class BuildHintCatalogTest {
         String src = "package com.example;\n"
                 + "import com.codename1.annotations.buildhints.*;\n"
                 + "@Ios(pods = {\"A\", \"B\"}, teamId = \"T\")\n"
-                + "@Desktop(titleBar = DesktopTitleBar.NATIVE)\n"
+                + "@DesktopBuild(titleBar = DesktopTitleBar.NATIVE)\n"
                 + "public class MyApp extends Lifecycle {\n}\n";
         java.util.Map<String, String> owned = new java.util.HashMap<>();
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
         assertEquals("@Ios(pods)", owned.get("ios.pods"));
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
-        assertEquals("@Desktop(titleBar)", owned.get("desktop.titleBar"));
+        assertEquals("@DesktopBuild(titleBar)", owned.get("desktop.titleBar"));
         assertTrue(owned.get("ios.objC") == null, "an attribute nobody set is not owned");
     }
 

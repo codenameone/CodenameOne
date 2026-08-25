@@ -35,7 +35,7 @@
 /// ```java
 /// @Ios(newStorageLocation = true, themeMode = IosThemeMode.MODERN)
 /// @Android(themeMode = AndroidThemeMode.MODERN)
-/// @Desktop(titleBar = DesktopTitleBar.NATIVE)
+/// @DesktopBuild(titleBar = DesktopTitleBar.NATIVE)
 /// public class MyApplication {
 /// }
 /// ```

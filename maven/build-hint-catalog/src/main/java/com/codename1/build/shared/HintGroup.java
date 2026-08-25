@@ -40,7 +40,11 @@ package com.codename1.build.shared;
 public enum HintGroup {
     IOS("Ios", "ios."),
     ANDROID("Android", "android."),
-    DESKTOP("Desktop", "desktop."),
+    // NOT "Desktop": com.codename1.ui.Desktop is a public UI class, and an app
+    // that wildcard-imports both packages -- which is the ordinary way to write
+    // one -- gets "reference to Desktop is ambiguous" on the annotation. A
+    // compile error on the annotation that exists to give better compile errors.
+    DESKTOP("DesktopBuild", "desktop."),
     MAC_NATIVE("MacNative", "macNative."),
     WINDOWS("Windows", "windows."),
     LINUX("Linux", "linux."),

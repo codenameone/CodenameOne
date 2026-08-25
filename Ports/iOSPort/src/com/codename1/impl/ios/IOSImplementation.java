@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.ui.Desktop;
 import com.codename1.background.BackgroundFetch;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -63,6 +64,7 @@ import com.codename1.push.PushCallback;
 import com.codename1.push.PushActionsProvider;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -803,8 +805,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static void updateNativeTextEditorFrame(boolean requestFocus) {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
-            Form form = cmp.getComponentForm();
-            if (form == null || form != CN.getCurrentForm() ) {
+            // A field in a Window has no Form; the equivalent check is that its top
+            // level is still the one being displayed.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top == null
+                    || (top instanceof Form && top != CN.getCurrentForm())) { //NOPMD CompareObjectsWithEquals
                 instance.stopTextEditing();
                 return;
             }
@@ -861,14 +866,23 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             */
-            Container contentPane = form.getContentPane();
+            Container contentPane = top.getContentPane();
             if (!contentPane.contains(cmp)) {
-                contentPane = form;
+                contentPane = top.asContainer();
             }
             Style contentPaneStyle = contentPane.getStyle();
 
             int minY = contentPane.getAbsoluteY() + contentPane.getScrollY() + contentPaneStyle.getPaddingTop();
-            int maxH = Display.getInstance().getDisplayHeight() - minY - nativeInstance.getVKBHeight();
+            // A window's coordinates are its own, so the main surface height is the
+            // wrong ceiling to measure one against: a field lower than the main window
+            // is tall clipped to a negative height and stopped editing outright, and a
+            // window shorter than the main surface got an editor running past its
+            // bottom edge. Same resolution as Container.snapToSafeAreaInternal, and the
+            // main window keeps reading the display exactly as before.
+            int surfaceHeight = top instanceof com.codename1.ui.Window
+                    ? top.asContainer().getHeight()
+                    : Display.getInstance().getDisplayHeight();
+            int maxH = surfaceHeight - minY - nativeInstance.getVKBHeight();
             
             if (y < minY) {
                 h -= (minY - y);
@@ -1014,6 +1028,34 @@ public class IOSImplementation extends CodenameOneImplementation {
         // window title bar (and hides the CN1 Toolbar). In "custom" mode the visible Toolbar is the
         // title bar, so the OS title is not used. Opt-in only: defaults to toolbar (unchanged).
         return isDesktop() && "native".equals(getDesktopTitleBarMode());
+    }
+
+    private MacWindowManager windowManager;
+
+    /**
+     * @inheritDoc
+     *
+     * Desktop windows exist only on the Mac Catalyst slice, where the builder writes
+     * {@code UIApplicationSupportsMultipleScenes} into Info.plist. That key is what
+     * actually makes a second scene possible, so this reads it back out of the bundle
+     * rather than trusting a build flag -- the API and the plist then cannot disagree,
+     * including in a hand-edited project.
+     */
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (!isDesktop()) {
+            return null;
+        }
+        // The Info.plist key is the single source of truth: without multiple scenes
+        // enabled the system refuses to activate a second one, so reporting supported
+        // here would hand back windows that never appear.
+        if (!nativeInstance.macMultiWindowSupported()) {
+            return null;
+        }
+        if (windowManager == null) {
+            windowManager = new MacWindowManager(this);
+        }
+        return windowManager;
     }
 
     // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
@@ -1215,11 +1257,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             
            // Check if the form has any setting for asyncEditing that should override
            // the application defaults.
-            Form parentForm = cmp.getComponentForm();
-            if (parentForm == null) {
-                //Log.p("Attempt to edit text area that is not on a form.  This is not supported");
+            // The top level, not the Form. getComponentForm() is null for a component
+            // in a Window, and returning here meant a Catalyst window -- which this
+            // port advertises as supporting windows -- could not edit any text field
+            // at all.
+            com.codename1.ui.TopLevelContainer parentTop = cmp.getTopLevelContainer();
+            if (parentTop == null) {
+                //Log.p("Attempt to edit text area that is not on a top level.  This is not supported");
                 return;
             }
+            Container parentForm = parentTop.asContainer();
+            // Tell the native side which window is being edited, so the editor is
+            // added to that window's view rather than the main surface's. Cleared to
+            // -1 for a field on the main form, since the slot is process wide.
+            nativeInstance.macWindowSetEditingSlot(
+                    parentTop instanceof Form ? -1 : MacWindowManager.slotForComponent(cmp));
             if (parentForm.getClientProperty("asyncEditing") != null) {
                 Object async = parentForm.getClientProperty("asyncEditing");
                 if (async instanceof Boolean) {
@@ -1241,7 +1293,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // the form to make sure that it is scrollable.  If it is not 
             // scrollable, then this field should default to Non-async
             // editing - and should instead revert to legacy editing mode.
-            if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
+            // Bottom padding editing mode is a Form concept tied to the virtual
+            // keyboard; a desktop Window has neither, so it reads as false there.
+            boolean bottomPaddingMode = parentTop instanceof Form
+                    && ((Form) parentTop).isFormBottomPaddingEditingMode();
+            if(asyncEdit && !bottomPaddingMode) {
                 Container p = cmp.getParent();
                 
                 // A crude estimate of how far the component needs to be able to scroll to make 
@@ -1258,7 +1314,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 asyncEdit = p != null;
                 //Log.p("Overriding asyncEdit due to form scrollability: "+asyncEdit);
                 
-            } else if (parentForm.isFormBottomPaddingEditingMode()){
+            } else if (bottomPaddingMode){
                 // If form uses bottom padding mode, then we will always
                 // use async edit (unless the field explicitly overrides it).
                 asyncEdit = true;
@@ -1317,9 +1373,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
             final Style hintStyle = currentEditing.getHintLabel() != null ? currentEditing.getHintLabel().getStyle() : stl;
             
-            if (current != null) {
-                Component nextComponent = current.getNextComponent(cmp);
-                TextEditUtil.setNextEditComponent(nextComponent);
+            // Through the editing component's own top level, not the current form. In a
+            // Window cmp is absent from the main form's tab order, so TabIterator
+            // treated it as an unknown start and handed back the main form's first
+            // focusable component -- the keyboard's Next action jumped to an unrelated
+            // field, or in a window-only application left a stale destination in place.
+            // getNextComponent is Form-only but is defined as exactly this call, and
+            // getTabIterator is on TopLevelContainer.
+            if (parentTop != null) {
+                TextEditUtil.setNextEditComponent(parentTop.getTabIterator(cmp).getNext());
+            } else if (current != null) {
+                TextEditUtil.setNextEditComponent(current.getNextComponent(cmp));
             }
             Display.getInstance().callSerially(new Runnable() {
                 @Override
@@ -1416,9 +1480,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
             
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-                Form form = cmp.getComponentForm();
-                if (form != null) {
-                    form.revalidate();
+                com.codename1.ui.TopLevelContainer revalidateTop = cmp.getTopLevelContainer();
+                if (revalidateTop != null) {
+                    revalidateTop.asContainer().revalidate();
                 }
             }
             if(editNext) {
@@ -1827,7 +1891,78 @@ public class IOSImplementation extends CodenameOneImplementation {
         return true;
     }
     
+    /// True when the Metal view renders straight into the drawable, so no retained
+    /// screen texture exists. Resolved once -- the renderer decides it at startup.
+    private int directToDrawable = -1;
+
+    private boolean isDirectToDrawable() {
+        if (directToDrawable < 0) {
+            boolean d = false;
+            try {
+                d = nativeInstance.isDirectToDrawable();
+            } catch (Throwable t) {
+                d = false;
+            }
+            directToDrawable = d ? 1 : 0;
+        }
+        return directToDrawable == 1;
+    }
+
+    /// Direct-to-drawable rendering presents a DIFFERENT buffer every frame, so a
+    /// region left unpainted does not show last frame -- it shows whatever was in
+    /// that buffer two or three presents ago. Painting only the dirty components,
+    /// which is the whole point of {@code paintDirty}, is therefore incorrect in
+    /// that mode.
+    ///
+    /// Enqueueing the current Form ahead of the superclass call is enough to fix
+    /// it: a Component queued with a null dirty region is painted under a
+    /// full-screen clip, and {@code repaint(Animation)} already drops any child
+    /// whose ancestor is queued, so this both forces the full paint and collapses
+    /// the queue instead of adding to it. Components enqueued BEFORE this call
+    /// still repaint redundantly; that is a real cost, and it is the trade the
+    /// mode exists to make.
+    @Override
+    public void paintDirty() {
+        if (isDirectToDrawable() && hasPendingPaints()) {
+            Form f = Display.getInstance().getCurrent();
+            if (f != null) {
+                // Painted HERE rather than enqueued. repaint(f) would append,
+                // and the superclass drains in order, so the full-form paint
+                // would land on top of overlay animations already queued --
+                // Container.TransitionAnimation queues its Transition through
+                // Display.repaint(t), and painting the form over it makes the
+                // transition vanish or snap to its end state. The background
+                // has to go down first and the queue drain on top of it.
+                Graphics wrapper = getCodenameOneGraphics();
+                if (wrapper != null) {
+                    int dwidth = getDisplayWidth();
+                    int dheight = getDisplayHeight();
+                    wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
+                    wrapper.resetAffine();
+                    wrapper.setClip(0, 0, dwidth, dheight);
+                    f.setDirtyRegion(null);
+                    f.paintComponent(wrapper, true);
+                }
+            }
+        }
+        super.paintDirty();
+    }
+
     public void flushGraphics(int x, int y, int width, int height) {
+        if (isDirectToDrawable()) {
+            // The flush region is not just a hint here: CodenameOne_GLViewController
+            // hands it to ClipRect.setDrawRect and the Metal path clamps every
+            // screen op to it. The superclass derives it from the queued
+            // components alone, so with a partially dirty Component in the queue
+            // it would be that component's rect -- while direct mode has already
+            // cleared the ENTIRE drawable and repainted the whole Form (see
+            // paintDirty). Everything the Form drew outside that rect would be
+            // clipped away and the rest of the frame would present black.
+            x = 0;
+            y = 0;
+            width = getDisplayWidth();
+            height = getDisplayHeight();
+        }
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
         if (isDesktop()) {
@@ -1842,6 +1977,228 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private final static int[] singleDimensionX = new int[1];
     private final static int[] singleDimensionY = new int[1];
+    // ---- Mac Catalyst desktop windows -------------------------------------
+    //
+    // Invoked from CN1MacWindows.m by way of the delivery bridge in IOSNative.m.
+    // Every one of these arrives on the platform's own thread; Display marshals
+    // onto the event dispatch thread where that matters.
+
+    /// Invoked when the user activates a window's close control.
+    public static void windowCloseCallback(int windowId) {
+        Desktop.getInstance().windowCloseRequested(windowId);
+    }
+
+    /// Invoked when the platform refuses to give a window a scene, so it will never
+    /// appear. Reported separately from a minimize because a modal window that never
+    /// appeared has to release its blocker.
+    public static void windowActivationFailedCallback(final int windowId, final int requestSeq) {
+        // The token identifies the request that failed and arrives with the failure.
+        // Sampling the current one here instead would sample a retry that started after
+        // the port released the slot, and the stale failure would then be applied to it.
+        //
+        // Both halves in one EDT unit. Updating the peer here on UIKit's thread while
+        // the framework half waited in the queue let a concurrent show() slip between
+        // them and be undone by a failure that no longer applied to it.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (!MacWindowManager.activationFailed(windowId, requestSeq)) {
+                    return;
+                }
+                Desktop.getInstance().windowActivationFailed(windowId);
+            }
+        });
+    }
+
+    /// Invoked once the platform has destroyed a window's scene. Catalyst hands the
+    /// disconnect over after the fact, so there is nothing left to veto.
+    public static void windowClosedNativelyCallback(int windowId) {
+        Desktop.getInstance().windowClosedNatively(windowId);
+    }
+
+    /// Invoked when a display is attached, removed or changes mode.
+    public static void monitorsChangedCallback() {
+        Desktop.getInstance().monitorsChanged();
+    }
+
+    /// Invoked for a mouse or trackpad hover over a secondary window. Catalyst
+    /// delivers hover through a gesture recognizer rather than as a touch, so a
+    /// secondary scene reports nothing without one installed on its own controller.
+    public static void windowHoverCallback(int windowId, int type, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        switch (type) {
+            case 1:
+                com.codename1.ui.Desktop.getInstance().windowPointerHoverPressed(windowId, xs, ys);
+                break;
+            case 2:
+                com.codename1.ui.Desktop.getInstance().windowPointerHoverReleased(windowId, xs, ys);
+                break;
+            default:
+                Desktop.getInstance().windowPointerHover(windowId, xs, ys);
+                break;
+        }
+    }
+
+    /// Invoked for an indirect scroll (wheel or trackpad) over a secondary window.
+    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY) {
+        if (dropEvents) {
+            return;
+        }
+        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, false, 0);
+    }
+
+    /// Invoked for a trackpad magnify over a secondary window.
+    public static void windowPinchCallback(final int windowId, final float scale,
+            final int x, final int y) {
+        if (dropEvents) {
+            return;
+        }
+        // On the event dispatch thread, not UIKit's main thread: this hit tests the
+        // window's hierarchy and runs application pinch handlers.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Desktop.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+            }
+        });
+    }
+
+    /// Invoked for a trackpad rotation over a secondary window.
+    public static void windowRotationCallback(final int windowId, final float radians,
+            final int x, final int y) {
+        if (dropEvents) {
+            return;
+        }
+        // Marshalled for the same reason as windowPinchCallback.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Desktop.getInstance().windowRotationGesture(windowId, x, y, radians);
+            }
+        });
+    }
+
+    /// Invoked when a window gains or loses keyboard focus.
+    public static void windowFocusCallback(int windowId, boolean gained) {
+        Desktop.getInstance().windowFocusChanged(windowId, gained);
+    }
+
+    /// Invoked when a window's scene enters or leaves the background, which on Mac
+    /// Catalyst is how minimizing and restoring one window is reported. Distinct from
+    /// focus: an unfocused window is still on screen and still painted, a minimized
+    /// one is neither.
+    /// Invoked once a Catalyst window's scene has been granted and its content view
+    /// exists.
+    ///
+    /// A peer created in the same event dispatch turn as `Window.show()` had nowhere
+    /// to go and stayed on the main surface. Rather than queue those natively -- which
+    /// means retained views to purge when a peer or its window goes away, a table to
+    /// size, and stale entries that could land in a recycled slot -- the window's own
+    /// component tree is walked here, which is the authoritative list of what belongs
+    /// in it.
+    public static void windowContentReadyCallback(final int windowId) {
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                com.codename1.ui.Window[] all = com.codename1.ui.Desktop.getInstance().getWindows();
+                for (int iter = 0; iter < all.length; iter++) {
+                    if (all[iter].getWindowId() == windowId) {
+                        reattachPeers(all[iter]);
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+    private static void reattachPeers(com.codename1.ui.Container c) {
+        int count = c.getComponentCount();
+        for (int iter = 0; iter < count; iter++) {
+            com.codename1.ui.Component cmp = c.getComponentAt(iter);
+            if (cmp instanceof NativeIPhoneView) {
+                // Only the heavyweight ones. peerSetVisible(false) removed the native
+                // view on purpose, and re-adding it here would put a lightweight
+                // component's live view back over its own snapshot, taking native
+                // input with it.
+                NativeIPhoneView peer = (NativeIPhoneView) cmp;
+                if (!peer.lightweightMode) {
+                    peer.attachToOwningWindow();
+                }
+            } else if (cmp instanceof com.codename1.ui.Container) {
+                reattachPeers((com.codename1.ui.Container) cmp);
+            }
+        }
+    }
+
+    public static void windowVisibilityCallback(final int windowId, final boolean shown) {
+        // UIKit reports this on its main thread, but every other peer visibility
+        // mutation runs on the EDT. Cascading straight from here races an EDT dispose:
+        // the cascade holds a Peer and then uses its numeric slot, and a slot freed and
+        // reused in between would make this hide or show an unrelated window. Queueing
+        // the cascade and the lifecycle notification together also keeps them in that
+        // order, so the framework never sees a child reported before its owner.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                // The other desktop platforms take a window's owned windows down with
+                // it and report each one; Catalyst scenes have no owner relation, so
+                // the cascade is emulated here. Doing it for the user-driven minimize
+                // as well as for hide() is what makes the two paths agree -- an owner
+                // becomes hidden both ways.
+                // The owner's own transition is delivered first. Both notify methods
+                // queue through callSerially rather than running here, so cascading
+                // first would put every descendant ahead of the owner in that queue
+                // and a child listener asking whether its owner is showing would read
+                // stale state.
+                if (shown) {
+                    Desktop.getInstance().windowShowNotify(windowId);
+                } else {
+                    Desktop.getInstance().windowHideNotify(windowId);
+                }
+                MacWindowManager.windowVisibilityChanged(windowId, shown);
+            }
+        });
+    }
+
+    /// Invoked when a window's drawable area changes size.
+    public static void windowSizeCallback(int windowId, int width, int height) {
+        Desktop.getInstance().windowSizeChanged(windowId, width, height);
+    }
+
+    /// Invoked for a pointer event inside a window. The type is 1 for a press,
+    /// 2 for a release and 3 for a drag, matching CN1MacWindowView.
+    public static void windowPointerCallback(int windowId, int type, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        switch (type) {
+            case 1:
+                Desktop.getInstance().windowPointerPressed(windowId, xs, ys);
+                break;
+            case 2:
+                Desktop.getInstance().windowPointerReleased(windowId, xs, ys);
+                break;
+            default:
+                Desktop.getInstance().windowPointerDragged(windowId, xs, ys);
+                break;
+        }
+    }
+
+    /// Invoked for a hardware keyboard event inside a window. Pressed is true for a
+    /// key down and false for a key up.
+    public static void windowKeyCallback(int windowId, int keyCode, boolean pressed) {
+        if (dropEvents) {
+            return;
+        }
+        if (pressed) {
+            Desktop.getInstance().windowKeyPressed(windowId, keyCode);
+        } else {
+            com.codename1.ui.Desktop.getInstance().windowKeyReleased(windowId, keyCode);
+        }
+    }
+
     public static void pointerPressedCallback(int x, int y) {
         if(dropEvents) {
             return;
@@ -1891,20 +2248,33 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad
     /// pinch and the iOS two finger pinch. Routes to the cross-platform pinch gesture dispatch.
-    public static void pinchMagnifyCallback(float scale, int x, int y) {
+    public static void pinchMagnifyCallback(final float scale, final int x, final int y) {
         if (dropEvents || instance == null) {
             return;
         }
-        com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+        // Marshalled: the recognizer fires on UIKit's main thread while this hit tests
+        // the hierarchy and runs application pinch handlers, which would race the
+        // event dispatch thread's painting and layout. The pointer path is safe
+        // without this only because it enqueues rather than dispatching in place.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().fireMagnifyGesture(x, y, scale);
+            }
+        });
     }
 
     /// Invoked from the native rotation gesture recognizer (Mac Catalyst trackpad rotate / iOS two
     /// finger rotate). Routes to the cross-platform rotation gesture dispatch.
-    public static void rotationGestureCallback(float radians, int x, int y) {
+    public static void rotationGestureCallback(final float radians, final int x, final int y) {
         if (dropEvents || instance == null) {
             return;
         }
-        com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+        // Marshalled for the same reason as pinchMagnifyCallback.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().fireRotationGesture(x, y, radians);
+            }
+        });
     }
 
     protected void pointerPressed(final int[] x, final int[] y) {
@@ -9345,6 +9715,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void onPositionSizeChange() {
             if(nativePeer != 0) {
                 nativeInstance.updatePeerPositionSize(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                // Re-applies the frame in the window's own scale as well as re-homing
+                // it, since updatePeerPositionSize converts with the global one.
+                attachToOwningWindow();
             }
         }
 
@@ -9352,6 +9725,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             super.initComponent();
             if(nativePeer != 0) {
                 nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                attachToOwningWindow();
+            }
+        }
+
+        /// Moves this peer into the Catalyst window that owns it.
+        ///
+        /// peerInitialized attaches every native view to the main controller's view,
+        /// so without this a browser, camera or video view inside a Window appeared
+        /// over the main surface and took its input there. A no-op for a component on
+        /// the main surface, and on every platform that is not Catalyst.
+        void attachToOwningWindow() {
+            int slot = MacWindowManager.slotForComponent(this);
+            if (slot >= 0) {
+                // The result is false when the window's scene has not been granted
+                // yet, which is ordinary rather than an error: a peer can be created
+                // in the same event dispatch turn as show(). The native side queues
+                // it in that case and scene adoption attaches it, so there is nothing
+                // to retry from here.
+                nativeInstance.macWindowAttachPeer(nativePeer, slot,
+                        getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
         }
 
@@ -9368,10 +9761,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(lightweightMode != l) {
                     lightweightMode = l;
                     nativeInstance.peerSetVisible(nativePeer, !lightweightMode);
+                    if (!lightweightMode) {
+                        // peerSetVisible re-adds to the main view, so the peer has to
+                        // be put back in its own window each time it becomes heavy.
+                        attachToOwningWindow();
+                    }
                     // fix for https://groups.google.com/d/msg/codenameone-discussions/LKxy16PhYEY/bvusdq-ICwAJ
-                    Form f = getComponentForm();
+                    // Through the top level: getComponentForm() is null inside a Window,
+                    // so the repaint this fix exists for was skipped there.
+                    com.codename1.ui.TopLevelContainer f = getTopLevelContainer();
                     if(f != null) {
-                        f.repaint();
+                        f.asContainer().repaint();
                     }
                 }
             }
@@ -13047,6 +13447,61 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
+    }
+
+    /// UIKit PULLS the semantic tree (it asks the view for accessibility elements),
+    /// so the portable tree only has to be projected eagerly while something is
+    /// actually listening. The base class notes exactly this -- "pull-based ports
+    /// should override this to return true only while assistive technology is
+    /// active" -- but the iOS port never overrode it, so it inherited
+    /// isAccessibilityTreeSupported() and rebuilt the whole snapshot on EVERY
+    /// invalidation: every layout, every scroll, every text setter, on every
+    /// device, whether or not VoiceOver was running. Measured with
+    /// malloc_history that was 4.0MB of live allocation under
+    /// AccessibilityManager.getSnapshot on an idle Mac Catalyst app with no
+    /// assistive technology running at all, plus the CPU to build it.
+    ///
+    /// Turning VoiceOver on mid-session is picked up on the next invalidation --
+    /// the flag is read per call, and any mutation after that point projects
+    /// normally.
+    /// Invoked from native when an assistive-technology status notification fires.
+    ///
+    /// The status flip itself is not a component mutation, so without this nothing
+    /// would schedule the projection a newly-started technology needs and the
+    /// native tree would stay empty until some unrelated UI change happened to
+    /// invalidate a component. Marks the whole current form dirty so the very next
+    /// pass rebuilds and pushes the tree.
+    public static void assistiveTechnologyStatusChanged() {
+        final IOSImplementation impl = instance;
+        if (impl == null) {
+            return;
+        }
+        Display d = Display.getInstance();
+        if (d == null) {
+            return;
+        }
+        d.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    AccessibilityManager.getInstance().invalidate(f,
+                            AccessibilityManager.CHANGE_STRUCTURE
+                                    | AccessibilityManager.CHANGE_CONTENT
+                                    | AccessibilityManager.CHANGE_STATE);
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        try {
+            return nativeInstance.isAssistiveTechnologyActive();
+        } catch (Throwable t) {
+            // Never let a semantics optimisation take the app down.
+            return true;
+        }
     }
 
     public static void performAccessibilityActionFromNative(long nodeId, String actionId, String argument) {

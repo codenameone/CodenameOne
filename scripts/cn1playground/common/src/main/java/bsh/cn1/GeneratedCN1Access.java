@@ -368,7 +368,7 @@ public final class GeneratedCN1Access implements CN1Access {
         "com.codename1.annotations.buildhints.Android",
         "com.codename1.annotations.buildhints.AndroidThemeMode",
         "com.codename1.annotations.buildhints.Build",
-        "com.codename1.annotations.buildhints.Desktop",
+        "com.codename1.annotations.buildhints.DesktopBuild",
         "com.codename1.annotations.buildhints.DesktopTitleBar",
         "com.codename1.annotations.buildhints.HardenControlFlow",
         "com.codename1.annotations.buildhints.HardenLevel",
@@ -2369,7 +2369,7 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.annotations.buildhints.Android", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.AndroidThemeMode", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.Build", splitMembers(""));
-        index.put("com.codename1.annotations.buildhints.Desktop", splitMembers(""));
+        index.put("com.codename1.annotations.buildhints.DesktopBuild", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.DesktopTitleBar", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.HardenControlFlow", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.HardenLevel", splitMembers(""));
@@ -4445,7 +4445,7 @@ public final class GeneratedCN1Access implements CN1Access {
         index.put("com.codename1.annotations.buildhints.Android", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.AndroidThemeMode", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.Build", splitMembers(""));
-        index.put("com.codename1.annotations.buildhints.Desktop", splitMembers(""));
+        index.put("com.codename1.annotations.buildhints.DesktopBuild", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.DesktopTitleBar", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.HardenControlFlow", splitMembers(""));
         index.put("com.codename1.annotations.buildhints.HardenLevel", splitMembers(""));

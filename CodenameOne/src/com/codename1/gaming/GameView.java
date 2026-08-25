@@ -25,10 +25,10 @@ package com.codename1.gaming;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Light;
 import com.codename1.gpu.RenderView;
-import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.TopLevelContainer;
 
 /// A GPU accelerated game surface: a `com.codename1.gpu.RenderView` that hosts a
 /// `SpriteRenderer` over a `Scene` and calls your `#update(double)` once per frame.
@@ -248,7 +248,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         if (formListenersAdded) {
             return;
         }
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f == null) {
             return;
         }
@@ -272,9 +272,9 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
                 }
             };
         }
-        f.addPointerPressedListener(pressListener);
-        f.addPointerDraggedListener(dragListener);
-        f.addPointerReleasedListener(releaseListener);
+        f.asContainer().addPointerPressedListener(pressListener);
+        f.asContainer().addPointerDraggedListener(dragListener);
+        f.asContainer().addPointerReleasedListener(releaseListener);
         formListenersAdded = true;
     }
 
@@ -282,11 +282,11 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         if (!formListenersAdded) {
             return;
         }
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null && pressListener != null) {
-            f.removePointerPressedListener(pressListener);
-            f.removePointerDraggedListener(dragListener);
-            f.removePointerReleasedListener(releaseListener);
+            f.asContainer().removePointerPressedListener(pressListener);
+            f.asContainer().removePointerDraggedListener(dragListener);
+            f.asContainer().removePointerReleasedListener(releaseListener);
         }
         formListenersAdded = false;
     }
@@ -338,7 +338,7 @@ public abstract class GameView extends RenderView implements SpriteRenderer.Upda
         int sy = 0;
         int sw = getWidth();
         int sh = getHeight();
-        Form f = getComponentForm();
+        TopLevelContainer f = getTopLevelContainer();
         if (f != null) {
             Rectangle safe = f.getSafeArea();
             if (safe != null && safe.getWidth() > 0 && safe.getHeight() > 0) {

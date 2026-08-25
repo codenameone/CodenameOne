@@ -177,6 +177,20 @@ final class BuildHintsApple {
                 .doc("Mac Native builds only. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default "
                         + "`10.15` — earlier versions don't support Mac Catalyst."));
 
+        h.add(new Hint("macNative.multiWindow")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("mac")
+                .consumedBy("IPhoneBuilder", "MacNativeBuilder")
+                .doc("Mac Native builds only. Declares that the app uses `com.codename1.ui.Window`, which "
+                        + "needs multiple UIScenes and exists only on the Mac Catalyst slice. Writes "
+                        + "`UIApplicationSupportsMultipleScenes` and a scene configuration into the Mac "
+                        + "slice's own `Info.plist`; `getWindowManager()` reads that key back out of the "
+                        + "bundle, so without it windows are reported unsupported and constructing one "
+                        + "throws. Off by default because multi-window support relayouts the app into a "
+                        + "resizable window, which an app that never asked for it should not get."));
+
         h.add(new Hint("macNative.notarize")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)

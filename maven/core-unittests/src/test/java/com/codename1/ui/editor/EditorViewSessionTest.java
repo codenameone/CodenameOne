@@ -203,4 +203,30 @@ class EditorViewSessionTest extends UITestBase {
         v.performUndo();
         assertEquals("xyz", v.getText(), "undo restores the text the composition replaced");
     }
+
+    @FormTest
+    void theCaretAnimationRegistersInsideAWindow() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        com.codename1.ui.Window w =
+                new com.codename1.ui.Window("editor", new BorderLayout());
+        w.setWindowSize(400, 300);
+        EditorView v = new EditorView(new CountingHost(), true);
+        w.add(BorderLayout.CENTER, v);
+        w.show();
+        w.revalidate();
+
+        // The registration itself was migrated to the top level, but it sat inside an
+        // `if (getComponentForm() != null)` -- and that form is null by design inside a
+        // Window, so the guard skipped it and the caret never blinked. Migrating the
+        // call without the guard around it changed nothing.
+        v.requestFocus();
+        flushSerialCalls();
+
+        java.lang.reflect.Field f = EditorView.class.getDeclaredField("animRegistered");
+        f.setAccessible(true);
+        assertTrue(f.getBoolean(v),
+                "a focused editor inside a window must register its caret animation");
+
+        w.dispose();
+    }
 }

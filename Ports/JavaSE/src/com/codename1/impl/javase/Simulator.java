@@ -480,7 +480,7 @@ public class Simulator {
         // A reload re-enters main() in the SAME JVM, so anything published last
         // time is still set. Withdraw it before deciding anything: otherwise the
         // "existing value wins" rule that protects -D also protects the previous
-        // build's annotation value, and an edited @Desktop(titleBar = ...) -- or
+        // build's annotation value, and an edited @DesktopBuild(titleBar = ...) -- or
         // a deleted annotation, which takes an early return below -- keeps
         // showing the old setting until the process is restarted.
         //

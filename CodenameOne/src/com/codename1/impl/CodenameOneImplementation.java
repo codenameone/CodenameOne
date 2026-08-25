@@ -23,6 +23,7 @@
  */
 package com.codename1.impl;
 
+import com.codename1.ui.Desktop;
 import com.codename1.annotations.Concrete;
 import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.codescan.CodeScanner;
@@ -157,8 +158,7 @@ public abstract class CodenameOneImplementation {
     private final Hashtable builtinSounds = new Hashtable();
     /// For use inside paintDirty() so that we don't have to instantiate
     /// a rectangle each time it is called.
-    private final Rectangle paintDirtyTmpRect = new Rectangle();
-    private Object displayLock;
+    Object displayLock;
     private boolean bidi;
     private Object lightweightClipboard;
     private Hashtable linearGradientCache;
@@ -166,14 +166,36 @@ public abstract class CodenameOneImplementation {
     private boolean builtinSoundEnabled = true;
     private boolean dragStarted = false;
     private int dragActivationCounter = 0;
+    /// How many windows may have a drag gesture in flight at once. A touchscreen can
+    /// have a contact down in two windows at the same time, and the framework already
+    /// keys press targets and drag histories per window rather than globally.
+    /// Drops any drag-activation state held for a window.
+    ///
+    /// A window can be disposed or lose the native pointer while a press is still
+    /// down, and then no release ever arrives to end the gesture. The next press in a
+    /// window reset for reuse would otherwise continue the old one, which reads as a
+    /// drag already in progress. The framework calls this from its own window input
+    /// cancellation, which until now cleared only its own records.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id; zero -- the main surface -- keeps its state in
+    /// fields on this class and is not affected
+    public void releaseWindowInputState(int windowId) {
+        if (windowId > 0) {
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
+        }
+    }
+
     private int dragActivationX = 0;
     private int dragActivationY = 0;
     private int dragStartPercentage = 3;
     private Form currentForm;
-    private Animation[] paintQueue = new Animation[200];
-    private Animation[] paintQueueTemp = new Animation[200];
-    private int paintQueueFill = 0;
-    private Graphics codenameOneGraphics;
+    private final PaintSurface mainSurface = new PaintSurface(this, null);
+    private ArrayList<PaintSurface> windowSurfaces;
     private String packageName;
     private Component editingText;
     private String appArg;
@@ -579,9 +601,12 @@ public abstract class CodenameOneImplementation {
     public void setFocusedEditingText(Component cmp) {
         editingText = cmp;
         if (cmp != null) {
-            Form form = cmp.getComponentForm();
-            if (form != null) {
-                form.setFocused(cmp);
+            // The top level rather than the form: getComponentForm() is null by design
+            // inside a Window, so focus was silently never moved to the component being
+            // edited there.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top != null) {
+                top.setFocused(cmp);
             }
         }
     }
@@ -748,7 +773,54 @@ public abstract class CodenameOneImplementation {
     ///
     /// false by default
     public boolean hasPendingPaints() {
-        return paintQueueFill != 0;
+        if (mainSurface.hasPendingPaints()) {
+            return true;
+        }
+        if (windowSurfaces != null) {
+            int len = windowSurfaces.size();
+            for (int iter = 0; iter < len; iter++) {
+                if (windowSurfaces.get(iter).hasPendingPaints()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// Creates the paint surface backing a native window and registers it, so that
+    /// the sweeps over every surface -- pending paints, cancelled repaints -- see it.
+    ///
+    /// This is the whole of the window painting API on this class: everything else a
+    /// surface can do is a method on the surface itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativeWindow`: the window peer the surface draws into
+    ///
+    /// #### Returns
+    ///
+    /// the new surface
+    public final PaintSurface createPaintSurface(Object nativeWindow) {
+        PaintSurface surface = new PaintSurface(this, nativeWindow);
+        synchronized (displayLock) {
+            if (windowSurfaces == null) {
+                windowSurfaces = new ArrayList<PaintSurface>();
+            }
+            windowSurfaces.add(surface);
+        }
+        return surface;
+    }
+
+    /// Unregisters a surface being disposed. Called by `PaintSurface#dispose()`
+    /// under the display lock, which is why it does not take it again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: the surface to forget
+    void forgetWindowSurface(PaintSurface surface) {
+        if (windowSurfaces != null) {
+            windowSurfaces.remove(surface);
+        }
     }
 
     /// Return the number of alpha levels supported by the implementation.
@@ -813,7 +885,7 @@ public abstract class CodenameOneImplementation {
     /// - `c`: The component whose paintable bounds we are interested in.
     ///
     /// - `out`: A rectangle to return the bounds in.
-    private void getPaintableBounds(Component c, Rectangle out) {
+    void getPaintableBounds(Component c, Rectangle out) {
         int x = c.getAbsoluteX() + c.getScrollX();
         int y = c.getAbsoluteY() + c.getScrollY();
         int x2 = x + c.getWidth();
@@ -833,85 +905,10 @@ public abstract class CodenameOneImplementation {
 
     }
 
-    /// Invoked by the EDT to paint the dirty regions
+    /// Invoked by the EDT to paint the dirty regions of the application's main
+    /// surface.
     public void paintDirty() {
-        int size = 0;
-        synchronized (displayLock) {
-            size = paintQueueFill;
-            Animation[] array = paintQueue;
-            paintQueue = paintQueueTemp;
-            paintQueueTemp = array;
-            paintQueueFill = 0;
-        }
-        if (size > 0) {
-            Graphics wrapper = getCodenameOneGraphics();
-            int dwidth = getDisplayWidth();
-            int dheight = getDisplayHeight();
-            int topX = dwidth;
-            int topY = dheight;
-            int bottomX = 0;
-            int bottomY = 0;
-            for (int iter = 0; iter < size; iter++) {
-                Animation ani = paintQueueTemp[iter];
-
-                // might happen due to paint queue removal
-                if (ani == null) {
-                    continue;
-                }
-                paintQueueTemp[iter] = null;
-                wrapper.translate(-wrapper.getTranslateX(), -wrapper.getTranslateY());
-                wrapper.resetAffine();
-                // Reset the flush-region hint to the full screen before the
-                // full-screen clip below so neither it nor a previous
-                // component's tighter region wrongly clamps this reset (#5273).
-                setPaintDirtyRegionClip(0, 0, dwidth, dheight);
-                wrapper.setClip(0, 0, dwidth, dheight);
-                if (ani instanceof Component) {
-                    Component cmp = (Component) ani;
-                    Rectangle dirty = cmp.getDirtyRegion();
-                    if (dirty != null) {
-                        Dimension d = dirty.getSize();
-                        wrapper.setClip(dirty.getX(), dirty.getY(), d.getWidth(), d.getHeight());
-                        cmp.setDirtyRegion(null);
-                    }
-                    // Confine any clip this component sets while painting to its
-                    // flushed region on immediate-mode ports. Use the paintable
-                    // bounds -- the region retained ports clamp to via the
-                    // flushGraphics call below -- NOT the dirty region, which
-                    // repaint() nulls (Component.repaint), in which case it would
-                    // fall back to the full screen and the clip could still escape
-                    // (#5273). Computed before paintComponent (paint does not move
-                    // the component) so the clip set during paint can be clamped.
-                    getPaintableBounds(cmp, paintDirtyTmpRect);
-                    setPaintDirtyRegionClip(paintDirtyTmpRect.getX(), paintDirtyTmpRect.getY(),
-                            paintDirtyTmpRect.getWidth(), paintDirtyTmpRect.getHeight());
-                    cmp.paintComponent(wrapper);
-                    // Recompute the paintable bounds AFTER paint for the flush
-                    // region below: paintComponent can lay the component out (its
-                    // bounds may change), and the retained ports clamp to / flush
-                    // exactly this rect, so it must match the pre-#5273 value to
-                    // the pixel (the before-paint value above is only the immediate
-                    // -mode clip hint).
-                    getPaintableBounds(cmp, paintDirtyTmpRect);
-                    int cmpAbsX = paintDirtyTmpRect.getX();
-                    topX = Math.min(cmpAbsX, topX);
-                    bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
-                    int cmpAbsY = paintDirtyTmpRect.getY();
-                    topY = Math.min(cmpAbsY, topY);
-                    bottomY = Math.max(cmpAbsY + paintDirtyTmpRect.getHeight(), bottomY);
-                } else {
-                    bottomX = dwidth;
-                    bottomY = dheight;
-                    topX = 0;
-                    topY = 0;
-                    ani.paint(wrapper);
-                }
-            }
-
-            paintOverlay(wrapper);
-            //Log.p("Flushing graphics : "+topX+","+topY+","+bottomX+","+bottomY);
-            flushGraphics(topX, topY, bottomX - topX, bottomY - topY);
-        }
+        mainSurface.paintDirty(getDisplayWidth(), getDisplayHeight());
     }
 
     /// Reports the clip region that bounds the current component's flush as
@@ -966,7 +963,7 @@ public abstract class CodenameOneImplementation {
     /// @return a graphics object, either recycled or new, this object will be
     /// used on the EDT
     protected Graphics getCodenameOneGraphics() {
-        return codenameOneGraphics;
+        return mainSurface.getGraphics();
     }
 
     /// Installs the Codename One graphics object into the implementation
@@ -975,7 +972,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `g`: graphics object for use by the implementation
     public void setCodenameOneGraphics(Graphics g) {
-        codenameOneGraphics = g;
+        mainSurface.setGraphics(g);
     }
 
     /// A flag that can be overridden by a platform to indicate that native
@@ -1007,13 +1004,17 @@ public abstract class CodenameOneImplementation {
     /// - `cmp`: the component to
     public void cancelRepaint(Animation cmp) {
         synchronized (displayLock) {
-            for (int iter = 0; iter < paintQueueFill; iter++) {
-                if (paintQueue[iter] == cmp) { //NOPMD CompareObjectsWithEquals
-                    paintQueue[iter] = null;
-                    return;
+            if (mainSurface.cancelRepaint(cmp)) {
+                return;
+            }
+            if (windowSurfaces != null) {
+                int len = windowSurfaces.size();
+                for (int iter = 0; iter < len; iter++) {
+                    if (windowSurfaces.get(iter).cancelRepaint(cmp)) {
+                        return;
+                    }
                 }
             }
-
         }
     }
 
@@ -1023,33 +1024,7 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `cmp`: component or animation to push into the paint queue
     public void repaint(Animation cmp) {
-        synchronized (displayLock) {
-            for (int iter = 0; iter < paintQueueFill; iter++) {
-                Animation ani = paintQueue[iter];
-                if (ani == cmp) { //NOPMD CompareObjectsWithEquals
-                    return;
-                }
-                //no need to paint a Component if one of its parent is already in the queue
-                if (ani instanceof Container && cmp instanceof Component) {
-                    Component parent = ((Component) cmp).getParent();
-                    while (parent != null) {
-                        if (parent == ani) { //NOPMD CompareObjectsWithEquals
-                            return;
-                        }
-                        parent = parent.getParent();
-                    }
-                }
-            }
-            // overcrowding the queue don't try to grow the array!
-            if (paintQueueFill >= paintQueue.length) {
-                System.out.println("Warning paint queue size exceeded, please watch the amount of repaint calls");
-                return;
-            }
-
-            paintQueue[paintQueueFill] = cmp;
-            paintQueueFill++;
-            displayLock.notifyAll();
-        }
+        mainSurface.repaint(cmp);
     }
 
     /// Extracts RGB data from the given native image and places it in the given array
@@ -2901,6 +2876,141 @@ public abstract class CodenameOneImplementation {
     private int currentPointerModifiers;
     private boolean currentPointerHovering;
 
+    /// Ring of pointer metadata snapshots, one per queued pointer packet.
+    ///
+    /// The metadata a port reports is a single mutable record, but a port queues pointer
+    /// events off the event dispatch thread and the `PointerEvent` is not built until
+    /// the event is dispatched. A port that drains a burst -- the Win32 pump translates
+    /// queued messages before returning, and the GTK drain does the same -- therefore
+    /// overwrote the record several times before any of those events were dispatched,
+    /// and every one of them came out carrying the *last* packet's button and device
+    /// type. A secondary window's right click or pen event read as a left mouse click,
+    /// which is enough to lose a context menu or a stylus callback.
+    ///
+    /// A snapshot is taken when the packet is queued and restored when it is
+    /// dispatched, so each event keeps the metadata that arrived with it.
+    ///
+    /// Sized for **two** live buffers, not one. `Display` double buffers the input event
+    /// stack: the event dispatch thread swaps a full batch out and dispatches it while
+    /// the native input thread fills the other, so both are live at once. Each is 1000
+    /// ints and the smallest pointer packet is three (type, x, y), which puts a ceiling
+    /// of about 666 queued snapshots -- past a 512 slot ring, which would then wrap onto
+    /// packets that had not been dispatched yet and hand them the wrong button or device
+    /// type under a sustained burst. 2048 leaves headroom over that ceiling.
+    private static final int POINTER_METADATA_SLOTS = 2048;
+    private final int[] pointerMetadataInts =
+            new int[POINTER_METADATA_SLOTS * 4];
+    private final float[] pointerMetadataFloats =
+            new float[POINTER_METADATA_SLOTS * 4];
+    private final boolean[] pointerMetadataHovering =
+            new boolean[POINTER_METADATA_SLOTS];
+    private int pointerMetadataNext;
+
+    /// Snapshots the current pointer metadata and returns the slot holding it.
+    ///
+    /// #### Returns
+    ///
+    /// the slot to hand back to `#selectPointerEventMetadata(int)` when the matching
+    /// packet is dispatched
+    public int capturePointerEventMetadata() {
+        int slot;
+        synchronized (pointerMetadataHovering) {
+            slot = pointerMetadataNext;
+            pointerMetadataNext = (pointerMetadataNext + 1) % POINTER_METADATA_SLOTS;
+        }
+        return recapturePointerEventMetadata(slot);
+    }
+
+    /// Overwrites an existing snapshot slot rather than taking a new one.
+    ///
+    /// Coalescing is why this exists. A drag that replaces the queued drag packet keeps
+    /// one packet however many updates arrive, so advancing the ring on each of them
+    /// would run it forward without bound while the number of live packets stays small
+    /// -- and the ring would then wrap onto slots belonging to presses and releases
+    /// that are still queued, which is the very mix-up the snapshot prevents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: the slot to overwrite; out of range values are ignored
+    ///
+    /// #### Returns
+    ///
+    /// the slot that now holds the current metadata
+    public int recapturePointerEventMetadata(int slot) {
+        if (slot < 0 || slot >= POINTER_METADATA_SLOTS) {
+            return capturePointerEventMetadata();
+        }
+        int i = slot * 4;
+        pointerMetadataInts[i] = currentPointerButton;
+        pointerMetadataInts[i + 1] = currentPointerButtonMask;
+        pointerMetadataInts[i + 2] = currentPointerType;
+        pointerMetadataInts[i + 3] = currentPointerModifiers;
+        int f = slot * 4;
+        pointerMetadataFloats[f] = currentPointerPressure;
+        pointerMetadataFloats[f + 1] = currentPointerTiltX;
+        pointerMetadataFloats[f + 2] = currentPointerTiltY;
+        pointerMetadataFloats[f + 3] = currentPointerContactSize;
+        pointerMetadataHovering[slot] = currentPointerHovering;
+        return slot;
+    }
+
+    /// Restores the metadata snapshotted into the given slot, so the event about to be
+    /// dispatched builds its `PointerEvent` from the values that arrived with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: a slot from `#capturePointerEventMetadata()`, or a negative value to
+    ///   leave the current metadata alone
+    public void selectPointerEventMetadata(int slot) {
+        if (slot < 0 || slot >= POINTER_METADATA_SLOTS) {
+            return;
+        }
+        int i = slot * 4;
+        dispatchPointerButton = pointerMetadataInts[i];
+        dispatchPointerButtonMask = pointerMetadataInts[i + 1];
+        dispatchPointerType = pointerMetadataInts[i + 2];
+        dispatchPointerModifiers = pointerMetadataInts[i + 3];
+        int f = slot * 4;
+        dispatchPointerPressure = pointerMetadataFloats[f];
+        dispatchPointerTiltX = pointerMetadataFloats[f + 1];
+        dispatchPointerTiltY = pointerMetadataFloats[f + 2];
+        dispatchPointerContactSize = pointerMetadataFloats[f + 3];
+        dispatchPointerHovering = pointerMetadataHovering[slot];
+        dispatchMetadataActive = true;
+    }
+
+    /// The metadata of the event being dispatched, restored from its snapshot.
+    ///
+    /// Deliberately a second set of fields rather than a write back into the
+    /// `currentPointer*` staging the ports fill in. Those are written on the port's
+    /// own thread and read when a packet is queued; writing them from the event
+    /// dispatch thread as well put the two in a race, and the restore could land
+    /// between a port's `#setPointerEventMetadata` and the capture that follows it --
+    /// handing the next packet the previous event's button. Separating the two means
+    /// the dispatch thread never writes what the port writes.
+    private int dispatchPointerButton = com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+    private int dispatchPointerButtonMask = com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+    private int dispatchPointerType = com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+    private float dispatchPointerPressure = 1f;
+    private float dispatchPointerTiltX;
+    private float dispatchPointerTiltY;
+    private float dispatchPointerContactSize;
+    private int dispatchPointerModifiers;
+    private boolean dispatchPointerHovering;
+    /// False until the first packet is dispatched, so the accessors keep answering
+    /// from the staging fields for a port that sets metadata and builds an event
+    /// directly, without going through the queue.
+    private boolean dispatchMetadataActive;
+
+    /// Stops the accessors answering from the last dispatched packet's snapshot.
+    ///
+    /// Called when a dispatch batch is finished. Without it the selection latched on
+    /// and a port that staged fresh metadata and then read it back -- rather than
+    /// queueing an event -- was answered with the previous event's values.
+    public void clearPointerEventMetadataSelection() {
+        dispatchMetadataActive = false;
+    }
+
     /// Resets the rich pointer metadata back to its defaults. Ports may call this between
     /// gestures so stale button or pressure values do not leak into unrelated events.
     public void resetPointerEventMetadata() {
@@ -2913,6 +3023,9 @@ public abstract class CodenameOneImplementation {
         currentPointerContactSize = 0;
         currentPointerModifiers = 0;
         currentPointerHovering = false;
+        // The dispatch copy goes with it: a port resetting between gestures means the
+        // accessors should stop answering from the last dispatched packet.
+        dispatchMetadataActive = false;
     }
 
     /// Populates all of the rich pointer metadata in one call. Platform ports invoke this from
@@ -2969,55 +3082,58 @@ public abstract class CodenameOneImplementation {
 
     /// The button associated with the current pointer event, one of the `PointerEvent.BUTTON_*` constants.
     public int getPointerButton() {
-        return currentPointerButton;
+        return dispatchMetadataActive ? dispatchPointerButton : currentPointerButton;
     }
 
     /// A bitmask of the buttons currently held, built from the `PointerEvent.MASK_*` constants.
     public int getPointerButtonMask() {
-        return currentPointerButtonMask;
+        return dispatchMetadataActive ? dispatchPointerButtonMask : currentPointerButtonMask;
     }
 
     /// The current pointing device type, one of the `PointerEvent.TYPE_*` constants.
     public int getPointerType() {
-        return currentPointerType;
+        return dispatchMetadataActive ? dispatchPointerType : currentPointerType;
     }
 
     /// The normalized pressure of the current pointer event between `0.0` and `1.0`.
     public float getPointerPressure() {
-        return currentPointerPressure;
+        return dispatchMetadataActive ? dispatchPointerPressure : currentPointerPressure;
     }
 
     /// The stylus tilt across the x axis for the current pointer event, in degrees.
     public float getPointerTiltX() {
-        return currentPointerTiltX;
+        return dispatchMetadataActive ? dispatchPointerTiltX : currentPointerTiltX;
     }
 
     /// The stylus tilt across the y axis for the current pointer event, in degrees.
     public float getPointerTiltY() {
-        return currentPointerTiltY;
+        return dispatchMetadataActive ? dispatchPointerTiltY : currentPointerTiltY;
     }
 
     /// The normalized contact size of the current pointer event between `0.0` and `1.0`.
     public float getPointerContactSize() {
-        return currentPointerContactSize;
+        return dispatchMetadataActive ? dispatchPointerContactSize : currentPointerContactSize;
     }
 
     /// The keyboard modifier mask held during the current pointer event.
     public int getPointerModifiers() {
-        return currentPointerModifiers;
+        return dispatchMetadataActive ? dispatchPointerModifiers : currentPointerModifiers;
     }
 
     /// True if the current pointer event is a hover (no contact with the surface).
     public boolean isPointerHovering() {
-        return currentPointerHovering;
+        return dispatchMetadataActive ? dispatchPointerHovering : currentPointerHovering;
     }
 
     /// Builds an immutable `PointerEvent` snapshot from the current metadata for the given coordinates.
     /// Used by the framework when it dispatches a pointer event.
     public com.codename1.ui.events.PointerEvent buildPointerEvent(int x, int y, boolean hovering) {
-        return new com.codename1.ui.events.PointerEvent(x, y, currentPointerButton, currentPointerButtonMask,
-                currentPointerType, currentPointerPressure, currentPointerTiltX, currentPointerTiltY,
-                currentPointerContactSize, currentPointerModifiers, hovering || currentPointerHovering);
+        // Through the accessors, so this reads the dispatched event's own snapshot
+        // rather than whatever a port has staged since.
+        return new com.codename1.ui.events.PointerEvent(x, y, getPointerButton(),
+                getPointerButtonMask(), getPointerType(), getPointerPressure(),
+                getPointerTiltX(), getPointerTiltY(), getPointerContactSize(),
+                getPointerModifiers(), hovering || isPointerHovering());
     }
 
     /// Subclasses should invoke this method, it delegates the event to the display and into
@@ -3046,6 +3162,174 @@ public abstract class CodenameOneImplementation {
         xPointerEvent[0] = x;
         yPointerEvent[0] = y;
         pointerPressed(xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a pointer press that happened in one of the additional native
+    /// windows. Ports call this instead of `#pointerPressed(int, int)` when the
+    /// event came from a window rather than the main surface; window id zero routes
+    /// to the main surface, so a port may use this form unconditionally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id handed to
+    /// `WindowManager#createWindow(int, java.lang.String, int, int, int, int, boolean, boolean, java.lang.Object)`
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerPressed(int windowId, int x, int y) {
+        if (windowId > 0) {
+            // A new gesture in this window starts its own activation filter over,
+            // leaving any other window's gesture alone.
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
+        }
+        if (windowId == 0) {
+            pointerPressed(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        Desktop.getInstance().windowPointerPressed(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a pointer release that happened in one of the additional native
+    /// windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerReleased(int windowId, int x, int y) {
+        if (windowId > 0) {
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act != null) {
+                act.reset();
+            }
+        }
+        if (windowId == 0) {
+            pointerReleased(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        Desktop.getInstance().windowPointerReleased(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a pointer drag that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    /// Multi pointer drag over a specific native window, which is how the desktop
+    /// simulator plays a pinch gesture. Without the id the second pointer would land
+    /// on the main form while the press that started the gesture went to the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the x positions of the pointers
+    ///
+    /// - `y`: the y positions of the pointers
+    protected void windowPointerDragged(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0) {
+            // The same activation filter the main surface applies. Forwarding straight
+            // through made a pixel of jitter after a press into a drag, which activates
+            // drag and drop and moves a draggable component on what was meant as a
+            // click.
+            PointerDragActivation act = Desktop.getInstance().windowDragActivation(windowId);
+            if (act == null) {
+                // No window under this id any more -- disposed with events still in
+                // flight. Filtering is a refinement, so let the gesture through rather
+                // than swallow it.
+                Desktop.getInstance().windowPointerDragged(windowId, x, y);
+                return;
+            }
+            boolean started = false;
+            if (!act.started) {
+                try {
+                    started = hasWindowDragStarted(windowId, act, x[0], y[0]);
+                } catch (Throwable t) {
+                    // Matches the main path: a filter that throws must not take the
+                    // gesture with it.
+                    Log.e(t);
+                }
+            }
+            if (act.started || started) {
+                act.started = true;
+                Desktop.getInstance().windowPointerDragged(windowId, x, y);
+            }
+            return;
+        }
+        pointerDragged(x, y);
+    }
+
+    protected void windowPointerDragged(int windowId, int x, int y) {
+        if (windowId == 0) {
+            pointerDragged(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        // Through the array overload rather than straight to the framework, so this
+        // path gets the activation filter too.
+        windowPointerDragged(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a key press that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `keyCode`: the key code
+    protected void windowKeyPressed(int windowId, int keyCode) {
+        if (windowId == 0) {
+            keyPressed(keyCode);
+            return;
+        }
+        Desktop.getInstance().windowKeyPressed(windowId, keyCode);
+    }
+
+    /// Delivers a key release that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `keyCode`: the key code
+    protected void windowKeyReleased(int windowId, int keyCode) {
+        if (windowId == 0) {
+            keyReleased(keyCode);
+            return;
+        }
+        Desktop.getInstance().windowKeyReleased(windowId, keyCode);
+    }
+
+    /// Returns the native window peer owning the given component, or null when the
+    /// component belongs to the main surface. Ports use this to place native peers
+    /// and native text editors into the right window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to locate
+    ///
+    /// #### Returns
+    ///
+    /// the owning window's native peer, or null for the main surface
+    public final Object getWindowPeerForComponent(Component cmp) {
+        return Desktop.getInstance().getWindowPeerForComponent(cmp);
     }
 
     /// Subclasses should invoke this method, it delegates the event to the display and into
@@ -3140,6 +3424,26 @@ public abstract class CodenameOneImplementation {
         pointerHover(xPointerEvent, yPointerEvent);
     }
 
+    /// Same as `#pointerHover(int, int)`, for a hover over a specific native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerHover(final int windowId, final int x, final int y) {
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        if (windowId > 0) {
+            Desktop.getInstance().windowPointerHover(windowId, xPointerEvent, yPointerEvent);
+        } else {
+            pointerHover(xPointerEvent, yPointerEvent);
+        }
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
@@ -3207,18 +3511,72 @@ public abstract class CodenameOneImplementation {
             dragActivationCounter++;
             return false;
         }
-        int dragRegion = getCurrentForm().getDragRegionStatus(x, y);
-
-        //send the drag events to the form only after latency of 7 drag events,
-        //most touch devices are too sensitive and send too many drag events.
-        //7 is just a latency const number that is pretty good for most devices
-        //this may be tuned for specific devices.
         dragActivationCounter++;
+        if (dragPassedThreshold(getCurrentForm().getDragRegionStatus(x, y),
+                getDisplayWidth(), getDisplayHeight(),
+                dragActivationX, dragActivationY, dragActivationCounter, x, y)) {
+            dragActivationCounter = getDragAutoActivationThreshold() + 1;
+            return true;
+        }
+        return false;
+    }
+
+    /// The same activation filter, for a drag inside one of the additional native
+    /// windows.
+    ///
+    /// Window drags used to reach the framework unfiltered, so a pixel of jitter after
+    /// a press was already a drag: drag and drop activated, and a draggable component
+    /// moved on what the user meant as a click.
+    ///
+    /// The state is separate from the main surface's rather than shared, because
+    /// nothing resets the main one for a window gesture -- window presses and releases
+    /// go straight to the framework -- so a shared counter would be stale from the
+    /// first window drag onwards. And the region and the size come from the window: the
+    /// thresholds are a percentage of the surface, and measuring a window's drag
+    /// against the display makes a small window nearly undraggable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window the drag is happening in
+    ///
+    /// - `x`: the position of the current drag event
+    ///
+    /// - `y`: the position of the current drag event
+    ///
+    /// #### Returns
+    ///
+    /// true if the drag should propagate into Codename One
+    protected boolean hasWindowDragStarted(final int windowId, final PointerDragActivation act,
+            final int x, final int y) {
+        int surfaceWidth = Desktop.getInstance().windowWidth(windowId);
+        int surfaceHeight = Desktop.getInstance().windowHeight(windowId);
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) {
+            return false;
+        }
+        if (act.counter == 0) {
+            act.x = x;
+            act.y = y;
+            act.counter++;
+            return false;
+        }
+        act.counter++;
+        if (dragPassedThreshold(Desktop.getInstance().windowDragRegionStatus(windowId, x, y),
+                surfaceWidth, surfaceHeight, act.x, act.y, act.counter, x, y)) {
+            act.counter = getDragAutoActivationThreshold() + 1;
+            return true;
+        }
+        return false;
+    }
+
+    /// Whether a drag has moved far enough, for a given drag region and surface size.
+    /// Shared by the main surface and by the windows so the two cannot drift.
+    private boolean dragPassedThreshold(int dragRegion, int surfaceWidth, int surfaceHeight,
+            int activationX, int activationY, int counter, final int x, final int y) {
         float startX = getDragStartPercentage();
         float startY = startX;
         switch (dragRegion) {
             case Component.DRAG_REGION_NOT_DRAGGABLE:
-                if (dragActivationCounter > getDragAutoActivationThreshold()) {
+                if (counter > getDragAutoActivationThreshold()) {
                     return true;
                 }
                 startX = Math.max(5, startX);
@@ -3267,20 +3625,13 @@ public abstract class CodenameOneImplementation {
         }
 
         // have we passed the motion threshold on the X axis?
-        if (((float) getDisplayWidth()) / 100.0f * startX <=
-                Math.abs(dragActivationX - x)) {
-            dragActivationCounter = getDragAutoActivationThreshold() + 1;
+        if (((float) surfaceWidth) / 100.0f * startX <=
+                Math.abs(activationX - x)) {
             return true;
         }
 
         // have we passed the motion threshold on the Y axis?
-        if (((float) getDisplayHeight()) / 100.0f * startY <=
-                Math.abs(dragActivationY - y)) {
-            dragActivationCounter = getDragAutoActivationThreshold() + 1;
-            return true;
-        }
-
-        return false;
+        return ((float) surfaceHeight) / 100.0f * startY <= Math.abs(activationY - y);
     }
 
     /// This method allows us to manipulate the drag started detection logic.
@@ -7516,6 +7867,21 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific window manager, which carries the whole native
+    /// windowing contract. Default implementation returns {@code null}; the desktop
+    /// ports override it to return a cached instance.
+    ///
+    /// A {@code null} return **is** the capability query --- there is deliberately no
+    /// separate supported flag that could drift out of step with it. Application code
+    /// should use {@link com.codename1.ui.Desktop} rather than calling this directly.
+    ///
+    /// #### Returns
+    ///
+    /// the window manager, or {@code null} when this platform has no windowing system
+    public WindowManager getWindowManager() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters
@@ -8911,6 +9277,35 @@ public abstract class CodenameOneImplementation {
     /// - `modifiers`: bitmask of the held keyboard modifiers (the `PointerEvent` `MODIFIER_*` constants)
     public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY,
             final boolean precise, final int modifiers) {
+        windowPointerWheelMoved(0, x, y, scrollX, scrollY, precise, modifiers);
+    }
+
+    /// Same as `#pointerWheelMoved(int, int, int, int, boolean, int)`, for a wheel
+    /// event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to say which window the wheel was over: the
+    /// main form version resolves everything -- the listeners and the synthesized
+    /// scroll gesture -- from the current form, so a wheel over a second window
+    /// would scroll the main form's content instead of the window's.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    public void windowPointerWheelMoved(final int windowId, final int x, final int y,
+            final int scrollX, final int scrollY, final boolean precise, final int modifiers) {
         if (scrollX == 0 && scrollY == 0) {
             return;
         }
@@ -8920,24 +9315,60 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (d.fireMouseWheelEvent(x, y, scrollX, scrollY, precise, modifiers)) {
+                if (Desktop.getInstance().windowMouseWheelEvent(
+                        windowId, x, y, scrollX, scrollY, precise, modifiers)) {
                     return;
                 }
-                playWheelScrollGesture(d, x, y, scrollX, scrollY);
+                playWheelScrollGesture(d, windowId, x, y, scrollX, scrollY);
             }
         });
+    }
+
+    /// Resolves the top level a wheel gesture should play into: the window with the
+    /// given id, or the current form for the main surface.
+    private Container wheelRoot(Display d, int windowId) {
+        // Modality is rechecked on every step, not only when the wheel arrived. The
+        // gesture is played as four queued steps and an unconsumed wheel listener can
+        // show a modal in between, after which the remaining synthetic press, drags
+        // and release would scroll or activate content behind it.
+        if (Desktop.getInstance().isWindowInputBlocked(windowId)) {
+            return null;
+        }
+        if (windowId > 0) {
+            com.codename1.ui.Window w = Desktop.getInstance().windowById(windowId);
+            // Visibility as well as modality, and for the same reason: an unconsumed
+            // wheel listener can hide or minimize its own window before the gesture
+            // starts, and a hidden window stays registered -- so the synthetic press,
+            // drags and release would scroll and activate components in a hierarchy
+            // nobody can see.
+            if (w == null || !w.isWindowShowing()) {
+                return null;
+            }
+            return w;
+        }
+        return d.getCurrent();
     }
 
     /// Plays the default scroll gesture for a wheel movement. Quarter the gesture across four EDT
     /// cycles: a single press->drag(full)->release would read as a fling and overshoot, whereas
     /// stepped drags let the scroll container settle the way a finger drag does. While it runs
     /// `#isScrollWheeling` reports `true`.
-    private void playWheelScrollGesture(final Display d, final int x, final int y, final int scrollX, final int scrollY) {
+    private void playWheelScrollGesture(final Display d, final int windowId, final int x,
+            final int y, final int scrollX, final int scrollY) {
+        // The root is resolved once, by the step that dispatches the press, and the
+        // remaining steps reuse it. Re-checking modality on every step -- which is
+        // what the previous version did -- suppressed the later steps including the
+        // only release, so a gesture whose press had already been delivered never
+        // completed and left the top level's pressed and drag bookkeeping stranded.
+        // A gesture blocked *before* its press still never starts, which is the case
+        // modality is there to stop.
+        final Container[] started = new Container[1];
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = wheelRoot(d, windowId);
                 if (f != null) {
+                    started[0] = f;
                     scrollWheeling = true;
                     dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
                 }
@@ -8946,7 +9377,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
                 }
@@ -8955,7 +9386,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
                 }
@@ -8964,7 +9395,9 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                // The release, which must reach the same root the press did -- a
+                // modal shown mid-gesture must not strand the pressed component.
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX, scrollY, false, true);
                 }
@@ -8977,7 +9410,7 @@ public abstract class CodenameOneImplementation {
     /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
     /// releases. The component under the cursor is made non-focusable around the
     /// step so the synthetic press is not turned into a selection/click.
-    private void dragWheelStep(Form f, int x, int y, int dx, int dy, boolean press, boolean release) {
+    private void dragWheelStep(Container f, int x, int y, int dx, int dy, boolean press, boolean release) {
         Component cmp;
         try {
             cmp = f.getComponentAt(x, y);

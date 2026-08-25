@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -332,18 +354,24 @@ class SheetSwipeToDismissTest extends UITestBase {
     }
 
     private void clearPaintQueue() throws Exception {
+        // The dirty queue lives on the implementation's main PaintSurface -- each
+        // surface (the main one, and one per native desktop window) owns its own.
         Class<?> implClass = Class.forName("com.codename1.impl.CodenameOneImplementation");
-        Field fillField = implClass.getDeclaredField("paintQueueFill");
-        Field queueField = implClass.getDeclaredField("paintQueue");
+        Field mainSurfaceField = implClass.getDeclaredField("mainSurface");
+        mainSurfaceField.setAccessible(true);
+        Object surface = mainSurfaceField.get(implementation);
+        Class<?> surfaceClass = surface.getClass();
+        Field fillField = surfaceClass.getDeclaredField("paintQueueFill");
+        Field queueField = surfaceClass.getDeclaredField("paintQueue");
         fillField.setAccessible(true);
         queueField.setAccessible(true);
         synchronized (implementation) {
-            Object queue = queueField.get(implementation);
+            Object queue = queueField.get(surface);
             int len = java.lang.reflect.Array.getLength(queue);
             for (int i = 0; i < len; i++) {
                 java.lang.reflect.Array.set(queue, i, null);
             }
-            fillField.setInt(implementation, 0);
+            fillField.setInt(surface, 0);
         }
     }
 
@@ -358,12 +386,16 @@ class SheetSwipeToDismissTest extends UITestBase {
             return;
         }
         Class<?> implClass = Class.forName("com.codename1.impl.CodenameOneImplementation");
-        Field fillField = implClass.getDeclaredField("paintQueueFill");
-        Field queueField = implClass.getDeclaredField("paintQueue");
+        Field mainSurfaceField = implClass.getDeclaredField("mainSurface");
+        mainSurfaceField.setAccessible(true);
+        Object surface = mainSurfaceField.get(implementation);
+        Class<?> surfaceClass = surface.getClass();
+        Field fillField = surfaceClass.getDeclaredField("paintQueueFill");
+        Field queueField = surfaceClass.getDeclaredField("paintQueue");
         fillField.setAccessible(true);
         queueField.setAccessible(true);
-        int fill = fillField.getInt(implementation);
-        Object queue = queueField.get(implementation);
+        int fill = fillField.getInt(surface);
+        Object queue = queueField.get(surface);
 
         Component content = form.getContentPane();
         boolean covered = false;

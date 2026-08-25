@@ -367,42 +367,42 @@ final class BuildHintCatalogDefaults {
         set("{{#Android#android.xpermissions}}.description", "more permissions for the Android manifest");
         }
 
-        set("{{@Desktop}}.label", "Desktop");
+        set("{{@DesktopBuild}}.label", "Desktop");
         if (!handWritten.contains("desktop.adaptToRetina")) {
-        set("{{#Desktop#desktop.adaptToRetina}}.label", "Adapt to retina");
-        set("{{#Desktop#desktop.adaptToRetina}}.type", "Checkbox");
-        set("{{#Desktop#desktop.adaptToRetina}}.description", "Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. Will use higher DPI's");
+        set("{{#DesktopBuild#desktop.adaptToRetina}}.label", "Adapt to retina");
+        set("{{#DesktopBuild#desktop.adaptToRetina}}.type", "Checkbox");
+        set("{{#DesktopBuild#desktop.adaptToRetina}}.description", "Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. Will use higher DPI's");
         }
         if (!handWritten.contains("desktop.fullscreen")) {
-        set("{{#Desktop#desktop.fullscreen}}.label", "Fullscreen");
-        set("{{#Desktop#desktop.fullscreen}}.type", "Checkbox");
-        set("{{#Desktop#desktop.fullscreen}}.description", "Starts the desktop build in full-screen mode.");
+        set("{{#DesktopBuild#desktop.fullscreen}}.label", "Fullscreen");
+        set("{{#DesktopBuild#desktop.fullscreen}}.type", "Checkbox");
+        set("{{#DesktopBuild#desktop.fullscreen}}.description", "Starts the desktop build in full-screen mode.");
         }
         if (!handWritten.contains("desktop.height")) {
-        set("{{#Desktop#desktop.height}}.label", "Height");
-        set("{{#Desktop#desktop.height}}.type", "TextField");
-        set("{{#Desktop#desktop.height}}.description", "Height in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 600.");
+        set("{{#DesktopBuild#desktop.height}}.label", "Height");
+        set("{{#DesktopBuild#desktop.height}}.type", "TextField");
+        set("{{#DesktopBuild#desktop.height}}.description", "Height in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 600.");
         }
         if (!handWritten.contains("desktop.interactiveScrollbars")) {
-        set("{{#Desktop#desktop.interactiveScrollbars}}.label", "Interactive scrollbars");
-        set("{{#Desktop#desktop.interactiveScrollbars}}.type", "Checkbox");
-        set("{{#Desktop#desktop.interactiveScrollbars}}.description", "Enables grab-able, click-to-page desktop scrollbars.");
+        set("{{#DesktopBuild#desktop.interactiveScrollbars}}.label", "Interactive scrollbars");
+        set("{{#DesktopBuild#desktop.interactiveScrollbars}}.type", "Checkbox");
+        set("{{#DesktopBuild#desktop.interactiveScrollbars}}.description", "Enables grab-able, click-to-page desktop scrollbars.");
         }
         if (!handWritten.contains("desktop.resizable")) {
-        set("{{#Desktop#desktop.resizable}}.label", "Resizable");
-        set("{{#Desktop#desktop.resizable}}.type", "Checkbox");
-        set("{{#Desktop#desktop.resizable}}.description", "Boolean true/false defaults to true. Indicates whether the UI in the desktop build is resizable");
+        set("{{#DesktopBuild#desktop.resizable}}.label", "Resizable");
+        set("{{#DesktopBuild#desktop.resizable}}.type", "Checkbox");
+        set("{{#DesktopBuild#desktop.resizable}}.description", "Boolean true/false defaults to true. Indicates whether the UI in the desktop build is resizable");
         }
         if (!handWritten.contains("desktop.titleBar")) {
-        set("{{#Desktop#desktop.titleBar}}.label", "Title bar");
-        set("{{#Desktop#desktop.titleBar}}.type", "Select");
-        set("{{#Desktop#desktop.titleBar}}.values", "native,custom,toolbar");
-        set("{{#Desktop#desktop.titleBar}}.description", "How the desktop window is framed: native for the OS title bar and menu bar, custom for an undecorated window with a Codename One drawn title bar, or toolbar for the legacy in-app Toolbar. An unrecognized value falls back to native with a warning.");
+        set("{{#DesktopBuild#desktop.titleBar}}.label", "Title bar");
+        set("{{#DesktopBuild#desktop.titleBar}}.type", "Select");
+        set("{{#DesktopBuild#desktop.titleBar}}.values", "native,custom,toolbar");
+        set("{{#DesktopBuild#desktop.titleBar}}.description", "How the desktop window is framed: native for the OS title bar and menu bar, custom for an undecorated window with a Codename One drawn title bar, or toolbar for the legacy in-app Toolbar. An unrecognized value falls back to native with a warning.");
         }
         if (!handWritten.contains("desktop.width")) {
-        set("{{#Desktop#desktop.width}}.label", "Width");
-        set("{{#Desktop#desktop.width}}.type", "TextField");
-        set("{{#Desktop#desktop.width}}.description", "Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.");
+        set("{{#DesktopBuild#desktop.width}}.label", "Width");
+        set("{{#DesktopBuild#desktop.width}}.type", "TextField");
+        set("{{#DesktopBuild#desktop.width}}.description", "Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.");
         }
 
         set("{{@OnDeviceDebug}}.label", "On-Device Debugging");

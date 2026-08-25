@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
 /// re-run scripts/gen-build-hint-annotations.sh.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
-public @interface Desktop {
+public @interface DesktopBuild {
 
     /// Boolean true/false defaults to true. When set to true some values will ve
     /// implicitly doubled to deal with retina displays and icons etc. Will use

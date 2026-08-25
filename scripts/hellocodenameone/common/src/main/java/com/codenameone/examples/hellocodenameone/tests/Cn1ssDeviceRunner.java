@@ -480,6 +480,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // on the Mac native build it enables desktop mode (commands move to the native menu
             // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
             new DesktopModeScreenshotTest(),
+            // Desktop windowing. MultiWindowApiTest asserts behaviour on every target --
+            // where there is no windowing system it asserts the capability query says so
+            // and that constructing a Window throws. The Window* cases re-run
+            // representative UI INSIDE a real operating-system window at several sizes
+            // and capture that window rather than the main surface, which is the only
+            // way to prove layout, scrolling, graphics, overlays, native editing and
+            // modality actually work on a non-primary surface. They skip without
+            // emitting a golden where windows are unsupported, so mobile baselines never
+            // contain a picture of something the platform cannot do.
+            new MultiWindowApiTest(),
+            new WindowLayoutTest(),
+            new WindowScrollTest(),
+            new WindowGraphicsTest(),
+            new WindowEditingTest(),
+            new WindowOverlayTest(),
+            new WindowModalTest(),
             // VideoIO animation screenshot: encodes a 6-frame counting clip (digits
             // 1..6), decodes it back with the video decoder, and lays the decoded
             // frames out as a 2x3 grid -- so a decode regression is visible. Placed

@@ -765,8 +765,61 @@
         "Media360PanoramaScreenshotTest",
         "VRStereoSceneScreenshotTest"
       ]
+    },
+    {
+      "id": "multi-window",
+      "category": "Desktop integration",
+      "name": "Multiple native windows",
+      "description": "Opens additional native operating-system windows, each rendering its own component hierarchy, and checks layout, scrolling, graphics, layered overlays, native text editing and modality inside one.",
+      "tests": [
+        "MultiWindowApiTest",
+        "WindowLayoutTest",
+        "WindowScrollTest",
+        "WindowGraphicsTest",
+        "WindowEditingTest",
+        "WindowOverlayTest",
+        "WindowModalTest"
+      ]
     }
   ],
+  "test_scopes": {
+    "WindowLayoutTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowScrollTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowGraphicsTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowEditingTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowOverlayTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowModalTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ]
+  },
   "screenshot_mappings": [
     {
       "pattern": "kotlin",
@@ -1311,6 +1364,30 @@
     {
       "pattern": "Media360Panorama",
       "test": "Media360PanoramaScreenshotTest"
+    },
+    {
+      "pattern": "Window-Layout*",
+      "test": "WindowLayoutTest"
+    },
+    {
+      "pattern": "Window-Scroll*",
+      "test": "WindowScrollTest"
+    },
+    {
+      "pattern": "Window-Graphics*",
+      "test": "WindowGraphicsTest"
+    },
+    {
+      "pattern": "Window-Editing*",
+      "test": "WindowEditingTest"
+    },
+    {
+      "pattern": "Window-Overlay*",
+      "test": "WindowOverlayTest"
+    },
+    {
+      "pattern": "Window-Modal*",
+      "test": "WindowModalTest"
     }
   ]
 }

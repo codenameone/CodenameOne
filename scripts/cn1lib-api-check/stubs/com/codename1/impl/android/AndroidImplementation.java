@@ -24,8 +24,8 @@ package com.codename1.impl.android;
 
 /**
  * Compile-only stand-in for the Android port's class of the same name. See
- * {@link AndroidNativeUtil} for why the Ads SDK API check stubs these two
- * rather than depending on the port. Never packaged.
+ * {@link AndroidNativeUtil} for why the cn1lib API checks stub these two rather
+ * than depending on the port. Never packaged.
  *
  * <p>The signature below is checked against
  * {@code Ports/Android/src/com/codename1/impl/android/AndroidImplementation.java}

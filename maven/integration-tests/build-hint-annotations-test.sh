@@ -39,7 +39,7 @@ SETTINGS=common/codenameone_settings.properties
 # a build error, which is covered separately at the end of this test.
 echo "--- annotate the generated main class ---"
 perl -0pi -e 's/^import com\.codename1\.system\.Lifecycle;/import com.codename1.annotations.buildhints.*;\nimport com.codename1.system.Lifecycle;/m' $MAIN
-perl -0pi -e 's/^public class MyApp extends Lifecycle \{/\@Ios(pods = {"Alamofire", "SwiftyJSON"}, teamId = "ABCDE12345")\n\@Android(installLocation = InstallLocation.INTERNAL_ONLY)\n\@Desktop(width = 1280)\npublic class MyApp extends Lifecycle {/m' $MAIN
+perl -0pi -e 's/^public class MyApp extends Lifecycle \{/\@Ios(pods = {"Alamofire", "SwiftyJSON"}, teamId = "ABCDE12345")\n\@Android(installLocation = InstallLocation.INTERNAL_ONLY)\n\@DesktopBuild(width = 1280)\npublic class MyApp extends Lifecycle {/m' $MAIN
 grep -q "com.codename1.annotations.buildhints" $MAIN \
   || { echo "FAIL: could not add the import to $MAIN"; exit 1; }
 grep -q 'pods = {"Alamofire"' $MAIN || { echo "FAIL: could not annotate $MAIN"; head -40 $MAIN; exit 1; }

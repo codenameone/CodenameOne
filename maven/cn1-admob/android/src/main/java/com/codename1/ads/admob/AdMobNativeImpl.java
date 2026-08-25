@@ -28,7 +28,6 @@ import android.view.View;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
-import com.codename1.ui.PeerComponent;
 
 import com.google.ads.mediation.admob.AdMobAdapter;
 import com.google.android.gms.ads.AdError;
@@ -326,7 +325,12 @@ public class AdMobNativeImpl {
         ads.remove(handle);
     }
 
-    public PeerComponent createBanner(final int handle, final String adUnitId, final int sizeType, final int widthDp) {
+    /// Returns the raw Android view rather than a peer component. The
+    /// generated AdMobNativeStub wraps whatever this method returns in
+    /// PeerComponent.create(), so returning a peer here makes
+    /// AndroidImplementation.createNativePeer reject its own AndroidPeer with
+    /// an IllegalArgumentException the first time a banner is shown.
+    public View createBanner(final int handle, final String adUnitId, final int sizeType, final int widthDp) {
         final Activity activity = AndroidNativeUtil.getActivity();
         if (activity == null) {
             return null;
@@ -341,7 +345,7 @@ public class AdMobNativeImpl {
                 out[0] = adView;
             }
         });
-        return out[0] == null ? null : PeerComponent.create(out[0]);
+        return out[0];
     }
 
     private static AdSize mapSize(Activity activity, int sizeType, int widthDp) {

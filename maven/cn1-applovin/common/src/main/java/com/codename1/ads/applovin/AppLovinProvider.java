@@ -83,8 +83,10 @@ public class AppLovinProvider implements AdProvider {
 
     @Override
     public boolean isFormatSupported(AdFormat format) {
-        // Banner plus the four full screen formats; native ads are not yet wired.
-        return format != AdFormat.NATIVE;
+        // MAX has no rewarded-interstitial -- both bridges return false for it
+        // from createFullScreen -- and native ads are not wired, so neither can
+        // be promised here.
+        return format != AdFormat.REWARDED_INTERSTITIAL && format != AdFormat.NATIVE;
     }
 
     @Override

@@ -28,7 +28,6 @@ import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -42,6 +41,7 @@ import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.html.HTMLElement;
 import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Vector;
 
@@ -127,7 +127,13 @@ public class Ads extends Container implements HTMLCallback {
             });
 
             if (refreshAd) {
-                getComponentForm().registerAnimated(this);
+                // The top level rather than the form: getComponentForm() is null
+                // by design inside a Window, so this both threw and left the
+                // animation unregistered there.
+                TopLevelContainer topLevel = getTopLevelContainer();
+                if (topLevel != null) {
+                    topLevel.registerAnimated(this);
+                }
             } else {
                 requestAd();
             }
@@ -138,7 +144,13 @@ public class Ads extends Container implements HTMLCallback {
     @Override
     protected void deinitialize() {
         if (refreshAd) {
-            getComponentForm().deregisterAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.deregisterAnimated(this);
+            }
         }
     }
 
@@ -150,8 +162,11 @@ public class Ads extends Container implements HTMLCallback {
     /// {@inheritDoc}
     @Override
     public boolean animate() {
-        Form parent = getComponentForm();
-        if (parent == null || !parent.isVisible()) {
+        // The top level's visibility rather than an enclosing Form's: getComponentForm()
+        // is null by design inside a Window, so this returned immediately there and the
+        // refresh the registration had just been fixed to enable never actually ran.
+        TopLevelContainer parent = getTopLevelContainer();
+        if (parent == null || !parent.asContainer().isVisible()) {
             return false;
         }
         long t = System.currentTimeMillis();

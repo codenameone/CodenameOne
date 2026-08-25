@@ -71,7 +71,7 @@ import com.codename1.annotations.buildhints.*;
 
 @Android(themeMode = AndroidThemeMode.MODERN)
 @Build(nativeTheme = NativeThemeMode.MODERN)
-@Desktop(height = 820, titleBar = DesktopTitleBar.NATIVE, width = 1260)
+@DesktopBuild(height = 820, titleBar = DesktopTitleBar.NATIVE, width = 1260)
 @Ios(themeMode = IosThemeMode.MODERN)
 public class CertificateWizard extends Lifecycle {
     public enum Section { OVERVIEW, CREDENTIAL, CERTIFICATES, BUNDLES, DEVICES, PROFILES, APNS, MAC, ANDROID, WINDOWS, MAINTENANCE }
