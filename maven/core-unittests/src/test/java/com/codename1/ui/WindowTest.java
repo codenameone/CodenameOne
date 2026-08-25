@@ -2826,6 +2826,46 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void arrowKeysStayInsideAWholeWindowOverlay() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("overlay traversal", new BorderLayout());
+        w.setWindowSize(400, 300);
+
+        // Behind the overlay.
+        Button behind = new Button("behind");
+        w.add(BorderLayout.CENTER, behind);
+
+        // The whole-window overlay -- what getFormLayeredPane() installs, where a
+        // form-mode InteractionDialog or a side menu lives. It is a sibling of the
+        // content pane, so getActualPane() cannot reach it and the content-area
+        // layeredPane is not it either.
+        Container overlay = w.getFormLayeredPane(Window.class, true);
+        Button top = new Button("top");
+        Button bottom = new Button("bottom");
+        overlay.setLayout(new BorderLayout());
+        overlay.add(BorderLayout.NORTH, top);
+        overlay.add(BorderLayout.SOUTH, bottom);
+
+        w.show();
+        DisplayTest.flushEdt();
+        try {
+            w.setFocused(top);
+            w.asContainer().revalidate();
+            DisplayTest.flushEdt();
+
+            // Down from a control in the overlay has to reach the other control in the
+            // overlay, not the component behind it.
+            Desktop.getInstance().windowKeyPressed(w.getWindowId(), Display.GAME_DOWN);
+            Desktop.getInstance().windowKeyReleased(w.getWindowId(), Display.GAME_DOWN);
+            DisplayTest.flushEdt();
+            assertSame(bottom, w.getFocused(),
+                    "traversal has to search the whole-window overlay before what is under it");
+        } finally {
+            w.dispose();
+        }
+    }
+
+    @FormTest
     void arrowKeysMoveFocusBetweenAWindowsControls() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("keyboard", new BoxLayout(BoxLayout.Y_AXIS));

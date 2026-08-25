@@ -3692,6 +3692,18 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusVertical(boolean down) {
         Component c;
+        // The whole-window overlay first, which is what Form does with its own
+        // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
+        // installed through getFormLayeredPane() lives here, NOT in the content-area
+        // layeredPane below -- and it is a sibling of the content pane, so getActualPane()
+        // cannot reach it either. Searching only the other two moved focus to a component
+        // behind the overlay, or failed to reach a second control inside it.
+        if (windowLayeredPane != null) {
+            c = TopLevelSupport.findNextFocusVertical(focused, null, windowLayeredPane, down);
+            if (c != null) {
+                return c;
+            }
+        }
         if (layeredPane != null) {
             c = TopLevelSupport.findNextFocusVertical(focused, null, layeredPane, down);
             if (c != null) {
@@ -3728,6 +3740,18 @@ public class Window extends Container implements TopLevelContainer {
     /// the next focusable component, or null
     private Component findNextFocusHorizontal(boolean right) {
         Component c;
+        // The whole-window overlay first, which is what Form does with its own
+        // formLayeredPane. A form-mode InteractionDialog, a side menu and anything else
+        // installed through getFormLayeredPane() lives here, NOT in the content-area
+        // layeredPane below -- and it is a sibling of the content pane, so getActualPane()
+        // cannot reach it either. Searching only the other two moved focus to a component
+        // behind the overlay, or failed to reach a second control inside it.
+        if (windowLayeredPane != null) {
+            c = TopLevelSupport.findNextFocusHorizontal(focused, null, windowLayeredPane, right);
+            if (c != null) {
+                return c;
+            }
+        }
         if (layeredPane != null) {
             c = TopLevelSupport.findNextFocusHorizontal(focused, null, layeredPane, right);
             if (c != null) {
