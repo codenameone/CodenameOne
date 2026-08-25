@@ -569,6 +569,35 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void markupInsideACdataSectionIsNotADeclaration() {
+        // Character data that happens to look like markup. The element search excluded
+        // only XML comments, so this was read as a live declaration: plistDeclaresKey
+        // said a manifest was present, plistManifestScope then found nothing at the
+        // fragment root, and an entirely valid Catalyst build was refused for having a
+        // manifest that "is not a <dict>".
+        String inject = "<key>SomeUnrelatedString</key>\n"
+                + "<string><![CDATA[<key>UIApplicationSceneManifest</key>]]></string>\n";
+        assertNull(IPhoneBuilder.sceneManifestRejection(inject),
+                "CDATA content is character data, not a manifest declaration");
+    }
+
+    @Test
+    void aCommentOpenerInsideCdataDoesNotHideTheRestOfTheFragment() {
+        // The old check searched BACKWARDS for "<!--". A "<!--" written inside CDATA is
+        // literal text, but it looked like an unterminated comment, so everything after
+        // it became invisible -- including a genuinely malformed manifest, which was
+        // then accepted and shipped as a Window-less build.
+        String inject = "<key>SomeUnrelatedString</key>\n"
+                + "<string><![CDATA[<!-- not really a comment]]></string>\n"
+                + "<key>UIApplicationSceneManifest</key>\n"
+                + "<string>not a dictionary</string>\n";
+        String rejection = IPhoneBuilder.sceneManifestRejection(inject);
+        assertNotNull(rejection,
+                "the manifest after the CDATA section is still there and is still wrong");
+        assertTrue(rejection.contains("<dict>"), rejection);
+    }
+
+    @Test
     void theMacSliceDropsAnInjectedMainNibThatShadowsTheTemplateOne() {
         // ios.plistInject appends its members after the template's, so a project that
         // injects its own NSMainNibFile produces a root dictionary carrying the key

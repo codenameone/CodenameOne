@@ -11559,13 +11559,21 @@ public class IPhoneBuilder extends Executor {
         return gt < 0 ? -1 : gt + 1;
     }
 
-    /// Index of the first occurrence of `needle` at or after `from` that is not inside
-    /// a comment, or -1.
+    /// Index of the first occurrence of `needle` at or after `from` that is really
+    /// markup -- not inside a comment and not inside a CDATA section -- or -1.
     ///
     /// Every one of these checks needs the same thing -- text that is really there,
-    /// rather than text someone commented out -- so they share this rather than each
-    /// deciding for itself. Three separate `indexOf` calls is how the role ended up
-    /// comment-aware while the delegate name beneath it was not.
+    /// rather than text that only looks like markup -- so they share this rather than
+    /// each deciding for itself. Three separate `indexOf` calls is how the role ended
+    /// up comment-aware while the delegate name beneath it was not.
+    ///
+    /// CDATA counts as much as a comment. `<![CDATA[<key>UIApplicationSceneManifest</key>]]>`
+    /// inside some unrelated injected string is character data, not a declaration, and
+    /// reading it as one made `#sceneManifestRejection(String)` believe a manifest had
+    /// been declared, fail to find it at the fragment root, and refuse a Catalyst build
+    /// that was perfectly valid. Delegating to the shared scanner also drops the old
+    /// backwards `lastIndexOf("<!--")` heuristic, which read a `<!--` written INSIDE a
+    /// CDATA section as if it opened a real comment.
     ///
     /// #### Parameters
     ///
@@ -11579,23 +11587,25 @@ public class IPhoneBuilder extends Executor {
     ///
     /// the index of the first live occurrence, or -1
     static int plistIndexOfLive(String plist, String needle, int from) {
-        int at = plist.indexOf(needle, from);
-        while (at >= 0) {
-            if (!plistIndexIsCommented(plist, at)) {
-                return at;
+        int i = from;
+        while (i <= plist.length()) {
+            int at = plist.indexOf(needle, i);
+            if (at < 0) {
+                return -1;
             }
-            at = plist.indexOf(needle, at + needle.length());
+            int skipped = WatchNativeBuilder.skipMarkupBefore(plist, at, i);
+            if (skipped < 0) {
+                // Unterminated comment or CDATA: nothing after it can be located
+                // reliably, so the needle is treated as absent rather than guessed at.
+                return -1;
+            }
+            if (skipped != at) {
+                i = skipped;
+                continue;
+            }
+            return at;
         }
         return -1;
-    }
-
-    private static boolean plistIndexIsCommented(String plist, int index) {
-        int open = plist.lastIndexOf("<!--", index);
-        if (open < 0) {
-            return false;
-        }
-        int close = plist.indexOf("-->", open);
-        return close < 0 || close > index;
     }
 
     /// The name of the next element opening at or after `from`, or null if there is
