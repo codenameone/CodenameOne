@@ -1207,46 +1207,85 @@ public class BuildHintCatalogTest {
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
 
-    /// A `typealias` is top-level but not global: another package's declaration
-    /// is invisible unless imported. Taking every Kotlin file in the project let
-    /// an alias declared in an unrelated package vouch for a same-named
-    /// annotation the main class really does write itself, so the hint read as
-    /// owned when nothing owns it -- which hides the editor and is
-    /// indistinguishable from the tool being broken.
+    /// A `typealias` is top-level but not global, and visibility is per SYMBOL
+    /// rather than per package: `import com.other.Unrelated` exposes nothing
+    /// else from `com.other`, and `import com.other.AppIos as Custom` exposes
+    /// that one under `Custom`. A package-level answer was wrong both ways --
+    /// it let an unrelated import expose an alias, hiding the editor for a hint
+    /// nothing owns, and it lost the renamed name so a real annotation went
+    /// unrecognised and Add wrote the duplicate.
     @Test
-    public void anAliasInAnotherPackageIsNotVisible() {
-        String main = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+    public void aliasVisibilityIsPerSymbol() {
+        String elsewhere = "package com.other\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+        java.util.List<String> others = java.util.Collections.singletonList(elsewhere);
 
-        // Same package: visible.
-        assertTrue(CodenameOneSettings.visibleTo(main,
-                "package com.example\ntypealias AppIos = Ios\n"));
+        // Not imported at all: invisible.
+        String plain = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(plain, others), "Ios", true).isEmpty());
 
-        // Another package, not imported: not visible.
-        assertFalse(CodenameOneSettings.visibleTo(main,
-                "package com.other\ntypealias AppIos = Ios\n"));
+        // Another symbol from the same package: still invisible.
+        String unrelated = "package com.example\n"
+                + "import com.other.Unrelated\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(unrelated, others), "Ios", true).isEmpty());
 
-        // Another package, imported by name: visible.
-        String importing = "package com.example\n"
+        // Named: visible under its own name.
+        String named = "package com.example\n"
                 + "import com.other.AppIos\n"
                 + "@AppIos(teamId = \"X\")\nclass MyApp\n";
-        assertTrue(CodenameOneSettings.visibleTo(importing,
-                "package com.other\ntypealias AppIos = Ios\n"));
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(named, others), "Ios", true));
 
-        // ...and on demand.
+        // Renamed: visible under the NEW name, and not under the old one.
+        String renamed = "package com.example\n"
+                + "import com.other.AppIos as Custom\n"
+                + "@Custom(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("Custom"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(renamed, others), "Ios", true));
+
+        // On demand: visible under its own name.
         String wildcard = "package com.example\n"
                 + "import com.other.*\n"
                 + "@AppIos(teamId = \"X\")\nclass MyApp\n";
-        assertTrue(CodenameOneSettings.visibleTo(wildcard,
-                "package com.other\ntypealias AppIos = Ios\n"));
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(wildcard, others), "Ios", true));
 
-        // An import from a DIFFERENT package does not make com.other visible.
-        String elsewhere = "package com.example\n"
-                + "import com.third.Thing\n"
-                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
-        assertFalse(CodenameOneSettings.visibleTo(elsewhere,
-                "package com.other\ntypealias AppIos = Ios\n"));
+        // Same package needs no import.
+        String samePackage = "package com.other\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(samePackage, others), "Ios", true));
+    }
 
-        // Two default-package files see each other.
-        assertTrue(CodenameOneSettings.visibleTo("class MyApp\n", "typealias AppIos = Ios\n"));
+    /// A chain resolves in the package it is written in, and only its visible
+    /// end reaches the main file -- under whatever name the import gives it.
+    @Test
+    public void aChainResolvesInItsOwnScope() {
+        String elsewhere = "package com.other\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias Base = Ios\n"
+                + "typealias AppIos = Base\n";
+        String main = "package com.example\n"
+                + "import com.other.AppIos as Custom\n"
+                + "@Custom(teamId = \"ABCDE12345\")\nclass MyApp\n";
+
+        // Custom resolves; Base, which the main file cannot name, does not leak.
+        assertEquals(java.util.Collections.singletonList("Custom"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(elsewhere)),
+                        "Ios", true));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(elsewhere));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
 }

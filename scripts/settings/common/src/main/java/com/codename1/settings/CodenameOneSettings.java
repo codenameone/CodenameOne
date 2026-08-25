@@ -2321,7 +2321,7 @@ public class CodenameOneSettings extends Lifecycle {
                 }
                 collectAnnotationOwnedHints(text, out, ext.equals(".kt"),
                         ext.equals(".kt")
-                                ? visibleKotlinSources(binding.projectDir(), path, text) : null);
+                                ? otherKotlinSources(binding.projectDir(), path) : null);
                 return out;
             }
         }
@@ -2335,7 +2335,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (found != null) {
             collectAnnotationOwnedHints(found, out, lastSourceWasKotlin,
                     lastSourceWasKotlin
-                            ? visibleKotlinSources(binding.projectDir(), lastSourcePath, found)
+                            ? otherKotlinSources(binding.projectDir(), lastSourcePath)
                             : null);
             return out;
         }
@@ -2351,54 +2351,6 @@ public class CodenameOneSettings extends Lifecycle {
     /// The path findMainClassSource read, so it can be left out of the sweep for
     /// declarations made elsewhere.
     private String lastSourcePath;
-
-    /// The other Kotlin sources whose top-level declarations the main source can
-    /// actually SEE: its own package, or a package it imports from.
-    ///
-    /// A `typealias` is top-level, not file-scoped, but it is not global either.
-    /// Taking every Kotlin file in the project let an alias declared in an
-    /// unrelated package vouch for a same-named annotation the main class
-    /// really does write itself -- and the hint then read as owned when nothing
-    /// owns it, which hides the editor and is indistinguishable from the tool
-    /// being broken.
-    private java.util.List<String> visibleKotlinSources(String projectDir, String exclude,
-                                                        String mainSource) {
-        java.util.List<String> out = new java.util.ArrayList<>();
-        for (String text : otherKotlinSources(projectDir, exclude)) {
-            if (visibleTo(mainSource, text)) {
-                out.add(text);
-            }
-        }
-        return out;
-    }
-
-    /// Whether `mainSource` can see `other`'s top-level declarations: same
-    /// package, or a package it imports from.
-    static boolean visibleTo(String mainSource, String other) {
-        String pkg = declaredPackageIn(other, true);
-        return pkg.equals(declaredPackageIn(mainSource, true))
-                || importsFromPackage(mainSource, pkg);
-    }
-
-    /// Whether `source` imports anything from `pkg` -- a named type or the
-    /// package on demand. An explicit import is how a declaration from another
-    /// package becomes visible at all.
-    private static boolean importsFromPackage(String source, String pkg) {
-        if (pkg == null || pkg.isEmpty()) {
-            return false;
-        }
-        String prefix = pkg + ".";
-        for (Imported imported : importsIn(source, true)) {
-            if (!imported.name.startsWith(prefix)) {
-                continue;
-            }
-            String rest = imported.name.substring(prefix.length());
-            if (rest.indexOf('.') < 0) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     /// The text of every OTHER Kotlin source in the project, bounded.
     ///
@@ -2888,7 +2840,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// and use only the second.
     static java.util.List<String> kotlinTypeAliases(String source, String simple,
                                                     boolean kotlin) {
-        return kotlinTypeAliases(java.util.Collections.singletonList(source), simple, kotlin);
+        return kotlinTypeAliases(visibleTypeAliases(source, null), simple, kotlin);
     }
 
     /// Every name that resolves to `simple`, across all of `sources`, following
@@ -2901,49 +2853,143 @@ public class CodenameOneSettings extends Lifecycle {
     /// refuses. Resolved by closure rather than by recursion so that a cycle --
     /// which the compiler rejects, but this reader must not hang on -- simply
     /// stops adding names.
-    static java.util.List<String> kotlinTypeAliases(java.util.List<String> sources, String simple,
-                                                    boolean kotlin) {
+    /// A `typealias`, with where it was written and the name the main file sees
+    /// it under.
+    ///
+    /// The two names differ because an import may rename it: `import
+    /// com.other.AppIos as Custom` makes `com.other`'s `AppIos` usable only as
+    /// `Custom`, so the file that declares it and the file that writes the
+    /// annotation disagree about what it is called.
+    static final class AliasDeclaration {
+        /// The name in the file that declares it, which its own chain uses.
+        final String local;
+        /// The name the main file writes, or null when it cannot see this one.
+        final String visible;
+        final String target;
+        /// The package it is declared in, which is the scope its chain resolves
+        /// in -- a chain may span files, but only within one package.
+        final String scope;
+        /// The text that declares it, whose imports decide what its target names.
+        final String owner;
+
+        AliasDeclaration(String local, String visible, String target, String scope, String owner) {
+            this.local = local;
+            this.visible = visible;
+            this.target = target;
+            this.scope = scope;
+            this.owner = owner;
+        }
+    }
+
+    /// Every `typealias` `mainSource` can see, with the name it sees it under.
+    ///
+    /// Visibility is per SYMBOL, not per package: `import com.other.Unrelated`
+    /// exposes nothing else from `com.other`, and `import com.other.AppIos as
+    /// Custom` exposes that one under `Custom`. Reducing this to "does the main
+    /// file import anything from that package" was wrong in both directions --
+    /// it let an unrelated import expose an alias that hides the editor for a
+    /// hint nothing owns, and it lost the local name of a renamed one so a real
+    /// annotation went unrecognised and Add wrote the duplicate.
+    static java.util.List<AliasDeclaration> visibleTypeAliases(String mainSource,
+                                                               java.util.List<String> others) {
+        java.util.List<AliasDeclaration> out = new java.util.ArrayList<>();
+        if (mainSource == null) {
+            return out;
+        }
+        String mainPkg = declaredPackageIn(mainSource, true);
+        for (String[] declared : typeAliasDeclarations(mainSource, true)) {
+            out.add(new AliasDeclaration(declared[0], declared[0], declared[1], mainPkg,
+                    mainSource));
+        }
+        if (others == null) {
+            return out;
+        }
+        java.util.List<Imported> imports = importsIn(mainSource, true);
+        for (String other : others) {
+            if (other == null) {
+                continue;
+            }
+            String pkg = declaredPackageIn(other, true);
+            boolean samePackage = pkg.equals(mainPkg);
+            for (String[] declared : typeAliasDeclarations(other, true)) {
+                String visible = samePackage ? declared[0]
+                        : importedNameOf(imports, pkg, declared[0]);
+                // Kept even when invisible: it may still be a LINK in a chain
+                // whose visible end is imported, and that chain resolves in the
+                // package it is written in.
+                out.add(new AliasDeclaration(declared[0], visible, declared[1], pkg, other));
+            }
+        }
+        return out;
+    }
+
+    /// The name `imports` gives `pkg`.`simple`, or null when none of them does.
+    ///
+    /// A named import wins over an on-demand one, since it is the more specific
+    /// statement about that symbol and may rename it.
+    private static String importedNameOf(java.util.List<Imported> imports, String pkg,
+                                         String simple) {
+        String qualified = pkg == null || pkg.isEmpty() ? simple : pkg + "." + simple;
+        String onDemand = null;
+        for (Imported imported : imports) {
+            if (imported.name.equals(qualified)) {
+                return imported.alias != null ? imported.alias : simple;
+            }
+            if (imported.name.equals(pkg + ".*")) {
+                onDemand = simple;
+            }
+        }
+        return onDemand;
+    }
+
+    /// Every name that resolves to `simple`, following a CHAIN of aliases.
+    ///
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate declaration the next build
+    /// refuses. Resolved by closure rather than by recursion so that a cycle --
+    /// which the compiler rejects, but this reader must not hang on -- simply
+    /// stops adding names.
+    ///
+    /// The chain is followed by the LOCAL name within one package, which is the
+    /// scope a top-level declaration resolves in, and only names the main file
+    /// can actually see are returned.
+    static java.util.List<String> kotlinTypeAliases(java.util.List<AliasDeclaration> declarations,
+                                                    String simple, boolean kotlin) {
         java.util.List<String> out = new java.util.ArrayList<String>();
-        if (!kotlin || sources == null) {
+        if (!kotlin || declarations == null) {
             return out;
         }
         String qualified = "com.codename1.annotations.buildhints." + simple;
-        java.util.List<String[]> declarations = new java.util.ArrayList<String[]>();
-        for (String source : sources) {
-            if (source == null) {
-                continue;
-            }
+        java.util.List<String> resolved = new java.util.ArrayList<String>();
+        java.util.List<AliasDeclaration> pending = new java.util.ArrayList<>();
+        for (AliasDeclaration declared : declarations) {
             // The bare name counts only where an import makes it ours, and that
-            // import is file-scoped -- so it is decided per source, here, rather
-            // than once for the whole sweep.
-            boolean imported = importsAnnotation(source, simple, kotlin);
-            // `import ...Ios as Base` then `typealias AppIos = Base` is legal,
-            // and the compiled annotation is still ours. Collecting the two
-            // kinds of alias into one list left the typealias unresolved,
-            // because its right-hand side names the IMPORT alias rather than the
-            // annotation -- so the closure is seeded with them instead.
-            //
-            // Per source, since an import applies only to the file that writes
-            // it: a typealias elsewhere naming the same word is not this one.
-            java.util.List<String> importedAs = kotlinImportAliases(source, simple, kotlin);
-            for (String[] declared : typeAliasDeclarations(source, kotlin)) {
-                if (declared[1].equals(qualified) || (imported && declared[1].equals(simple))
-                        || importedAs.contains(declared[1])) {
-                    if (!out.contains(declared[0])) {
-                        out.add(declared[0]);
-                    }
-                } else {
-                    declarations.add(declared);
-                }
+            // import is file-scoped -- so it is decided per owner, here, rather
+            // than once for the whole sweep. `import ...Ios as Base` then
+            // `typealias AppIos = Base` is the same point one step along.
+            boolean imported = importsAnnotation(declared.owner, simple, kotlin);
+            java.util.List<String> importedAs = kotlinImportAliases(declared.owner, simple, kotlin);
+            if (declared.target.equals(qualified)
+                    || (imported && declared.target.equals(simple))
+                    || importedAs.contains(declared.target)) {
+                add(resolved, declared.scope + "\u0000" + declared.local);
+                add(out, declared.visible);
+            } else {
+                pending.add(declared);
             }
         }
         // Each pass can only resolve one more link, so the number of passes is
         // bounded by the number of declarations left over.
-        for (int pass = 0; pass < declarations.size(); pass++) {
+        for (int pass = 0; pass < pending.size(); pass++) {
             boolean grew = false;
-            for (String[] declared : declarations) {
-                if (!out.contains(declared[0]) && out.contains(declared[1])) {
-                    out.add(declared[0]);
+            for (AliasDeclaration declared : pending) {
+                String key = declared.scope + "\u0000" + declared.local;
+                if (!resolved.contains(key)
+                        && resolved.contains(declared.scope + "\u0000" + declared.target)) {
+                    resolved.add(key);
+                    add(out, declared.visible);
                     grew = true;
                 }
             }
@@ -2952,6 +2998,12 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return out;
+    }
+
+    private static void add(java.util.List<String> out, String value) {
+        if (value != null && !out.contains(value)) {
+            out.add(value);
+        }
     }
 
     /// Every `typealias Name = Target` in `source`, as {name, target}.
@@ -3050,12 +3102,8 @@ public class CodenameOneSettings extends Lifecycle {
             // One closure over every source, not one per file: a chain may cross
             // files, with the link that names our annotation in one and the link
             // that the main class writes in another.
-            java.util.List<String> forAliases = new java.util.ArrayList<String>();
-            forAliases.add(source);
-            if (otherSources != null) {
-                forAliases.addAll(otherSources);
-            }
-            aliases.addAll(kotlinTypeAliases(forAliases, simple, kotlin));
+            aliases.addAll(kotlinTypeAliases(visibleTypeAliases(source, otherSources),
+                    simple, kotlin));
             // The simple name only counts when an import makes it OUR annotation.
             // @Build and @Android are ordinary enough names that another library's
             // annotation with a matching attribute would otherwise be read as
