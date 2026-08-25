@@ -14,6 +14,13 @@ set -uo pipefail
 # bounds; the command is always attempted at least once and the last attempt's
 # exit status is what this script returns.
 #
+# The delay DOUBLES after each failure (30s, 60s, 120s ...). A 403 from Central is
+# a rate-limit response, not a blip: it keeps rejecting the runner's IP for as long
+# as the throttle holds, so a flat delay just spends every attempt inside the same
+# outage window. The errorprone job burned all three 30s-apart attempts that way.
+# Backing off costs nothing when the command succeeds, and only lengthens the tail
+# of a run that was going to fail anyway.
+#
 # RETRY_ONLY_MATCHING is an extended regex that narrows retrying to failures
 # whose output matches it -- for steps that RUN TESTS, where a blanket retry
 # would quietly convert a flaky test into a pass and hide exactly the kind of
@@ -71,6 +78,7 @@ while [ "$attempt" -le "$attempts" ]; do
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
       "retrying in ${delay}s (possible transient Maven Central 403/429/5xx)" >&2
     sleep "$delay"
+    delay=$((delay * 2))
   fi
   attempt=$((attempt + 1))
 done
