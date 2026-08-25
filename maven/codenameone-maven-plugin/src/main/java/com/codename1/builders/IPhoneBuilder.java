@@ -12467,7 +12467,7 @@ public class IPhoneBuilder extends Executor {
     ///
     /// #### Returns
     ///
-    /// the string's text, trimmed, or null
+    /// the string's text with its XML character data resolved, trimmed, or null
     static String plistStringValueAfter(String plist, int from) {
         if (!"string".equals(nextElementName(plist, from))) {
             return null;
@@ -12485,7 +12485,14 @@ public class IPhoneBuilder extends Executor {
         if (close < 0) {
             return null;
         }
-        return plist.substring(contentStart, close).trim();
+        // The value a plist parser reads, not its serialization:
+        // <string><![CDATA[CodenameOne_GLSceneDelegate]]></string> and
+        // CodenameOne_GLSceneDelegat&#x65; both name that delegate. Comparing the raw
+        // text made plistManifestWiresWindowScene report another delegate and reject a
+        // correctly configured manifest. Same helper the key comparisons use, so the
+        // two sides of a member agree about what its text is. It trims on both of its
+        // paths, so the explicit trim is not lost.
+        return WatchNativeBuilder.plistStringContent(plist.substring(contentStart, close));
     }
 
     private void injectToPlist(File tmpFile, File resDir, BuildRequest request)

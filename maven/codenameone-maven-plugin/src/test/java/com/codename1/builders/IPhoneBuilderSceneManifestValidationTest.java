@@ -569,6 +569,31 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    void aDelegateNameSpelledWithCharacterDataStillNamesThatDelegate() {
+        // The value side of the same question. A plist parser reads both of these as
+        // CodenameOne_GLSceneDelegate, so the manifest is correctly wired; comparing the
+        // raw serialization reported some other delegate and refused the build.
+        String cdata = manifest(
+                "    <key>UIApplicationSupportsMultipleScenes</key>\n    <true/>\n"
+                + "    <key>UISceneConfigurations</key>\n    <dict>\n"
+                + "        <key>UIWindowSceneSessionRoleApplication</key>\n"
+                + "        <array>\n"
+                + "            <dict>\n"
+                + "                <key>UISceneDelegateClassName</key>\n"
+                + "                <string><![CDATA[CodenameOne_GLSceneDelegate]]></string>\n"
+                + "            </dict>\n"
+                + "        </array>\n"
+                + "    </dict>\n");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(document(cdata))),
+                "a CDATA-spelled delegate name still names that delegate");
+
+        String entity = cdata.replace("<![CDATA[CodenameOne_GLSceneDelegate]]>",
+                "CodenameOne_GLSceneDelegat&#x65;");
+        assertTrue(IPhoneBuilder.plistManifestWiresWindowScene(rootBody(document(entity))),
+                "and so does one whose last letter is a character reference");
+    }
+
+    @Test
     void aKeySpelledWithCdataIsStillThatKey() {
         // A plist parser resolves <key><![CDATA[NSMainNibFile]]></key> to NSMainNibFile,
         // so this IS a main NIB declaration. Matching the raw serialization missed it,
