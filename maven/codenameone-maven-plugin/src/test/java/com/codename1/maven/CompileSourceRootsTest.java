@@ -76,8 +76,11 @@ public class CompileSourceRootsTest {
         // plugin compiles.
         assertTrue(roots.toString(), contains(roots, basedir, "src/main/java"));
         assertTrue(roots.toString(), contains(roots, basedir, "src/main/kotlin"));
-        assertTrue(roots.toString(), contains(roots, basedir, "src/shared/kotlin"));
         assertTrue(roots.toString(), contains(roots, basedir, "src/extra/kotlin"));
+        // NOT the plugin-level list: the compile execution supplies its own, and
+        // Maven merges by element rather than appending. See
+        // aKotlinExecutionsSourceDirsReplaceThePluginLevelOnes.
+        assertFalse(roots.toString(), contains(roots, basedir, "src/shared/kotlin"));
 
         // NOT the test execution's: a same-named test fixture would then make a
         // deleted production class look like it still has a source.
@@ -121,5 +124,55 @@ public class CompileSourceRootsTest {
     private static boolean contains(List<String> roots, File basedir, String relative) {
         return roots != null
                 && roots.contains(new File(basedir, relative).getAbsolutePath());
+    }
+
+    /**
+     * Maven merges configuration by element, so a `compile` execution's
+     * `<sourceDirs>` replaces the plugin-level list. Adding both put a
+     * directory the build does not compile into the roots, where a source left
+     * behind can make a stale annotated class look live.
+     */
+    @Test
+    public void aKotlinExecutionsSourceDirsReplaceThePluginLevelOnes() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setConfiguration(config("<sourceDirs><d>src/plugin-level</d></sourceDirs>"));
+        kotlin.addExecution(execution("compile", "<sourceDirs><d>src/execution</d></sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertTrue(roots.toString(), contains(roots, basedir, "src/execution"));
+        assertFalse(roots.toString(), contains(roots, basedir, "src/plugin-level"));
+    }
+
+    /**
+     * `${project.basedir}/appsrc` is an ordinary way to write a root, and
+     * dropping it outright is a main class the migration cannot find. Maven
+     * usually interpolates these while building the model, so this is normally
+     * a no-op -- but a value that arrives unexpanded must not be discarded.
+     */
+    @Test
+    public void projectExpressionsInAConfiguredRootAreResolved() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.getBuild().setDirectory(new File(basedir, "out").getAbsolutePath());
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.setConfiguration(config("<sourceDirs>"
+                + "<a>${project.basedir}/appsrc</a>"
+                + "<b>${project.build.directory}/generated-sources</b>"
+                + "<c>${nobody.knows}/x</c>"
+                + "</sourceDirs>"));
+        project.getBuild().addPlugin(kotlin);
+
+        List<String> roots = AbstractCN1Mojo.compileSourceRoots(project);
+        assertTrue(roots.toString(), contains(roots, basedir, "appsrc"));
+        assertTrue(roots.toString(), contains(roots, basedir, "out/generated-sources"));
+        // What it cannot resolve it still leaves alone rather than guessing.
+        assertFalse(roots.toString(), roots.toString().contains("nobody.knows"));
     }
 }

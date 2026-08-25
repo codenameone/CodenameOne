@@ -1255,6 +1255,36 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         }
     }
 
+    /**
+     * A configured path with the project expressions Maven resolves the same
+     * way every time applied, or null when it is empty or still holds one this
+     * cannot resolve.
+     *
+     * <p>Maven usually interpolates these while building the model, so this is
+     * normally a no-op -- but a value that arrives unexpanded was being dropped
+     * outright, and `${project.basedir}/appsrc` is an ordinary way to write a
+     * root. A root dropped here is a main class the migration cannot find.</p>
+     */
+    private static String expandProjectExpressions(MavenProject project, String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String out = value.trim();
+        String basedir = project.getBasedir() == null ? null
+                : project.getBasedir().getAbsolutePath();
+        String build = project.getBuild() == null ? null : project.getBuild().getDirectory();
+        if (basedir != null) {
+            out = out.replace("${project.basedir}", basedir)
+                    .replace("${project.baseDir}", basedir)
+                    .replace("${basedir}", basedir)
+                    .replace("${pom.basedir}", basedir);
+        }
+        if (build != null) {
+            out = out.replace("${project.build.directory}", build);
+        }
+        return out.indexOf('$') >= 0 ? null : out;
+    }
+
     /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
     private static void addKotlinSourceDirs(MavenProject project, List<String> roots) {
         List<org.apache.maven.model.Plugin> plugins;
@@ -1270,22 +1300,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            addSourceDirsFrom(project, plugin.getConfiguration(), roots);
-            if (plugin.getExecutions() == null) {
-                continue;
-            }
-            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                // The `compile` goal only. A `test-compile` execution's
-                // sourceDirs are src/test/kotlin and friends, and adding them
-                // here made a deleted production class look like it still had a
-                // source -- because a same-named test fixture does -- so a stale
-                // class under target/classes kept failing the build on a
-                // misplaced annotation no production source declares.
-                List<String> goals = execution.getGoals();
-                if (goals == null || !goals.contains("compile")) {
-                    continue;
-                }
-                addSourceDirsFrom(project, execution.getConfiguration(), roots);
+            // The same selection build-helper uses: the `compile` goal only --
+            // a `test-compile` execution's sourceDirs are src/test/kotlin and
+            // friends, and adding them made a deleted production class look
+            // like it still had a source -- and within an execution the
+            // configuration levels override rather than accumulate.
+            for (Object configuration : configurationsFor(plugin, "compile", "sourceDirs")) {
+                addSourceDirsFrom(project, configuration, roots);
             }
         }
     }
@@ -1306,12 +1327,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     private static void addRoot(MavenProject project, String value, List<String> roots) {
-        if (value == null || value.trim().isEmpty() || value.indexOf('$') >= 0) {
+        String path = expandProjectExpressions(project, value);
+        if (path == null) {
             return;
         }
-        File f = new File(value.trim());
+        File f = new File(path);
         if (!f.isAbsolute() && project.getBasedir() != null) {
-            f = new File(project.getBasedir(), value.trim());
+            f = new File(project.getBasedir(), path);
         }
         if (!roots.contains(f.getAbsolutePath())) {
             roots.add(f.getAbsolutePath());
