@@ -57,7 +57,6 @@ int mallocWhileSuspended = 0;
 static CodenameOne_GLViewController *singletonInstance = nil;
 
 @implementation CodenameOne_GLViewController {
-    CGRect macFlushRect;
 }
 
 @synthesize animationFrameInterval;
@@ -149,8 +148,6 @@ static CodenameOne_GLViewController *singletonInstance = nil;
                 // appends.
                 [currentTarget addObjectsFromArray:upcomingTarget];
                 [upcomingTarget removeAllObjects];
-                CGRect r = CGRectMake(x, y, width, height);
-                macFlushRect = CGRectIsEmpty(macFlushRect) ? r : CGRectUnion(macFlushRect, r);
             }
         }
         [self drawFrame:CGRectMake(x, y, width, height)];
@@ -198,12 +195,9 @@ static CodenameOne_GLViewController *singletonInstance = nil;
         return;
     }
     NSArray *ops;
-    CGRect flushRect;
     @synchronized (self) {
         ops = [currentTarget copy];
-        flushRect = macFlushRect;
         [currentTarget removeAllObjects];
-        macFlushRect = CGRectZero;
     }
     // The retained target has to be prepared for the region about to be
     // repainted before the encoder opens, and only when something in this batch
@@ -231,7 +225,7 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     // mutable-image operation it clips that image to whatever part of the
     // screen happened to be dirty, which is how a painter that fills its whole
     // image came back unpainted in the middle.
-    CGRect screenClampRect = flushRect;
+    CGRect screenClampRect = rect;
 
     // The queue is not all screen drawing. An operation that paints into a
     // mutable image carries that image as its target, and it needs an encoder
