@@ -75,6 +75,29 @@ typedef struct {
     int inUse;
 } CN1DesktopWindow;
 
+/* The window style for a (decorated, resizable) pair, in one place.
+ *
+ * Both halves of this used to be computed twice -- once when creating the window and
+ * once in desktopWindowSetDecorated -- and the two disagreed in the same way. An
+ * undecorated window got plain WS_POPUP, which carries no WS_THICKFRAME, so it could
+ * not be resized however the application had set resizable and whatever
+ * Window.isResizable() went on reporting. WS_OVERLAPPEDWINDOW bundles THICKFRAME, so
+ * the decorated path got it by accident and the undecorated path never did.
+ *
+ * WS_THICKFRAME is what makes a window sizable; on an undecorated window it is a
+ * sizing border with no caption, which is exactly what a resizable undecorated window
+ * should have. WS_MAXIMIZEBOX stays tied to decoration because it is a caption button
+ * -- toggleMaximize() drives ShowWindow directly and does not depend on it. */
+static DWORD cn1WinDesktopWindowStyle(int decorated, int resizable) {
+    DWORD style = decorated ? WS_OVERLAPPEDWINDOW : WS_POPUP;
+    if (resizable) {
+        style |= WS_THICKFRAME;
+    } else {
+        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+    }
+    return style;
+}
+
 static CN1DesktopWindow g_windows[CN1_MAX_DESKTOP_WINDOWS];
 static int g_classRegistered = 0;
 
@@ -558,10 +581,7 @@ static void cn1WinDesktopCreateOnPump(CN1DesktopWindowOp* op) {
     /* Seeded here so a later decoration change knows what to restore. */
     w->resizable = op->resizable ? 1 : 0;
 
-    style = op->decorated ? WS_OVERLAPPEDWINDOW : WS_POPUP;
-    if (op->decorated && !op->resizable) {
-        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-    }
+    style = cn1WinDesktopWindowStyle(op->decorated, op->resizable);
 
     titleLen = MultiByteToWideChar(CP_UTF8, 0, op->utf8Title, -1, NULL, 0);
     if (titleLen <= 0) {
@@ -898,20 +918,14 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetDecorated___i
     CN1DesktopWindow* w = slotAt(slot);
     if (w != NULL) {
         LONG_PTR style = GetWindowLongPtrW(w->hwnd, GWL_STYLE);
-        if (decorated == JAVA_TRUE) {
-            style |= WS_OVERLAPPEDWINDOW;
-            style &= ~WS_POPUP;
-            if (!w->resizable) {
-                /* WS_OVERLAPPEDWINDOW bundles the resize affordances, so restoring
-                 * the chrome would quietly make a fixed window resizable again. */
-                style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
-            }
-        } else {
-            /* WS_POPUP rather than merely clearing the caption bits: a window with
-             * no caption but still WS_OVERLAPPED keeps a thin non-client frame. */
-            style &= ~WS_OVERLAPPEDWINDOW;
-            style |= WS_POPUP;
-        }
+        /* Cleared before re-deriving so the two style families cannot both be set:
+         * WS_POPUP rather than merely dropping the caption bits, because a window
+         * with no caption but still WS_OVERLAPPED keeps a thin non-client frame. */
+        /* Cast before complementing: ~ on a DWORD yields a 32-bit value that
+         * zero-extends into LONG_PTR, which would clear the top half of the
+         * style word rather than leave it alone. */
+        style &= ~(LONG_PTR)(WS_OVERLAPPEDWINDOW | WS_POPUP);
+        style |= cn1WinDesktopWindowStyle(decorated == JAVA_TRUE, w->resizable);
         SetWindowLongPtrW(w->hwnd, GWL_STYLE, style);
         /* SWP_FRAMECHANGED is what makes the non-client area recompute; without it
          * the old chrome stays on screen until something else forces a reframe. */
