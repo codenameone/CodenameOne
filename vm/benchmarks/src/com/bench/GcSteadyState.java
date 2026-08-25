@@ -71,7 +71,20 @@ public class GcSteadyState {
     static Object[][] legacyLiveSet;
     static final Object SUM_LOCK = new Object();
     static long checksum = 0;
-    static long nodes = 0;
+    /**
+     * Per-worker node counts, one slot each, so counting costs no synchronisation and
+     * loses no increments. A single shared counter cannot be used for this: an
+     * unsynchronised read-modify-write from four workers drops updates at a rate that
+     * depends on CONTENTION, and contention is precisely what differs between the builds
+     * this benchmark compares -- a build whose threads park more would lose fewer
+     * increments and so report a throughput advantage it does not have.
+     *
+     * NODES= at the end is the authoritative figure: it is summed after join(), which
+     * gives it a happens-before edge to every worker's last write. The SAMPLE series sums
+     * the same slots while they are still being written, so it is a progress indicator
+     * and not a measurement.
+     */
+    static long[] nodeCounts;
 
     /** One node of the search: small, short-lived, and REFERENCE-CARRYING. Only a non-leaf
      * object has a mark function, and only such an object is eligible for maturation into
@@ -102,6 +115,7 @@ public class GcSteadyState {
         // table walk costs nothing and this workload cannot tell a cheap drain from an
         // O(heap) one. Reference-carrying, because the rescan skips objects with no mark
         // function.
+        nodeCounts = new long[threads];
         legacyLiveSet = new Object[legacyBlocks][];
         for (int i = 0; i < legacyBlocks; i++) {
             Object[] block = new Object[LEGACY_BLOCK_REFS];
@@ -118,7 +132,7 @@ public class GcSteadyState {
             public void run() {
                 while (!stop) {
                     System.out.println("SAMPLE tMs=" + probeMs() + " fpKb=" + footprintKb()
-                            + " nodes=" + nodes);
+                            + " nodes~=" + sumNodes());
                     sleep(250);
                 }
             }
@@ -128,24 +142,24 @@ public class GcSteadyState {
         Thread[] workers = new Thread[threads];
         for (int t = 0; t < threads; t++) {
             final int seed = t * 7919;
+            final int slot = t;
             workers[t] = new Thread(new Runnable() {
                 public void run() {
                     long sum = 0;
-                    long localNodes = 0;
+                    long[] counter = new long[1];
                     int[] root = new int[BOARD_CELLS];
                     int round = 0;
                     while (!stop) {
-                        sum += search(root, depth, seed + round);
-                        localNodes = nodes;
+                        sum += search(root, depth, seed + round, counter);
                         round++;
                         if (sleepMs > 0) {
                             sleep(sleepMs);
                         }
                     }
+                    nodeCounts[slot] = counter[0];
                     // Order-independent, so the checksum does not depend on scheduling.
                     synchronized (SUM_LOCK) {
                         checksum += sum;
-                        nodes = localNodes;
                     }
                 }
             });
@@ -179,6 +193,7 @@ public class GcSteadyState {
             scrub(scrubDepth);
         }
 
+        System.out.println("NODES=" + sumNodes());
         System.out.println("ELAPSED_MS=" + (System.currentTimeMillis() - startMs));
         System.out.println("FINAL_FOOTPRINT_KB=" + footprintKb());
         Move lastHeld = (Move) legacyLiveSet[legacyBlocks - 1][LEGACY_BLOCK_REFS - 1];
@@ -186,11 +201,12 @@ public class GcSteadyState {
         System.out.println("GC_STEADY_STATE_DONE");
     }
 
-    private static int search(int[] board, int d, int seed) {
+    private static int search(int[] board, int d, int seed, long[] c) {
         if (stop) {
             return 0;
         }
-        nodes++;
+        // Thread-private: this array belongs to one worker for the whole run.
+        c[0]++;
         if (d == 0) {
             int s = 0;
             for (int i = 0; i < BOARD_CELLS; i++) {
@@ -214,7 +230,7 @@ public class GcSteadyState {
                 mv.next = chain;
                 chain = mv;
             }
-            int v = search(child, d - 1, seed + b + chain.to);
+            int v = search(child, d - 1, seed + b + chain.to, c);
             if (v > best) {
                 best = v;
             }
@@ -234,6 +250,14 @@ public class GcSteadyState {
             return pad[0];
         }
         return pad[0] + scrub(d - 1);
+    }
+
+    private static long sumNodes() {
+        long total = 0;
+        for (int i = 0; i < nodeCounts.length; i++) {
+            total += nodeCounts[i];
+        }
+        return total;
     }
 
     private static long footprintKb() {
