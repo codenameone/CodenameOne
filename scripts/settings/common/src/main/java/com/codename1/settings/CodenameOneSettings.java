@@ -2320,7 +2320,8 @@ public class CodenameOneSettings extends Lifecycle {
                     continue;
                 }
                 collectAnnotationOwnedHints(text, out, ext.equals(".kt"),
-                        ext.equals(".kt") ? otherKotlinSources(binding.projectDir(), path) : null);
+                        ext.equals(".kt")
+                                ? visibleKotlinSources(binding.projectDir(), path, text) : null);
                 return out;
             }
         }
@@ -2334,7 +2335,8 @@ public class CodenameOneSettings extends Lifecycle {
         if (found != null) {
             collectAnnotationOwnedHints(found, out, lastSourceWasKotlin,
                     lastSourceWasKotlin
-                            ? otherKotlinSources(binding.projectDir(), lastSourcePath) : null);
+                            ? visibleKotlinSources(binding.projectDir(), lastSourcePath, found)
+                            : null);
             return out;
         }
         // Genuinely no source. Distinct from "found and declares nothing", and
@@ -2349,6 +2351,54 @@ public class CodenameOneSettings extends Lifecycle {
     /// The path findMainClassSource read, so it can be left out of the sweep for
     /// declarations made elsewhere.
     private String lastSourcePath;
+
+    /// The other Kotlin sources whose top-level declarations the main source can
+    /// actually SEE: its own package, or a package it imports from.
+    ///
+    /// A `typealias` is top-level, not file-scoped, but it is not global either.
+    /// Taking every Kotlin file in the project let an alias declared in an
+    /// unrelated package vouch for a same-named annotation the main class
+    /// really does write itself -- and the hint then read as owned when nothing
+    /// owns it, which hides the editor and is indistinguishable from the tool
+    /// being broken.
+    private java.util.List<String> visibleKotlinSources(String projectDir, String exclude,
+                                                        String mainSource) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (String text : otherKotlinSources(projectDir, exclude)) {
+            if (visibleTo(mainSource, text)) {
+                out.add(text);
+            }
+        }
+        return out;
+    }
+
+    /// Whether `mainSource` can see `other`'s top-level declarations: same
+    /// package, or a package it imports from.
+    static boolean visibleTo(String mainSource, String other) {
+        String pkg = declaredPackageIn(other, true);
+        return pkg.equals(declaredPackageIn(mainSource, true))
+                || importsFromPackage(mainSource, pkg);
+    }
+
+    /// Whether `source` imports anything from `pkg` -- a named type or the
+    /// package on demand. An explicit import is how a declaration from another
+    /// package becomes visible at all.
+    private static boolean importsFromPackage(String source, String pkg) {
+        if (pkg == null || pkg.isEmpty()) {
+            return false;
+        }
+        String prefix = pkg + ".";
+        for (Imported imported : importsIn(source, true)) {
+            if (!imported.name.startsWith(prefix)) {
+                continue;
+            }
+            String rest = imported.name.substring(prefix.length());
+            if (rest.indexOf('.') < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /// The text of every OTHER Kotlin source in the project, bounded.
     ///
@@ -2508,6 +2558,20 @@ public class CodenameOneSettings extends Lifecycle {
     /// inside a string, would otherwise make an unrelated file answer for the
     /// main class -- ownership then reads as empty and Settings offers Add for a
     /// hint the real main class already annotates.
+    /// The package `source` declares, or "" for the default package.
+    static String declaredPackageIn(String text, boolean kotlin) {
+        int pkgAt = nextMarker(text, "package", 0, kotlin);
+        while (pkgAt >= 0) {
+            int after = pkgAt + "package".length();
+            if (after < text.length() && !continuesAName(text.charAt(after))
+                    && (pkgAt == 0 || !continuesAName(text.charAt(pkgAt - 1)))) {
+                return qualifiedNameAt(text, after, kotlin);
+            }
+            pkgAt = nextMarker(text, "package", after, kotlin);
+        }
+        return "";
+    }
+
     static boolean declaresClass(String text, String main, String pkg, boolean kotlin) {
         String declaredPkg = "";
         int pkgAt = nextMarker(text, "package", 0, kotlin);

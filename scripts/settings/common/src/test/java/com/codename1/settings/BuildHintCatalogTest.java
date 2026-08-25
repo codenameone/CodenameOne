@@ -1206,4 +1206,47 @@ public class BuildHintCatalogTest {
         CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
+
+    /// A `typealias` is top-level but not global: another package's declaration
+    /// is invisible unless imported. Taking every Kotlin file in the project let
+    /// an alias declared in an unrelated package vouch for a same-named
+    /// annotation the main class really does write itself, so the hint read as
+    /// owned when nothing owns it -- which hides the editor and is
+    /// indistinguishable from the tool being broken.
+    @Test
+    public void anAliasInAnotherPackageIsNotVisible() {
+        String main = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+
+        // Same package: visible.
+        assertTrue(CodenameOneSettings.visibleTo(main,
+                "package com.example\ntypealias AppIos = Ios\n"));
+
+        // Another package, not imported: not visible.
+        assertFalse(CodenameOneSettings.visibleTo(main,
+                "package com.other\ntypealias AppIos = Ios\n"));
+
+        // Another package, imported by name: visible.
+        String importing = "package com.example\n"
+                + "import com.other.AppIos\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.visibleTo(importing,
+                "package com.other\ntypealias AppIos = Ios\n"));
+
+        // ...and on demand.
+        String wildcard = "package com.example\n"
+                + "import com.other.*\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.visibleTo(wildcard,
+                "package com.other\ntypealias AppIos = Ios\n"));
+
+        // An import from a DIFFERENT package does not make com.other visible.
+        String elsewhere = "package com.example\n"
+                + "import com.third.Thing\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertFalse(CodenameOneSettings.visibleTo(elsewhere,
+                "package com.other\ntypealias AppIos = Ios\n"));
+
+        // Two default-package files see each other.
+        assertTrue(CodenameOneSettings.visibleTo("class MyApp\n", "typealias AppIos = Ios\n"));
+    }
 }
