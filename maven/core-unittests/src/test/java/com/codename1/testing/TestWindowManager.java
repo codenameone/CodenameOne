@@ -312,8 +312,17 @@ public class TestWindowManager extends WindowManager {
             publishedCommands =
                     new java.util.HashMap<Object, java.util.List<com.codename1.ui.Command>>();
 
+    /// Set the first time `#setCommands(Object, Command[])` is reached from anywhere
+    /// other than the EDT. The SPI contract is EDT-only, and a violation is otherwise
+    /// invisible: the fake happily records the commands and the assertions all pass.
+    private volatile String commandsPublishedOffEdtBy;
+
     @Override
     public void setCommands(Object peer, com.codename1.ui.Command[] commands) {
+        if (!com.codename1.ui.Display.getInstance().isEdt()
+                && commandsPublishedOffEdtBy == null) {
+            commandsPublishedOffEdtBy = Thread.currentThread().getName();
+        }
         java.util.List<com.codename1.ui.Command> copy =
                 new java.util.ArrayList<com.codename1.ui.Command>();
         if (commands != null) {
@@ -322,6 +331,12 @@ public class TestWindowManager extends WindowManager {
             }
         }
         publishedCommands.put(peer, copy);
+    }
+
+    /// The name of the first non-EDT thread that published commands, or null when the
+    /// EDT contract has been honoured throughout.
+    public String getCommandsPublishedOffEdtBy() {
+        return commandsPublishedOffEdtBy;
     }
 
     /// The commands last published for the given window peer, never null.
@@ -341,6 +356,7 @@ public class TestWindowManager extends WindowManager {
     public void reset() {
         mainWindowBounds = null;
         publishedCommands.clear();
+        commandsPublishedOffEdtBy = null;
         captureResult = null;
         captureCalls = 0;
         createFails = false;

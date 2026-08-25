@@ -461,23 +461,38 @@ public class Window extends Container implements TopLevelContainer {
 
     /// {@inheritDoc}
     @Override
-    public void addCommand(Command cmd) {
-        commands.add(cmd);
-        publishCommands();
+    public void addCommand(final Command cmd) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                commands.add(cmd);
+                publishCommands();
+            }
+        });
     }
 
     /// {@inheritDoc}
     @Override
-    public void removeCommand(Command cmd) {
-        commands.remove(cmd);
-        publishCommands();
+    public void removeCommand(final Command cmd) {
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                commands.remove(cmd);
+                publishCommands();
+            }
+        });
     }
 
     /// {@inheritDoc}
     @Override
     public void removeAllCommands() {
-        commands.clear();
-        publishCommands();
+        onEdt(new Runnable() {
+            @Override
+            public void run() {
+                commands.clear();
+                publishCommands();
+            }
+        });
     }
 
     /// Hands the current command list to the port so it can put them wherever this
@@ -1158,6 +1173,27 @@ public class Window extends Container implements TopLevelContainer {
                 }
             }
         });
+    }
+
+    /// Runs `op` on the EDT -- immediately when the caller is already there, queued
+    /// otherwise.
+    ///
+    /// Unlike `#onPeer(Runnable)` this runs whether or not a peer exists yet, because
+    /// the command list is meaningful before `#show()`: commands added early are
+    /// published when the peer is created.
+    ///
+    /// The mutation is marshalled along with the publication, not just the
+    /// `WindowManager` call, and that is the whole point. Marshalling only the
+    /// publication would let two background threads each snapshot the list under a
+    /// lock and then reach the EDT in the opposite order, leaving the port holding an
+    /// older snapshot than the list it was taken from. Mutating on the EDT and
+    /// publishing in the same pass makes the native menu always agree with the list.
+    private void onEdt(Runnable op) {
+        if (Display.getInstance().isEdt()) {
+            op.run();
+            return;
+        }
+        Display.getInstance().callSerially(op);
     }
 
     /// Indicates whether the user may resize this window.

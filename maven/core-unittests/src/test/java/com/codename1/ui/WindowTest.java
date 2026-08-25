@@ -3124,6 +3124,70 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void commandMutationsFromABackgroundThreadAreMarshalledOntoTheEdt()
+            throws InterruptedException {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("bg commands", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer);
+
+        try {
+
+            // addCommand() used to mutate the unsynchronized list and reach
+            // WindowManager.setCommands() on whatever thread called it, while the SPI
+            // contract is EDT-only. That races an EDT show(), removal or disposal and can
+            // hand a peer to the port during teardown.
+            final Command fromBackground = new Command("Background");
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.addCommand(fromBackground);
+                }
+            }, "cn1-test-background");
+            t.start();
+            t.join();
+
+            // Joining the background thread proves the call returned; the work must NOT
+            // have been done on it. This test body runs on the EDT, so nothing queued can
+            // have been dispatched yet.
+            assertEquals(0, wm.getPublishedCommands(peer).size(),
+                    "the mutation must be deferred to the EDT, not run on the caller");
+
+            DisplayTest.flushEdt();
+
+            assertEquals(1, wm.getPublishedCommands(peer).size(),
+                    "and it must actually arrive once the EDT runs it");
+            assertSame(fromBackground, wm.getPublishedCommands(peer).get(0));
+            assertNull(wm.getCommandsPublishedOffEdtBy(),
+                    "the port must never be called off the EDT");
+
+            // removeCommand() and removeAllCommands() publish through the same path.
+            Thread remove = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    w.removeCommand(fromBackground);
+                }
+            }, "cn1-test-background-remove");
+            remove.start();
+            remove.join();
+            assertEquals(1, wm.getPublishedCommands(peer).size(),
+                    "removal is deferred the same way");
+            DisplayTest.flushEdt();
+            assertEquals(0, wm.getPublishedCommands(peer).size());
+            assertNull(wm.getCommandsPublishedOffEdtBy(),
+                    "including on the removal path");
+
+        } finally {
+            // A failed assertion must not leak a registered window into later tests:
+            // Desktop keeps it in the registry and the next test counting windows sees
+            // it, turning one real failure into three confusing ones.
+            w.dispose();
+        }
+    }
+
+    @FormTest
     void anAnimationInBothRegistriesRunsOncePerFrame() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("anim", new BorderLayout());
