@@ -1762,6 +1762,25 @@ public class BuildHintCatalogTest {
         assertTrue(kotlin.contains("src/main/kt"), kotlin.toString());
         assertFalse(kotlin.contains("fixtures"), kotlin.toString());
 
+        // Plugin-level configuration applies to every execution, so it counts
+        // alongside them rather than being dropped when executions exist.
+        java.util.List<String> both = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "<execution><goals><goal>test-compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>fixtures</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(both.contains("src/shared/kt"), both.toString());
+        assertTrue(both.contains("src/main/kt"), both.toString());
+        assertFalse(both.contains("fixtures"), both.toString());
+
         // A project-directory expression is deterministic, so it is resolved
         // rather than discarded.
         java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
@@ -1839,5 +1858,39 @@ public class BuildHintCatalogTest {
         assertEquals("/p/a/pom.xml",
                 CodenameOneSettings.normalizePath("/p/common/./../a/pom.xml"));
         assertEquals("a/pom.xml", CodenameOneSettings.normalizePath("b/../a/pom.xml"));
+    }
+
+    /// `${project.build.directory}` is `target` by default and whatever
+    /// `<build><directory>` says otherwise -- hard-coding `target` sent the
+    /// search to a directory a project that overrides it does not compile from.
+    @Test
+    public void theConfiguredBuildDirectoryIsUsed() {
+        assertEquals("out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><directory>out</directory></build></project>"));
+        assertEquals("/p/common/out/generated-sources",
+                CodenameOneSettings.expandProjectPaths(
+                        "${project.build.directory}/generated-sources", "/p/common", "out"));
+
+        // The default when nothing configures one.
+        assertNull(CodenameOneSettings.configuredBuildDirectory("<project><build/></project>"));
+        assertEquals("/p/common/target/generated-sources",
+                CodenameOneSettings.expandProjectPaths(
+                        "${project.build.directory}/generated-sources", "/p/common", null));
+
+        // A DIRECT child: resources and the plugin sections carry `<directory>`
+        // elements of their own, and taking the first would read a resource
+        // directory as the output directory.
+        assertNull(CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><resources><resource>"
+                        + "<directory>src/main/resources</directory>"
+                        + "</resource></resources></build></project>"));
+        assertEquals("out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><resources><resource>"
+                        + "<directory>src/main/resources</directory></resource></resources>"
+                        + "<directory>out</directory></build></project>"));
+
+        // An absolute one is taken as it stands.
+        assertEquals("/elsewhere/gen", CodenameOneSettings.expandProjectPaths(
+                "${project.build.directory}/gen", "/p/common", "/elsewhere"));
     }
 }

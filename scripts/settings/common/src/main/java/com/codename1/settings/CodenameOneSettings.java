@@ -2440,14 +2440,22 @@ public class CodenameOneSettings extends Lifecycle {
         if (pluginBlock == null) {
             return out;
         }
-        boolean any = false;
+        // Plugin-level configuration applies to every execution, so it counts
+        // whether or not there are any -- returning only the matching executions
+        // dropped a `<sourceDirs>` written once outside them, and a main class
+        // compiled from there became invisible.
+        int executions = pluginBlock.indexOf("<executions>");
+        int endOfExecutions = pluginBlock.indexOf("</executions>");
+        out.add(executions >= 0 && endOfExecutions > executions
+                ? pluginBlock.substring(0, executions)
+                        + pluginBlock.substring(endOfExecutions)
+                : pluginBlock);
         int at = pluginBlock.indexOf("<execution>");
         while (at >= 0) {
             int close = pluginBlock.indexOf("</execution>", at);
             if (close < 0) {
                 break;
             }
-            any = true;
             String execution = pluginBlock.substring(at, close);
             // The goal as an ELEMENT: `test-compile` contains `compile`, so a
             // substring test takes exactly the executions it must not.
@@ -2455,9 +2463,6 @@ public class CodenameOneSettings extends Lifecycle {
                 out.add(execution);
             }
             at = pluginBlock.indexOf("<execution>", close);
-        }
-        if (!any) {
-            out.add(pluginBlock);
         }
         return out;
     }
@@ -2489,13 +2494,70 @@ public class CodenameOneSettings extends Lifecycle {
     /// every time applied, or null when an expression is left that this reader
     /// cannot resolve.
     static String expandProjectPaths(String path, String projectDir) {
+        return expandProjectPaths(path, projectDir, null);
+    }
+
+    /// As above; `buildDirectory` is what the POM configures, when it configures
+    /// one.
+    ///
+    /// `${project.build.directory}` is `target` by default and whatever
+    /// `<build><directory>` says otherwise -- hard-coding `target` sent the
+    /// search to a directory a project that overrides it does not compile from.
+    static String expandProjectPaths(String path, String projectDir, String buildDirectory) {
+        String build = buildDirectory == null || buildDirectory.trim().isEmpty()
+                ? projectDir + "/target" : buildDirectory.trim().replace('\\', '/');
+        if (!build.startsWith("/") && build.indexOf(':') != 1) {
+            build = projectDir + "/" + build;
+        }
         String out = path;
         out = replaceLiteral(out, "${project.basedir}", projectDir);
         out = replaceLiteral(out, "${project.baseDir}", projectDir);
         out = replaceLiteral(out, "${basedir}", projectDir);
         out = replaceLiteral(out, "${pom.basedir}", projectDir);
-        out = replaceLiteral(out, "${project.build.directory}", projectDir + "/target");
+        out = replaceLiteral(out, "${project.build.directory}", build);
         return out.indexOf('$') >= 0 ? null : out;
+    }
+
+    /// The `<directory>` the POM's `<build>` element configures, or null.
+    ///
+    /// A DIRECT child: `<resources>` and the plugin sections carry
+    /// `<directory>` elements of their own, and taking the first one in the
+    /// build element would read a resource directory as the output directory.
+    static String configuredBuildDirectory(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        int at = pomText.indexOf("<build>");
+        if (at < 0) {
+            return null;
+        }
+        int close = pomText.indexOf("</build>", at);
+        String build = close < 0 ? pomText.substring(at) : pomText.substring(at, close);
+        for (String nested : new String[] {"resources", "testResources", "plugins",
+                "pluginManagement", "filters", "extensions"}) {
+            build = withoutElement(build, nested);
+        }
+        return elementValue(build, "directory");
+    }
+
+    private static String withoutElement(String xml, String name) {
+        String open = "<" + name + ">";
+        String shut = "</" + name + ">";
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = xml.indexOf(open, at);
+            if (hit < 0) {
+                out.append(xml.substring(at));
+                return out.toString();
+            }
+            out.append(xml, at, hit);
+            int close = xml.indexOf(shut, hit);
+            if (close < 0) {
+                return out.toString();
+            }
+            at = close + shut.length();
+        }
     }
 
     private static String replaceLiteral(String text, String find, String with) {
@@ -2562,7 +2624,7 @@ public class CodenameOneSettings extends Lifecycle {
         // THIS module rather than the module that declared it.
         for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom)) {
-                String expanded = expandProjectPaths(declared, projectDir);
+                String expanded = expandProjectPaths(declared, projectDir, buildDirectory());
                 if (expanded == null) {
                     continue;
                 }
@@ -2655,6 +2717,19 @@ public class CodenameOneSettings extends Lifecycle {
             out.append(parts.get(i));
         }
         return out.toString();
+    }
+
+    /// The build directory the POM chain configures, nearest first, or null for
+    /// Maven's own default.
+    private String buildDirectory() {
+        for (String pom : pomChain()) {
+            String configured = configuredBuildDirectory(pom);
+            if (configured != null && !configured.trim().isEmpty()
+                    && configured.indexOf('$') < 0) {
+                return configured;
+            }
+        }
+        return null;
     }
 
     /// The bound POM's text, read once per session.
