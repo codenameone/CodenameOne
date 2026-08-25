@@ -1148,21 +1148,38 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
             probe++;
         }
-        if (probe >= code.length() || code.charAt(probe) != '(') {
+        if (probe >= code.length()) {
             return i;
         }
+        char c = code.charAt(probe);
+        // Arguments, or a BRACKETED list: Kotlin lets one use-site target carry
+        // several annotations -- `@file:[JvmName("X") Suppress("unchecked")]` --
+        // and stopping at the `[` read the bracket as the first declaration, so
+        // the import went between `@file:` and its own list.
+        if (c == '(') {
+            return balancedEnd(code, probe, '(', ')', at);
+        }
+        if (c == '[') {
+            return balancedEnd(code, probe, '[', ']', at);
+        }
+        return i;
+    }
+
+    /// The offset just past the run opened at `from`, or `fallback` when it never
+    /// closes. Blanked code, so a delimiter inside a literal is already gone.
+    private static int balancedEnd(String code, int from, char open, char close, int fallback) {
         int depth = 0;
-        for (int j = probe; j < code.length(); j++) {
-            if (code.charAt(j) == '(') {
+        for (int j = from; j < code.length(); j++) {
+            if (code.charAt(j) == open) {
                 depth++;
-            } else if (code.charAt(j) == ')') {
+            } else if (code.charAt(j) == close) {
                 depth--;
                 if (depth == 0) {
                     return j + 1;
                 }
             }
         }
-        return at;
+        return fallback;
     }
 
     /// One thing this deliberately does NOT do: translate Java's unicode

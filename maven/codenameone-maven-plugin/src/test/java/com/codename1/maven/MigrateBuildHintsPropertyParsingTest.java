@@ -298,6 +298,16 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals(kt.indexOf("class MyApp"),
                 MigrateBuildHintsMojo.startOfFirstDeclaration(kt, true));
 
+        // One target may carry a BRACKETED list of annotations.
+        String grouped = "@file:[JvmName(\"X\") Suppress(\"unchecked\")]\n\nclass MyApp\n";
+        assertEquals(grouped.indexOf("class MyApp"),
+                MigrateBuildHintsMojo.startOfFirstDeclaration(grouped, true));
+
+        // ...and a bracketed list with no target is not a FILE annotation, so
+        // the import goes above it like any other.
+        String untargeted = "@[JvmName(\"X\") Suppress(\"unchecked\")]\nclass MyApp\n";
+        assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(untargeted, true));
+
         // An ordinary annotation is not a file annotation.
         String ordinary = "@Suppress(\"unchecked\")\nclass MyApp\n";
         assertEquals(0, MigrateBuildHintsMojo.startOfFirstDeclaration(ordinary, true));
