@@ -2964,6 +2964,9 @@ public class CodenameOneSettings extends Lifecycle {
         String qualified = "com.codename1.annotations.buildhints." + simple;
         java.util.List<String> resolved = new java.util.ArrayList<String>();
         java.util.List<AliasDeclaration> pending = new java.util.ArrayList<>();
+        // The key each pending declaration's target might name, worked out once
+        // rather than on every pass.
+        java.util.List<java.util.List<String>> pendingTargets = new java.util.ArrayList<>();
         for (AliasDeclaration declared : declarations) {
             // The bare name counts only where an import makes it ours, and that
             // import is file-scoped -- so it is decided per owner, here, rather
@@ -2978,25 +2981,75 @@ public class CodenameOneSettings extends Lifecycle {
                 add(out, declared.visible);
             } else {
                 pending.add(declared);
+                pendingTargets.add(targetKeys(declared));
             }
         }
         // Each pass can only resolve one more link, so the number of passes is
         // bounded by the number of declarations left over.
         for (int pass = 0; pass < pending.size(); pass++) {
             boolean grew = false;
-            for (AliasDeclaration declared : pending) {
+            for (int i = 0; i < pending.size(); i++) {
+                AliasDeclaration declared = pending.get(i);
                 String key = declared.scope + "\u0000" + declared.local;
-                if (!resolved.contains(key)
-                        && resolved.contains(declared.scope + "\u0000" + declared.target)) {
-                    resolved.add(key);
-                    add(out, declared.visible);
-                    grew = true;
+                if (resolved.contains(key)) {
+                    continue;
+                }
+                for (String candidate : pendingTargets.get(i)) {
+                    if (resolved.contains(candidate)) {
+                        resolved.add(key);
+                        add(out, declared.visible);
+                        grew = true;
+                        break;
+                    }
                 }
             }
             if (!grew) {
                 break;
             }
         }
+        return out;
+    }
+
+    /// The chain links `declared`'s target might name, most specific first.
+    ///
+    /// A link may cross a package boundary: package `a` declares
+    /// `typealias Base = Ios`, package `b` imports `a.Base` and declares
+    /// `typealias AppIos = Base`. Looking only in the declaring file's own
+    /// package missed that, so the chain stopped there, the hint read as unowned
+    /// and Add wrote the duplicate declaration the next build refuses.
+    ///
+    /// A qualified target names its package outright. Otherwise a named import
+    /// -- under its own name or an `as` name -- says where it comes from, and
+    /// failing that it is the declaring package's own, or any package imported
+    /// on demand.
+    private static java.util.List<String> targetKeys(AliasDeclaration declared) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String target = declared.target;
+        int dot = target.lastIndexOf('.');
+        if (dot > 0) {
+            out.add(target.substring(0, dot) + "\u0000" + target.substring(dot + 1));
+            return out;
+        }
+        java.util.List<String> onDemand = new java.util.ArrayList<String>();
+        for (Imported imported : importsIn(declared.owner, true)) {
+            int at = imported.name.lastIndexOf('.');
+            if (at <= 0) {
+                continue;
+            }
+            String pkg = imported.name.substring(0, at);
+            String simpleName = imported.name.substring(at + 1);
+            if ("*".equals(simpleName)) {
+                onDemand.add(pkg + "\u0000" + target);
+                continue;
+            }
+            String visibleAs = imported.alias != null ? imported.alias : simpleName;
+            if (visibleAs.equals(target)) {
+                out.add(pkg + "\u0000" + simpleName);
+                return out;
+            }
+        }
+        out.add(declared.scope + "\u0000" + target);
+        out.addAll(onDemand);
         return out;
     }
 

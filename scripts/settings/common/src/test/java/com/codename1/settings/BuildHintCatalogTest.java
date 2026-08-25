@@ -1288,4 +1288,52 @@ public class BuildHintCatalogTest {
                 java.util.Collections.singletonList(elsewhere));
         assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
+
+    /// A chain link may cross a package boundary: `a` declares
+    /// `typealias Base = Ios`, `b` imports `a.Base` and declares
+    /// `typealias AppIos = Base`. Looking only in the declaring file's own
+    /// package stopped the chain there, so the hint read as unowned and Add
+    /// wrote the duplicate the next build refuses.
+    @Test
+    public void aChainLinkMayBeImportedFromAnotherPackage() {
+        String a = "package a\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias Base = Ios\n";
+        String b = "package b\n"
+                + "import a.Base\n"
+                + "typealias AppIos = Base\n";
+        String main = "package com.example\n"
+                + "import b.AppIos\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.List<String> others = java.util.Arrays.asList(a, b);
+
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main, others), "Ios", true));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true, others);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The renamed form of the link, and the qualified spelling.
+        String renamedLink = "package b\n"
+                + "import a.Base as Root\n"
+                + "typealias AppIos = Root\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Arrays.asList(a, renamedLink)), "Ios", true));
+
+        String qualifiedLink = "package b\ntypealias AppIos = a.Base\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Arrays.asList(a, qualifiedLink)), "Ios", true));
+
+        // A link that names nothing reachable is still not ours.
+        String broken = "package b\ntypealias AppIos = Base\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main,
+                        java.util.Arrays.asList(a, broken)), "Ios", true).isEmpty());
+    }
 }
