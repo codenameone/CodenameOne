@@ -2359,9 +2359,15 @@ public class CodenameOneSettings extends Lifecycle {
     /// - Unless `build` is a package NAME under a source tree, which this
     ///   repository has -- refusing to descend there meant a main class living
     ///   in it could not be read at all.
-    /// - A `src/test` tree takes no part in compiling the main class, so a
+    /// - A test source set takes no part in compiling the main class, so a
     ///   same-package type there shadows nothing; counting it made a production
     ///   annotation look like somebody else's.
+    ///
+    /// That last one is a directory under `src` whose name says test:
+    /// `src/test`, and equally `src/testFixtures`, `src/integrationTest` and
+    /// `src/androidTest`, which are source sets by the same convention. Only
+    /// under `src`, because deeper down the same word is an ordinary package
+    /// name.
     static boolean peerDirectoryHoldsSources(String dir, String name, boolean insideSourceTree) {
         if (name.startsWith(".")) {
             return false;
@@ -2369,7 +2375,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (("target".equals(name) || "build".equals(name)) && !insideSourceTree) {
             return false;
         }
-        return !("test".equals(name) && dir.endsWith("/src"));
+        return !(dir.endsWith("/src") && name.toLowerCase().indexOf("test") >= 0);
     }
 
     /// The generated source root under the output directory `dir`/`name`, or

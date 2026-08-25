@@ -1542,9 +1542,18 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
                 "/p/common/src/main/java/com/codename1", "build", true));
 
-        // A test tree takes no part in compiling the main class.
+        // A test source set takes no part in compiling the main class, and
+        // `test` is not the only name one goes by.
         assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "test", false));
-        // ...but a directory called test deeper in a package is a package.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "testFixtures",
+                false));
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src",
+                "integrationTest", false));
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "androidTest",
+                false));
+        // The main source set is not one of them.
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "main", false));
+        // ...and deeper down the same word is an ordinary package name.
         assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
                 "/p/common/src/main/java/com", "test", false));
 
