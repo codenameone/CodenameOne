@@ -127,7 +127,7 @@ jobs:
           # without it, so a test that failed once and passed on a later attempt would take
           # this gate green and hide the race that produced it. The wrapper's own docs
           # require this filter for test-running commands.
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: transient
         run: |
           set -euo pipefail
           # Targeted run: OidcCoreTest is the new suite; the *Connect / Login /

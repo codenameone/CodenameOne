@@ -140,7 +140,7 @@ jobs:
         # RETRY_ONLY_MATCHING keeps a failing test failing on the first attempt
         # rather than letting a re-run launder a flake into a pass.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM'
+          RETRY_ONLY_MATCHING: transient
         run: |
           MVN_GOAL="verify"
           MVN_ARGS=""
@@ -449,7 +449,7 @@ jobs:
         # could not be resolved" before a single test had run -- a Maven Central failure, which a
         # missing plugin version fails identically on every attempt anyway.
         env:
-          RETRY_ONLY_MATCHING: 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+          RETRY_ONLY_MATCHING: transient
           # Five attempts a minute apart rather than three at thirty seconds: Central
           # refused two different jobs on this branch today, and a window of about a
           # minute is shorter than the incidents have been. It costs nothing on a real

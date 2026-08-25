@@ -27,9 +27,21 @@ set -uo pipefail
 # race this repo requires to be root-caused. With it set, a failure that does not
 # match is returned on the first attempt, so only the transient-resolution case
 # gets a second chance. Leave it unset for steps that merely download and build.
+#
+# The value `transient` selects the canonical set below instead of a hand-written
+# regex. Every workflow that spelled this out meant the same thing, and they drifted
+# into three different versions: a parparvm-tests run failed for good on
+# "or one of its dependencies could not be resolved" -- a plain Central hiccup that
+# two other workflows already knew to retry and that one had never been taught. One
+# definition, so the next failure mode is added once.
+TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
+
 attempts="${RETRY_ATTEMPTS:-3}"
 delay="${RETRY_DELAY_SECONDS:-30}"
 only_matching="${RETRY_ONLY_MATCHING:-}"
+if [ "$only_matching" = "transient" ]; then
+  only_matching="$TRANSIENT_RESOLUTION_FAILURE"
+fi
 
 if [ "$#" -eq 0 ]; then
   echo "retry.sh: no command given" >&2
