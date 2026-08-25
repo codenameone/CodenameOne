@@ -86,6 +86,19 @@ class GcSteadyStateIntegrationTest {
      * How much the page heap may still grow in the second half of the run, relative to the
      * first. Zero would be wrong: a run reaches its working set at its own pace and a
      * partially-filled arena is 64 pages. A COMPOUNDING heap doubles here.
+     *
+     * <p>This is the OUTCOME check, and unlike the other three assertions it deliberately
+     * has no fault twin. The obvious one -- requiring the -DCN1_SATB_LOG_FRESH build to
+     * exceed this bound -- was measured and rejected: across two runs of that build the
+     * second-half growth came out 0.446 and then 0.033, because a runaway's page pool
+     * sometimes saturates before the midpoint and the ratio then reads flat while the heap
+     * is enormous. Asserting it would fail about half the time, and a coin-flip gate is
+     * worse than the inertness it would be guarding against.</p>
+     *
+     * <p>What has teeth is the MECHANISM check above: the same faulted build separates
+     * from the fixed one by five orders of magnitude on satbRefs per live object, every
+     * time. Both series are printed on every run so this ratio stays auditable rather than
+     * merely asserted.</p>
      */
     private static final double MAX_SECOND_HALF_PAGE_GROWTH = 0.25;
 
@@ -222,6 +235,8 @@ class GcSteadyStateIntegrationTest {
         assertTrue(bad.satbRefsPerLiveObject() > good.satbRefsPerLiveObject() * 10,
                 "The fresh-reference filter should cut the log by orders of magnitude. "
                         + describe("fixed", good) + " " + describe("faulted", bad));
+        System.err.println("[GcSteadyState] " + describe("fixed", good));
+        System.err.println("[GcSteadyState] " + describe("faulted", bad));
 
         // ---- 3. under a per-process ceiling, the collector defends a reserve ----
         // Budget headroom is not a footprint bound: admission answers "is there budget

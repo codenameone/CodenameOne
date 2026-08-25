@@ -1552,7 +1552,9 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
         // Same reasoning as the filter above; a census may misclassify but must not be a
         // mixed atomic/non-atomic access to the field.
         int __m = __atomic_load_n(&old->__codenameOneGcMark, __ATOMIC_RELAXED);
-        if(__m == currentGcMarkValue) {
+        // Read atomically for the same reason: this runs on a mutator, and the collector
+        // owns and increments currentGcMarkValue.
+        if(__m == __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED)) {
             atomic_fetch_add_explicit(&cn1GcSatbAlready, 1, memory_order_relaxed);
         } else if(__m == -1) {
             atomic_fetch_add_explicit(&cn1GcSatbFresh, 1, memory_order_relaxed);
@@ -1779,16 +1781,20 @@ void codenameOneGCMark() {
                 // silently skipping the live region below it (missed roots -> UAF).
                 t->gcParkCaptured = JAVA_FALSE;
 #endif
-#ifdef CN1_GC_CONFORM
-                long long __wt0 = cn1GcNowNs();
-                int __wtActive = 1;
-#endif
                 // wait for the thread to pause so we can traverse its stack but not for native threads where
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
                     int totalwait = 0;
                     long now = time(0);
+#ifdef CN1_GC_CONFORM
+                    // Opened and closed around the safepoint wait ALONE. Closing it later
+                    // -- after the migration and the stack scans -- would fold their cost
+                    // into waitMs as well as into migrateMs and stackMs, and a phase
+                    // breakdown that double-counts reads a long root scan as mutator wait.
+                    // A non-lightweight thread is never waited for, and now contributes 0.
+                    long long __wt0 = cn1GcNowNs();
+#endif
                     while(t->threadActive) {
                         usleep(500);
                         totalwait += 500;
@@ -1803,6 +1809,9 @@ void codenameOneGCMark() {
                             }
                         }
                     }
+#ifdef CN1_GC_CONFORM
+                    cn1GcWaitNs += cn1GcNowNs() - __wt0;
+#endif
                 }
                 
                 // place allocations from the local thread into the global heap list.
@@ -1944,11 +1953,6 @@ void codenameOneGCMark() {
 #endif
 #ifdef CN1_GC_VERIFY
     { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "statics"; }
-#endif
-#ifdef CN1_GC_CONFORM
-                // The spin above is over by the time control reaches here, whatever path
-                // it took, so this is the honest close for the safepoint wait.
-                if(__wtActive) { cn1GcWaitNs += cn1GcNowNs() - __wt0; __wtActive = 0; }
 #endif
                 markStatics(d);
                 // Drain the worklist before unblocking the thread so that every object
@@ -9465,7 +9469,11 @@ static void* cn1GcProbeThread(void* ignored) {
                         " bytesSinceGc=%lld staleSkips=%ld\n",
             cn1GcProbeElapsedMs(),
             (long long)cn1ProcFootprintBytes() / 1024,
-            currentGcMarkValue,
+            // Atomic: the collector increments this ordinary int in codenameOneGCMark
+            // while this detached thread reads it. Plain would be a data race, and this
+            // emitter exists precisely to keep reporting when the collector is stalled --
+            // the moment a stale or invented value would mislead most.
+            __atomic_load_n(&currentGcMarkValue, __ATOMIC_RELAXED),
 #ifdef CN1_DISABLE_BIBOP
             0LL,
 #else
