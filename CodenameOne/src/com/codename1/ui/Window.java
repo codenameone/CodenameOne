@@ -200,6 +200,16 @@ public class Window extends Container implements TopLevelContainer {
     private int closeOperation = DISPOSE_ON_CLOSE;
     private int modalityType = MODALITY_NONE;
     private TopLevelContainer ownerWindow;
+
+    /// Windows that named this one as their owner, whether or not they have been shown.
+    ///
+    /// `Desktop`'s registry holds only windows that have been shown, so an owner asked
+    /// which windows it owns could not see a child that was constructed, given an owner
+    /// and then disposed of before ever being shown. Disposing the owner left that child
+    /// alive against the contract on `#setOwnerWindow(TopLevelContainer)`, and it could
+    /// no longer be opened either: `#show()` shows an unshown owner first, and that
+    /// owner was disposed.
+    private final ArrayList<Window> ownedWindows = new ArrayList<Window>();
     private Monitor currentMonitor;
 
     /// Creates a window whose content is laid out with a `FlowLayout`.
@@ -1196,6 +1206,23 @@ public class Window extends Container implements TopLevelContainer {
         Display.getInstance().callSerially(op);
     }
 
+    /// Runs `op` on the event dispatch thread and waits for it, for the reads that have
+    /// to answer the caller rather than being queued: `#getWindowBounds()` and
+    /// `#capture()` both go through the `WindowManager`, whose contract is that it is
+    /// called on that thread only.
+    ///
+    /// Runs inline when the caller is already there, and also when there is no
+    /// framework running to marshal onto -- with no event dispatch thread there is
+    /// nothing to race, and waiting would simply never return.
+    private void onEdtAndWait(Runnable op) {
+        Display d = Display.getInstance();
+        if (!Display.isInitialized() || d.isEdt()) {
+            op.run();
+            return;
+        }
+        d.callSeriallyAndWait(op);
+    }
+
     /// Indicates whether the user may resize this window.
     ///
     /// #### Returns
@@ -1328,6 +1355,25 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// the native window bounds
     public Rectangle getWindowBounds() {
+        final Rectangle[] out = new Rectangle[1];
+        onEdtAndWait(new Runnable() {
+            @Override
+            public void run() {
+                out[0] = windowBoundsImpl();
+            }
+        });
+        return out[0];
+    }
+
+    /// The bounds read itself, always on the event dispatch thread.
+    ///
+    /// The peer is re-read here rather than by the caller because it is only stable on
+    /// this thread. On the Linux and Windows ports a peer identifies a slot in a fixed
+    /// native window table, and those slots are reused: an event dispatch thread
+    /// disposal followed by another window's creation can hand the same peer to a
+    /// different window, so a background reader holding the old value would have been
+    /// answered about the replacement.
+    private Rectangle windowBoundsImpl() {
         if (nativePeer == null) {
             return new Rectangle(pendingX, pendingY, pendingWidth, pendingHeight);
         }
@@ -2247,8 +2293,12 @@ public class Window extends Container implements TopLevelContainer {
         // An owned window cannot outlive its owner: the platform would leave it open
         // with no owner behind it, and it would keep painting. Snapshot first -- each
         // dispose deregisters, which mutates the registry being walked.
-        for (Window each : Desktop.getInstance().windowsOwnedBy(this)) {
+        for (Window each : ownedWindows()) {
             each.dispose();
+        }
+        // So a long-lived owner does not accumulate children it has already outlived.
+        if (ownerWindow instanceof Window) {
+            ((Window) ownerWindow).forgetOwned(this);
         }
         releaseModal();
         Desktop.getInstance().deregisterWindow(this);
@@ -2348,6 +2398,23 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// an image of the window, or null when the port cannot capture one
     public Image capture() {
+        final Image[] out = new Image[1];
+        onEdtAndWait(new Runnable() {
+            @Override
+            public void run() {
+                out[0] = captureImpl();
+            }
+        });
+        return out[0];
+    }
+
+    /// The capture itself, always on the event dispatch thread.
+    ///
+    /// Marshalled for the same peer-reuse reason as `#windowBoundsImpl()`, and for one
+    /// more of its own: the fallback below paints the component hierarchy, and painting
+    /// a live tree from another thread races the frame the event dispatch thread is
+    /// drawing.
+    private Image captureImpl() {
         if (disposing || nativePeer == null) {
             return null;
         }
@@ -2441,7 +2508,37 @@ public class Window extends Container implements TopLevelContainer {
             }
             probe = ((Window) probe).ownerWindow;
         }
+        if (this.ownerWindow instanceof Window) {
+            ((Window) this.ownerWindow).forgetOwned(this);
+        }
         this.ownerWindow = owner;
+        if (owner instanceof Window) {
+            ((Window) owner).rememberOwned(this);
+        }
+    }
+
+    private void rememberOwned(Window child) {
+        synchronized (ownedWindows) {
+            if (!ownedWindows.contains(child)) {
+                ownedWindows.add(child);
+            }
+        }
+    }
+
+    private void forgetOwned(Window child) {
+        synchronized (ownedWindows) {
+            ownedWindows.remove(child);
+        }
+    }
+
+    /// The windows this one owns, shown or not, as a snapshot.
+    ///
+    /// A snapshot because disposing each child re-enters `#forgetOwned(Window)` on this
+    /// window and would otherwise mutate the list being walked.
+    private Window[] ownedWindows() {
+        synchronized (ownedWindows) {
+            return ownedWindows.toArray(new Window[ownedWindows.size()]);
+        }
     }
 
     /// Returns the top level that owns this window.

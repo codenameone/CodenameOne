@@ -2594,6 +2594,119 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void synchronousWindowReadsFromABackgroundThreadRunOnTheEdt()
+            throws InterruptedException {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        final Window w = new Window("bg reads", new BorderLayout());
+        w.setWindowSize(300, 200);
+        w.show();
+        DisplayTest.flushEdt();
+
+        // getWindowBounds() and capture() both go straight to the WindowManager, whose
+        // contract is EDT-only. On the Linux and Windows ports a peer names a slot in a
+        // fixed native window table and those slots are reused, so a background reader
+        // could be answered about whichever window now holds the slot. capture()'s
+        // fallback is worse still: it paints the live component hierarchy, racing the
+        // frame the event dispatch thread is drawing.
+        try {
+        final Rectangle[] bounds = new Rectangle[1];
+        final Object[] captured = new Object[1];
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                bounds[0] = w.getWindowBounds();
+                captured[0] = w.capture();
+            }
+        }, "cn1-test-reader");
+        t.start();
+        // The reads marshal onto this thread, so it has to keep dispatching while they
+        // wait -- joining here instead would deadlock the pair.
+        long deadline = System.currentTimeMillis() + 5000;
+        while (t.isAlive() && System.currentTimeMillis() < deadline) {
+            DisplayTest.flushEdt();
+        }
+        t.join(1000);
+        assertFalse(t.isAlive(), "the background reads have to complete, not hang");
+
+        assertNotNull(bounds[0], "the read still has to answer the caller");
+        assertEquals(300, bounds[0].getWidth(), "and answer correctly");
+        assertNull(wm.getReadOffEdtBy(),
+                "the window manager must never be read off the EDT");
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            w.dispose();
+        }
+    }
+
+    @FormTest
+    void disposingAnOwnerAlsoDisposesAChildThatWasNeverShown() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner", new BorderLayout());
+        owner.setWindowSize(300, 200);
+        final Window child = new Window("child", new BorderLayout());
+        child.setWindowSize(200, 150);
+        child.setOwnerWindow(owner);
+        try {
+            owner.show();
+            DisplayTest.flushEdt();
+
+            // The child has an owner but has never been shown, so it is not in Desktop's
+            // registry -- that only holds windows that have been shown. Ownership used to
+            // be read back out of that registry, so this child was invisible to its
+            // owner's disposal and outlived it, against setOwnerWindow's contract.
+            assertFalse(child.isWindowDisposed(), "precondition: the child is still alive");
+
+            owner.dispose();
+            DisplayTest.flushEdt();
+
+            assertTrue(child.isWindowDisposed(),
+                    "a window is disposed with its owner whether or not it was ever shown");
+
+            // And the consequence that made it more than bookkeeping: show() brings an
+            // unshown owner up first, so a child left alive here could never be opened.
+            IllegalStateException refused = assertThrows(IllegalStateException.class,
+                    new org.junit.jupiter.api.function.Executable() {
+                        @Override
+                        public void execute() {
+                            child.show();
+                        }
+                    },
+                    "showing a window disposed with its owner has to be refused");
+            assertTrue(refused.getMessage().contains("disposed"), refused.getMessage());
+        } finally {
+            // As elsewhere here: a leaked registered window turns one real failure into
+            // several confusing ones in the tests that run after it.
+            owner.dispose();
+            child.dispose();
+        }
+    }
+
+    @FormTest
+    void aShownChildIsStillDisposedWithItsOwner() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner shown", new BorderLayout());
+        owner.setWindowSize(300, 200);
+        Window child = new Window("child shown", new BorderLayout());
+        child.setWindowSize(200, 150);
+        child.setOwnerWindow(owner);
+        owner.show();
+        child.show();
+        DisplayTest.flushEdt();
+        try {
+            assertTrue(child.isWindowShowing(), "precondition: the child is up");
+
+            owner.dispose();
+            DisplayTest.flushEdt();
+            assertTrue(child.isWindowDisposed(),
+                    "the case that already worked has to go on working");
+        } finally {
+            owner.dispose();
+            child.dispose();
+        }
+    }
+
+    @FormTest
     void aShowListenerThatHidesTheWindowStillSeesShownBeforeHidden() {
         implementation.setMultiWindowSupported(true);
         final Window w = new Window("reversing show listener", new BorderLayout());

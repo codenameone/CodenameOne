@@ -347,8 +347,26 @@ public class TestWindowManager extends WindowManager {
                 : new java.util.ArrayList<com.codename1.ui.Command>(c);
     }
 
+    /// Set the first time a synchronous read is served off the EDT. Like
+    /// `#getCommandsPublishedOffEdtBy()`, this makes an EDT-contract violation visible
+    /// at all: the fake answers happily from any thread and every assertion passes.
+    private volatile String readOffEdtBy;
+
+    /// The name of the first non-EDT thread to reach a synchronous read, or null when
+    /// the EDT contract has been honoured throughout.
+    public String getReadOffEdtBy() {
+        return readOffEdtBy;
+    }
+
+    private void recordReadThread() {
+        if (!com.codename1.ui.Display.getInstance().isEdt() && readOffEdtBy == null) {
+            readOffEdtBy = Thread.currentThread().getName();
+        }
+    }
+
     @Override
     public Object capture(Object peer) {
+        recordReadThread();
         captureCalls++;
         return win(peer) == null ? null : captureResult;
     }
@@ -357,6 +375,7 @@ public class TestWindowManager extends WindowManager {
         mainWindowBounds = null;
         publishedCommands.clear();
         commandsPublishedOffEdtBy = null;
+        readOffEdtBy = null;
         captureResult = null;
         captureCalls = 0;
         createFails = false;
@@ -454,6 +473,7 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public int[] getBounds(Object peer, int[] out) {
+        recordReadThread();
         FakeWindow w = win(peer);
         if (w != null) {
             out[0] = w.x;
