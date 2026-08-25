@@ -36,10 +36,15 @@ concurrency:
   # holds its slots until it finishes. Without this, a branch that is pushed
   # several times queues every superseded run behind the current one -- five
   # obsolete runs of this workflow, 6 macOS jobs each, sat queued on this
-  # branch before it was added. On push to master head_ref is empty and the
-  # group falls back to the unique run_id, so every master commit is still
-  # checked in full.
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  # branch before it was added.
+  #
+  # Keyed on the pull request number rather than head_ref, which is the source
+  # branch name with no fork identity in it: two pull requests opened from
+  # different forks that both use a common branch name -- master, patch-1 --
+  # would share a group and cancel each other's check. On push to master there
+  # is no pull request, so the group falls back to the unique run_id and every
+  # master commit is still checked in full.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
