@@ -42,6 +42,10 @@
 #import "ExecutableOp.h"
 #import "DrawString.h"
 #import "ClipRect.h"
+#import "GLUIImage.h"
+#import "CN1Metalcompat.h"
+#import "DrawGradientTextureCache.h"
+#import "DrawStringTextureCache.h"
 
 /// Set while the process is in the background. The garbage collector reads it
 /// to avoid allocating during a suspension the OS may end by terminating us.
@@ -186,14 +190,50 @@ static CodenameOne_GLViewController *singletonInstance = nil;
     [v setFramebuffer];
     // Clamp a screen clip to the region actually being repainted.
     [ClipRect setDrawRect:flushRect];
+
+    // The queue is not all screen drawing. An operation that paints into a
+    // mutable image carries that image as its target, and it needs an encoder
+    // opened against THAT texture -- running it against the screen encoder the
+    // line above opened does not merely draw in the wrong place, it hands Metal
+    // a pipeline bound to the wrong attachment and eventually crashes inside
+    // objc_msgSend. So the drain switches encoders whenever the target changes,
+    // exactly as the UIKit backend does.
+    GLUIImage *currentDrainTarget = nil;
+    BOOL mutableEncoderOpen = NO;
     for (ExecutableOp *op in ops) {
+        GLUIImage *opTarget = [op target];
+        if (opTarget != currentDrainTarget) {
+            if (mutableEncoderOpen) {
+                CN1MetalEndMutableImageDraw(currentDrainTarget);
+                mutableEncoderOpen = NO;
+            }
+            currentDrainTarget = opTarget;
+            if (opTarget != nil) {
+                mutableEncoderOpen = CN1MetalBeginMutableImageDraw(opTarget);
+            }
+        }
+        // A mutable-image operation whose encoder would not open is skipped
+        // rather than run against the screen, which is where it would otherwise
+        // land.
+        if (opTarget != nil && !mutableEncoderOpen) {
+            continue;
+        }
         @try {
             [op executeWithClipping];
         } @catch (NSException *e) {
             // Keep draining: one failing operation must not blank the frame.
         }
     }
+    if (mutableEncoderOpen) {
+        CN1MetalEndMutableImageDraw(currentDrainTarget);
+    }
+
     [ClipRect setDrawRect:CGRectZero];
+    // Textures retired during the drain are freed here, after the last
+    // operation that could still reference one has run. Without this the
+    // caches grow for the life of the process.
+    [DrawGradientTextureCache flushDeleted];
+    [DrawStringTextureCache flushDeleted];
     [v presentFramebuffer];
     painted = YES;
 #ifndef CN1_USE_ARC
