@@ -1893,4 +1893,51 @@ public class BuildHintCatalogTest {
         assertEquals("/elsewhere/gen", CodenameOneSettings.expandProjectPaths(
                 "${project.build.directory}/gen", "/p/common", "/elsewhere"));
     }
+
+    /// A profile this reader cannot evaluate is left out rather than merged in.
+    /// An inactive `<sourceDirectory>src/preview</sourceDirectory>` was read as
+    /// a production root, so a type kept there shadowed the real annotation --
+    /// and activation depends on properties, files, the JDK and the OS, none of
+    /// which this tool has a model for.
+    @Test
+    public void anInactiveProfileIsNotTheBuild() {
+        String pom = "<project><build><sourceDirectory>appsrc</sourceDirectory></build>"
+                + "<profiles>"
+                + "<profile><id>preview</id><activation><property><name>preview</name>"
+                + "</property></activation>"
+                + "<build><sourceDirectory>src/preview</sourceDirectory></build></profile>"
+                + "<profile><id>always</id>"
+                + "<activation><activeByDefault>true</activeByDefault></activation>"
+                + "<build><sourceDirectory>src/always</sourceDirectory></build></profile>"
+                + "</profiles></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("appsrc"), roots.toString());
+        // Active by default is knowable, so it counts.
+        assertTrue(roots.contains("src/always"), roots.toString());
+        // Conditionally active is not, so it does not.
+        assertFalse(roots.contains("src/preview"), roots.toString());
+    }
+
+    /// `<directory>${project.basedir}/out</directory>` is legal and resolvable;
+    /// discarding it sent the search to `target` for a project that compiles
+    /// somewhere else.
+    @Test
+    public void theBuildDirectoryMayUseAnExpression() {
+        assertEquals("${project.basedir}/out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><directory>${project.basedir}/out</directory></build></project>"));
+        assertEquals("/p/common/out/gen", CodenameOneSettings.expandProjectPaths(
+                "${project.build.directory}/gen", "/p/common", "/p/common/out"));
+
+        // The expansion the build directory itself gets: the basedir family.
+        assertEquals("/p/common/out",
+                CodenameOneSettings.expandBasedir("${project.basedir}/out", "/p/common"));
+        assertEquals("/p/common/out",
+                CodenameOneSettings.expandBasedir("${basedir}/out", "/p/common"));
+        assertEquals("out", CodenameOneSettings.expandBasedir("out", "/p/common"));
+
+        // NOT a reference to itself: the general expander resolves that one to
+        // `target`, which would quietly make a self-reference mean the default.
+        assertNull(CodenameOneSettings.expandBasedir("${project.build.directory}/x", "/p/common"));
+        assertNull(CodenameOneSettings.expandBasedir("${custom.dir}/x", "/p/common"));
+    }
 }

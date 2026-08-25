@@ -2404,9 +2404,43 @@ public class CodenameOneSettings extends Lifecycle {
     /// the failure this list exists to avoid.
     static java.util.List<String> declaredSourceRoots(String pomText) {
         java.util.List<String> out = new java.util.ArrayList<>();
+        for (String active : activeConfiguration(pomText)) {
+            collectDeclaredRoots(active, out);
+        }
+        return out;
+    }
+
+    /// The parts of a POM whose configuration is in effect without being asked
+    /// for: the document with its `<profiles>` removed, and any profile that
+    /// says it is active by default.
+    ///
+    /// A profile this reader cannot evaluate is left out rather than merged in.
+    /// An inactive `<sourceDirectory>src/preview</sourceDirectory>` was being
+    /// read as a production root, so a type kept there shadowed the real
+    /// annotation -- and activation depends on properties, files, the JDK and
+    /// the OS, none of which this tool has a model for.
+    static java.util.List<String> activeConfiguration(String pomText) {
+        java.util.List<String> out = new java.util.ArrayList<>();
         if (pomText == null) {
             return out;
         }
+        out.add(withoutElement(pomText, "profiles"));
+        int at = pomText.indexOf("<profile>");
+        while (at >= 0) {
+            int close = pomText.indexOf("</profile>", at);
+            if (close < 0) {
+                break;
+            }
+            String profile = pomText.substring(at, close);
+            if (profile.indexOf("<activeByDefault>true</activeByDefault>") >= 0) {
+                out.add(profile);
+            }
+            at = pomText.indexOf("<profile>", close);
+        }
+        return out;
+    }
+
+    private static void collectDeclaredRoots(String pomText, java.util.List<String> out) {
         // Scoped to the elements that actually declare a compile root.
         // `<source>` and `<sourceDir>` are ordinary words: another plugin
         // naming src/main/templates in one of them is not saying it is
@@ -2422,7 +2456,6 @@ public class CodenameOneSettings extends Lifecycle {
             // plugin's compile and test-compile executions need.
             collectRoots(compileGoalConfiguration(helper, "add-source"), "source", out);
         }
-        return out;
     }
 
     /// The parts of a plugin element whose configuration applies to the MAIN
@@ -2624,7 +2657,7 @@ public class CodenameOneSettings extends Lifecycle {
         // THIS module rather than the module that declared it.
         for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom)) {
-                String expanded = expandProjectPaths(declared, projectDir, buildDirectory());
+                String expanded = expandProjectPaths(declared, projectDir, buildDirectory(projectDir));
                 if (expanded == null) {
                     continue;
                 }
@@ -2721,15 +2754,40 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// The build directory the POM chain configures, nearest first, or null for
     /// Maven's own default.
-    private String buildDirectory() {
+    private String buildDirectory(String projectDir) {
         for (String pom : pomChain()) {
-            String configured = configuredBuildDirectory(pom);
-            if (configured != null && !configured.trim().isEmpty()
-                    && configured.indexOf('$') < 0) {
-                return configured;
+            for (String active : activeConfiguration(pom)) {
+                String configured = configuredBuildDirectory(active);
+                if (configured == null || configured.trim().isEmpty()) {
+                    continue;
+                }
+                // `<directory>${project.basedir}/out</directory>` is legal and
+                // resolvable -- discarding it sent the search to `target` for a
+                // project that compiles somewhere else. Only the basedir family
+                // is applied here: the value being read IS the build directory,
+                // so expanding a reference to it would be circular.
+                String expanded = expandBasedir(configured.trim(), projectDir);
+                if (expanded != null) {
+                    return expanded;
+                }
             }
         }
         return null;
+    }
+
+    /// The basedir family only, which is what a build directory may name.
+    ///
+    /// Not `${project.build.directory}`: the value being read IS the build
+    /// directory, so expanding a reference to it would be circular -- and the
+    /// general expander resolves that one to `target`, which would quietly make
+    /// a self-reference mean the default.
+    static String expandBasedir(String value, String projectDir) {
+        String out = value;
+        out = replaceLiteral(out, "${project.basedir}", projectDir);
+        out = replaceLiteral(out, "${project.baseDir}", projectDir);
+        out = replaceLiteral(out, "${basedir}", projectDir);
+        out = replaceLiteral(out, "${pom.basedir}", projectDir);
+        return out.indexOf('$') >= 0 ? null : out;
     }
 
     /// The bound POM's text, read once per session.
@@ -3439,7 +3497,12 @@ public class CodenameOneSettings extends Lifecycle {
             // multi-module Codename One project puts it -- so looking only at
             // the bound POM found nothing in the standard layout.
             for (String pom : pomChain()) {
-                sourceEncoding = declaredSourceEncoding(pom);
+                for (String active : activeConfiguration(pom)) {
+                    sourceEncoding = declaredSourceEncoding(active);
+                    if (sourceEncoding != null) {
+                        break;
+                    }
+                }
                 if (sourceEncoding != null) {
                     break;
                 }
