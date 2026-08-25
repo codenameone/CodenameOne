@@ -130,18 +130,36 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 }
 
 - (void)flushBuffer:(CN1Image *)buff x:(int)x y:(int)y width:(int)width height:(int)height {
-    @synchronized (self) {
-        if ([upcomingTarget count] > 0) {
-            // Append rather than swap. When several flushes coalesce into one
-            // drawFrame a swap drops every batch but the last, leaving stale
-            // pixels on screen -- the same reason the watch driver appends.
-            [currentTarget addObjectsFromArray:upcomingTarget];
-            [upcomingTarget removeAllObjects];
-            CGRect r = CGRectMake(x, y, width, height);
-            macFlushRect = CGRectIsEmpty(macFlushRect) ? r : CGRectUnion(macFlushRect, r);
+    painted = NO;
+    // On the main thread, and waiting, exactly as the UIKit backend does.
+    //
+    // The drain drives the rendering view's encoder, and the encoder is a
+    // process-global reached through CN1Metalcompat rather than a per-caller
+    // handle. That is correct as long as one thread drains at a time -- but
+    // this is called from the event dispatch thread while Display.screenshot()
+    // drains from the main thread, and two drains interleaving on one encoder
+    // ends in a wild pointer inside objc_msgSend several hundred tests into a
+    // run. Marshalling here is what makes "one at a time" true.
+    void (^flushBlock)(void) = ^{
+        @synchronized (self) {
+            if ([upcomingTarget count] > 0) {
+                // Append rather than swap. When several flushes coalesce into
+                // one drawFrame a swap drops every batch but the last, leaving
+                // stale pixels on screen -- the same reason the watch driver
+                // appends.
+                [currentTarget addObjectsFromArray:upcomingTarget];
+                [upcomingTarget removeAllObjects];
+                CGRect r = CGRectMake(x, y, width, height);
+                macFlushRect = CGRectIsEmpty(macFlushRect) ? r : CGRectUnion(macFlushRect, r);
+            }
         }
+        [self drawFrame:CGRectMake(x, y, width, height)];
+    };
+    if ([NSThread isMainThread]) {
+        flushBlock();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), flushBlock);
     }
-    [self drawFrame:CGRectMake(x, y, width, height)];
 }
 
 - (void)drawScreen {
@@ -187,6 +205,24 @@ static CodenameOne_GLViewController *singletonInstance = nil;
         [currentTarget removeAllObjects];
         macFlushRect = CGRectZero;
     }
+    // The retained target has to be prepared for the region about to be
+    // repainted before the encoder opens, and only when something in this batch
+    // actually draws to the screen -- a drain of nothing but mutable-image
+    // operations must leave the screen alone. Skipping this left a partial
+    // flush drawing against a target that had not been set up for its rect.
+    BOOL hasScreenOps = NO;
+    for (ExecutableOp *op in ops) {
+        if ([op target] == nil) {
+            hasScreenOps = YES;
+            break;
+        }
+    }
+    if (hasScreenOps) {
+        [v prepareRetainedFramebufferForDrawRect:rect
+                                    displayWidth:[CN1MacHost sharedHost].displayWidth
+                                   displayHeight:[CN1MacHost sharedHost].displayHeight];
+    }
+
     [v setFramebuffer];
     // Clamp a screen clip to the region actually being repainted.
     [ClipRect setDrawRect:flushRect];
