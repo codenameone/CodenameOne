@@ -2349,6 +2349,44 @@ public class CodenameOneSettings extends Lifecycle {
     /// declarations made elsewhere.
     private String lastSourcePath;
 
+    /// Whether the walk should descend into `dir`/`name` looking for sources
+    /// that take part in compiling the main class.
+    ///
+    /// Three rules, and each of them was a bug first:
+    ///
+    /// - An output directory holds COPIES of the sources read elsewhere, and
+    ///   walking one found a generated stub and called it the main class.
+    /// - Unless `build` is a package NAME under a source tree, which this
+    ///   repository has -- refusing to descend there meant a main class living
+    ///   in it could not be read at all.
+    /// - A `src/test` tree takes no part in compiling the main class, so a
+    ///   same-package type there shadows nothing; counting it made a production
+    ///   annotation look like somebody else's.
+    static boolean peerDirectoryHoldsSources(String dir, String name, boolean insideSourceTree) {
+        if (name.startsWith(".")) {
+            return false;
+        }
+        if (("target".equals(name) || "build".equals(name)) && !insideSourceTree) {
+            return false;
+        }
+        return !("test".equals(name) && dir.endsWith("/src"));
+    }
+
+    /// The generated source root under the output directory `dir`/`name`, or
+    /// null when that is not what this directory is.
+    ///
+    /// Everything else under an output directory is a copy, but
+    /// `generated-sources` is not: Maven plugins add it as a compile root, so a
+    /// declaration there is one the compiler sees. Named rather than read out of
+    /// the effective model, which is a large amount of machinery for one
+    /// conventional directory.
+    static String generatedSourceRootUnder(String dir, String name) {
+        if (!"target".equals(name) && !"build".equals(name)) {
+            return null;
+        }
+        return dir + "/" + name + "/generated-sources";
+    }
+
     /// The text of every OTHER source in the project, bounded.
     ///
     /// For the declarations that are not file-scoped and so can decide what a
@@ -2384,18 +2422,14 @@ public class CodenameOneSettings extends Lifecycle {
                 String name = child.endsWith("/") ? child.substring(0, child.length() - 1) : child;
                 String path = dir + "/" + name;
                 if (FileSystemStorage.getInstance().isDirectory(ProjectIO.fsUrl(path))) {
-                    // Same rule as the main-class search: an output directory
-                    // holds copies, unless `build` is a package name under src/.
-                    boolean output = ("target".equals(name) || "build".equals(name))
-                            && !insideSourceTree(dir);
-                    // A test tree does not take part in compiling the main
-                    // class, so a same-package type there shadows nothing --
-                    // counting it made a production `@Ios` look like somebody
-                    // else's, so the hint read as unowned and Add wrote the
-                    // duplicate the next build refuses.
-                    boolean tests = "test".equals(name) && dir.endsWith("/src");
-                    if (!output && !tests && !name.startsWith(".")) {
+                    if (peerDirectoryHoldsSources(dir, name, insideSourceTree(dir))) {
                         queue.add(path);
+                    } else {
+                        String generated = generatedSourceRootUnder(dir, name);
+                        if (generated != null && FileSystemStorage.getInstance()
+                                .isDirectory(ProjectIO.fsUrl(generated))) {
+                            queue.add(generated);
+                        }
                     }
                     continue;
                 }

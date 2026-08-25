@@ -1488,4 +1488,41 @@ public class BuildHintCatalogTest {
                 java.util.Collections.singletonList(kotlinOwn));
         assertNull(owned.get("ios.teamId"));
     }
+
+    /// Which directories the peer sweep walks. Each of these rules was a bug
+    /// first, and until now they lived inside the walk itself -- which needs a
+    /// project directory and the Codename One FileSystemStorage, so none of them
+    /// were covered.
+    @Test
+    public void thePeerSweepWalksTheSourceTreesOnly() {
+        // Ordinary source directories.
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "src", false));
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "main", false));
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src/main", "kotlin",
+                false));
+
+        // Output directories hold copies of those same sources.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "target", false));
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common", "build", false));
+
+        // ...unless `build` is a package name, which this repository has.
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
+                "/p/common/src/main/java/com/codename1", "build", true));
+
+        // A test tree takes no part in compiling the main class.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "test", false));
+        // ...but a directory called test deeper in a package is a package.
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
+                "/p/common/src/main/java/com", "test", false));
+
+        // Hidden directories are not source trees.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p", ".git", false));
+
+        // Generated sources under an output directory ARE a compile root.
+        assertEquals("/p/common/target/generated-sources",
+                CodenameOneSettings.generatedSourceRootUnder("/p/common", "target"));
+        assertEquals("/p/common/build/generated-sources",
+                CodenameOneSettings.generatedSourceRootUnder("/p/common", "build"));
+        assertNull(CodenameOneSettings.generatedSourceRootUnder("/p/common/src", "test"));
+    }
 }
