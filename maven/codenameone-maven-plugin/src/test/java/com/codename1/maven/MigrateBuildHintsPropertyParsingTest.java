@@ -617,4 +617,28 @@ public class MigrateBuildHintsPropertyParsingTest {
         byte[] all = java.nio.file.Files.readAllBytes(f.toPath());
         return new String(all, "ISO-8859-1");
     }
+
+    /// The source is read byte for byte, while `codename1.packageName` and
+    /// `codename1.mainName` come from a properties file and are real Unicode.
+    /// For an ASCII name the two spellings are identical; for
+    /// `package com.\u5e94\u7528` in a UTF-8 file they are not, and comparing
+    /// only the Unicode one made the goal refuse a valid migration saying it
+    /// could not find the main source.
+    @Test
+    public void aNonAsciiNameIsMatchedAsTheSourceSpellsIt() throws Exception {
+        String pkg = "com.\u5e94\u7528";
+        String asWritten = MigrateBuildHintsMojo.asWrittenInSource(pkg);
+        // The bytes of the UTF-8 file, read one per character.
+        assertEquals(new String(pkg.getBytes("UTF-8"), "ISO-8859-1"), asWritten);
+        assertTrue("a non-ASCII name must read differently", !asWritten.equals(pkg));
+
+        // An ASCII name is untouched, so nothing about the common case changes.
+        assertEquals("com.example", MigrateBuildHintsMojo.asWrittenInSource("com.example"));
+
+        // And the declaration locator accepts either spelling of the class name.
+        String source = "package " + asWritten + ";\n\nclass "
+                + MigrateBuildHintsMojo.asWrittenInSource("\u5e94\u7528") + " {\n}\n";
+        assertEquals(source.indexOf("class "),
+                MigrateBuildHintsMojo.classDeclarationIndex(source, false, "\u5e94\u7528"));
+    }
 }

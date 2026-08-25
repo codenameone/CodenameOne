@@ -831,10 +831,37 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // `class Outer { class Main }` -- the annotations were then inserted on
         // Outer, and the verification build rejected the placement and rolled the
         // migration back.
-        return pkg.equals(com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaredPackageIn(text, kotlin))
-                && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .declaresNestedPath(text, new String[] {simple}, kotlin);
+        String declaredPkg = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaredPackageIn(text, kotlin);
+        return (pkg.equals(declaredPkg) || asWrittenInSource(pkg).equals(declaredPkg))
+                && (com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaresNestedPath(text, new String[] {simple}, kotlin)
+                    || com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaresNestedPath(text, new String[] {asWrittenInSource(simple)}, kotlin));
+    }
+
+    /// `name` spelled the way a UTF-8 source file reads under the
+    /// byte-transparent scheme, or `name` itself when it is ASCII.
+    ///
+    /// The source is read byte for byte -- see [#read(File)] -- while
+    /// `codename1.packageName` and `codename1.mainName` come from a properties
+    /// file, which is real Unicode. For an ASCII name the two are identical, but
+    /// `package com.应用` in a UTF-8 file reads as its individual bytes, so the
+    /// comparison failed and the goal refused a valid migration saying it could
+    /// not find the main source.
+    ///
+    /// Compared as an ALTERNATIVE rather than a replacement, so nothing is
+    /// assumed about the file's encoding: an ASCII file matches either way, a
+    /// UTF-8 one matches this spelling, and a source genuinely written in a
+    /// single-byte encoding still matches the plain one. Reinterpreting the file
+    /// instead would decide its encoding for it, which is the thing the
+    /// byte-transparent read exists to avoid.
+    static String asWrittenInSource(String name) {
+        try {
+            return new String(name.getBytes("UTF-8"), SOURCE_BYTE_TRANSPARENT_ENCODING);
+        } catch (java.io.UnsupportedEncodingException ex) {
+            return name;
+        }
     }
 
     /**
@@ -1264,7 +1291,8 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     // the annotations have to go before those.
                     int start = startOfModifiers(code, i);
                     if (simpleName != null && simpleName.length() > 0
-                            && declared.equals(simpleName)) {
+                            && (declared.equals(simpleName)
+                                || declared.equals(asWrittenInSource(simpleName)))) {
                         return start;
                     }
                     if (first < 0) {
