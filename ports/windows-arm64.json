@@ -1,48 +1,48 @@
 {
-  "commit": "cc57582302f260fd40ca8e28a43802b088193ea6",
-  "generated_at": "2026-08-25T16:08:54Z",
+  "commit": "e1065051c0b032ed08c97ec19b23fce4268d8dae",
+  "generated_at": "2026-08-25T18:32:18Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 177354000
+        "duration_ns": 175050000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 24843000
+        "duration_ns": 24961000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 51427000
+        "duration_ns": 50535000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62840000
+        "duration_ns": 62901000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39414000
+        "duration_ns": 39208000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 214678000
+        "duration_ns": 221238000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 1261244000
+        "duration_ns": 1268011000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 94005000
+        "duration_ns": 92913000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 122761000
+        "duration_ns": 132309000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 80861000
+        "duration_ns": 79395000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "windows-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32865259372",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32881092732",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 177,
+    "pass": 184,
     "skip": 3
   },
   "tests": {
@@ -516,6 +516,10 @@
       "feature": "native-theme-controls",
       "status": "pass"
     },
+    "MultiWindowApiTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
       "status": "pass"
@@ -789,6 +793,30 @@
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
+      "status": "pass"
+    },
+    "WindowEditingTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowGraphicsTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowLayoutTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowModalTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowOverlayTest": {
+      "feature": "multi-window",
+      "status": "pass"
+    },
+    "WindowScrollTest": {
+      "feature": "multi-window",
       "status": "pass"
     }
   }
