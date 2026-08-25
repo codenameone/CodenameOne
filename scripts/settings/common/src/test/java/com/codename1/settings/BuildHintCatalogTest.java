@@ -1801,6 +1801,84 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.declaredSourceRoots(null).isEmpty());
     }
 
+    /// A root or an encoding written as an ordinary `${property}` is one Maven
+    /// resolves from the POM's own `<properties>`, so this reader resolves it
+    /// too.
+    ///
+    /// Dropping such a root is a main class this tool cannot find, and then Add
+    /// offers that class's annotation-owned hints as properties to set a second
+    /// time -- the duplicate declaration the next build refuses.
+    @Test
+    public void anOrdinaryPropertyIsResolvedFromThePom() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties>"
+                        + "<generated.sources>gen/from-pom</generated.sources>"
+                        + "<shared.root>${generated.sources}/nested</shared.root>"
+                        + "<source.charset>Shift_JIS</source.charset>"
+                        + "</properties>"
+                        // A plugin's own <properties> is not a project property.
+                        + "<build><plugins><plugin>"
+                        + "<artifactId>maven-surefire-plugin</artifactId>"
+                        + "<configuration><properties><forked>yes</forked></properties>"
+                        + "</configuration></plugin></plugins></build>"
+                        + "</project>", properties);
+        assertEquals("gen/from-pom", properties.get("generated.sources"));
+        assertNull(properties.get("forked"), properties.toString());
+
+        // Relative as written: the caller resolves it against the project
+        // directory, the same as any other relative root.
+        assertEquals("gen/from-pom", CodenameOneSettings.expandProjectPaths(
+                "${generated.sources}", "/p/common", "/p/common/target", properties));
+        // A property written in terms of another resolves too.
+        assertEquals("gen/from-pom/nested", CodenameOneSettings.expandProjectPaths(
+                "${shared.root}", "/p/common", "/p/common/target", properties));
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                        + "<configuration><encoding>${source.charset}</encoding>"
+                        + "</configuration></plugin></plugins></build></project>", properties));
+
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${generated.sources}</sourceDirectory>"
+                        + "</build></project>", properties);
+        assertTrue(roots.contains("${generated.sources}"), roots.toString());
+
+        // A name nothing declares is still left alone rather than guessed at.
+        assertNull(CodenameOneSettings.expandProjectPaths(
+                "${nobody.declares.this}/x", "/p/common", null, properties));
+        assertNull(CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties>"
+                        + "<project.build.sourceEncoding>${nobody.declares.this}"
+                        + "</project.build.sourceEncoding></properties></project>", properties));
+    }
+
+    /// A nearer POM's property wins, which is how a module overrides its
+    /// parent's value.
+    @Test
+    public void theNearerPomsPropertyWins() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties><gen>module</gen></properties></project>", properties);
+        CodenameOneSettings.declaredProperties(
+                "<project><properties><gen>parent</gen>"
+                        + "<only.parent>p</only.parent></properties></project>", properties);
+        assertEquals("module", properties.get("gen"));
+        assertEquals("p", properties.get("only.parent"));
+    }
+
+    /// A `$` that opens nothing is an ordinary character in a path -- dropping
+    /// such a root lost a real source directory.
+    @Test
+    public void aDollarThatOpensNothingIsPartOfThePath() {
+        assertEquals("gen/dollar$dir",
+                CodenameOneSettings.expandProjectPaths("gen/dollar$dir", "/p/common"));
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>gen/dollar$dir</sourceDirectory>"
+                        + "</build></project>");
+        assertTrue(roots.contains("gen/dollar$dir"), roots.toString());
+    }
+
     /// maven-resources-plugin declares an `<encoding>` of its own, and taking
     /// the first one in the file adopted the resource charset for every source.
     @Test

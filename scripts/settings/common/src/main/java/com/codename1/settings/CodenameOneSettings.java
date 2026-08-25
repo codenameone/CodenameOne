@@ -2407,9 +2407,17 @@ public class CodenameOneSettings extends Lifecycle {
     /// through the same elements, and one of them shadowing a production type is
     /// the failure this list exists to avoid.
     static java.util.List<String> declaredSourceRoots(String pomText) {
+        return declaredSourceRoots(pomText, null);
+    }
+
+    /// The same list, resolving a `${property}` root against `properties` --
+    /// what the POM chain declares. A root written that way is one Maven
+    /// compiles, and dropping it is a main class this tool cannot find.
+    static java.util.List<String> declaredSourceRoots(String pomText,
+                                                      java.util.Map<String, String> properties) {
         java.util.List<String> out = new java.util.ArrayList<>();
         for (String active : activeConfiguration(pomText)) {
-            collectDeclaredRoots(active, out);
+            collectDeclaredRoots(active, properties, out);
         }
         return out;
     }
@@ -2444,21 +2452,24 @@ public class CodenameOneSettings extends Lifecycle {
         return out;
     }
 
-    private static void collectDeclaredRoots(String pomText, java.util.List<String> out) {
+    private static void collectDeclaredRoots(String pomText,
+                                             java.util.Map<String, String> properties,
+                                             java.util.List<String> out) {
         // Scoped to the elements that actually declare a compile root.
         // `<source>` and `<sourceDir>` are ordinary words: another plugin
         // naming src/main/templates in one of them is not saying it is
         // compiled, and treating it as a root put the templates back in the
         // sweep that the root list had just taken them out of.
-        collectRoots(elementValues(pomText, "sourceDirectory"), out);
+        collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
         collectRoots(compileGoalConfiguration(pluginBlock(pomText, "kotlin-maven-plugin"),
-                "compile"), "sourceDir", out);
+                "compile"), "sourceDir", properties, out);
         String helper = pluginBlock(pomText, "build-helper-maven-plugin");
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
             // plugin's compile and test-compile executions need.
-            collectRoots(compileGoalConfiguration(helper, "add-source"), "source", out);
+            collectRoots(compileGoalConfiguration(helper, "add-source"), "source",
+                    properties, out);
         }
     }
 
@@ -2505,18 +2516,21 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
     private static void collectRoots(java.util.List<String> blocks, String element,
+                                     java.util.Map<String, String> properties,
                                      java.util.List<String> out) {
         for (String block : blocks) {
-            collectRoots(elementValues(block, element), out);
+            collectRoots(elementValues(block, element), properties, out);
         }
     }
 
-    private static void collectRoots(java.util.List<String> values, java.util.List<String> out) {
+    private static void collectRoots(java.util.List<String> values,
+                                     java.util.Map<String, String> properties,
+                                     java.util.List<String> out) {
         for (String value : values) {
             String path = value.trim().replace('\\', '/');
             // A `${project.basedir}` prefix is deterministic and common; only
             // an expression this reader cannot resolve makes the path unusable.
-            if (path.isEmpty() || expandProjectPaths(path, "/probe") == null
+            if (path.isEmpty() || expandProjectPaths(path, "/probe", null, properties) == null
                     || looksLikeATestRoot(path)) {
                 continue;
             }
@@ -2541,6 +2555,19 @@ public class CodenameOneSettings extends Lifecycle {
     /// `<build><directory>` says otherwise -- hard-coding `target` sent the
     /// search to a directory a project that overrides it does not compile from.
     static String expandProjectPaths(String path, String projectDir, String buildDirectory) {
+        return expandProjectPaths(path, projectDir, buildDirectory, null);
+    }
+
+    /// As above, also resolving an ordinary `${property}` against what the POM
+    /// chain declares.
+    ///
+    /// Only the project expressions used to be resolved and everything else was
+    /// discarded, which is not "unknown, leave it alone": a dropped root is a
+    /// main class this tool cannot find, and then Add offers that class's
+    /// annotation-owned hints as properties to set a second time -- the
+    /// duplicate declaration the next build refuses.
+    static String expandProjectPaths(String path, String projectDir, String buildDirectory,
+                                     java.util.Map<String, String> properties) {
         String build = buildDirectory == null || buildDirectory.trim().isEmpty()
                 ? projectDir + "/target" : buildDirectory.trim().replace('\\', '/');
         if (!build.startsWith("/") && build.indexOf(':') != 1) {
@@ -2552,7 +2579,59 @@ public class CodenameOneSettings extends Lifecycle {
         out = replaceLiteral(out, "${basedir}", projectDir);
         out = replaceLiteral(out, "${pom.basedir}", projectDir);
         out = replaceLiteral(out, "${project.build.directory}", build);
-        return out.indexOf('$') >= 0 ? null : out;
+        out = resolveDeclaredProperties(out, properties);
+        // A `$` that opens nothing is an ordinary character in a path; only an
+        // unresolved `${...}` makes the value unusable.
+        return out.indexOf("${") >= 0 ? null : out;
+    }
+
+    /// `value` with every `${name}` the POM chain defines applied, repeating for
+    /// a property written in terms of another and stopping on a cycle.
+    ///
+    /// Names it does not know are left in place, so the caller can still tell an
+    /// unresolved expression from a resolved one.
+    static String resolveDeclaredProperties(String value,
+                                            java.util.Map<String, String> properties) {
+        if (value == null || properties == null || properties.isEmpty()) {
+            return value;
+        }
+        String out = value;
+        // Long enough for a property defined in terms of another; a cycle stops
+        // here rather than looping.
+        for (int pass = 0; pass < 8 && out.indexOf("${") >= 0; pass++) {
+            StringBuilder expanded = new StringBuilder();
+            boolean changed = false;
+            int at = 0;
+            while (true) {
+                int open = out.indexOf("${", at);
+                if (open < 0) {
+                    expanded.append(out.substring(at));
+                    break;
+                }
+                int close = out.indexOf('}', open + 2);
+                if (close < 0) {
+                    // Not an expression, just a stray `${`.
+                    expanded.append(out.substring(at));
+                    break;
+                }
+                expanded.append(out, at, open);
+                String resolved = properties.get(out.substring(open + 2, close));
+                if (resolved == null) {
+                    expanded.append(out, open, close + 1);
+                } else {
+                    expanded.append(resolved);
+                    changed = true;
+                }
+                at = close + 1;
+            }
+            out = expanded.toString();
+            if (!changed) {
+                // Everything left is a name nothing declares; another pass would
+                // produce the same string.
+                break;
+            }
+        }
+        return out;
     }
 
     /// The `<directory>` the POM's `<build>` element configures, or null.
@@ -2687,8 +2766,9 @@ public class CodenameOneSettings extends Lifecycle {
         // explicitly DEACTIVATES an activeByDefault profile, so a root read from
         // such a profile is one the build is not compiling.
         for (String pom : pomChain()) {
-            for (String declared : declaredSourceRoots(pom)) {
-                String expanded = expandProjectPaths(declared, projectDir, buildDirectory(projectDir));
+            for (String declared : declaredSourceRoots(pom, pomProperties())) {
+                String expanded = expandProjectPaths(declared, projectDir,
+                        buildDirectory(projectDir), pomProperties());
                 if (expanded == null) {
                     continue;
                 }
@@ -2705,6 +2785,110 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return out;
+    }
+
+    /// Every `<properties>` name the POM chain declares, nearest POM winning.
+    ///
+    /// Read once per session: the chain does not change while the project is
+    /// bound, and this walks the filesystem to find the parents.
+    ///
+    /// A profile this reader cannot evaluate contributes nothing, the same rule
+    /// `activeConfiguration` applies to everything else. `-D` is invisible here
+    /// -- the launcher resolves that and publishes the answer in the binding;
+    /// this is the fallback for when it did not.
+    private java.util.Map<String, String> pomProperties() {
+        if (!pomPropertiesRead) {
+            pomPropertiesRead = true;
+            pomProperties = new java.util.HashMap<>();
+            for (String pom : pomChain()) {
+                for (String active : activeConfiguration(pom)) {
+                    // Nearest POM first, and a name already taken stays taken:
+                    // a module's own property overrides its parent's.
+                    // The plugin sections carry `<properties>` elements of
+                    // their own -- surefire's system properties, for one -- and
+                    // reading those as project properties would resolve a root
+                    // against a name the model does not define.
+                    String declarations = withoutElement(active, "plugins");
+                    declarations = withoutElement(declarations, "pluginManagement");
+                    for (String block : elementValues(declarations, "properties")) {
+                        collectProperties(block, pomProperties);
+                    }
+                }
+            }
+        }
+        return pomProperties;
+    }
+
+    private boolean pomPropertiesRead;
+    private java.util.Map<String, String> pomProperties;
+
+    /// The `<properties>` `pomText` declares, added to `out` unless the name is
+    /// already there -- a nearer POM's value wins.
+    ///
+    /// Only the configuration that is in effect, the same rule
+    /// `activeConfiguration` applies to everything else.
+    static void declaredProperties(String pomText, java.util.Map<String, String> out) {
+        for (String active : activeConfiguration(pomText)) {
+            // The plugin sections carry `<properties>` elements of their own --
+            // surefire's system properties, for one -- and reading those as
+            // project properties would resolve a root against a name the model
+            // does not define.
+            String declarations = withoutElement(active, "plugins");
+            declarations = withoutElement(declarations, "pluginManagement");
+            for (String block : elementValues(declarations, "properties")) {
+                collectProperties(block, out);
+            }
+        }
+    }
+
+    /// The name/value pairs a `<properties>` block declares.
+    ///
+    /// A string read like the rest of this tool's POM handling: every direct
+    /// child element is a property, and its name is the tag.
+    static void collectProperties(String block, java.util.Map<String, String> out) {
+        if (block == null) {
+            return;
+        }
+        int at = 0;
+        while (true) {
+            int open = block.indexOf('<', at);
+            if (open < 0) {
+                return;
+            }
+            if (open + 4 <= block.length() && "<!--".equals(block.substring(open, open + 4))) {
+                int end = block.indexOf("-->", open);
+                if (end < 0) {
+                    return;
+                }
+                at = end + 3;
+                continue;
+            }
+            int nameEnd = block.indexOf('>', open);
+            if (nameEnd < 0) {
+                return;
+            }
+            String name = block.substring(open + 1, nameEnd).trim();
+            if (name.isEmpty() || name.charAt(0) == '/' || name.charAt(0) == '?'
+                    || name.endsWith("/")) {
+                at = nameEnd + 1;
+                continue;
+            }
+            // An attribute is not part of the name, and a property element does
+            // not carry one that matters here.
+            int space = name.indexOf(' ');
+            if (space >= 0) {
+                name = name.substring(0, space);
+            }
+            int close = block.indexOf("</" + name + ">", nameEnd);
+            if (close < 0) {
+                at = nameEnd + 1;
+                continue;
+            }
+            if (!out.containsKey(name)) {
+                out.put(name, block.substring(nameEnd + 1, close).trim());
+            }
+            at = close + name.length() + 3;
+        }
     }
 
     /// The bound POM and its ancestors, nearest first.
@@ -2797,7 +2981,7 @@ public class CodenameOneSettings extends Lifecycle {
                 // project that compiles somewhere else. Only the basedir family
                 // is applied here: the value being read IS the build directory,
                 // so expanding a reference to it would be circular.
-                String expanded = expandBasedir(configured.trim(), projectDir);
+                String expanded = expandBasedir(configured.trim(), projectDir, pomProperties());
                 if (expanded != null) {
                     return expanded;
                 }
@@ -2813,12 +2997,19 @@ public class CodenameOneSettings extends Lifecycle {
     /// general expander resolves that one to `target`, which would quietly make
     /// a self-reference mean the default.
     static String expandBasedir(String value, String projectDir) {
+        return expandBasedir(value, projectDir, null);
+    }
+
+    /// As above, also resolving an ordinary `${property}`.
+    static String expandBasedir(String value, String projectDir,
+                                java.util.Map<String, String> properties) {
         String out = value;
         out = replaceLiteral(out, "${project.basedir}", projectDir);
         out = replaceLiteral(out, "${project.baseDir}", projectDir);
         out = replaceLiteral(out, "${basedir}", projectDir);
         out = replaceLiteral(out, "${pom.basedir}", projectDir);
-        return out.indexOf('$') >= 0 ? null : out;
+        out = resolveDeclaredProperties(out, properties);
+        return out.indexOf("${") >= 0 ? null : out;
     }
 
     /// The bound POM's text, read once per session.
@@ -3537,7 +3728,7 @@ public class CodenameOneSettings extends Lifecycle {
             // the bound POM found nothing in the standard layout.
             for (String pom : pomChain()) {
                 for (String active : activeConfiguration(pom)) {
-                    sourceEncoding = declaredSourceEncoding(active);
+                    sourceEncoding = declaredSourceEncoding(active, pomProperties());
                     if (sourceEncoding != null) {
                         break;
                     }
@@ -3560,6 +3751,19 @@ public class CodenameOneSettings extends Lifecycle {
     /// POMs everywhere else. It is looking for one value that is written as a
     /// plain element in both places.
     static String declaredSourceEncoding(String pomText) {
+        return declaredSourceEncoding(pomText, null);
+    }
+
+    /// The same answer, resolving a `${property}` encoding against what the POM
+    /// chain declares.
+    ///
+    /// `<encoding>${source.charset}</encoding>` is the charset Maven really
+    /// compiles with. Discarding it fell through to an inherited
+    /// `project.build.sourceEncoding` that is not the one in force, and a
+    /// non-ASCII package or main-class name was then decoded with the wrong
+    /// charset -- missing the annotated source altogether.
+    static String declaredSourceEncoding(String pomText,
+                                         java.util.Map<String, String> properties) {
         if (pomText == null) {
             return null;
         }
@@ -3574,9 +3778,10 @@ public class CodenameOneSettings extends Lifecycle {
             // with a differently encoded resources block was read as neither.
             value = elementValue(pluginBlock(pomText, "maven-compiler-plugin"), "encoding");
         }
-        if (value == null || value.trim().isEmpty() || value.indexOf('$') >= 0) {
-            // An unresolved ${property} is not an encoding, and this reader has
-            // no model to resolve it against.
+        value = resolveDeclaredProperties(value, properties);
+        if (value == null || value.trim().isEmpty() || value.indexOf("${") >= 0) {
+            // An expression nothing declares is not an encoding; the caller
+            // falls back rather than compiling a property name as a charset.
             return null;
         }
         return value.trim();
