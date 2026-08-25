@@ -1336,4 +1336,57 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.visibleTypeAliases(main,
                         java.util.Arrays.asList(a, broken)), "Ios", true).isEmpty());
     }
+
+    /// On a top-level Kotlin declaration `private` means this FILE only, not
+    /// this package. Exposing another file's private alias let it vouch for an
+    /// unrelated annotation of the same name, hiding the editor for a hint
+    /// nothing owns.
+    @Test
+    public void aPrivateAliasBelongsToItsFile() {
+        String sibling = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private typealias AppIos = Ios\n";
+        String main = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        java.util.List<String> others = java.util.Collections.singletonList(sibling);
+
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main, others), "Ios", true).isEmpty());
+
+        // Without the modifier the same declaration is visible in the package.
+        String shared = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(shared)), "Ios", true));
+
+        // A private alias in the MAIN file is the file it belongs to.
+        String privateHere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(privateHere, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // `internal` is module-wide, so it is not this file's alone.
+        String internal = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "internal typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(internal)), "Ios", true));
+
+        // A `private` belonging to whatever came before is not this one's.
+        String before = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private val x = 1\n"
+                + "typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(before)), "Ios", true));
+    }
 }

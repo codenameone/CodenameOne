@@ -2881,6 +2881,40 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// Whether the declaration at `at` carries the `private` modifier.
+    ///
+    /// Read backwards over the modifiers that may precede the keyword, stopping
+    /// at anything that is not one -- so a `private` belonging to whatever came
+    /// before this declaration is not read as this one's.
+    private static boolean declaredPrivate(String source, int at) {
+        int i = at;
+        for (int word = 0; word < 4; word++) {
+            int end = i;
+            while (end > 0 && (source.charAt(end - 1) == ' ' || source.charAt(end - 1) == '\t'
+                    || source.charAt(end - 1) == '\n' || source.charAt(end - 1) == '\r')) {
+                end--;
+            }
+            int start = end;
+            while (start > 0 && continuesAName(source.charAt(start - 1))) {
+                start--;
+            }
+            if (start == end) {
+                return false;
+            }
+            String modifier = source.substring(start, end);
+            if ("private".equals(modifier)) {
+                return true;
+            }
+            if (!"public".equals(modifier) && !"internal".equals(modifier)
+                    && !"protected".equals(modifier) && !"actual".equals(modifier)
+                    && !"expect".equals(modifier)) {
+                return false;
+            }
+            i = start;
+        }
+        return false;
+    }
+
     /// Every `typealias` `mainSource` can see, with the name it sees it under.
     ///
     /// Visibility is per SYMBOL, not per package: `import com.other.Unrelated`
@@ -2912,6 +2946,14 @@ public class CodenameOneSettings extends Lifecycle {
             String pkg = declaredPackageIn(other, true);
             boolean samePackage = pkg.equals(mainPkg);
             for (String[] declared : typeAliasDeclarations(other, true)) {
+                if ("private".equals(declared[2])) {
+                    // On a top-level Kotlin declaration `private` means this FILE
+                    // only, not this package -- so another file's is not a name
+                    // the main source can write, and treating it as one let it
+                    // vouch for an unrelated annotation of the same name and hide
+                    // the editor for a hint nothing owns.
+                    continue;
+                }
                 String visible = samePackage ? declared[0]
                         : importedNameOf(imports, pkg, declared[0]);
                 // Kept even when invisible: it may still be a LINK in a chain
@@ -3059,7 +3101,11 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
-    /// Every `typealias Name = Target` in `source`, as {name, target}.
+    /// Every `typealias Name = Target` in `source`, as {name, target, private}.
+    ///
+    /// The third element is "private" when the declaration carries that
+    /// modifier, which on a top-level Kotlin declaration means visible in this
+    /// FILE only -- not in the package.
     static java.util.List<String[]> typeAliasDeclarations(String source, boolean kotlin) {
         java.util.List<String[]> out = new java.util.ArrayList<String[]>();
         if (!kotlin || source == null) {
@@ -3078,7 +3124,8 @@ public class CodenameOneSettings extends Lifecycle {
                         String name = componentText(source, n, end, kotlin);
                         int eq = nextLiveChar(source, end, kotlin);
                         if (eq >= 0 && source.charAt(eq) == '=') {
-                            out.add(new String[] {name, qualifiedNameAt(source, eq + 1, kotlin)});
+                            out.add(new String[] {name, qualifiedNameAt(source, eq + 1, kotlin),
+                                    declaredPrivate(source, at) ? "private" : ""});
                         }
                     }
                 }
