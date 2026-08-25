@@ -42,6 +42,7 @@
 /// need more than that are converted individually.
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
+#import <CoreImage/CoreImage.h>
 #else
 #import <UIKit/UIKit.h>
 #endif
@@ -121,6 +122,66 @@ static inline CN1Image * _Nullable UIGraphicsGetImageFromCurrentImageContext(voi
 
 static inline void UIGraphicsEndImageContext(void) {
     [NSGraphicsContext restoreGraphicsState];
+}
+
+/*
+ * Name-only differences. The constants and the types behind them are identical;
+ * only the prefix moved when the API was brought to AppKit, so aliasing them is
+ * the whole of the port for the call sites that use them -- unlike UIImage and
+ * NSImage, which are genuinely different ideas and are converted per site.
+ */
+#define UIFontTextStyleBody          NSFontTextStyleBody
+#define UIFontTextStyleHeadline      NSFontTextStyleHeadline
+#define UIFontTextStyleSubheadline   NSFontTextStyleSubheadline
+#define UIFontTextStyleCaption1      NSFontTextStyleCaption1
+#define UIFontTextStyleCaption2      NSFontTextStyleCaption2
+#define UIFontTextStyleFootnote      NSFontTextStyleFootnote
+#define UIFontWeightUltraLight       NSFontWeightUltraLight
+#define UIFontWeightThin             NSFontWeightThin
+#define UIFontWeightLight            NSFontWeightLight
+#define UIFontWeightRegular          NSFontWeightRegular
+#define UIFontWeightMedium           NSFontWeightMedium
+#define UIFontWeightSemibold         NSFontWeightSemibold
+#define UIFontWeightBold             NSFontWeightBold
+#define UIFontWeightHeavy            NSFontWeightHeavy
+#define UIFontWeightBlack            NSFontWeightBlack
+
+/*
+ * Image encoding. UIKit exposes these as free functions and AppKit as a
+ * representation object; the conversion is genuinely mechanical -- unlike
+ * NSImage vs UIImage themselves, which are different ideas and are converted
+ * per call site.
+ */
+typedef NS_ENUM(NSInteger, UIImageOrientation) {
+    UIImageOrientationUp = 0
+};
+
+static inline NSBitmapImageRep * _Nullable CN1AppleBitmapRep(NSImage * _Nullable image) {
+    if (image == nil) {
+        return nil;
+    }
+    // Asking the image for "its" bitmap has more than one answer, so the CGImage
+    // is taken at the image's own size and wrapped, rather than picking one of
+    // the representations and hoping it is the right one.
+    CGImageRef cg = [image CGImageForProposedRect:NULL context:nil hints:nil];
+    if (cg == NULL) {
+        return nil;
+    }
+    NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithCGImage:cg];
+    rep.size = image.size;
+    return rep;
+}
+
+static inline NSData * _Nullable UIImagePNGRepresentation(NSImage * _Nullable image) {
+    NSBitmapImageRep *rep = CN1AppleBitmapRep(image);
+    return [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+}
+
+static inline NSData * _Nullable UIImageJPEGRepresentation(NSImage * _Nullable image,
+                                                           CGFloat quality) {
+    NSBitmapImageRep *rep = CN1AppleBitmapRep(image);
+    return [rep representationUsingType:NSBitmapImageFileTypeJPEG
+                             properties:@{NSImageCompressionFactor: @(quality)}];
 }
 
 static inline void UIRectFill(CGRect rect) {

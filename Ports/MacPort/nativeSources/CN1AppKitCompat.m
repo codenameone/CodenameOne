@@ -92,3 +92,48 @@ BOOL CN1AppKitReadARGB(CGImageRef cgImage, unsigned int *argb, int width, int he
 }
 
 #endif
+
+NSImage * _Nullable CN1AppKitNSImageFromARGB(const unsigned int * _Nonnull argb,
+                                             int width, int height) {
+    if (argb == NULL || width <= 0 || height <= 0) {
+        return nil;
+    }
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    if (space == NULL) {
+        return nil;
+    }
+    CGContextRef ctx = CGBitmapContextCreate(NULL, width, height, 8, width * 4, space,
+                                             kCGImageAlphaPremultipliedFirst
+                                             | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(space);
+    if (ctx == NULL) {
+        return nil;
+    }
+    unsigned int *dest = (unsigned int *)CGBitmapContextGetData(ctx);
+    if (dest == NULL) {
+        CGContextRelease(ctx);
+        return nil;
+    }
+    // The framework's raster is straight alpha and the context wants it
+    // premultiplied; handing it over unconverted makes every partly transparent
+    // pixel too bright.
+    for (int i = 0; i < width * height; i++) {
+        unsigned int p = argb[i];
+        unsigned int a = (p >> 24) & 0xff;
+        unsigned int r = (p >> 16) & 0xff;
+        unsigned int g = (p >> 8) & 0xff;
+        unsigned int b = p & 0xff;
+        r = (r * a + 127) / 255;
+        g = (g * a + 127) / 255;
+        b = (b * a + 127) / 255;
+        dest[i] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
+    CGImageRef cgImage = CGBitmapContextCreateImage(ctx);
+    CGContextRelease(ctx);
+    if (cgImage == NULL) {
+        return nil;
+    }
+    NSImage *image = CN1AppKitNSImageFromCGImage(cgImage);
+    CGImageRelease(cgImage);
+    return image;
+}

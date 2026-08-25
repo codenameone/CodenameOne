@@ -20,36 +20,116 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-#import <Foundation/Foundation.h>
+#import "CN1MacTextInput.h"
+#import "CN1MacHost.h"
 #include "cn1_globals.h"
+#include "java_lang_String.h"
 
-/*
- * Native text input: not implemented yet on the native macOS port.
- *
- * The iOS implementation lives in CN1TextInputView.m and is a UITextInput
- * client, which has no macOS analogue; AppKit's equivalent is NSTextInputClient
- * on the rendering view. That file is therefore excluded from this port (see
- * Ports/MacPort/shared-natives.exclude) and these four symbols stand in for it.
- *
- * They must exist even while unimplemented, because ParparVM keeps a native
- * method alive BY its symbol appearing in the native sources; without them the
- * dead-code pass drops the Java side and the build stays green with text input
- * silently absent.
- *
- * Until NSTextInputClient is wired up, startTextInput does nothing, so the
- * framework's own editing path is what runs. Editing through the pure
- * com.codename1.ui.editor engine is unaffected -- it needs no native editor.
- */
+// Defined in the shared IOSNative.m: hands a text edit back to
+// IOSImplementation.editingUpdate, which is where every Apple port's editing
+// round trip lands.
+extern void stringEdit(int finished, int cursorPos, NSString *text);
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4) {
+@implementation CN1MacTextInputSession
+
++ (instancetype)sharedSession {
+    static CN1MacTextInputSession *shared = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        shared = [[CN1MacTextInputSession alloc] init];
+    });
+    return shared;
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1, JAVA_BOOLEAN __cn1Arg2, JAVA_BOOLEAN __cn1Arg3, JAVA_BOOLEAN __cn1Arg4, JAVA_OBJECT __cn1Arg5, JAVA_INT __cn1Arg6, JAVA_INT __cn1Arg7, JAVA_INT __cn1Arg8) {
+- (instancetype)init {
+    self = [super init];
+    if (self != nil) {
+        _text = @"";
+        _selectedRange = NSMakeRange(0, 0);
+        _markedRange = NSMakeRange(NSNotFound, 0);
+        _caretRect = CGRectZero;
+        _editorBounds = CGRectZero;
+    }
+    return self;
+}
+
+- (void)startWithText:(NSString *)initialText
+             selStart:(NSInteger)selStart
+               selEnd:(NSInteger)selEnd
+            multiline:(BOOL)multiline {
+    self.text = initialText != nil ? initialText : @"";
+    NSInteger len = (NSInteger)self.text.length;
+    // The framework can hand over a selection recorded against text it has since
+    // changed, so clamp rather than trust it -- an out of range NSRange is a
+    // crash, not a wrong caret.
+    selStart = MIN(MAX(selStart, 0), len);
+    selEnd = MIN(MAX(selEnd, selStart), len);
+    self.selectedRange = NSMakeRange(selStart, selEnd - selStart);
+    self.markedRange = NSMakeRange(NSNotFound, 0);
+    self.multiline = multiline;
+    _active = YES;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSView *view = [CN1MacHost sharedHost].renderingView;
+        [view.window makeFirstResponder:view];
+    });
+}
+
+- (void)stop {
+    if (!_active) {
+        return;
+    }
+    _active = NO;
+    self.markedRange = NSMakeRange(NSNotFound, 0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSTextInputContext currentInputContext] discardMarkedText];
+    });
+}
+
+- (void)commitFinished:(BOOL)finished {
+    stringEdit(finished ? 1 : 0, (int)NSMaxRange(self.selectedRange), self.text);
+}
+
+@end
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    session.editorBounds = CGRectMake(x, y, w, h);
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
+    // autoCorrect / autoCapitalize / constraint / actionType have no AppKit
+    // equivalent for a custom drawn surface: correction and capitalization are a
+    // system wide input source behaviour rather than a per field one, and there
+    // is no return key to relabel. They are accepted and ignored so the shared
+    // Java side needs no macOS special case.
+    NSString *initial = initialText != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG initialText)
+        : @"";
+    [[CN1MacTextInputSession sharedSession] startWithText:initial
+                                                selStart:selStart
+                                                  selEnd:selEnd
+                                               multiline:multiline != 0];
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_stopTextInput__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    [[CN1MacTextInputSession sharedSession] stop];
 }
 
-JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5, JAVA_INT __cn1Arg6, JAVA_INT __cn1Arg7, JAVA_INT __cn1Arg8) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
+    if (session.markedRange.location != NSNotFound) {
+        // Mid composition the input method owns the text. Taking the
+        // framework's copy back here would drop the marked run and make the
+        // composition look like it did nothing.
+        return;
+    }
+    if (text != JAVA_NULL) {
+        session.text = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
+    }
+    NSInteger len = (NSInteger)session.text.length;
+    NSInteger start = MIN(MAX((NSInteger)selStart, 0), len);
+    NSInteger end = MIN(MAX((NSInteger)selEnd, start), len);
+    session.selectedRange = NSMakeRange(start, end - start);
 }
-

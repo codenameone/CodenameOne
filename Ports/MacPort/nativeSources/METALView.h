@@ -72,7 +72,7 @@
 /// locations, tracking areas, peer frames, the text input client's rects --
 /// then needs no vertical flip. The alternative is a conversion at each of
 /// those sites and a permanent tax on every new one.
-@interface METALView : NSView<CN1RenderingView> {
+@interface METALView : NSView<CN1RenderingView, NSTextInputClient> {
 @private
     int framebufferWidth;
     int framebufferHeight;
@@ -103,6 +103,11 @@
 /// without a lookup on the platform's own thread.
 @property (nonatomic, assign) int cn1WindowId;
 
+/// Whether this surface currently accepts input. Cleared while another window
+/// holds the application modal, so a click on this one reaches nothing rather
+/// than being delivered and then discarded further up.
+@property (nonatomic, assign) BOOL cn1InputEnabled;
+
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
 - (void)deleteFramebuffer;
@@ -126,6 +131,10 @@
 /// Reads the finished frame back as an ARGB raster. Used by the screenshot
 /// pipeline and by Window.capture().
 - (BOOL)readbackInto:(unsigned int *)argb width:(int)w height:(int)h;
+
+/// Converts an NSEvent location into the pixel coordinates Codename One works
+/// in. The view is flipped, so this is a scale rather than a scale and a flip.
+- (CGPoint)cn1PointFromEvent:(NSEvent *)event;
 
 @end
 

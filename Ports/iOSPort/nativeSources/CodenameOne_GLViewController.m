@@ -2337,7 +2337,17 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
         } else {
             // italic
             if((style & 2) == 2) {
+#if TARGET_OS_OSX
+                // NSFont has no italicSystemFontOfSize:, so the trait is applied
+                // to the system font instead. NSFontManager returns the input
+                // font unchanged when the family has no italic face, which is
+                // the same graceful degradation UIFont gives.
+                fnt = [[NSFontManager sharedFontManager]
+                        convertFont:[NSFont systemFontOfSize:pSize]
+                        toHaveTrait:NSItalicFontMask];
+#else
                 fnt = [CN1Font italicSystemFontOfSize:pSize];
+#endif
             } else {
                 fnt = [CN1Font systemFontOfSize:pSize];
             }

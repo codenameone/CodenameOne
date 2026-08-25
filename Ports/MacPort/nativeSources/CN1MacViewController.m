@@ -149,7 +149,7 @@ static CodenameOne_GLViewController *singletonInstance = nil;
 }
 
 - (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive {
-    METALView *v = (METALView *)[CN1MacHost sharedHost].renderingView;
+    METALView *v = (METALView *)[CN1MacHost sharedHost].activeRenderingView;
     if (v == nil) {
         return;
     }

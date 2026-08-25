@@ -74,5 +74,11 @@ NSImage * _Nullable CN1AppKitNSImageFromCGImage(CGImageRef _Nullable cgImage);
 BOOL CN1AppKitReadARGB(CGImageRef _Nullable cgImage, unsigned int * _Nonnull argb,
                        int width, int height);
 
+/// Builds an image from a Codename One ARGB raster. The framework hands out
+/// pixels rather than platform images, so this is the one direction that has no
+/// CGImage to start from.
+NSImage * _Nullable CN1AppKitNSImageFromARGB(const unsigned int * _Nonnull argb,
+                                             int width, int height);
+
 #endif
 #endif

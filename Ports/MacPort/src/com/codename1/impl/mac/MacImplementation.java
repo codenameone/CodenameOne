@@ -68,4 +68,22 @@ public class MacImplementation extends IOSImplementation {
     public boolean isDesktop() {
         return true;
     }
+
+    private AppKitWindowManager windowManager;
+
+    /// @inheritDoc
+    ///
+    /// Unconditional here. The iOS port has to read
+    /// `UIApplicationSupportsMultipleScenes` back out of the bundle before it can
+    /// offer windows, because on Mac Catalyst that key is what decides whether a
+    /// second scene can be activated at all. AppKit is multi-window natively,
+    /// with no manifest key and no opt-in, so there is nothing to consult and no
+    /// build that could answer differently.
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (windowManager == null) {
+            windowManager = new AppKitWindowManager(this);
+        }
+        return windowManager;
+    }
 }

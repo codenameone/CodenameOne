@@ -54,6 +54,10 @@ static const CGFloat CN1_MAC_DEFAULT_HEIGHT = 685;
     return _window;
 }
 
+- (NSView *)activeRenderingView {
+    return _activeRenderingView != nil ? _activeRenderingView : self.renderingView;
+}
+
 - (NSView *)renderingView {
     if (_renderingView == nil) {
         [self buildWindow];

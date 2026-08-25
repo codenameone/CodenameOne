@@ -52,6 +52,14 @@
 @property (nonatomic, readonly) int displayWidth;
 @property (nonatomic, readonly) int displayHeight;
 
+/// The surface the render driver is currently drawing into.
+///
+/// There is one because the event dispatch thread paints one window at a time,
+/// so the drawing pipeline's global encoder is genuinely a single value rather
+/// than a limitation. A secondary window sets this for the duration of its own
+/// paint and clears it again, and everything else draws into the main window.
+@property (nonatomic, assign) NSView *activeRenderingView;
+
 /// Pins the window to one size so a screenshot comparison has something stable
 /// to compare. Only the compliance suite sets this.
 - (void)setFixedContentSize:(NSSize)size;
