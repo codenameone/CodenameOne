@@ -2237,8 +2237,16 @@ public class Window extends Container implements TopLevelContainer {
         // screen, but the application asking to hide it still has to release the
         // native window, drop the modal blocker and unpark showModal().
         if (nativePeer != null && (nativeVisible || iconified)) {
-            nativeVisible = false;
-            iconified = false;
+            // Published under the monitor showModal's waiter is parked on, and notified,
+            // exactly as dispose() publishes `disposed`. Hiding ends the modal wait just
+            // as disposing does -- isModalFinished() reads both of these -- but they were
+            // written plainly, so nothing established that the waiting thread would ever
+            // observe the change. It also had to wait out the 40ms poll to notice.
+            synchronized (Display.lock) {
+                nativeVisible = false;
+                iconified = false;
+                Display.lock.notifyAll();
+            }
             // A key handler can hide its own window, and the window stays registered
             // while hidden -- so a repeat or long press armed by the press that got
             // us here would go on firing into a component tree the user cannot see,
