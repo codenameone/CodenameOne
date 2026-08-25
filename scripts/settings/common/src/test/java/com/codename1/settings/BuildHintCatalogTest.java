@@ -1565,6 +1565,16 @@ public class BuildHintCatalogTest {
         assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
                 "/p/common/src/main/java/com", "test", false));
 
+        // A source set's resources are not compiled, so a source template kept
+        // in one is not a peer.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src/main",
+                "resources", false));
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "resources",
+                false));
+        // ...but a package that happens to be called that is a package.
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
+                "/p/common/src/main/java/com/example", "resources", false));
+
         // Hidden directories are not source trees.
         assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p", ".git", false));
 

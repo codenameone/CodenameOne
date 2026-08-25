@@ -996,31 +996,68 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
         for (int at = importKeywordAt(blanked, 0); at >= 0;
                 at = importKeywordAt(blanked, at + "import".length())) {
-            int end = endOfImportDeclaration(blanked, at);
-            String statement = blanked.substring(at, Math.min(end, blanked.length()));
-            String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
-                    .qualifiedNameAt(blanked, at + "import".length());
-            int dot = name.lastIndexOf('.');
-            String last = dot < 0 ? name : name.substring(dot + 1);
-            if ("*".equals(last)) {
-                // On demand, which the named import this goal writes beats.
-                continue;
-            }
-            int as = statement.indexOf(" as ");
-            if (kotlin && as >= 0) {
-                String alias = statement.substring(as + 4).trim();
-                int stop = 0;
-                while (stop < alias.length()
-                        && Character.isJavaIdentifierPart(alias.charAt(stop))) {
-                    stop++;
-                }
-                last = alias.substring(0, stop);
-            }
-            if (simple.equals(last)) {
+            if (simple.equals(importedSimpleName(blanked, at, kotlin))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /// The name the import at `at` makes available, or null when it makes none
+    /// this goal has to work around.
+    ///
+    /// The `as` alias is read as a TOKEN. Searching for the literal `" as "`
+    /// missed `import com.example.Other as\nIos`, which is legal, so the goal
+    /// wrote its own `import ...buildhints.Ios` beside it -- two imports giving
+    /// the same local name, which does not compile, so verification rolled back
+    /// an otherwise valid migration. An on-demand import is not a name at all:
+    /// the named import this goal writes beats it.
+    private static String importedSimpleName(String blanked, int at, boolean kotlin) {
+        int nameAt = at + "import".length();
+        int probeStatic = nameAt;
+        while (probeStatic < blanked.length()
+                && Character.isWhitespace(blanked.charAt(probeStatic))) {
+            probeStatic++;
+        }
+        if (!kotlin && blanked.startsWith("static", probeStatic)
+                && probeStatic + 6 < blanked.length()
+                && !Character.isJavaIdentifierPart(blanked.charAt(probeStatic + 6))) {
+            nameAt = probeStatic + 6;
+        }
+        String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameAt(blanked, nameAt);
+        int end = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameEnd(blanked, nameAt);
+        int dot = name.lastIndexOf('.');
+        String last = dot < 0 ? name : name.substring(dot + 1);
+        if ("*".equals(last) || last.length() == 0) {
+            return null;
+        }
+        if (!kotlin) {
+            return last;
+        }
+        int probe = end;
+        while (probe < blanked.length() && Character.isWhitespace(blanked.charAt(probe))) {
+            probe++;
+        }
+        if (!blanked.startsWith("as", probe) || probe + 2 >= blanked.length()
+                || Character.isJavaIdentifierPart(blanked.charAt(probe + 2))) {
+            return last;
+        }
+        int alias = probe + 2;
+        while (alias < blanked.length() && Character.isWhitespace(blanked.charAt(alias))) {
+            alias++;
+        }
+        int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .escapedIdentifierEnd(blanked, alias);
+        if (escaped > alias) {
+            return blanked.substring(alias + 1, escaped - 1);
+        }
+        int stop = alias;
+        while (stop < blanked.length() && Character.isJavaIdentifierPart(blanked.charAt(stop))) {
+            stop++;
+        }
+        return stop > alias ? blanked.substring(alias, stop) : last;
     }
 
     /**

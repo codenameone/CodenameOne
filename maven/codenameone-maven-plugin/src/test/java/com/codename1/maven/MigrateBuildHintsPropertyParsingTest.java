@@ -782,6 +782,37 @@ public class MigrateBuildHintsPropertyParsingTest {
                 declaresIt.contains("import com.codename1.annotations.buildhints.Ios;"));
     }
 
+    /// A Kotlin alias is a TOKEN, and `import com.example.Other as\nIos` is
+    /// legal. Searching for the literal `" as "` missed it, so the goal wrote
+    /// its own `import ...buildhints.Ios` beside it -- two imports giving the
+    /// same local name, which does not compile.
+    @Test
+    public void anAliasSpanningLinesStillTakesTheName() throws Exception {
+        String migrated = migrateKotlin("package com.example\n"
+                        + "import com.example.other.Other as\n Ios\n"
+                        + "class MyApp\n",
+                "@Ios(teamId = \"X\")\n");
+        assertTrue(migrated,
+                migrated.contains("@com.codename1.annotations.buildhints.Ios(teamId"));
+        assertFalse(migrated, migrated.contains("import com.codename1.annotations.buildhints.Ios"));
+
+        // An alias that takes some OTHER name leaves ours alone.
+        String free = migrateKotlin("package com.example\n"
+                        + "import com.example.other.Other as\n Something\n"
+                        + "class MyApp\n",
+                "@Ios(teamId = \"X\")\n");
+        assertTrue(free, free.contains("import com.codename1.annotations.buildhints.Ios"));
+        assertTrue(free, free.contains("@Ios(teamId"));
+    }
+
+    private String migrateKotlin(String source, String annotations) throws Exception {
+        File f = File.createTempFile("MyApp", ".kt");
+        f.deleteOnExit();
+        write(f, source);
+        new MigrateBuildHintsMojo().insertAnnotations(f, annotations, "MyApp");
+        return read(f);
+    }
+
     /// Runs the real insertion over a temporary file and hands back the result.
     private String migrate(String source, String annotations) throws Exception {
         File f = File.createTempFile("MyApp", ".java");

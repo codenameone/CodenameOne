@@ -2375,7 +2375,22 @@ public class CodenameOneSettings extends Lifecycle {
         if (("target".equals(name) || "build".equals(name)) && !insideSourceTree) {
             return false;
         }
-        return !(dir.endsWith("/src") && isTestSourceSet(name));
+        if (dir.endsWith("/src") && isTestSourceSet(name)) {
+            return false;
+        }
+        // A source set's resources are not compiled, so a `.java` or `.kt`
+        // TEMPLATE kept in one is not a peer -- treating it as a same-package
+        // type made a real annotation read as somebody else's. Only where the
+        // layout says resources root: `src/main/resources` and the flat
+        // `src/resources`, not a package that happens to be called that.
+        return !("resources".equals(name)
+                && (dir.endsWith("/src") || parentOf(dir).endsWith("/src")));
+    }
+
+    /// `dir` without its last segment.
+    private static String parentOf(String dir) {
+        int slash = dir.lastIndexOf('/');
+        return slash < 0 ? "" : dir.substring(0, slash);
     }
 
     /// Whether `name` is a test source set by the usual convention.
