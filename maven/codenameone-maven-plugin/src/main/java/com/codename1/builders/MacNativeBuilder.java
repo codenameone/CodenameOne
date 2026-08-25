@@ -63,6 +63,8 @@ class MacNativeBuilder {
 
     // Parsed hints.
     private boolean enabled;
+
+    private boolean multiWindow;
     private String distribution;       // appStore | developerID | both
     private String teamId;
     private String bundleId;
@@ -94,6 +96,22 @@ class MacNativeBuilder {
         return enabled;
     }
 
+    /// Whether this build asks for `com.codename1.ui.Window` support.
+    ///
+    /// Opt-in, and deliberately not implied by `macNative.enabled`. Supporting windows
+    /// means declaring `UIApplicationSupportsMultipleScenes`, which puts the app on the
+    /// UIScene lifecycle -- and a Catalyst window opens four points shorter under it, so
+    /// every existing Mac Catalyst application would have re-laid out slightly on the
+    /// next build. Measured, not assumed: the conformance suite renders 1024x685 without
+    /// the manifest and 1024x681 with it, and the 148 goldens recorded before windows
+    /// existed match the former exactly.
+    ///
+    /// So an application that does not ask for windows gets the bundle it always got,
+    /// and one that does accepts the relayout knowingly.
+    boolean isMultiWindow() {
+        return enabled && multiWindow;
+    }
+
     /**
      * Parse the {@code macNative.*} hint family off the request and
      * stash the values for later. Caller is expected to flip {@code
@@ -102,6 +120,7 @@ class MacNativeBuilder {
      */
     void parseHints(BuildRequest request) {
         enabled = "true".equals(request.getArg("macNative.enabled", "false"));
+        multiWindow = "true".equals(request.getArg("macNative.multiWindow", "false"));
         if (!enabled) {
             return;
         }
@@ -616,10 +635,12 @@ class MacNativeBuilder {
         // always writes the file for a Mac build, copying the finished plist and
         // ensuring the key -- so when the application already asked for multiple
         // scenes the copy is simply identical.
-        s.append("  bs['INFOPLIST_FILE[sdk=macosx*]'] = '")
-                .append(IPhoneBuilder.escapeRubyStr(
-                        IPhoneBuilder.catalystInfoPlistRelativePath(mainClass)))
-                .append("'\n");
+        if (multiWindow) {
+            s.append("  bs['INFOPLIST_FILE[sdk=macosx*]'] = '")
+                    .append(IPhoneBuilder.escapeRubyStr(
+                            IPhoneBuilder.catalystInfoPlistRelativePath(mainClass)))
+                    .append("'\n");
+        }
         s
                 .append("  bs['SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD'] = 'NO'\n")
                 .append("  bs['TARGETED_DEVICE_FAMILY'] = '1,2,6'\n")

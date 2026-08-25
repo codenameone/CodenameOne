@@ -40,8 +40,8 @@ Windows are a desktop feature, and the API says so plainly:
 |
 
 |macOS (Mac Catalyst)
-|Yes
-|See <<mac-catalyst-windows>> for how a window is rendered there.
+|Opt-in
+|Needs `macNative.multiWindow=true`. See <<mac-catalyst-windows>>.
 
 |iOS, Android, JavaScript
 |No
@@ -395,10 +395,27 @@ letting a re-render pass for a readback.
 [[mac-catalyst-windows]]
 === Mac Catalyst
 
-Windows work on the macOS (Mac Catalyst) target with no configuration. A second
-Codename One window is a second `UIWindowScene`, which needs the
-`UIApplicationSupportsMultipleScenes` key in `Info.plist`; the builder emits that key
-for Catalyst builds and for no other target, so iPhone and iPad apps are unaffected.
+Windows are opt-in on the macOS (Mac Catalyst) target. Set the `macNative.multiWindow`
+build hint to `true` alongside `macNative.enabled`:
+
+[source]
+----
+macNative.enabled=true
+macNative.multiWindow=true
+----
+
+A second Codename One window is a second `UIWindowScene`, which needs the
+`UIApplicationSupportsMultipleScenes` key in `Info.plist`. The builder emits that key
+only for a Catalyst build that asked for windows, and for no other target, so iPhone
+and iPad apps are unaffected either way.
+
+The opt-in exists because that key has a cost the rest of the app pays. It puts the
+process on the UIScene lifecycle, under which a Catalyst window opens four points
+shorter: the conformance suite measures 685 points of content height without the key
+and 681 with it.
+Every layout in the app shifts slightly. That's a fair trade when you want windows and
+an unpleasant surprise when you don't, so an app that doesn't ask for them keeps the
+bundle it has always had.
 
 `Desktop.isSupported()` reads the key back out of the running bundle rather than
 trusting a build flag, so the API and the `Info.plist` can never disagree -- including

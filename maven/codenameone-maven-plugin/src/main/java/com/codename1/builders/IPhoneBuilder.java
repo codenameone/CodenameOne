@@ -5455,7 +5455,7 @@ public class IPhoneBuilder extends Executor {
 
                 // After every edit to the shared plist, never before: the Mac slice's copy
                 // is derived from the finished file. See writeCatalystInfoPlist.
-                if (macNativeBuilder.isEnabled()) {
+                if (macNativeBuilder.isMultiWindow()) {
                     writeCatalystInfoPlist(tmpFile, request.getMainClass());
                 }
 
@@ -12727,7 +12727,7 @@ public class IPhoneBuilder extends Executor {
         boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
         // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
         // the Mac Catalyst slice, so the key follows macNative.enabled exactly.
-        boolean multiWindow = "true".equals(request.getArg("macNative.enabled", "false"));
+        boolean multiWindow = macNativeBuilder.isMultiWindow();
         // CarPlay requires the UIScene lifecycle and a dedicated
         // CPTemplateApplicationSceneSessionRoleApplication scene wired to
         // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
