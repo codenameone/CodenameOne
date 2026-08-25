@@ -1519,7 +1519,7 @@ static int gcBeltDiagCount = 0;
 #endif
 
 void cn1SatbEnqueue(JAVA_OBJECT old) {
-#ifndef CN1_SATB_LOG_FRESH
+#if !defined(CN1_SATB_LOG_FRESH) && !defined(CN1_NURSERY)
     // FRESH-REFERENCE FILTER (issue 5537).
     //
     // A mark == -1 object was allocated after this cycle's snapshot was taken, so it is
@@ -1529,6 +1529,17 @@ void cn1SatbEnqueue(JAVA_OBJECT old) {
     // Its own outgoing references to NON-fresh objects are still logged by this same
     // barrier as they are stored, so nothing reachable only through a fresh object is
     // lost -- which is the hazard the insertion half was added for.
+    //
+    // THAT LAST STEP IS THE WHOLE ARGUMENT, AND IT HAS A PRECONDITION: the INSERTION half
+    // has to exist. Under CN1_NURSERY it does not -- CN1_WRITE_BARRIER is the nursery
+    // remembered-set update there and enqueues nothing (cn1_globals.h) -- so a fresh
+    // container that takes an older child after the grace pass has that child recorded
+    // nowhere, and dropping the deletion entry for the container would let the sweep
+    // reclaim a child the graced container still references. The filter is an
+    // optimisation, not a correctness requirement, so a build without the insertion half
+    // simply does not get it. CN1_NURSERY is not defined anywhere in-tree today, which is
+    // why this is a latent hole rather than a live one, but the flag is documented and
+    // reachable.
     //
     // Without the filter the log is a positive feedback loop rather than a cost. Measured
     // on the game-tree shape at 4 threads: essentially the ENTIRE log was fresh
