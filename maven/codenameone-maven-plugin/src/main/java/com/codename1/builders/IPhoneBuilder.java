@@ -5453,6 +5453,12 @@ public class IPhoneBuilder extends Executor {
                     replaceAllInFile(infoPlist, "<key>UIPrerenderedIcon</key>[^<]*<false/>", "<key>UIPrerenderedIcon</key><true/>");
                 }
 
+                // After every edit to the shared plist, never before: the Mac slice's copy
+                // is derived from the finished file. See writeCatalystInfoPlist.
+                if (macNativeBuilder.isEnabled()) {
+                    writeCatalystInfoPlist(tmpFile, request.getMainClass());
+                }
+
 
                 if(runPods || !request.getArg("ios.buildType", "debug").equals("debug") || request.getArg("ios.force64", "false").equals("true")) {
                     File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
@@ -13175,9 +13181,6 @@ public class IPhoneBuilder extends Executor {
         try(FileOutputStream fo = new FileOutputStream(infoPlist)) {
             fo.write(b.toString().getBytes(StandardCharsets.UTF_8));
         }
-        if (macNativeBuilder.isEnabled()) {
-            writeCatalystInfoPlist(tmpFile, request.getMainClass(), b.toString());
-        }
     }
 
     /// The window scene role, wired to Codename One's scene delegate. A
@@ -13246,12 +13249,32 @@ public class IPhoneBuilder extends Executor {
     /// - `mainClass`: the application's main class, which names the file
     ///
     /// - `plist`: the finished plist text
-    private void writeCatalystInfoPlist(File tmpFile, String mainClass, String plist)
-            throws IOException {
+    /// Writes the Mac slice's Info.plist, derived from the FINISHED shared one.
+    ///
+    /// Read off disk rather than handed the buffer injectToPlist wrote, and called from
+    /// the end of the build rather than from inside it, because the shared plist is
+    /// still edited afterwards: ios.interface_orientation strips the orientations the
+    /// application did not ask for, and ios.prerendered_icon rewrites its key. A copy
+    /// taken earlier kept orientations the real plist no longer had -- and supported
+    /// orientations decide how large a Catalyst window opens, so every screenshot in the
+    /// suite came out a point shorter than the golden and 147 of them failed. Anything
+    /// that edits the shared plist has to run BEFORE this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tmpFile`: the build's temporary directory
+    ///
+    /// - `mainClass`: the application's main class name
+    private void writeCatalystInfoPlist(File tmpFile, String mainClass) throws IOException {
         File distSrc = new File(new File(tmpFile, "dist"), mainClass + "-src");
         if (!distSrc.isDirectory()) {
             return;
         }
+        File source = new File(distSrc, mainClass + "-Info.plist");
+        if (!source.isFile()) {
+            return;
+        }
+        String plist = new String(java.nio.file.Files.readAllBytes(source.toPath()), "UTF-8");
         File target = new File(distSrc, mainClass + "-MacCatalyst-Info.plist");
         try (FileOutputStream fo = new FileOutputStream(target)) {
             fo.write(plistForMacSlice(plist).getBytes(StandardCharsets.UTF_8));
