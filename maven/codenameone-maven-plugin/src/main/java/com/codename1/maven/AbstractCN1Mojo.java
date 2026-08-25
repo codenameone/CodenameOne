@@ -236,22 +236,50 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * `common` then has no backing source and reads as stale.</p>
      */
     protected MavenProject moduleProducing(File element) {
-        if (reactorProjects == null || element == null || !element.isDirectory()) {
+        if (reactorProjects == null || element == null) {
             return null;
         }
         String wanted = canonicalPath(element);
         for (MavenProject candidate : reactorProjects) {
-            if (candidate.getBuild() == null || candidate.getBuild().getOutputDirectory() == null) {
-                continue;
+            if (candidate.getBuild() != null
+                    && candidate.getBuild().getOutputDirectory() != null
+                    && wanted.equals(
+                        canonicalPath(new File(candidate.getBuild().getOutputDirectory())))) {
+                return candidate;
             }
-            if (wanted.equals(canonicalPath(new File(candidate.getBuild().getOutputDirectory())))) {
+            // A reactor `package` build hands over the dependency module's JAR
+            // rather than its output directory, which is the ordinary shape for
+            // the generated layout -- matching directories alone sent every
+            // class in that jar back to the running module's source roots, where
+            // it has none, so a live misplaced annotation read as stale.
+            if (candidate.getArtifact() != null && candidate.getArtifact().getFile() != null
+                    && wanted.equals(canonicalPath(candidate.getArtifact().getFile()))) {
+                return candidate;
+            }
+            if (wanted.equals(canonicalPath(packagedFileOf(candidate)))) {
                 return candidate;
             }
         }
         return null;
     }
 
+    /// Where `candidate` writes its jar, or null when it does not say.
+    ///
+    /// The artifact's own file is the better answer and is checked first, but it
+    /// is only set once the module has been packaged in this session.
+    private static File packagedFileOf(MavenProject candidate) {
+        if (candidate.getBuild() == null || candidate.getBuild().getDirectory() == null
+                || candidate.getBuild().getFinalName() == null) {
+            return null;
+        }
+        return new File(candidate.getBuild().getDirectory(),
+                candidate.getBuild().getFinalName() + ".jar");
+    }
+
     private static String canonicalPath(File f) {
+        if (f == null) {
+            return null;
+        }
         try {
             return f.getCanonicalPath();
         } catch (IOException ex) {
