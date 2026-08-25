@@ -1004,7 +1004,9 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
      */
     void insertAnnotations(File source, String annotations, String simpleName)
             throws IOException {
-        String text = read(source);
+        String charset = rewriteCharset(source);
+        boolean decoded = !SOURCE_BYTE_TRANSPARENT_ENCODING.equals(charset);
+        String text = read(source, charset);
         boolean kotlin = source.getName().endsWith(".kt");
         String blanked = com.codename1.maven.processors.BuildHintAnnotationProcessor
                 .blankNonCode(text, kotlin);
@@ -1052,7 +1054,10 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         String importLine = importLines.length() == 0 ? null
                 : importLines.substring(0, importLines.length() - 1);
 
-        int declaration = declarationOffsetIn(source, text, kotlin, simpleName);
+        // Decoded text needs no offset mapping: every index IS a character
+        // index in the string about to be written back.
+        int declaration = decoded ? classDeclarationIndex(text, kotlin, simpleName)
+                : declarationOffsetIn(source, text, kotlin, simpleName);
         if (declaration < 0) {
             throw new IOException("Could not find the class declaration in " + source.getName());
         }
@@ -1089,7 +1094,79 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
                     + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
         }
-        write(source, head + annotations + tail);
+        write(source, head + annotations + tail, charset);
+    }
+
+    /**
+     * The charset to parse and rewrite {@code source} with.
+     *
+     * <p>The rewrite is byte-transparent by default: read and write ISO-8859-1,
+     * so every byte round-trips and the only change is the inserted ASCII. That
+     * is the right answer for a file whose real encoding cannot be known, and it
+     * works for any ASCII-compatible one, because the tokens this scanner looks
+     * for -- {@code package}, {@code import}, {@code class}, {@code &#123;} --
+     * are single ASCII bytes either way.</p>
+     *
+     * <p>It is wrong for UTF-16. There every ASCII character is two bytes with a
+     * NUL beside it, so read byte-transparently the file is
+     * {@code p\0a\0c\0k\0...}: no import is found, no package is found, and
+     * the ASCII the migration splices in would be written as single bytes into a
+     * two-byte-per-character file. The goal would have mangled a source it had
+     * just correctly IDENTIFIED, since {@code declares} already reads in the
+     * compiler's charset.</p>
+     *
+     * <p>So the module's declared charset is used when it declares one AND the
+     * file round-trips through it byte for byte. Never a guess and never a
+     * default: decoding a source with the wrong charset and writing it back
+     * would corrupt every non-ASCII character in it, which is worse than
+     * refusing the migration.</p>
+     */
+    private String rewriteCharset(File source) {
+        org.apache.maven.project.MavenProject owner = moduleOwning(source);
+        String declared = sourceEncodingOf(owner == null ? project : owner, userProperties());
+        if (declared == null || declared.trim().isEmpty()
+                || SOURCE_BYTE_TRANSPARENT_ENCODING.equalsIgnoreCase(declared.trim())) {
+            return SOURCE_BYTE_TRANSPARENT_ENCODING;
+        }
+        return roundTripsThrough(source, declared.trim())
+                ? declared.trim() : SOURCE_BYTE_TRANSPARENT_ENCODING;
+    }
+
+    /// Whether decoding `f` as `charset` and encoding it back reproduces the
+    /// file exactly.
+    ///
+    /// Stronger than "it decodes without error", and it is the property the
+    /// rewrite actually needs: a file declared UTF-8 that is not valid UTF-8
+    /// decodes into replacement characters quite happily, and writing that back
+    /// destroys the bytes it could not read.
+    private boolean roundTripsThrough(File f, String charset) {
+        try {
+            byte[] raw = readAllBytes(f);
+            java.nio.charset.CharsetDecoder decoder = java.nio.charset.Charset.forName(charset)
+                    .newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+            String text = decoder.decode(java.nio.ByteBuffer.wrap(raw)).toString();
+            return java.util.Arrays.equals(raw, text.getBytes(charset));
+        } catch (Exception ex) {
+            getLog().debug("cn1: " + f + " does not round-trip through " + charset, ex);
+            return false;
+        }
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.io.InputStream in = new FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+        } finally {
+            in.close();
+        }
+        return out.toByteArray();
     }
 
     /// `line` with every enum type it names either imported or written out in
@@ -2044,7 +2121,11 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     private static void write(File f, String content) throws IOException {
-        Writer w = new OutputStreamWriter(new FileOutputStream(f), SOURCE_BYTE_TRANSPARENT_ENCODING);
+        write(f, content, SOURCE_BYTE_TRANSPARENT_ENCODING);
+    }
+
+    private static void write(File f, String content, String charset) throws IOException {
+        Writer w = new OutputStreamWriter(new FileOutputStream(f), charset);
         try {
             w.write(content);
         } finally {

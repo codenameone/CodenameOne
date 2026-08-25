@@ -926,6 +926,86 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertTrue(migrated, migrated.contains("class " + main));
     }
 
+    /// A UTF-16 source is parsed and rewritten in its own charset.
+    ///
+    /// The rewrite is byte-transparent by default -- read and write ISO-8859-1
+    /// so every byte round-trips -- which is right for a file whose encoding
+    /// cannot be known and works for any ASCII-compatible one. UTF-16 is
+    /// neither: every ASCII character is two bytes with a NUL beside it, so read
+    /// that way the file is `p\0a\0c\0k\0...`. No import and no package
+    /// declaration is found, and the ASCII spliced in would be written as single
+    /// bytes into a two-byte-per-character file -- mangling a source `declares`
+    /// had just correctly identified, since that half already reads in the
+    /// compiler's charset.
+    @Test
+    public void aUtf16SourceIsRewrittenInItsOwnCharset() throws Exception {
+        String decoded = "package com.example;\n"
+                + "\n"
+                + "import com.codename1.system.Lifecycle;\n"
+                + "\n"
+                + "public class MyApp extends Lifecycle {\n}\n";
+        File f = File.createTempFile("Utf16", ".java");
+        f.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(decoded.getBytes("UTF-16LE"));
+        } finally {
+            os.close();
+        }
+
+        MigrateBuildHintsMojo mojo = mojoWithEncoding("UTF-16LE");
+        mojo.insertAnnotations(f, "@Ios(teamId = \"X\")\n", "MyApp");
+
+        // Still UTF-16LE, and still valid: read back in any other charset this
+        // would be unreadable rather than merely different.
+        String migrated = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-16LE");
+        assertTrue(migrated, migrated.contains("@Ios(teamId = \"X\")"));
+        // The annotation goes above the class, and the import lands after the
+        // existing one rather than at the top of the file.
+        assertTrue(migrated, migrated.indexOf("@Ios(teamId") < migrated.indexOf("public class MyApp"));
+        assertTrue(migrated, migrated.indexOf("import com.codename1.annotations.buildhints.Ios;")
+                > migrated.indexOf("import com.codename1.system.Lifecycle;"));
+        assertTrue(migrated, migrated.startsWith("package com.example;"));
+    }
+
+    /// ...but a file that does NOT round-trip through the declared charset is
+    /// left byte-transparent.
+    ///
+    /// A source declared UTF-8 that is not valid UTF-8 decodes into replacement
+    /// characters quite happily, and writing that back destroys the bytes it
+    /// could not read. Refusing to decode is the conservative answer: the
+    /// migration either works byte-transparently or does not happen.
+    @Test
+    public void aSourceThatDoesNotDecodeKeepsItsBytes() throws Exception {
+        byte[] head = "package com.example;\npublic class MyApp {\n".getBytes("ISO-8859-1");
+        // 0xFF is not a legal UTF-8 lead byte anywhere.
+        byte[] raw = new byte[head.length + 6];
+        System.arraycopy(head, 0, raw, 0, head.length);
+        raw[head.length] = '/';
+        raw[head.length + 1] = '/';
+        raw[head.length + 2] = (byte) 0xFF;
+        raw[head.length + 3] = '\n';
+        raw[head.length + 4] = '}';
+        raw[head.length + 5] = '\n';
+        File f = File.createTempFile("Broken", ".java");
+        f.deleteOnExit();
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(raw);
+        } finally {
+            os.close();
+        }
+
+        MigrateBuildHintsMojo mojo = mojoWithEncoding("UTF-8");
+        mojo.insertAnnotations(f, "@Ios(teamId = \"X\")\n", "MyApp");
+
+        byte[] after = java.nio.file.Files.readAllBytes(f.toPath());
+        String asBytes = new String(after, "ISO-8859-1");
+        assertTrue(asBytes, asBytes.contains("@Ios(teamId = \"X\")"));
+        // The byte it could not decode is still exactly that byte.
+        assertTrue(asBytes, asBytes.indexOf((char) 0xFF) >= 0);
+    }
+
     /// The manifest's presence proves nothing on its own: a project can keep
     /// one in `src/main/resources`, and any resource-producing plugin then
     /// recreates it whether or not the processor ran -- so the keys are all
