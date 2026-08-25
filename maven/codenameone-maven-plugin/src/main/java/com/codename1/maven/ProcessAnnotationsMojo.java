@@ -295,8 +295,21 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
 
     /// `codename1.packageName` + `codename1.mainName`, or null when the project
     /// declares no main class.
-    private String mainClassBinaryName() {
-        Properties p = rawProjectSettings();
+    ///
+    /// From the EFFECTIVE settings, not the file: `execute()` has already
+    /// overlaid `-D codename1.mainName` / `codename1.packageName` onto
+    /// `properties`, and `CN1BuildMojo` computes the main class it expects from
+    /// that same overlaid table. Reading the file here stamped the manifest for
+    /// a class the merge was not looking for, so it refused the manifest and
+    /// the annotated hints were silently dropped -- while
+    /// `failOnMisplacedAnnotations` reported the entry point the build had
+    /// actually selected as the wrong place to put them.
+    ///
+    /// The RAW file is still what the duplicate-hint check reads, which is the
+    /// one thing `-D` must NOT feed: a hint passed on the command line is an
+    /// override of the file's value, not a second declaration of it.
+    String mainClassBinaryName() {
+        Properties p = properties != null ? properties : rawProjectSettings();
         if (p == null) {
             return null;
         }

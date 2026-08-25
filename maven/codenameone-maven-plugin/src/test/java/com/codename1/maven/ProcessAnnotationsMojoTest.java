@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -187,6 +188,67 @@ public class ProcessAnnotationsMojoTest {
     /// Runs the real Mojo against a compiled output directory. `executeImpl` is
     /// what the Maven lifecycle ultimately calls, and it loads processors
     /// through `ServiceLoader` exactly as a real build does.
+    /// A `-D codename1.mainName` override decides which class owns the
+    /// annotations.
+    ///
+    /// `execute()` overlays the command line onto `properties`, and
+    /// `CN1BuildMojo` computes the main class it expects from that same table.
+    /// Reading the file here stamped the manifest for a class the merge was not
+    /// looking for, so it refused the manifest and the annotated hints were
+    /// silently dropped -- while the misplacement check reported the entry
+    /// point the build had actually selected as the wrong place for them.
+    @Test
+    public void theCommandLineMainClassOverrideDecidesTheOwner() throws Exception {
+        File basedir = tmp.newFolder();
+        writeSettings(basedir, "com.example", "FileApp");
+
+        ProcessAnnotationsMojo mojo = new ProcessAnnotationsMojo();
+        mojo.setLog(new SystemStreamLog());
+        mojo.project = projectAt(basedir);
+
+        // What execute() leaves behind once overlayCommandLineBuildHints has
+        // applied -Dcodename1.mainName=OverriddenApp.
+        mojo.properties = new java.util.Properties();
+        mojo.properties.setProperty("codename1.packageName", "com.example");
+        mojo.properties.setProperty("codename1.mainName", "OverriddenApp");
+
+        assertEquals("com.example.OverriddenApp", mojo.mainClassBinaryName());
+    }
+
+    /// With nothing overridden the file is still the answer.
+    @Test
+    public void withoutAnOverrideTheFileDecidesTheOwner() throws Exception {
+        File basedir = tmp.newFolder();
+        writeSettings(basedir, "com.example", "FileApp");
+
+        ProcessAnnotationsMojo mojo = new ProcessAnnotationsMojo();
+        mojo.setLog(new SystemStreamLog());
+        mojo.project = projectAt(basedir);
+
+        assertEquals("com.example.FileApp", mojo.mainClassBinaryName());
+    }
+
+    private static void writeSettings(File basedir, String pkg, String main) throws Exception {
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("codename1.packageName", pkg);
+        p.setProperty("codename1.mainName", main);
+        java.io.FileOutputStream out = new java.io.FileOutputStream(
+                new File(basedir, "codenameone_settings.properties"));
+        try {
+            p.store(out, null);
+        } finally {
+            out.close();
+        }
+    }
+
+    private static org.apache.maven.project.MavenProject projectAt(File basedir) {
+        org.apache.maven.project.MavenProject project =
+                new org.apache.maven.project.MavenProject();
+        project.setBuild(new org.apache.maven.model.Build());
+        project.setFile(new File(basedir, "pom.xml"));
+        return project;
+    }
+
     private void runMojo(File classes) throws Exception {
         ProcessAnnotationsMojo mojo = new ProcessAnnotationsMojo();
         mojo.outputDirectory = classes;
