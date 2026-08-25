@@ -1952,6 +1952,43 @@ public class BuildHintCatalogTest {
         assertFalse(roots.contains("managed/gen"), roots.toString());
     }
 
+    /// A bare `<plugin>` under `<plugins>` turns a managed declaration ON, and
+    /// Maven merges the managed configuration into it.
+    ///
+    /// That is the ordinary idiom -- the executions live in
+    /// `<pluginManagement>`, often in the parent, and the module lists the
+    /// plugin to activate it. Reading only the active block lost the roots the
+    /// module really compiles, which is the same missed-main-class ending as
+    /// reading the managed block when nothing activates it.
+    @Test
+    public void aManagedDeclarationActivatedByABarePluginStillCounts() {
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("managed/gen"), roots.toString());
+    }
+
+    /// ...and the same for an inherited compiler encoding.
+    @Test
+    public void aManagedEncodingActivatedByABarePluginStillCounts() {
+        String pom = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><release>17</release></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(pom));
+    }
+
     /// The compiler plugin is the exception: it runs from the default lifecycle,
     /// so a `<pluginManagement>` configuration for it IS in effect -- and an
     /// explicit `<plugins>` entry still overrides that.

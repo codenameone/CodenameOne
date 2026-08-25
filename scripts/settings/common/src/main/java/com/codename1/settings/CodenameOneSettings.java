@@ -2492,9 +2492,10 @@ public class CodenameOneSettings extends Lifecycle {
         // compiled, and treating it as a root put the templates back in the
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
-        collectRoots(compileGoalConfiguration(activePluginBlock(pomText, "kotlin-maven-plugin"),
+        collectRoots(compileGoalConfiguration(
+                activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir"),
                 "compile", "sourceDir"), "sourceDir", properties, out);
-        String helper = activePluginBlock(pomText, "build-helper-maven-plugin");
+        String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source");
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
@@ -3877,23 +3878,70 @@ public class CodenameOneSettings extends Lifecycle {
         return value.trim();
     }
 
-    /// The `<plugin>` element declaring `artifactId` among the plugins the
-    /// module actually RUNS, or null.
+    /// The `<plugin>` element that supplies `element` for the plugins the module
+    /// actually RUNS, or null when the module does not run this plugin.
     ///
     /// `<pluginManagement>` is a place to pin a version and pre-configure a
     /// plugin, not to run one: Maven executes a managed plugin only where the
-    /// module also lists it under `<plugins>`. Reading the managed block added
-    /// `add-source` directories the build does not compile -- and a dormant
-    /// source in one of those can declare a same-package `Ios` or `Android`
-    /// type, which shadows the real annotation and puts an annotation-owned
-    /// hint back in the editor for Add to declare a second time.
+    /// module also lists it under `<plugins>`. Reading the managed block on its
+    /// own added `add-source` directories the build does not compile -- and a
+    /// dormant source in one of those can declare a same-package `Ios` or
+    /// `Android` type, which shadows the real annotation and puts an
+    /// annotation-owned hint back in the editor for Add to declare a second
+    /// time.
     ///
-    /// Not for the compiler plugin. That one is bound by the default lifecycle,
-    /// so a `<pluginManagement>` configuration for it IS in effect without the
-    /// module listing it -- see `compilerPluginBlock`.
-    static String activePluginBlock(String pomText, String artifactId) {
-        return pluginBlock(pomText == null ? null
-                : withoutElement(pomText, "pluginManagement"), artifactId);
+    /// But Maven MERGES the managed declaration into the active one, and the
+    /// ordinary idiom is a managed block carrying the executions with a bare
+    /// `<plugin>` under `<plugins>` to turn it on. Returning only the active
+    /// block there lost the configuration the module really compiles with, which
+    /// is the same missed-root ending by another route. So: the active block
+    /// where it declares `element` itself, and the managed one where it does
+    /// not.
+    ///
+    /// The narrowing this does not model, which is rare enough to name rather
+    /// than guess at: a managed execution and an active execution with DIFFERENT
+    /// ids both contributing the element. Maven keeps both; this takes the
+    /// active one, on the same principle as everywhere else here -- a root the
+    /// build does not compile is worse than one it does.
+    ///
+    /// Not for the compiler plugin, which is bound by the default lifecycle --
+    /// see `compilerPluginBlock`.
+    static String activePluginBlock(String pomText, String artifactId, String element) {
+        if (pomText == null) {
+            return null;
+        }
+        String active = pluginBlock(withoutElement(pomText, "pluginManagement"), artifactId);
+        if (active == null) {
+            return null;
+        }
+        if (element == null || active.indexOf("<" + element + ">") >= 0) {
+            return active;
+        }
+        String managed = pluginBlock(managementOnly(pomText), artifactId);
+        return managed == null ? active : managed;
+    }
+
+    /// The `<pluginManagement>` sections of `pomText`, and nothing else.
+    private static String managementOnly(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        String open = "<pluginManagement>";
+        String shut = "</pluginManagement>";
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int hit = pomText.indexOf(open, at);
+            if (hit < 0) {
+                return out.length() == 0 ? null : out.toString();
+            }
+            int close = pomText.indexOf(shut, hit);
+            if (close < 0) {
+                return out.length() == 0 ? null : out.toString();
+            }
+            out.append(pomText, hit + open.length(), close);
+            at = close + shut.length();
+        }
     }
 
     /// The compiler plugin's element, preferring the one the module declares.
@@ -3904,8 +3952,11 @@ public class CodenameOneSettings extends Lifecycle {
     /// usually comes first in the file, so taking the first match in the text
     /// picked exactly the wrong one.
     static String compilerPluginBlock(String pomText) {
-        String active = activePluginBlock(pomText, "maven-compiler-plugin");
-        return active != null ? active : pluginBlock(pomText, "maven-compiler-plugin");
+        String active = activePluginBlock(pomText, "maven-compiler-plugin", "encoding");
+        if (active != null) {
+            return active;
+        }
+        return pluginBlock(managementOnly(pomText), "maven-compiler-plugin");
     }
 
     /// The `<plugin>` element declaring `artifactId`, or null.
