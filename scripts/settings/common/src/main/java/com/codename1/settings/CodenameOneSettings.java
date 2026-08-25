@@ -2375,7 +2375,26 @@ public class CodenameOneSettings extends Lifecycle {
         if (("target".equals(name) || "build".equals(name)) && !insideSourceTree) {
             return false;
         }
-        return !(dir.endsWith("/src") && name.toLowerCase().indexOf("test") >= 0);
+        return !(dir.endsWith("/src") && isTestSourceSet(name));
+    }
+
+    /// Whether `name` is a test source set by the usual convention.
+    ///
+    /// The convention is a shape, not a word anywhere in the name: `test`
+    /// itself, `test` followed by a capital as in `testFixtures`, or a name
+    /// ending in `Test`/`Tests` as in `integrationTest` and `androidTest`.
+    /// Matching the substring pruned `src/latest` and `src/contest`, which are
+    /// production roots, and a main class living in one could not be found at
+    /// all.
+    private static boolean isTestSourceSet(String name) {
+        if ("test".equals(name)) {
+            return true;
+        }
+        if (name.length() > 4 && name.startsWith("test")
+                && Character.isUpperCase(name.charAt(4))) {
+            return true;
+        }
+        return name.endsWith("Test") || name.endsWith("Tests");
     }
 
     /// The generated source root under the output directory `dir`/`name`, or

@@ -1551,8 +1551,16 @@ public class BuildHintCatalogTest {
                 "integrationTest", false));
         assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "androidTest",
                 false));
-        // The main source set is not one of them.
+        assertFalse(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "jvmTests",
+                false));
+        // The main source set is not one of them, and neither is a production
+        // root that merely contains the letters.
         assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "main", false));
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "latest", false));
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "contest",
+                false));
+        assertTrue(CodenameOneSettings.peerDirectoryHoldsSources("/p/common/src", "testing",
+                false));
         // ...and deeper down the same word is an ordinary package name.
         assertTrue(CodenameOneSettings.peerDirectoryHoldsSources(
                 "/p/common/src/main/java/com", "test", false));
