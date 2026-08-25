@@ -33,9 +33,10 @@ public final class BuildHintMetadata {
     private final List<String> values;
     private final String defaultValue;
     private final String annotation;
+    private final String aliasOf;
 
     public BuildHintMetadata(String name, String description, BuildHintType type, String platform) {
-        this(name, description, type, platform, null, null, null);
+        this(name, description, type, platform, null, null, null, null);
     }
 
     /**
@@ -43,9 +44,12 @@ public final class BuildHintMetadata {
      * @param defaultValue the builder's own default, or null when it has none
      * @param annotation the annotation attribute that sets this hint, e.g.
      *                   {@code @Ios(pods)}, or null when it has none
+     * @param aliasOf the hint this one is a deprecated second spelling of, or
+     *                null when it is the canonical name
      */
     public BuildHintMetadata(String name, String description, BuildHintType type, String platform,
-                             List<String> values, String defaultValue, String annotation) {
+                             List<String> values, String defaultValue, String annotation,
+                             String aliasOf) {
         this.name = name;
         this.description = description == null ? "" : description.trim();
         this.type = type == null ? BuildHintType.TEXT : type;
@@ -54,6 +58,7 @@ public final class BuildHintMetadata {
                 ? Collections.<String>emptyList() : Collections.unmodifiableList(values);
         this.defaultValue = defaultValue;
         this.annotation = annotation;
+        this.aliasOf = aliasOf;
     }
 
     /** The accepted values, or empty when the hint is free-form. */
@@ -73,6 +78,19 @@ public final class BuildHintMetadata {
      */
     public String annotation() {
         return annotation;
+    }
+
+    /**
+     * The hint this one is a deprecated second spelling of, or null.
+     *
+     * <p>Both names denote ONE effective setting -- the builder reads
+     * {@code android.captureRecord} and then lets {@code and.captureRecord}
+     * override it -- so an alias must not be offered as a second thing to set.
+     * It is still described here, so a project that already declares one gets a
+     * properly typed row rather than being told it is a custom hint.</p>
+     */
+    public String aliasOf() {
+        return aliasOf;
     }
 
     public String name() {

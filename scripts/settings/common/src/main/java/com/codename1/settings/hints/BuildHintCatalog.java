@@ -59,6 +59,16 @@ public final class BuildHintCatalog {
     public List<BuildHintMetadata> search(String query) {
         ArrayList<BuildHintMetadata> out = new ArrayList<BuildHintMetadata>();
         for (BuildHintMetadata hint : hints.values()) {
+            // A deprecated alias is the same effective setting as its target --
+            // the builder reads android.captureRecord and then lets
+            // and.captureRecord override it. Offering both as things to add gave
+            // one setting two independent controls, and a project that filled in
+            // both got whichever the builder happens to prefer. The alias stays
+            // in the catalog so an existing declaration is still described; it
+            // is simply not something to browse to and add.
+            if (hint.aliasOf() != null) {
+                continue;
+            }
             if (hint.matches(query)) {
                 out.add(hint);
             }
@@ -91,7 +101,8 @@ public final class BuildHintCatalog {
                     h.platform(),
                     h.values(),
                     h.def(),
-                    annotationOf(h)));
+                    annotationOf(h),
+                    h.aliasOf()));
         }
         return catalog;
     }

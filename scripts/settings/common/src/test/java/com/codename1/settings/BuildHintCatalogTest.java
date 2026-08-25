@@ -1867,6 +1867,42 @@ public class BuildHintCatalogTest {
         assertEquals("p", properties.get("only.parent"));
     }
 
+    /// A deprecated alias is not a second thing to set.
+    ///
+    /// The builder reads `android.captureRecord` and then lets
+    /// `and.captureRecord` override it -- one effective setting, two spellings.
+    /// Offering both in the browse list gave it two independent controls, and a
+    /// project that filled in both got whichever the builder happens to prefer.
+    /// The alias is still DESCRIBED, so a project that already declares one gets
+    /// a properly typed row instead of being told it is a custom hint.
+    @Test
+    public void aDeprecatedAliasIsDescribedButNotOffered() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+
+        BuildHintMetadata alias = catalog.get("and.captureRecord");
+        assertNotNull(alias, "the alias must still be described");
+        assertEquals("android.captureRecord", alias.aliasOf());
+        assertNull(catalog.get("android.captureRecord").aliasOf(),
+                "the canonical name is not an alias of anything");
+
+        for (BuildHintMetadata found : catalog.search("captureRecord")) {
+            assertNull(found.aliasOf(),
+                    "the browse list offered the alias " + found.name()
+                            + ", which is the same setting as " + found.aliasOf());
+        }
+        // ...and the canonical one is still there to find.
+        boolean canonical = false;
+        for (BuildHintMetadata found : catalog.search("captureRecord")) {
+            canonical |= "android.captureRecord".equals(found.name());
+        }
+        assertTrue(canonical, "the canonical hint must still be offered");
+
+        // Every alias in the catalog, not just this one.
+        for (BuildHintMetadata found : catalog.search("")) {
+            assertNull(found.aliasOf(), found.name() + " is an alias and must not be offered");
+        }
+    }
+
     /// An `activeByDefault` profile redefining a base property is the whole
     /// point of writing it there, so within one POM the profile's value wins.
     ///

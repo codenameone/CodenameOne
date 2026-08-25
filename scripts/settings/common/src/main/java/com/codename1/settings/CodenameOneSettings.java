@@ -695,7 +695,25 @@ public class CodenameOneSettings extends Lifecycle {
         if (ownedBy != null) {
             metaLine.add(new Label(ownedBy, uiid("SettingsRowMeta")));
         }
+        if (meta.aliasOf() != null) {
+            metaLine.add(new Label("alias of " + meta.aliasOf(), uiid("SettingsRowMeta")));
+        }
         text.add(name).add(metaLine);
+        // Both spellings declared. They are ONE setting -- the builder reads the
+        // canonical name and then lets the alias override it -- so the file is
+        // saying two things and which one wins is a builder detail nobody should
+        // have to know. The alias no longer appears in the browse list, so this
+        // is reachable only for a project that already had it.
+        if (meta.aliasOf() != null && active && hasBuildHint(meta.aliasOf())) {
+            TextArea both = new TextArea(meta.name() + " and " + meta.aliasOf()
+                    + " are two spellings of one setting, and both are declared. "
+                    + meta.name() + " is the one that takes effect. Remove it to fall back to "
+                    + meta.aliasOf() + ".");
+            both.setUIID(uiid("SettingsRowText"));
+            both.setEditable(false);
+            both.setFocusable(false);
+            text.add(both);
+        }
         if (ownedBy != null) {
             // Set by an annotation on the main class. Editing it here would write a
             // second declaration and the next build would refuse the project, so the
