@@ -3008,6 +3008,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             return com.codename1.ui.Desktop.getInstance().windowById(windowId);
         }
 
+        /// Repaints whatever this canvas is showing: the application's current form for
+        /// the main surface, this canvas's own window otherwise.
+        ///
+        /// The callbacks below run for whichever canvas AWT is dealing with, and a
+        /// secondary window has its own. Repainting the current form from them dirtied
+        /// and redrew an unrelated surface, and left this one holding the blank buffer
+        /// that prompted the repaint in the first place.
+        private void repaintCanvasTopLevel() {
+            com.codename1.ui.TopLevelContainer top = canvasTopLevel();
+            if (top != null) {
+                top.asContainer().repaint();
+            }
+        }
+
         double canvasScale() {
             if (windowId == 0) {
                 return retinaScale;
@@ -3294,10 +3308,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    Form f = getCurrentForm();
-                    if (f != null) {
-                        f.repaint();
-                    }
+                    repaintCanvasTopLevel();
                 }
             });
         }
@@ -3638,10 +3649,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if (Display.isInitialized()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            Form f = getCurrentForm();
-                            if (f != null) {
-                                f.repaint();
-                            }
+                            repaintCanvasTopLevel();
                         }
                     });
 
@@ -3649,7 +3657,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        flushGraphics();
+                        if (windowId == 0) {
+                            flushGraphics();
+                        } else {
+                            // flushGraphics() is the main surface's. A window is flushed
+                            // by painting it, which goes through its own paint surface
+                            // and its own manager.
+                            repaintCanvasTopLevel();
+                        }
                     }
                 });
             }
