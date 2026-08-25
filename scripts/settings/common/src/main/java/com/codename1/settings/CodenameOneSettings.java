@@ -2654,11 +2654,11 @@ public class CodenameOneSettings extends Lifecycle {
         // missing them. Treating an incomplete list as the whole answer hid
         // roots the POM reading would have found.
         java.util.List<String> out = new java.util.ArrayList<>();
-        if (binding != null) {
-            for (String root : binding.sourceRoots()) {
-                if (fs.isDirectory(ProjectIO.fsUrl(root)) && !out.contains(root)) {
-                    out.add(root);
-                }
+        java.util.List<String> resolvedRoots =
+                binding == null ? new java.util.ArrayList<>() : binding.sourceRoots();
+        for (String root : resolvedRoots) {
+            if (fs.isDirectory(ProjectIO.fsUrl(root)) && !out.contains(root)) {
+                out.add(root);
             }
         }
         boolean hasSrcMain = projectDir != null
@@ -2669,10 +2669,15 @@ public class CodenameOneSettings extends Lifecycle {
         // class is the one file this list cannot afford to miss: without it
         // nothing knows which hints an annotation owns, and Add writes the
         // duplicate the next build refuses.
-        // The whole chain: Maven inherits <sourceDirectory> and plugin
-        // configuration from the parent, and a relative one resolves against
-        // THIS module rather than the module that declared it.
-        for (String pom : pomChain()) {
+        // Only when the launcher did not answer. Maven applies profile
+        // activation, and activating one explicitly DEACTIVATES an
+        // activeByDefault profile -- so a root this reader takes from such a
+        // profile is one the build is not compiling, and adding it beside a
+        // resolved list put a source tree back that Maven had already excluded.
+        // The conventional roots above are safe either way: they are where
+        // sources live, not something a profile turns on.
+        for (String pom : resolvedRoots.isEmpty() ? pomChain()
+                : java.util.Collections.<String>emptyList()) {
             for (String declared : declaredSourceRoots(pom)) {
                 String expanded = expandProjectPaths(declared, projectDir, buildDirectory(projectDir));
                 if (expanded == null) {

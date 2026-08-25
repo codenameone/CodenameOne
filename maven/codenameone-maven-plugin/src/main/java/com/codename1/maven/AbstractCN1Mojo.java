@@ -1169,24 +1169,38 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * lifecycle-injected execution.</p>
      */
     private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
-                                                  String goal) {
+                                                  String goal, String element) {
         List<Object> out = new ArrayList<Object>();
+        boolean bound = false;
         if (plugin.getExecutions() != null) {
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                boolean bound = execution.getGoals() != null
+                boolean thisOne = execution.getGoals() != null
                         && execution.getGoals().contains(goal);
-                if (!bound && ("default-" + goal).equals(execution.getId())) {
-                    bound = true;
+                if (!thisOne && ("default-" + goal).equals(execution.getId())) {
+                    thisOne = true;
                 }
-                if (bound && execution.getConfiguration() != null) {
-                    out.add(execution.getConfiguration());
+                if (!thisOne) {
+                    continue;
                 }
+                bound = true;
+                // The execution's own value REPLACES the plugin-level one --
+                // Maven merges by element, and a repeated list is not appended
+                // unless the POM says so. Taking both would have added a
+                // directory the build does not compile, which is a phantom root
+                // for everything downstream to scan.
+                out.add(has(execution.getConfiguration(), element)
+                        ? execution.getConfiguration() : plugin.getConfiguration());
             }
         }
-        if (plugin.getConfiguration() != null) {
+        if (!bound && plugin.getConfiguration() != null) {
             out.add(plugin.getConfiguration());
         }
         return out;
+    }
+
+    private static boolean has(Object configuration, String element) {
+        return configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom
+                && ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild(element) != null;
     }
 
     /**
@@ -1216,11 +1230,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             if (!"build-helper-maven-plugin".equals(plugin.getArtifactId())) {
                 continue;
             }
-            // Every configuration that applies to add-source, including the
-            // plugin-level one. Collected rather than overridden: this list is
-            // used to decide where a source COULD be, so a root named at either
-            // level is a root.
-            for (Object configuration : configurationsFor(plugin, "add-source")) {
+            // Once per execution bound to add-source, taking the configuration
+            // that actually supplies its <sources>. Every such execution adds
+            // its own roots, so these accumulate -- but within one execution the
+            // levels do not, they override.
+            for (Object configuration : configurationsFor(plugin, "add-source", "sources")) {
                 addSourcesFrom(project, configuration, roots);
             }
         }
@@ -1349,7 +1363,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
             // Most specific first: an execution bound to `compile` overrides
             // the plugin-level value, and testCompile's is not this one.
-            for (Object configuration : configurationsFor(plugin, "compile")) {
+            for (Object configuration : configurationsFor(plugin, "compile", "encoding")) {
                 String encoding = encodingIn(configuration);
                 if (encoding != null) {
                     return encoding;

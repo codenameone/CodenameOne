@@ -335,6 +335,39 @@ public class OpenSettingsMojoTest {
         assertFalse(binding, binding.contains("sourceEncoding=UTF-8"));
     }
 
+    /// Within one execution the levels do NOT accumulate: Maven merges by
+    /// element, and a repeated list is replaced rather than appended unless the
+    /// POM says otherwise. Taking both added a directory the build does not
+    /// compile -- a phantom root for everything downstream to scan.
+    @Test
+    public void anExecutionsSourcesReplaceThePluginLevelOnes() throws Exception {
+        File root = tmp.newFolder("override");
+        File common = new File(root, "common");
+        assertTrue(new File(common, "src/main/java").mkdirs());
+        assertTrue(new File(common, "gen/plugin-level").mkdirs());
+        assertTrue(new File(common, "gen/execution").mkdirs());
+        File input = tmp.newFile("override.input");
+
+        OpenSettingsMojo mojo = new OpenSettingsMojo();
+        mojo.project = projectAt(common);
+        org.apache.maven.model.Plugin helper = new org.apache.maven.model.Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        helper.setConfiguration(org.codehaus.plexus.util.xml.Xpp3DomBuilder.build(
+                new java.io.StringReader(
+                        "<configuration><sources><source>gen/plugin-level</source></sources>"
+                                + "</configuration>")));
+        helper.addExecution(sourceExecution("add-source", "gen/execution"));
+        mojo.project.getBuild().addPlugin(helper);
+
+        mojo.writeBinding(input, common);
+
+        String binding = new String(Files.readAllBytes(input.toPath()), StandardCharsets.UTF_8);
+        assertTrue(binding, binding.contains(
+                "sourceRoot=" + new File(common, "gen/execution").getAbsolutePath() + "\n"));
+        assertFalse(binding,
+                binding.contains(new File(common, "gen/plugin-level").getAbsolutePath()));
+    }
+
     /// A project that resolves neither says neither, and the tool falls back to
     /// reading the POM itself rather than being handed an empty answer.
     @Test
