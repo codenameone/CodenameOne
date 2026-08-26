@@ -50,6 +50,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
 @implementation METALView {
     NSTrackingArea *cn1TrackingArea;
+    NSMutableIndexSet *consumedKeys;
 }
 
 @synthesize commandQueue;
@@ -648,8 +649,26 @@ static int CN1MacKeyCode(NSEvent *event) {
     }
 }
 
+/// Hardware key codes whose press this view swallowed, so the matching release
+/// can be swallowed too. Keyed on event.keyCode rather than the character,
+/// because the character changes with the modifiers between down and up.
+///
+/// Needed because the two are gated independently in time: a press consumed by
+/// an input session is followed by a release that arrives after the session has
+/// ended -- pressing Return in a single-line field finishes editing, and the
+/// unmatched release then reached Form.keyReleased() and fired the form's
+/// default command. Gating keyUp: on the CURRENT state instead would swallow
+/// the release of a key pressed before the session began.
+- (NSMutableIndexSet *)cn1ConsumedKeys {
+    if (consumedKeys == nil) {
+        consumedKeys = [[NSMutableIndexSet alloc] init];
+    }
+    return consumedKeys;
+}
+
 - (void)keyDown:(NSEvent *)event {
     if (!self.cn1InputEnabled) {
+        [[self cn1ConsumedKeys] addIndex:event.keyCode];
         return;
     }
     if ([CN1MacTextInputSession sharedSession].active) {
@@ -657,6 +676,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         // into insertText:, setMarkedText: or doCommandBySelector:. Doing this
         // rather than reading characters directly is what buys dead keys, CJK
         // input methods, dictation and the Emacs key bindings for free.
+        [[self cn1ConsumedKeys] addIndex:event.keyCode];
         [self interpretKeyEvents:@[event]];
         return;
     }
@@ -911,6 +931,13 @@ static int CN1MacKeyCode(NSEvent *event) {
 
 
 - (void)keyUp:(NSEvent *)event {
+    if ([[self cn1ConsumedKeys] containsIndex:event.keyCode]) {
+        [[self cn1ConsumedKeys] removeIndex:event.keyCode];
+        return;
+    }
+    if (!self.cn1InputEnabled) {
+        return;
+    }
     int code = CN1MacKeyCode(event);
     if (code == 0) {
         return;
@@ -920,6 +947,112 @@ static int CN1MacKeyCode(NSEvent *event) {
         return;
     }
     keyReleasedNative(code);
+}
+
+// ---- Edit menu -----------------------------------------------------------
+//
+// The menu bar's Edit items have nil targets, which is how AppKit is meant to
+// work: it walks the responder chain and whoever is first responder answers.
+// This view IS the first responder while a text field is being edited, and it
+// answered none of them -- so the whole Edit menu and its Command-X/C/V stayed
+// greyed out during text entry, on a port whose point is being a real Mac app.
+//
+// The edits go through the same cn1EffectiveRange/cn1ReplaceRange/commitFinished
+// path insertText: uses, so the framework sees a paste exactly as it sees typing.
+
+/// The selection, or an empty range when there is no session.
+- (NSRange)cn1SelectionForEditing {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.active) {
+        return NSMakeRange(NSNotFound, 0);
+    }
+    NSRange sel = session.selectedRange;
+    if (sel.location == NSNotFound || NSMaxRange(sel) > session.text.length) {
+        return NSMakeRange(NSNotFound, 0);
+    }
+    return sel;
+}
+
+- (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item {
+    SEL action = [item action];
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (action == @selector(undo:) || action == @selector(redo:)) {
+        // Disabled honestly rather than shown enabled and doing nothing: the
+        // input session keeps no undo stack, and the pure Codename One editor
+        // (EditField/CodeEditor) owns its own undo rather than routing it here.
+        return NO;
+    }
+    if (action == @selector(paste:)) {
+        return session.active
+            && [[NSPasteboard generalPasteboard] canReadObjectForClasses:@[[NSString class]]
+                                                                 options:nil];
+    }
+    if (action == @selector(selectAll:)) {
+        return session.active && session.text.length > 0;
+    }
+    if (action == @selector(cut:) || action == @selector(copy:)
+            || action == @selector(delete:)) {
+        return [self cn1SelectionForEditing].length > 0;
+    }
+    return [super validateUserInterfaceItem:item];
+}
+
+- (void)copy:(id)sender {
+    NSRange sel = [self cn1SelectionForEditing];
+    if (sel.length == 0) {
+        return;
+    }
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+    [pb clearContents];
+    [pb writeObjects:@[[[CN1MacTextInputSession sharedSession].text
+                            substringWithRange:sel]]];
+}
+
+- (void)cut:(id)sender {
+    NSRange sel = [self cn1SelectionForEditing];
+    if (sel.length == 0) {
+        return;
+    }
+    [self copy:sender];
+    [self delete:sender];
+}
+
+- (void)delete:(id)sender {
+    NSRange sel = [self cn1SelectionForEditing];
+    if (sel.length == 0) {
+        return;
+    }
+    if (![self cn1ReplaceRange:sel withString:@""]) {
+        return;
+    }
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    session.markedRange = NSMakeRange(NSNotFound, 0);
+    session.selectedRange = NSMakeRange(sel.location, 0);
+    [session commitFinished:NO];
+}
+
+- (void)paste:(id)sender {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.active) {
+        return;
+    }
+    NSString *pasted = [[NSPasteboard generalPasteboard]
+                            stringForType:NSPasteboardTypeString];
+    if (pasted == nil) {
+        return;
+    }
+    // Through insertText:, so a multi-line paste into a single-line field is
+    // flattened the same way a typed newline is rather than being truncated.
+    [self insertText:pasted replacementRange:NSMakeRange(NSNotFound, 0)];
+}
+
+- (void)selectAll:(id)sender {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.active) {
+        return;
+    }
+    session.markedRange = NSMakeRange(NSNotFound, 0);
+    session.selectedRange = NSMakeRange(0, session.text.length);
 }
 
 /// An I-beam over the view. Its absence is the loudest "this is not really a Mac

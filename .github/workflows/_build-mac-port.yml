@@ -79,10 +79,24 @@ jobs:
           # gets fixed in CI (most visible on clipped_badge.svg, whose outer
           # rect kept rendering as a square long after the clip-path
           # forwarding fix landed in the transcoder source).
+          # Every file under these roots, with no extension allowlist. The list
+          # used to be .java/.m/.h/.xml/.properties/.css, which silently missed
+          # most of what the macOS build actually consumes: CN1MetalShaders.metal,
+          # the .c natives (Renderer.c, Stroker.c, Curve.c), both
+          # Ports/MacPort/shared-*.exclude manifests -- which decide WHICH files
+          # are compiled at all -- the macOS template's .plist and .pbxproj, the
+          # asset catalog's .json, and the bundled .res themes. A PR touching any
+          # of them produced the same key, so build-port skipped the rebuild and
+          # the consumer untarred the previous artifact over its checkout: the
+          # macOS tests then exercised the old binary and passed on a change they
+          # never ran.
+          #
+          # target/ is pruned so a local build cannot change the key; CI checks
+          # out clean, but this hash has to mean the same thing in both places.
           SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
               maven/codenameone-maven-plugin/src/main \
               maven/svg-transcoder/src/main \
-              -type f \( -name '*.java' -o -name '*.m' -o -name '*.h' -o -name '*.xml' -o -name '*.properties' -o -name '*.css' \) 2>/dev/null \
+              \( -name target -o -name .git \) -prune -o -type f -print 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')

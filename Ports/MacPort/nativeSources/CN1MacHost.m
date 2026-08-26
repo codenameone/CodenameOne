@@ -131,6 +131,21 @@ void CN1MacRefreshScaleValue(void) {
     // would be laid out at pixel coordinates read as points, so on a Retina
     // display each one lands at twice its size in the wrong place.
     CN1MacRefreshScaleValue();
+    // macos.fixedWindowSize, read back out of the bundle. The builder wrote
+    // CN1FixedWindowWidth/Height and nothing read them, so the hint did nothing
+    // and the screenshot workflow that sets 1024x685 was comparing frames from a
+    // window free to be any size -- which is the one thing a strict pixel
+    // comparison cannot survive.
+    //
+    // In points, because that is what setContentSize: takes; the value in the
+    // plist is what the developer asked for and the backing scale turns it into
+    // pixels on a Retina display.
+    NSNumber *fixedW = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowWidth"];
+    NSNumber *fixedH = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1FixedWindowHeight"];
+    if (fixedW != nil && fixedH != nil
+            && fixedW.doubleValue > 0 && fixedH.doubleValue > 0) {
+        [self setFixedContentSize:NSMakeSize(fixedW.doubleValue, fixedH.doubleValue)];
+    }
     [_window center];
     [_window makeKeyAndOrderFront:nil];
     [_window makeFirstResponder:_renderingView];

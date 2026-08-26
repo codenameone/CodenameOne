@@ -70,7 +70,23 @@ extern void stringEdit(int finished, int cursorPos, NSString *text);
     _active = YES;
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSView *view = [CN1MacHost sharedHost].renderingView;
+        // The window the editing started in, not always the main one. Editing a
+        // component in a secondary NSWindow used to make the MAIN host's view
+        // first responder, which took key focus away from the window the user
+        // was typing in and routed every subsequent keystroke to the wrong one.
+        //
+        // Chosen by conformance rather than by class: the thing that has to
+        // become first responder is whatever can receive text input, and asking
+        // that question directly needs no import of the view's header.
+        NSView *view = nil;
+        NSWindow *key = [NSApp keyWindow];
+        if (key != nil
+                && [key.contentView conformsToProtocol:@protocol(NSTextInputClient)]) {
+            view = key.contentView;
+        }
+        if (view == nil) {
+            view = [CN1MacHost sharedHost].renderingView;
+        }
         [view.window makeFirstResponder:view];
     });
 }

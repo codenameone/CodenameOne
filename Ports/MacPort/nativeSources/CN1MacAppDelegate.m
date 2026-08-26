@@ -69,6 +69,13 @@ static BOOL cn1MacJavaReady = NO;
 static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
 static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
+static NSMutableArray<NSString *> *cn1MacPendingPushes = nil;
+
+static void cn1MacDeliverPush(NSString *body) {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+        threadStateData, fromNSString(threadStateData, body), JAVA_NULL);
+}
 
 static void cn1MacDeliverURL(NSString *url) {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
@@ -106,6 +113,10 @@ void cn1_mac_runtime_markJavaReady(void) {
             cn1MacDeliverURL(url);
         }
         [cn1MacPendingURLs removeAllObjects];
+        for (NSString *body in cn1MacPendingPushes) {
+            cn1MacDeliverPush(body);
+        }
+        [cn1MacPendingPushes removeAllObjects];
     });
 }
 
@@ -251,9 +262,20 @@ extern BOOL isAppSuspended;
     if (body == nil) {
         return;
     }
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(threadStateData,
-        fromNSString(threadStateData, body), JAVA_NULL);
+    // Queued like the lifecycle transitions and the launch URL, and for the
+    // sharper version of the same reason: a notification that LAUNCHED the app
+    // arrives before the Java bootstrap has run, IOSImplementation.pushCallback
+    // is still null, and pushReceived() drops the payload on the floor. The
+    // application then never learns about the push that started it -- the one
+    // push it most needs.
+    if (!cn1MacJavaReady) {
+        if (cn1MacPendingPushes == nil) {
+            cn1MacPendingPushes = [[NSMutableArray alloc] init];
+        }
+        [cn1MacPendingPushes addObject:body];
+        return;
+    }
+    cn1MacDeliverPush(body);
 }
 
 @end

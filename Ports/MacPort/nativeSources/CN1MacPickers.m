@@ -90,17 +90,18 @@ static void cn1PickerFinish(JAVA_LONG result) {
         return;
     }
     NSDate *date = self.datePicker.dateValue;
-    if (self.pickerType == 5 || self.pickerType == 6 || self.pickerType == 7) {
-        // A duration is minutes rather than an instant. NSDatePicker has no
-        // duration mode, so hours and minutes are read back off the date the
-        // picker was seeded with.
-        NSCalendar *cal = [NSCalendar currentCalendar];
-        NSDateComponents *parts = [cal components:(NSCalendarUnitHour | NSCalendarUnitMinute)
-                                         fromDate:date];
-        cn1PickerFinish((JAVA_LONG)(parts.hour * 60 + parts.minute));
-        return;
-    }
-    cn1PickerFinish((JAVA_LONG)([date timeIntervalSince1970] * 1000));
+    // Milliseconds for every type, duration included. Picker.setDuration stores
+    // hours*3600000 + minutes*60000 and Picker.getDuration hands that value back
+    // untouched, so returning minutes turned 1h30m into 90 rather than
+    // 5,400,000 -- every duration the user picked was corrupted.
+    //
+    // And read as an interval rather than through calendar components. A
+    // duration picker is seeded with an offset from the epoch and pinned to GMT
+    // (see the seeding below), so the interval IS the duration; reading hour and
+    // minute back through the current time zone shifted it by the UTC offset,
+    // which also meant the value shown when the popover opened was not the value
+    // that went in.
+    cn1PickerFinish((JAVA_LONG)llround([date timeIntervalSince1970] * 1000.0));
 }
 
 - (void)cancel:(id)sender {
@@ -214,6 +215,18 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
             default: // time, and the three duration types
                 picker.datePickerElements = NSDatePickerElementFlagHourMinute;
                 break;
+        }
+        if (type == 5 || type == 6 || type == 7) {
+            // A duration is an elapsed amount, not an instant, and NSDatePicker
+            // has no duration mode -- so it edits an offset from the epoch. GMT
+            // makes what is displayed and what is read back the same number; in
+            // the local zone the picker opened showing the duration plus the UTC
+            // offset and handed that back.
+            NSTimeZone *gmt = [NSTimeZone timeZoneForSecondsFromGMT:0];
+            NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+            cal.timeZone = gmt;
+            picker.timeZone = gmt;
+            picker.calendar = cal;
         }
         picker.dateValue = [NSDate dateWithTimeIntervalSince1970:time / 1000.0];
         controller.datePicker = picker;

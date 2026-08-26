@@ -39,6 +39,14 @@ on:
       - '!CodenameOne/src/**/*.md'
       - 'Ports/MacPort/**'
       - '!Ports/MacPort/**/*.md'
+      # The mac module stages and compiles shared sources out of Ports/iOSPort --
+      # IOSImplementation, IOSNative.m, the Metal renderer, the whole drawing
+      # core. An iOS-port-only change to any of that reaches this port, so
+      # without this filter the AppKit suite never starts and the change ships
+      # untested here. The reusable build workflow's source hash cannot save
+      # it: the workflow is not invoked at all.
+      - 'Ports/iOSPort/**'
+      - '!Ports/iOSPort/**/*.md'
       - 'native-themes/ios-modern/**'
       - '!native-themes/ios-modern/**/*.md'
       - 'vm/**'
@@ -66,6 +74,7 @@ on:
       - 'scripts/lib/cn1ss.sh'
       - 'CodenameOne/src/**'
       - 'Ports/MacPort/**'
+      - 'Ports/iOSPort/**'
       - 'native-themes/ios-modern/**'
       - 'vm/**'
       - 'tests/**'
