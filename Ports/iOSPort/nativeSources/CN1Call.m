@@ -410,6 +410,11 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [cn1clActions removeAllObjects];
         [cn1clJavaStarts removeAllObjects];
         [cn1clSystemStarts removeAllObjects];
+        // Held actions go too. They name calls this reset has just destroyed,
+        // so replaying them after the drain would deliver answerRequested for
+        // a session that no longer exists -- and a stale system start would
+        // have the app place a call the user asked for before the reset.
+        [cn1clQueuedActions removeAllObjects];
         cn1clAudioCall = nil;
         cn1clAudioRetiring = nil;
     }
@@ -688,23 +693,36 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
     update.supportsGrouping = NO;
     update.supportsUngrouping = NO;
 
+    // ONE critical section for the test, the waiter registration AND the
+    // reservation. Split, a socket and a push reporting the same uuid could
+    // both read known == NO and both call reportNewIncomingCallWithUUID:
+    // whichever completion got CallKit's duplicate error then dropped the
+    // shared record, so the other report succeeded while every later end or
+    // update on it answered INVALID_ID.
     BOOL known = NO;
     BOOL stillPending = NO;
     @synchronized (cn1clLock) {
         known = [cn1clCalls objectForKey:uuidString] != nil;
         stillPending = [cn1clReporting containsObject:uuidString];
-        if (known && requestId >= 0 && stillPending) {
-            // The first report has not heard back from CallKit yet, so
-            // acknowledging this one as accepted would be a guess -- and if
-            // the original is then filtered or refused, its completion drops
-            // the uuid while Java holds a session with no system call behind
-            // it. Wait and share the original's answer instead.
-            NSMutableArray *waiters = [cn1clReportWaiters objectForKey:uuidString];
-            if (waiters == nil) {
-                waiters = [NSMutableArray array];
-                [cn1clReportWaiters setObject:waiters forKey:uuidString];
+        if (known) {
+            if (requestId >= 0 && stillPending) {
+                // The first report has not heard back from CallKit yet, so
+                // acknowledging this one as accepted would be a guess -- and
+                // if the original is then filtered or refused, its completion
+                // drops the uuid while Java holds a session with no system
+                // call behind it. Wait and share the original's answer.
+                NSMutableArray *waiters =
+                        [cn1clReportWaiters objectForKey:uuidString];
+                if (waiters == nil) {
+                    waiters = [NSMutableArray array];
+                    [cn1clReportWaiters setObject:waiters forKey:uuidString];
+                }
+                [waiters addObject:[NSNumber numberWithInt:requestId]];
             }
-            [waiters addObject:[NSNumber numberWithInt:requestId]];
+        } else {
+            // Reserved here, under the same lock that just found it absent.
+            [cn1clCalls setObject:uuidString forKey:uuidString];
+            [cn1clReporting addObject:uuidString];
         }
     }
     if (known) {
@@ -714,10 +732,6 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
             cn1clAck(requestId, YES, 0, nil);
         }
         return;
-    }
-    @synchronized (cn1clLock) {
-        [cn1clCalls setObject:uuidString forKey:uuidString];
-        [cn1clReporting addObject:uuidString];
     }
     [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid update:update
             completion:^(NSError *error) {
