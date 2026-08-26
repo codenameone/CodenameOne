@@ -69,32 +69,69 @@ class BluetoothOpQueueTest extends UITestBase {
     }
 
     @Test
+    void cancellingAPublishingOperationReachesTheQueuedOne() {
+        // AsyncResource.cancel() marks itself done and notifies OBSERVERS; it
+        // never runs the callback chain. Propagating the cancel through an
+        // onResult listener was therefore dead code for the single event it
+        // existed to catch -- so a cancelled requestMtu still started when
+        // its turn came, and still wrote the MTU cache behind a caller who
+        // had given up.
+        AsyncResource<byte[]> inFlight = p.readCharacteristic(c1);
+        AsyncResource<Integer> cancelled = p.requestMtu(185);
+        assertEquals(1, p.pendingCount(),
+                "the read is in flight; the mtu request is queued behind it");
+
+        cancelled.cancel(true);
+        p.completeNext(bytes(1, 2));
+        assertArrayEquals(bytes(1, 2), inFlight.get());
+
+        // The cancelled operation is skipped rather than started, so the
+        // platform is never asked and the queue is not left holding it.
+        assertEquals(0, p.pendingCount(),
+                "a cancelled queued operation must be skipped, not started");
+        assertEquals(23, p.getMtu(),
+                "a cancelled request must not publish an MTU");
+
+        // And the queue is still usable afterwards.
+        AsyncResource<byte[]> after = p.readCharacteristic(c2);
+        p.completeNext(bytes(5, 6));
+        assertArrayEquals(bytes(5, 6), after.get());
+    }
+
+    @Test
     void aThrowingCallbackDoesNotWedgeTheQueue() {
-        // The queue advances from a listener registered on the internal
-        // resource AFTER the one that publishes state and completes the
-        // caller's. Completing the caller's runs the app's own callbacks
-        // inline, so an app callback that threw came out through the
-        // publishing listener, the advancement listener never ran, and every
-        // later read, write and notify on that peripheral queued behind an
-        // operation nothing would ever start. The peripheral was dead for
-        // the life of the connection, with no error anywhere.
-        AsyncResource<byte[]> r1 = p.readCharacteristic(c1);
-        r1.ready(new SuccessCallback<byte[]>() {
+        // requestMtu, not readCharacteristic. Only the operations that
+        // publish state before completing -- requestMtu and discoverServices
+        // -- have the hazard: the queue watches their INTERNAL resource, and
+        // the listener that completes the caller's is registered on it
+        // FIRST, ahead of the queue's advancement listener. Completing the
+        // caller's resource runs the app's callbacks inline, so an app
+        // callback that threw came out through the publishing listener, the
+        // advancement never ran, and every later GATT operation on this
+        // peripheral queued behind one nothing would start again. The
+        // peripheral was dead for the life of the connection with no error
+        // anywhere. Operations with no publish step register the advancement
+        // before the app can attach anything, which is why they were fine.
+        AsyncResource<Integer> mtuRequest = p.requestMtu(185);
+        mtuRequest.ready(new SuccessCallback<Integer>() {
             @Override
-            public void onSucess(byte[] value) {
+            public void onSucess(Integer value) {
                 throw new IllegalStateException("a badly behaved app");
             }
         });
-        AsyncResource<byte[]> r2 = p.readCharacteristic(c2);
+        AsyncResource<byte[]> queued = p.readCharacteristic(c1);
 
-        p.completeNext(bytes(1, 2));
-        assertTrue(r1.isDone());
+        assertEquals(FakeBlePeripheral.OpKind.REQUEST_MTU, p.peekNext().kind);
+        p.completeNext(Integer.valueOf(185));
+        assertTrue(mtuRequest.isDone());
+        assertEquals(185, p.getMtu(),
+                "the state update still happens; only the app callback threw");
 
         assertEquals(1, p.pendingCount(),
                 "the queue must advance even though the callback threw");
-        assertSame(c2, p.peekNext().characteristic);
+        assertSame(c1, p.peekNext().characteristic);
         p.completeNext(bytes(3, 4));
-        assertArrayEquals(bytes(3, 4), r2.get(),
+        assertArrayEquals(bytes(3, 4), queued.get(),
                 "the operation behind the throwing callback still answers");
     }
 

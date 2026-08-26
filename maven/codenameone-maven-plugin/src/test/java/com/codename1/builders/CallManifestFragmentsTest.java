@@ -189,6 +189,38 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void aCommentedOutDeclarationIsNotADeclaration() {
+        // The exact-attribute matcher still matched inside a comment, so an
+        // app that had commented its own <service> OUT lost the generated one
+        // too -- and a manifest with no ConnectionService is not a build
+        // error, just Telecom refusing every call on the device.
+        String mine = "        <!-- <service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\" /> -->\n";
+        assertTrue(CallManifestFragments.services(true, false, false, mine)
+                .contains("android:name=\""
+                        + CallManifestFragments.CONNECTION_SERVICE + "\""));
+    }
+
+    @Test
+    public void anAttributeOutsideAServiceElementIsNotADeclaration() {
+        String mine = "        <meta-data android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\""
+                + " android:value=\"1\" />\n";
+        assertTrue(CallManifestFragments.services(true, false, false, mine)
+                .contains("android:name=\""
+                        + CallManifestFragments.CONNECTION_SERVICE + "\""));
+    }
+
+    @Test
+    public void aLiveDeclarationAfterACommentStillSuppresses() {
+        String mine = "        <!-- old: <service android:name=\"x\" /> -->\n"
+                + "        <service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\" />\n";
+        assertFalse(CallManifestFragments.services(true, false, false, mine)
+                .contains(CallManifestFragments.CONNECTION_SERVICE));
+    }
+
+    @Test
     public void aLongerClassNameThatStartsWithOursIsNotOurs() {
         String mine = "        <service android:name=\""
                 + CallManifestFragments.CONNECTION_SERVICE + "Proxy\" />\n";

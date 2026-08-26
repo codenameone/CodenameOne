@@ -227,7 +227,13 @@ public class AndroidVpnBridge implements VpnBridge {
                 // other profile's record.
                 consentPending = true;
                 previous = storedWire();
-                installedWire = wire;
+                // installedWire is NOT set here. Android provisions nothing
+                // until the user approves the prompt, so publishing the
+                // attempted profile now had load() hand back a configuration
+                // the user had not agreed to, and -- on a first install --
+                // reconciledStatus() read its mere presence as DISCONNECTED
+                // for a VPN that did not exist. Consent carries the wire and
+                // publishes it on approval; until then only it knows.
             }
             try {
                 com.codename1.impl.android.AndroidNativeUtil
@@ -242,8 +248,8 @@ public class AndroidVpnBridge implements VpnBridge {
                 // still up -- and the cached record described a profile that
                 // was never installed.
                 synchronized (this) {
+                    // Only the reservation to undo; nothing was published.
                     consentPending = false;
-                    installedWire = previous;
                 }
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "The VPN consent prompt could not be shown: "

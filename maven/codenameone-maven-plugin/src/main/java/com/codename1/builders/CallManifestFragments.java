@@ -212,10 +212,59 @@ final class CallManifestFragments {
      * @return true when the fragment already declares that exact component
      */
     private static boolean declares(String existing, String name) {
-        // Both quotings, because an app hand-writing android.xapplication is
-        // writing XML by hand and either is valid there.
-        return existing.contains("android:name=\"" + name + "\"")
-                || existing.contains("android:name='" + name + "'");
+        // The attribute has to sit inside a LIVE <service> start tag. Testing
+        // the whole fragment for the attribute matched it wherever it
+        // appeared -- inside a <!-- commented-out --> declaration, or on a
+        // <meta-data android:name="..."> that names the class as a value --
+        // and suppressed the real element for it. The manifest then has no
+        // component handling android.telecom.ConnectionService, which is not
+        // a build error: Telecom simply refuses every call on the device.
+        String live = withoutComments(existing);
+        int at = live.indexOf("<service");
+        while (at >= 0) {
+            int close = live.indexOf('>', at);
+            if (close < 0) {
+                return false;
+            }
+            String tag = live.substring(at, close);
+            // Both quotings, because an app hand-writing android.xapplication
+            // is writing XML by hand and either is valid there.
+            if (tag.contains("android:name=\"" + name + "\"")
+                    || tag.contains("android:name='" + name + "'")) {
+                return true;
+            }
+            at = live.indexOf("<service", close);
+        }
+        return false;
+    }
+
+    /**
+     * Returns {@code xml} with every {@code <!-- ... -->} span removed.
+     *
+     * <p>An unterminated comment swallows the rest of the fragment, which is
+     * what an XML parser would do with it too.</p>
+     *
+     * @param xml the fragment
+     * @return the fragment with its comments removed
+     */
+    private static String withoutComments(String xml) {
+        int open = xml.indexOf("<!--");
+        if (open < 0) {
+            return xml;
+        }
+        StringBuilder sb = new StringBuilder();
+        int from = 0;
+        while (open >= 0) {
+            sb.append(xml, from, open);
+            int close = xml.indexOf("-->", open + 4);
+            if (close < 0) {
+                return sb.toString();
+            }
+            from = close + 3;
+            open = xml.indexOf("<!--", from);
+        }
+        sb.append(xml, from, xml.length());
+        return sb.toString();
     }
 
     static String services(boolean session, boolean voip, boolean directory,

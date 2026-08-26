@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.TimerTask;
 
 /// A remote BLE peripheral: connection lifecycle, GATT client operations
@@ -308,9 +310,16 @@ public abstract class BlePeripheral extends BluetoothDevice {
         // is inner since the queue watches it. Otherwise a cancel left inner
         // pending, startOp did not skip it, and its eventual answer published
         // state and completed a resource the caller had already given up on.
-        out.onResult(new AsyncResult<T>() {
+        //
+        // An OBSERVER, not onResult. AsyncResource.cancel() marks itself done
+        // and notifies observers, but never runs the callback chain -- so an
+        // onResult listener here was dead code for the one event it existed
+        // to catch, and cancelling a discoverServices() or requestMtu() still
+        // started the operation and let it write the service or MTU cache
+        // afterwards.
+        out.addObserver(new Observer() {
             @Override
-            public void onReady(T value, Throwable err) {
+            public void update(Observable o, Object arg) {
                 if (out.isCancelled()) {
                     inner.cancel(true);
                 }
@@ -324,6 +333,15 @@ public abstract class BlePeripheral extends BluetoothDevice {
                         return;
                     }
                     published[0] = true;
+                }
+                if (out.isCancelled()) {
+                    // The other half of the cancel. Skipping the start only
+                    // covers an operation still QUEUED; one already in flight
+                    // gets its answer from the platform afterwards, and
+                    // applying it would write the service or MTU cache on
+                    // behalf of a caller who had given up -- and complete a
+                    // resource that is already done.
+                    return;
                 }
                 // CONTAINED. Both the state update and the caller's own
                 // callbacks run inside this listener, and the queue's

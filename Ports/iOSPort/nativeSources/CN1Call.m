@@ -292,6 +292,17 @@ static void cn1clReplayQueuedActions(void) {
     NSArray *held = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        // Readiness RE-READ here, under the same lock that guards the queue.
+        // setJavaReady replays through a dispatch_async, so the app can drop
+        // its last listener between the flag going true and this block
+        // running. Draining then delivered every held action into a facade
+        // with nobody listening, which auto-fulfills them -- so CallKit was
+        // told an answer, a hang-up or a hold had been carried out while no
+        // app code ever signalled it. Left queued instead, for whenever a
+        // listener comes back.
+        if (!cn1clJavaReady) {
+            return;
+        }
         held = [NSArray arrayWithArray:cn1clQueuedActions];
         [cn1clQueuedActions removeAllObjects];
     }
@@ -1820,9 +1831,18 @@ void com_codename1_impl_ios_IOSNative_callSetJavaReady___boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_BOOLEAN ready) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    BOOL wasReady = cn1clJavaReady;
-    cn1clJavaReady = ready != JAVA_FALSE;
-    if (cn1clJavaReady && !wasReady) {
+    BOOL wasReady;
+    BOOL nowReady;
+    cn1clEnsureState();
+    // Under the same lock the replay re-reads it through, so the two cannot
+    // disagree about whether a listener is installed. Nothing is called out
+    // to from inside, so this cannot deadlock against a delivery.
+    @synchronized (cn1clLock) {
+        wasReady = cn1clJavaReady;
+        cn1clJavaReady = ready != JAVA_FALSE;
+        nowReady = cn1clJavaReady;
+    }
+    if (nowReady && !wasReady) {
         // Replayed here as well as after the drain, because readiness no
         // longer implies a drain: an app that registers a Calls action
         // listener without ever touching VoipPush has nothing to drain, and
