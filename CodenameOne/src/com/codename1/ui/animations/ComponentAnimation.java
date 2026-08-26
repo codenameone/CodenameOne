@@ -147,10 +147,16 @@ public abstract class ComponentAnimation {
         if (!isInProgress()) {
             if (!stateUpdated) {
                 stateUpdated = true;
-                updateState();
+                applyNeverStartedState();
             }
             completeIfNeeded();
         }
+    }
+
+    /// Applies the pending effect of an animation the manager completed without ever stepping.
+    /// The default is the single `#updateState()` call that stepping would have made.
+    void applyNeverStartedState() {
+        updateState();
     }
     
     private void completeIfNeeded() {
@@ -246,6 +252,18 @@ public abstract class ComponentAnimation {
             }
             for (ComponentAnimation a : anims) {
                 a.updateAnimationState();
+            }
+        }
+
+        /// Every child is pending, not just the one `sequence` points at. A sequential compound
+        /// that was never stepped has already had `#isInProgress()` walk `sequence` to the end of
+        /// the array, so the single update `#updateState()` would make lands on the last child and
+        /// drops the rest. Each child completes itself instead, which is a no-op for any that the
+        /// aggregate did step.
+        @Override
+        void applyNeverStartedState() {
+            for (ComponentAnimation a : anims) {
+                a.completeAnimation();
             }
         }
 

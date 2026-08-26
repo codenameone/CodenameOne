@@ -111,4 +111,36 @@ class AnimationManagerQueuedMutationTest extends UITestBase {
         assertTrue(cnt.contains(added));
     }
 
+    /**
+     * A sequential compound that is never stepped has had {@code isInProgress()} walk its cursor past
+     * the last child, so one aggregate update would land on that child alone and drop every earlier
+     * one.
+     */
+    @FormTest
+    void everyChildOfANeverStartedSequenceIsApplied() {
+        Form form = Display.getInstance().getCurrent();
+        final int[] applied = new int[3];
+        ComponentAnimation[] children = new ComponentAnimation[applied.length];
+        for (int i = 0; i < children.length; i++) {
+            final int index = i;
+            children[i] = new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    applied[index]++;
+                }
+            };
+        }
+
+        form.getAnimationManager().addAnimation(ComponentAnimation.sequentialAnimation(children));
+        drain(form);
+
+        for (int i = 0; i < applied.length; i++) {
+            assertEquals(1, applied[i], "child " + i + " of the sequence must be applied exactly once");
+        }
+    }
 }

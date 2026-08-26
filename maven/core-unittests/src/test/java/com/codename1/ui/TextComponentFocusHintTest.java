@@ -136,4 +136,29 @@ class TextComponentFocusHintTest extends UITestBase {
         assertBlurred(first, "Firstname");
         assertFocused(last, "Lastname");
     }
+
+    @FormTest
+    void aFormTornDownMidTransitionLeavesNothingBehind() {
+        Form form = new Form("TextComponent Test", BoxLayout.y());
+        TextComponent first = floatingHintComponent("Firstname");
+        form.add(first);
+        form.show();
+        form.revalidate();
+
+        // start the transition and abandon it: deinitializing the form flushes the animation queue
+        // without running completion callbacks
+        first.getField().requestFocus();
+        Form other = new Form("Elsewhere", BoxLayout.y());
+        other.show();
+
+        assertEquals(1, countLabelsWithText(first, "Firstname"),
+                "the temporary label must not survive the form it was animating in");
+
+        // and the transition guard must have reopened, so the component still reacts to focus
+        form.show();
+        form.revalidate();
+        first.getField().requestFocus();
+        pump(form);
+        assertFocused(first, "Firstname");
+    }
 }

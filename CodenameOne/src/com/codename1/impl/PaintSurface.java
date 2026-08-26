@@ -175,6 +175,28 @@ public final class PaintSurface {
                     }
                 }
             }
+            // The same relationship in the other direction: a child queued *before* its parent used
+            // to stay queued, so the flush painted the parent and then painted that subtree a second
+            // time over the pixels it had just produced. Anything translucent in it -- antialiased
+            // glyphs, a shadow -- composites twice and comes out darker. The parent's paint already
+            // covers the child, so drop it, matching what the loop above does when the order is
+            // reversed. Null slots are what cancelRepaint leaves too, and paintDirty skips them.
+            if (cmp instanceof Container) {
+                for (int iter = 0; iter < paintQueueFill; iter++) {
+                    Animation ani = paintQueue[iter];
+                    if (!(ani instanceof Component)) {
+                        continue;
+                    }
+                    Component parent = ((Component) ani).getParent();
+                    while (parent != null) {
+                        if (parent == cmp) { //NOPMD CompareObjectsWithEquals
+                            paintQueue[iter] = null;
+                            break;
+                        }
+                        parent = parent.getParent();
+                    }
+                }
+            }
             // overcrowding the queue don't try to grow the array!
             if (paintQueueFill >= paintQueue.length) {
                 System.out.println("Warning paint queue size exceeded, please watch the amount of repaint calls");

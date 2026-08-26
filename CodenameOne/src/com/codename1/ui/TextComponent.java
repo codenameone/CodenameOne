@@ -84,7 +84,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 public class TextComponent extends InputComponent {
     private static final int animationSpeed = 100;
     private Container animationLayer;
-    private boolean hintAnimating;
+    private Runnable hintAnimationCleanup;
     private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
@@ -123,7 +123,7 @@ public class TextComponent extends InputComponent {
     /// rather than from the step it happens to be on, only one runs at a time, and the state is
     /// re-checked once it completes.
     private void syncHintPosition() {
-        if (hintAnimating || animationLayer == null || !isInitialized() || !isFocusAnimation()) {
+        if (hintAnimationCleanup != null || animationLayer == null || !isInitialized() || !isFocusAnimation()) {
             return;
         }
         if (field.hasFocus()) {
@@ -138,7 +138,6 @@ public class TextComponent extends InputComponent {
     }
 
     private void animateHintToLabel() {
-        hintAnimating = true;
         final Label text = new Label(field.getHint(), "TextHint");
         field.setHint("");
         final Label placeholder = new Label();
@@ -149,22 +148,26 @@ public class TextComponent extends InputComponent {
         text.setY(field.getY());
         text.setWidth(field.getWidth());
         text.setHeight(field.getHeight());
-        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
-        field.getAnimationManager().addAnimation(anim, new Runnable() {
+        hintAnimationCleanup = new Runnable() {
             @Override
             public void run() {
                 Component.setSameSize(field);
                 text.remove();
                 placeholder.remove();
                 getLabel().setVisible(true);
-                hintAnimating = false;
+            }
+        };
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                finishHintAnimation();
                 syncHintPosition();
             }
         });
     }
 
     private void animateLabelToHint() {
-        hintAnimating = true;
         final Label text = new Label(getLabel().getText(), getLabel().getUIID());
         final Label placeholder = new Label();
         Component.setSameSize(placeholder, getLabel());
@@ -178,8 +181,7 @@ public class TextComponent extends InputComponent {
         if (field.getHintLabel() != null) {
             hintLabelUIID = field.getHintLabel().getUIID();
         }
-        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
-        field.getAnimationManager().addAnimation(anim, new Runnable() {
+        hintAnimationCleanup = new Runnable() {
             @Override
             public void run() {
                 field.setHint(getLabel().getText());
@@ -187,10 +189,34 @@ public class TextComponent extends InputComponent {
                 Component.setSameSize(getLabel());
                 text.remove();
                 placeholder.remove();
-                hintAnimating = false;
+            }
+        };
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                finishHintAnimation();
                 syncHintPosition();
             }
         });
+    }
+
+    /// Puts the transition in its end state exactly once, whether it got there by completing or by
+    /// being abandoned. `com.codename1.ui.Form#deinitializeImpl()` flushes the animation queue
+    /// without running completion callbacks, so a form torn down mid-transition would otherwise keep
+    /// the temporary labels in the animation layer, with `#syncHintPosition()` permanently guarded off.
+    private void finishHintAnimation() {
+        Runnable cleanup = hintAnimationCleanup;
+        if (cleanup != null) {
+            hintAnimationCleanup = null;
+            cleanup.run();
+        }
+    }
+
+    @Override
+    protected void deinitialize() {
+        finishHintAnimation();
+        super.deinitialize();
     }
 
     /// Default constructor allows us to create an arbitrary text component
