@@ -291,6 +291,18 @@ DISABLED_RULES = (
     # POSSESSIVE_APOSTROPHE flags constructs like "Java's" that are
     # already correct in context.
     "POSSESSIVE_APOSTROPHE",
+    # EN_ELLIPSIS wants whitespace before the ellipsis character (" …").
+    # Every occurrence in this guide is a UI label the reader has to match
+    # against what is on their screen -- File > Import…, Browse…, New
+    # Project… -- or a truncated identifier such as a +1999… phone-number
+    # prefix. A space in front of the ellipsis would make the instruction
+    # disagree with the menu item it is naming, so the suggestion is not one
+    # we can take anywhere it fires.
+    "EN_ELLIPSIS",
+    # DOUBLE_PUNCTUATION fires on ". ." where an asciidoc ordered-list marker
+    # follows a sentence that ends in a full stop; the extraction step keeps
+    # both. It is a list, not prose with two dots in it.
+    "DOUBLE_PUNCTUATION",
     # EN_UNPAIRED_BRACKETS regularly fires when an inline code element
     # contains parentheses or brackets that the extraction step strips,
     # leaving an apparently unpaired closing bracket in prose.

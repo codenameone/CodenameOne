@@ -800,6 +800,21 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
                 }
                 cn1clAck(requestId, NO, code, [error localizedDescription]);
             }
+            // AND retire the session, whatever the request was. A pushed call
+            // has no requestId (-1), and the push path starts the drain as
+            // soon as this report is under way -- so Java can already hold a
+            // live RINGING CallSession for a uuid CallKit then refused, for
+            // Do Not Disturb or the block list. Clearing only the native
+            // tables left that session ringing for the life of the process,
+            // addressable but attached to no system call. Reported as FAILED
+            // rather than filtered: the app is being told the call is over,
+            // and the reason it did not happen already reached whoever asked.
+            //
+            // A uuid Java has never heard of is ignored by the facade, so
+            // sending this unconditionally costs nothing.
+            com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
+                    getThreadLocalData(), cn1clJString(uuidString),
+                    CN1_CALL_END_FAILED);
             return;
         }
         for (NSNumber *waiter in waiters) {
@@ -1300,8 +1315,19 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
         // built without a name and the bundle supplies it; setting it there
         // would throw.
         if (![cfg respondsToSelector:@selector(setLocalizedName:)]) {
-            cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
-            cfg.ringtoneSound = cn1clPlistString(@"CN1CallRingtoneSound", nil);
+            CXProviderConfiguration *replacement =
+                    [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+            // EVERYTHING the bundle configured, carried across -- not just the
+            // ringtone. The icon in particular comes only from
+            // CN1CallIconTemplateImageName, so an app that set ios.call.icon
+            // and then made the documented Calls.configure() call lost its
+            // CallKit icon the moment it did so. Copied from the old
+            // configuration rather than re-read, so this cannot drift from
+            // cn1clConfiguration again.
+            replacement.ringtoneSound = cfg.ringtoneSound;
+            replacement.iconTemplateImageData = cfg.iconTemplateImageData;
+            replacement.supportedHandleTypes = cfg.supportedHandleTypes;
+            cfg = replacement;
         }
     }
     cfg.supportsVideo = [cn1clField(cfgFields, 1) isEqualToString:@"1"];

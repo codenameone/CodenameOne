@@ -103,11 +103,78 @@ static NSArray *cn1vpSplit(NSString *record) {
     return [record componentsSeparatedByString:@"\t"];
 }
 
+/// Reverses VpnWire.escape, which is what the Java side writes.
+///
+/// The call wire's sanitizer turns a tab, carriage return or newline into a
+/// space. That is right for display text and wrong for a secret: a password
+/// or pre-shared key containing one of them was installed as a DIFFERENT
+/// string, the install was acknowledged, and authentication then failed with
+/// nothing anywhere to say the credential had been altered. Every field is
+/// escaped, so every field is unescaped here.
+///
+/// A backslash before anything else -- including at the end -- is kept as
+/// itself, matching the Java side: refusing to guess beats dropping a
+/// character out of a password.
+static NSString *cn1vpUnescape(NSString *value) {
+    if (value == nil) {
+        return @"";
+    }
+    NSRange first = [value rangeOfString:@"\\"];
+    if (first.location == NSNotFound) {
+        return value;
+    }
+    NSMutableString *out = [NSMutableString stringWithCapacity:[value length]];
+    NSUInteger i = 0;
+    NSUInteger len = [value length];
+    while (i < len) {
+        unichar c = [value characterAtIndex:i];
+        if (c != '\\' || i + 1 >= len) {
+            [out appendFormat:@"%C", c];
+            i++;
+            continue;
+        }
+        unichar n = [value characterAtIndex:i + 1];
+        if (n == '\\') {
+            [out appendString:@"\\"];
+        } else if (n == 't') {
+            [out appendString:@"\t"];
+        } else if (n == 'r') {
+            [out appendString:@"\r"];
+        } else if (n == 'n') {
+            [out appendString:@"\n"];
+        } else {
+            [out appendFormat:@"%C", c];
+            i++;
+            continue;
+        }
+        i += 2;
+    }
+    return out;
+}
+
+/// The write side of cn1vpUnescape, for the record load() hands back.
+///
+/// Java unescapes every field it reads, so iOS must escape every field it
+/// writes -- otherwise a legitimate backslash in a value, and a domain
+/// username like CORP\\alice is the ordinary case, is eaten on the way back.
+/// cn1vpSanitize is still right for text iOS shows the USER, which is why
+/// localizedDescription keeps it.
+static NSString *cn1vpEscape(NSString *value) {
+    if (value == nil) {
+        return @"";
+    }
+    NSString *out = [value stringByReplacingOccurrencesOfString:@"\\"
+            withString:@"\\\\"];
+    out = [out stringByReplacingOccurrencesOfString:@"\t" withString:@"\\t"];
+    out = [out stringByReplacingOccurrencesOfString:@"\r" withString:@"\\r"];
+    return [out stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
+}
+
 static NSString *cn1vpField(NSArray *fields, NSUInteger index) {
     if (fields == nil || index >= [fields count]) {
         return @"";
     }
-    return [fields objectAtIndex:index];
+    return cn1vpUnescape([fields objectAtIndex:index]);
 }
 
 static NSString *cn1vpSanitize(NSString *s) {
@@ -646,17 +713,21 @@ void com_codename1_impl_ios_IOSNative_vpnLoadProfile___int(
         // Fields 5 and 6 -- the password and the shared secret -- are left
         // EMPTY. The platform holds them in the keychain as references and
         // never hands the values back, and the Java side documents that.
+        // ESCAPED, not sanitized: Java unescapes every field it reads, and
+        // sanitizing here would both mangle a value that legitimately holds
+        // a tab and leave a real backslash -- CORP\\alice -- to be eaten by
+        // the unescape at the other end.
         NSArray *fields = [NSArray arrayWithObjects:
-                cn1vpSanitize(cfg.serverAddress),
+                cn1vpEscape(cfg.serverAddress),
                 [NSString stringWithFormat:@"%d", proto],
-                cn1vpSanitize(remoteId),
-                cn1vpSanitize(localId),
-                cfg.username == nil ? @"" : cn1vpSanitize(cfg.username),
+                cn1vpEscape(remoteId),
+                cn1vpEscape(localId),
+                cfg.username == nil ? @"" : cn1vpEscape(cfg.username),
                 @"", @"", @"",
                 manager.onDemandEnabled ? @"1" : @"0",
                 manager.onDemandEnabled ? @"1" : @"0",
                 manager.localizedDescription == nil ? @""
-                        : cn1vpSanitize(manager.localizedDescription), nil];
+                        : cn1vpEscape(manager.localizedDescription), nil];
         com_codename1_impl_ios_IOSCallCallbacks_vpnProfile___int_java_lang_String(
                 getThreadLocalData(), requestId,
                 cn1vpJString([fields componentsJoinedByString:@"\t"]));
@@ -678,6 +749,24 @@ void com_codename1_impl_ios_IOSNative_vpnStart___int(
             cn1vpAck(requestId, NO, CN1_VPN_ERR_NOT_CONFIGURED,
                     @"No VPN configuration is installed");
             return;
+        }
+        // The SAME reservation install and removal take. This load runs
+        // asynchronously against the one shared NEVPNManager, so without it a
+        // start could reload and bring up the OLD profile while an install
+        // was saving its replacement, or be acknowledged a moment before a
+        // removal deleted the profile it just started -- both requests
+        // reporting success for a tunnel that is absent or wrong. Checked
+        // inside the completion, which is where the manager is actually
+        // touched; an install that began while this load was in flight is
+        // caught here and nowhere else.
+        cn1vpEnsureInstallLock();
+        @synchronized (cn1vpInstallLock) {
+            if (cn1vpInstalling) {
+                cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                        @"A VPN profile operation is in progress; wait for it"
+                        " to finish");
+                return;
+            }
         }
         NSError *error = nil;
         [[manager connection] startVPNTunnelAndReturnError:&error];
@@ -706,6 +795,24 @@ void com_codename1_impl_ios_IOSNative_vpnStop___int(
             cn1vpAck(requestId, NO, CN1_VPN_ERR_NOT_CONFIGURED,
                     @"No VPN configuration is installed");
             return;
+        }
+        // The SAME reservation install and removal take. This load runs
+        // asynchronously against the one shared NEVPNManager, so without it a
+        // start could reload and bring up the OLD profile while an install
+        // was saving its replacement, or be acknowledged a moment before a
+        // removal deleted the profile it just started -- both requests
+        // reporting success for a tunnel that is absent or wrong. Checked
+        // inside the completion, which is where the manager is actually
+        // touched; an install that began while this load was in flight is
+        // caught here and nowhere else.
+        cn1vpEnsureInstallLock();
+        @synchronized (cn1vpInstallLock) {
+            if (cn1vpInstalling) {
+                cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                        @"A VPN profile operation is in progress; wait for it"
+                        " to finish");
+                return;
+            }
         }
         [[manager connection] stopVPNTunnel];
         cn1vpAck(requestId, YES, 0, nil);

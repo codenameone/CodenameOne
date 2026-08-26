@@ -42,6 +42,96 @@ public final class VpnWire {
     private VpnWire() {
     }
 
+    /// Makes `value` safe to carry in a tab-delimited field WITHOUT changing
+    /// what it says.
+    ///
+    /// The call wire's sanitizer turns a tab, carriage return or newline into
+    /// a space, which is right for display text and wrong for a secret: a
+    /// password or pre-shared key containing one of them was installed as a
+    /// different string, the platform acknowledged the install, and
+    /// authentication then failed with nothing anywhere to say the credential
+    /// had been altered. Every field is escaped rather than only the two that
+    /// hold secrets, so there is one rule to remember and no field that is
+    /// quietly the exception.
+    ///
+    /// A backslash escape, matched by `cn1vpUnescape` in CN1Vpn.m -- the
+    /// iOS port parses this record itself, in C.
+    ///
+    /// @param value the field, or null
+    /// @return the escaped field, never null
+    static String escape(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder b = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            String rep = null;
+            if (c == '\\') {
+                rep = "\\\\";
+            } else if (c == '\t') {
+                rep = "\\t";
+            } else if (c == '\r') {
+                rep = "\\r";
+            } else if (c == '\n') {
+                rep = "\\n";
+            }
+            if (rep != null) {
+                if (b == null) {
+                    b = new StringBuilder(value.substring(0, i));
+                }
+                b.append(rep);
+            } else if (b != null) {
+                b.append(c);
+            }
+        }
+        return b == null ? value : b.toString();
+    }
+
+    /// Reverses [#escape].
+    ///
+    /// A trailing lone backslash, or one before any other character, is kept
+    /// as itself: this decodes records this class wrote, and refusing to
+    /// guess is better than dropping a character out of a password.
+    ///
+    /// @param value the escaped field, or null
+    /// @return the original field, never null
+    static String unescape(String value) {
+        if (value == null) {
+            return "";
+        }
+        int at = value.indexOf('\\');
+        if (at < 0) {
+            return value;
+        }
+        StringBuilder b = new StringBuilder(value.substring(0, at));
+        int i = at;
+        while (i < value.length()) {
+            char c = value.charAt(i);
+            if (c != '\\' || i + 1 >= value.length()) {
+                b.append(c);
+                i++;
+                continue;
+            }
+            char n = value.charAt(i + 1);
+            if (n == '\\') {
+                b.append('\\');
+            } else if (n == 't') {
+                b.append('\t');
+            } else if (n == 'r') {
+                b.append('\r');
+            } else if (n == 'n') {
+                b.append('\n');
+            } else {
+                b.append(c);
+                i++;
+                continue;
+            }
+            i += 2;
+        }
+        return b.toString();
+    }
+
     /// Encodes a profile.
     ///
     /// The credentials travel in the clear within the process and are handed
@@ -53,13 +143,13 @@ public final class VpnWire {
             return "";
         }
         return CallWire.join(new String[]{
-            p.getServerAddress(),
+            escape(p.getServerAddress()),
             String.valueOf(p.getProtocol().ordinal()),
-            p.getRemoteIdentifier(),
-            p.getLocalIdentifier(),
-            p.getUsername(),
-            p.getPassword(),
-            p.getSharedSecret(),
+            escape(p.getRemoteIdentifier()),
+            escape(p.getLocalIdentifier()),
+            escape(p.getUsername()),
+            escape(p.getPassword()),
+            escape(p.getSharedSecret()),
             // Field 7 is reserved and always empty: it carried a PKCS#12
             // certificate that neither port could install without its
             // passphrase. Kept as a slot rather than removed so the indices
@@ -69,7 +159,7 @@ public final class VpnWire {
             // app can ask either platform for.
             "",
             CallWire.flagOf(p.isOnDemand()),
-            p.getDisplayName()
+            escape(p.getDisplayName())
         });
     }
 
@@ -83,22 +173,22 @@ public final class VpnWire {
             return null;
         }
         String[] f = CallWire.split(record);
-        String server = CallWire.field(f, 0);
+        String server = unescape(CallWire.field(f, 0));
         if (server.length() == 0) {
             return null;
         }
         VpnProfile p = new VpnProfile(server)
                 .protocol(protocol(CallWire.integer(f, 1, 0)))
-                .remoteIdentifier(emptyToNull(CallWire.field(f, 2)))
-                .localIdentifier(emptyToNull(CallWire.field(f, 3)))
+                .remoteIdentifier(emptyToNull(unescape(CallWire.field(f, 2))))
+                .localIdentifier(emptyToNull(unescape(CallWire.field(f, 3))))
                 .onDemand(CallWire.flag(f, 9))
-                .displayName(emptyToNull(CallWire.field(f, 10)));
-        String user = CallWire.field(f, 4);
-        String pass = CallWire.field(f, 5);
+                .displayName(emptyToNull(unescape(CallWire.field(f, 10))));
+        String user = unescape(CallWire.field(f, 4));
+        String pass = unescape(CallWire.field(f, 5));
         if (user.length() > 0 || pass.length() > 0) {
             p.usernamePassword(emptyToNull(user), emptyToNull(pass));
         }
-        String secret = CallWire.field(f, 6);
+        String secret = unescape(CallWire.field(f, 6));
         if (secret.length() > 0) {
             p.sharedSecret(secret);
         }

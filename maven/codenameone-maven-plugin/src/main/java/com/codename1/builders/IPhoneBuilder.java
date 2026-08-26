@@ -3745,6 +3745,20 @@ public class IPhoneBuilder extends Executor {
 
 
 
+        // BEFORE includePush is read, not after. A VoIP push IS a push, and
+        // this copy has no pushV3 -- it reads ios.includePush directly.
+        // Turning the hint on is what gets the push entitlement onto an app
+        // that never touched PushClient.
+        //
+        // It used to be set further down, after this field had been computed
+        // AND after the false value had already stripped the push source
+        // defines, so the automatic enablement did nothing at all unless the
+        // project had set the hint itself -- which is the one case that
+        // needed no inference. The class scan runs earlier in this method, so
+        // usesCallVoip is already known here.
+        if (usesCallVoip && request.getArg("ios.includePush", null) == null) {
+            request.putArgument("ios.includePush", "true");
+        }
         includePush = request.getArg("ios.includePush", "false").equalsIgnoreCase("true");
 
         if ((request.getPushCertificate() != null || includePush) || usesLocalNotifications) {
@@ -4956,15 +4970,12 @@ public class IPhoneBuilder extends Executor {
                 if (usesCallVoip) {
                     enableFeatureDefine(buildinRes, "CN1_CALL_VOIP",
                             "com.codename1.call.voip");
-                    // A VoIP push IS a push, and this copy has no pushV3 --
-                    // it reads ios.includePush directly. Turning the hint on
-                    // is what gets the push entitlement onto an app that
-                    // never touched PushClient; the cloud builder does the
-                    // same thing through pushV3, where it ALSO makes the
-                    // provisioning check demand Push Notifications.
-                    if (request.getArg("ios.includePush", null) == null) {
-                        request.putArgument("ios.includePush", "true");
-                    }
+                    // ios.includePush is inferred where includePush is
+                    // computed, far above: setting it here was too late for
+                    // every decision that had already read the field. The
+                    // cloud builder does the same inference through pushV3,
+                    // where it ALSO makes the provisioning check demand Push
+                    // Notifications.
                     // The voip background mode, added only for an app that
                     // referenced the push package. Apple rejects an app that
                     // carries it without a working call implementation, which
@@ -5118,8 +5129,16 @@ public class IPhoneBuilder extends Executor {
                 // "allow-vpn\n" here would either change nothing or, without
                 // the trim, emit an empty second element that fails
                 // codesigning differently.
-                if (request.getArg("ios.entitlements.com.apple.developer"
-                        + ".networking.vpn.api", null) == null) {
+                String vpnEntitlement = request.getArg("ios.entitlements.com"
+                        + ".apple.developer.networking.vpn.api", null);
+                // A BLANK hint counts as absent. buildNamespacedEntitlements
+                // skips an empty value entirely, so a configuration that set
+                // this key to "" or to whitespace suppressed the generated
+                // entry here and then contributed nothing itself -- shipping
+                // an app that uses com.codename1.vpn.profile with no Personal
+                // VPN entitlement, which fails only at runtime on a device.
+                if (vpnEntitlement == null
+                        || vpnEntitlement.trim().length() == 0) {
                     request.putArgument("ios.entitlements.com.apple.developer"
                             + ".networking.vpn.api", "allow-vpn");
                 }

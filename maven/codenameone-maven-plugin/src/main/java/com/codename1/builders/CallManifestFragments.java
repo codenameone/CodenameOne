@@ -175,7 +175,22 @@ final class CallManifestFragments {
      * @return the elements, or the empty string when none are needed
      */
     static String services(boolean session, boolean voip, boolean directory) {
-        return services(session, voip, directory, "");
+        return services(session, voip, directory, "", 0);
+    }
+
+    /**
+     * As {@link #services(boolean, boolean, boolean, String, int)} with no
+     * compile-SDK constraint.
+     *
+     * @param session   {@code com.codename1.call.session} usage detected
+     * @param voip      {@code com.codename1.call.voip} usage detected
+     * @param directory {@code com.codename1.call.directory} usage detected
+     * @param existing  the application fragment the project already supplies
+     * @return the elements still needed, or the empty string when none are
+     */
+    static String services(boolean session, boolean voip, boolean directory,
+            String existing) {
+        return services(session, voip, directory, existing, 0);
     }
 
     /**
@@ -268,7 +283,7 @@ final class CallManifestFragments {
     }
 
     static String services(boolean session, boolean voip, boolean directory,
-            String existing) {
+            String existing, int compileSdk) {
         String have = existing == null ? "" : existing;
         StringBuilder sb = new StringBuilder();
         if ((session || voip) && !declares(have, CONNECTION_SERVICE)) {
@@ -286,10 +301,19 @@ final class CallManifestFragments {
                 // manifest never declared, so an app that grants itself
                 // FOREGROUND_SERVICE_PHONE_CALL and stops there cannot keep
                 // this service alive for a call that arrived in the
-                // background. Declared whatever the app targets: the
-                // attribute is ignored below 29, where it did not exist.
-                sb.append("\n                 android:foregroundServiceType=")
-                        .append("\"phoneCall\"");
+                // background. Declared whatever the app TARGETS...
+                // ...but only when the project compiles against 29 or
+                // later. The enum value arrived in API 29 and AAPT REJECTS a
+                // manifest that names one it does not know, so emitting it
+                // unconditionally broke the still-supported legacy
+                // configuration -- android.useGradle8=false with
+                // android.buildToolsVersion=28 -- before compilation even
+                // started. Below 29 the attribute is not needed: the
+                // startForeground type check it exists for arrives with it.
+                if (compileSdk <= 0 || compileSdk >= 29) {
+                    sb.append("\n                 android:foregroundServiceType=")
+                            .append("\"phoneCall\"");
+                }
             }
             sb.append("\n                 android:exported=\"true\">\n")
                     .append("            <intent-filter>\n")

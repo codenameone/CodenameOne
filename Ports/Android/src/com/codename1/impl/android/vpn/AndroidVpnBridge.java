@@ -84,8 +84,12 @@ public class AndroidVpnBridge implements VpnBridge {
     /// Whether this app has asked for its tunnel to be up.
     private volatile boolean startRequested;
 
-    /// Whether a consent dialog is on screen and owns the result channel.
-    private boolean consentPending;
+    /// Whether an install or removal owns the profile right now.
+    ///
+    /// Covers the WHOLE operation rather than just the consent dialog: the
+    /// already-authorized install path never shows one, and two of those
+    /// racing could provision in one order and persist in the other.
+    private boolean operationPending;
 
     public AndroidVpnBridge(Context context) {
         this.context = context;
@@ -168,6 +172,24 @@ public class AndroidVpnBridge implements VpnBridge {
                     + " configuration");
             return;
         }
+        // RESERVED BEFORE PROVISIONING, not just before the prompt. The
+        // already-consented path returns null and used to skip the
+        // reservation entirely, so two concurrent replacements could
+        // provision A then B and persist B then A -- both acknowledged, with
+        // load() describing A while Android ran B. The window is the whole
+        // operation, not the dialog, so the reservation has to open here.
+        String previous;
+        synchronized (this) {
+            if (operationPending) {
+                fail(requestId, VpnError.UNKNOWN,
+                        "Another VPN profile operation is still in progress;"
+                        + " wait for it to finish before installing again");
+                return;
+            }
+            operationPending = true;
+            previous = storedWire();
+        }
+        boolean handedOff = false;
         try {
             Object profile = Reflect.buildIkev2(p);
             Object manager = Reflect.manager(context);
@@ -188,6 +210,7 @@ public class AndroidVpnBridge implements VpnBridge {
                 synchronized (this) {
                     installedWire = wire;
                     Preferences.set(WIRE_PREF, strip(wire));
+                    operationPending = false;
                 }
                 setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
@@ -202,43 +225,25 @@ public class AndroidVpnBridge implements VpnBridge {
                         + " the consent prompt");
                 return;
             }
-            // One prompt at a time. setIntentResultListener refuses to
-            // replace a listener whose result channel is busy -- silently --
-            // so a second install started while the first dialog was up left
-            // the second request in VpnRequests for ever, and the two shared
-            // one installedWire so the first consent could persist the second
-            // profile. Rejecting is better than queueing: the user is looking
-            // at a prompt for the OTHER profile, and an install that lands
-            // behind it is not what the app asked for.
-            String previous;
-            synchronized (this) {
-                if (consentPending) {
-                    fail(requestId, VpnError.UNKNOWN,
-                            "A VPN consent prompt is already on screen; wait"
-                            + " for it to be answered before installing"
-                            + " again");
-                    return;
-                }
-                // Test AND reservation together. Split, two installs could
-                // both read it as free, both overwrite installedWire and both
-                // reach for the single activity-result listener -- where the
-                // second claim is refused in silence, leaving one request
-                // pending for ever while the first callback persisted the
-                // other profile's record.
-                consentPending = true;
-                previous = storedWire();
-                // installedWire is NOT set here. Android provisions nothing
-                // until the user approves the prompt, so publishing the
-                // attempted profile now had load() hand back a configuration
-                // the user had not agreed to, and -- on a first install --
-                // reconciledStatus() read its mere presence as DISCONNECTED
-                // for a VPN that did not exist. Consent carries the wire and
-                // publishes it on approval; until then only it knows.
-            }
+            // The reservation opened above is HELD across the dialog and
+            // released by Consent. One prompt at a time also matters in its
+            // own right: setIntentResultListener refuses to replace a
+            // listener whose result channel is busy -- silently -- so a
+            // second install started while the first dialog was up left the
+            // second request in VpnRequests for ever.
+            //
+            // installedWire is NOT published here. Android provisions nothing
+            // until the user approves the prompt, so publishing the attempted
+            // profile now had load() hand back a configuration the user had
+            // not agreed to, and -- on a first install -- reconciledStatus()
+            // read its mere presence as DISCONNECTED for a VPN that did not
+            // exist. Consent carries the wire and publishes it on approval.
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(consent,
                                 new Consent(this, requestId, previous, wire));
+                // From here the reservation belongs to Consent.
+                handedOff = true;
             } catch (RuntimeException launchFailed) {
                 // The cached context can still LOOK like an Activity after
                 // the app is backgrounded, while the current activity that
@@ -247,16 +252,22 @@ public class AndroidVpnBridge implements VpnBridge {
                 // every later install was refused as though a dialog were
                 // still up -- and the cached record described a profile that
                 // was never installed.
-                synchronized (this) {
-                    // Only the reservation to undo; nothing was published.
-                    consentPending = false;
-                }
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "The VPN consent prompt could not be shown: "
                                 + describe(launchFailed));
             }
         } catch (Exception e) {
             fail(requestId, VpnError.INVALID_CONFIGURATION, describe(e));
+        } finally {
+            // Released on every path that did not hand it to Consent --
+            // including the failures above, one of which used to leave it set
+            // for ever so every later install was refused as though a dialog
+            // were still up.
+            if (!handedOff) {
+                synchronized (this) {
+                    operationPending = false;
+                }
+            }
         }
     }
 
@@ -314,7 +325,7 @@ public class AndroidVpnBridge implements VpnBridge {
                         Preferences.set(WIRE_PREF, strip(previous));
                     }
                 }
-                bridge.consentPending = false;
+                bridge.operationPending = false;
             }
             if (approved) {
                 bridge.setStatus(VpnStatus.DISCONNECTED);
@@ -340,11 +351,13 @@ public class AndroidVpnBridge implements VpnBridge {
             // approved after it reported success -- so both answered success
             // and the approved install put the profile back.
             synchronized (this) {
-                if (consentPending) {
-                    // A prompt for a profile this would delete is on screen.
+                if (operationPending) {
+                    // An install owns the profile: a prompt is on screen, or
+                    // an already-authorized install is between provisioning
+                    // and persisting. Either way deleting now would race it.
                     fail(requestId, VpnError.UNKNOWN,
-                            "A VPN consent prompt is on screen; wait for it to"
-                            + " be answered before removing the profile");
+                            "A VPN profile install is in progress; wait for it"
+                            + " to finish before removing the profile");
                     return;
                 }
                 Reflect.DELETE.invoke(Reflect.manager(context));

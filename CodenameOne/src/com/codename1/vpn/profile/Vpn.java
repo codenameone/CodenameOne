@@ -109,6 +109,26 @@ public final class Vpn {
             return failed(VpnError.INVALID_CONFIGURATION,
                     "A profile is required");
         }
+        // A profile that came back from load() has its username but NOT its
+        // password: the platform keeps the secret and never hands it over.
+        // Loading one, changing the display name or the on-demand flag and
+        // installing it back is the obvious thing to try, and it used to
+        // succeed -- iOS saved a configuration with a nil password reference
+        // and retired the keychain generation the working profile was using,
+        // so a VPN that had authenticated for months stopped being able to,
+        // with a successful acknowledgement to say it had all gone well.
+        //
+        // Refused rather than papered over. The alternative -- carrying the
+        // previous credential references forward -- would silently reinstall
+        // a secret the app cannot see and did not ask for, and there is no
+        // portable way to know it is still the right one.
+        if (profile.getUsername() != null && !profile.isPasswordKnown()) {
+            return failed(VpnError.INVALID_CONFIGURATION,
+                    "This profile has a username but no password. A profile"
+                    + " from load() never carries its password -- the platform"
+                    + " keeps it -- so set the credentials again before"
+                    + " installing it back.");
+        }
         int id = VpnRequests.nextId();
         EdtResult<Boolean> r = VpnRequests.openAck(id);
         b.installProfile(id, VpnWire.encodeProfile(profile));

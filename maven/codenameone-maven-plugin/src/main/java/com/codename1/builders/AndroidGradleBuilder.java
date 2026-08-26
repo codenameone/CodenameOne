@@ -2857,9 +2857,17 @@ public class AndroidGradleBuilder extends Executor {
             // Suppression is per service, inside services(): an app that
             // hand-declared one of the two used to suppress both.
             String existingApplication = request.getArg("android.xapplication", "");
+            // The COMPILE sdk, not the target: AAPT rejects a manifest that
+            // names an enum value the platform it compiles against does not
+            // know, and android:foregroundServiceType="phoneCall" arrived in
+            // API 29. The legacy android.useGradle8=false with
+            // android.buildToolsVersion=28 configuration is still supported
+            // and compiles against 28.
             String callServices = CallManifestFragments.services(
                     usesCallSession, usesCallVoip, usesCallDirectory,
-                    existingApplication);
+                    existingApplication,
+                    compileSdkInt(maxPlatformVersion, buildToolsVersion,
+                            targetNumber));
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
@@ -7036,45 +7044,21 @@ public class AndroidGradleBuilder extends Executor {
 
         String supportV4Default;
 
-        compileSdkVersion = maxPlatformVersion;
+        // Through the shared helper, so the manifest fragments generated
+        // thousands of lines earlier cannot disagree with what this actually
+        // compiles against -- a fragment naming an attribute value newer than
+        // the compile SDK is an AAPT failure, not a runtime one. The
+        // support-lib ladder is NOT the same mapping and stays as it is.
+        compileSdkVersion = String.valueOf(compileSdkInt(maxPlatformVersion,
+                buildToolsVersion, targetNumber));
         String supportLibVersion = maxPlatformVersion;
-        if (buildToolsVersion.startsWith("28")) {
-            compileSdkVersion = "28";
-            supportLibVersion = "28";
+        String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
+            "35", "36"};
+        for (int i = 0; i < supportLadder.length; i++) {
+            if (buildToolsVersion.startsWith(supportLadder[i])) {
+                supportLibVersion = "28";
+            }
         }
-        if (buildToolsVersion.startsWith("29")) {
-            compileSdkVersion = "29";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("30")) {
-            compileSdkVersion = "30";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("31")) {
-            compileSdkVersion = "31";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("32")) {
-            compileSdkVersion = "32";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("33")) {
-            compileSdkVersion = "33";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("34")) {
-            compileSdkVersion = "34";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("35")) {
-            compileSdkVersion = "35";
-            supportLibVersion = "28";
-        }
-        if (buildToolsVersion.startsWith("36")) {
-            compileSdkVersion = "36";
-            supportLibVersion = "28";
-        }
-        compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
         if (usesNearbyRanging) {
             // androidx.core.uwb declares minCompileSdk=36 in its AAR metadata,
             // and Gradle rejects the project outright rather than compiling
@@ -10310,6 +10294,41 @@ public class AndroidGradleBuilder extends Executor {
                 log("Deleting directory " + directory);
                 delTree(directory, true);
             }
+        }
+    }
+
+
+    /**
+     * The API level this build compiles against.
+     *
+     * <p>Extracted so the manifest fragments and the generated
+     * {@code compileSdkVersion} cannot disagree: a fragment naming an
+     * attribute value newer than the compile SDK is rejected by AAPT before
+     * anything is compiled, and the two decisions live thousands of lines
+     * apart. This mirrors the ladder in the gradle-file generation below and
+     * is the only other place that decides it.</p>
+     *
+     * @param maxPlatformVersion the newest installed platform
+     * @param buildToolsVersion  the effective build-tools version
+     * @param targetNumber       the {@code android.targetSDKVersion} in force
+     * @return the API level, or 0 when it cannot be determined
+     */
+    static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
+            String targetNumber) {
+        String compileSdkVersion = maxPlatformVersion;
+        String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
+        for (int i = 0; i < ladder.length; i++) {
+            if (buildToolsVersion != null
+                    && buildToolsVersion.startsWith(ladder[i])) {
+                compileSdkVersion = ladder[i];
+            }
+        }
+        compileSdkVersion =
+                ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
+        try {
+            return Integer.parseInt(compileSdkVersion.trim());
+        } catch (NumberFormatException notANumber) {
+            return 0;
         }
     }
 

@@ -189,6 +189,29 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void thePhoneCallServiceTypeNeedsApi29ToCompile() {
+        // android:foregroundServiceType="phoneCall" arrived in API 29, and
+        // AAPT REJECTS a manifest naming an enum value the compile SDK does
+        // not know -- so emitting it unconditionally broke the still
+        // supported android.useGradle8=false with buildToolsVersion=28
+        // configuration before compilation even started.
+        String old = CallManifestFragments.services(true, true, false, "", 28);
+        assertFalse(old.contains("foregroundServiceType"),
+                "compiling against 28 cannot name a 29 enum value");
+        assertTrue(old.contains(CallManifestFragments.CONNECTION_SERVICE),
+                "the service itself is still required");
+
+        String modern = CallManifestFragments.services(true, true, false, "", 29);
+        assertTrue(modern.contains("android:foregroundServiceType=\"phoneCall\""));
+        assertTrue(CallManifestFragments.services(true, true, false, "", 34)
+                .contains("foregroundServiceType"));
+        // Unknown compile SDK keeps the attribute: the default path is
+        // modern, and dropping it there would cost startForeground on 34+.
+        assertTrue(CallManifestFragments.services(true, true, false, "", 0)
+                .contains("foregroundServiceType"));
+    }
+
+    @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
         // The exact-attribute matcher still matched inside a comment, so an
         // app that had commented its own <service> OUT lost the generated one
