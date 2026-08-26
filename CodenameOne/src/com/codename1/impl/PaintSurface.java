@@ -175,6 +175,13 @@ public final class PaintSurface {
                     }
                 }
             }
+            // overcrowding the queue don't try to grow the array!
+            // Checked before anything below drops an entry: a full queue means cmp is refused, and
+            // discarding the descendants first would then leave neither them nor cmp to paint.
+            if (paintQueueFill >= paintQueue.length) {
+                System.out.println("Warning paint queue size exceeded, please watch the amount of repaint calls");
+                return;
+            }
             // The same relationship in the other direction: a child queued *before* its parent used
             // to stay queued, so the flush painted the parent and then painted that subtree a second
             // time over the pixels it had just produced. Anything translucent in it -- antialiased
@@ -184,9 +191,12 @@ public final class PaintSurface {
             //
             // Only when the parent repaints in full: paintDirty clips a component to its dirty
             // region, so a parent holding one does not necessarily cover the child, and dropping it
-            // there would lose the paint rather than deduplicate it. The child's own dirty region is
-            // deliberately left alone -- keeping it means a later partial repaint still unions and
-            // requeues instead of being swallowed.
+            // there would lose the paint rather than deduplicate it.
+            //
+            // consumePendingRepaint() retires the dropped request the way the flush would have. A
+            // child queued through the no-argument repaint() carries a null dirty region and a
+            // latched pending flag, and that pair is exactly what makes repaint(x, y, w, h) return
+            // without queueing, so every later partial repaint of that child would be lost.
             if (cmp instanceof Container && ((Component) cmp).getDirtyRegion() == null) {
                 for (int iter = 0; iter < paintQueueFill; iter++) {
                     Animation ani = paintQueue[iter];
@@ -197,16 +207,12 @@ public final class PaintSurface {
                     while (parent != null) {
                         if (parent == cmp) { //NOPMD CompareObjectsWithEquals
                             paintQueue[iter] = null;
+                            ((Component) ani).consumePendingRepaint();
                             break;
                         }
                         parent = parent.getParent();
                     }
                 }
-            }
-            // overcrowding the queue don't try to grow the array!
-            if (paintQueueFill >= paintQueue.length) {
-                System.out.println("Warning paint queue size exceeded, please watch the amount of repaint calls");
-                return;
             }
 
             paintQueue[paintQueueFill] = cmp;

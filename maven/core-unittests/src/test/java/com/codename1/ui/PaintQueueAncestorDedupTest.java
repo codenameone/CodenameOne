@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class PaintQueueAncestorDedupTest extends UITestBase {
 
+    /** Matches the fixed slot count in {@code PaintSurface}. */
+    private static final int PAINT_QUEUE_CAPACITY = 200;
+
     private static final class CountingContainer extends Container {
         private int paints;
 
@@ -67,8 +70,8 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         Form form = new Form("paint queue", BoxLayout.y());
         CountingContainer child = showChild(form);
 
-        Display.getInstance().repaint(child);
-        Display.getInstance().repaint(form);
+        child.repaint();
+        form.repaint();
         Display.impl.paintDirty();
 
         assertEquals(1, child.paints, "the form's paint already covers the child");
@@ -79,8 +82,8 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         Form form = new Form("paint queue", BoxLayout.y());
         CountingContainer child = showChild(form);
 
-        Display.getInstance().repaint(form);
-        Display.getInstance().repaint(child);
+        form.repaint();
+        child.repaint();
         Display.impl.paintDirty();
 
         assertEquals(1, child.paints, "the queued form still covers a child queued after it");
@@ -91,7 +94,7 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         Form form = new Form("paint queue", BoxLayout.y());
         CountingContainer child = showChild(form);
 
-        Display.getInstance().repaint(child);
+        child.repaint();
         // a form clipped to one corner is not guaranteed to cover the child, so the child's own
         // entry has to survive
         form.repaint(0, 0, 1, 1);
@@ -100,12 +103,66 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         assertEquals(1, child.paints, "the child must still be painted by its own queue entry");
     }
 
+    /**
+     * Dropping the entry has to retire the request the way the flush would have. A child queued
+     * through the no-argument {@code repaint()} carries a null dirty region and a latched pending
+     * flag, and that pair is what makes {@code repaint(x, y, w, h)} return without queueing.
+     */
+    @FormTest
+    void aDroppedChildCanStillRequestAPartialRepaint() {
+        Form form = new Form("paint queue", BoxLayout.y());
+        CountingContainer child = showChild(form);
+
+        child.repaint();
+        form.repaint();
+        Display.impl.paintDirty();
+        child.paints = 0;
+
+        child.repaint(child.getAbsoluteX(), child.getAbsoluteY(), child.getWidth(), child.getHeight());
+        Display.impl.paintDirty();
+
+        assertEquals(1, child.paints, "a partial repaint after the drop must not be swallowed");
+    }
+
+    /**
+     * A full queue refuses the incoming parent, so discarding the descendants first would leave
+     * neither them nor the parent to paint.
+     */
+    @FormTest
+    void aFullQueueKeepsWhatItAlreadyHas() {
+        Form form = new Form("paint queue", BoxLayout.y());
+        Container holder = new Container(BoxLayout.y());
+        form.add(holder);
+        CountingContainer first = new CountingContainer();
+        first.add(new Label("first"));
+        holder.add(first);
+        // more siblings than the queue can hold, so it is certainly full when the form arrives
+        for (int i = 0; i < PAINT_QUEUE_CAPACITY; i++) {
+            Container filler = new Container(BoxLayout.y());
+            filler.add(new Label("c" + i));
+            holder.add(filler);
+        }
+        form.show();
+        form.revalidate();
+        Display.impl.paintDirty();
+
+        first.paints = 0;
+        first.repaint();
+        for (int i = 1; i < holder.getComponentCount(); i++) {
+            holder.getComponentAt(i).repaint();
+        }
+        form.repaint();
+        Display.impl.paintDirty();
+
+        assertEquals(1, first.paints, "a refused parent must not take the queued children with it");
+    }
+
     @FormTest
     void childOnItsOwnStillPaints() {
         Form form = new Form("paint queue", BoxLayout.y());
         CountingContainer child = showChild(form);
 
-        Display.getInstance().repaint(child);
+        child.repaint();
         Display.impl.paintDirty();
 
         assertEquals(1, child.paints, "a child with no ancestor queued must still paint");
