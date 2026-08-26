@@ -59,10 +59,23 @@ public class MacOSNativeBuilder extends Executor {
     private File resultDir;
     private File appBundle;
     private File xcodeProjectDir;
+    private final List<File> artifacts = new ArrayList<File>();
+    /// The scan result and the dlopen flag, kept because the entitlements are
+    /// written once per signing channel while the scan is worth doing once.
+    private MacOSXcodeProject.MacOSCapabilities capabilities;
+    private boolean loadsExternalCode;
 
     /** The produced {@code .app} bundle, or {@code null} if the build failed. */
     public File getAppBundle() {
         return appBundle;
+    }
+
+    /**
+     * Everything the build produced, in the order it was produced: each channel's
+     * {@code .app} followed by the dmg and/or pkg built from it.
+     */
+    public List<File> getArtifacts() {
+        return artifacts;
     }
 
     /** The directory holding the build output. */
@@ -385,6 +398,13 @@ public class MacOSNativeBuilder extends Executor {
                 + "    public void run() {\n"
                 + "        if(!initialized) {\n"
                 + "            initialized = true;\n"
+                // Stamped before anything else runs, so Hardening.isHardened()
+                // and the crash report's mapping id are right from the first
+                // line of application code. Without it a hardened build reports
+                // itself unhardened and its crash reports name no mapping, which
+                // makes the uploaded mapping unreachable -- the failure is a
+                // stack trace nobody can retrace, months later.
+                + hardeningRuntimeProperties(request)
                 + svgRegistryInstall
                 + "            i.init(this);\n"
                 + createStartInvocation(request, "i")
@@ -527,16 +547,33 @@ public class MacOSNativeBuilder extends Executor {
             // shows up as a permission denial at runtime with no explanation.
             throw new IOException("Failed to scan the application for macOS capabilities", ex);
         }
-        boolean appStore = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(hints.getDistribution());
+        capabilities = caps;
         // loadsExternalCode: a hardened-runtime bundle that dlopens anything --
         // which a Codename One application does not, but a cn1lib shipping a
         // dylib might -- needs the library-validation exception or the load is
         // refused at runtime with nothing in the application's own logs.
-        boolean loadsExternalCode = "true".equalsIgnoreCase(
+        loadsExternalCode = "true".equalsIgnoreCase(
                 request.getArg("macos.loadsExternalCode", "false"));
-        Map<String, Object> ent = MacOSXcodeProject.entitlements(appStore, hints.isSandboxed(),
-                caps, loadsExternalCode);
-        MacOSXcodeProject.writePlist(ent, new File(srcRoot, appName + ".entitlements"));
+    }
+
+    /**
+     * Writes the entitlements for one signing channel and returns the file.
+     *
+     * <p>Per channel rather than once, because the two channels do not want the
+     * same set: the App Store requires the sandbox and a direct build usually
+     * does not. That is also why {@code distribution=both} cannot be one
+     * xcodebuild run -- the entitlements are baked into the signature.</p>
+     */
+    private File writeEntitlements(MacOSBuildHints hints, File srcRoot, String appName,
+            String channel, String suffix) throws IOException {
+        boolean appStore = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel);
+        Map<String, Object> ent = MacOSXcodeProject.entitlements(appStore,
+                hints.isSandboxedFor(channel),
+                capabilities == null ? new MacOSXcodeProject.MacOSCapabilities() : capabilities,
+                loadsExternalCode);
+        File out = new File(srcRoot, appName + "-" + suffix + ".entitlements");
+        MacOSXcodeProject.writePlist(ent, out);
+        return out;
     }
 
     /**
@@ -614,11 +651,40 @@ public class MacOSNativeBuilder extends Executor {
         }
     }
 
-    /** Runs xcodebuild, then signs, notarizes and packages as configured. */
+    /**
+     * Runs xcodebuild once per requested signing channel, then packages,
+     * signs and notarizes each channel's output.
+     *
+     * <p>{@code distribution=both} is genuinely two builds. The channels differ
+     * in the signing certificate AND in the entitlements the signature carries --
+     * the App Store one has to be sandboxed -- so a single binary cannot be
+     * relabelled into the other channel afterwards.</p>
+     */
     private boolean buildAndPackage(BuildRequest request, MacOSBuildHints hints, File distDir,
             String appName) throws BuildException {
-        File derived = new File(distDir, "DerivedData");
+        File srcRoot = new File(distDir, appName + "-src");
+        List<String> channels = hints.getChannels();
+        for (String channel : channels) {
+            if (!buildChannel(request, hints, distDir, srcRoot, appName, channel,
+                    channels.size() > 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean buildChannel(BuildRequest request, MacOSBuildHints hints, File distDir,
+            File srcRoot, String appName, String channel, boolean multiChannel)
+            throws BuildException {
+        String suffix = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)
+                ? "appstore" : "developerid";
+        // A derived-data directory per channel: the two builds differ only in
+        // signing settings, and sharing one would let xcodebuild hand the second
+        // channel the first channel's signature out of the build cache.
+        File derived = new File(distDir, multiChannel ? "DerivedData-" + suffix : "DerivedData");
         derived.mkdirs();
+
+        String signingIdentity = hints.getSigningIdentityFor(channel);
         List<String> cmd = new ArrayList<String>();
         cmd.add("xcodebuild");
         cmd.add("-project");
@@ -635,14 +701,27 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add("ARCHS=" + request.getArg("macos.arch", "arm64 x86_64"));
         cmd.add("ONLY_ACTIVE_ARCH=NO");
         cmd.add("MACOSX_DEPLOYMENT_TARGET=" + hints.getMinDeploymentTarget());
-        String signingIdentity = signingIdentityFor(hints);
         if (signingIdentity == null) {
             cmd.add("CODE_SIGNING_ALLOWED=NO");
             cmd.add("CODE_SIGN_IDENTITY=");
         } else {
+            File entitlements;
+            try {
+                entitlements = writeEntitlements(hints, srcRoot, appName, channel, suffix);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the " + channel + " entitlements", ex);
+            }
             cmd.add("CODE_SIGN_IDENTITY=" + signingIdentity);
             cmd.add("CODE_SIGN_STYLE=" + ("automatic".equalsIgnoreCase(hints.getSigningStyle())
                     ? "Automatic" : "Manual"));
+            // The generated entitlements have to be named here. Neither the
+            // project template nor codesign picks the file up by convention, so
+            // without this the signature carries none of them: an App Store build
+            // is signed without the sandbox entitlement it is required to have,
+            // and the scanned capabilities -- camera, Bluetooth, location,
+            // network server -- are absent, which shows up as a submission
+            // rejection or a permission denial rather than as a build failure.
+            cmd.add("CODE_SIGN_ENTITLEMENTS=" + entitlements.getAbsolutePath());
             if (hints.getTeamId() != null && hints.getTeamId().length() > 0) {
                 cmd.add("DEVELOPMENT_TEAM=" + hints.getTeamId());
             }
@@ -661,58 +740,160 @@ public class MacOSNativeBuilder extends Executor {
             throw new BuildException("xcodebuild reported success but no " + appName
                     + ".app was produced under " + derived.getAbsolutePath());
         }
-        appBundle = new File(resultDir, built.getName());
+        String base = multiChannel ? appName + "-" + suffix : appName;
+        File bundle = new File(resultDir, base + ".app");
         try {
-            copyBundle(built, appBundle);
+            copyBundle(built, bundle);
         } catch (IOException ex) {
             throw new BuildException("Failed to collect the built application bundle", ex);
         }
+        if (appBundle == null) {
+            appBundle = bundle;
+        }
+        artifacts.add(bundle);
+
+        List<File> containers = packageChannel(hints, channel, bundle, base);
+        artifacts.addAll(containers);
 
         // Notarization needs a signed bundle, so an unsigned build says so
         // rather than running a notarization that would be rejected.
         if (hints.isNotarize()) {
             if (signingIdentity == null) {
-                log("macos.notarize is set but the build is unsigned, so there is nothing to "
-                        + "notarize. Configure a Developer ID signing identity.");
+                log("macos.notarize is set but the " + channel + " build is unsigned, so there is "
+                        + "nothing to notarize. Configure a Developer ID signing identity.");
+            } else if (containers.isEmpty()) {
+                notarize(request, hints, bundle);
             } else {
-                notarize(request, hints, appBundle);
+                // The container carries the ticket. Stapling to the .app inside a
+                // dmg is invisible to the person who downloads the dmg, so it is
+                // the dmg or the pkg that gets submitted and stapled.
+                for (File container : containers) {
+                    notarize(request, hints, container);
+                }
             }
         }
         return true;
     }
 
     /**
-     * The identity to sign with, or {@code null} for an unsigned build. An
-     * unsigned build is a legitimate outcome -- it is what the screenshot suite
-     * and a local smoke test want -- so it is not an error.
+     * Produces the artifacts {@code macos.packaging} asks for, beside the
+     * {@code .app}, and returns them. Without this the build hands back a bundle
+     * directory: nothing to upload to the App Store, and on the cloud builder
+     * nothing that can even be transferred, since a result is read as a file.
      */
-    private String signingIdentityFor(MacOSBuildHints hints) {
-        if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(hints.getDistribution())) {
-            return emptyToNull(hints.getSigningIdentityAppStore());
+    private List<File> packageChannel(MacOSBuildHints hints, String channel, File bundle,
+            String base) throws BuildException {
+        String packaging = hints.getPackagingFor(channel);
+        boolean wantsDmg = "dmg".equalsIgnoreCase(packaging) || "both".equalsIgnoreCase(packaging);
+        boolean wantsPkg = "pkg".equalsIgnoreCase(packaging) || "both".equalsIgnoreCase(packaging);
+        if (!wantsDmg && !wantsPkg && !"app".equalsIgnoreCase(packaging)) {
+            log("Unrecognized macos.packaging value \"" + packaging
+                    + "\"; producing the .app only. Valid values are app, dmg, pkg and both.");
         }
-        return emptyToNull(hints.getSigningIdentityDeveloperID());
+        List<File> containers = new ArrayList<File>();
+        if (wantsDmg) {
+            containers.add(buildDmg(hints, channel, bundle, base));
+        }
+        if (wantsPkg) {
+            containers.add(buildPkg(hints, channel, bundle, base));
+        }
+        return containers;
+    }
+
+    private File buildDmg(MacOSBuildHints hints, String channel, File bundle, String base)
+            throws BuildException {
+        File dmg = new File(resultDir, base + ".dmg");
+        dmg.delete();
+        try {
+            if (!exec(resultDir, 1800000, "hdiutil", "create", "-volname", base,
+                    "-srcfolder", bundle.getAbsolutePath(), "-ov", "-format", "UDZO",
+                    dmg.getAbsolutePath())) {
+                throw new BuildException("hdiutil failed to create " + dmg.getName());
+            }
+            String identity = hints.getSigningIdentityFor(channel);
+            if (identity != null) {
+                // Gatekeeper checks the container on first open, so an unsigned
+                // dmg around a signed app still warns.
+                if (!exec(resultDir, 600000, "codesign", "--force", "--sign", identity,
+                        "--timestamp", dmg.getAbsolutePath())) {
+                    throw new BuildException("Failed to sign " + dmg.getName());
+                }
+            }
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to build " + dmg.getName(), ex);
+        }
+        return dmg;
+    }
+
+    private File buildPkg(MacOSBuildHints hints, String channel, File bundle, String base)
+            throws BuildException {
+        File pkg = new File(resultDir, base + ".pkg");
+        pkg.delete();
+        List<String> cmd = new ArrayList<String>();
+        cmd.add("productbuild");
+        cmd.add("--component");
+        cmd.add(bundle.getAbsolutePath());
+        cmd.add("/Applications");
+        String installer = emptyToNull(hints.getInstallerIdentity());
+        if (installer != null) {
+            cmd.add("--sign");
+            cmd.add(installer);
+        } else if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)) {
+            // Said here because productbuild accepts an unsigned package happily
+            // and the upload refuses it a long way downstream.
+            log("macos.signingIdentity.installer is not set, so the App Store package is "
+                    + "unsigned and will be refused on upload. It wants a \"3rd Party Mac "
+                    + "Developer Installer\" certificate, which is a different certificate "
+                    + "from the application signing identity.");
+        }
+        cmd.add(pkg.getAbsolutePath());
+        try {
+            if (!exec(resultDir, 1800000, cmd.toArray(new String[0]))) {
+                throw new BuildException("productbuild failed to create " + pkg.getName());
+            }
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to build " + pkg.getName(), ex);
+        }
+        return pkg;
     }
 
     private static String emptyToNull(String s) {
         return s == null || s.trim().length() == 0 ? null : s;
     }
 
-    private void notarize(BuildRequest request, MacOSBuildHints hints, File bundle)
+    /**
+     * Submits one artifact to notarytool and staples the ticket to it.
+     *
+     * <p>Takes a {@code .app}, a {@code .dmg} or a {@code .pkg}. Only the bundle
+     * needs archiving first; notarytool accepts a dmg or a pkg directly, and
+     * wrapping one in a zip would staple the ticket to the zip instead of to the
+     * thing the user opens.</p>
+     */
+    private void notarize(BuildRequest request, MacOSBuildHints hints, File artifact)
             throws BuildException {
-        File zip = new File(resultDir, bundle.getName() + ".zip");
+        File zip = null;
         try {
-            // ditto rather than zip: notarytool rejects an archive that does not
-            // preserve the bundle's symlinks and extended attributes, and a
-            // plain zip does not.
-            if (!exec(resultDir, 600000, "ditto", "-c", "-k", "--keepParent",
-                    bundle.getAbsolutePath(), zip.getAbsolutePath())) {
-                throw new BuildException("Failed to archive the application for notarization");
+            File submission = artifact;
+            if (artifact.isDirectory()) {
+                zip = new File(resultDir, artifact.getName() + ".zip");
+                // ditto rather than zip: notarytool rejects an archive that does
+                // not preserve the bundle's symlinks and extended attributes, and
+                // a plain zip does not.
+                if (!exec(resultDir, 600000, "ditto", "-c", "-k", "--keepParent",
+                        artifact.getAbsolutePath(), zip.getAbsolutePath())) {
+                    throw new BuildException("Failed to archive the application for notarization");
+                }
+                submission = zip;
             }
             List<String> submit = new ArrayList<String>();
             submit.add("xcrun");
             submit.add("notarytool");
             submit.add("submit");
-            submit.add(zip.getAbsolutePath());
+            submit.add(submission.getAbsolutePath());
             if (hints.getNotarizeKeychainProfile() != null
                     && hints.getNotarizeKeychainProfile().length() > 0) {
                 submit.add("--keychain-profile");
@@ -723,7 +904,12 @@ public class MacOSNativeBuilder extends Executor {
                 submit.add("--team-id");
                 submit.add(hints.getNotarizeTeamId());
                 submit.add("--password");
-                submit.add(request.getArg("macos.notarize.password", ""));
+                // Through the hints, not straight off the request: the legacy
+                // macNative.notarize.password spelling is still supported and
+                // only the hint parser knows about it. Reading the modern key
+                // directly submits an empty password for a migrated project.
+                submit.add(hints.getNotarizePassword() == null
+                        ? "" : hints.getNotarizePassword());
             }
             submit.add("--wait");
             if (!exec(resultDir, 3600000, submit.toArray(new String[0]))) {
@@ -732,7 +918,7 @@ public class MacOSNativeBuilder extends Executor {
             // Stapling the ticket is what makes the application launch without a
             // network round trip on the user's machine.
             if (!exec(resultDir, 600000, "xcrun", "stapler", "staple",
-                    bundle.getAbsolutePath())) {
+                    artifact.getAbsolutePath())) {
                 throw new BuildException("Failed to staple the notarization ticket");
             }
         } catch (BuildException ex) {
@@ -740,7 +926,9 @@ public class MacOSNativeBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Notarization failed", ex);
         } finally {
-            zip.delete();
+            if (zip != null) {
+                zip.delete();
+            }
         }
     }
 

@@ -27,10 +27,6 @@ function mac_native {
 
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=mac-os-x-native" "-U" "-e"
 }
-function mac_catalyst {
-
-  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=ios" "-Dcodename1.buildTarget=mac-catalyst" "-U" "-e"
-}
 function windows_desktop {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javase" "-Dcodename1.buildTarget=windows-desktop" "-U" "-e"
@@ -115,8 +111,6 @@ function help {
   "echo" "-e" "    *Mac OS Desktop builds are a Pro user feature."
   "echo" "-e" "  mac_native"
   "echo" "-e" "    Builds a native Mac app (no JVM)."
-  "echo" "-e" "  mac_catalyst"
-  "echo" "-e" "    Builds the legacy Mac Catalyst app."
   "echo" "-e" "  windows_desktop"
   "echo" "-e" "    Builds Windows desktop app."
   "echo" "-e" "    *Windows Desktop builds are a Pro user feature."

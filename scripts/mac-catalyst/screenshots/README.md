@@ -45,7 +45,7 @@ When a change is expected to modify a screenshot:
    ```sh
    ./scripts/build-mac-catalyst-app.sh -q -DskipTests
    ./scripts/run-mac-catalyst-ui-tests.sh \
-       scripts/hellocodenameone/ios/target/hellocodenameone-ios-1.0-SNAPSHOT-mac-catalyst-source/HelloCodenameOne.xcodeproj
+       scripts/hellocodenameone/ios/target/hellocodenameone-ios-1.0-SNAPSHOT-mac-source/HelloCodenameOne.xcodeproj
    ```
    Requires Xcode 26 and `gem install xcodeproj`: the Catalyst path injects its
    build settings into an already-generated iOS project with a Ruby script, so

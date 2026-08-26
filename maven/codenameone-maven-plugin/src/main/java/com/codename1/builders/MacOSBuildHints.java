@@ -69,6 +69,8 @@ public class MacOSBuildHints {
     private String signingIdentityDeveloperID;
     private String fixedWindowSize;
     private String packaging;
+    private boolean packagingExplicit;
+    private String installerIdentity;
     private Boolean sandbox;
     private boolean hardenedRuntime = true;
     private boolean notarize;
@@ -146,9 +148,17 @@ public class MacOSBuildHints {
         fixedWindowSize = hint(src, "fixedWindowSize", null);
 
         packaging = hint(src, "packaging", null);
-        if (packaging == null) {
+        packagingExplicit = packaging != null && packaging.length() > 0;
+        if (!packagingExplicit) {
             packaging = defaultPackagingFor(distribution);
         }
+
+        // The installer identity is a different certificate from the application
+        // one -- "3rd Party Mac Developer Installer" / "Developer ID Installer"
+        // -- and productbuild wants that one. Signing a pkg with the application
+        // identity produces a package the store rejects, so it is asked for
+        // separately rather than derived.
+        installerIdentity = hint(src, "signingIdentity.installer", null);
 
         String sandboxHint = hint(src, "sandbox", null);
         // Unset rather than false: the App Store requires the sandbox and direct
@@ -227,6 +237,64 @@ public class MacOSBuildHints {
 
     public String getSigningIdentityDeveloperID() {
         return signingIdentityDeveloperID;
+    }
+
+    /** The installer certificate productbuild signs a {@code .pkg} with, or null. */
+    public String getInstallerIdentity() {
+        return installerIdentity;
+    }
+
+    /**
+     * The application signing identity for one channel, or {@code null} when that
+     * channel is unsigned. Unsigned is a legitimate outcome -- it is what the
+     * screenshot suite and a local smoke test want -- so it is not an error.
+     */
+    public String getSigningIdentityFor(String channel) {
+        String identity = DISTRIBUTION_APP_STORE.equals(channel)
+                ? signingIdentityAppStore : signingIdentityDeveloperID;
+        return identity == null || identity.trim().length() == 0 ? null : identity;
+    }
+
+    /**
+     * The channels this build produces, in order. {@code distribution=both} is
+     * two channels and therefore two xcodebuild invocations: they differ in the
+     * signing certificate AND in the entitlements (the App Store one must be
+     * sandboxed), so one binary cannot serve both no matter how it is packaged.
+     */
+    public List<String> getChannels() {
+        List<String> channels = new ArrayList<String>();
+        if (buildsAppStoreChannel()) {
+            channels.add(DISTRIBUTION_APP_STORE);
+        }
+        if (buildsDeveloperIdChannel()) {
+            channels.add(DISTRIBUTION_DEVELOPER_ID);
+        }
+        return channels;
+    }
+
+    /**
+     * The packaging for one channel. An explicit {@code macos.packaging} applies
+     * to every channel; unset, each channel takes its own default -- {@code pkg}
+     * for the App Store, because productbuild's output is what you upload, and
+     * {@code dmg} for Developer ID. So {@code distribution=both} yields a pkg and
+     * a dmg rather than one artifact that is neither.
+     */
+    public String getPackagingFor(String channel) {
+        return packagingExplicit ? packaging : defaultPackagingFor(channel);
+    }
+
+    /**
+     * Whether one channel is sandboxed. The App Store requires the sandbox and
+     * direct distribution usually does not want it, so with
+     * {@code distribution=both} the store's requirement must not leak into the
+     * directly distributed build -- an explicit {@code macos.sandbox} still wins
+     * for both, because that is the developer saying so.
+     */
+    public boolean isSandboxedFor(String channel) {
+        if (sandbox != null) {
+            return sandbox.booleanValue();
+        }
+        return DISTRIBUTION_APP_STORE.equals(channel);
     }
 
     public String getFixedWindowSize() {

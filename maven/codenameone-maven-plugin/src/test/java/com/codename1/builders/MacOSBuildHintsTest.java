@@ -24,11 +24,14 @@ package com.codename1.builders;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /// Covers the migration half of the macOS build hints.
@@ -155,5 +158,88 @@ public class MacOSBuildHintsTest {
         MacOSBuildHints devId = parse(raw("macos.distribution", "developerID"), "p");
         assertFalse(devId.buildsAppStoreChannel());
         assertTrue(devId.buildsDeveloperIdChannel());
+    }
+
+    /// distribution=both is two builds, and the builder loops over exactly this
+    /// list. If it ever answered with one entry, "both" would quietly ship one
+    /// channel -- which is what it used to do.
+    @Test
+    public void channelsAreEnumeratedForTheBuilderToLoopOver() {
+        assertEquals(Arrays.asList("appStore", "developerID"),
+                parse(raw("macos.distribution", "both"), "p").getChannels());
+        assertEquals(Collections.singletonList("developerID"),
+                parse(raw(), "p").getChannels());
+        assertEquals(Collections.singletonList("appStore"),
+                parse(raw("macos.distribution", "appStore"), "p").getChannels());
+    }
+
+    /// Each channel of a distribution=both build gets its own container: a pkg
+    /// for the store because that is what you upload, a dmg for direct download.
+    /// One artifact that is neither would serve neither.
+    @Test
+    public void packagingIsResolvedPerChannel() {
+        MacOSBuildHints both = parse(raw("macos.distribution", "both"), "p");
+        assertEquals("pkg", both.getPackagingFor("appStore"));
+        assertEquals("dmg", both.getPackagingFor("developerID"));
+
+        MacOSBuildHints pinned = parse(raw("macos.distribution", "both",
+                "macos.packaging", "dmg"), "p");
+        assertEquals("dmg", pinned.getPackagingFor("appStore"));
+        assertEquals("dmg", pinned.getPackagingFor("developerID"));
+    }
+
+    /// The store requires the sandbox; a directly distributed build usually does
+    /// not want it. With distribution=both the store's requirement must not
+    /// follow the download into the wild, where it breaks file access.
+    @Test
+    public void sandboxIsResolvedPerChannel() {
+        MacOSBuildHints both = parse(raw("macos.distribution", "both"), "p");
+        assertTrue(both.isSandboxedFor("appStore"));
+        assertFalse(both.isSandboxedFor("developerID"));
+
+        MacOSBuildHints explicit = parse(raw("macos.distribution", "both",
+                "macos.sandbox", "true"), "p");
+        assertTrue(explicit.isSandboxedFor("appStore"));
+        assertTrue(explicit.isSandboxedFor("developerID"));
+    }
+
+    /// Each channel signs with its own certificate. Signing the store build with
+    /// the Developer ID identity is a submission rejection.
+    @Test
+    public void signingIdentityIsResolvedPerChannel() {
+        MacOSBuildHints h = parse(raw("macos.distribution", "both",
+                "macos.signingIdentity.appStore", "3rd Party Mac Developer Application: X",
+                "macos.signingIdentity.developerID", "Developer ID Application: X"), "p");
+        assertEquals("3rd Party Mac Developer Application: X", h.getSigningIdentityFor("appStore"));
+        assertEquals("Developer ID Application: X", h.getSigningIdentityFor("developerID"));
+        assertNull(parse(raw("macos.signingIdentity.developerID", "  "), "p")
+                .getSigningIdentityFor("developerID"));
+    }
+
+    /// The installer certificate is not the application certificate, so it is
+    /// asked for rather than derived: productbuild signed with the application
+    /// identity produces a package the store refuses.
+    @Test
+    public void installerIdentityHasItsOwnHintAndLegacySpelling() {
+        assertEquals("3rd Party Mac Developer Installer: X",
+                parse(raw("macos.signingIdentity.installer",
+                        "3rd Party Mac Developer Installer: X"), "p").getInstallerIdentity());
+        assertEquals("Developer ID Installer: X",
+                parse(raw("macNative.signingIdentity.installer",
+                        "Developer ID Installer: X"), "p").getInstallerIdentity());
+        assertNull(parse(raw(), "p").getInstallerIdentity());
+    }
+
+    /// The builder submits hints.getNotarizePassword(), not the raw modern key,
+    /// so a project still spelling it macNative.* notarizes rather than sending
+    /// notarytool an empty password.
+    @Test
+    public void notarizePasswordHonoursTheLegacySpelling() {
+        assertEquals("app-specific",
+                parse(raw("macNative.notarize.password", "app-specific"), "p")
+                        .getNotarizePassword());
+        assertEquals("modern",
+                parse(raw("macos.notarize.password", "modern",
+                        "macNative.notarize.password", "legacy"), "p").getNotarizePassword());
     }
 }

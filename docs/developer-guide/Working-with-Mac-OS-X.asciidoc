@@ -209,4 +209,4 @@ The native macOS build emits a `<MainClass>.entitlements` plist (or `<MainClass>
 
 === If You Need the Previous Mac Behavior
 
-Projects that depend on the Mac Catalyst build this target replaced can still build it, under its own target name. See <<_working_with_mac_catalyst>>.
+Projects that depend on the Mac Catalyst build this target replaced can still build it: set `macNative.enabled=true` and build the iOS target, which is what Catalyst has always been. See <<_working_with_mac_catalyst>>.

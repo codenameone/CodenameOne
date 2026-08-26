@@ -100,6 +100,7 @@ dependency-reduced-pom.xml
 /artifacts/
 
 # Hugo website generated artifacts
+/docs/website/generated/
 /docs/website/.hugo_build.lock
 /docs/website/hugo_stats.json
 /docs/website/resources/

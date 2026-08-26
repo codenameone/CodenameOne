@@ -97,12 +97,12 @@ public abstract class Executor {
     // "which machine compiled this" is not something a target string should
     // leave ambiguous.
     public static final String BUILD_TARGET_MAC_NATIVE_LOCAL = "local-mac-device";
-    // Legacy Mac Catalyst. The Catalyst slice rides the iOS pipeline with the
-    // macNative.enabled build hint, exactly as it always did; it moved off
-    // "mac-os-x-native" onto its own names so a project that depends on the
-    // Catalyst behaviour has somewhere to say so.
-    public static final String BUILD_TARGET_MAC_CATALYST = "mac-catalyst";
-    public static final String BUILD_TARGET_MAC_CATALYST_PROJECT = "mac-catalyst-source";
+    // Mac Catalyst has no target of its own, deliberately. It IS an iPhone
+    // build: IPhoneBuilder switches to the Catalyst slice on the
+    // macNative.enabled hint alone and has always done so, so an iOS target
+    // plus that hint is the whole of it. Giving it a target name would add a
+    // second spelling for something the hint already says, in the maven
+    // targeting, the ant template and both builders.
     private String buildTarget;
 
     private static boolean disableDelete;

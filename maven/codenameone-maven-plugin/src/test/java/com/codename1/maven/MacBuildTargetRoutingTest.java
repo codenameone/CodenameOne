@@ -31,8 +31,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/// Guards the split between the native macOS (AppKit) targets and the legacy Mac
-/// Catalyst ones.
+/// Guards the macOS (AppKit) build targets, and guards Mac Catalyst against
+/// growing one.
 ///
 /// Both halves fail quietly if they drift. A Mac target that stops hardening as
 /// "mac" starts reading `harden.ios.enabled` instead, so a project's opt-out
@@ -54,30 +54,40 @@ public class MacBuildTargetRoutingTest {
     }
 
     @Test
-    public void theFourMacTargetsAreDistinctNames() {
+    public void theMacTargetsAreTheOnesThatAlreadyExisted() {
         assertEquals("mac-os-x-native", Executor.BUILD_TARGET_MAC_NATIVE);
         assertEquals("mac-source", Executor.BUILD_TARGET_MAC_NATIVE_PROJECT);
-        assertEquals("mac-catalyst", Executor.BUILD_TARGET_MAC_CATALYST);
-        assertEquals("mac-catalyst-source", Executor.BUILD_TARGET_MAC_CATALYST_PROJECT);
+    }
+
+    /// Mac Catalyst has no build target, and must not grow one. It IS an iPhone
+    /// build -- IPhoneBuilder switches to the Catalyst slice on macNative.enabled
+    /// alone -- so a target name would be a second spelling for what the hint
+    /// already says, in the maven targeting, the ant template and both builders.
+    @Test
+    public void catalystHasNoTargetOfItsOwn() throws Exception {
+        for (java.lang.reflect.Field f : Executor.class.getDeclaredFields()) {
+            if (f.getName().startsWith("BUILD_TARGET_")) {
+                Object v = f.get(null);
+                assertFalse("Executor." + f.getName() + " reintroduces a Catalyst build target",
+                        String.valueOf(v).contains("catalyst"));
+            }
+        }
     }
 
     @Test
     public void sourceTargetsBuildLocallyAndCloudTargetsDoNot() throws Exception {
         assertTrue(isLocal(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));
-        assertTrue(isLocal(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
         assertFalse(isLocal(Executor.BUILD_TARGET_MAC_NATIVE));
-        assertFalse(isLocal(Executor.BUILD_TARGET_MAC_CATALYST));
     }
 
     @Test
     public void everyMacTargetHardensAsMac() throws Exception {
-        // Not "ios", even though the Catalyst targets run with platform=ios, and
-        // not null for the AppKit ones -- a project moving between the two must
-        // keep the same harden.mac.enabled opt-out key.
+        // Not "ios", even though these run with platform=ios, and not null --
+        // a Mac target that stops hardening as "mac" reads harden.ios.enabled
+        // instead, and the project's opt-out silently stops applying.
         assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_NATIVE));
         assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));
-        assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_CATALYST));
-        assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
+        assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_NATIVE_LOCAL));
     }
 
     @Test
@@ -98,60 +108,5 @@ public class MacBuildTargetRoutingTest {
         assertEquals("mac", hardenPlatform(Executor.BUILD_TARGET_MAC_NATIVE_LOCAL));
     }
 
-    @Test
-    public void theAppKitCloudTargetDoesNotAskForCatalyst() throws Exception {
-        // macNative.enabled is what tells the server-side IPhoneBuilder to emit a
-        // Catalyst slice. Setting it for an AppKit target would mean asking the
-        // iOS builder for Catalyst under a name that promises AppKit, which is
-        // exactly the ambiguity the separate queue exists to remove -- and the
-        // failure would be a green build shipping the wrong application.
-        assertFalse(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_NATIVE));
-        assertFalse(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));
-        assertTrue(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_CATALYST));
-        assertTrue(catalystHintIsSetFor(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
-    }
-
     /// Reads the mojo's own source for the cloud dispatch arm, because the
-    /// decision lives in a private branch of a method that needs a whole Maven
-    /// session to invoke. Asserting on the source is worth less than asserting on
-    /// behaviour, but it is worth much more than not asserting at all: this is a
-    /// silent failure, and the test names which targets may carry the hint.
-    private static boolean catalystHintIsSetFor(String target) throws Exception {
-        java.io.File src = new java.io.File("src/main/java/com/codename1/maven/CN1BuildMojo.java");
-        if (!src.isFile()) {
-            throw new IllegalStateException("Could not locate CN1BuildMojo.java at " + src.getAbsolutePath());
-        }
-        String body = new String(java.nio.file.Files.readAllBytes(src.toPath()), "UTF-8");
-        int at = body.indexOf("codename1.arg.macNative.enabled");
-        while (at > 0) {
-            int blockStart = body.lastIndexOf("if (", at);
-            String condition = body.substring(blockStart, at);
-            if (condition.contains(constantNameFor(target))) {
-                return true;
-            }
-            at = body.indexOf("codename1.arg.macNative.enabled", at + 1);
-        }
-        return false;
-    }
-
-    private static String constantNameFor(String target) {
-        if (Executor.BUILD_TARGET_MAC_NATIVE.equals(target)) {
-            return "BUILD_TARGET_MAC_NATIVE.equals";
-        }
-        if (Executor.BUILD_TARGET_MAC_NATIVE_PROJECT.equals(target)) {
-            return "BUILD_TARGET_MAC_NATIVE_PROJECT.equals";
-        }
-        if (Executor.BUILD_TARGET_MAC_CATALYST.equals(target)) {
-            return "BUILD_TARGET_MAC_CATALYST.equals";
-        }
-        return "BUILD_TARGET_MAC_CATALYST_PROJECT.equals";
-    }
-
-    @Test
-    public void catalystSourceIsRecognizedByTheHardeningPreflight() {
-        assertTrue(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_CATALYST_PROJECT));
-        assertTrue(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_NATIVE_PROJECT));
-        assertFalse(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_CATALYST));
-        assertFalse(HardeningPreflight.isLocalOrSourceTarget(Executor.BUILD_TARGET_MAC_NATIVE));
-    }
 }

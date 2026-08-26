@@ -25,17 +25,20 @@ configuration reaches:
   `UIKeyCommand` objects.
 * Controls are UIKit's, drawn by the compatibility layer rather than by AppKit.
 
-=== Build Targets
+=== Building It
 
-[cols="1,3", options="header"]
-|===
-| Target | Purpose
-| `mac-catalyst-source` | Generates the Xcode project locally, under `target/<finalName>-mac-catalyst-source/`.
-| `mac-catalyst` | Builds on the Codename One build server.
-|===
+Catalyst has no build target of its own, because it isn't a separate build. It
+is the iOS build with one hint set, and `IPhoneBuilder` emits the Catalyst
+slice whenever it sees that hint:
 
-Both run with `-Dcodename1.platform=ios`, because Catalyst genuinely is an iOS
-build:
+[source]
+----
+codename1.arg.macNative.enabled=true
+----
+
+With it in `codenameone_settings.properties`, the ordinary iOS targets produce
+the Catalyst app -- `ios-source` for a local Xcode project, `ios-device` for a
+build-server build:
 
 [source,shell]
 ----
