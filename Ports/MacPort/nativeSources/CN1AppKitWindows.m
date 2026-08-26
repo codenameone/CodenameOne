@@ -279,6 +279,12 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
         if (scale <= 0) {
             scale = 1;
         }
+        // Creation takes the CONTENT rect, unlike setBounds/getBounds which are
+        // the outer-frame pair the WindowManager SPI specifies. Deliberate: the
+        // size an application asks for at creation is the area it draws into,
+        // and shrinking it by the title bar would make every Window come up
+        // smaller than it asked for. Once the window exists, geometry travels as
+        // the outer rectangle so a get/set round trip agrees with itself.
         NSRect content = NSMakeRect(x / scale, y / scale,
                                     MAX(width / scale, 1), MAX(height / scale, 1));
         NSWindow *w = cn1MakeWindow(content, decorated != 0, resizable != 0, NO);
@@ -418,11 +424,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetBounds___int_int_int_int_
         if (rec == nil) {
             return;
         }
+        // The OUTER frame, matching what getBounds returns. Treating the
+        // request as a content rect and expanding it by the chrome grew the
+        // window by its title bar on every restore, because the value being
+        // restored came from getBounds -- the round trip has to agree, and the
+        // SPI says both ends of it are the rectangle including chrome.
         CGFloat scale = cn1DesktopScale();
-        NSRect content = NSMakeRect(x / scale, y / scale,
-                                    MAX(width / scale, 1), MAX(height / scale, 1));
-        NSRect frame = [rec.window frameRectForContentRect:cn1ToAppKitFrame(content)];
-        [rec.window setFrame:frame display:YES];
+        NSRect frame = NSMakeRect(x / scale, y / scale,
+                                  MAX(width / scale, 1), MAX(height / scale, 1));
+        [rec.window setFrame:cn1ToAppKitFrame(frame) display:YES];
     });
 }
 
@@ -475,8 +485,15 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macMainWindowGetBounds___int_1ARRA
         if (w == nil) {
             return;
         }
-        CGFloat scale = w.backingScaleFactor;
-        NSRect topLeft = cn1FromAppKitFrame([w contentRectForFrameRect:w.frame]);
+        // The shared desktop scale, not this window's own. Monitor rectangles
+        // and every secondary window's bounds are expressed in it, so a main
+        // window on a display of a different density reported a rectangle in a
+        // different space -- and Window.centerOver(Form) then computed a
+        // position in one space that was applied in the other, landing the
+        // window on the wrong monitor. The frame rather than the content rect,
+        // for the same reason getBounds returns the frame.
+        CGFloat scale = cn1DesktopScale();
+        NSRect topLeft = cn1FromAppKitFrame(w.frame);
         b.x = (int)(topLeft.origin.x * scale);
         b.y = (int)(topLeft.origin.y * scale);
         b.width = (int)(topLeft.size.width * scale);

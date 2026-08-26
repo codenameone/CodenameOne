@@ -200,6 +200,13 @@ public class MacOSNativeBuilder extends Executor {
             File portDir = new File(tmpFile, "macPort");
             portClasses = new File(portDir, "classes");
             nativeSources = new File(portDir, "nativeSources");
+            // Emptied, not merely created. extractJarResource overwrites the
+            // entries the bundle carries and removes nothing, so on a rebuild in
+            // the same directory a class or native source dropped from
+            // MacPort.jar or nativemac.jar stayed in the translator's input --
+            // still compiled, and a duplicate symbol once a replacement lands
+            // under a different name.
+            deleteRecursively(portDir);
             portClasses.mkdirs();
             nativeSources.mkdirs();
             // Provided by the codenameone-mac 'bundle' artifact on the plugin

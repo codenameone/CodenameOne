@@ -845,6 +845,44 @@ static int CN1MacKeyCode(NSEvent *event) {
     return NSNotFound;
 }
 
+/// The edge a shift-arrow moves. Growing leftwards moves the start, rightwards
+/// the end -- and with no selection both are the caret.
+static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
+    return leftwards ? sel.location : NSMaxRange(sel);
+}
+
+/// The index one composed character before `at`.
+///
+/// Not `at - 1`: an emoji, a flag or a combining sequence is several UTF-16
+/// units, and a caret parked inside one splits a surrogate pair the moment
+/// anything is inserted or deleted there -- committing text the framework cannot
+/// render. The deletion handlers already move by composed sequence; the caret
+/// has to agree with them.
+- (NSUInteger)cn1IndexBefore:(NSUInteger)at inText:(NSString *)text {
+    if (at == 0 || text == nil || at > text.length) {
+        return 0;
+    }
+    NSRange seq = [text rangeOfComposedCharacterSequenceAtIndex:at - 1];
+    return seq.location;
+}
+
+/// The index one composed character after `at`.
+- (NSUInteger)cn1IndexAfter:(NSUInteger)at inText:(NSString *)text {
+    if (text == nil || at >= text.length) {
+        return text == nil ? 0 : text.length;
+    }
+    NSRange seq = [text rangeOfComposedCharacterSequenceAtIndex:at];
+    return NSMaxRange(seq);
+}
+
+/// Grows or shrinks a selection towards `to`, keeping the far edge anchored.
+- (NSRange)cn1Extend:(NSRange)sel to:(NSUInteger)to anchoredAtStart:(BOOL)atStart {
+    NSUInteger anchor = atStart ? sel.location : NSMaxRange(sel);
+    NSUInteger lo = MIN(anchor, to);
+    NSUInteger hi = MAX(anchor, to);
+    return NSMakeRange(lo, hi - lo);
+}
+
 - (void)doCommandBySelector:(SEL)selector {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (!session.active) {
@@ -899,13 +937,47 @@ static int CN1MacKeyCode(NSEvent *event) {
         return;
     }
     if (selector == @selector(moveLeft:)) {
-        NSUInteger at = sel.length > 0 ? sel.location : (sel.location > 0 ? sel.location - 1 : 0);
+        NSUInteger at = sel.length > 0 ? sel.location
+            : [self cn1IndexBefore:sel.location inText:session.text];
         session.selectedRange = NSMakeRange(at, 0);
         return;
     }
     if (selector == @selector(moveRight:)) {
-        NSUInteger at = sel.length > 0 ? NSMaxRange(sel) : MIN(sel.location + 1, len);
+        NSUInteger at = sel.length > 0 ? NSMaxRange(sel)
+            : [self cn1IndexAfter:sel.location inText:session.text];
         session.selectedRange = NSMakeRange(at, 0);
+        return;
+    }
+    // Shift-arrow and its line/document variants. AppKit turns them into these
+    // ...AndModifySelection: selectors, and the fallback below used to swallow
+    // every one -- so a keyboard user could not select text at all, in any
+    // TextField or TextArea on the port.
+    if (selector == @selector(moveLeftAndModifySelection:)
+        || selector == @selector(moveBackwardAndModifySelection:)) {
+        session.selectedRange = [self cn1Extend:sel
+                                             to:[self cn1IndexBefore:cn1SelectionEdge(sel, YES)
+                                                              inText:session.text]
+                                       anchoredAtStart:NO];
+        return;
+    }
+    if (selector == @selector(moveRightAndModifySelection:)
+        || selector == @selector(moveForwardAndModifySelection:)) {
+        session.selectedRange = [self cn1Extend:sel
+                                             to:[self cn1IndexAfter:cn1SelectionEdge(sel, NO)
+                                                             inText:session.text]
+                                       anchoredAtStart:YES];
+        return;
+    }
+    if (selector == @selector(moveToBeginningOfLineAndModifySelection:)
+        || selector == @selector(moveToBeginningOfParagraphAndModifySelection:)
+        || selector == @selector(moveToBeginningOfDocumentAndModifySelection:)) {
+        session.selectedRange = NSMakeRange(0, NSMaxRange(sel));
+        return;
+    }
+    if (selector == @selector(moveToEndOfLineAndModifySelection:)
+        || selector == @selector(moveToEndOfParagraphAndModifySelection:)
+        || selector == @selector(moveToEndOfDocumentAndModifySelection:)) {
+        session.selectedRange = NSMakeRange(sel.location, len - sel.location);
         return;
     }
     if (selector == @selector(moveToBeginningOfLine:)
