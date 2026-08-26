@@ -227,8 +227,14 @@ jobs:
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+          # Central served a Connection reset here and Maven treats that as a
+          # permanent resolution failure -- the step died at plugin download,
+          # before a single test ran, and reported the branch red. RETRY_ONLY_
+          # MATCHING=transient returns anything else on the FIRST attempt, so a
+          # genuine test failure still fails once and fails fast.
+          RETRY_ONLY_MATCHING: transient
         run: |
-          mvn -B -Dmaven.javadoc.skip=true \
+          bash ../scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
             -DunitTests=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
