@@ -71,6 +71,11 @@ public class CN1Connection extends Connection {
     /// this call IS doing it. Without them Telecom treated every reported
     /// call as audio-only while the bridge advertised CAPABILITY_VIDEO, and
     /// onAnswer(videoState) had nothing to honour.
+    /// Whether this call carries video, for the service that created it.
+    boolean isVideo() {
+        return video;
+    }
+
     void setVideo(boolean video) {
         this.video = video;
         if (!video) {
@@ -313,4 +318,9 @@ public class CN1Connection extends Connection {
     /// see onCallAudioStateChanged. Kept so the neighbouring values, which
     /// index nothing but are read in logs, do not shift.
     static final int ACTION_MUTE = 7;
+
+    /// The system asked this app to PLACE a call, from Recents, a contact
+    /// or a voice assistant. Failing it ends the call, because Telecom has
+    /// no channel for saying the app could not place it.
+    static final int ACTION_START = 8;
 }

@@ -278,6 +278,12 @@ public class AndroidCallBridge implements CallBridge {
                     .loadLabel(context.getPackageManager()).toString();
         }
         boolean video = CallWire.flag(f, 1);
+        // Field 2, which used to be read by iOS alone. Android does NOT log
+        // self-managed calls unless the phone account asks for it, so a call
+        // app that left CallConfiguration.includesCallsInRecents at its
+        // documented default of true was still absent from Recents on this
+        // platform -- with nothing to say the setting had been ignored.
+        boolean inRecents = CallWire.flag(f, 2);
         try {
             handle = new PhoneAccountHandle(
                     new ComponentName(context, CN1ConnectionService.class), "cn1");
@@ -286,11 +292,25 @@ public class AndroidCallBridge implements CallBridge {
                 caps |= PhoneAccount.CAPABILITY_SUPPORTS_VIDEO_CALLING
                         | PhoneAccount.CAPABILITY_VIDEO_CALLING;
             }
-            PhoneAccount account = PhoneAccount.builder(handle, label)
+            PhoneAccount.Builder builder = PhoneAccount.builder(handle, label)
                     .setCapabilities(caps)
                     .addSupportedUriScheme(PhoneAccount.SCHEME_TEL)
-                    .addSupportedUriScheme(PhoneAccount.SCHEME_SIP)
-                    .build();
+                    .addSupportedUriScheme(PhoneAccount.SCHEME_SIP);
+            if (inRecents) {
+                // An EXTRA rather than a capability, and the string is
+                // spelled out rather than named: PhoneAccount
+                // .EXTRA_LOG_SELF_MANAGED_CALLS is API 30 and the port
+                // compiles against an older SDK. The value is the constant's,
+                // and an extra a platform does not know is ignored rather
+                // than rejected -- which is exactly the pre-30 behaviour
+                // wanted here, since self-managed call logging did not exist
+                // before it.
+                Bundle extras = new Bundle();
+                extras.putBoolean(
+                        "android.telecom.extra.LOG_SELF_MANAGED_CALLS", true);
+                builder.setExtras(extras);
+            }
+            PhoneAccount account = builder.build();
             telecom().registerPhoneAccount(account);
             configured = true;
             Calls.deliverAck(requestId, true, 0, null);

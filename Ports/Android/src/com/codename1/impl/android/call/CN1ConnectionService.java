@@ -29,8 +29,15 @@ import android.telecom.DisconnectCause;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 
+import android.net.Uri;
+import android.telecom.PhoneAccount;
+
 import com.codename1.call.CallEndReason;
 import com.codename1.call.CallError;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallHandleType;
+import com.codename1.call.CallId;
+import com.codename1.impl.call.CallWire;
 import com.codename1.call.session.CallAudioRoute;
 import com.codename1.call.session.Calls;
 
@@ -129,7 +136,25 @@ public class CN1ConnectionService extends ConnectionService {
     private Connection adopt(ConnectionRequest request, boolean incoming) {
         String id = request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(EXTRA_CALL_ID);
-        if (id == null) {
+        // A call the SYSTEM asked this app to place -- from Recents, from a
+        // contact, or from a voice assistant -- carries none of this bridge's
+        // extras, because this app never placed it. Treating it as a report
+        // whose extras went missing meant adopt() either reused an unrelated
+        // call id or refused outright, and startCallRequested never fired --
+        // so the documented way to hear about these calls could not work at
+        // all. The discriminator is a report actually being in flight:
+        // without one there is nothing for a dropped extra to belong to.
+        boolean external = false;
+        if (id == null && !incoming) {
+            boolean reportPending;
+            synchronized (PENDING_REPORTS) {
+                reportPending = !PENDING_REPORTS.isEmpty();
+            }
+            external = !reportPending;
+        }
+        if (external) {
+            id = CallId.random();
+        } else if (id == null) {
             // Only reachable when Telecom dropped our extras; with one report
             // in flight this is still the right answer, and with several
             // there is nothing better to guess.
@@ -157,8 +182,41 @@ public class CN1ConnectionService extends ConnectionService {
         synchronized (CONNECTIONS) {
             CONNECTIONS.put(id, c);
         }
+        if (external) {
+            // No report to answer -- nothing asked for this call -- so the
+            // app is TOLD about it instead, with an id it has never seen and
+            // the address the system supplied. This is the Android half of
+            // what performStartCallAction delivers on iOS.
+            Calls.deliverStartCallRequest(id, externalHandleWire(request),
+                    c.isVideo(), nextActionToken(c, CN1Connection.ACTION_START));
+            return c;
+        }
         answerReport(id, true, 0, null);
         return c;
+    }
+
+    /// The address of a call the system asked this app to place, as a handle
+    /// record.
+    ///
+    /// Telecom hands it over as a `tel:` or `sip:` URI; anything else is
+    /// carried through as a generic handle rather than dropped, because the
+    /// app can still recognise an address this bridge does not.
+    private static String externalHandleWire(ConnectionRequest request) {
+        Uri address = request == null ? null : request.getAddress();
+        if (address == null) {
+            return "";
+        }
+        String part = address.getSchemeSpecificPart();
+        if (part == null || part.length() == 0) {
+            return "";
+        }
+        CallHandleType type = CallHandleType.GENERIC;
+        if (PhoneAccount.SCHEME_TEL.equals(address.getScheme())) {
+            type = CallHandleType.PHONE_NUMBER;
+        } else if ("mailto".equals(address.getScheme())) {
+            type = CallHandleType.EMAIL_ADDRESS;
+        }
+        return CallWire.encodeHandle(new CallHandle(type, part));
     }
 
     private void refuse(ConnectionRequest request) {
@@ -292,6 +350,12 @@ public class CN1ConnectionService extends ConnectionService {
             a.connection.setActive();
         } else if (a.kind == CN1Connection.ACTION_UNHOLD) {
             a.connection.setOnHold();
+        } else if (a.kind == CN1Connection.ACTION_START) {
+            // The app declined a call the SYSTEM asked it to place. Telecom
+            // is already showing it as dialing, so leaving it would strand a
+            // call nothing will ever connect.
+            a.connection.finish(CallEndReason.FAILED);
+            forget(a.connection.getCallId());
         }
     }
 

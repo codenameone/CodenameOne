@@ -1028,6 +1028,45 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                     && [reason intValue] == CN1_CALL_END_UNANSWERED) {
                 r = CXCallEndedReasonUnanswered;
             }
+            BOOL live;
+            cn1clEnsureState();
+            @synchronized (cn1clLock) {
+                live = [cn1clCalls objectForKey:uuidString] != nil;
+            }
+            if (!live) {
+                // A COLD cancellation: the process was restarted since the
+                // call was reported, so there is no live CallKit call to end
+                // and reportCallWithUUID:endedAtDate: does nothing. PushKit
+                // does not care that this push is a retraction -- it requires
+                // reportNewIncomingCallWithUUID for EVERY VoIP push, and iOS
+                // terminates an app that returns without one, then revokes
+                // VoIP delivery if it keeps happening. A server that retracts
+                // reliably would be punished for it.
+                //
+                // Reported and ended at once, exactly as the payload with no
+                // cn1call above is: the process survives and the user sees
+                // nothing.
+                CXCallUpdate *cancelled = [[CXCallUpdate alloc] init];
+                cancelled.remoteHandle =
+                        [[CXHandle alloc] initWithType:CXHandleTypeGeneric
+                                                 value:@" "];
+                [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid
+                        update:cancelled completion:^(NSError *error) {
+                    [cn1clEnsureProvider() reportCallWithUUID:uuid
+                            endedAtDate:nil reason:r];
+                    completion();
+                    // Told to Java anyway: a fresh process has no session to
+                    // retire, and the facade ignores a uuid it has never
+                    // heard of -- but the same push can arrive in a process
+                    // that HAS drained one.
+                    com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
+                            getThreadLocalData(), cn1clJString(uuidString),
+                            r == CXCallEndedReasonUnanswered
+                                    ? CN1_CALL_END_UNANSWERED
+                                    : CN1_CALL_END_REMOTE);
+                }];
+                return;
+            }
             [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil reason:r];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
