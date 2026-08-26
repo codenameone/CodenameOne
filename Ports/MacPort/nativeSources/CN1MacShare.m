@@ -80,6 +80,9 @@ extern void com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_i
 }
 
 - (void)sharingService:(NSSharingService *)service didShareItems:(NSArray *)items {
+    // Unset before reporting, which is what releases this object: the service's
+    // delegate is unretained, and AppKit outlives the share.
+    service.delegate = nil;
     [self reportStatus:1 target:service.title message:nil];
 }
 
@@ -88,6 +91,7 @@ extern void com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_i
                  error:(NSError *)error {
     // Cancelling inside the service's own sheet is a dismissal rather than a
     // failure, and it is the common case -- opening Mail and closing it again.
+    service.delegate = nil;
     if ([error.domain isEqualToString:NSCocoaErrorDomain] && error.code == NSUserCancelledError) {
         [self reportStatus:2 target:service.title message:nil];
         return;
