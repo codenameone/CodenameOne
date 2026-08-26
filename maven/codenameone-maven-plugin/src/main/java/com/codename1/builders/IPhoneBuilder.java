@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
+import com.codename1.util.IOSCallDirectoryExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -992,6 +993,12 @@ public class IPhoneBuilder extends Executor {
     /// The app group the Matter extension and its host share. Resolved
     /// alongside the extension and read again when the target is written.
     private String matterAppGroup;
+
+    /// The App Group the Call Directory extension and the app share.
+    private String callDirectoryAppGroup;
+
+    /// Whether the Call Directory extension target is generated.
+    private boolean callDirectoryExtensionEnabled;
 
     /**
      * Whether the API scan saw {@code com.codename1.wearable}.
@@ -4813,6 +4820,23 @@ public class IPhoneBuilder extends Executor {
                 if (usesCallDirectory) {
                     enableFeatureDefine(buildinRes, "CN1_CALL_DIRECTORY",
                             "com.codename1.call.directory");
+                    // The extension is a separate process and cannot see this
+                    // one's memory, so the numbers reach it through a shared
+                    // App Group -- and CN1Call.m reads the group's name and
+                    // the extension's bundle id out of Info.plist. Without
+                    // all three the API compiled, linked, and then failed
+                    // every setEntries with "No App Group is configured".
+                    callDirectoryExtensionEnabled = true;
+                    String group = request.getArg("ios.call.appGroup",
+                            IOSCallDirectoryExtensionBuilder
+                                    .defaultAppGroup(request.getPackageName()));
+                    callDirectoryAppGroup = group;
+                    String appGroups = request.getArg("ios.app_groups", "");
+                    if (!declaresAppGroup(appGroups, group)) {
+                        request.putArgument("ios.app_groups",
+                                appGroups.trim().length() == 0 ? group
+                                        : appGroups.trim() + "," + group);
+                    }
                 }
                 // The call provider's identity is written into Info.plist
                 // further down, in the plist assembly, because native code
@@ -5707,6 +5731,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
+                    || callDirectoryExtensionEnabled
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
@@ -6126,6 +6151,14 @@ public class IPhoneBuilder extends Executor {
 
                     if (walletExtensionEnabled) {
                         appendWalletExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
+                    if (callDirectoryExtensionEnabled) {
+                        // Same ordering note as the Matter extension: this
+                        // runs after the global deployment-target pass, so
+                        // the extension keeps its own.
+                        appendCallDirectoryExtensionTarget(appExtensionsBuilder,
+                                request, new File(tmpFile, "dist"));
                     }
 
                     if (matterExtensionEnabled) {
@@ -10593,6 +10626,88 @@ public class IPhoneBuilder extends Executor {
      *
      * <p>Only reached when the scanner saw {@code com.codename1.home.commissioning}.</p>
      */
+    /// Adds the generated Call Directory extension target to the schemes
+    /// script.
+    ///
+    /// Modelled on [#appendMatterExtensionTarget], including the guard that
+    /// keeps a re-run of `fix_xcode_schemes.rb` from creating the target
+    /// twice -- the build re-executes it after dependency integration, and an
+    /// unguarded `new_target` produced duplicates on the Wallet work.
+    ///
+    /// Objective-C rather than Swift, so no SWIFT_VERSION and no embedded
+    /// Swift runtime: an extension is memory-capped and CallKit has an
+    /// Objective-C interface, unlike MatterSupport.
+    private void appendCallDirectoryExtensionTarget(StringBuilder sb,
+            BuildRequest request, File distDir)
+            throws IOException, BuildException {
+        String name = IOSCallDirectoryExtensionBuilder.EXTENSION_NAME;
+        String displayName = request.getDisplayName() == null
+                ? name : request.getDisplayName();
+        // The host's own versions: an embedded extension whose marketing or
+        // build version differs from its containing app fails archive
+        // validation.
+        IOSWalletExtensionBuilder.writeFileMap(
+                IOSCallDirectoryExtensionBuilder.buildFileMap(
+                        request.getPackageName(), callDirectoryAppGroup,
+                        displayName, embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request)),
+                new File(distDir, name));
+        log("Adding call directory extension target " + name
+                + " (app group " + callDirectoryAppGroup + ")");
+
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER",
+                IOSCallDirectoryExtensionBuilder.bundleId(
+                        request.getPackageName()));
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS",
+                name + "/" + name + ".entitlements");
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
+                IOSCallDirectoryExtensionBuilder.DEPLOYMENT_TARGET);
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(
+                        request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
+                "$(inherited) @executable_path/Frameworks"
+                + " @executable_path/../../Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.call.directory.buildSettings.")) {
+                buildSettingsMap.put(
+                        key.substring("ios.call.directory.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + name
+                + "', :ios, '"
+                + IOSCallDirectoryExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + "service_target.add_system_framework('CallKit')\n"
+                + "service_group = xcproj.new_group('" + name + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, name), "service_group",
+                "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
+                + name + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
+                + "p.name=='Embed App Extensions'} || "
+                + "main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_phase.add_file_reference(fileref)\n"
+                + "service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
+                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+        }
+        sb.append("}\nend\n");
+    }
+
     private void appendMatterExtensionTarget(StringBuilder sb, BuildRequest request, File distDir)
             throws IOException, BuildException {
         String name = MatterExtensionBuilder.EXTENSION_NAME;
@@ -13122,6 +13237,18 @@ public class IPhoneBuilder extends Executor {
                     request.getArg("ios.call.video", "false"));
             inject = appendCallPlist(inject, "CN1CallIncludesCallsInRecents",
                     request.getArg("ios.call.recents", "true"));
+            // The two keys the directory half needs. CN1Call.m refuses
+            // setDirectorySource without the group and reloadDirectory
+            // without the identifier, so both are written whenever the
+            // extension is generated.
+            if (callDirectoryExtensionEnabled) {
+                inject = appendCallPlist(inject, "CN1CallAppGroup",
+                        callDirectoryAppGroup);
+                inject = appendCallPlist(inject,
+                        "CN1CallDirectoryExtensionIdentifier",
+                        IOSCallDirectoryExtensionBuilder.bundleId(
+                                request.getPackageName()));
+            }
         }
 
         // Receive-shared-content: the host app reads the shared payload from this App Group
