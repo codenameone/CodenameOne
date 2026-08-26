@@ -89,6 +89,44 @@ public class SimulatorAnnotationManifestTest {
         }
     }
 
+    /**
+     * A command-line alias claims the hint the annotation would publish.
+     *
+     * <p>An alias and its target are one effective setting. With
+     * `-Dcodename1.arg.cn1.androidTheme` against an annotated `and.themeMode`
+     * the canonical key looked unclaimed, so the annotation value was published
+     * -- and `buildHint()` reads the canonical before the alias, so the
+     * annotation beat the command line in the simulator while the device build
+     * honoured it.</p>
+     */
+    @Test
+    public void aCommandLineAliasClaimsTheHint() throws Exception {
+        Properties manifest = new Properties();
+        manifest.setProperty("cn1.buildHints.alias.and.themeMode", "cn1.androidTheme");
+
+        String before = System.getProperty("codename1.arg.cn1.androidTheme");
+        System.setProperty("codename1.arg.cn1.androidTheme", "legacy");
+        try {
+            assertEquals("codename1.arg.cn1.androidTheme",
+                    Simulator.claimedBySystemProperty(manifest,
+                            "codename1.arg.and.themeMode"));
+        } finally {
+            if (before == null) {
+                System.clearProperty("codename1.arg.cn1.androidTheme");
+            } else {
+                System.setProperty("codename1.arg.cn1.androidTheme", before);
+            }
+        }
+
+        // Nothing on the command line: the annotation publishes as before.
+        assertNull(Simulator.claimedBySystemProperty(manifest,
+                "codename1.arg.and.themeMode"));
+
+        // A hint with no alias list is judged on its own key alone.
+        assertNull(Simulator.claimedBySystemProperty(new Properties(),
+                "codename1.arg.ios.pods"));
+    }
+
     /** A manifest that names no main class -- not something the processor writes. */
     private static void unstampedManifestIn(File dir, String hint) throws Exception {
         File out = new File(dir, "META-INF/codenameone");

@@ -564,10 +564,19 @@ public class Simulator {
                         + "NOT applied. Delete one of them -- a build will refuse this.");
                 continue;
             }
-            if (System.getProperty(key) == null) {
+            String claimed = claimedBySystemProperty(p, key);
+            if (claimed == null) {
                 System.setProperty(key, p.getProperty(key));
                 PUBLISHED_HINTS.add(key);
                 applied++;
+            } else if (!claimed.equals(key)) {
+                // Set under the OTHER spelling of the same setting, so leaving
+                // this one out is what makes -D win. Publishing it would not
+                // even lose quietly: buildHint() reads and.themeMode before
+                // cn1.androidTheme, so the annotation would beat the command
+                // line here while the device build honoured it.
+                System.out.println("Applying " + claimed + " from the command line rather than "
+                        + key + " from the annotation -- they are one setting");
             }
         }
         if (applied > 0) {
@@ -594,6 +603,40 @@ public class Simulator {
             System.clearProperty(key);
         }
         PUBLISHED_HINTS.clear();
+    }
+
+    /**
+     * The system property that already sets {@code key}, under any spelling, or
+     * null when nothing does.
+     *
+     * <p>An alias and its target are ONE effective setting, so a command line
+     * that named either of them has set this hint. Comparing the key literally
+     * missed that: with `-Dcodename1.arg.cn1.androidTheme` against an annotated
+     * `and.themeMode`, the canonical key was unclaimed, the annotation value was
+     * published, and `buildHint()` reads the canonical first -- so the
+     * annotation beat the command line in the simulator while the device build
+     * honoured it.</p>
+     *
+     * <p>The alias list comes out of the manifest, which the processor writes it
+     * into, because the catalog that knows about aliases is a build-time
+     * artifact this port cannot reach.</p>
+     */
+    static String claimedBySystemProperty(java.util.Properties manifest, String key) {
+        if (System.getProperty(key) != null) {
+            return key;
+        }
+        String name = key.substring("codename1.arg.".length());
+        String aliases = manifest.getProperty("cn1.buildHints.alias." + name);
+        if (aliases == null) {
+            return null;
+        }
+        for (String alias : aliases.split(",")) {
+            String other = "codename1.arg." + alias.trim();
+            if (alias.trim().length() > 0 && System.getProperty(other) != null) {
+                return other;
+            }
+        }
+        return null;
     }
 
     /**
