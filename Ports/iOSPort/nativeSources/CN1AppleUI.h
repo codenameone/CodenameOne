@@ -50,6 +50,12 @@
 /// Aliases for the handful of framework types that appear in shared *signatures*.
 ///
 /// These exist so a declaration shared by both ports can name a type at all.
+/// CN1View is absent on watchOS on purpose: UIView is unavailable there, WatchKit
+/// draws through WKInterface objects instead, and there is nothing a CN1View
+/// could be. Declaring it as some placeholder would let a shared header that
+/// takes a view compile into the watch target and fail somewhere less obvious --
+/// CN1RenderingView already degrades its peer argument to id for exactly this
+/// reason. An unknown-type error naming CN1View is the right failure.
 /// They are emphatically not permission to treat the two as interchangeable: an
 /// implementation that asks a CN1Image for "its" bitmap has to go through
 /// CGImageRef, because NSImage holds representations rather than pixels and can
@@ -66,7 +72,9 @@ typedef NSView CN1View;
 #define CN1AppleCGImageOfCompat(i) [(i) CGImage]
 typedef UIImage CN1Image;
 typedef UIFont CN1Font;
+#if !TARGET_OS_WATCH
 typedef UIView CN1View;
+#endif
 #endif
 
 #if TARGET_OS_OSX
