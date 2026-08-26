@@ -2427,11 +2427,26 @@ public class CodenameOneSettings extends Lifecycle {
     /// build refuses.
     static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
                                                        boolean kotlinCompiled) {
+        return candidateSourceRoots(projectDir, hasSrcMain, kotlinCompiled, true);
+    }
+
+    /// The same, with `javaCompiled` saying whether the build compiles the
+    /// conventional Java root.
+    ///
+    /// A `.java` candidate is searched before any `.kt`, so a dormant Java copy
+    /// of the main class in a module that compiles its application from Kotlin
+    /// was selected ahead of the compiled source -- and its missing or obsolete
+    /// annotations then made annotation-owned hints look editable.
+    static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
+                                                       boolean kotlinCompiled,
+                                                       boolean javaCompiled) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (projectDir == null) {
             return out;
         }
-        out.add(projectDir + "/src/main/java");
+        if (javaCompiled) {
+            out.add(projectDir + "/src/main/java");
+        }
         if (kotlinCompiled) {
             out.add(projectDir + "/src/main/kotlin");
         }
@@ -2931,7 +2946,8 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         for (String conventional
-                : candidateSourceRoots(projectDir, hasSrcMain, compilesKotlinConventionally())) {
+                : candidateSourceRoots(projectDir, hasSrcMain, compilesKotlinConventionally(),
+                        compilesJava())) {
             if (!candidates.contains(conventional)) {
                 candidates.add(conventional);
             }
@@ -3061,6 +3077,49 @@ public class CodenameOneSettings extends Lifecycle {
             }
             at = close + name.length() + 3;
         }
+    }
+
+    /// Whether the POM chain says anything compiles the Java sources.
+    ///
+    /// `default-compile` switched off with `<phase>none</phase>` and nothing
+    /// bound in its place means javac never runs, however many `.java` files are
+    /// there. Only a JAVA compiler execution counts: kotlinc does joint
+    /// compilation, reading Java sources to resolve against them and emitting no
+    /// class files for them, which is why Kotlin's documented Maven setup adds a
+    /// `java-compile` execution back.
+    private boolean compilesJava() {
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String compiler = activePluginBlock(active, "maven-compiler-plugin", "encoding",
+                        "compile", chainPluginManagement());
+                if (compiler == null) {
+                    compiler = pluginBlock(managementOnly(active), "maven-compiler-plugin");
+                }
+                if (compiler == null || !disablesDefaultCompile(compiler)) {
+                    continue;
+                }
+                return bindsGoal(compiler, "compile");
+            }
+        }
+        return true;
+    }
+
+    /// Whether this compiler plugin block switches `default-compile` off.
+    static boolean disablesDefaultCompile(String pluginBlock) {
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return false;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (declaresValue(execution, "id", "default-compile")
+                    && declaresValue(execution, "phase", "none")) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return false;
     }
 
     /// Whether the POM chain says the build compiles `src/main/kotlin`.

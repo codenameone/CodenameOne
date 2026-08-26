@@ -1706,14 +1706,15 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * would then vouch for a stale class in {@code target/classes}, and a
      * misplaced annotation on that class fails every incremental build.</p>
      *
-     * <p>Three conditions, and the third is the one that keeps this from
-     * breaking the ordinary mixed-language project. Kotlin's own documented
-     * setup disables {@code default-compile} and adds a replacement execution,
-     * which the second condition already sees -- but a module can also leave the
-     * Java sources to the Kotlin plugin, which compiles them from its own
-     * {@code <sourceDirs>}. Dropping the roots there would call live classes
-     * stale and take their misplaced annotations down with them, which is the
-     * silence this whole change exists to remove.</p>
+     * <p>Only a JAVA compiler execution counts. An earlier version of this also
+     * accepted a Kotlin compile execution, on the belief that a module could
+     * leave its Java sources to the Kotlin plugin -- which is not what happens.
+     * kotlinc does JOINT compilation: it reads Java sources to resolve against
+     * them and emits no class files for them, which is exactly why Kotlin's own
+     * documented Maven setup disables {@code default-compile} and then adds a
+     * {@code java-compile} execution back. That replacement is what the second
+     * condition sees, and it is the only thing that makes those roots
+     * compiled.</p>
      */
     private static boolean compilesJava(MavenProject project) {
         List<org.apache.maven.model.Plugin> plugins;
@@ -1746,11 +1747,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 }
             }
         }
-        if (!defaultCompileDisabled || replacementBound) {
-            return true;
-        }
-        // Kotlin may be compiling them instead.
-        return hasKotlinCompileExecution(project);
+        return !defaultCompileDisabled || replacementBound;
     }
 
     /**

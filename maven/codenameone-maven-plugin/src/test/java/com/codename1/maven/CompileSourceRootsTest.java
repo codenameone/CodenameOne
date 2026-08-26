@@ -492,12 +492,17 @@ public class CompileSourceRootsTest {
     }
 
     /**
-     * ...and so is a module that leaves the Java sources to the Kotlin plugin.
-     * Dropping the roots there would call live classes stale and lose their
-     * misplaced annotations, which is the silence this change exists to remove.
+     * A Kotlin compile execution does NOT keep the Java roots.
+     *
+     * <p>This asserted the opposite until Maven was checked rather than assumed:
+     * kotlinc does joint compilation, reading Java sources to resolve against
+     * them and emitting no class files for them. That is precisely why Kotlin's
+     * documented Maven setup disables `default-compile` and adds a
+     * `java-compile` execution back -- and it is that replacement, not the
+     * Kotlin binding, that makes the Java roots compiled.</p>
      */
     @Test
-    public void kotlinCompilingInsteadKeepsTheJavaRoots() throws Exception {
+    public void aKotlinBindingDoesNotCompileTheJavaRoots() throws Exception {
         File basedir = tmp.newFolder();
         MavenProject project = projectAt(basedir);
         project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
@@ -515,7 +520,7 @@ public class CompileSourceRootsTest {
         kotlin.addExecution(execution("compile", "<jvmTarget>17</jvmTarget>"));
         project.getBuild().addPlugin(kotlin);
 
-        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
                 contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/main/java"));
     }
 

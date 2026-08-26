@@ -2144,6 +2144,48 @@ public class BuildHintCatalogTest {
                 .contains("/p/common/src/main/java"));
     }
 
+    /// The conventional JAVA root is offered only where the build compiles it.
+    ///
+    /// `annotationOwnedHintsFromSource()` searches every `.java` candidate
+    /// before any `.kt`, so in a module that compiles its app from Kotlin and
+    /// switched `default-compile` off, a dormant `.java` copy of the main class
+    /// was selected ahead of the compiled source. Its annotations are whatever
+    /// they were when it stopped being built, which makes an annotation-owned
+    /// hint look editable.
+    @Test
+    public void theConventionalJavaRootIsOfferedOnlyWhenCompiled() {
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false, true)
+                .contains("/p/common/src/main/java"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/src/main/java"));
+        // The Kotlin root is not conditional on it.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/src/main/kotlin"));
+    }
+
+    /// Only `default-compile` switched off with `<phase>none</phase>` counts.
+    ///
+    /// Any other execution -- one that renames the id, one that binds a phase,
+    /// `default-testCompile` -- leaves javac running, and reading it as a
+    /// shutdown would drop the roots of an ordinary build.
+    @Test
+    public void onlyDefaultCompileAtPhaseNoneReadsAsDisabled() {
+        assertTrue(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-compile</id><phase>none</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-compile</id><phase>compile</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-testCompile</id><phase>none</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId></plugin>"));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
