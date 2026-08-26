@@ -2666,6 +2666,39 @@ public class BuildHintCatalogTest {
         assertTrue(roots.contains("gen/merged"), roots.toString());
     }
 
+    /// The manifest is looked for where the classes actually land.
+    ///
+    /// `target/classes` was hardcoded. A project configuring
+    /// `<build><outputDirectory>` compiles somewhere else and
+    /// process-annotations writes the manifest there, so the lookup found
+    /// nothing, every annotation-owned hint looked editable, and Add wrote the
+    /// duplicate the next build refuses -- the exact failure the manifest exists
+    /// to prevent, reached by reading the wrong directory.
+    @Test
+    public void theConfiguredOutputDirectoryIsWhereTheManifestLives() {
+        String configured = "<project><build>"
+                + "<outputDirectory>out/classes</outputDirectory>"
+                + "</build></project>";
+        assertEquals("out/classes", CodenameOneSettings.configuredOutputDirectory(configured));
+
+        // A plugin's own <outputDirectory> is not the build's.
+        String pluginOwned = "<project><build>"
+                + "<outputDirectory>out/classes</outputDirectory>"
+                + "<plugins><plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><outputDirectory>plugin/only</outputDirectory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertEquals("out/classes", CodenameOneSettings.configuredOutputDirectory(pluginOwned));
+
+        // ...and with the build declaring none, the plugin's is not adopted.
+        String pluginOnly = "<project><build>"
+                + "<plugins><plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><outputDirectory>plugin/only</outputDirectory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertNull(CodenameOneSettings.configuredOutputDirectory(pluginOnly));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

@@ -2247,7 +2247,8 @@ public class CodenameOneSettings extends Lifecycle {
         if (binding == null || binding.projectDir() == null) {
             return out;
         }
-        String path = binding.projectDir() + "/target/classes/META-INF/codenameone/build-hints.properties";
+        String path = outputDirectory(binding.projectDir())
+                + "/META-INF/codenameone/build-hints.properties";
         InputStream in = null;
         try {
             // Always start from the source, because it is the only current
@@ -3326,6 +3327,62 @@ public class CodenameOneSettings extends Lifecycle {
         return out.toString();
     }
 
+
+    /// Where the compiled classes land, which is where process-annotations
+    /// writes the build hint manifest.
+    ///
+    /// `target/classes` was hardcoded. A project that configures
+    /// `<build><outputDirectory>` compiles somewhere else and the manifest goes
+    /// with it, so the lookup found nothing and every annotation-owned hint
+    /// looked editable -- and Add then wrote the duplicate declaration the next
+    /// build refuses. That is the whole failure this manifest exists to prevent,
+    /// reached by looking in the wrong directory.
+    ///
+    /// Maven's own layering: the configured `<outputDirectory>` if there is one,
+    /// else `<directory>/classes`, else `target/classes`. Read from the POM
+    /// rather than the binding because the binding does not carry it; a launcher
+    /// that resolved it could pass it and this would become the fallback.
+    private String outputDirectory(String projectDir) {
+        for (String pom : pomChain()) {
+            for (String active : activeConfiguration(pom)) {
+                String configured = configuredOutputDirectory(active);
+                if (configured == null || configured.trim().isEmpty()) {
+                    continue;
+                }
+                // The build directory IS resolvable here, unlike inside
+                // <directory> itself, so the general expander applies.
+                String expanded = expandProjectPaths(configured.trim(), projectDir,
+                        buildDirectory(projectDir), pomProperties());
+                if (expanded != null && !expanded.isEmpty()) {
+                    return expanded.startsWith("/") || expanded.indexOf(':') == 1
+                            ? normalizePath(expanded)
+                            : normalizePath(projectDir + "/" + expanded);
+                }
+            }
+        }
+        String build = buildDirectory(projectDir);
+        return normalizePath((build == null || build.isEmpty()
+                ? projectDir + "/target" : build) + "/classes");
+    }
+
+    /// The `<outputDirectory>` the POM's `<build>` element configures, or null.
+    ///
+    /// A DIRECT child, through the same section filter as `<directory>`: the
+    /// plugin sections carry `<outputDirectory>` elements of their own -- the
+    /// compiler plugin's, the resources plugin's -- and taking the first one in
+    /// the build element would read somebody else's.
+    static String configuredOutputDirectory(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        int at = pomText.indexOf("<build>");
+        if (at < 0) {
+            return null;
+        }
+        int close = pomText.indexOf("</build>", at);
+        String build = close < 0 ? pomText.substring(at) : pomText.substring(at, close);
+        return elementValue(withoutNonCompileSections(build), "outputDirectory");
+    }
 
     /// The build directory the POM chain configures, nearest first, or null for
     /// Maven's own default.
