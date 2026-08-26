@@ -23,6 +23,7 @@
 package com.codename1.impl.ios;
 
 import com.codename1.call.spi.CallBridge;
+import com.codename1.io.FileSystemStorage;
 
 /// The iOS half of `com.codename1.call`, on CallKit, PushKit and the Call
 /// Directory extension.
@@ -200,7 +201,13 @@ class IOSCallBridge implements CallBridge {
 
     @Override
     public void setDirectorySource(int requestId, String filePath) {
-        nativeInstance.callSetDirectorySource(requestId, filePath);
+        // Converted, not passed through. getAppHomePath() on this platform
+        // answers a file:// URL -- listFilesystemRoots() puts that prefix on
+        // -- and the native side hands the string to fileURLWithPath:, which
+        // treats it as a literal path rather than parsing it as a URL. Every
+        // setEntries therefore failed to find its own staged file.
+        nativeInstance.callSetDirectorySource(requestId,
+                FileSystemStorage.getInstance().toNativePath(filePath));
     }
 
     @Override

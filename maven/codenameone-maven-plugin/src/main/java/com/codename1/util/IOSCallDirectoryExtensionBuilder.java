@@ -58,24 +58,25 @@ public final class IOSCallDirectoryExtensionBuilder {
     /**
      * What tells iOS this is a call directory rather than some other kind.
      *
-     * <p><b>Not {@code com.apple.callkit.call-directory}</b>, which does not
-     * exist. The confusion is natural -- the class this target implements is
-     * {@code CXCallDirectoryProvider} and {@code CX} is CallKit -- but the
-     * extension POINT belongs to the IdentityLookup family, beside
-     * {@code com.apple.identitylookup.message-filter}. Xcode's own "Call
-     * Directory Extension" template writes exactly the value below into
-     * {@code NSExtensionPointIdentifier}, and Apple's
-     * {@code CXCallDirectoryProvider} documentation names it as the point to
-     * declare.</p>
+     * <p>Read from Xcode's own "Call Directory Extension" template rather
+     * than from memory:
+     * {@code Platforms/iPhoneOS.platform/Developer/Library/Xcode/Templates/
+     * Project Templates/iOS/Application Extension/Call Directory
+     * Extension.xctemplate/TemplateInfo.plist} sets
+     * {@code NSExtensionPointIdentifier} to this value, and the visionOS
+     * template agrees. The IdentityLookup family owns
+     * {@code com.apple.identitylookup.message-filter} and
+     * {@code .classification-ui}; it has no call-directory point, and
+     * {@code com.apple.identitylookup.call-directory} appears nowhere in the
+     * toolchain.</p>
      *
      * <p>Getting it wrong is silent in the way this whole feature is silent:
      * the extension builds, signs and embeds, and iOS never launches it, so
      * caller identification is simply absent with nothing to read anywhere.
-     * Change it only against Apple's documentation, never against a
-     * plausible-looking name.</p>
+     * Check the template before changing it.</p>
      */
     public static final String EXTENSION_POINT =
-            "com.apple.identitylookup.call-directory";
+            "com.apple.callkit.call-directory";
 
     /**
      * The floor for a call directory extension.

@@ -70,10 +70,20 @@ public class CallDirectoryExtensionTest {
     @Test
     public void theInfoPlistNamesTheCallDirectoryExtensionPoint() {
         // The exact string is what tells iOS this is a call directory rather
-        // than some other extension kind; a typo makes it silently inert.
+        // than some other extension kind; a wrong one makes the extension
+        // build, sign, embed and never launch.
+        //
+        // The value is Xcode's, read from its own template rather than from
+        // memory -- Platforms/iPhoneOS.platform/Developer/Library/Xcode/
+        // Templates/Project Templates/iOS/Application Extension/Call
+        // Directory Extension.xctemplate/TemplateInfo.plist. This assertion
+        // previously pinned com.apple.identitylookup.call-directory, which
+        // is not an extension point at all: IdentityLookup owns
+        // message-filter and classification-ui, and nothing in the toolchain
+        // mentions an identitylookup call-directory.
         String plist = text(files(), "Info.plist");
         assertTrue(plist.contains(
-                "<string>com.apple.identitylookup.call-directory</string>"));
+                "<string>com.apple.callkit.call-directory</string>"));
         assertTrue(plist.contains("<string>CN1CallDirectoryHandler</string>"));
         assertTrue(plist.contains("<string>XPC!</string>"));
     }

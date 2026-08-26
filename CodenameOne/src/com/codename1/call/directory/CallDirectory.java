@@ -97,19 +97,30 @@ public final class CallDirectory {
             r.error(new CallException(CallError.NOT_SUPPORTED));
             return r;
         }
-        String path;
-        try {
-            path = write(entries == null ? new DirectoryEntry[0] : entries);
-        } catch (IOException e) {
-            EdtResult<Boolean> r = new EdtResult<Boolean>();
-            r.error(new CallException(CallError.DIRECTORY_FAILED,
-                    "Could not stage the directory: " + e.getMessage(), e));
+        // The write AND the handoff, together. The file has one canonical
+        // name -- the Android screening service reads exactly that path, and
+        // the iOS port copies from it into the App Group -- so releasing the
+        // lock in between let a second caller replace it before the port had
+        // consumed the first caller's, and both requests then described the
+        // second caller's entries. The port consumes the file inside this
+        // call, so the lock is held only for that.
+        synchronized (WRITE_LOCK) {
+            String path;
+            try {
+                path = writeLocked(entries == null
+                        ? new DirectoryEntry[0] : entries);
+            } catch (IOException e) {
+                EdtResult<Boolean> r = new EdtResult<Boolean>();
+                r.error(new CallException(CallError.DIRECTORY_FAILED,
+                        "Could not stage the directory: " + e.getMessage(),
+                        e));
+                return r;
+            }
+            int id = CallRequests.nextId();
+            EdtResult<Boolean> r = CallRequests.openAck(id);
+            b.setDirectorySource(id, path);
             return r;
         }
-        int id = CallRequests.nextId();
-        EdtResult<Boolean> r = CallRequests.openAck(id);
-        b.setDirectorySource(id, path);
-        return r;
     }
 
     /// Asks the system to re-read what [#setEntries] installed.
@@ -166,12 +177,6 @@ public final class CallDirectory {
     private static final Object WRITE_LOCK = new Object();
 
     /// Sorts, de-duplicates and writes the entries, answering with the path.
-    private static String write(DirectoryEntry[] entries) throws IOException {
-        synchronized (WRITE_LOCK) {
-            return writeLocked(entries);
-        }
-    }
-
     private static String writeLocked(DirectoryEntry[] entries)
             throws IOException {
         DirectoryEntry[] sorted = new DirectoryEntry[entries.length];
