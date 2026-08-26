@@ -174,15 +174,15 @@ public final class CallDirectory {
         try {
             StringBuilder sb = new StringBuilder();
             long previous = -1;
-            for (int i = 0; i < sorted.length; i++) {
-                if (sorted[i] == null || sorted[i].getNumber() == previous) {
+            for (DirectoryEntry entry : sorted) {
+                if (entry == null || entry.getNumber() == previous) {
                     continue;
                 }
-                previous = sorted[i].getNumber();
+                previous = entry.getNumber();
                 sb.append(previous).append(CallWire.SEPARATOR)
-                        .append(CallWire.sanitize(sorted[i].getLabel()))
+                        .append(CallWire.sanitize(entry.getLabel()))
                         .append(CallWire.SEPARATOR)
-                        .append(CallWire.flagOf(sorted[i].isBlocked()))
+                        .append(CallWire.flagOf(entry.isBlocked()))
                         .append('\n');
             }
             os.write(sb.toString().getBytes("UTF-8"));
@@ -196,6 +196,7 @@ public final class CallDirectory {
     /// require. A named class rather than an anonymous one so it carries no
     /// synthetic outer reference.
     private static final class ByNumber implements Comparator<DirectoryEntry> {
+        @Override
         public int compare(DirectoryEntry a, DirectoryEntry b) {
             long x = a == null ? 0 : a.getNumber();
             long y = b == null ? 0 : b.getNumber();
@@ -212,6 +213,7 @@ public final class CallDirectory {
             this.out = out;
         }
 
+        @Override
         public void onReady(String value, Throwable error) {
             if (error != null) {
                 out.error(error);

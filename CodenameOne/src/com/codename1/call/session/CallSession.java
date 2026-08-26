@@ -24,7 +24,6 @@ package com.codename1.call.session;
 
 import com.codename1.call.CallDirection;
 import com.codename1.call.CallEndReason;
-import com.codename1.call.CallError;
 import com.codename1.call.CallHandle;
 import com.codename1.call.CallState;
 import com.codename1.call.spi.CallBridge;

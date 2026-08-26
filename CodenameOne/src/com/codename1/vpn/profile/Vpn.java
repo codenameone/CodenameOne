@@ -276,10 +276,11 @@ public final class Vpn {
             this.status = status;
         }
 
+        @Override
         public void run() {
             VpnStatusListener[] ls = listeners();
-            for (int i = 0; i < ls.length; i++) {
-                ls[i].vpnStatusChanged(status);
+            for (VpnStatusListener l : ls) {
+                l.vpnStatusChanged(status);
             }
         }
     }
@@ -293,6 +294,7 @@ public final class Vpn {
             this.out = out;
         }
 
+        @Override
         public void onReady(String value, Throwable error) {
             if (error != null) {
                 out.error(error);

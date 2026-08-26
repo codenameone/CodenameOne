@@ -239,6 +239,7 @@ public final class Calls {
             this.id = id;
         }
 
+        @Override
         public void onReady(Boolean value, Throwable error) {
             if (error != null) {
                 forget(id);
@@ -407,7 +408,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverAnswer(String callId, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.ANSWER, callId, actionToken, false,
-                null, null, null, false));
+                null, null, false));
     }
 
     /// The user hung up through the system UI.
@@ -415,7 +416,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverEndRequest(String callId, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.END, callId, actionToken, false,
-                null, null, null, false));
+                null, null, false));
     }
 
     /// The user or the system held or resumed a call.
@@ -423,7 +424,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverHold(String callId, boolean held, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.HOLD, callId, actionToken, held,
-                null, null, null, false));
+                null, null, false));
     }
 
     /// The user muted or unmuted a call.
@@ -431,7 +432,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverMute(String callId, boolean muted, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.MUTE, callId, actionToken, muted,
-                null, null, null, false));
+                null, null, false));
     }
 
     /// The user typed on the system keypad.
@@ -439,7 +440,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverDtmf(String callId, String digits, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.DTMF, callId, actionToken, false,
-                digits, null, null, false));
+                digits, null, false));
     }
 
     /// The system is asking this app to place a call.
@@ -448,7 +449,7 @@ public final class Calls {
     public static void deliverStartCallRequest(String callId, String handleWire,
             boolean video, long actionToken) {
         dispatch(new ActionEvent(ActionEvent.START, callId, actionToken, false,
-                null, null, CallWire.decodeHandle(handleWire), video));
+                null, CallWire.decodeHandle(handleWire), video));
     }
 
     /// The operating system activated the audio session.
@@ -456,7 +457,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverAudioActivated(String callId, int routeOrdinal) {
         dispatch(new ActionEvent(ActionEvent.AUDIO_ON, callId, 0L, false, null,
-                null, null, false, routeOrdinal));
+                null, false, routeOrdinal));
     }
 
     /// The operating system took the audio session back.
@@ -464,7 +465,7 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverAudioDeactivated(String callId) {
         dispatch(new ActionEvent(ActionEvent.AUDIO_OFF, callId, 0L, false, null,
-                null, null, false));
+                null, false));
     }
 
     /// A call ended for a reason that did not come from this app.
@@ -472,14 +473,14 @@ public final class Calls {
     /// @hidden not part of the public API.
     public static void deliverCallEnded(String callId, int reasonOrdinal) {
         dispatch(new ActionEvent(ActionEvent.ENDED, callId, 0L, false, null,
-                null, null, false, reasonOrdinal));
+                null, false, reasonOrdinal));
     }
 
     /// The system's call provider was reset and every call is gone.
     ///
     /// @hidden not part of the public API.
     public static void deliverProviderReset() {
-        dispatch(new ActionEvent(ActionEvent.RESET, null, 0L, false, null, null,
+        dispatch(new ActionEvent(ActionEvent.RESET, null, 0L, false, null,
                 null, false));
     }
 
@@ -497,38 +498,45 @@ public final class Calls {
     /// each of those would hold a synthetic reference to its enclosing scope,
     /// which SpotBugs reports and which keeps a call alive after it ended.
     private static final class ActionEvent implements Runnable {
-        static final int ANSWER = 0, END = 1, HOLD = 2, MUTE = 3, DTMF = 4,
-                START = 5, AUDIO_ON = 6, AUDIO_OFF = 7, ENDED = 8, RESET = 9;
+        static final int ANSWER = 0;
+        static final int END = 1;
+        static final int HOLD = 2;
+        static final int MUTE = 3;
+        static final int DTMF = 4;
+        static final int START = 5;
+        static final int AUDIO_ON = 6;
+        static final int AUDIO_OFF = 7;
+        static final int ENDED = 8;
+        static final int RESET = 9;
 
         private final int kind;
         private final String callId;
         private final long token;
         private final boolean flag;
         private final String text;
-        private final String spare;
         private final CallHandle handle;
         private final boolean video;
         private final int ordinal;
 
         ActionEvent(int kind, String callId, long token, boolean flag,
-                String text, String spare, CallHandle handle, boolean video) {
-            this(kind, callId, token, flag, text, spare, handle, video, 0);
+                String text, CallHandle handle, boolean video) {
+            this(kind, callId, token, flag, text, handle, video, 0);
         }
 
         ActionEvent(int kind, String callId, long token, boolean flag,
-                String text, String spare, CallHandle handle, boolean video,
+                String text, CallHandle handle, boolean video,
                 int ordinal) {
             this.kind = kind;
             this.callId = callId;
             this.token = token;
             this.flag = flag;
             this.text = text;
-            this.spare = spare;
             this.handle = handle;
             this.video = video;
             this.ordinal = ordinal;
         }
 
+        @Override
         public void run() {
             CallActionListener[] ls = listeners();
             CallSession session = callId == null ? null : getSession(callId);
@@ -538,8 +546,8 @@ public final class Calls {
                         session.setStateInternal(CallState.ACTIVE);
                     }
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].answerRequested(callId, a);
+                    for (CallActionListener l : ls) {
+                        l.answerRequested(callId, a);
                     }
                     settle(a);
                     break;
@@ -549,8 +557,8 @@ public final class Calls {
                         session.setStateInternal(CallState.ENDED);
                     }
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].endRequested(callId, a);
+                    for (CallActionListener l : ls) {
+                        l.endRequested(callId, a);
                     }
                     settle(a);
                     forget(callId);
@@ -561,8 +569,8 @@ public final class Calls {
                         session.setStateInternal(flag ? CallState.HELD : CallState.ACTIVE);
                     }
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].holdRequested(callId, flag, a);
+                    for (CallActionListener l : ls) {
+                        l.holdRequested(callId, flag, a);
                     }
                     settle(a);
                     break;
@@ -572,38 +580,38 @@ public final class Calls {
                         session.setMutedInternal(flag);
                     }
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].muteRequested(callId, flag, a);
+                    for (CallActionListener l : ls) {
+                        l.muteRequested(callId, flag, a);
                     }
                     settle(a);
                     break;
                 }
                 case DTMF: {
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].dtmfRequested(callId, text, a);
+                    for (CallActionListener l : ls) {
+                        l.dtmfRequested(callId, text, a);
                     }
                     settle(a);
                     break;
                 }
                 case START: {
                     CallAction a = new CallAction(token, callId);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].startCallRequested(callId, handle, video, a);
+                    for (CallActionListener l : ls) {
+                        l.startCallRequested(callId, handle, video, a);
                     }
                     settle(a);
                     break;
                 }
                 case AUDIO_ON: {
                     CallAudioSession s = new CallAudioSession(callId, route(ordinal));
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].audioSessionActivated(s);
+                    for (CallActionListener l : ls) {
+                        l.audioSessionActivated(s);
                     }
                     break;
                 }
                 case AUDIO_OFF:
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].audioSessionDeactivated(callId);
+                    for (CallActionListener l : ls) {
+                        l.audioSessionDeactivated(callId);
                     }
                     break;
                 case ENDED: {
@@ -611,8 +619,8 @@ public final class Calls {
                         session.setStateInternal(CallState.ENDED);
                     }
                     CallEndReason reason = CallWire.endReason(ordinal);
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].callEnded(callId, reason);
+                    for (CallActionListener l : ls) {
+                        l.callEnded(callId, reason);
                     }
                     forget(callId);
                     break;
@@ -624,8 +632,8 @@ public final class Calls {
                     synchronized (SESSIONS) {
                         SESSIONS.clear();
                     }
-                    for (int i = 0; i < ls.length; i++) {
-                        ls[i].providerReset();
+                    for (CallActionListener l : ls) {
+                        l.providerReset();
                     }
                     break;
                 default:

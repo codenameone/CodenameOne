@@ -99,9 +99,9 @@ public final class CallConfiguration {
     public CallConfiguration handleTypes(CallHandleType[] types) {
         handleTypes.clear();
         if (types != null) {
-            for (int i = 0; i < types.length; i++) {
-                if (types[i] != null && !handleTypes.contains(types[i])) {
-                    handleTypes.add(types[i]);
+            for (CallHandleType type : types) {
+                if (type != null && !handleTypes.contains(type)) {
+                    handleTypes.add(type);
                 }
             }
         }

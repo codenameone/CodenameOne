@@ -32,34 +32,44 @@ import com.codename1.call.CallHandle;
 /// usually the wrong one -- see the method on the interface.
 public class CallActionAdapter implements CallActionListener {
 
+    @Override
     public void answerRequested(String callId, CallAction action) {
     }
 
+    @Override
     public void endRequested(String callId, CallAction action) {
     }
 
+    @Override
     public void holdRequested(String callId, boolean held, CallAction action) {
     }
 
+    @Override
     public void muteRequested(String callId, boolean muted, CallAction action) {
     }
 
+    @Override
     public void dtmfRequested(String callId, String digits, CallAction action) {
     }
 
+    @Override
     public void startCallRequested(String callId, CallHandle handle,
             boolean video, CallAction action) {
     }
 
+    @Override
     public void audioSessionActivated(CallAudioSession session) {
     }
 
+    @Override
     public void audioSessionDeactivated(String callId) {
     }
 
+    @Override
     public void callEnded(String callId, CallEndReason reason) {
     }
 
+    @Override
     public void providerReset() {
     }
 }

@@ -165,6 +165,49 @@ public class LocalCallBridge implements CallBridge {
         return configured;
     }
 
+    /// What the **simulated platform** believes a call's state is.
+    ///
+    /// Deliberately separate from the state the facade tracks: a test that
+    /// asserts on both is checking that the two agree, which is the thing
+    /// that silently stops being true on a real device when a report is
+    /// refused and the app keeps its session anyway.
+    ///
+    /// Answers null when the simulated platform has no such call.
+    public CallState getSimulatedState(String callId) {
+        SimCall c = find(callId);
+        return c == null ? null : c.state;
+    }
+
+    /// Who the simulated platform thinks is calling, or null.
+    public CallHandle getSimulatedHandle(String callId) {
+        SimCall c = find(callId);
+        return c == null ? null : c.handle;
+    }
+
+    /// The name the simulated platform is showing, or null.
+    public String getSimulatedDisplayName(String callId) {
+        SimCall c = find(callId);
+        return c == null ? null : c.displayName;
+    }
+
+    /// Whether the simulated platform has the call muted.
+    public boolean isSimulatedMuted(String callId) {
+        SimCall c = find(callId);
+        return c != null && c.muted;
+    }
+
+    /// Whether the simulated platform considers the call a video call.
+    public boolean isSimulatedVideo(String callId) {
+        SimCall c = find(callId);
+        return c != null && c.video;
+    }
+
+    /// Whether the simulated platform considers the call incoming.
+    public boolean isSimulatedIncoming(String callId) {
+        SimCall c = find(callId);
+        return c != null && c.incoming;
+    }
+
     /// Queues a call as though it had arrived as a VoIP push while the app
     /// was not listening.
     ///
@@ -273,18 +316,22 @@ public class LocalCallBridge implements CallBridge {
     // CallBridge
     // ------------------------------------------------------------------
 
+    @Override
     public boolean isCallSupported() {
         return supported;
     }
 
+    @Override
     public boolean isVoipPushSupported() {
         return supported && voipSupported;
     }
 
+    @Override
     public boolean isDirectorySupported() {
         return supported && directorySupported;
     }
 
+    @Override
     public int getCallCapabilities() {
         if (!supported) {
             return 0;
@@ -301,30 +348,36 @@ public class LocalCallBridge implements CallBridge {
         return caps;
     }
 
+    @Override
     public int getCallAvailability() {
         return supported ? availability : 4;
     }
 
+    @Override
     public int getGrantedPermissions() {
         return grantedPermissions;
     }
 
+    @Override
     public void requestPermissions(int requestId, int permissionBits) {
         grantedPermissions |= permissionBits;
         later(LATENCY_MILLIS, new PermissionDelivery(requestId, grantedPermissions));
     }
 
+    @Override
     public void configureProvider(int requestId, String configWire) {
         configured = true;
         ok(requestId);
     }
 
+    @Override
     public void reportIncomingCall(int requestId, String callId,
             String handleWire, String displayName, int capabilityBits,
             boolean hasVideo) {
         report(requestId, callId, handleWire, displayName, hasVideo, true);
     }
 
+    @Override
     public void reportOutgoingCall(int requestId, String callId,
             String handleWire, String displayName, int capabilityBits,
             boolean hasVideo) {
@@ -369,6 +422,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void reportOutgoingStartedConnecting(String callId, long timestampMs) {
         SimCall c = find(callId);
         if (c != null) {
@@ -376,10 +430,12 @@ public class LocalCallBridge implements CallBridge {
         }
     }
 
+    @Override
     public void reportOutgoingConnected(String callId, long timestampMs) {
         connected(callId);
     }
 
+    @Override
     public void reportIncomingConnected(String callId, long timestampMs) {
         connected(callId);
     }
@@ -393,6 +449,7 @@ public class LocalCallBridge implements CallBridge {
         later(AUDIO_MILLIS, new AudioDelivery(callId, route, true));
     }
 
+    @Override
     public void updateCall(String callId, String handleWire, String displayName,
             int capabilityBits, boolean hasVideo) {
         SimCall c = find(callId);
@@ -410,11 +467,13 @@ public class LocalCallBridge implements CallBridge {
         }
     }
 
+    @Override
     public void reportCallEnded(String callId, int endReasonOrdinal,
             long timestampMs) {
         remove(callId);
     }
 
+    @Override
     public void endCall(int requestId, String callId, int endReasonOrdinal) {
         if (find(callId) == null) {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
@@ -425,6 +484,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void setHeld(int requestId, String callId, boolean held) {
         SimCall c = find(callId);
         if (c == null) {
@@ -435,6 +495,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void setMuted(int requestId, String callId, boolean muted) {
         SimCall c = find(callId);
         if (c == null) {
@@ -445,6 +506,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void sendDtmf(int requestId, String callId, String digits) {
         if (find(callId) == null) {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
@@ -453,6 +515,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void setCallGroup(int requestId, String callId, String otherCallId) {
         if (find(callId) == null) {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
@@ -461,24 +524,29 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public int getAudioRoute() {
         return route;
     }
 
+    @Override
     public void setAudioRoute(int requestId, int routeOrdinal) {
         this.route = routeOrdinal;
         ok(requestId);
     }
 
+    @Override
     public void showAudioRoutePicker(int requestId, String callId) {
         ok(requestId);
     }
 
+    @Override
     public void completeAction(long actionToken, boolean fulfilled) {
         // Nothing to time out against here; the simulation's purpose is to
         // let the facade's own answer-exactly-once logic be exercised.
     }
 
+    @Override
     public void registerVoipPush(int requestId) {
         if (!isVoipPushSupported()) {
             failString(requestId, CallError.NOT_SUPPORTED, null);
@@ -487,28 +555,32 @@ public class LocalCallBridge implements CallBridge {
         later(LATENCY_MILLIS, new TokenDelivery(requestId, voipToken));
     }
 
+    @Override
     public void unregisterVoipPush(int requestId) {
         voipToken = null;
     }
 
+    @Override
     public void setJavaReady(boolean ready) {
         this.javaReady = ready;
     }
 
+    @Override
     public void drainPendingCalls(int requestId) {
         List<PendingPush> batch;
         synchronized (calls) {
             batch = new ArrayList<PendingPush>(pending);
             pending.clear();
         }
-        for (int i = 0; i < batch.size(); i++) {
-            later(LATENCY_MILLIS, new PushDelivery(batch.get(i)));
+        for (PendingPush p : batch) {
+            later(LATENCY_MILLIS, new PushDelivery(p));
         }
         if (requestId >= 0) {
             later(LATENCY_MILLIS, new DrainedDelivery(requestId, batch.size()));
         }
     }
 
+    @Override
     public void setDirectorySource(int requestId, String filePath) {
         if (!isDirectorySupported()) {
             fail(requestId, CallError.NOT_SUPPORTED, null);
@@ -518,6 +590,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void reloadDirectory(int requestId) {
         if (!isDirectorySupported()) {
             fail(requestId, CallError.NOT_SUPPORTED, null);
@@ -531,6 +604,7 @@ public class LocalCallBridge implements CallBridge {
         ok(requestId);
     }
 
+    @Override
     public void getDirectoryStatus(int requestId) {
         later(LATENCY_MILLIS, new StringDelivery(requestId, CallWire.join(
                 new String[]{CallWire.flagOf(directoryEnabled),
@@ -538,6 +612,7 @@ public class LocalCallBridge implements CallBridge {
                     "simulated"})));
     }
 
+    @Override
     public void requestScreeningRole(int requestId) {
         ok(requestId);
     }
@@ -613,6 +688,7 @@ public class LocalCallBridge implements CallBridge {
             this.message = message;
         }
 
+        @Override
         public void run() {
             Calls.deliverAck(requestId, ok, error, message);
         }
@@ -627,6 +703,7 @@ public class LocalCallBridge implements CallBridge {
             this.mask = mask;
         }
 
+        @Override
         public void run() {
             Calls.deliverPermissionResult(requestId, mask);
         }
@@ -641,6 +718,7 @@ public class LocalCallBridge implements CallBridge {
             this.token = token;
         }
 
+        @Override
         public void run() {
             Calls.deliverAnswer(callId, token);
         }
@@ -655,6 +733,7 @@ public class LocalCallBridge implements CallBridge {
             this.token = token;
         }
 
+        @Override
         public void run() {
             Calls.deliverEndRequest(callId, token);
         }
@@ -669,6 +748,7 @@ public class LocalCallBridge implements CallBridge {
             this.reason = reason;
         }
 
+        @Override
         public void run() {
             Calls.deliverCallEnded(callId, reason);
         }
@@ -685,6 +765,7 @@ public class LocalCallBridge implements CallBridge {
             this.on = on;
         }
 
+        @Override
         public void run() {
             if (on) {
                 Calls.deliverAudioActivated(callId, route);
@@ -705,6 +786,7 @@ public class LocalCallBridge implements CallBridge {
             this.token = token;
         }
 
+        @Override
         public void run() {
             Calls.deliverDtmf(callId, digits, token);
         }
@@ -723,12 +805,14 @@ public class LocalCallBridge implements CallBridge {
             this.token = token;
         }
 
+        @Override
         public void run() {
             Calls.deliverStartCallRequest(callId, handleWire, video, token);
         }
     }
 
     private static final class ResetDelivery implements Runnable {
+        @Override
         public void run() {
             Calls.deliverProviderReset();
         }
@@ -743,6 +827,7 @@ public class LocalCallBridge implements CallBridge {
             this.token = token;
         }
 
+        @Override
         public void run() {
             VoipPush.deliverToken(requestId, token);
         }
@@ -759,6 +844,7 @@ public class LocalCallBridge implements CallBridge {
             this.message = message;
         }
 
+        @Override
         public void run() {
             VoipPush.deliverRegistrationFailed(requestId, error, message);
         }
@@ -771,6 +857,7 @@ public class LocalCallBridge implements CallBridge {
             this.p = p;
         }
 
+        @Override
         public void run() {
             VoipPush.deliverPushedCall(p.id, p.handleWire, p.displayName,
                     p.video, p.stale, p.synthesized, p.data, p.receivedAt);
@@ -786,6 +873,7 @@ public class LocalCallBridge implements CallBridge {
             this.count = count;
         }
 
+        @Override
         public void run() {
             VoipPush.deliverPendingCallsDrained(requestId, count);
         }
@@ -800,6 +888,7 @@ public class LocalCallBridge implements CallBridge {
             this.value = value;
         }
 
+        @Override
         public void run() {
             com.codename1.call.directory.CallDirectory.deliverStatus(requestId, value);
         }

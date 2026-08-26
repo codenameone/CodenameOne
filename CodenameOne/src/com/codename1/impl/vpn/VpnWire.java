@@ -101,7 +101,7 @@ public final class VpnWire {
         }
         String cert = CallWire.field(f, 7);
         if (cert.length() > 0) {
-            p.certificate(Base64.decode(cert.getBytes()));
+            p.certificate(Base64.decode(asciiBytes(cert)));
         }
         return p;
     }
@@ -139,5 +139,19 @@ public final class VpnWire {
 
     private static String emptyToNull(String v) {
         return v == null || v.length() == 0 ? null : v;
+    }
+
+    /// Base64 as bytes, without asking the platform what its default
+    /// encoding is.
+    ///
+    /// `String.getBytes()` would answer differently on two devices, and the
+    /// base64 alphabet is ASCII, so the conversion is spelled out rather than
+    /// left to a default that is only ever right by accident.
+    private static byte[] asciiBytes(String v) {
+        byte[] out = new byte[v.length()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) v.charAt(i);
+        }
+        return out;
     }
 }

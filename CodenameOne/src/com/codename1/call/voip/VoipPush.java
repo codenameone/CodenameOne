@@ -237,13 +237,14 @@ public final class VoipPush {
             this.newToken = newToken;
         }
 
+        @Override
         public void run() {
             VoipPushListener[] ls = listeners();
-            for (int i = 0; i < ls.length; i++) {
+            for (VoipPushListener l : ls) {
                 if (call != null) {
-                    ls[i].callReceived(call);
+                    l.callReceived(call);
                 } else {
-                    ls[i].tokenChanged(newToken);
+                    l.tokenChanged(newToken);
                 }
             }
         }

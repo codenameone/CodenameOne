@@ -86,7 +86,11 @@ public final class CallAction {
     }
 
     /// Whether this has already been answered.
-    boolean isAnswered() {
+    ///
+    /// Synchronized because the safety net and the application can answer
+    /// from different threads, and a read that saw a stale `false` would send
+    /// a second answer for the same token.
+    synchronized boolean isAnswered() {
         return answered;
     }
 

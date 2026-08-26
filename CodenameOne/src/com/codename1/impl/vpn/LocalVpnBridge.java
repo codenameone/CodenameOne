@@ -88,14 +88,17 @@ public class LocalVpnBridge implements VpnBridge {
         return status;
     }
 
+    @Override
     public boolean isVpnSupported() {
         return supported;
     }
 
+    @Override
     public boolean isCustomTunnelSupported() {
         return supported && tunnelSupported;
     }
 
+    @Override
     public int getVpnCapabilities() {
         if (!supported) {
             return 0;
@@ -108,10 +111,12 @@ public class LocalVpnBridge implements VpnBridge {
         return caps;
     }
 
+    @Override
     public int getVpnStatus() {
         return status.ordinal();
     }
 
+    @Override
     public void installProfile(int requestId, String wire) {
         if (!supported) {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
@@ -132,6 +137,7 @@ public class LocalVpnBridge implements VpnBridge {
         ok(requestId);
     }
 
+    @Override
     public void removeProfile(int requestId) {
         if (!supported) {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
@@ -142,6 +148,7 @@ public class LocalVpnBridge implements VpnBridge {
         ok(requestId);
     }
 
+    @Override
     public void loadProfile(int requestId) {
         if (!supported) {
             later(LATENCY_MILLIS, new ProfileFailure(requestId,
@@ -155,6 +162,7 @@ public class LocalVpnBridge implements VpnBridge {
                 stripSecrets(profileWire)));
     }
 
+    @Override
     public void startVpn(int requestId) {
         if (!supported) {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
@@ -176,6 +184,7 @@ public class LocalVpnBridge implements VpnBridge {
         later(CONNECT_MILLIS, new AckDelivery(requestId, true, 0, null));
     }
 
+    @Override
     public void stopVpn(int requestId) {
         if (!supported) {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
@@ -190,6 +199,7 @@ public class LocalVpnBridge implements VpnBridge {
         later(CONNECT_MILLIS, new AckDelivery(requestId, true, 0, null));
     }
 
+    @Override
     public void setStatusListening(boolean value) {
         this.listening = value;
     }
@@ -254,6 +264,7 @@ public class LocalVpnBridge implements VpnBridge {
             this.message = message;
         }
 
+        @Override
         public void run() {
             Vpn.deliverAck(requestId, ok, error, message);
         }
@@ -268,6 +279,7 @@ public class LocalVpnBridge implements VpnBridge {
             this.wire = wire;
         }
 
+        @Override
         public void run() {
             Vpn.deliverProfile(requestId, wire);
         }
@@ -284,6 +296,7 @@ public class LocalVpnBridge implements VpnBridge {
             this.message = message;
         }
 
+        @Override
         public void run() {
             Vpn.deliverProfileFailed(requestId, error, message);
         }
@@ -296,6 +309,7 @@ public class LocalVpnBridge implements VpnBridge {
             this.ordinal = ordinal;
         }
 
+        @Override
         public void run() {
             Vpn.deliverStatusChanged(ordinal);
         }
@@ -312,6 +326,7 @@ public class LocalVpnBridge implements VpnBridge {
             this.target = target;
         }
 
+        @Override
         public void run() {
             bridge.setStatus(target);
         }

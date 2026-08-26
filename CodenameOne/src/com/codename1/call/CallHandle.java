@@ -81,6 +81,7 @@ public final class CallHandle {
         return value;
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -92,10 +93,12 @@ public final class CallHandle {
         return type == other.type && value.equals(other.value);
     }
 
+    @Override
     public int hashCode() {
         return type.hashCode() * 31 + value.hashCode();
     }
 
+    @Override
     public String toString() {
         return type.name() + ":" + value;
     }
