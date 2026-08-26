@@ -223,6 +223,27 @@ public final class CallDirectory {
         }
     }
 
+    /// Answers [#getStatus] with a wire record.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStatus(int requestId, String statusWire) {
+        EdtResult<String> r = CallRequests.takeString(requestId);
+        if (r != null) {
+            r.complete(statusWire == null ? "" : statusWire);
+        }
+    }
+
+    /// Fails a status request.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverStatusFailed(int requestId, int errorOrdinal,
+            String message) {
+        EdtResult<String> r = CallRequests.takeString(requestId);
+        if (r != null) {
+            r.error(CallWire.decodeError(errorOrdinal, message));
+        }
+    }
+
     /// No static state to clear; present so the family's reset is uniform.
     ///
     /// @hidden not part of the public API; test-only.
