@@ -390,6 +390,12 @@ DISABLED_RULES = (
     # quoted text (e.g. a TeaVM error message) or apply stylistic
     # suggestions whose surrounding context the rendered HTML cannot
     # easily recover.
+    # Asciidoctor renders `...` as an ellipsis CHARACTER followed by a
+    # zero-width space, and EN_ELLIPSIS wants whitespace before it. There is
+    # nothing an author can write differently: the source says "..." and the
+    # renderer decides the rest, so every one of these is a property of the
+    # toolchain rather than of the prose.
+    "EN_ELLIPSIS",
     "COMMA_PARENTHESIS_WHITESPACE",  # most matches are AsciiDoc-syntax
     "EXTREME_ADJECTIVES",            # "Extra Small/Extra Large" labels
     "RB_RB_COMMA",                   # same as above
