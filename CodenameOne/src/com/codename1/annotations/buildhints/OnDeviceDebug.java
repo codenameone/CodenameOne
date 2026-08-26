@@ -31,47 +31,45 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies; the values shown here are that default,
-/// for reference.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// the builder's own default applies. Each attribute's `@Hint(def)` records
+/// what that default is; the `default` clause below it is a neutral placeholder
+/// with no meaning at runtime.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface OnDeviceDebug {
 
-    /// Boolean true/false defaults to false. When `true`, the generated
-    /// `AndroidManifest.xml` is marked `android:debuggable="true"`, R8/proguard is
-    /// disabled, and the build is pinned to debug-only (`android.release` is forced
-    /// off and `android.debug` is forced on) so a stray hint can't ship a
-    /// release-signed APK that's `debuggable="true"`. Pair with the
-    /// `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run
-    /// configs) to install, launch, forward JDWP, and stream logcat through adb.
-    /// Has no effect on builds that don't carry it -- release builds are
-    /// unaffected. See the On-Device Debugging (Android) chapter for the full flow.
+    @Hint(name = "android.onDeviceDebug",
+            def = "false",
+            platform = "android",
+            doc = "Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable=\"true\"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable=\"true\"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it -- release builds are unaffected. See the On-Device Debugging (Android) chapter for the full flow.",
+            consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo"})
     boolean android() default false;
 
-    /// Boolean true/false defaults to false. When `true`, the iOS build links a
-    /// small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM
-    /// translator emits source-line and locals metadata so a desktop proxy can
-    /// serve the running app to any JDWP-speaking debugger. Has no effect on
-    /// release builds. See the On-Device Debugging (iOS) chapter for the full flow.
+    @Hint(name = "ios.onDeviceDebug",
+            def = "false",
+            platform = "ios",
+            doc = "Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the On-Device Debugging (iOS) chapter for the full flow.",
+            consumedBy = {"IPhoneBuilder"})
     boolean ios() default false;
 
-    /// Hostname or IP address the device-side listener dials to reach the desktop
-    /// proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a
-    /// physical device, set this to the developer laptop's LAN IP. Has no effect
-    /// unless `ios.onDeviceDebug=true`.
+    @Hint(name = "ios.onDeviceDebug.proxyHost",
+            def = "127.0.0.1",
+            platform = "ios",
+            doc = "Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.",
+            consumedBy = {"IPhoneBuilder"})
     String iosProxyHost() default "";
 
-    /// TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for
-    /// the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.
-    int iosProxyPort() default 55333;
+    @Hint(name = "ios.onDeviceDebug.proxyPort",
+            def = "55333",
+            platform = "ios",
+            doc = "TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.",
+            consumedBy = {"IPhoneBuilder"})
+    int iosProxyPort() default 0;
 
-    /// Boolean true/false defaults to false. When `true`, the app blocks at startup
-    /// until the proxy connects and the IDE tells the VM to continue. Useful when
-    /// the breakpoint to investigate fires during app boot. Has no effect unless
-    /// `ios.onDeviceDebug=true`.
+    @Hint(name = "ios.onDeviceDebug.waitForAttach",
+            def = "false",
+            platform = "ios",
+            doc = "Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.",
+            consumedBy = {"IPhoneBuilder"})
     boolean iosWaitForAttach() default false;
 }

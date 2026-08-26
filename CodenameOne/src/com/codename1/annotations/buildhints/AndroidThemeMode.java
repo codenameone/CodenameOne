@@ -24,26 +24,18 @@ package com.codename1.annotations.buildhints;
 
 /// Accepted values of the `and.themeMode` build hint.
 ///
-/// Each constant carries the string the build actually receives, which is not
-/// always the constant's own name.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// Each constant's `@HintValue` carries the string the build actually receives,
+/// which is not always the constant's own name.
 public enum AndroidThemeMode {
-    AUTO("auto"),
-    MODERN("modern"),
-    HOLOLIGHT("hololight"),
-    LEGACY("legacy");
+    @HintValue("auto")
+    AUTO,
 
-    private final String wire;
+    @HintValue("modern")
+    MODERN,
 
-    AndroidThemeMode(String wire) {
-        this.wire = wire;
-    }
+    @HintValue("hololight")
+    HOLOLIGHT,
 
-    /// The value written into the build hint.
-    public String wireValue() {
-        return wire;
-    }
+    @HintValue("legacy")
+    LEGACY;
 }

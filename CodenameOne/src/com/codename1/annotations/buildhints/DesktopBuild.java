@@ -31,42 +31,52 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies; the values shown here are that default,
-/// for reference.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// the builder's own default applies. Each attribute's `@Hint(def)` records
+/// what that default is; the `default` clause below it is a neutral placeholder
+/// with no meaning at runtime.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface DesktopBuild {
 
-    /// Boolean true/false defaults to true. When set to true some values will ve
-    /// implicitly doubled to deal with retina displays and icons etc. Will use
-    /// higher DPI's
-    boolean adaptToRetina() default true;
+    @Hint(def = "true",
+            platform = "desktop",
+            doc = "Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. Will use higher DPI's",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
+    boolean adaptToRetina() default false;
 
-    /// Starts the desktop build in full-screen mode.
+    @Hint(def = "false",
+            platform = "desktop",
+            doc = "Starts the desktop build in full-screen mode.",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
     boolean fullscreen() default false;
 
-    /// Height in pixels for the form in desktop builds, will be doubled for retina
-    /// grade displays. Defaults to 600.
-    int height() default 600;
+    @Hint(def = "600",
+            platform = "desktop",
+            doc = "Height in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 600.",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
+    int height() default 0;
 
-    /// Enables grab-able, click-to-page desktop scrollbars.
-    boolean interactiveScrollbars() default true;
+    @Hint(def = "true",
+            platform = "desktop",
+            doc = "Enables grab-able, click-to-page desktop scrollbars.",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
+    boolean interactiveScrollbars() default false;
 
-    /// Boolean true/false defaults to true. Indicates whether the UI in the desktop
-    /// build is resizable
-    boolean resizable() default true;
+    @Hint(def = "true",
+            platform = "desktop",
+            doc = "Boolean true/false defaults to true. Indicates whether the UI in the desktop build is resizable",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
+    boolean resizable() default false;
 
-    /// How the desktop window is framed: native for the OS title bar and menu bar,
-    /// custom for an undecorated window with a Codename One drawn title bar, or
-    /// toolbar for the legacy in-app Toolbar. An unrecognized value falls back to
-    /// native with a warning.
+    @Hint(def = "native",
+            platform = "desktop",
+            doc = "How the desktop window is framed: native for the OS title bar and menu bar, custom for an undecorated window with a Codename One drawn title bar, or toolbar for the legacy in-app Toolbar. An unrecognized value falls back to native with a warning.",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
     DesktopTitleBar titleBar() default DesktopTitleBar.NATIVE;
 
-    /// Width in pixels for the form in desktop builds, will be doubled for retina
-    /// grade displays. Defaults to 800.
-    int width() default 800;
+    @Hint(def = "800",
+            platform = "desktop",
+            doc = "Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.",
+            consumedBy = {"GenerateDesktopAppWrapperMojo"})
+    int width() default 0;
 }

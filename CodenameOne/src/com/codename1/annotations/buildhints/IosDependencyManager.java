@@ -24,27 +24,21 @@ package com.codename1.annotations.buildhints;
 
 /// Accepted values of the `ios.dependencyManager` build hint.
 ///
-/// Each constant carries the string the build actually receives, which is not
-/// always the constant's own name.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// Each constant's `@HintValue` carries the string the build actually receives,
+/// which is not always the constant's own name.
 public enum IosDependencyManager {
-    AUTO("auto"),
-    COCOAPODS("cocoapods"),
-    SPM("spm"),
-    BOTH("both"),
-    NONE("none");
+    @HintValue("auto")
+    AUTO,
 
-    private final String wire;
+    @HintValue("cocoapods")
+    COCOAPODS,
 
-    IosDependencyManager(String wire) {
-        this.wire = wire;
-    }
+    @HintValue("spm")
+    SPM,
 
-    /// The value written into the build hint.
-    public String wireValue() {
-        return wire;
-    }
+    @HintValue("both")
+    BOTH,
+
+    @HintValue("none")
+    NONE;
 }

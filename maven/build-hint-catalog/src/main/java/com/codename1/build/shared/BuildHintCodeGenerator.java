@@ -144,36 +144,23 @@ public final class BuildHintCodeGenerator {
             }
         }
 
-        Set<String> written = new LinkedHashSet<String>();
+        // Sorted by attribute, so every view below is byte-stable whatever order
+        // the catalog happens to list a group's hints in. This used to sit
+        // inside the annotation writer, and removing that took the ordering
+        // with it -- the binding table's entries stayed the same and simply
+        // moved, which is drift with no meaning.
         for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
             Collections.sort(e.getValue(), new Comparator<BuildHints.Hint>() {
                 public int compare(BuildHints.Hint a, BuildHints.Hint b) {
                     return a.attr().compareTo(b.attr());
                 }
             });
-            String name = e.getKey().annotationSimpleName();
-            write(new File(annRoot, name + ".java"), annotationSource(e.getKey(), e.getValue()));
-            written.add(name + ".java");
-        }
-        for (Map.Entry<String, BuildHints.Hint> e : enums.entrySet()) {
-            write(new File(annRoot, e.getKey() + ".java"), enumSource(e.getKey(), e.getValue()));
-            written.add(e.getKey() + ".java");
-        }
-        write(new File(annRoot, "package-info.java"), packageInfoSource(byGroup));
-        written.add("package-info.java");
-
-        // A group that loses its last annotated hint must not leave a stale
-        // annotation type behind: it would still compile and still be settable,
-        // and it would write a hint nothing reads.
-        File[] existing = annRoot.listFiles();
-        if (existing != null) {
-            for (File f : existing) {
-                if (f.getName().endsWith(".java") && !written.contains(f.getName()) && !f.delete()) {
-                    throw new IOException("Could not remove stale generated file " + f);
-                }
-            }
         }
 
+        // The annotations are NOT generated. They are the source of truth for the
+        // hints they expose -- hand-written, and read back by
+        // BuildHintAnnotationReader -- so nothing here writes into
+        // CodenameOne/src.
         write(new File(catalogRoot, "BuildHintAnnotationBinding.java"), bindingSource(byGroup, enums));
         for (int i = 2; i < args.length; i++) {
             File target = new File(args[i]);
@@ -184,7 +171,7 @@ public final class BuildHintCodeGenerator {
                         simulatorSchemaSource(byGroup));
             }
         }
-        System.out.println("cn1: generated " + written.size() + " source(s) under " + annRoot);
+        System.out.println("cn1: generated the build hint views");
     }
 
     private static String javaType(BuildHints.Hint h) {
@@ -259,10 +246,9 @@ public final class BuildHintCodeGenerator {
         sb.append("///\n");
         sb.append(doc("Place this on your application's main class -- the class named by "
                 + "`codename1.mainName`. An attribute you do not set is not written at all, "
-                + "so the builder's own default applies; the values shown here are that "
-                + "default, for reference.", ""));
-        sb.append("///\n");
-        sb.append(GENERATED_NOTE);
+                + "so the builder's own default applies. Each attribute's `@Hint(def)` "
+                + "records what that default is; the `default` clause below it is a neutral "
+                + "placeholder with no meaning at runtime.", ""));
         sb.append("@Retention(RetentionPolicy.CLASS)\n");
         sb.append("@Target(ElementType.TYPE)\n");
         sb.append("public @interface ").append(group.annotationSimpleName()).append(" {\n");
@@ -279,21 +265,109 @@ public final class BuildHintCodeGenerator {
                           + "touches this resource without one."
                         : "Sets the `" + h.name() + "` build hint.";
             }
-            sb.append(doc(text, "    "));
-            if (h.type() == HintType.STRING_LIST) {
-                sb.append(doc("Values are joined with `" + visible(h.separator())
-                        + "` when the hint is written.", "    "));
-            }
             if (h.deprecated() != null) {
-                sb.append("    ///\n");
-                sb.append(doc("Deprecated. " + h.deprecated(), "    "));
                 sb.append("    @Deprecated\n");
             }
+            sb.append(hintAnnotation(group, h, text));
             sb.append("    ").append(javaType(h)).append(" ").append(h.attr())
-              .append("() default ").append(defaultClause(h)).append(";\n");
+              .append("() default ").append(neutralDefault(h)).append(";\n");
         }
         sb.append("}\n");
         return sb.toString();
+    }
+
+    /// The `@Hint` carrying what the attribute's signature cannot say.
+    ///
+    /// Only what differs from the convention: a name the group prefix does not
+    /// produce, a separator, a documented default, and the handful of facts the
+    /// guide's table shows. Everything javac already knows is left out.
+    private static String hintAnnotation(HintGroup group, BuildHints.Hint h, String doc) {
+        List<String> members = new ArrayList<String>();
+        String prefix = group.keyPrefix() == null ? "" : group.keyPrefix();
+        if (!(prefix + h.attr()).equals(h.name())) {
+            members.add("name = \"" + esc(h.name()) + "\"");
+        }
+        String kind = kindOf(h.type());
+        if (kind != null) {
+            members.add("kind = HintKind." + kind);
+        }
+        if (h.def() != null && h.def().length() > 0) {
+            members.add("def = \"" + esc(h.def()) + "\"");
+        }
+        if (h.separator() != null) {
+            members.add("appendable = true");
+            if (h.separator().length() > 0) {
+                members.add("separator = \"" + esc(h.separator()) + "\"");
+            }
+        }
+        if (h.platform() != null && !"general".equals(h.platform())) {
+            members.add("platform = \"" + esc(h.platform()) + "\"");
+        }
+        if (h.aliasOf() != null) {
+            members.add("aliasOf = \"" + esc(h.aliasOf()) + "\"");
+        }
+        if (h.deprecated() != null) {
+            members.add("deprecated = \"" + esc(h.deprecated()) + "\"");
+        }
+        if (h.isExternal()) {
+            members.add("external = true");
+        }
+        if (h.isEnterpriseOnly()) {
+            members.add("enterpriseOnly = true");
+        }
+        if (h.link() != null && h.link().length() > 0) {
+            members.add("link = \"" + esc(h.link()) + "\"");
+        }
+        if (doc != null && doc.length() > 0) {
+            // Through the same ASCII conversion the javadoc path uses: the doc
+            // is a string literal in a source file now, and the Ant javac step
+            // rejects an unmappable character wherever it appears.
+            members.add("doc = \"" + esc(toAscii(doc)) + "\"");
+        }
+        if (!h.consumedBy().isEmpty()) {
+            StringBuilder by = new StringBuilder("consumedBy = {");
+            for (int i = 0; i < h.consumedBy().size(); i++) {
+                by.append(i == 0 ? "" : ", ").append("\"").append(esc(h.consumedBy().get(i)))
+                  .append("\"");
+            }
+            members.add(by.append("}").toString());
+        }
+        if (members.isEmpty()) {
+            return "    @Hint\n";
+        }
+        StringBuilder sb = new StringBuilder("    @Hint(");
+        for (int i = 0; i < members.size(); i++) {
+            sb.append(i == 0 ? "" : ",\n            ").append(members.get(i));
+        }
+        return sb.append(")\n").toString();
+    }
+
+    /// The `HintKind` naming a string hint's real shape, or null where the
+    /// attribute's Java type already says everything.
+    private static String kindOf(HintType t) {
+        switch (t) {
+            case TEXT_BLOCK: return "TEXT_BLOCK";
+            case XML: return "XML";
+            case PATH: return "PATH";
+            case URL: return "URL";
+            case VERSION: return "VERSION";
+            case SECRET: return "SECRET";
+            default: return null;
+        }
+    }
+
+    /// A default clause with no meaning, because the attribute's default has
+    /// none: a hint is written only where the developer set it. The builder's
+    /// real default is in `@Hint(def)`, which -- unlike this -- survives being
+    /// read back.
+    private static String neutralDefault(BuildHints.Hint h) {
+        switch (h.type()) {
+            case BOOLEAN: return "false";
+            case INT: return "0";
+            case ENUM: return h.enumName() + "." + enumConstant(h.values().get(0));
+            case STRING_LIST: return "{}";
+            default: return "\"\"";
+        }
     }
 
     /// Turns ios.NSCameraUsageDescription into "the camera", so the generated
@@ -334,26 +408,26 @@ public final class BuildHintCodeGenerator {
         sb.append("package ").append(PKG).append(";\n\n");
         sb.append(doc("Accepted values of the `" + origin.name() + "` build hint.", ""));
         sb.append("///\n");
-        sb.append(doc("Each constant carries the string the build actually receives, which is "
-                + "not always the constant's own name.", ""));
-        sb.append("///\n");
-        sb.append(GENERATED_NOTE);
+        sb.append(doc("Each constant's `@HintValue` carries the string the build actually "
+                + "receives, which is not always the constant's own name.", ""));
         sb.append("public enum ").append(name).append(" {\n");
         List<String> values = origin.values();
         List<String> labels = origin.valueLabels();
         for (int i = 0; i < values.size(); i++) {
             String v = values.get(i);
+            sb.append(i == 0 ? "" : "\n");
             if (i < labels.size()) {
                 sb.append(doc(labels.get(i), "    "));
             }
-            sb.append("    ").append(enumConstant(v)).append("(\"").append(esc(v)).append("\")");
+            sb.append("    @HintValue(\"").append(esc(v)).append("\"");
+            if (i < labels.size() && labels.get(i) != null && labels.get(i).length() > 0) {
+                sb.append(", label = \"").append(esc(labels.get(i))).append("\"");
+            }
+            sb.append(")\n");
+            sb.append("    ").append(enumConstant(v));
             sb.append(i == values.size() - 1 ? ";\n" : ",\n");
         }
-        sb.append("\n    private final String wire;\n\n");
-        sb.append("    ").append(name).append("(String wire) {\n");
-        sb.append("        this.wire = wire;\n    }\n\n");
-        sb.append(doc("The value written into the build hint.", "    "));
-        sb.append("    public String wireValue() {\n        return wire;\n    }\n}\n");
+        sb.append("}\n");
         return sb.toString();
     }
 

@@ -24,24 +24,12 @@ package com.codename1.annotations.buildhints;
 
 /// Accepted values of the `harden.controlFlow` build hint.
 ///
-/// Each constant carries the string the build actually receives, which is not
-/// always the constant's own name.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// Each constant's `@HintValue` carries the string the build actually receives,
+/// which is not always the constant's own name.
 public enum HardenControlFlow {
-    OFF("off"),
-    ON("on");
+    @HintValue("off")
+    OFF,
 
-    private final String wire;
-
-    HardenControlFlow(String wire) {
-        this.wire = wire;
-    }
-
-    /// The value written into the build hint.
-    public String wireValue() {
-        return wire;
-    }
+    @HintValue("on")
+    ON;
 }

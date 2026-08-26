@@ -31,34 +31,29 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies; the values shown here are that default,
-/// for reference.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// the builder's own default applies. Each attribute's `@Hint(def)` records
+/// what that default is; the `default` clause below it is a neutral placeholder
+/// with no meaning at runtime.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Build {
 
-    /// The application ID for an app that requires native Facebook login
-    /// integration, this defaults to null which means native Facebook support
-    /// shouldn't be in the app
+    @Hint(name = "facebook.appId",
+            doc = "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app",
+            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
     String facebookAppId() default "";
 
-    /// The Android/chrome push identifier, see the push section for more details
+    @Hint(name = "gcm.sender_id",
+            doc = "The Android/chrome push identifier, see the push section for more details",
+            consumedBy = {"AndroidGradleBuilder"})
     String gcmSenderId() default "";
 
-    /// `modern`, `legacy`, `custom` (default unset). Cross-platform override that
-    /// sets both `ios.themeMode` and `and.themeMode` together when those aren't set
-    /// explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat +
-    /// Holo Light, `custom` disables the framework native theme entirely. The
-    /// legacy alias `cn1.nativeTheme` is still accepted.
+    @Hint(doc = "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.",
+            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
     NativeThemeMode nativeTheme() default NativeThemeMode.MODERN;
 
-    /// true/false (defaults to false). Blocks codename one from injecting its own
-    /// resources when set to true, the only effect this has is in slightly reducing
-    /// archive size. This might have adverse effects on some features of Codename
-    /// One so it isn't recommended.
+    @Hint(def = "false",
+            doc = "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.",
+            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
     boolean noExtraResources() default false;
 }

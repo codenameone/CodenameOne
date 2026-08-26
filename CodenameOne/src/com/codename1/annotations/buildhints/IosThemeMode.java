@@ -24,26 +24,18 @@ package com.codename1.annotations.buildhints;
 
 /// Accepted values of the `ios.themeMode` build hint.
 ///
-/// Each constant carries the string the build actually receives, which is not
-/// always the constant's own name.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// Each constant's `@HintValue` carries the string the build actually receives,
+/// which is not always the constant's own name.
 public enum IosThemeMode {
-    AUTO("auto"),
-    MODERN("modern"),
-    IOS7("ios7"),
-    LEGACY("legacy");
+    @HintValue("auto")
+    AUTO,
 
-    private final String wire;
+    @HintValue("modern")
+    MODERN,
 
-    IosThemeMode(String wire) {
-        this.wire = wire;
-    }
+    @HintValue("ios7")
+    IOS7,
 
-    /// The value written into the build hint.
-    public String wireValue() {
-        return wire;
-    }
+    @HintValue("legacy")
+    LEGACY;
 }

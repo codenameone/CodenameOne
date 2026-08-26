@@ -22,17 +22,27 @@
  */
 package com.codename1.annotations.buildhints;
 
-/// Accepted values of the `harden.strings` build hint.
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/// What an enum constant is called on the wire.
 ///
-/// Each constant's `@HintValue` carries the string the build actually receives,
-/// which is not always the constant's own name.
-public enum HardenStrings {
-    @HintValue("off")
-    OFF,
+/// The builders compare against a literal, and the constant name is not it:
+/// `IOS7` happens to lowercase to `ios7`, but `INTERNAL_ONLY` does not lowercase
+/// to `internalOnly`, and `java.version` accepts `8`, `11`, `17` and `21`, none
+/// of which can be a constant name at all. A builder handed a value it does not
+/// recognize falls back to its default, so a name-based conversion fails
+/// silently -- which is the failure this whole package removes.
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.FIELD)
+public @interface HintValue {
 
-    @HintValue("constants")
-    CONSTANTS,
+    /// The literal the builder compares against.
+    String value();
 
-    @HintValue("all")
-    ALL;
+    /// How the Settings editor labels this choice, when the wire value is not
+    /// presentable on its own.
+    String label() default "";
 }

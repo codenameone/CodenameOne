@@ -33,102 +33,121 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies; the values shown here are that default,
-/// for reference.
-///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// the builder's own default applies. Each attribute's `@Hint(def)` records
+/// what that default is; the `default` clause below it is a neutral placeholder
+/// with no meaning at runtime.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface IosPrivacy {
 
-    /// Why the app uses Bluetooth. Supplied automatically when the app references
-    /// `com.codename1.bluetooth`; set it to say something more specific than the
-    /// default.
+    @Hint(name = "ios.NSBluetoothAlwaysUsageDescription",
+            platform = "ios",
+            doc = "Why the app uses Bluetooth. Supplied automatically when the app references `com.codename1.bluetooth`; set it to say something more specific than the default.",
+            consumedBy = {"IPhoneBuilder"})
     String bluetoothAlwaysUsageDescription() default "";
 
-    /// The pre-iOS 13 spelling of the Bluetooth usage description, supplied and
-    /// overridable on the same terms.
+    @Hint(name = "ios.NSBluetoothPeripheralUsageDescription",
+            platform = "ios",
+            doc = "The pre-iOS 13 spelling of the Bluetooth usage description, supplied and overridable on the same terms.",
+            consumedBy = {"IPhoneBuilder"})
     String bluetoothPeripheralUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the calendars full access. It
-    /// becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`. The
-    /// App Store rejects an app that touches this resource without one.
-    String calendarsFullAccessUsageDescription() default "This app uses your calendars to read and schedule events.";
+    @Hint(name = "ios.NSCalendarsFullAccessUsageDescription",
+            def = "This app uses your calendars to read and schedule events.",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the calendars full access. It becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    String calendarsFullAccessUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the calendars. It becomes the
-    /// `NSCalendarsUsageDescription` key in `Info.plist`. The App Store rejects an
-    /// app that touches this resource without one.
+    @Hint(name = "ios.NSCalendarsUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the calendars. It becomes the `NSCalendarsUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     String calendarsUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the calendars write only
-    /// access. It becomes the `NSCalendarsWriteOnlyAccessUsageDescription` key in
-    /// `Info.plist`. The App Store rejects an app that touches this resource
-    /// without one.
-    String calendarsWriteOnlyAccessUsageDescription() default "This app uses your calendar to schedule events.";
+    @Hint(name = "ios.NSCalendarsWriteOnlyAccessUsageDescription",
+            def = "This app uses your calendar to schedule events.",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the calendars write only access. It becomes the `NSCalendarsWriteOnlyAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    String calendarsWriteOnlyAccessUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the camera. It becomes the
-    /// `NSCameraUsageDescription` key in `Info.plist`. The App Store rejects an app
-    /// that touches this resource without one.
+    @Hint(name = "ios.NSCameraUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the camera. It becomes the `NSCameraUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"MacNativeBuilder"})
     String cameraUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the health share. It becomes
-    /// the `NSHealthShareUsageDescription` key in `Info.plist`. The App Store
-    /// rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSHealthShareUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the health share. It becomes the `NSHealthShareUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String healthShareUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the health update. It becomes
-    /// the `NSHealthUpdateUsageDescription` key in `Info.plist`. The App Store
-    /// rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSHealthUpdateUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the health update. It becomes the `NSHealthUpdateUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String healthUpdateUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the local network. It becomes
-    /// the `NSLocalNetworkUsageDescription` key in `Info.plist`. The App Store
-    /// rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSLocalNetworkUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the local network. It becomes the `NSLocalNetworkUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String localNetworkUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the location always and when
-    /// in use. It becomes the `NSLocationAlwaysAndWhenInUseUsageDescription` key in
-    /// `Info.plist`. The App Store rejects an app that touches this resource
-    /// without one.
+    @Hint(name = "ios.NSLocationAlwaysAndWhenInUseUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the location always and when in use. It becomes the `NSLocationAlwaysAndWhenInUseUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String locationAlwaysAndWhenInUseUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the location always. It
-    /// becomes the `NSLocationAlwaysUsageDescription` key in `Info.plist`. The App
-    /// Store rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSLocationAlwaysUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the location always. It becomes the `NSLocationAlwaysUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String locationAlwaysUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the location when in use. It
-    /// becomes the `NSLocationWhenInUseUsageDescription` key in `Info.plist`. The
-    /// App Store rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSLocationWhenInUseUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the location when in use. It becomes the `NSLocationWhenInUseUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder"})
     String locationWhenInUseUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the microphone. It becomes
-    /// the `NSMicrophoneUsageDescription` key in `Info.plist`. The App Store
-    /// rejects an app that touches this resource without one.
+    @Hint(name = "ios.NSMicrophoneUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the microphone. It becomes the `NSMicrophoneUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"MacNativeBuilder"})
     String microphoneUsageDescription() default "";
 
-    /// The pre-iOS 16 spelling of the nearby-interaction usage description,
-    /// supplied automatically when the app references the nearby APIs.
+    @Hint(name = "ios.NSNearbyInteractionAllowOnceUsageDescription",
+            platform = "ios",
+            doc = "The pre-iOS 16 spelling of the nearby-interaction usage description, supplied automatically when the app references the nearby APIs.",
+            consumedBy = {"IPhoneBuilder"})
     String nearbyInteractionAllowOnceUsageDescription() default "";
 
-    /// Why the app measures distance and direction to nearby devices. Supplied
-    /// automatically when the app references the nearby APIs; set it to say
-    /// something more specific than the default.
+    @Hint(name = "ios.NSNearbyInteractionUsageDescription",
+            platform = "ios",
+            doc = "Why the app measures distance and direction to nearby devices. Supplied automatically when the app references the nearby APIs; set it to say something more specific than the default.",
+            consumedBy = {"IPhoneBuilder"})
     String nearbyInteractionUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the reminders full access. It
-    /// becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`. The
-    /// App Store rejects an app that touches this resource without one.
-    String remindersFullAccessUsageDescription() default "This app uses your reminders to read and schedule tasks.";
+    @Hint(name = "ios.NSRemindersFullAccessUsageDescription",
+            def = "This app uses your reminders to read and schedule tasks.",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the reminders full access. It becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    String remindersFullAccessUsageDescription() default "";
 
-    /// The text iOS shows when the app first asks for the reminders. It becomes the
-    /// `NSRemindersUsageDescription` key in `Info.plist`. The App Store rejects an
-    /// app that touches this resource without one.
+    @Hint(name = "ios.NSRemindersUsageDescription",
+            platform = "ios",
+            doc = "The text iOS shows when the app first asks for the reminders. It becomes the `NSRemindersUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.",
+            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     String remindersUsageDescription() default "";
 
-    /// Why the app sends speech for recognition. Supplied automatically when the
-    /// app references the speech APIs; set it to say something more specific.
+    @Hint(name = "ios.NSSpeechRecognitionUsageDescription",
+            platform = "ios",
+            doc = "Why the app sends speech for recognition. Supplied automatically when the app references the speech APIs; set it to say something more specific.",
+            consumedBy = {"IPhoneBuilder"})
     String speechRecognitionUsageDescription() default "";
 }

@@ -17,6 +17,18 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
+        <!--
+            The generator reads the build hint annotations out of their COMPILED
+            classes, where @Hint sits as a RuntimeInvisibleAnnotations attribute.
+            Provided, so it stays a build-time tool dependency: this artifact is
+            also consumed by the Settings tool, which is a Codename One app and
+            has no business dragging ASM onto a device.
+        -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

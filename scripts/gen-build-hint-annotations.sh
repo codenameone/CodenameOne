@@ -43,12 +43,15 @@ if [ "$check" -eq 1 ]; then
   # there is nothing for it to drift FROM. scripts/gen-build-hint-table.sh
   # renders it during the doc build instead, and this script still writes it for
   # a local asciidoctor run -- gitignored, so that copy is never reviewed.
-  targets=("CodenameOne/src/com/codename1/annotations/buildhints"
-           "maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
+  # NOT the annotation package. Those are hand-written -- they are the source of
+  # truth for the hints they expose, and BuildHintAnnotationReader reads them
+  # back rather than any file restating them. Policing them here would report a
+  # deliberate edit as drift.
+  targets=("maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
            "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
-    echo "::error::Generated build hint annotations are out of date." >&2
+    echo "::error::Generated build hint views are out of date." >&2
     echo "Run scripts/gen-build-hint-annotations.sh and commit the result." >&2
     git -C "$REPO_ROOT" --no-pager diff -- "${targets[@]}" >&2 || true
     git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}" >&2 || true
