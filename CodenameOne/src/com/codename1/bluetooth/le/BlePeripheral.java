@@ -30,6 +30,7 @@ import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattDescriptor;
 import com.codename1.bluetooth.gatt.GattNotificationListener;
 import com.codename1.bluetooth.gatt.GattService;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
@@ -324,14 +325,26 @@ public abstract class BlePeripheral extends BluetoothDevice {
                     }
                     published[0] = true;
                 }
+                // CONTAINED. Both the state update and the caller's own
+                // callbacks run inside this listener, and the queue's
+                // advancement listener is registered on inner AFTER it -- so
+                // an app callback that threw came out here, skipped the
+                // advancement, and wedged the peripheral for good: every
+                // later read, write and notify sat in a queue nothing would
+                // ever start again. One badly behaved callback is a logged
+                // error, not a dead connection.
                 try {
-                    apply.onReady(value, err);
-                } finally {
-                    if (err == null) {
-                        out.complete(value);
-                    } else {
-                        out.error(err);
+                    try {
+                        apply.onReady(value, err);
+                    } finally {
+                        if (err == null) {
+                            out.complete(value);
+                        } else {
+                            out.error(err);
+                        }
                     }
+                } catch (Throwable t) { //NOPMD - see above
+                    Log.e(t);
                 }
             }
         });

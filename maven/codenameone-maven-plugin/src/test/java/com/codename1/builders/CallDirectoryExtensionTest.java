@@ -139,6 +139,42 @@ public class CallDirectoryExtensionTest {
     }
 
     @Test
+    public void blockedAndLabelledNumbersAreEmittedInSeparatePasses() {
+        // One interleaved pass emitted blocking(N) immediately followed by
+        // identification(N) for a row that is both blocked and labelled.
+        // Whether those two share one sequence cursor is precisely what
+        // CallKit does not document -- the headers carry no prose at all, and
+        // Xcode's own template says only "Numbers must be provided in
+        // numerically ascending order", stated once per kind. Guessing wrong
+        // costs a directory that silently never loads, which no build catches
+        // and only a device shows. Two passes are correct under either
+        // reading, and a second scan of an mmapped buffer is nearly free.
+        String handler = text(files(), "CN1CallDirectoryHandler.m");
+        assertTrue(handler.contains("cn1cdScan(context, data, YES);"));
+        assertTrue(handler.contains("cn1cdScan(context, data, NO);"));
+        int block = handler.indexOf(
+                "addBlockingEntryWithNextSequentialPhoneNumber");
+        int ident = handler.indexOf(
+                "addIdentificationEntryWithNextSequentialPhoneNumber");
+        assertTrue(block > 0 && ident > block,
+                "the two kinds must not share a scan");
+        // Each pass keeps its own ascending cursor, so a number present in
+        // both lists is not dropped by the other pass's "goes backwards"
+        // guard.
+        assertEquals(2, count(handler, "previous = number;"),
+                "each pass advances only its own cursor");
+    }
+
+    private static int count(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0;
+                i = haystack.indexOf(needle, i + needle.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    @Test
     public void theListIsMappedRatherThanReadIntoMemory() {
         // A production blocklist runs to six figures and the extension has a
         // tight memory budget; reading it into an NSString is how the

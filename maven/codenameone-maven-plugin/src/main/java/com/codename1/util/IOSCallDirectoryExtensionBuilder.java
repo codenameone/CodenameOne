@@ -172,6 +172,77 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("// other way to learn it.\n");
         sb.append("static NSString * const kCN1CallAppGroup = @\"")
                 .append(escapeObjC(appGroup)).append("\";\n\n");
+        // Emits one kind of entry. blocking=YES adds the blocked
+        // numbers, blocking=NO the labelled ones; each keeps its own
+        // ascending cursor, so a number present in both lists is
+        // never dropped for "going backwards".
+        sb.append("static void cn1cdScan(CXCallDirectoryExtensionContext *context,\n");
+        sb.append("        NSData *data, BOOL blocking) {\n");
+        sb.append("    const char *bytes = (const char *)[data bytes];\n");
+        sb.append("    NSUInteger length = [data length];\n");
+        sb.append("    NSUInteger lineStart = 0;\n");
+        sb.append("    int64_t previous = 0;\n");
+        sb.append("    // One pool per batch of rows, drained as it goes: a single pool\n");
+        sb.append("    // around the whole scan would hold every temporary to the end.\n");
+        sb.append("    @autoreleasepool {\n");
+        sb.append("        NSUInteger sinceDrain = 0;\n");
+        sb.append("        for (NSUInteger i = 0; i <= length; i++) {\n");
+        sb.append("            if (i != length && bytes[i] != '\\n') {\n");
+        sb.append("                continue;\n");
+        sb.append("            }\n");
+        sb.append("            NSUInteger lineLength = i - lineStart;\n");
+        sb.append("            if (lineLength == 0) {\n");
+        sb.append("                lineStart = i + 1;\n");
+        sb.append("                continue;\n");
+        sb.append("            }\n");
+        sb.append("            // The number is parsed from the raw bytes, so the common\n");
+        sb.append("            // case allocates nothing at all; only a row that carries a\n");
+        sb.append("            // label builds an NSString.\n");
+        sb.append("            int64_t number = 0;\n");
+        sb.append("            NSUInteger cursor = lineStart;\n");
+        sb.append("            while (cursor < i && bytes[cursor] >= '0' && bytes[cursor] <= '9') {\n");
+        sb.append("                number = number * 10 + (bytes[cursor] - '0');\n");
+        sb.append("                cursor++;\n");
+        sb.append("            }\n");
+        sb.append("            // Ascending order is a hard requirement, and a row out of\n");
+        sb.append("            // order would have iOS reject the whole list. The host app\n");
+        sb.append("            // sorts before writing, so a violation means the file was\n");
+        sb.append("            // not written by it: skip rather than poison the load.\n");
+        sb.append("            //\n");
+        sb.append("            // previous tracks the entries THIS pass emitted, not the\n");
+        sb.append("            // rows it read, so a row skipped for the other kind never\n");
+        sb.append("            // advances the cursor past a number this kind still needs.\n");
+        sb.append("            if (number <= previous || cursor >= i || bytes[cursor] != '\\t') {\n");
+        sb.append("                lineStart = i + 1;\n");
+        sb.append("                continue;\n");
+        sb.append("            }\n");
+        sb.append("            NSUInteger labelStart = cursor + 1;\n");
+        sb.append("            NSUInteger labelEnd = labelStart;\n");
+        sb.append("            while (labelEnd < i && bytes[labelEnd] != '\\t') {\n");
+        sb.append("                labelEnd++;\n");
+        sb.append("            }\n");
+        sb.append("            if (blocking) {\n");
+        sb.append("                if (labelEnd + 1 < i && bytes[labelEnd + 1] == '1') {\n");
+        sb.append("                    previous = number;\n");
+        sb.append("                    [context addBlockingEntryWithNextSequentialPhoneNumber:number];\n");
+        sb.append("                }\n");
+        sb.append("            } else if (labelEnd > labelStart) {\n");
+        sb.append("                NSString *label = [[NSString alloc] initWithBytes:bytes + labelStart\n");
+        sb.append("                        length:labelEnd - labelStart\n");
+        sb.append("                        encoding:NSUTF8StringEncoding];\n");
+        sb.append("                if (label != nil) {\n");
+        sb.append("                    previous = number;\n");
+        sb.append("                    [context addIdentificationEntryWithNextSequentialPhoneNumber:number\n");
+        sb.append("                            label:label];\n");
+        sb.append("                }\n");
+        sb.append("            }\n");
+        sb.append("            lineStart = i + 1;\n");
+        sb.append("            sinceDrain++;\n");
+        sb.append("        }\n");
+        sb.append("        (void)sinceDrain;\n");
+        sb.append("    }\n");
+        sb.append("}\n");
+        sb.append("\n");
         sb.append("@implementation CN1CallDirectoryHandler\n\n");
         sb.append("- (void)beginRequestWithExtensionContext:"
                 + "(CXCallDirectoryExtensionContext *)context {\n");
@@ -213,78 +284,25 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("        [context completeRequestWithCompletionHandler:nil];\n");
         sb.append("        return;\n");
         sb.append("    }\n");
-        sb.append("    const char *bytes = (const char *)[data bytes];\n");
-        sb.append("    NSUInteger length = [data length];\n");
-        sb.append("    NSUInteger lineStart = 0;\n");
-        sb.append("    int64_t previous = 0;\n");
-        sb.append("    // One pool per batch of rows, drained as it goes:"
-                + " a single pool\n");
-        sb.append("    // around the whole loop would hold every temporary"
-                + " to the end.\n");
-        sb.append("    @autoreleasepool {\n");
-        sb.append("        NSUInteger sinceDrain = 0;\n");
-        sb.append("        for (NSUInteger i = 0; i <= length; i++) {\n");
-        sb.append("            if (i != length && bytes[i] != '\\n') {\n");
-        sb.append("                continue;\n");
-        sb.append("            }\n");
-        sb.append("            NSUInteger lineLength = i - lineStart;\n");
-        sb.append("            if (lineLength == 0) {\n");
-        sb.append("                lineStart = i + 1;\n");
-        sb.append("                continue;\n");
-        sb.append("            }\n");
-        sb.append("            // The number is parsed from the raw bytes,"
-                + " so the common\n");
-        sb.append("            // case allocates nothing at all; only a row"
-                + " that carries a\n");
-        sb.append("            // label builds an NSString.\n");
-        sb.append("            int64_t number = 0;\n");
-        sb.append("            NSUInteger cursor = lineStart;\n");
-        sb.append("            while (cursor < i && bytes[cursor] >= '0'"
-                + " && bytes[cursor] <= '9') {\n");
-        sb.append("                number = number * 10 + (bytes[cursor] - '0');\n");
-        sb.append("                cursor++;\n");
-        sb.append("            }\n");
-        sb.append("            // Ascending order is a hard requirement, and"
-                + " a row out of\n");
-        sb.append("            // order would have iOS reject the whole list."
-                + " The host app\n");
-        sb.append("            // sorts before writing, so a violation means"
-                + " the file was\n");
-        sb.append("            // not written by it: skip rather than poison"
-                + " the load.\n");
-        sb.append("            if (number <= previous || cursor >= i"
-                + " || bytes[cursor] != '\\t') {\n");
-        sb.append("                lineStart = i + 1;\n");
-        sb.append("                continue;\n");
-        sb.append("            }\n");
-        sb.append("            previous = number;\n");
-        sb.append("            NSUInteger labelStart = cursor + 1;\n");
-        sb.append("            NSUInteger labelEnd = labelStart;\n");
-        sb.append("            while (labelEnd < i && bytes[labelEnd] != '\\t') {\n");
-        sb.append("                labelEnd++;\n");
-        sb.append("            }\n");
-        sb.append("            BOOL blocked = labelEnd + 1 < i"
-                + " && bytes[labelEnd + 1] == '1';\n");
-        sb.append("            if (blocked) {\n");
-        sb.append("                [context addBlockingEntryWithNextSequential"
-                + "PhoneNumber:number];\n");
-        sb.append("            }\n");
-        sb.append("            if (labelEnd > labelStart) {\n");
-        sb.append("                NSString *label = [[NSString alloc]"
-                + " initWithBytes:bytes + labelStart\n");
-        sb.append("                        length:labelEnd - labelStart\n");
-        sb.append("                        encoding:NSUTF8StringEncoding];\n");
-        sb.append("                if (label != nil) {\n");
-        sb.append("                    [context addIdentificationEntryWithNext"
-                + "SequentialPhoneNumber:number\n");
-        sb.append("                            label:label];\n");
-        sb.append("                }\n");
-        sb.append("            }\n");
-        sb.append("            lineStart = i + 1;\n");
-        sb.append("            sinceDrain++;\n");
-        sb.append("        }\n");
-        sb.append("        (void)sinceDrain;\n");
-        sb.append("    }\n");
+        // TWO passes over the mapped file, one per entry kind.
+        //
+        // A single interleaved pass looked correct -- the file is
+        // globally ascending, so each kind's own subsequence ascends,
+        // which is all Apple actually documents ("Numbers must be
+        // provided in numerically ascending order", stated once per
+        // kind in Xcode's own Call Directory Extension template).
+        // Nothing in CallKit's headers or docs says blocking must
+        // precede identification.
+        //
+        // It is still wrong for a row that is BOTH blocked and
+        // labelled: that emits blocking(N) and then identification(N),
+        // and whether those two share one sequence cursor is exactly
+        // the thing the docs do not say. Guessing costs a silently
+        // unloaded directory that no build catches. Two passes -- what
+        // Apple's template does -- are correct under either reading,
+        // and a second scan of an mmapped buffer is nearly free.
+        sb.append("    cn1cdScan(context, data, YES);\n");
+        sb.append("    cn1cdScan(context, data, NO);\n");
         sb.append("    [context completeRequestWithCompletionHandler:nil];\n");
         sb.append("}\n\n");
         // requestFailedForExtensionContext:withError:, which is the whole

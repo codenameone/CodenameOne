@@ -343,6 +343,9 @@ static void cn1clReleaseOwn(NSString *uuidString, Class kind) {
     }
 }
 
+/// The route iOS is actually using; defined with the other audio natives.
+static int cn1clCurrentRoute(void);
+
 /// Records the call the audio session is about to belong to.
 static void cn1clOwnAudio(NSString *uuidString) {
     cn1clEnsureState();
@@ -430,6 +433,19 @@ static int64_t cn1clTrackAction(CXAction *action) {
 
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
     cn1clOwnAudio([action.callUUID UUIDString]);
+    // CLAIMED here, not only when the delivery runs. cn1clTrackAction is what
+    // takes a pushed call off the unclaimed list, and a held action does not
+    // reach it -- so a user who answered before the app was listening had the
+    // TTL watchdog end their call as unanswered while the answer sat in the
+    // queue. The user acting on it is the claim; when Java hears about it is
+    // not.
+    //
+    // ANSWER ONLY, deliberately. End must not claim: if Java never arrives,
+    // the watchdog ending the call is exactly what the user asked for, and
+    // claiming would leave it on screen for ever instead. Hold, mute and DTMF
+    // need no claim of their own -- they are only reachable on a call that
+    // was already answered, and the answer claimed it.
+    cn1clClaim([action.callUUID UUIDString]);
     // Held when the app has no listener yet: a pushed call rings before any
     // of its code runs, and the user can answer it there and then.
     if (cn1clHoldUntilReady(^{
@@ -577,6 +593,11 @@ static int64_t cn1clTrackAction(CXAction *action) {
     if (uuid == nil) {
         return;
     }
+    // The route iOS ACTUALLY chose, not the cached one. cn1clRoute starts at
+    // earpiece and only an app-initiated setter moves it, so a call activated
+    // on a connected headset or Bluetooth device was announced to the app as
+    // earpiece.
+    cn1clRoute = cn1clCurrentRoute();
     com_codename1_impl_ios_IOSCallCallbacks_audioActivated___java_lang_String_int(
             getThreadLocalData(), cn1clJString(uuid), cn1clRoute);
 }

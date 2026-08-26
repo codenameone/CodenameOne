@@ -75,6 +75,12 @@ public class AndroidVpnBridge implements VpnBridge {
     private boolean listening;
     private ConnectivityManager.NetworkCallback networkCallback;
 
+    /// Guards the watcher registration. Its own monitor rather than the
+    /// instance's, so a status delivery running on a platform callback thread
+    /// can never be waiting behind a registration that is itself calling into
+    /// ConnectivityManager.
+    private final Object watchLock = new Object();
+
     /// Whether this app has asked for its tunnel to be up.
     private volatile boolean startRequested;
 
@@ -458,6 +464,7 @@ public class AndroidVpnBridge implements VpnBridge {
         }
         // Not gated on installedWire; see startVpn.
         VpnStatus before = reconciledStatus();
+        boolean wasRequested = startRequested;
         try {
             startRequested = false;
             setStatus(VpnStatus.DISCONNECTING);
@@ -472,6 +479,14 @@ public class AndroidVpnBridge implements VpnBridge {
             // NOT_CONFIGURED when the platform has just said there is
             // nothing provisioned.
             boolean absent = isNotProvisioned(e);
+            // startRequested goes back too, and for the same reason the
+            // status does: a refused stop means the tunnel this app asked for
+            // is still up. Left false, setStatusListening(false) would then
+            // unregister the transport watcher on a live tunnel -- the very
+            // case the watcher exists for -- and a disconnect from Settings
+            // would go unseen for ever. Only a platform saying there is no
+            // profile at all justifies keeping it clear.
+            startRequested = wasRequested && !absent;
             setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
@@ -504,45 +519,59 @@ public class AndroidVpnBridge implements VpnBridge {
     /// is the only signal Android gives an app that its tunnel came up or
     /// went away, including when the user disconnects it from Settings.
     private void startWatchingTheTunnel() {
-        if (networkCallback != null || Build.VERSION.SDK_INT < 21) {
-            return;
-        }
-        ConnectivityManager cm = (ConnectivityManager)
-                context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm == null) {
-            return;
-        }
-        networkCallback = new TunnelWatcher(this);
-        try {
-            NetworkRequest request = new NetworkRequest.Builder()
-                    .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
-                    // A VPN is not "internet capable" by the default filter's
-                    // reckoning, so the default capabilities would never
-                    // match one.
-                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                    .build();
-            cm.registerNetworkCallback(request, networkCallback);
-        } catch (RuntimeException e) {
-            // Some devices refuse the registration; the API then reports
-            // whatever setStatus last set, which is what it did before.
-            networkCallback = null;
+        // The test, the assignment and the registration under ONE ordering.
+        // Vpn.start() and the first status listener both call this, and split,
+        // both could read null, build a watcher and register it -- after
+        // which only the last one written to the field is reachable. The
+        // other stayed registered for the life of the process, delivering
+        // duplicate status changes that no unregister could ever stop.
+        synchronized (watchLock) {
+            if (networkCallback != null || Build.VERSION.SDK_INT < 21) {
+                return;
+            }
+            ConnectivityManager cm = (ConnectivityManager)
+                    context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) {
+                return;
+            }
+            ConnectivityManager.NetworkCallback cb = new TunnelWatcher(this);
+            try {
+                NetworkRequest request = new NetworkRequest.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                        // A VPN is not "internet capable" by the default
+                        // filter's reckoning, so the default capabilities
+                        // would never match one.
+                        .removeCapability(
+                                NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                        .build();
+                cm.registerNetworkCallback(request, cb);
+                // Published only once the platform has accepted it, so a
+                // refusal leaves nothing registered and nothing in the field.
+                networkCallback = cb;
+            } catch (RuntimeException e) {
+                // Some devices refuse the registration; the API then reports
+                // whatever setStatus last set, which is what it did before.
+                networkCallback = null;
+            }
         }
     }
 
     private void stopWatchingTheTunnel() {
-        if (networkCallback == null) {
-            return;
-        }
-        ConnectivityManager cm = (ConnectivityManager)
-                context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm != null) {
-            try {
-                cm.unregisterNetworkCallback(networkCallback);
-            } catch (RuntimeException ignored) {
-                // Already gone.
+        synchronized (watchLock) {
+            if (networkCallback == null) {
+                return;
             }
+            ConnectivityManager cm = (ConnectivityManager)
+                    context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                try {
+                    cm.unregisterNetworkCallback(networkCallback);
+                } catch (RuntimeException ignored) {
+                    // Already gone.
+                }
+            }
+            networkCallback = null;
         }
-        networkCallback = null;
     }
 
     /// Turns VPN transport arrival and loss into a status change.

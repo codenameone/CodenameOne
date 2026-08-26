@@ -194,11 +194,35 @@ final class CallManifestFragments {
      * @param existing  the application fragment the project already supplies
      * @return the elements still needed, or the empty string when none are
      */
+    /**
+     * Whether {@code existing} declares a component with exactly this
+     * {@code android:name}.
+     *
+     * <p>A plain substring test was wrong in both directions. It matched the
+     * name inside anything that merely mentioned it -- an XML comment, a
+     * {@code meta-data} value, an {@code <intent-filter>} -- and suppressed a
+     * service the app never declared. It also matched a longer class that
+     * starts with ours, so an app shipping its own
+     * {@code CN1ConnectionServiceProxy} silently lost the real one. Either
+     * way the component goes missing, and a missing ConnectionService is not
+     * a build error: Telecom simply refuses every call at runtime.</p>
+     *
+     * @param existing the application fragment the project already supplies
+     * @param name     the fully qualified component name
+     * @return true when the fragment already declares that exact component
+     */
+    private static boolean declares(String existing, String name) {
+        // Both quotings, because an app hand-writing android.xapplication is
+        // writing XML by hand and either is valid there.
+        return existing.contains("android:name=\"" + name + "\"")
+                || existing.contains("android:name='" + name + "'");
+    }
+
     static String services(boolean session, boolean voip, boolean directory,
             String existing) {
         String have = existing == null ? "" : existing;
         StringBuilder sb = new StringBuilder();
-        if ((session || voip) && !have.contains(CONNECTION_SERVICE)) {
+        if ((session || voip) && !declares(have, CONNECTION_SERVICE)) {
             // exported=true is required rather than careless: Telecom is a
             // different process and cannot bind an unexported service. The
             // android:permission attribute is what keeps anything other than
@@ -225,7 +249,7 @@ final class CallManifestFragments {
                     .append("            </intent-filter>\n")
                     .append("        </service>\n");
         }
-        if (directory && !have.contains(SCREENING_SERVICE)) {
+        if (directory && !declares(have, SCREENING_SERVICE)) {
             sb.append("        <service android:name=\"")
                     .append(SCREENING_SERVICE)
                     .append("\"\n                 android:permission=")

@@ -170,6 +170,45 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void aMereMentionDoesNotCountAsADeclaration() {
+        // Suppression used to be a substring test, so anything that merely
+        // named the class -- an XML comment, a meta-data value, an
+        // intent-filter -- deleted the real <service>. A missing
+        // ConnectionService is not a build error: Telecom just refuses every
+        // call at runtime, on a device, long after the build went green.
+        String mine = "        <!-- we do not use "
+                + CallManifestFragments.CONNECTION_SERVICE + " yet -->\n"
+                + "        <meta-data android:name=\"screener\""
+                + " android:value=\""
+                + CallManifestFragments.SCREENING_SERVICE + "\" />\n";
+        String out = CallManifestFragments.services(true, false, true, mine);
+        assertTrue(out.contains("android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\""));
+        assertTrue(out.contains("android:name=\""
+                + CallManifestFragments.SCREENING_SERVICE + "\""));
+    }
+
+    @Test
+    public void aLongerClassNameThatStartsWithOursIsNotOurs() {
+        String mine = "        <service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "Proxy\" />\n";
+        String out = CallManifestFragments.services(true, false, false, mine);
+        assertTrue(out.contains("android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\""),
+                "an app's own subclass must not displace the real service");
+    }
+
+    @Test
+    public void singleQuotedDeclarationsSuppressToo() {
+        // android.xapplication is hand-written XML, where either quoting is
+        // valid.
+        String mine = "        <service android:name='"
+                + CallManifestFragments.CONNECTION_SERVICE + "' />\n";
+        assertFalse(CallManifestFragments.services(true, false, false, mine)
+                .contains(CallManifestFragments.CONNECTION_SERVICE));
+    }
+
+    @Test
     public void declaringBothLeavesNothingToGenerate() {
         String mine = CallManifestFragments.services(true, false, true, "");
         assertEquals("", CallManifestFragments.services(true, false, true, mine));

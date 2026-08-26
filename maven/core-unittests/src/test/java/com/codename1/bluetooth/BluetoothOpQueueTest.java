@@ -26,6 +26,7 @@ import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattService;
 import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +66,36 @@ class BluetoothOpQueueTest extends UITestBase {
         c3 = p.buildCharacteristic(s, BluetoothUuid.fromShort(0x2A39),
                 GattCharacteristic.PROPERTY_READ);
         p.connectNow();
+    }
+
+    @Test
+    void aThrowingCallbackDoesNotWedgeTheQueue() {
+        // The queue advances from a listener registered on the internal
+        // resource AFTER the one that publishes state and completes the
+        // caller's. Completing the caller's runs the app's own callbacks
+        // inline, so an app callback that threw came out through the
+        // publishing listener, the advancement listener never ran, and every
+        // later read, write and notify on that peripheral queued behind an
+        // operation nothing would ever start. The peripheral was dead for
+        // the life of the connection, with no error anywhere.
+        AsyncResource<byte[]> r1 = p.readCharacteristic(c1);
+        r1.ready(new SuccessCallback<byte[]>() {
+            @Override
+            public void onSucess(byte[] value) {
+                throw new IllegalStateException("a badly behaved app");
+            }
+        });
+        AsyncResource<byte[]> r2 = p.readCharacteristic(c2);
+
+        p.completeNext(bytes(1, 2));
+        assertTrue(r1.isDone());
+
+        assertEquals(1, p.pendingCount(),
+                "the queue must advance even though the callback threw");
+        assertSame(c2, p.peekNext().characteristic);
+        p.completeNext(bytes(3, 4));
+        assertArrayEquals(bytes(3, 4), r2.get(),
+                "the operation behind the throwing callback still answers");
     }
 
     @Test

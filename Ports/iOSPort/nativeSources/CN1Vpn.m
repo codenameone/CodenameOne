@@ -159,6 +159,10 @@ static void cn1vpEnsureInstallLock(void) {
 /// Whether the shared manager's saved configuration has been read.
 static BOOL cn1vpLoaded = NO;
 
+/// Whether a read is in flight, so a failure can be retried without two
+/// loads racing.
+static BOOL cn1vpLoading = NO;
+
 /// Reads the generation once per process.
 static int cn1vpLoadSecretGeneration(void) {
     if (cn1vpSecretGeneration < 0) {
@@ -331,18 +335,34 @@ JAVA_INT com_codename1_impl_ios_IOSNative_vpnCapabilities___R_int(
 /// stops being wrong: when the load lands, a listening app is told through
 /// the same statusChanged path a real transition uses.
 static void cn1vpEnsureLoaded(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        [[NEVPNManager sharedManager] loadFromPreferencesWithCompletionHandler:
-                ^(NSError *error) {
-            cn1vpLoaded = YES;
-            if (cn1vpListening) {
-                com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
-                        getThreadLocalData(), cn1vpStatusOrdinal(
-                                [[NEVPNManager sharedManager] connection].status));
+    // NOT dispatch_once: a load that FAILS must be retried. Marking the
+    // manager loaded regardless published its unloaded NEVPNStatusInvalid as
+    // NOT_CONFIGURED for good, so a transient read failure left an installed
+    // -- even connected -- VPN reported as absent for the life of the
+    // process.
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        if (cn1vpLoaded || cn1vpLoading) {
+            return;
+        }
+        cn1vpLoading = YES;
+    }
+    [[NEVPNManager sharedManager] loadFromPreferencesWithCompletionHandler:
+            ^(NSError *error) {
+        @synchronized (cn1vpInstallLock) {
+            cn1vpLoading = NO;
+            if (error != nil) {
+                // Left unloaded on purpose, so the next status query retries.
+                return;
             }
-        }];
-    });
+            cn1vpLoaded = YES;
+        }
+        if (cn1vpListening) {
+            com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
+                    getThreadLocalData(), cn1vpStatusOrdinal(
+                            [[NEVPNManager sharedManager] connection].status));
+        }
+    }];
 }
 
 #endif
