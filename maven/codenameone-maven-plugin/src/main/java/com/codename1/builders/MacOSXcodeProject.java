@@ -60,6 +60,26 @@ public class MacOSXcodeProject {
     static final String ENT_BLUETOOTH = "com.apple.security.device.bluetooth";
     static final String ENT_LOCATION = "com.apple.security.personal-information.location";
     static final String ENT_DISABLE_LIBRARY_VALIDATION = "com.apple.security.cs.disable-library-validation";
+    static final String ENT_FILES_USER_SELECTED_RO = "com.apple.security.files.user-selected.read-only";
+    static final String ENT_FILES_DOWNLOADS = "com.apple.security.files.downloads.read-write";
+    static final String ENT_CALENDARS = "com.apple.security.personal-information.calendars";
+    static final String ENT_ALLOW_JIT = "com.apple.security.cs.allow-jit";
+    static final String ENT_ALLOW_UNSIGNED_MEMORY = "com.apple.security.cs.allow-unsigned-executable-memory";
+
+    /**
+     * The privacy usage descriptions a capability needs, and the sentence used
+     * when the application does not supply one.
+     *
+     * <p>These are not cosmetic. macOS terminates a process that touches a
+     * TCC-gated API with no usage description in its bundle -- there is no
+     * prompt and no recoverable error, so an app built without them crashes the
+     * first time it opens the camera. The application's own string always wins;
+     * this is the floor, not the answer.</p>
+     */
+    static final String USAGE_CAMERA = "NSCameraUsageDescription";
+    static final String USAGE_MICROPHONE = "NSMicrophoneUsageDescription";
+    static final String USAGE_BLUETOOTH = "NSBluetoothAlwaysUsageDescription";
+    static final String USAGE_LOCATION = "NSLocationWhenInUseUsageDescription";
 
     private MacOSXcodeProject() {
     }
@@ -124,6 +144,10 @@ public class MacOSXcodeProject {
     /**
      * The entitlements for one distribution channel.
      *
+     * <p>Kept for the callers that only have the two booleans; the overload
+     * below is the one a build uses, because it also honours the documented
+     * {@code macos.entitlements.*} family.</p>
+     *
      * @param appStore  true for the sandboxed App Store channel, false for Developer ID
      * @param sandboxed whether the sandbox applies
      * @param caps      capabilities the app was detected to use
@@ -132,32 +156,73 @@ public class MacOSXcodeProject {
      */
     public static Map<String, Object> entitlements(boolean appStore, boolean sandboxed,
             MacOSCapabilities caps, boolean loadsExternalCode) {
+        return entitlements(appStore,
+                MacOSBuildHints.EntitlementOverrides.defaults(appStore, sandboxed),
+                caps, loadsExternalCode);
+    }
+
+    /**
+     * The entitlements for one distribution channel, honouring the configured
+     * overrides.
+     *
+     * <p>The capability scan decides the device entitlements and an explicit
+     * {@code macos.entitlements.device.*} overrides it in both directions. That
+     * ordering is what makes the scan a convenience rather than a ceiling: an
+     * application that reaches the camera through a cn1lib the scanner cannot
+     * see can still ask for the entitlement, and one that links the camera API
+     * without using it can decline the permission prompt.</p>
+     *
+     * @param appStore  true for the App Store channel, false for Developer ID
+     * @param overrides the resolved {@code macos.entitlements.*} settings
+     * @param caps      capabilities the app was detected to use
+     * @param loadsExternalCode true when the app dlopens, which Developer ID needs
+     *                          library validation relaxed for
+     */
+    public static Map<String, Object> entitlements(boolean appStore,
+            MacOSBuildHints.EntitlementOverrides overrides, MacOSCapabilities caps,
+            boolean loadsExternalCode) {
         Map<String, Object> ent = new LinkedHashMap<String, Object>();
-        if (sandboxed) {
+        MacOSCapabilities c = caps == null ? new MacOSCapabilities() : caps;
+        if (overrides.isSandbox()) {
             ent.put(ENT_SANDBOX, Boolean.TRUE);
             // Outbound networking and user-chosen files are what nearly every app
             // needs and neither can be requested later at runtime, so a sandboxed
             // build without them is one that fails the first time it opens a
             // socket or a file dialog.
-            ent.put(ENT_NETWORK_CLIENT, Boolean.TRUE);
-            ent.put(ENT_FILES_USER_SELECTED, Boolean.TRUE);
-            if (caps != null) {
-                if (caps.usesServerSockets) {
-                    ent.put(ENT_NETWORK_SERVER, Boolean.TRUE);
-                }
-                if (caps.usesCamera) {
-                    ent.put(ENT_CAMERA, Boolean.TRUE);
-                }
-                if (caps.usesMicrophone) {
-                    ent.put(ENT_MICROPHONE, Boolean.TRUE);
-                }
-                if (caps.usesBluetooth) {
-                    ent.put(ENT_BLUETOOTH, Boolean.TRUE);
-                }
-                if (caps.usesLocation) {
-                    ent.put(ENT_LOCATION, Boolean.TRUE);
-                }
+            if (overrides.isNetworkClient()) {
+                ent.put(ENT_NETWORK_CLIENT, Boolean.TRUE);
             }
+            if ("readwrite".equals(overrides.getFilesUserSelected())) {
+                ent.put(ENT_FILES_USER_SELECTED, Boolean.TRUE);
+                ent.put(ENT_FILES_DOWNLOADS, Boolean.TRUE);
+            } else if ("readonly".equals(overrides.getFilesUserSelected())) {
+                ent.put(ENT_FILES_USER_SELECTED_RO, Boolean.TRUE);
+            }
+            if (overrides.networkServer(c.usesServerSockets)) {
+                ent.put(ENT_NETWORK_SERVER, Boolean.TRUE);
+            }
+            if (overrides.camera(c.usesCamera)) {
+                ent.put(ENT_CAMERA, Boolean.TRUE);
+            }
+            if (overrides.microphone(c.usesMicrophone)) {
+                ent.put(ENT_MICROPHONE, Boolean.TRUE);
+            }
+            if (overrides.bluetooth(c.usesBluetooth)) {
+                ent.put(ENT_BLUETOOTH, Boolean.TRUE);
+            }
+            if (overrides.location(c.usesLocation)) {
+                ent.put(ENT_LOCATION, Boolean.TRUE);
+            }
+            if (overrides.calendars(false)) {
+                ent.put(ENT_CALENDARS, Boolean.TRUE);
+            }
+        }
+        // JIT is a hardened-runtime exception, not a sandbox one, so it is
+        // outside the block above: a Developer ID build is hardened and not
+        // sandboxed, and that is exactly the build that needs it.
+        if (overrides.isAllowJit()) {
+            ent.put(ENT_ALLOW_JIT, Boolean.TRUE);
+            ent.put(ENT_ALLOW_UNSIGNED_MEMORY, Boolean.TRUE);
         }
         if (!appStore && loadsExternalCode) {
             // Only when the app actually loads code it did not ship. Adding it
@@ -167,6 +232,54 @@ public class MacOSXcodeProject {
             ent.put(ENT_DISABLE_LIBRARY_VALIDATION, Boolean.TRUE);
         }
         return ent;
+    }
+
+    /**
+     * The privacy usage descriptions this application needs in its Info.plist.
+     *
+     * <p>Keyed off the same capability scan that decides the entitlements,
+     * because the two travel together: an entitlement grants the right to ask,
+     * and the usage description is the sentence macOS shows when asking. A
+     * bundle with the entitlement and no description does not prompt -- the
+     * process is killed the moment it touches the API, with nothing in the
+     * application's own logs to say why.</p>
+     *
+     * @param resolver supplies the application's own string for a key, or null
+     */
+    public static Map<String, Object> privacyUsageDescriptions(MacOSCapabilities caps,
+            UsageDescriptionResolver resolver) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (caps == null) {
+            return out;
+        }
+        if (caps.usesCamera) {
+            put(out, resolver, USAGE_CAMERA,
+                    "This app uses the camera at your request.");
+        }
+        if (caps.usesMicrophone) {
+            put(out, resolver, USAGE_MICROPHONE,
+                    "This app uses the microphone at your request.");
+        }
+        if (caps.usesBluetooth) {
+            put(out, resolver, USAGE_BLUETOOTH,
+                    "This app uses Bluetooth to communicate with nearby devices.");
+        }
+        if (caps.usesLocation) {
+            put(out, resolver, USAGE_LOCATION,
+                    "This app uses your location at your request.");
+        }
+        return out;
+    }
+
+    private static void put(Map<String, Object> out, UsageDescriptionResolver resolver,
+            String key, String fallback) {
+        String supplied = resolver == null ? null : resolver.get(key);
+        out.put(key, supplied != null && supplied.length() > 0 ? supplied : fallback);
+    }
+
+    /** Supplies the application's own usage-description string for a key, or null. */
+    public interface UsageDescriptionResolver {
+        String get(String key);
     }
 
     /** What the app was detected to use, which decides the sandbox entitlements. */
@@ -194,6 +307,21 @@ public class MacOSXcodeProject {
 
     /** Serializes a plist map to XML and writes it. */
     public static void writePlist(Map<String, Object> plist, File dest) throws IOException {
+        writePlist(plist, null, dest);
+    }
+
+    /**
+     * Serializes a plist map, then appends a raw XML fragment inside the dict.
+     *
+     * <p>The fragment is what {@code macos.entitlements.extra} carries: key/value
+     * pairs for entitlements this class does not model one at a time -- app
+     * groups, iCloud containers, a capability Apple added last week. It is
+     * written verbatim and deliberately not parsed, which is the only way to
+     * keep the escape hatch open; a malformed fragment produces a plist codesign
+     * rejects by name, which is a legible failure.</p>
+     */
+    public static void writePlist(Map<String, Object> plist, String extraXml, File dest)
+            throws IOException {
         FileOutputStream fos = new FileOutputStream(dest);
         try {
             Writer w = new OutputStreamWriter(fos, "UTF-8");
@@ -204,6 +332,12 @@ public class MacOSXcodeProject {
             for (Map.Entry<String, Object> e : plist.entrySet()) {
                 w.write("\t<key>" + escape(e.getKey()) + "</key>\n");
                 writeValue(w, e.getValue(), "\t");
+            }
+            if (extraXml != null && extraXml.trim().length() > 0) {
+                w.write(extraXml);
+                if (!extraXml.endsWith("\n")) {
+                    w.write("\n");
+                }
             }
             w.write("</dict>\n</plist>\n");
             w.flush();

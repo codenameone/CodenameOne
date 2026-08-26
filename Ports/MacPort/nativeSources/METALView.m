@@ -194,6 +194,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         self.renderPassDescriptor = nil;
     }
 
+    BOOL sizeWasKnown = framebufferWidth > 0 && framebufferHeight > 0;
     framebufferWidth = pw;
     framebufferHeight = ph;
     projectionMatrix = CN1MacOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
@@ -242,6 +243,23 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 #ifndef CN1_USE_ARC
     [newStencil release];
 #endif
+
+    // The framework has to hear about it, not just the framebuffer. Resizing the
+    // main NSWindow reallocated the Metal target and stopped there, so the
+    // current Form kept its old bounds: laid out and repainted for a size the
+    // window no longer has. Secondary windows never had this problem because
+    // their delegate calls CN1MacWindowDeliverResize; window 0 has no such
+    // delegate and this is its equivalent.
+    //
+    // Skipped for the first sizing, where there is no previous size to have
+    // changed from and the framework has not been told a size at all yet -- and
+    // skipped until Java exists, since this runs from AppKit before the app's
+    // main thread has constructed anything.
+    extern void screenSizeChanged(int width, int height);
+    extern BOOL cn1MacRuntimeIsJavaReady(void);
+    if (sizeWasKnown && cn1MacRuntimeIsJavaReady()) {
+        screenSizeChanged(pw, ph);
+    }
 }
 
 - (void)createRenderPassDescriptor {

@@ -614,6 +614,14 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     // no Apple port ever reaches. Returning from here deadlocks the start.
     extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_callback__(struct ThreadLocalData* threadStateData);
     com_codename1_impl_ios_IOSImplementation_callback__(threadStateData);
+    // HERE, exactly as on the watch. The generated main installs the app
+    // delegate and enters [NSApp run] without waiting for this thread, so AppKit
+    // can activate the application and deliver applicationDidBecomeActive before
+    // IOSImplementation exists -- and that callback dereferences the static
+    // instance with no null guard. The delegate holds those transitions until
+    // this line and then replays the state they left behind.
+    extern void cn1_mac_runtime_markJavaReady(void);
+    cn1_mac_runtime_markJavaReady();
     while (1) {
         [NSThread sleepForTimeInterval:3600];
     }

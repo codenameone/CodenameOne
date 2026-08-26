@@ -599,13 +599,13 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macOS builds. `NSHumanReadableCopyright` in the Info.plist. Defaults to `Copyright (c) <year> <vendor>`.
 
 |macos.signing.style
-|macOS builds. `automatic` (default) lets Xcode pick the signing certificate; `manual` forces the certificate identity hints below to be respected verbatim.
+|macOS builds. `manual` (default) signs with the certificate identity hints below, verbatim. `automatic` lets Xcode resolve the certificate from the team and provisioning profile instead. Manual is the default because a build server has an installed certificate and no Xcode account session, and automatic signing there stops to ask you to sign in; use automatic when building on your own machine.
 
 |macos.signingIdentity.appStore
-|macOS builds. Signing certificate identity for the App Store channel. Default `Apple Distribution`.
+|macOS builds. Signing certificate identity for the App Store channel. Default `Apple Distribution`. Set it to `none` to build unsigned -- an empty value can't say that, because an empty hint reads as unset and takes the default.
 
 |macos.signingIdentity.developerID
-|macOS builds. Signing certificate identity for the Developer ID channel. Default `Developer ID Application`.
+|macOS builds. Signing certificate identity for the Developer ID channel. Default `Developer ID Application`. Set it to `none` to build unsigned.
 
 |macos.provisioningProfile.appStore
 |macOS builds. Provisioning profile name for App Store distribution — used only when `macNative.signing.style=manual`.
@@ -614,7 +614,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macOS builds. Provisioning profile name for Developer ID distribution — used only when `macNative.signing.style=manual`.
 
 |macos.entitlements.appSandbox
-|macOS builds. `true` enables `com.apple.security.app-sandbox`. Default is `true` for the `appStore` channel (Mac App Store requires the sandbox), `false` for `developerID`.
+|macOS builds. `true` enables `com.apple.security.app-sandbox`. Default is `true` for the `appStore` channel, `false` for `developerID`. The App Store channel is always sandboxed whatever this says -- the Mac App Store requires it, and a package built without the sandbox gets rejected at submission rather than at build time. The refusal is reported in the build log.
 
 |macos.entitlements.network.client
 |macOS builds. Toggles `com.apple.security.network.client`. Default `true`.

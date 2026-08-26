@@ -53,6 +53,17 @@ public class MacOSBuildHints {
     /** Default deployment floor. Universal arm64 plus a mature NSTextInputClient. */
     public static final String DEFAULT_DEPLOYMENT_TARGET = "11.0";
 
+    /** The identities the Catalyst builder defaults to, kept so a migrated project still signs. */
+    public static final String DEFAULT_IDENTITY_APP_STORE = "Apple Distribution";
+    public static final String DEFAULT_IDENTITY_DEVELOPER_ID = "Developer ID Application";
+
+    /**
+     * Asks for an unsigned build. Needed because an empty hint reads as unset and
+     * therefore takes the default; this is how a smoke build says "no signature"
+     * out loud.
+     */
+    public static final String NO_SIGNING_IDENTITY = "none";
+
     private static final String DEFAULT_APP_CATEGORY = "public.app-category.developer-tools";
 
     private final List<String> warnings = new ArrayList<String>();
@@ -78,6 +89,11 @@ public class MacOSBuildHints {
     private String notarizeAppleId;
     private String notarizeTeamId;
     private String notarizePassword;
+    /// The hints this instance was parsed from, read again by the accessors that
+    /// resolve per channel. Initialized to a source that answers every key with
+    /// its default, so an instance nobody called parse() on behaves like a
+    /// project with no hints rather than throwing at the first accessor.
+    private HintSource source = NO_HINTS;
 
     /**
      * Reads one hint, preferring the {@code macos.} spelling and falling back to
@@ -86,6 +102,13 @@ public class MacOSBuildHints {
     public interface HintSource {
         String get(String key, String defaultValue);
     }
+
+    private static final HintSource NO_HINTS = new HintSource() {
+        @Override
+        public String get(String key, String defaultValue) {
+            return defaultValue;
+        }
+    };
 
     private String hint(HintSource src, String suffix, String defaultValue) {
         String modern = src.get("macos." + suffix, null);
@@ -103,6 +126,41 @@ public class MacOSBuildHints {
         return "true".equalsIgnoreCase(v) || "1".equals(v) || "on".equalsIgnoreCase(v);
     }
 
+    /** The first non-empty value, or null. */
+    private static String first(String... values) {
+        for (String v : values) {
+            if (v != null && v.length() > 0) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * A tri-state entitlement hint: the developer's value, or {@code fallback}
+     * when unset. Separate from {@link #isTrue} because "unset" and "false" mean
+     * different things here -- most of these default to something other than
+     * false, so treating a missing hint as false would turn every default off.
+     */
+    private static boolean entBool(HintSource src, String suffix, boolean fallback) {
+        String v = src.get("macos.entitlements." + suffix, null);
+        if (v == null || v.length() == 0) {
+            v = src.get("macNative.entitlements." + suffix, null);
+        }
+        if (v == null || v.length() == 0) {
+            return fallback;
+        }
+        return isTrue(v);
+    }
+
+    private static String entString(HintSource src, String suffix, String fallback) {
+        String v = src.get("macos.entitlements." + suffix, null);
+        if (v == null || v.length() == 0) {
+            v = src.get("macNative.entitlements." + suffix, null);
+        }
+        return v == null || v.length() == 0 ? fallback : v;
+    }
+
     /**
      * Parses the hint family. Never throws on a hint it does not recognise; an
      * unusable value is recorded in {@link #getWarnings()} and the default kept,
@@ -110,6 +168,7 @@ public class MacOSBuildHints {
      * underneath the project.
      */
     public void parse(HintSource src, String packageName) {
+        source = src;
         String dist = hint(src, "distribution", DISTRIBUTION_DEVELOPER_ID);
         if (DISTRIBUTION_APP_STORE.equalsIgnoreCase(dist)) {
             distribution = DISTRIBUTION_APP_STORE;
@@ -124,8 +183,15 @@ public class MacOSBuildHints {
         }
 
         // The Apple team id can legitimately be shared with the iOS build, so it
-        // falls back to ios.release.teamId rather than being asked for twice.
-        teamId = hint(src, "teamId", src.get("ios.release.teamId", null));
+        // is not asked for twice. The whole legacy chain, not just the first
+        // link: a project that only ever set ios.teamId or ios.debug.teamId
+        // signed fine under the Catalyst builder, and dropping either link
+        // leaves automatic signing with no DEVELOPMENT_TEAM -- which fails, or
+        // worse picks another team the account happens to belong to.
+        teamId = hint(src, "teamId",
+                first(src.get("ios.release.teamId", null),
+                        src.get("ios.teamId", null),
+                        src.get("ios.debug.teamId", null)));
 
         deriveBundleId = isTrue(hint(src, "deriveBundleId", "false"));
         bundleId = hint(src, "bundleId", null);
@@ -141,8 +207,16 @@ public class MacOSBuildHints {
         appCategory = hint(src, "appCategory", DEFAULT_APP_CATEGORY);
         copyright = hint(src, "copyright", null);
         signingStyle = hint(src, "signing.style", null);
-        signingIdentityAppStore = hint(src, "signingIdentity.appStore", null);
-        signingIdentityDeveloperID = hint(src, "signingIdentity.developerID", null);
+        // Defaulted, not left null. The Catalyst builder defaults these to the
+        // same two strings, so a project carrying only a team id signed there
+        // and would silently produce an unsigned dmg or pkg here -- a build you
+        // paid for and cannot ship. NO_SIGNING_IDENTITY is the way to ask for an
+        // unsigned build on purpose, which an empty value cannot express because
+        // an empty hint reads as unset.
+        signingIdentityAppStore = hint(src, "signingIdentity.appStore",
+                DEFAULT_IDENTITY_APP_STORE);
+        signingIdentityDeveloperID = hint(src, "signingIdentity.developerID",
+                DEFAULT_IDENTITY_DEVELOPER_ID);
         // Screenshot CI is the only consumer: a window whose size the app cannot
         // change is what makes a strict pixel comparison meaningful.
         fixedWindowSize = hint(src, "fixedWindowSize", null);
@@ -165,6 +239,11 @@ public class MacOSBuildHints {
         // distribution usually does not want it, so the default follows the
         // channel instead of being one value for both.
         sandbox = sandboxHint == null ? null : Boolean.valueOf(isTrue(sandboxHint));
+        if (sandbox != null && !sandbox.booleanValue() && buildsAppStoreChannel()) {
+            warnings.add("macos.sandbox=false is ignored for the App Store channel, which "
+                    + "requires the sandbox; the package would be rejected at submission. It is "
+                    + "honored for the Developer ID channel.");
+        }
         hardenedRuntime = !"false".equalsIgnoreCase(hint(src, "hardenedRuntime", "true"));
 
         notarize = isTrue(hint(src, "notarize", "false"));
@@ -192,13 +271,11 @@ public class MacOSBuildHints {
         return "dmg";
     }
 
-    /** True when the sandbox applies, following the channel unless set explicitly. */
-    public boolean isSandboxed() {
-        if (sandbox != null) {
-            return sandbox.booleanValue();
-        }
-        return DISTRIBUTION_APP_STORE.equals(distribution) || DISTRIBUTION_BOTH.equals(distribution);
-    }
+    // No whole-build isSandboxed()/getPackaging()/getSigningIdentity<Channel>()
+    // accessors. Both are per channel now, and a second way to ask that answers
+    // for "the build" would have to pick one channel's answer for a
+    // distribution=both build -- which is how the App Store package came to be
+    // signed with the Developer ID entitlements in the first place.
 
     public List<String> getWarnings() {
         return warnings;
@@ -232,13 +309,7 @@ public class MacOSBuildHints {
         return signingStyle;
     }
 
-    public String getSigningIdentityAppStore() {
-        return signingIdentityAppStore;
-    }
 
-    public String getSigningIdentityDeveloperID() {
-        return signingIdentityDeveloperID;
-    }
 
     /** The installer certificate productbuild signs a {@code .pkg} with, or null. */
     public String getInstallerIdentity() {
@@ -253,7 +324,66 @@ public class MacOSBuildHints {
     public String getSigningIdentityFor(String channel) {
         String identity = DISTRIBUTION_APP_STORE.equals(channel)
                 ? signingIdentityAppStore : signingIdentityDeveloperID;
-        return identity == null || identity.trim().length() == 0 ? null : identity;
+        if (identity == null || identity.trim().length() == 0
+                || NO_SIGNING_IDENTITY.equalsIgnoreCase(identity.trim())) {
+            return null;
+        }
+        return identity;
+    }
+
+    /**
+     * Whether Xcode resolves the certificate itself.
+     *
+     * <p>Manual is the default, deliberately, even though it reads as the less
+     * convenient one. A build server has an installed certificate and no Xcode
+     * account session, and automatic signing there fails asking to sign in --
+     * which is why the Catalyst ExportOptions default to manual too. Automatic
+     * is for a developer building on their own machine.</p>
+     */
+    public boolean usesAutomaticSigning() {
+        return "automatic".equalsIgnoreCase(signingStyle);
+    }
+
+    /**
+     * The hardened runtime, as an Xcode build setting rather than an entitlement.
+     * Notarization requires it, so it is on unless {@code macos.hardenedRuntime}
+     * turns it off. Distinct from {@code macos.entitlements.hardenedRuntime},
+     * which decides the JIT exceptions inside the signature.
+     */
+    public boolean isHardenedRuntime() {
+        return hardenedRuntime;
+    }
+
+    public String getFixedWindowSize() {
+        return fixedWindowSize;
+    }
+
+    public boolean isNotarize() {
+        return notarize;
+    }
+
+    public String getNotarizeKeychainProfile() {
+        return notarizeKeychainProfile;
+    }
+
+    public String getNotarizeAppleId() {
+        return notarizeAppleId;
+    }
+
+    public String getNotarizeTeamId() {
+        return notarizeTeamId;
+    }
+
+    public String getNotarizePassword() {
+        return notarizePassword;
+    }
+
+    public boolean buildsAppStoreChannel() {
+        return DISTRIBUTION_APP_STORE.equals(distribution) || DISTRIBUTION_BOTH.equals(distribution);
+    }
+
+    public boolean buildsDeveloperIdChannel() {
+        return DISTRIBUTION_DEVELOPER_ID.equals(distribution) || DISTRIBUTION_BOTH.equals(distribution);
     }
 
     /**
@@ -285,56 +415,203 @@ public class MacOSBuildHints {
     }
 
     /**
-     * Whether one channel is sandboxed. The App Store requires the sandbox and
-     * direct distribution usually does not want it, so with
-     * {@code distribution=both} the store's requirement must not leak into the
-     * directly distributed build -- an explicit {@code macos.sandbox} still wins
-     * for both, because that is the developer saying so.
+     * Whether one channel is sandboxed.
+     *
+     * <p>The App Store channel always is. The sandbox is mandatory there, so
+     * honouring an explicit {@code macos.sandbox=false} would build a package
+     * that is rejected at submission -- days later, by an email. It is honoured
+     * for Developer ID, where turning it off is a legitimate choice, and the
+     * override is reported in {@link #getWarnings()} rather than applied
+     * silently.</p>
      */
     public boolean isSandboxedFor(String channel) {
+        if (DISTRIBUTION_APP_STORE.equals(channel)) {
+            return true;
+        }
         if (sandbox != null) {
             return sandbox.booleanValue();
         }
-        return DISTRIBUTION_APP_STORE.equals(channel);
+        return false;
     }
 
-    public String getFixedWindowSize() {
-        return fixedWindowSize;
+    /**
+     * The documented {@code macos.entitlements.*} family (also accepted spelled
+     * {@code macNative.entitlements.*}), resolved for one channel.
+     *
+     * <p>Resolved here rather than at parse time because two of the defaults
+     * follow the channel: the sandbox is required for the App Store, and the
+     * hardened runtime is what notarization requires of Developer ID.</p>
+     */
+    public EntitlementOverrides entitlementsFor(String channel) {
+        boolean appStore = DISTRIBUTION_APP_STORE.equals(channel);
+        // The sandbox is not negotiable on the App Store channel, so it is read
+        // back from isSandboxedFor rather than from the hint -- see the warning
+        // parse() records when the two disagree.
+        int calendars = entTri(source, "personalInformation.calendars");
+        if (calendars == EntitlementOverrides.UNSET) {
+            // Inherited from the iOS side the same way the Catalyst builder does
+            // it: the sandbox calendars entitlement gates all EventKit access, so
+            // any calendar or reminder usage description implies it -- including
+            // write-only and reminders-only apps.
+            boolean needsCalendar = source.get("ios.NSCalendarsUsageDescription", null) != null
+                    || source.get("ios.NSCalendarsFullAccessUsageDescription", null) != null
+                    || source.get("ios.NSCalendarsWriteOnlyAccessUsageDescription", null) != null
+                    || source.get("ios.NSRemindersUsageDescription", null) != null
+                    || source.get("ios.NSRemindersFullAccessUsageDescription", null) != null;
+            if (needsCalendar) {
+                calendars = EntitlementOverrides.ON;
+            }
+        }
+        return new EntitlementOverrides(
+                appStore || entBool(source, "appSandbox", isSandboxedFor(channel)),
+                entBool(source, "network.client", true),
+                entTri(source, "network.server"),
+                entString(source, "files.userSelected", "readwrite").toLowerCase(),
+                entBool(source, "hardenedRuntime", !appStore && hardenedRuntime),
+                entBool(source, "allowJit", false),
+                entString(source, "extra", null),
+                entTri(source, "device.camera"),
+                entTri(source, "device.microphone"),
+                entTri(source, "device.bluetooth"),
+                entTri(source, "personalInformation.location"),
+                calendars);
     }
 
-    public String getPackaging() {
-        return packaging;
+    /**
+     * One usage-description string, or null.
+     *
+     * <p>{@code macos.NS...} wins, then the iOS spelling, which is what the
+     * feature catalog and existing settings files populate. Falling back to it
+     * matters because these strings are the same sentence on both platforms and
+     * nobody writes them twice.</p>
+     */
+    public String getUsageDescription(String key) {
+        return first(source.get("macos." + key, null),
+                source.get("macNative." + key, null),
+                source.get("ios." + key, null));
     }
 
-    public boolean isHardenedRuntime() {
-        return hardenedRuntime;
+    /// Tri-state as an int rather than a nullable Boolean: "unset" is a third
+    /// answer here, not an absent one, and every caller has to distinguish it
+    /// from false. A null Boolean would say the same thing and unbox into a
+    /// crash at the one call site that forgets.
+    private static int entTri(HintSource src, String suffix) {
+        String v = src.get("macos.entitlements." + suffix, null);
+        if (v == null || v.length() == 0) {
+            v = src.get("macNative.entitlements." + suffix, null);
+        }
+        if (v == null || v.length() == 0) {
+            return EntitlementOverrides.UNSET;
+        }
+        return isTrue(v) ? EntitlementOverrides.ON : EntitlementOverrides.OFF;
     }
 
-    public boolean isNotarize() {
-        return notarize;
+    /**
+     * The resolved {@code macos.entitlements.*} settings for one channel.
+     *
+     * <p>The device and personal-information settings are tri-state: unset means
+     * "follow what the application was detected to use", which is the default and
+     * the reason a build does not have to declare a capability it obviously
+     * needs. Each is read through a resolver that takes the detected value, so an
+     * explicit setting overrides the scan in both directions -- an app reaching
+     * the camera through a cn1lib the scanner cannot see can ask for the
+     * entitlement, and one that links the API without using it can decline the
+     * permission prompt.</p>
+     */
+    public static final class EntitlementOverrides {
+        static final int UNSET = -1;
+        static final int OFF = 0;
+        static final int ON = 1;
+
+        private final boolean sandbox;
+        private final boolean networkClient;
+        private final int networkServer;
+        private final String filesUserSelected;
+        private final boolean hardenedRuntime;
+        private final boolean allowJit;
+        private final String extra;
+        private final int camera;
+        private final int microphone;
+        private final int bluetooth;
+        private final int location;
+        private final int calendars;
+
+        EntitlementOverrides(boolean sandbox, boolean networkClient, int networkServer,
+                String filesUserSelected, boolean hardenedRuntime, boolean allowJit, String extra,
+                int camera, int microphone, int bluetooth, int location, int calendars) {
+            this.sandbox = sandbox;
+            this.networkClient = networkClient;
+            this.networkServer = networkServer;
+            this.filesUserSelected = filesUserSelected;
+            this.hardenedRuntime = hardenedRuntime;
+            this.allowJit = allowJit;
+            this.extra = extra;
+            this.camera = camera;
+            this.microphone = microphone;
+            this.bluetooth = bluetooth;
+            this.location = location;
+            this.calendars = calendars;
+        }
+
+        /** The defaults, for a caller that has no hints to resolve against. */
+        public static EntitlementOverrides defaults(boolean appStore, boolean sandboxed) {
+            return new EntitlementOverrides(sandboxed, true, UNSET, "readwrite", !appStore, false,
+                    null, UNSET, UNSET, UNSET, UNSET, UNSET);
+        }
+
+        public boolean isSandbox() {
+            return sandbox;
+        }
+
+        public boolean isNetworkClient() {
+            return networkClient;
+        }
+
+        /** {@code readwrite}, {@code readonly} or anything else for none. */
+        public String getFilesUserSelected() {
+            return filesUserSelected;
+        }
+
+        public boolean isHardenedRuntime() {
+            return hardenedRuntime;
+        }
+
+        public boolean isAllowJit() {
+            return allowJit;
+        }
+
+        /** Free-form XML inserted verbatim into the entitlements dict, or null. */
+        public String getExtra() {
+            return extra;
+        }
+
+        public boolean networkServer(boolean detected) {
+            return resolve(networkServer, detected);
+        }
+
+        public boolean camera(boolean detected) {
+            return resolve(camera, detected);
+        }
+
+        public boolean microphone(boolean detected) {
+            return resolve(microphone, detected);
+        }
+
+        public boolean bluetooth(boolean detected) {
+            return resolve(bluetooth, detected);
+        }
+
+        public boolean location(boolean detected) {
+            return resolve(location, detected);
+        }
+
+        public boolean calendars(boolean detected) {
+            return resolve(calendars, detected);
+        }
+
+        private static boolean resolve(int override, boolean detected) {
+            return override == UNSET ? detected : override == ON;
+        }
     }
 
-    public String getNotarizeKeychainProfile() {
-        return notarizeKeychainProfile;
-    }
-
-    public String getNotarizeAppleId() {
-        return notarizeAppleId;
-    }
-
-    public String getNotarizeTeamId() {
-        return notarizeTeamId;
-    }
-
-    public String getNotarizePassword() {
-        return notarizePassword;
-    }
-
-    public boolean buildsAppStoreChannel() {
-        return DISTRIBUTION_APP_STORE.equals(distribution) || DISTRIBUTION_BOTH.equals(distribution);
-    }
-
-    public boolean buildsDeveloperIdChannel() {
-        return DISTRIBUTION_DEVELOPER_ID.equals(distribution) || DISTRIBUTION_BOTH.equals(distribution);
-    }
 }

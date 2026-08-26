@@ -507,6 +507,28 @@ public class MacOSNativeBuilder extends Executor {
      */
     private void writeGeneratedPlists(BuildRequest request, MacOSBuildHints hints, File srcRoot,
             String appName, String version, String bundleVersion, File classesDir) throws IOException {
+        // Scanned once, up front. The same answer decides two things that have to
+        // agree: which sandbox entitlements the signature carries, and which
+        // usage descriptions the bundle carries. An entitlement without its
+        // description is a capability the app is allowed to ask for and is
+        // killed for using.
+        MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
+        try {
+            scanClassesForPermissions(classesDir, new CapabilityScanner(caps));
+        } catch (IOException ex) {
+            // A failed scan must not silently produce an entitlement set that
+            // omits a capability the application uses, because the failure then
+            // shows up as a permission denial at runtime with no explanation.
+            throw new IOException("Failed to scan the application for macOS capabilities", ex);
+        }
+        capabilities = caps;
+        // loadsExternalCode: a hardened-runtime bundle that dlopens anything --
+        // which a Codename One application does not, but a cn1lib shipping a
+        // dylib might -- needs the library-validation exception or the load is
+        // refused at runtime with nothing in the application's own logs.
+        loadsExternalCode = "true".equalsIgnoreCase(
+                request.getArg("macos.loadsExternalCode", "false"));
+
         Map<String, Object> plist = MacOSXcodeProject.infoPlist(request.getDisplayName(),
                 hints.getBundleId(), version, bundleVersion, hints);
 
@@ -519,6 +541,19 @@ public class MacOSNativeBuilder extends Executor {
             plist.put("CN1FixedWindowWidth", Integer.valueOf(fixedSize[0]));
             plist.put("CN1FixedWindowHeight", Integer.valueOf(fixedSize[1]));
         }
+
+        // Written before the inject merge so an application can still override one
+        // of them, and after the generated keys so a capability the scan found
+        // cannot ship without its sentence. macOS kills a process that touches a
+        // TCC-gated API with no usage description -- no prompt, no catchable
+        // error -- so a camera app built without this crashes on first use.
+        plist.putAll(MacOSXcodeProject.privacyUsageDescriptions(caps,
+                new MacOSXcodeProject.UsageDescriptionResolver() {
+                    @Override
+                    public String get(String key) {
+                        return hints.getUsageDescription(key);
+                    }
+                }));
 
         String inject = request.getArg("macos.plistInject", null);
         if (inject != null && inject.trim().length() > 0) {
@@ -538,22 +573,21 @@ public class MacOSNativeBuilder extends Executor {
 
         MacOSXcodeProject.writePlist(plist, new File(srcRoot, appName + "-Info.plist"));
 
-        MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
-        try {
-            scanClassesForPermissions(classesDir, new CapabilityScanner(caps));
-        } catch (IOException ex) {
-            // A failed scan must not silently produce an entitlement set that
-            // omits a capability the application uses, because the failure then
-            // shows up as a permission denial at runtime with no explanation.
-            throw new IOException("Failed to scan the application for macOS capabilities", ex);
+        // Written here rather than only at signing time, so mac-source hands the
+        // developer a project that is complete: they open it in Xcode, sign it
+        // themselves, and the entitlements are already sitting beside the plist
+        // under the channel name. buildChannel points xcodebuild at the same
+        // files rather than writing its own.
+        for (String channel : hints.getChannels()) {
+            writeEntitlements(hints, srcRoot, appName, channel, channelSuffix(channel));
         }
-        capabilities = caps;
-        // loadsExternalCode: a hardened-runtime bundle that dlopens anything --
-        // which a Codename One application does not, but a cn1lib shipping a
-        // dylib might -- needs the library-validation exception or the load is
-        // refused at runtime with nothing in the application's own logs.
-        loadsExternalCode = "true".equalsIgnoreCase(
-                request.getArg("macos.loadsExternalCode", "false"));
+    }
+
+    /// The file-name suffix for one signing channel. One place, because the
+    /// entitlements are written under it and named to xcodebuild under it, and
+    /// the two disagreeing would sign against a file nobody generated.
+    private static String channelSuffix(String channel) {
+        return MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel) ? "appstore" : "developerid";
     }
 
     /**
@@ -567,12 +601,14 @@ public class MacOSNativeBuilder extends Executor {
     private File writeEntitlements(MacOSBuildHints hints, File srcRoot, String appName,
             String channel, String suffix) throws IOException {
         boolean appStore = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel);
-        Map<String, Object> ent = MacOSXcodeProject.entitlements(appStore,
-                hints.isSandboxedFor(channel),
-                capabilities == null ? new MacOSXcodeProject.MacOSCapabilities() : capabilities,
-                loadsExternalCode);
+        MacOSBuildHints.EntitlementOverrides overrides = hints.entitlementsFor(channel);
+        Map<String, Object> ent = MacOSXcodeProject.entitlements(appStore, overrides,
+                capabilities, loadsExternalCode);
         File out = new File(srcRoot, appName + "-" + suffix + ".entitlements");
-        MacOSXcodeProject.writePlist(ent, out);
+        // macos.entitlements.extra rides along as raw XML rather than through the
+        // map: it exists precisely for keys this builder does not model, so
+        // parsing it would defeat it.
+        MacOSXcodeProject.writePlist(ent, overrides.getExtra(), out);
         return out;
     }
 
@@ -676,8 +712,7 @@ public class MacOSNativeBuilder extends Executor {
     private boolean buildChannel(BuildRequest request, MacOSBuildHints hints, File distDir,
             File srcRoot, String appName, String channel, boolean multiChannel)
             throws BuildException {
-        String suffix = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)
-                ? "appstore" : "developerid";
+        String suffix = channelSuffix(channel);
         // A derived-data directory per channel: the two builds differ only in
         // signing settings, and sharing one would let xcodebuild hand the second
         // channel the first channel's signature out of the build cache.
@@ -685,6 +720,7 @@ public class MacOSNativeBuilder extends Executor {
         derived.mkdirs();
 
         String signingIdentity = hints.getSigningIdentityFor(channel);
+        boolean automatic = hints.usesAutomaticSigning();
         List<String> cmd = new ArrayList<String>();
         cmd.add("xcodebuild");
         cmd.add("-project");
@@ -701,6 +737,12 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add("ARCHS=" + request.getArg("macos.arch", "arm64 x86_64"));
         cmd.add("ONLY_ACTIVE_ARCH=NO");
         cmd.add("MACOSX_DEPLOYMENT_TARGET=" + hints.getMinDeploymentTarget());
+        // The template hard-codes ENABLE_HARDENED_RUNTIME = YES in both
+        // configurations, so the default was already right and only the opt-out
+        // was broken. Passed explicitly either way, because a setting the build
+        // reads from two places is a setting that disagrees with itself the next
+        // time the template is edited.
+        cmd.add("ENABLE_HARDENED_RUNTIME=" + (hints.isHardenedRuntime() ? "YES" : "NO"));
         if (signingIdentity == null) {
             cmd.add("CODE_SIGNING_ALLOWED=NO");
             cmd.add("CODE_SIGN_IDENTITY=");
@@ -711,9 +753,16 @@ public class MacOSNativeBuilder extends Executor {
             } catch (IOException ex) {
                 throw new BuildException("Failed to write the " + channel + " entitlements", ex);
             }
-            cmd.add("CODE_SIGN_IDENTITY=" + signingIdentity);
-            cmd.add("CODE_SIGN_STYLE=" + ("automatic".equalsIgnoreCase(hints.getSigningStyle())
-                    ? "Automatic" : "Manual"));
+            if (automatic) {
+                // No CODE_SIGN_IDENTITY under automatic signing: Xcode resolves
+                // the certificate from the team and the provisioning profile, and
+                // naming one here while it picks another is how a build ends up
+                // signed by a certificate nobody chose.
+                cmd.add("CODE_SIGN_STYLE=Automatic");
+            } else {
+                cmd.add("CODE_SIGN_STYLE=Manual");
+                cmd.add("CODE_SIGN_IDENTITY=" + signingIdentity);
+            }
             // The generated entitlements have to be named here. Neither the
             // project template nor codesign picks the file up by convention, so
             // without this the signature carries none of them: an App Store build
@@ -742,11 +791,7 @@ public class MacOSNativeBuilder extends Executor {
         }
         String base = multiChannel ? appName + "-" + suffix : appName;
         File bundle = new File(resultDir, base + ".app");
-        try {
-            copyBundle(built, bundle);
-        } catch (IOException ex) {
-            throw new BuildException("Failed to collect the built application bundle", ex);
-        }
+        collectBundle(built, bundle);
         if (appBundle == null) {
             appBundle = bundle;
         }
@@ -951,38 +996,59 @@ public class MacOSNativeBuilder extends Executor {
         return null;
     }
 
-    private static void copyBundle(File src, File dest) throws IOException {
-        if (src.isDirectory()) {
-            dest.mkdirs();
-            File[] children = src.listFiles();
+    /**
+     * Copies the built {@code .app} into the result directory.
+     *
+     * <p>ditto, not a recursive file copy. A bundle that embeds a framework
+     * carries symlinks -- {@code Versions/Current} and the top-level binary and
+     * resource entries -- and {@code File.isDirectory()} and
+     * {@code FileInputStream} both follow them, so a hand-rolled copy
+     * materializes each link as a real file. The copy then no longer matches the
+     * signature Xcode just produced, and codesign verification and notarization
+     * reject it; the original bundle passes, so it looks like the packaging step
+     * broke the app. ditto also preserves the mode bits and extended attributes
+     * the signature covers.</p>
+     *
+     * <p>The destination is removed first. Without that, a rebuild without
+     * {@code mvn clean} merges the new bundle over the old one: a resource or a
+     * nested binary deleted since the last build stays in what ships, and for a
+     * signed build those unsealed files fail verification.</p>
+     */
+    private void collectBundle(File src, File dest) throws BuildException {
+        try {
+            if (dest.exists()) {
+                deleteRecursively(dest);
+            }
+            dest.getParentFile().mkdirs();
+            if (!exec(resultDir, 600000, "ditto", src.getAbsolutePath(), dest.getAbsolutePath())) {
+                throw new BuildException("Failed to collect " + src.getName()
+                        + " into the result directory");
+            }
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to collect the built application bundle", ex);
+        }
+    }
+
+    private static void deleteRecursively(File f) throws IOException {
+        // No symlink following on the way out either: deleting through a link
+        // would reach outside the result directory.
+        if (f.isDirectory() && !isSymlink(f)) {
+            File[] children = f.listFiles();
             if (children != null) {
                 for (File child : children) {
-                    copyBundle(child, new File(dest, child.getName()));
+                    deleteRecursively(child);
                 }
             }
-            return;
         }
-        dest.getParentFile().mkdirs();
-        java.io.FileInputStream in = new java.io.FileInputStream(src);
-        try {
-            FileOutputStream out = new FileOutputStream(dest);
-            try {
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    out.write(buf, 0, n);
-                }
-            } finally {
-                out.close();
-            }
-        } finally {
-            in.close();
+        if (!f.delete() && f.exists()) {
+            throw new IOException("Failed to delete " + f.getAbsolutePath());
         }
-        // Preserved so the bundle's executable is still executable after the
-        // copy; without it the .app is present and refuses to launch.
-        if (src.canExecute()) {
-            dest.setExecutable(true, false);
-        }
+    }
+
+    private static boolean isSymlink(File f) throws IOException {
+        return !f.getCanonicalFile().equals(f.getAbsoluteFile());
     }
 
     private void extractJarResource(String resource, File destDir) throws Exception {

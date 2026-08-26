@@ -124,23 +124,30 @@ public class MacOSBuildHintsTest {
                 parse(raw("macos.bundleId", "com.acme.custom"), "com.example.app").getBundleId());
     }
 
+    /// The store requires the sandbox, so an explicit macos.sandbox=false is
+    /// refused there and recorded as a warning rather than applied. Honoring it
+    /// would build a package rejected at submission, days later, by email.
     @Test
-    public void sandboxFollowsTheChannelUnlessSaidOtherwise() {
-        assertTrue(parse(raw("macos.distribution", "appStore"), "p").isSandboxed());
-        assertFalse(parse(raw("macos.distribution", "developerID"), "p").isSandboxed());
-        // Explicit wins either way.
-        assertTrue(parse(raw("macos.distribution", "developerID", "macos.sandbox", "true"), "p")
-                .isSandboxed());
-        assertFalse(parse(raw("macos.distribution", "appStore", "macos.sandbox", "false"), "p")
-                .isSandboxed());
+    public void appStoreSandboxIsNotOptional() {
+        assertTrue(parse(raw("macos.distribution", "appStore"), "p").isSandboxedFor("appStore"));
+        assertFalse(parse(raw("macos.distribution", "developerID"), "p")
+                .isSandboxedFor("developerID"));
+
+        MacOSBuildHints off = parse(raw("macos.distribution", "both", "macos.sandbox", "false"), "p");
+        assertTrue(off.isSandboxedFor("appStore"));
+        assertFalse(off.isSandboxedFor("developerID"));
+        assertEquals(1, off.getWarnings().size());
+        assertTrue(off.getWarnings().get(0).contains("macos.sandbox=false"));
     }
 
     @Test
     public void packagingFollowsTheChannelUnlessSaidOtherwise() {
-        assertEquals("dmg", parse(raw("macos.distribution", "developerID"), "p").getPackaging());
-        assertEquals("pkg", parse(raw("macos.distribution", "appStore"), "p").getPackaging());
-        assertEquals("both", parse(raw("macos.distribution", "both"), "p").getPackaging());
-        assertEquals("app", parse(raw("macos.packaging", "app"), "p").getPackaging());
+        assertEquals("dmg", parse(raw("macos.distribution", "developerID"), "p")
+                .getPackagingFor("developerID"));
+        assertEquals("pkg", parse(raw("macos.distribution", "appStore"), "p")
+                .getPackagingFor("appStore"));
+        assertEquals("app", parse(raw("macos.packaging", "app"), "p")
+                .getPackagingFor("developerID"));
     }
 
     @Test
@@ -212,8 +219,104 @@ public class MacOSBuildHintsTest {
                 "macos.signingIdentity.developerID", "Developer ID Application: X"), "p");
         assertEquals("3rd Party Mac Developer Application: X", h.getSigningIdentityFor("appStore"));
         assertEquals("Developer ID Application: X", h.getSigningIdentityFor("developerID"));
-        assertNull(parse(raw("macos.signingIdentity.developerID", "  "), "p")
+    }
+
+    /// A project carrying only a team id signed under the Catalyst builder,
+    /// which defaults these two strings. Leaving them null here produced an
+    /// unsigned dmg from a distribution build -- something you paid for and
+    /// cannot ship, with nothing in the log to say so.
+    @Test
+    public void signingIdentitiesCarryTheCatalystDefaults() {
+        MacOSBuildHints h = parse(raw("macos.distribution", "both"), "p");
+        assertEquals("Apple Distribution", h.getSigningIdentityFor("appStore"));
+        assertEquals("Developer ID Application", h.getSigningIdentityFor("developerID"));
+    }
+
+    /// "none" is how a smoke build asks for no signature. An empty value cannot
+    /// say it, because an empty hint reads as unset and takes the default.
+    @Test
+    public void unsignedIsRequestedByName() {
+        assertNull(parse(raw("macos.signingIdentity.developerID", "none"), "p")
                 .getSigningIdentityFor("developerID"));
+        assertNull(parse(raw("macNative.signingIdentity.developerID", "NONE"), "p")
+                .getSigningIdentityFor("developerID"));
+    }
+
+    /// The full legacy chain, not just the first link: a project that only ever
+    /// set ios.teamId or ios.debug.teamId signed under the Catalyst builder, and
+    /// a missing DEVELOPMENT_TEAM either fails automatic signing or picks another
+    /// team the account belongs to.
+    @Test
+    public void teamIdFallsBackThroughEveryIosSpelling() {
+        assertEquals("REL", parse(raw("ios.release.teamId", "REL", "ios.teamId", "GEN",
+                "ios.debug.teamId", "DBG"), "p").getTeamId());
+        assertEquals("GEN", parse(raw("ios.teamId", "GEN", "ios.debug.teamId", "DBG"), "p")
+                .getTeamId());
+        assertEquals("DBG", parse(raw("ios.debug.teamId", "DBG"), "p").getTeamId());
+        assertEquals("MAC", parse(raw("macos.teamId", "MAC", "ios.release.teamId", "REL"), "p")
+                .getTeamId());
+    }
+
+    /// Manual by default even though the docs used to promise automatic: a build
+    /// server has an installed certificate and no Xcode account session, and
+    /// automatic signing there fails asking to sign in.
+    @Test
+    public void signingStyleIsManualUnlessAutomaticIsAskedFor() {
+        assertFalse(parse(raw(), "p").usesAutomaticSigning());
+        assertTrue(parse(raw("macos.signing.style", "automatic"), "p").usesAutomaticSigning());
+        assertFalse(parse(raw("macos.signing.style", "manual"), "p").usesAutomaticSigning());
+    }
+
+    /// The documented macos.entitlements.* family, which nothing read: every one
+    /// of these was silently dropped, so a build asking for JIT or a network
+    /// server or an app group got a signature without it.
+    @Test
+    public void entitlementOverridesAreHonoured() {
+        MacOSBuildHints h = parse(raw(
+                "macos.distribution", "developerID",
+                "macos.entitlements.appSandbox", "true",
+                "macos.entitlements.network.server", "true",
+                "macos.entitlements.files.userSelected", "readonly",
+                "macos.entitlements.allowJit", "true",
+                "macos.entitlements.extra", "<key>x</key><true/>"), "p");
+        MacOSBuildHints.EntitlementOverrides o = h.entitlementsFor("developerID");
+        assertTrue(o.isSandbox());
+        assertTrue(o.networkServer(false));
+        assertEquals("readonly", o.getFilesUserSelected());
+        assertTrue(o.isAllowJit());
+        assertEquals("<key>x</key><true/>", o.getExtra());
+
+        // The legacy spelling still means the same thing.
+        assertTrue(parse(raw("macNative.entitlements.allowJit", "true"), "p")
+                .entitlementsFor("developerID").isAllowJit());
+    }
+
+    /// Tri-state: unset follows the capability scan, and an explicit value
+    /// overrides it in BOTH directions -- so a cn1lib the scanner cannot see can
+    /// still ask for the camera, and a linked-but-unused API can decline it.
+    @Test
+    public void deviceEntitlementsAreTriState() {
+        // Unset follows the scan, so it answers whatever it is handed.
+        assertTrue(parse(raw(), "p").entitlementsFor("appStore").camera(true));
+        assertFalse(parse(raw(), "p").entitlementsFor("appStore").camera(false));
+        // Explicit wins in both directions -- including over a scan that did NOT
+        // find the capability, which is what lets a cn1lib ask for it.
+        assertTrue(parse(raw("macos.entitlements.device.camera", "true"), "p")
+                .entitlementsFor("appStore").camera(false));
+        assertFalse(parse(raw("macos.entitlements.device.camera", "false"), "p")
+                .entitlementsFor("appStore").camera(true));
+    }
+
+    /// The same sentence on both platforms, so nobody writes it twice: the iOS
+    /// spelling is what the feature catalog and existing settings files carry.
+    @Test
+    public void usageDescriptionsFallBackToTheIosSpelling() {
+        assertEquals("scan a code", parse(raw("ios.NSCameraUsageDescription", "scan a code"), "p")
+                .getUsageDescription("NSCameraUsageDescription"));
+        assertEquals("mac wording", parse(raw("ios.NSCameraUsageDescription", "scan a code",
+                "macos.NSCameraUsageDescription", "mac wording"), "p")
+                .getUsageDescription("NSCameraUsageDescription"));
+        assertNull(parse(raw(), "p").getUsageDescription("NSCameraUsageDescription"));
     }
 
     /// The installer certificate is not the application certificate, so it is

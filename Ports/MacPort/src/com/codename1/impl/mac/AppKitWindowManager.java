@@ -84,8 +84,15 @@ class AppKitWindowManager extends WindowManager {
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
             boolean ownedByMainWindow) {
+        // The owner reaches AppKit, which is what makes an owned window stay
+        // above its owner and minimize, hide and close with it. Recording it only
+        // on the Peer left every secondary window unowned, so a dialog or a
+        // palette outlived the window it belongs to. -2 is the main window, -1 is
+        // unowned; matching the Windows and Linux ports, and unowned is its own
+        // value so an independent window is not made a child by default.
+        int ownerSlot = parentPeer != null ? slot(parentPeer) : (ownedByMainWindow ? -2 : -1);
         int s = nativeInstance.macWindowCreate(windowId, title == null ? "" : title,
-                x, y, width, height, decorated, resizable, positionSet);
+                x, y, width, height, decorated, resizable, ownerSlot, positionSet);
         if (s < 0) {
             return null;
         }

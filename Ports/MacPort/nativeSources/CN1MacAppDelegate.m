@@ -44,6 +44,77 @@
  */
 int pendingRemoteNotificationRegistrations = 0;
 
+/*
+ * Whether the Java side exists yet.
+ *
+ * The generated main installs this delegate and enters [NSApp run] BEFORE the
+ * thread that constructs IOSImplementation has got there -- it dispatches the
+ * app's main onto a background queue and does not wait. AppKit then activates
+ * the application immediately, so applicationDidBecomeActive: can arrive first,
+ * and IOSImplementation.applicationDidBecomeActive() synchronizes on
+ * instance.onActiveListeners with no null guard. Whether launch survives is
+ * down to thread scheduling.
+ *
+ * So the transitions are held until initVM publishes the lifecycle callback,
+ * and the state that accumulated meanwhile is replayed then. State, not events:
+ * these are two independent level pairs -- active/inactive and hidden/visible --
+ * and what the application needs to be told on startup is where each one ENDED
+ * UP, not every edge it passed through while nobody was listening.
+ *
+ * Everything here runs on the main queue, including the flush, so the flag needs
+ * no lock: cn1_mac_runtime_markJavaReady is called from the bootstrap thread and
+ * hops over rather than touching this state directly.
+ */
+static BOOL cn1MacJavaReady = NO;
+static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
+static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
+static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
+
+static void cn1MacDeliverURL(NSString *url) {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    JAVA_OBJECT str = fromNSString(threadStateData, url);
+    // Through shouldApplicationHandleURL, not straight into the AppArg property.
+    // That method notifies a URLCallback application AND sets AppArg, and it is
+    // what the UIKit delegate calls; setting the property alone leaves every app
+    // implementing URLCallback.shouldApplicationHandleURL with no notification
+    // that a deep link arrived at all.
+    com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(
+        threadStateData, str, JAVA_NULL);
+}
+
+/// Called from initVM once IOSImplementation exists and its lifecycle callback
+/// is installed. Mirrors the watch port's cn1_watch_runtime_markJavaReady, and
+/// for the same reason: that is the first honest moment at which the Java side
+/// can be told anything.
+void cn1_mac_runtime_markJavaReady(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1MacJavaReady = YES;
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        if (cn1MacPendingActive == 1) {
+            com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(threadStateData);
+        } else if (cn1MacPendingActive == 0) {
+            com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(threadStateData);
+        }
+        if (cn1MacPendingHidden == 1) {
+            com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(threadStateData);
+        } else if (cn1MacPendingHidden == 0) {
+            com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(threadStateData);
+        }
+        cn1MacPendingActive = -1;
+        cn1MacPendingHidden = -1;
+        for (NSString *url in cn1MacPendingURLs) {
+            cn1MacDeliverURL(url);
+        }
+        [cn1MacPendingURLs removeAllObjects];
+    });
+}
+
+/// Whether the framework may be called. Also the answer to "is there a Display
+/// yet", which is why the resize hook asks it too.
+BOOL cn1MacRuntimeIsJavaReady(void) {
+    return cn1MacJavaReady;
+}
+
 /// Set when the application is hidden or its last window closes, mirroring the
 /// UIKit flag the shared code reads to decide whether it may paint.
 extern BOOL isAppSuspended;
@@ -61,26 +132,50 @@ extern BOOL isAppSuspended;
 // background. Both are reported so an application that pauses work off screen
 // keeps working here.
 
+// isAppSuspended is set whether or not Java is up: it is C state the shared
+// paint path reads, and it has to be right from the first frame.
+
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
     isAppSuspended = NO;
+    if (!cn1MacJavaReady) {
+        cn1MacPendingActive = 1;
+        return;
+    }
     com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillResignActive:(NSNotification *)notification {
+    if (!cn1MacJavaReady) {
+        cn1MacPendingActive = 0;
+        return;
+    }
     com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationDidHide:(NSNotification *)notification {
     isAppSuspended = YES;
+    if (!cn1MacJavaReady) {
+        cn1MacPendingHidden = 1;
+        return;
+    }
     com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillUnhide:(NSNotification *)notification {
     isAppSuspended = NO;
+    if (!cn1MacJavaReady) {
+        cn1MacPendingHidden = 0;
+        return;
+    }
     com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
+    // Not queued: there is nothing after this to replay it on, and calling into
+    // a Java side that does not exist is the crash this guard exists to avoid.
+    if (!cn1MacJavaReady) {
+        return;
+    }
     com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
@@ -95,18 +190,21 @@ extern BOOL isAppSuspended;
 }
 
 - (void)application:(NSApplication *)application openURLs:(NSArray<NSURL *> *)urls {
-    // Recorded as the AppArg display property, which is where every Apple port
-    // puts a launch URL and where Display.getProperty("AppArg") reads it.
     for (NSURL *url in urls) {
         if (url == nil) {
             continue;
         }
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        JAVA_OBJECT display = com_codename1_ui_Display_getInstance___R_com_codename1_ui_Display(threadStateData);
-        JAVA_OBJECT key = fromNSString(threadStateData, @"AppArg");
-        JAVA_OBJECT value = fromNSString(threadStateData,
-            url.isFileURL ? url.path : [url absoluteString]);
-        com_codename1_ui_Display_setProperty___java_lang_String_java_lang_String(threadStateData, display, key, value);
+        NSString *spec = url.isFileURL ? url.path : [url absoluteString];
+        // A launch URL arrives before the Java side exists, which is the whole
+        // point of a launch URL, so it is held rather than dropped.
+        if (!cn1MacJavaReady) {
+            if (cn1MacPendingURLs == nil) {
+                cn1MacPendingURLs = [[NSMutableArray alloc] init];
+            }
+            [cn1MacPendingURLs addObject:spec];
+            break;
+        }
+        cn1MacDeliverURL(spec);
         break;
     }
 }

@@ -57,6 +57,12 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 @property (nonatomic, assign) BOOL utility;
 @property (nonatomic, assign) BOOL disposed;
 @property (nonatomic, assign) NSModalSession modalSession;
+/// The owner this window is to be attached to on its first show. Held rather
+/// than attached at creation because addChildWindow: orders the child in
+/// immediately, and a window created hidden must not appear because it acquired
+/// an owner. assign, not retain: AppKit owns its windows and a retain here would
+/// be a cycle through the child's own delegate.
+@property (nonatomic, assign) NSWindow *pendingOwner;
 @end
 
 @implementation CN1MacWindowRecord
@@ -244,7 +250,7 @@ static NSWindow *cn1MakeWindow(NSRect contentRect, BOOL decorated, BOOL resizabl
 
 // ---- natives -------------------------------------------------------------
 
-JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId, JAVA_OBJECT titleObj, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_BOOLEAN positionSet) {
+JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId, JAVA_OBJECT titleObj, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot, JAVA_BOOLEAN positionSet) {
     NSString *title = titleObj != JAVA_NULL
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG titleObj)
         : @"";
@@ -288,6 +294,23 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
         rec.slot = slot;
         [table addObject:rec];
 
+        // Ownership, once the window exists and is in the table. AppKit keeps a
+        // child above its owner and carries it through the owner's minimize,
+        // hide and close -- which is the whole of what an owned dialog or a
+        // palette means, and none of it happened while the owner was recorded
+        // only on the Java Peer.
+        NSWindow *owner = nil;
+        if (ownerSlot == -2) {
+            owner = [CN1MacHost sharedHost].window;
+        } else if (ownerSlot >= 0) {
+            CN1MacWindowRecord *ownerRec = cn1WindowAt(ownerSlot);
+            owner = ownerRec == nil ? nil : ownerRec.window;
+        }
+        // addChildWindow: orders the child in immediately, so it is deferred to
+        // the first show rather than applied here -- a window created hidden must
+        // not appear because it acquired an owner.
+        rec.pendingOwner = owner;
+
         CGFloat s = w.backingScaleFactor;
         [view updateFrameBufferSize:(int)(content.size.width * s)
                                   h:(int)(content.size.height * s)];
@@ -325,6 +348,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             return;
         }
         if (visible != 0) {
+            // Attached on the first show, so the child is ordered in with its
+            // owner rather than ahead of it. Cleared afterwards: re-adding an
+            // existing child reorders it, which would jump a palette back in
+            // front every time its window is shown again.
+            if (rec.pendingOwner != nil && rec.pendingOwner != rec.window) {
+                [rec.pendingOwner addChildWindow:rec.window ordered:NSWindowAbove];
+                rec.pendingOwner = nil;
+            }
             [rec.window makeKeyAndOrderFront:nil];
             CN1MacWindowDeliverVisibility(rec.windowId, YES);
             // AppKit hands back a usable window synchronously, so the content is
@@ -509,6 +540,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetMinimumSize___int_int_int
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);
         if (rec == nil) {
+            return;
+        }
+        // Zero or less clears the constraint, per the WindowManager contract.
+        // Scaling it instead installed a nonpositive minimum: the old constraint
+        // was not lifted, and AppKit is entitled to reject a negative one, so a
+        // window that dropped its minimum kept the previous one.
+        if (width <= 0 || height <= 0) {
+            rec.window.contentMinSize = NSZeroSize;
             return;
         }
         CGFloat scale = cn1WindowScale(rec);

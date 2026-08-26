@@ -44,8 +44,14 @@ class MacNative {
     /// that was never placed; inferred from the coordinates alone the two are
     /// the same, and the window server then puts the second one wherever it
     /// likes.
+    /// `ownerSlot` is what makes an owned window behave like one: AppKit keeps a
+    /// child window above its owner and takes it along when the owner is
+    /// minimized, hidden or closed. -2 asks for the application's main window,
+    /// -1 leaves the window unowned, and anything else is another window's slot.
+    /// Unowned has to be its own value rather than a default, so a genuinely
+    /// independent window is not quietly made a child of the main one.
     native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable, boolean positionSet);
+            boolean decorated, boolean resizable, int ownerSlot, boolean positionSet);
 
     native void macWindowDestroy(int slot);
 
