@@ -296,6 +296,16 @@ public class CN1ConnectionService extends ConnectionService {
         route = ordinal;
     }
 
+    /// Whether this app currently owns a call.
+    ///
+    /// The difference between "somebody is in a call" and "somebody ELSE is",
+    /// which TelecomManager.isInCall cannot express.
+    static boolean hasOwnCalls() {
+        synchronized (CONNECTIONS) {
+            return !CONNECTIONS.isEmpty();
+        }
+    }
+
     /// Clears every static table, for a provider reset.
     static void reset() {
         CN1CallNotifications.dismissAll();

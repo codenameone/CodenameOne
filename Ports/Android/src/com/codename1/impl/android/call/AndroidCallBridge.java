@@ -146,11 +146,15 @@ public class AndroidCallBridge implements CallBridge {
             return CallAvailability.NOT_PERMITTED.ordinal();
         }
         TelecomManager tm = telecom();
-        if (tm != null && Build.VERSION.SDK_INT >= 26 && tm.isInCall()) {
-            // Being in a call is not by itself a refusal -- this app may own
-            // it -- but Telecom will refuse a second self-managed call from a
-            // different owner, and this is the only signal available before
-            // trying.
+        if (tm != null && Build.VERSION.SDK_INT >= 26 && tm.isInCall()
+                && !CN1ConnectionService.hasOwnCalls()) {
+            // isInCall() is true for THIS app's own self-managed call too,
+            // and OTHER_APP_IN_CALL means another application -- so reporting
+            // it while the app was in its own call told that app not to
+            // report a second one, which Telecom would have accepted from the
+            // same account. Checking our own connections is the only way to
+            // tell the two apart; with none of ours up, somebody else's is
+            // the honest reading.
             return CallAvailability.OTHER_APP_IN_CALL.ordinal();
         }
         return CallAvailability.AVAILABLE.ordinal();

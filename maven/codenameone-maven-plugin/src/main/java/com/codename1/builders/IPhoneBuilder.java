@@ -5039,6 +5039,19 @@ public class IPhoneBuilder extends Executor {
                 // machine. Injecting the specially-granted networkextension
                 // entitlement for a package nobody can import would fail
                 // codesigning for no reason anyone could act on.
+                //
+                // The bare value is correct and a newline must NOT be added
+                // to force the array. This key is in the renderer's
+                // ARRAY_VALUED_ENTITLEMENTS set, so it is emitted as an
+                // <array> however many entries it has -- which is the only
+                // thing that CAN work here, because the newline convention
+                // used for multi-element keys like the NFC formats cannot
+                // express a ONE element array: the value is trimmed before it
+                // is split, so "allow-vpn\n" and "allow-vpn" are the same
+                // string and both used to come out as a <string>. Writing
+                // "allow-vpn\n" here would either change nothing or, without
+                // the trim, emit an empty second element that fails
+                // codesigning differently.
                 if (request.getArg("ios.entitlements.com.apple.developer"
                         + ".networking.vpn.api", null) == null) {
                     request.putArgument("ios.entitlements.com.apple.developer"

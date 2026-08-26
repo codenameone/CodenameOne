@@ -159,6 +159,15 @@ static NSMutableSet *cn1clSystemStarts = nil;
 /// CallRequests. Guarded by cn1clLock like the rest of the state.
 static NSMutableArray *cn1clTokenRequests = nil;
 
+/// The call whose audio session is being torn down.
+///
+/// didDeactivateAudioSession arrives AFTER the call is gone, so an owner
+/// dropped when the end action was fulfilled left that callback with nobody
+/// to report to -- and an app waiting for audioSessionDeactivated to stop its
+/// media and release the microphone never heard it. With another call still
+/// up it was worse: the deactivation was attributed to the survivor.
+static NSString *cn1clAudioRetiring = nil;
+
 /// The call CallKit last put in charge of the audio session.
 ///
 /// didActivateAudioSession names no call, and with more than one call up --
@@ -234,6 +243,9 @@ static void cn1clClaim(NSString *uuidString) {
 static void cn1clDropAudioLocked(NSString *uuidString) {
     if (cn1clAudioCall != nil && uuidString != nil
             && [cn1clAudioCall isEqualToString:uuidString]) {
+        // Retired rather than forgotten: CallKit deactivates the session
+        // after the call is gone, and that callback still has to name it.
+        cn1clAudioRetiring = cn1clAudioCall;
         cn1clAudioCall = nil;
     }
 }
@@ -262,6 +274,22 @@ static NSString *cn1clAudioOwner(void) {
         }
         return nil;
     }
+}
+
+/// The call a deactivation belongs to: the retiring one if there is one.
+///
+/// Deactivation follows the END of a call, so the ordinary owner lookup --
+/// which requires a live call -- is the wrong question here.
+static NSString *cn1clAudioDeactivating(void) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        if (cn1clAudioRetiring != nil) {
+            NSString *retiring = cn1clAudioRetiring;
+            cn1clAudioRetiring = nil;
+            return retiring;
+        }
+    }
+    return cn1clAudioOwner();
 }
 
 /// Allocates a token for a CXAction and remembers it.
@@ -297,6 +325,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [cn1clJavaStarts removeAllObjects];
         [cn1clSystemStarts removeAllObjects];
         cn1clAudioCall = nil;
+        cn1clAudioRetiring = nil;
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
 }
@@ -395,7 +424,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider didDeactivateAudioSession:(AVAudioSession *)audioSession {
-    NSString *uuid = cn1clAudioOwner();
+    NSString *uuid = cn1clAudioDeactivating();
     if (uuid == nil) {
         return;
     }

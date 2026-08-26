@@ -135,25 +135,83 @@ static int cn1vpStatusOrdinal(NEVPNStatus status) {
 ///
 /// NEVPNProtocol takes a keychain persistent reference rather than a string,
 /// which is the whole reason a loaded profile can never hand the secret back.
+/// Which generation of keychain items the installed profile references.
+///
+/// Persisted, because the profile it belongs to outlives the process. Zero
+/// means nothing this port installed is on the device yet.
+static int cn1vpSecretGeneration = -1;
+
+/// Reads the generation once per process.
+static int cn1vpLoadSecretGeneration(void) {
+    if (cn1vpSecretGeneration < 0) {
+        cn1vpSecretGeneration = (int)[[NSUserDefaults standardUserDefaults]
+                integerForKey:@"cn1vpn.secretGeneration"];
+    }
+    return cn1vpSecretGeneration;
+}
+
+static NSDictionary *cn1vpSecretQuery(NSString *account) {
+    return [NSDictionary dictionaryWithObjectsAndKeys:
+            (__bridge id)kSecClassGenericPassword, (__bridge id)kSecClass,
+            account, (__bridge id)kSecAttrAccount,
+            @"com.codename1.vpn", (__bridge id)kSecAttrService, nil];
+}
+
+/// Stores a secret under a FRESH account name and returns its reference.
+///
+/// The account carries a generation suffix and the previous generation is
+/// left alone until the save succeeds. Replacing in place deleted the item
+/// the INSTALLED profile still referenced before the replacement had reached
+/// saveToPreferences -- so an invalid configuration, a failed save or a user
+/// who declined left the old profile installed with its password reference
+/// pointing at a deleted item, and a tunnel that had been working could no
+/// longer authenticate.
 static NSData *cn1vpStoreSecret(NSString *account, NSString *secret) {
     if (secret == nil || [secret length] == 0) {
         return nil;
     }
     NSData *value = [secret dataUsingEncoding:NSUTF8StringEncoding];
-    NSDictionary *query = [NSDictionary dictionaryWithObjectsAndKeys:
-            (__bridge id)kSecClassGenericPassword, (__bridge id)kSecClass,
-            account, (__bridge id)kSecAttrAccount,
-            @"com.codename1.vpn", (__bridge id)kSecAttrService, nil];
-    SecItemDelete((__bridge CFDictionaryRef)query);
-    NSMutableDictionary *add = [NSMutableDictionary dictionaryWithDictionary:query];
+    NSMutableDictionary *add = [NSMutableDictionary dictionaryWithDictionary:
+            cn1vpSecretQuery(account)];
     [add setObject:value forKey:(__bridge id)kSecValueData];
     [add setObject:(__bridge id)kCFBooleanTrue
             forKey:(__bridge id)kSecReturnPersistentRef];
     CFTypeRef result = NULL;
-    if (SecItemAdd((__bridge CFDictionaryRef)add, &result) != errSecSuccess) {
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)add, &result);
+    if (status == errSecDuplicateItem) {
+        // Same generation twice in one process: overwriting this one is safe
+        // because no saved profile can reference it yet.
+        SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(account));
+        status = SecItemAdd((__bridge CFDictionaryRef)add, &result);
+    }
+    if (status != errSecSuccess) {
         return nil;
     }
     return (__bridge_transfer NSData *)result;
+}
+
+/// The generation the NEXT install writes its secrets under.
+static NSString *cn1vpSecretAccount(NSString *base) {
+    return [NSString stringWithFormat:@"%@.%d", base,
+            cn1vpLoadSecretGeneration() + 1];
+}
+
+/// Retires the generations older than the one that just saved.
+///
+/// Only after a successful save: until then the installed profile still
+/// references them.
+static void cn1vpRetireOldSecrets(void) {
+    int retired = cn1vpLoadSecretGeneration();
+    cn1vpSecretGeneration = retired + 1;
+    [[NSUserDefaults standardUserDefaults]
+            setInteger:cn1vpSecretGeneration forKey:@"cn1vpn.secretGeneration"];
+    if (retired <= 0) {
+        return;
+    }
+    SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+            [NSString stringWithFormat:@"cn1vpn.psk.%d", retired]));
+    SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+            [NSString stringWithFormat:@"cn1vpn.password.%d", retired]));
 }
 
 @interface CN1VpnStatusWatcher : NSObject
@@ -284,7 +342,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
                     : NEVPNIKEAuthenticationMethodNone;
             if ([psk length] > 0) {
                 ipsec.sharedSecretReference =
-                        cn1vpStoreSecret(@"cn1vpn.psk", psk);
+                        cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.psk"), psk);
             }
             ipsec.localIdentifier = [localId length] > 0 ? localId : nil;
             ipsec.remoteIdentifier = [remoteId length] > 0 ? remoteId : server;
@@ -299,7 +357,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
                     ? NEVPNIKEAuthenticationMethodSharedSecret
                     : NEVPNIKEAuthenticationMethodNone;
             if ([psk length] > 0) {
-                ike.sharedSecretReference = cn1vpStoreSecret(@"cn1vpn.psk", psk);
+                ike.sharedSecretReference = cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.psk"), psk);
             }
             ike.localIdentifier = [localId length] > 0 ? localId : nil;
             ike.remoteIdentifier = [remoteId length] > 0 ? remoteId : server;
@@ -312,7 +370,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             // The password goes to the keychain and the profile keeps only a
             // reference, which is why a loaded profile can never hand the
             // secret back to the app.
-            cfg.passwordReference = cn1vpStoreSecret(@"cn1vpn.password", pass);
+            cfg.passwordReference = cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.password"), pass);
         }
         cfg.disconnectOnSleep = NO;
 
@@ -327,6 +385,11 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         }
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
             if (saveError == nil) {
+                // The new profile is installed and owns the new generation,
+                // so the previous one's items can go. A failed save falls
+                // through and leaves them exactly where the still-installed
+                // profile expects them.
+                cn1vpRetireOldSecrets();
                 cn1vpAck(requestId, YES, 0, nil);
                 return;
             }
