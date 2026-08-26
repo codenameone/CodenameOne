@@ -230,4 +230,41 @@ public class MacOSXcodeProjectTest {
         assertEquals(expected[0], actual[0]);
         assertEquals(expected[1], actual[1]);
     }
+
+    /**
+     * The calendars entitlement without its usage descriptions is a capability
+     * the signature grants and macOS kills the process for using: EventKit is
+     * TCC-gated, and a bundle with no description gets no prompt and no
+     * catchable error.
+     */
+    @Test
+    public void calendarEntitlementBringsItsUsageDescriptions() {
+        Map<String, Object> none = MacOSXcodeProject.privacyUsageDescriptions(
+                new MacOSXcodeProject.MacOSCapabilities(), false, null);
+        assertFalse(none.containsKey("NSCalendarsFullAccessUsageDescription"));
+
+        Map<String, Object> granted = MacOSXcodeProject.privacyUsageDescriptions(
+                new MacOSXcodeProject.MacOSCapabilities(), true, null);
+        // Both halves of the macOS 14 split, because either API can be the first
+        // one the application reaches.
+        assertTrue(granted.containsKey("NSCalendarsFullAccessUsageDescription"));
+        assertTrue(granted.containsKey("NSCalendarsWriteOnlyAccessUsageDescription"));
+        assertTrue(granted.containsKey("NSRemindersFullAccessUsageDescription"));
+    }
+
+    /** The application's own wording wins over the generated floor. */
+    @Test
+    public void suppliedUsageDescriptionWinsOverTheDefault() {
+        Map<String, Object> out = MacOSXcodeProject.privacyUsageDescriptions(
+                new MacOSXcodeProject.MacOSCapabilities(), true,
+                new MacOSXcodeProject.UsageDescriptionResolver() {
+                    @Override
+                    public String get(String key) {
+                        return "NSRemindersFullAccessUsageDescription".equals(key)
+                                ? "we schedule your workouts" : null;
+                    }
+                });
+        assertEquals("we schedule your workouts", out.get("NSRemindersFullAccessUsageDescription"));
+        assertTrue(((String) out.get("NSCalendarsFullAccessUsageDescription")).length() > 0);
+    }
 }

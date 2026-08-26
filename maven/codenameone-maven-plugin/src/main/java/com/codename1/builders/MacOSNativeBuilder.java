@@ -564,8 +564,16 @@ public class MacOSNativeBuilder extends Executor {
         // cannot ship without its sentence. macOS kills a process that touches a
         // TCC-gated API with no usage description -- no prompt, no catchable
         // error -- so a camera app built without this crashes on first use.
+        // Calendars travels separately from the scanned capabilities: it is not
+        // something the class scan detects, it is inherited from the iOS
+        // usage-description hints -- and whichever channel grants the
+        // entitlement needs the descriptions in the one shared plist.
+        boolean calendarsGranted = false;
+        for (String channel : hints.getChannels()) {
+            calendarsGranted |= hints.entitlementsFor(channel).calendars(false);
+        }
         plist.putAll(MacOSXcodeProject.privacyUsageDescriptions(
-                effectiveCapabilities(hints, caps),
+                effectiveCapabilities(hints, caps), calendarsGranted,
                 new MacOSXcodeProject.UsageDescriptionResolver() {
                     @Override
                     public String get(String key) {
@@ -997,12 +1005,13 @@ public class MacOSNativeBuilder extends Executor {
             cmd.add("--sign");
             cmd.add(installer);
         } else if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)) {
-            // Said here because productbuild accepts an unsigned package happily
-            // and the upload refuses it a long way downstream.
-            log("macos.signingIdentity.installer is not set, so the App Store package is "
-                    + "unsigned and will be refused on upload. It wants a \"3rd Party Mac "
-                    + "Developer Installer\" certificate, which is a different certificate "
-                    + "from the application signing identity.");
+            // Fatal, not a warning. productbuild accepts an unsigned package
+            // happily and App Store Connect refuses it a long way downstream, so
+            // warning here hands back an artifact that cannot be submitted.
+            throw new BuildException("macos.signingIdentity.installer is not set, so the App "
+                    + "Store package would be unsigned and App Store Connect would refuse it. "
+                    + "It wants a \"3rd Party Mac Developer Installer\" certificate, which is a "
+                    + "different certificate from the application signing identity.");
         }
         cmd.add(pkg.getAbsolutePath());
         try {
@@ -1045,6 +1054,7 @@ public class MacOSNativeBuilder extends Executor {
                 }
                 submission = zip;
             }
+            int passwordIndex = -1;
             List<String> submit = new ArrayList<String>();
             submit.add("xcrun");
             submit.add("notarytool");
@@ -1064,6 +1074,7 @@ public class MacOSNativeBuilder extends Executor {
                 // macNative.notarize.password spelling is still supported and
                 // only the hint parser knows about it. Reading the modern key
                 // directly submits an empty password for a migrated project.
+                passwordIndex = submit.size();
                 submit.add(hints.getNotarizePassword() == null
                         ? "" : hints.getNotarizePassword());
             }

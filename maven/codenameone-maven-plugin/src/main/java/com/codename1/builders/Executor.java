@@ -3009,11 +3009,60 @@ public abstract class Executor {
         return exec(dir, javaHome, timeout, (Map<String, String>) null, varArgs);
     }
 
+
+    /**
+     * Argument positions the next {@link #exec} must not print, or null.
+     *
+     * <p>An instance field rather than a parameter because the logging happens
+     * in one place at the bottom of five overloads, and threading a set through
+     * all of them to serve two call sites would be worse than this. Always set
+     * and cleared around a single call -- see {@link #execRedacted}.</p>
+     */
+    private java.util.Set<Integer> redactedArgIndices;
+
+    /**
+     * Runs a command whose arguments at {@code secretIndices} are credentials.
+     *
+     * <p>{@code exec} appends every argument to the build message that is handed
+     * back to the customer AND to the daemon's stdout, so a password on the
+     * command line is retained twice over: once in an error log the customer
+     * reads, once in host logging that outlives the build. This is the only way
+     * to run {@code security import} or {@code notarytool submit} without doing
+     * that.</p>
+     *
+     * <p>The process still receives the real argument -- this redacts the log,
+     * not the command. A command line is visible to other processes on the host
+     * while it runs, which is a smaller and much shorter-lived exposure than a
+     * log file, and neither tool accepts the secret any other way.</p>
+     */
+    public boolean execRedacted(File dir, int timeout, int[] secretIndices, String... varArgs)
+            throws Exception {
+        java.util.Set<Integer> secrets = new java.util.HashSet<Integer>();
+        if (secretIndices != null) {
+            for (int i : secretIndices) {
+                secrets.add(Integer.valueOf(i));
+            }
+        }
+        redactedArgIndices = secrets;
+        try {
+            return exec(dir, timeout, varArgs);
+        } finally {
+            redactedArgIndices = null;
+        }
+    }
+
     public boolean exec(File dir, File javaHome, int timeout, Map<String, String> env, String... varArgs) throws Exception {
         log("Executing: ");
         message.append("Executing: ");
         StringBuilder logSb = new StringBuilder();
-        for (String s : varArgs) {
+        for (int argIdx = 0; argIdx < varArgs.length; argIdx++) {
+            // Redacted arguments are replaced, not omitted, so the command still
+            // reads as the shape it was. Both sinks matter: `message` is returned
+            // to the customer in the build log, and log() goes to the daemon's
+            // own stdout, so a credential printed here outlives the build in
+            // operational logging as well.
+            String s = redactedArgIndices != null && redactedArgIndices.contains(Integer.valueOf(argIdx))
+                    ? "***" : varArgs[argIdx];
             logSb.append(s + " ");
             message.append(s);
             message.append(" ");

@@ -80,6 +80,12 @@ public class MacOSXcodeProject {
     static final String USAGE_MICROPHONE = "NSMicrophoneUsageDescription";
     static final String USAGE_BLUETOOTH = "NSBluetoothAlwaysUsageDescription";
     static final String USAGE_LOCATION = "NSLocationWhenInUseUsageDescription";
+    /// macOS 14 split EventKit's prompt in two, and an app that only writes must
+    /// still declare the write-only key. Both are emitted when the calendar
+    /// entitlement is granted, because either API can be the first one reached.
+    static final String USAGE_CALENDARS = "NSCalendarsFullAccessUsageDescription";
+    static final String USAGE_CALENDARS_WRITE = "NSCalendarsWriteOnlyAccessUsageDescription";
+    static final String USAGE_REMINDERS = "NSRemindersFullAccessUsageDescription";
 
     private MacOSXcodeProject() {
     }
@@ -248,7 +254,29 @@ public class MacOSXcodeProject {
      */
     public static Map<String, Object> privacyUsageDescriptions(MacOSCapabilities caps,
             UsageDescriptionResolver resolver) {
+        return privacyUsageDescriptions(caps, false, resolver);
+    }
+
+    /**
+     * The privacy usage descriptions this application needs in its Info.plist.
+     *
+     * @param calendars true when the calendars entitlement was granted, which
+     *                  needs its own descriptions -- the entitlement grants the
+     *                  right to ask and the description is what macOS shows when
+     *                  asking, so an entitlement without one is a capability the
+     *                  process is killed for using
+     */
+    public static Map<String, Object> privacyUsageDescriptions(MacOSCapabilities caps,
+            boolean calendars, UsageDescriptionResolver resolver) {
         Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (calendars) {
+            put(out, resolver, USAGE_CALENDARS,
+                    "This app reads and updates your calendar at your request.");
+            put(out, resolver, USAGE_CALENDARS_WRITE,
+                    "This app adds events to your calendar at your request.");
+            put(out, resolver, USAGE_REMINDERS,
+                    "This app reads and updates your reminders at your request.");
+        }
         if (caps == null) {
             return out;
         }
