@@ -685,3 +685,14 @@ Bonjour
 # The Apple verb for signing a build. Not "code signing" here: this is the
 # spelling in the error an unavailable entitlement produces.
 codesigning
+
+# Call management (Call-Management.asciidoc) terminology.
+CallKit
+PushKit
+Telecom
+VoIP
+DTMF
+
+# VPN (VPN.asciidoc) terminology.
+IKEv2
+IPsec

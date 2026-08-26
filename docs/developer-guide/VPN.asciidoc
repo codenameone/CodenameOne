@@ -1,0 +1,163 @@
+== VPN
+
+Two quite separate things are called VPN support, and conflating them
+wastes a great deal of time.
+
+The first is *asking the operating system to run a standard tunnel* -- an
+IKEv2 configuration the platform implements itself, which your app installs,
+starts, stops, and watches. That's portable, needs a capability any paid
+developer account can switch on, and is what almost every app that says
+"connect to VPN" actually wants. It's `com.codename1.vpn.profile`, and it's
+what this chapter is mostly about.
+
+The second is *shipping a tunnel of your own* that receives raw IP packets and
+decides what to do with them. On iOS that code runs in a separate process with
+its own memory limit and no Java virtual machine inside it, so it can't be
+written in this framework at all, and the entitlement for it's one Apple
+grants case by case. That's `com.codename1.vpn.tunnel`, and the section on it
+is mostly about what it can't do.
+
+[options="header"]
+|===
+| Capability | iOS | Android | Simulator and desktop | JavaScript
+| Install a managed IKEv2 profile | yes | yes (Android 11 and later) | simulated | --
+| IPsec with a pre-shared key | yes | -- | simulated | --
+| Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
+| Always-on / on-demand | yes | yes | simulated | --
+| A tunnel your app implements | extension only, not in Java | yes (VpnService) | -- | --
+| Detect that some VPN is active | yes | yes | yes | --
+|===
+
+Branch on `Vpn.isSupported()` and `Vpn.getCapabilities()` rather than on the
+platform. Every callback arrives on the EDT.
+
+=== Detecting A VPN Is A Different Question, And Already Answered
+
+If all you want to know is whether this device's traffic is going over a VPN --
+to warn about it, or to refuse to run behind one --
+`NetworkManager.isVPNActive()` has answered that for years, works on far more
+platforms than can install a profile, and needs no entitlement at all.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VpnJava003Snippet.java[tag=vpn-java-003,indent=0]
+----
+
+Reach for this chapter only when your app needs to _configure_ a VPN, not when
+it needs to know about one.
+
+=== Installing And Running A Managed Profile
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VpnJava001Snippet.java[tag=vpn-java-001,indent=0]
+----
+
+Three things about that code are worth spelling out.
+
+*The user is asked, every time.* Both platforms show a system prompt when a
+configuration is installed and neither lets an app avoid it. A declined prompt
+fails with `VpnError.USER_DECLINED`, which is an ordinary outcome and not
+something to report as an error -- the snippet treats it as a normal return.
+
+*One configuration per app.* Both platforms give an app a single managed
+configuration, so `install` replaces whatever was there rather than adding to
+it.
+
+*The platform keeps the secret.* A profile read back with `Vpn.load()`
+describes the configuration but its `getPassword()` is always null, because the
+password lives in the platform keychain and is never handed back. Use
+`isPasswordKnown()` to tell a profile built without a password from one that
+was loaded, where the
+platform kept it".
+
+Watching the tunnel is a listener, and worth having: it can go down without
+your app asking.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VpnJava002Snippet.java[tag=vpn-java-002,indent=0]
+----
+
+Note the states aren't decoration either. `CONNECTING` can last as long as a
+real negotiation takes, and an app that only watches for `CONNECTED` looks
+frozen for the duration.
+
+=== Where The Platforms Disagree
+
+*Android needs version 11.* `VpnManager` and `Ikev2VpnProfile` arrive in API
+30. Codename One doesn't raise your app's `minSdkVersion` for this -- a
+feature that can report itself absent isn't worth cutting off older devices
+for -- so `Vpn.isSupported()` answers false below that and your app needs a
+path for it.
+
+*Android offers IKEv2 only.* There is no pre-shared-key IPsec equivalent in
+the managed profile API. A profile asking for `VpnProtocol.IPSEC` is refused
+with `INVALID_CONFIGURATION` rather than installed as something else without
+comment.
+
+*Starting isn't the same as connected.* On Android the platform accepts the
+start request and reports nothing further, so a successful `start()` means the
+request was accepted, not that the tunnel is up. Watch the status.
+
+=== A Tunnel Your App Implements
+
+If your VPN speaks a protocol the platforms don't implement -- anything that
+isn't IKEv2 or IPsec -- you need a packet tunnel, and you should understand
+what you are taking on before you start.
+
+On iOS a packet tunnel is a *Network Extension*: a separate process, with its
+own bundle identifier, its own provisioning profile and a hard memory limit,
+and *no Codename One inside it*. There is no Java virtual machine in that
+process, so the tunnel body is Objective-C or Swift that you write and
+maintain. Referencing `com.codename1.vpn.tunnel` makes the build generate the
+extension target and its skeleton; filling it in is yours.
+
+It also needs the `com.apple.developer.networking.networkextension`
+entitlement, which *Apple grants case by case* -- unlike the Personal VPN
+capability, which any paid account can enable itself. Codename One never
+injects it, because an entitlement an App ID doesn't carry fails codesigning
+with an error naming the entitlement and not the reason it appeared. The build
+fails early instead, with a message saying what to enable.
+
+On Android the equivalent is a `VpnService` your app hosts, which does run in
+your own process, and referencing the same package declares it.
+
+If you can express your requirement as an IKEv2 configuration, do that instead.
+It's portable, needs no special grant, and is a fraction of the work.
+
+=== Developing Without Hardware
+
+The simulator and the desktop builds run a simulated configuration store that
+tunnels nothing, so an install flow, a status screen and a reconnect button can
+all be built without a device or a server.
+
+Like the call simulation it keeps the awkward orderings: connecting passes
+through `CONNECTING`, and a profile read back has no password, because a
+simulation that handed the secret back would let code depend on something no
+device does.
+
+The *Simulate -> VPN* menu scripts the failures:
+
+* *Decline The Next Install Prompt* -- the outcome apps routinely treat as
+  impossible.
+* *Refuse The Credentials On Connect* -- the install and the connection fail in
+  different places for different reasons, and apps commonly handle only the
+  first.
+* *Drop The Tunnel* -- a tunnel going down without being asked.
+
+Every item is also callable from a test with `CN.execute("vpn:itemN")`.
+
+=== Build Hints
+
+[options="header"]
+|===
+| Hint | Default | What it does
+| `ios.entitlements.com.apple.developer.networking.vpn.api` | injected as `allow-vpn` | The Personal VPN capability. Enable it on the App ID or the app won't sign.
+| `ios.entitlements.com.apple.developer.networking.networkextension` | none | Required by `com.codename1.vpn.tunnel`, and never injected. Set it to `packet-tunnel-provider` once Apple has granted the capability.
+|===
+
+Everything else is automatic. Referencing `com.codename1.vpn.profile` links
+`NetworkExtension.framework` and injects the Personal VPN entitlement;
+referencing `com.codename1.vpn.tunnel` additionally generates the extension
+target and requires the granted entitlement above.

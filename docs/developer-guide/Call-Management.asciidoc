@@ -1,0 +1,245 @@
+== Call Management
+
+Codename One can make a call your app carries look, to the operating system
+and to the user, like a call the phone itself placed. That means the
+lock-screen call UI, the ringtone that plays while your app isn't running,
+the entry in the system call log, the audio session the OS hands over and
+takes back, and the caller's name shown for an incoming number the address
+book has never seen.
+
+The APIs live under `com.codename1.call`, in three sub-packages, and they're
+separate packages rather than one because referencing a package is the whole
+opt-in. The build server decides what native machinery an app gets by scanning
+bytecode for these prefixes, so an app that only labels spam numbers pays for
+none of the calling machinery -- no telephony permissions, no VoIP background
+mode. Referencing `com.codename1.call` itself costs nothing; it holds only the
+shared value types.
+
+[options="header"]
+|===
+| Capability | iOS | Android | Simulator and desktop | JavaScript
+| System call UI | yes (CallKit) | yes (Android 8 and later) | simulated | --
+| Ring while the app isn't running | yes (PushKit) | yes (high-priority push) | simulated | --
+| Answer, hold, mute, keypad from the system | yes | yes | simulated | --
+| Audio session handoff | yes | synthesized | simulated | --
+| Conference grouping | yes | -- | simulated | --
+| Caller identification | yes (Call Directory) | yes (Android 10 and later) | simulated | --
+| Call blocking | yes | yes (Android 10 and later) | simulated | --
+|===
+
+Branch on the capability queries -- `Calls.isSupported()`,
+`Calls.getCapabilities()`, `VoipPush.isSupported()`,
+`CallDirectory.isSupported()` -- rather than on platform detection. There is
+no way to make a desktop show a lock-screen call, so an app that offers calling
+needs an in-app fallback screen whatever else it does.
+
+Every callback in this family arrives on the EDT.
+
+=== Four Things Worth Knowing Before You Design Around This
+
+*Codename One doesn't carry the voice.* There is no codec here, no
+signalling and no WebRTC, and none is planned: those are your app's, and there
+are good libraries for them. What was missing was everything _around_ the
+media, and without it an app couldn't ring at all while backgrounded -- which
+is why a Codename One app couldn't previously be a calling app no matter how
+good its audio was.
+
+*Start media when the audio session activates, not when the user answers.*
+This is the single most common way to get a calling app wrong. On iOS the
+system owns the audio session: your app configures a category but must not
+activate it, and CallKit activates it and tells you. Code that starts its audio
+engine in `answerRequested` works in every simulator and produces a silent call
+on a device, with no error anywhere. Use `audioSessionActivated`. The Android
+port synthesizes the same callback when the connection goes active, so the one
+piece of advice is correct everywhere.
+
+*A pushed call is already ringing.* When a call arrives as a VoIP push, iOS
+requires it to be reported to the system _before any of your code runs_ and
+kills the app when it isn't -- so native code does the reporting from a fixed
+payload, and your listener is told afterwards. `PushedCall` therefore hands you
+a `CallSession` you never created, possibly one the user has already answered.
+Your job is to attach media to a call that exists, not to decide whether to
+ring.
+
+*Implement `providerReset`.* It means every call your app had is gone,
+because the user switched calling off or the platform recovered from an error.
+Drop your media and forget your sessions, but don't call `end()` on them --
+they no longer exist as far as the system is concerned. An app that leaves this
+method empty leaks its media engine and shows calls that aren't there.
+
+=== Owning A Call
+
+Configure once, then listen. `Calls.configure` must run before anything is
+reported: on Android an unregistered account makes `TelecomManager` ignore
+every reported call -- no exception, no log line, no call.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava001Snippet.java[tag=call-management-java-001,indent=0]
+----
+
+An incoming call your app learned about over its own connection is reported
+with an identifier you allocate. Both ends must use the same one for the life
+of the call.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava002Snippet.java[tag=call-management-java-002,indent=0]
+----
+
+Note the failure path isn't decoration. The system genuinely refuses to ring a
+call during an emergency call, when another app holds one, or when the user has
+switched your app's calling off, and `Calls.getAvailability()` will tell you
+before you try. An app that assumes reporting always succeeds shows a caller
+"ringing" over a phone that's silent.
+
+Outgoing calls are the same shape, with two extra reports that drive what the
+user sees: `reportStartedConnecting` while the far end is being rung, and
+`reportConnected` when media is actually flowing, which is what starts the call
+duration.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava003Snippet.java[tag=call-management-java-003,indent=0]
+----
+
+`CallSession` carries the rest: `end`, `setHeld`, `setMuted`, `sendDigits`,
+`update` and `groupWith`. Two are worth reading twice. `setMuted` tells the
+operating system what the mute button should look like and does *not* stop your
+app sending audio -- nothing in this package touches media. And
+`reportEndedRemotely` rather than `end` is what you call when the hang-up came
+down your own signalling, so the system call log says the far end hung up
+instead of blaming the user.
+
+=== Actions, And Why They Have To Be Answered
+
+When the user answers on the lock screen, hangs up from the car, or taps the
+keypad, the request arrives with a `CallAction`. Both platforms require an
+answer within a few seconds, and an unanswered one times out and leaves the
+system UI and your app disagreeing about the call, with nothing in the
+log to say so.
+
+Almost every app should ignore this entirely: an action the listener doesn't
+touch is fulfilled automatically, which is the correct behaviour. Only an app
+that must do slow asynchronous work before it knows whether it can comply --
+renegotiating a session, say -- calls `action.defer()` and then `fulfill()` or
+`fail()` itself. A deferred action that's forgotten is failed by a safety
+timer, because a failed action puts the UI back in a state the user can act on
+and a timed-out one doesn't.
+
+=== Ringing When The App isn't Running
+
+A VoIP push is delivered straight to the calling machinery, launching the app
+if it has to. It's the only way an app that isn't running can make the phone
+ring.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava004Snippet.java[tag=call-management-java-004,indent=0]
+----
+
+Because the call is reported to the system before any Java runs, *the native
+code parses the push itself* and your server has to honour a fixed shape:
+
+....
+{ "cn1call": { "uuid": "6B29FC40-CA47-1067-B31D-00DD010662DA",
+               "handle": "+14155551212", "handleType": "phoneNumber",
+               "displayName": "Jane Doe", "video": false,
+               "ttl": 30, "data": "opaque, handed back untouched" } }
+....
+
+`uuid` and `handle` are required; everything else falls back to the build
+hints. `data` is never parsed by the framework and is how you carry a room id
+or a session token through to code that runs later. To retract a call that was
+cancelled before it was answered, send the same `uuid` with `"cancel": true`.
+
+Sending a payload without `cn1call` wakes the app and rings nothing, which on
+iOS is the case that gets the app killed.
+
+Set the listener before or after registering, as you like -- calls that
+arrived first are held and drained when a listener appears. An app that never
+sets one will find its calls timed out and ended by the platform.
+
+WARNING: `UIBackgroundModes: voip` is added only for apps that reference
+`com.codename1.call.voip`, and Apple rejects an app that carries it without a
+working call implementation. That's the entire reason this is a separate
+package from `com.codename1.call.session`.
+
+=== Naming And Blocking Other People's Callers
+
+This is caller ID and spam blocking: an ordinary cellular call arrives, and the
+system asks the installed directories whether any of them recognises the
+number. It has nothing to do with calls your app carries, which is why it's a
+package of its own and carries no telephony permissions.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava005Snippet.java[tag=call-management-java-005,indent=0]
+----
+
+Numbers are `long` rather than `String` on purpose. Both platforms require the
+list in ascending numerical order and reject the whole list -- not the offending
+row -- when it isn't, and a string list sorts lexicographically, which puts
+`+1999...` before `+12...`. `CallDirectory` sorts and de-duplicates what you
+give it, so you need not.
+
+Two platform facts to design around. On iOS the numbers are read by a separate
+app extension the system starts on its own schedule, so installing the data and
+asking the system to read it are two steps. And caller identification is *off
+until the user enables your app* in Settings, which nothing you write can do
+for them -- check `DirectoryStatus.isEnabled()` before concluding that a load
+failed.
+
+=== Developing Without Hardware
+
+The simulator and the desktop builds run a real simulated call stack rather
+than reporting the feature unsupported, so a ringing screen, an in-call screen
+and a media lifecycle can all be built and tested without a phone.
+
+It's a simulation and not a stub, and the difference is deliberate: nothing
+completes inside the calling stack frame, and the audio session arrives well
+after the answer rather than with it, because that gap is where media bugs
+live.
+
+The *Simulate -> Calls* menu scripts the awkward cases rather than the happy
+one, which is what makes it worth opening:
+
+* *Ring A Second Call While Busy* -- where a single-call state machine breaks.
+* *Refuse The Next Call* -- the emergency-call refusal an app that assumes
+  reporting always succeeds never handles.
+* *Never Activate The Audio Session* -- makes the silent-call mistake above
+  reproduce on your desk instead of on a device.
+* *Queue A Call That Already Ended* -- the cold-start call that must be logged
+  as missed, never answered.
+
+Every item is also callable from a test with `CN.execute("call:itemN")`.
+
+=== Build Hints
+
+[options="header"]
+|===
+| Hint | Default | What it does
+| `ios.call.providerName` | the app's display name | The name shown above a call in the system UI.
+| `ios.call.ringtone` | the system ringtone | A sound file in the bundle to ring with.
+| `ios.call.icon` | none | A template image shown beside the call.
+| `ios.call.unknownCaller` | none | The name shown when a push carries no `displayName`.
+| `ios.call.pushTTL` | `30` | Seconds a pushed call waits for your code before the system ends it as unanswered.
+| `ios.call.video` | `false` | Whether the provider offers video calls.
+| `ios.call.recents` | `true` | Whether calls appear in the system call log.
+|===
+
+These are baked into `Info.plist` rather than set from code because native code
+needs them during launch, before any of your code has run. Setting only
+`CallConfiguration` and expecting a pushed call to ring with the right name is
+the mistake to avoid; `CallConfiguration` refines them once the app is up.
+
+Everything else is automatic. Referencing `com.codename1.call.session` links
+CallKit and registers the Android service; referencing
+`com.codename1.call.voip` adds PushKit and the `voip` background mode;
+referencing `com.codename1.call.directory` generates the iOS Call Directory
+extension and the Android screening service.
+
+WARNING: CallKit can't be used in apps distributed in mainland China, and an
+app that ships it to that storefront is rejected or removed. Codename One
+can't detect where you intend to publish, so if that applies to you, keep the
+calling packages out of that build.

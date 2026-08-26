@@ -157,6 +157,10 @@ include::Bluetooth.asciidoc[]
 
 include::Nearby-Devices.asciidoc[]
 
+include::Call-Management.asciidoc[]
+
+include::VPN.asciidoc[]
+
 include::Health.asciidoc[]
 
 include::Smart-Home.asciidoc[]
