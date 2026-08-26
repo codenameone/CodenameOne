@@ -427,6 +427,86 @@ class InterpRuntimeContractTest {
         }
     }
 
+    /**
+     * The same shape as the method static/instance check, one level up:
+     * a bundle compiled against a public/protected method the installed
+     * framework has since made private would otherwise bind through
+     * <code>invokevirtual</code>, since <code>setAccessible(true)</code>
+     * would gladly call the private declaration. The JVM raises
+     * <code>IllegalAccessError</code> (nestmate access requires
+     * <code>invokespecial</code>); the linker mirrors that at
+     * <code>invokeVirtual</code>, and leaves <code>invokeSpecial</code>
+     * unaffected because super / init / nestmate targets are its whole
+     * purpose.
+     */
+    @Test
+    @DisplayName("virtual invocation refuses a method that became private")
+    void virtualInvocationRefusesAMethodThatBecamePrivate() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.invokeVirtual(new NowPrivate(),
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$NowPrivate",
+                    "run", "()V", new Object[0]);
+            throw new AssertionError("virtual bind to a private method should have been refused");
+        } catch (IllegalAccessError expected) {
+            // JVMS 5.4.3.3 -- invokevirtual against a private method is an IAE.
+        }
+    }
+
+    static class NowPrivate {
+        @SuppressWarnings("unused")
+        private void run() {
+        }
+    }
+
+    /**
+     * A field that changed instance/static between the bundle's compile and
+     * the installed framework must not bind through the opposite access
+     * opcode: <code>Field.get(target)</code> silently ignores the receiver
+     * on a static slot, and <code>Field.get(null)</code> on an instance
+     * slot throws an uninformative NPE. The JVM raises
+     * <code>IncompatibleClassChangeError</code>; the linker mirrors that
+     * at both the get/set instance sites (<code>GETFIELD/PUTFIELD</code>)
+     * and the get/set static sites (<code>GETSTATIC/PUTSTATIC</code>).
+     */
+    @Test
+    @DisplayName("static field access refuses an instance field")
+    void staticFieldAccessRefusesAnInstanceField() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.getStatic(
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$WasStatic",
+                    "value", "I");
+            throw new AssertionError("static read of an instance field should have been refused");
+        } catch (IncompatibleClassChangeError expected) {
+            // JVMS 5.4.3.2 -- static access of an instance field is an ICCE.
+        }
+    }
+
+    @Test
+    @DisplayName("instance field access refuses a static field")
+    void instanceFieldAccessRefusesAStaticField() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.getField(new WasInstance(),
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$WasInstance",
+                    "value", "I");
+            throw new AssertionError("instance read of a static field should have been refused");
+        } catch (IncompatibleClassChangeError expected) {
+            // JVMS 5.4.3.2 -- instance access of a static field is an ICCE.
+        }
+    }
+
+    static class WasStatic {
+        @SuppressWarnings("unused")
+        public int value = 3;
+    }
+
+    static class WasInstance {
+        @SuppressWarnings("unused")
+        public static int value = 3;
+    }
+
 
     /**
      * A pushed program that never returns has to be stoppable, or the Stop

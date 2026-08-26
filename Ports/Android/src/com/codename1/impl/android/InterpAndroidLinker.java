@@ -429,6 +429,16 @@ public class InterpAndroidLinker implements InterpLinker {
         if (Modifier.isStatic(m.getModifiers())) {
             throw new IncompatibleClassChangeError(owner + "." + name + " is static");
         }
+        // Same shape for a public/protected method the installed framework
+        // has since made private: setAccessible(true) would otherwise call
+        // the private declaration silently, and the JVM raises
+        // IllegalAccessError for invokevirtual on a private method (nestmate
+        // access requires invokespecial). lookupMethod already refuses a
+        // private declaration inherited from a superclass; this covers the
+        // directly-declared case that walk permits.
+        if (Modifier.isPrivate(m.getModifiers())) {
+            throw new IllegalAccessError(owner + "." + name + " is private");
+        }
         try {
             return m.invoke(target, args);
         } catch (InvocationTargetException e) {
@@ -442,6 +452,9 @@ public class InterpAndroidLinker implements InterpLinker {
         if (Modifier.isStatic(m.getModifiers())) {
             throw new IncompatibleClassChangeError(owner + "." + name + " is static");
         }
+        // No private check here: invokespecial's whole role -- super, init,
+        // nestmate -- is to reach methods invokevirtual cannot, and a private
+        // one on the declared owner is a legitimate target.
         try {
             return m.invoke(target, args);
         } catch (InvocationTargetException e) {
@@ -475,12 +488,16 @@ public class InterpAndroidLinker implements InterpLinker {
     }
 
     public Object getStatic(String owner, String name, String descriptor) throws Throwable {
-        return lookupField(owner, name, descriptor).get(null);
+        Field f = lookupField(owner, name, descriptor);
+        requireStaticField(f, owner, name);
+        return f.get(null);
     }
 
     public void setStatic(String owner, String name, String descriptor, Object value)
             throws Throwable {
-        lookupField(owner, name, descriptor).set(null, value);
+        Field f = lookupField(owner, name, descriptor);
+        requireStaticField(f, owner, name);
+        f.set(null, value);
     }
 
     public Object getField(Object target, String owner, String name, String descriptor)
@@ -488,7 +505,9 @@ public class InterpAndroidLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        return lookupField(owner, name, descriptor).get(target);
+        Field f = lookupField(owner, name, descriptor);
+        requireInstanceField(f, owner, name);
+        return f.get(target);
     }
 
     public void setField(Object target, String owner, String name, String descriptor, Object value)
@@ -496,7 +515,27 @@ public class InterpAndroidLinker implements InterpLinker {
         if (target == null) {
             throw new NullPointerException(owner + "." + name);
         }
-        lookupField(owner, name, descriptor).set(target, value);
+        Field f = lookupField(owner, name, descriptor);
+        requireInstanceField(f, owner, name);
+        f.set(target, value);
+    }
+
+    // A host field that changed instance/static between the bundle's compile
+    // and the installed framework must not bind through the opposite access
+    // opcode: Field.get(target) silently ignores the receiver on a static
+    // slot, and Field.get(null) on an instance slot throws NPE from deep in
+    // reflection with no context. The JVM raises IncompatibleClassChangeError;
+    // mirror that here for GETFIELD/PUTFIELD/GETSTATIC/PUTSTATIC.
+    private void requireStaticField(Field f, String owner, String name) {
+        if (!Modifier.isStatic(f.getModifiers())) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is not static");
+        }
+    }
+
+    private void requireInstanceField(Field f, String owner, String name) {
+        if (Modifier.isStatic(f.getModifiers())) {
+            throw new IncompatibleClassChangeError(owner + "." + name + " is static");
+        }
     }
 
     public boolean isInstance(Object hostClass, Object value) {
