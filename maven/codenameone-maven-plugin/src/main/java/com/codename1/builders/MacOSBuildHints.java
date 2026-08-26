@@ -64,7 +64,15 @@ public class MacOSBuildHints {
      */
     public static final String NO_SIGNING_IDENTITY = "none";
 
-    private static final String DEFAULT_APP_CATEGORY = "public.app-category.developer-tools";
+    /**
+     * The neutral category, and the one the build-hint documentation states.
+     *
+     * <p>Not developer-tools: that was the sample's own setting leaking into the
+     * default, and it would classify every customer application that never sets
+     * the hint -- a game, a shop, a utility -- as a developer tool in the App
+     * Store.</p>
+     */
+    private static final String DEFAULT_APP_CATEGORY = "public.app-category.utilities";
 
     private final List<String> warnings = new ArrayList<String>();
 
@@ -516,7 +524,8 @@ public class MacOSBuildHints {
                 entTri(source, "device.microphone"),
                 entTri(source, "device.bluetooth"),
                 entTri(source, "personalInformation.location"),
-                calendars);
+                calendars,
+                entTri(source, "files.downloads"));
     }
 
     /**
@@ -577,10 +586,12 @@ public class MacOSBuildHints {
         private final int bluetooth;
         private final int location;
         private final int calendars;
+        private final int filesDownloads;
 
         EntitlementOverrides(boolean sandbox, boolean networkClient, int networkServer,
                 String filesUserSelected, boolean hardenedRuntime, boolean allowJit, String extra,
-                int camera, int microphone, int bluetooth, int location, int calendars) {
+                int camera, int microphone, int bluetooth, int location, int calendars,
+                int filesDownloads) {
             this.sandbox = sandbox;
             this.networkClient = networkClient;
             this.networkServer = networkServer;
@@ -593,12 +604,13 @@ public class MacOSBuildHints {
             this.bluetooth = bluetooth;
             this.location = location;
             this.calendars = calendars;
+            this.filesDownloads = filesDownloads;
         }
 
         /** The defaults, for a caller that has no hints to resolve against. */
         public static EntitlementOverrides defaults(boolean appStore, boolean sandboxed) {
             return new EntitlementOverrides(sandboxed, true, UNSET, "readwrite", !appStore, false,
-                    null, UNSET, UNSET, UNSET, UNSET, UNSET);
+                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
         }
 
         public boolean isSandbox() {
@@ -629,6 +641,14 @@ public class MacOSBuildHints {
 
         public boolean networkServer(boolean detected) {
             return resolve(networkServer, detected);
+        }
+
+        /**
+         * Read/write access to the Downloads folder, which is a capability of
+         * its own and not part of files.userSelected.
+         */
+        public boolean filesDownloads(boolean detected) {
+            return resolve(filesDownloads, detected);
         }
 
         public boolean camera(boolean detected) {

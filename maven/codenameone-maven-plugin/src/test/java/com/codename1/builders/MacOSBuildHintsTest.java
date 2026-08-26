@@ -63,6 +63,15 @@ public class MacOSBuildHintsTest {
     }
 
     @Test
+    public void unsetAppCategoryTakesTheDocumentedDefault() {
+        // Pinned because it drifted: the constant said developer-tools while the
+        // build-hint table said utilities, so every application that did not set
+        // the hint shipped classified as a developer tool. Nothing compared the
+        // two, which is why nothing noticed.
+        assertEquals("public.app-category.utilities", parse(raw(), "com.example.app").getAppCategory());
+    }
+
+    @Test
     public void aCatalystEraProjectCarriesOverUnchanged() {
         // Exactly what scripts/build-mac-native-app.sh writes today.
         MacOSBuildHints h = parse(raw(

@@ -1036,6 +1036,18 @@ public class MacOSNativeBuilder extends Executor {
             } else {
                 cmd.add("CODE_SIGN_STYLE=Manual");
                 cmd.add("CODE_SIGN_IDENTITY=" + signingIdentity);
+                // Manual signing is the only mode that takes a profile: under
+                // automatic, Xcode chooses one from the team and naming a second
+                // here is how a build ends up signed against a profile nobody
+                // picked. Without this the hint was accepted, documented and
+                // read by nothing -- getProvisioningProfileFor had no caller at
+                // all -- so a configuration that requires one specific installed
+                // profile either failed to sign or silently matched a different
+                // one.
+                String profile = hints.getProvisioningProfileFor(channel);
+                if (profile != null && profile.length() > 0) {
+                    cmd.add("PROVISIONING_PROFILE_SPECIFIER=" + profile);
+                }
             }
             // The generated entitlements have to be named here. Neither the
             // project template nor codesign picks the file up by convention, so

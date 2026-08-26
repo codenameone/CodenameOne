@@ -260,9 +260,20 @@ public class MacOSXcodeProject {
             }
             if ("readwrite".equals(overrides.getFilesUserSelected())) {
                 ent.put(ENT_FILES_USER_SELECTED, Boolean.TRUE);
-                ent.put(ENT_FILES_DOWNLOADS, Boolean.TRUE);
             } else if ("readonly".equals(overrides.getFilesUserSelected())) {
                 ent.put(ENT_FILES_USER_SELECTED_RO, Boolean.TRUE);
+            }
+            // The Downloads folder is a separate capability from the files the
+            // user picks in a panel, and it is not what files.userSelected
+            // describes -- it is access to a directory with no panel at all. It
+            // used to be granted alongside readwrite, which quietly widened
+            // every sandboxed build's filesystem authority beyond the hint that
+            // was supposed to govern it. Its own opt-in now, off by default.
+            //
+            // Mac Catalyst still grants it with readwrite. The divergence is
+            // deliberate: matching it would mean keeping the wider grant.
+            if (overrides.filesDownloads(false)) {
+                ent.put(ENT_FILES_DOWNLOADS, Boolean.TRUE);
             }
             if (overrides.networkServer(c.usesServerSockets)) {
                 ent.put(ENT_NETWORK_SERVER, Boolean.TRUE);

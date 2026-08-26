@@ -86,6 +86,23 @@ public class MacImplementation extends IOSImplementation {
         return false;
     }
 
+    /// @inheritDoc
+    ///
+    /// Null until there is an AppKit 3D backend. The inherited answer is
+    /// non-null whenever Metal rendering is on, which it always is here, so
+    /// isGpuSupported() said yes -- and then createPeer() returned null every
+    /// time, because gl3dCreateContext is one of the CN1AppKitGL3D stubs and
+    /// answers 0. An application checking the capability took its GPU path and
+    /// got no surface, rather than taking the fallback it has for platforms
+    /// without one.
+    ///
+    /// A real implementation over MTKView is a separate piece of work, and the
+    /// stubs say so where they are defined.
+    @Override
+    public com.codename1.impl.gpu.GpuImplementation getGpuImplementation() {
+        return null;
+    }
+
     private AppKitWindowManager windowManager;
 
     /// @inheritDoc

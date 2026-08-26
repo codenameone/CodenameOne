@@ -221,6 +221,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET);
         Map<String, Object> withJit = MacOSXcodeProject.entitlements(false, jit, null, false);
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_JIT));
@@ -234,10 +235,35 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET);
         Map<String, Object> without = MacOSXcodeProject.entitlements(false, off, null, false);
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_JIT));
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
+    }
+
+    /**
+     * Downloads is a wider grant than the files the user picks in a panel, so
+     * it is not part of files.userSelected and is not on by default.
+     */
+    @Test
+    public void downloadsAccessIsItsOwnOptInRatherThanPartOfUserSelected() {
+        Map<String, Object> ent = MacOSXcodeProject.entitlements(true, true, null, false);
+        assertEquals(Boolean.TRUE, ent.get(MacOSXcodeProject.ENT_FILES_USER_SELECTED));
+        assertNull("readwrite user-selected access must not carry the Downloads folder",
+                ent.get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
+
+        MacOSBuildHints.EntitlementOverrides on = new MacOSBuildHints.EntitlementOverrides(
+                true, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                false, false, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.ON);
+        assertEquals(Boolean.TRUE, MacOSXcodeProject.entitlements(true, on, null, false)
+                .get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
     }
 
     // ---- export options --------------------------------------------------
