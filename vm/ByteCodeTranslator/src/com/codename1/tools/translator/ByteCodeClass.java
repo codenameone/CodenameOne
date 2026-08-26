@@ -1222,6 +1222,15 @@ public class ByteCodeClass {
                         b.append("    CN1MacInstallMainMenu();\n");
                         b.append("    CN1MacInstallAppDelegate();\n");
                         b.append("    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{\n");
+                        // The dispatched block runs on a DIFFERENT thread from
+                        // the one flagged above, and gets its own thread-local
+                        // state whose lightweightThread defaults to false. The
+                        // application's main allocates from the nursery on it,
+                        // so without this the concurrent GC scans that nursery
+                        // without pausing the thread filling it -- which is the
+                        // corruption the flag exists to prevent, on the only
+                        // target where main does not run on the flagged thread.
+                        b.append("#ifdef CN1_NURSERY\n        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
                         b.append("        ");
                         b.append(clsName);
                         b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");

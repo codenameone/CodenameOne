@@ -883,6 +883,60 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     return anchor == sel.location ? NSMaxRange(sel) : sel.location;
 }
 
+/// The offset of the first character on the line holding `at`.
+- (NSUInteger)cn1LineStart:(NSUInteger)at inText:(NSString *)text {
+    if (text == nil || at == 0) {
+        return 0;
+    }
+    NSUInteger limit = MIN(at, text.length);
+    NSRange before = NSMakeRange(0, limit);
+    NSRange nl = [text rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]
+                                       options:NSBackwardsSearch
+                                         range:before];
+    return nl.location == NSNotFound ? 0 : NSMaxRange(nl);
+}
+
+/// The offset just past the last character on the line holding `at`.
+- (NSUInteger)cn1LineEnd:(NSUInteger)at inText:(NSString *)text {
+    if (text == nil) {
+        return 0;
+    }
+    NSUInteger from = MIN(at, text.length);
+    NSRange rest = NSMakeRange(from, text.length - from);
+    NSRange nl = [text rangeOfCharacterFromSet:[NSCharacterSet newlineCharacterSet]
+                                       options:0
+                                         range:rest];
+    return nl.location == NSNotFound ? text.length : nl.location;
+}
+
+/// Where Up or Down puts the caret: the same column on the neighbouring line,
+/// clamped to that line's length.
+- (NSUInteger)cn1VerticalTarget:(NSRange)sel up:(BOOL)up inText:(NSString *)text {
+    if (text == nil) {
+        return 0;
+    }
+    NSUInteger at = up ? sel.location : NSMaxRange(sel);
+    NSUInteger lineStart = [self cn1LineStart:at inText:text];
+    NSUInteger column = at - lineStart;
+    if (up) {
+        if (lineStart == 0) {
+            // Already on the first line: Up goes to the very start, which is
+            // what a Mac text field does rather than nothing at all.
+            return 0;
+        }
+        NSUInteger prevEnd = lineStart - 1;
+        NSUInteger prevStart = [self cn1LineStart:prevEnd inText:text];
+        return MIN(prevStart + column, prevEnd);
+    }
+    NSUInteger lineEnd = [self cn1LineEnd:at inText:text];
+    if (lineEnd >= text.length) {
+        return text.length;
+    }
+    NSUInteger nextStart = lineEnd + 1;
+    NSUInteger nextEnd = [self cn1LineEnd:nextStart inText:text];
+    return MIN(nextStart + column, nextEnd);
+}
+
 /// The fixed end of the selection the keyboard is building.
 ///
 /// Remembered across keystrokes, because the range alone cannot say which end is
@@ -1054,16 +1108,50 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         [self cn1RememberAnchor:anchor];
         return;
     }
+    // Line and paragraph commands stay on the line. They used to be grouped with
+    // the document ones, so Home on the third line of a TextArea jumped to
+    // offset 0 and End jumped to the end of the whole field -- which is a
+    // different key's behaviour, not a rough approximation of this one.
     if (selector == @selector(moveToBeginningOfLine:)
-        || selector == @selector(moveToBeginningOfParagraph:)
-        || selector == @selector(moveToBeginningOfDocument:)) {
-        [self cn1SetSelection:NSMakeRange(0, 0)];
+        || selector == @selector(moveToBeginningOfParagraph:)) {
+        [self cn1SetSelection:NSMakeRange([self cn1LineStart:sel.location
+                                                     inText:session.text], 0)];
         return;
     }
     if (selector == @selector(moveToEndOfLine:)
-        || selector == @selector(moveToEndOfParagraph:)
-        || selector == @selector(moveToEndOfDocument:)) {
+        || selector == @selector(moveToEndOfParagraph:)) {
+        [self cn1SetSelection:NSMakeRange([self cn1LineEnd:NSMaxRange(sel)
+                                                   inText:session.text], 0)];
+        return;
+    }
+    if (selector == @selector(moveToBeginningOfDocument:)) {
+        [self cn1SetSelection:NSMakeRange(0, 0)];
+        return;
+    }
+    if (selector == @selector(moveToEndOfDocument:)) {
         [self cn1SetSelection:NSMakeRange(len, 0)];
+        return;
+    }
+    // Up and Down. Swallowed entirely before this, so the caret could not move
+    // between lines of a TextArea at all -- the one thing a multiline editor is
+    // for. The column is taken from the current line and reapplied to the
+    // neighbouring one, clamped to its length, which is what every Mac text
+    // control does.
+    if (selector == @selector(moveUp:) || selector == @selector(moveDown:)) {
+        BOOL up = selector == @selector(moveUp:);
+        [self cn1SetSelection:NSMakeRange([self cn1VerticalTarget:sel up:up
+                                                           inText:session.text], 0)];
+        return;
+    }
+    if (selector == @selector(moveUpAndModifySelection:)
+        || selector == @selector(moveDownAndModifySelection:)) {
+        BOOL up = selector == @selector(moveUpAndModifySelection:);
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        NSRange active = NSMakeRange(cn1ActiveEdge(sel, anchor), 0);
+        NSUInteger to = [self cn1VerticalTarget:active up:up inText:session.text];
+        session.selectedRange = [self cn1Extend:sel to:to anchor:anchor];
+        CN1MacTextInputNotifySelection(session.selectedRange);
+        [self cn1RememberAnchor:anchor];
         return;
     }
     if (selector == @selector(selectAll:)) {
@@ -1205,7 +1293,11 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     session.markedRange = NSMakeRange(NSNotFound, 0);
-    session.selectedRange = NSMakeRange(0, session.text.length);
+    // Through the helper, so the pure editor hears about it. Command-A and the
+    // Edit menu land here directly rather than through doCommandBySelector, so
+    // assigning the shadow alone left the Java editor with no selection to
+    // render -- and a following Cut or Copy then acted on nothing.
+    [self cn1SetSelection:NSMakeRange(0, session.text.length)];
 }
 
 /// An I-beam over the view. Its absence is the loudest "this is not really a Mac

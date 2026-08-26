@@ -591,7 +591,12 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetMinimumSize___int_int_int
             rec.window.contentMinSize = NSZeroSize;
             return;
         }
-        CGFloat scale = cn1DesktopScale();
+        // The WINDOW's own scale, not the desktop one. A minimum size is compared
+        // against what getWidth/getHeight report, and those are this window's
+        // drawable pixels -- so on a 1x secondary window under a 2x primary, a
+        // 400-pixel minimum divided by the desktop scale became 200. Position is
+        // desktop-space and size is drawable-space; this is a size.
+        CGFloat scale = cn1WindowScale(rec);
         rec.window.contentMinSize = NSMakeSize(width / scale, height / scale);
     });
 }

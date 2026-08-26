@@ -379,6 +379,8 @@ public class MacOSNativeBuilder extends Executor {
             throw new BuildException("Failed to write the macOS bundle metadata", ex);
         }
 
+        attachEntitlementsToProject(distDir, appName, hints);
+
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
 
@@ -712,6 +714,46 @@ public class MacOSNativeBuilder extends Executor {
             out.usesServerSockets |= o.networkServer(scanned.usesServerSockets);
         }
         return out;
+    }
+
+    /**
+     * Names the generated entitlements in the Xcode project itself.
+     *
+     * <p>buildChannel passes CODE_SIGN_ENTITLEMENTS on the xcodebuild command
+     * line, which covers a build this builder runs -- but not mac-source, where
+     * the deliverable IS the project and the developer signs it in Xcode. The
+     * files were written beside the sources and nothing referenced them, so an
+     * App Store archive made from the generated project came out with no
+     * sandbox entitlement at all.</p>
+     *
+     * <p>The first channel's file, which is the one a single-channel build has
+     * and the store's when a project ships both -- and the store is the side
+     * that cannot be signed without it. A developer targeting the other channel
+     * changes one line in the project, which is visible and editable; an absent
+     * setting is neither.</p>
+     */
+    private void attachEntitlementsToProject(File distDir, String appName, MacOSBuildHints hints) {
+        java.util.List<String> channels = hints.getChannels();
+        if (channels.isEmpty()) {
+            return;
+        }
+        File pbxproj = new File(new File(distDir, appName + ".xcodeproj"), "project.pbxproj");
+        if (!pbxproj.isFile()) {
+            return;
+        }
+        String entitlements = appName + "-src/" + appName + "-"
+                + channelSuffix(channels.get(0)) + ".entitlements";
+        String infoPlist = "INFOPLIST_FILE = \"" + appName + "-src/" + appName + "-Info.plist\";";
+        try {
+            replaceInFile(pbxproj, infoPlist,
+                    infoPlist + "\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = \"" + entitlements + "\";");
+        } catch (Exception ex) {
+            // Not fatal: a project without the setting still builds, it just
+            // signs without entitlements, and saying so is more use than failing
+            // a build over a cosmetic patch that did not apply.
+            log("Could not name the entitlements in the generated Xcode project ("
+                    + ex + "); sign with CODE_SIGN_ENTITLEMENTS set by hand.");
+        }
     }
 
     /// The file-name suffix for one signing channel. One place, because the

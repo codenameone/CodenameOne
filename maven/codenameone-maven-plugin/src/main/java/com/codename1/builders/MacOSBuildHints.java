@@ -317,6 +317,20 @@ public class MacOSBuildHints {
 
 
 
+    /**
+     * The provisioning profile NAME configured for one channel, or null.
+     *
+     * <p>Through {@link #hint}, so the legacy {@code macNative.} spelling is
+     * accepted: the Catalyst path consumed it, and a project migrating off that
+     * path keeps it. Read straight off the request, such a build supplies no
+     * profile at all and manual signing fails for a configuration that is
+     * complete.</p>
+     */
+    public String getProvisioningProfileFor(String channel) {
+        return hint(source, DISTRIBUTION_APP_STORE.equals(channel)
+                ? "provisioningProfile.appStore" : "provisioningProfile.developerID", null);
+    }
+
     /** The installer certificate productbuild signs a {@code .pkg} with, or null. */
     public String getInstallerIdentity() {
         return installerIdentity;
