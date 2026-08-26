@@ -441,6 +441,84 @@ public class CompileSourceRootsTest {
                         "src/main/kotlin"));
     }
 
+    /**
+     * A tree nothing compiles is not a source root.
+     *
+     * <p>`getCompileSourceRoots` comes from the model, not from what the build
+     * runs, so it still lists `src/main/java` when a POM switches
+     * `default-compile` off. A source sitting there would vouch for a stale
+     * class in `target/classes`, and a misplaced annotation on that class fails
+     * every incremental build.</p>
+     */
+    @Test
+    public void javaRootsNeedSomethingThatCompilesThem() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
+
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        PluginExecution off = new PluginExecution();
+        off.setId("default-compile");
+        off.setPhase("none");
+        compiler.addExecution(off);
+        project.getBuild().addPlugin(compiler);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/main/java"));
+    }
+
+    /**
+     * ...but Kotlin's documented mixed setup disables `default-compile` and adds
+     * a REPLACEMENT execution, and those roots are compiled.
+     */
+    @Test
+    public void aReplacementCompileExecutionKeepsTheJavaRoots() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
+
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        PluginExecution off = new PluginExecution();
+        off.setId("default-compile");
+        off.setPhase("none");
+        compiler.addExecution(off);
+        compiler.addExecution(execution("compile", "<release>17</release>"));
+        project.getBuild().addPlugin(compiler);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/main/java"));
+    }
+
+    /**
+     * ...and so is a module that leaves the Java sources to the Kotlin plugin.
+     * Dropping the roots there would call live classes stale and lose their
+     * misplaced annotations, which is the silence this change exists to remove.
+     */
+    @Test
+    public void kotlinCompilingInsteadKeepsTheJavaRoots() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+        project.addCompileSourceRoot(new File(basedir, "src/main/java").getAbsolutePath());
+
+        Plugin compiler = new Plugin();
+        compiler.setArtifactId("maven-compiler-plugin");
+        PluginExecution off = new PluginExecution();
+        off.setId("default-compile");
+        off.setPhase("none");
+        compiler.addExecution(off);
+        project.getBuild().addPlugin(compiler);
+
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        kotlin.addExecution(execution("compile", "<jvmTarget>17</jvmTarget>"));
+        project.getBuild().addPlugin(kotlin);
+
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir, "src/main/java"));
+    }
+
     /** A conventional root that does not exist is not invented. */
     @Test
     public void anAbsentKotlinRootIsNotAdded() throws Exception {

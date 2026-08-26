@@ -1273,7 +1273,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         Interpolation expressions = new Interpolation(project, userProperties);
         List<String> roots = new ArrayList<String>();
         List<String> configured = project.getCompileSourceRoots();
-        if (configured != null) {
+        if (configured != null && compilesJava(project)) {
             roots.addAll(configured);
         }
         addKotlinSourceDirs(expressions, roots);
@@ -1695,6 +1695,62 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether anything compiles the roots {@code getCompileSourceRoots} lists.
+     *
+     * <p>That list comes from the model, not from what the build runs, so it is
+     * still populated when a POM switches {@code default-compile} off with
+     * {@code <phase>none</phase>}. A source sitting in a tree nothing compiles
+     * would then vouch for a stale class in {@code target/classes}, and a
+     * misplaced annotation on that class fails every incremental build.</p>
+     *
+     * <p>Three conditions, and the third is the one that keeps this from
+     * breaking the ordinary mixed-language project. Kotlin's own documented
+     * setup disables {@code default-compile} and adds a replacement execution,
+     * which the second condition already sees -- but a module can also leave the
+     * Java sources to the Kotlin plugin, which compiles them from its own
+     * {@code <sourceDirs>}. Dropping the roots there would call live classes
+     * stale and take their misplaced annotations down with them, which is the
+     * silence this whole change exists to remove.</p>
+     */
+    private static boolean compilesJava(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return true;
+        }
+        if (plugins == null) {
+            return true;
+        }
+        boolean defaultCompileDisabled = false;
+        boolean replacementBound = false;
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"maven-compiler-plugin".equals(plugin.getArtifactId())
+                    || plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                boolean compiles = execution.getGoals() != null
+                        && execution.getGoals().contains("compile");
+                if ("default-compile".equals(execution.getId())) {
+                    if (isDisabled(execution)) {
+                        defaultCompileDisabled = true;
+                    } else {
+                        replacementBound = true;
+                    }
+                } else if (compiles && !isDisabled(execution)) {
+                    replacementBound = true;
+                }
+            }
+        }
+        if (!defaultCompileDisabled || replacementBound) {
+            return true;
+        }
+        // Kotlin may be compiling them instead.
+        return hasKotlinCompileExecution(project);
     }
 
     /**
