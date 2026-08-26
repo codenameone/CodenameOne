@@ -513,6 +513,23 @@ public final class Calls {
                 null, null, false));
     }
 
+    /// Digits the APP asked to send, handed back to its own listener.
+    ///
+    /// On iOS sendDigits() submits a CXPlayDTMFCallAction and CallKit hands
+    /// it straight back through `dtmfRequested`, which is where an app puts
+    /// the tone into its media. A port with no such round trip synthesizes
+    /// it here, the way the Android port synthesizes audioSessionActivated,
+    /// so one listener carries the tone on every platform.
+    ///
+    /// The action is unanswerable: the app asked for this itself, and there
+    /// is no system state to refuse.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverDtmfPlayed(String callId, String digits) {
+        dispatch(new ActionEvent(ActionEvent.DTMF, callId, CallAction.NONE,
+                false, digits, null, false));
+    }
+
     /// The user typed on the system keypad.
     ///
     /// @hidden not part of the public API.

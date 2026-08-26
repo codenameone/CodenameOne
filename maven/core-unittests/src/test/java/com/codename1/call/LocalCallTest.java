@@ -692,6 +692,27 @@ public class LocalCallTest {
     }
 
     @Test
+    public void digitsTheAppSendsComeBackToItsOwnListener() {
+        // On iOS sendDigits() submits a CXPlayDTMFCallAction and CallKit
+        // hands it straight back through dtmfRequested, which is where an app
+        // puts the tone into its media. A port that acknowledged and
+        // delivered nothing let that code be written once and do nothing.
+        final List<String> played = new ArrayList<String>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void dtmfRequested(String callId, String digits,
+                    CallAction action) {
+                played.add(digits);
+            }
+        });
+        String id = CallId.random();
+        CallSession s = ring(id);
+        CallAwait.value(s.sendDigits("42#"));
+        waitFor(played, 1);
+        assertEquals("42#", played.get(0),
+                "the digits the app sent must reach its own listener");
+    }
+
+    @Test
     public void registeringYieldsAToken() {
         String token = CallAwait.value(VoipPush.register());
         assertNotNull(token);

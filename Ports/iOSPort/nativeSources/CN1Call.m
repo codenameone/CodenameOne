@@ -1392,9 +1392,8 @@ void com_codename1_impl_ios_IOSNative_callSetGroup___int_java_lang_String_java_l
     cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(
-        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
-#ifdef CN1_CALL_HAS_CALLKIT
+/// The route iOS is ACTUALLY using, read from the session.
+static int cn1clCurrentRoute(void) {
     AVAudioSessionRouteDescription *route =
             [[AVAudioSession sharedInstance] currentRoute];
     for (AVAudioSessionPortDescription *port in route.outputs) {
@@ -1415,6 +1414,12 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(
         }
     }
     return CN1_CALL_ROUTE_UNKNOWN;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    return cn1clCurrentRoute();
 #else
     return CN1_CALL_ROUTE_UNKNOWN;
 #endif
@@ -1433,11 +1438,29 @@ void com_codename1_impl_ios_IOSNative_callSetAudioRoute___int_int(
         [session overrideOutputAudioPort:AVAudioSessionPortOverrideNone
                                    error:&error];
     }
-    if (error == nil) {
-        cn1clRoute = routeOrdinal;
+    if (error != nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_AUDIO_FAILED,
+                [error localizedDescription]);
+        return;
     }
-    cn1clAck(requestId, error == nil, CN1_CALL_ERR_AUDIO_FAILED,
-            error == nil ? nil : [error localizedDescription]);
+    // The override is the ONLY route control iOS offers an app: it moves
+    // audio to the speaker or takes that override off, and iOS then picks
+    // among the rest itself. Clearing the override and reporting the
+    // requested route as achieved meant asking for BLUETOOTH with no device
+    // paired answered yes, and audioSessionActivated went on to tell the app
+    // its audio was on Bluetooth while it played out of the earpiece.
+    //
+    // So the session is asked what actually happened, and the answer is what
+    // gets recorded and reported.
+    int actual = cn1clCurrentRoute();
+    cn1clRoute = actual;
+    if (actual == routeOrdinal || routeOrdinal == CN1_CALL_ROUTE_UNKNOWN) {
+        cn1clAck(requestId, YES, 0, nil);
+        return;
+    }
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"iOS chooses the non-speaker route itself; the requested one is"
+            @" not the one in use");
 #else
     cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
 #endif

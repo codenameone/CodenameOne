@@ -429,10 +429,22 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void sendDtmf(int requestId, String callId, String digits) {
-        // Outbound DTMF is carried by the app's own media, not by Telecom.
-        Calls.deliverAck(requestId,
-                CN1ConnectionService.find(callId) != null,
-                CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+        // Outbound DTMF is carried by the app's own media, not by Telecom:
+        // there is no self-managed API that emits a tone.
+        //
+        // Acknowledging and stopping there was still wrong. On iOS the same
+        // call submits a CXPlayDTMFCallAction and CallKit hands it straight
+        // back through dtmfRequested, which is where an app puts the tone
+        // into its media -- so an app written once did nothing at all here.
+        // The round trip is synthesized instead, the way this port
+        // synthesizes audioSessionActivated.
+        if (CN1ConnectionService.find(callId) == null) {
+            Calls.deliverAck(requestId, false,
+                    CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+            return;
+        }
+        Calls.deliverAck(requestId, true, 0, null);
+        Calls.deliverDtmfPlayed(callId, digits);
     }
 
     @Override

@@ -209,9 +209,39 @@ JAVA_INT com_codename1_impl_ios_IOSNative_vpnCapabilities___R_int(
 #endif
 }
 
+#ifdef CN1_VPN_HAS_NE
+/// Loads the saved configuration into the shared manager, once.
+///
+/// NEVPNManager starts with nothing loaded, and until
+/// loadFromPreferencesWithCompletionHandler: has run its connection.status is
+/// NEVPNStatusInvalid -- which reads as NOT_CONFIGURED. So a fresh process
+/// with an installed, even connected, profile reported that no VPN existed,
+/// and went on doing so until some other operation happened to load it.
+///
+/// The load is asynchronous and vpnStatus is not, so the first answer after
+/// a launch can still be the unloaded one. What this guarantees is that it
+/// stops being wrong: when the load lands, a listening app is told through
+/// the same statusChanged path a real transition uses.
+static void cn1vpEnsureLoaded(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        [[NEVPNManager sharedManager] loadFromPreferencesWithCompletionHandler:
+                ^(NSError *error) {
+            if (cn1vpListening) {
+                com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
+                        getThreadLocalData(), cn1vpStatusOrdinal(
+                                [[NEVPNManager sharedManager] connection].status));
+            }
+        }];
+    });
+}
+
+#endif
+
 JAVA_INT com_codename1_impl_ios_IOSNative_vpnStatus___R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
 #ifdef CN1_VPN_HAS_NE
+    cn1vpEnsureLoaded();
     return cn1vpStatusOrdinal([[NEVPNManager sharedManager] connection].status);
 #else
     return CN1_VPN_STATUS_NOT_CONFIGURED;
@@ -436,6 +466,12 @@ void com_codename1_impl_ios_IOSNative_vpnSetStatusListening___boolean(
         JAVA_BOOLEAN listening) {
 #ifdef CN1_VPN_HAS_NE
     cn1vpListening = listening != JAVA_FALSE;
+    if (cn1vpListening) {
+        // Before the observer, so the load's own notification finds a
+        // listening app: the baseline a new listener sees has to be the
+        // profile iOS actually holds, not the unloaded manager's Invalid.
+        cn1vpEnsureLoaded();
+    }
     if (cn1vpListening && cn1vpObserver == nil) {
         cn1vpWatcher = [[CN1VpnStatusWatcher alloc] init];
         [[NSNotificationCenter defaultCenter] addObserver:cn1vpWatcher

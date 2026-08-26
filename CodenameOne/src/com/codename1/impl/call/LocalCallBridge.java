@@ -557,6 +557,11 @@ public class LocalCallBridge implements CallBridge {
             return;
         }
         ok(requestId);
+        // The round trip CallKit performs: an app puts the tone into its own
+        // media when dtmfRequested fires, so a simulation that acknowledged
+        // and delivered nothing let that code be written and never run until
+        // a device.
+        later(LATENCY_MILLIS, new DtmfPlayback(callId, digits));
     }
 
     @Override
@@ -856,6 +861,21 @@ public class LocalCallBridge implements CallBridge {
         @Override
         public void run() {
             Calls.deliverMute(callId, muted, token);
+        }
+    }
+
+    private static final class DtmfPlayback implements Runnable {
+        private final String callId;
+        private final String digits;
+
+        DtmfPlayback(String callId, String digits) {
+            this.callId = callId;
+            this.digits = digits;
+        }
+
+        @Override
+        public void run() {
+            Calls.deliverDtmfPlayed(callId, digits);
         }
     }
 
