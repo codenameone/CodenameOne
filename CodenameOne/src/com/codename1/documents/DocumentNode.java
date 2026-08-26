@@ -204,6 +204,13 @@ public class DocumentNode {
     /// Sets the size in bytes. The browser shows this before any content is fetched, so it is
     /// worth setting for remote items even though it costs a round trip to learn.
     ///
+    /// For a remote item this is also half of how the browser learns that content changed: it has
+    /// no local bytes to compare, so the size and last-modified you declare are the only signal
+    /// it has. Declare them and keep them accurate across republishes, or leave both unset --
+    /// an item that declares values it never updates is one the browser will go on serving from
+    /// its cache. Items backed by the shared directory need none of this; their bytes are
+    /// measured directly.
+    ///
     /// #### Parameters
     ///
     /// - `size`: the size in bytes, or -1 when unknown

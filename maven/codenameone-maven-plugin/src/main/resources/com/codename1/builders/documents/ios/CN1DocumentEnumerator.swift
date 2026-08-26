@@ -45,6 +45,27 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
             observer.finishEnumerating(upTo: nil)
             return
         }
+        // The working set is the container `documentsSignalChange` invalidates, and the system
+        // asks it what changed. A provider that answers "nothing is in my working set" is
+        // answering honestly but uselessly: the signal then teaches the browser nothing and a
+        // closed or cached location goes on showing the previous publish. With no change
+        // tracking to offer (this index carries no per-item history), the whole published tree
+        // is the working set.
+        if containerId == .workingSet {
+            let items = index.nodes.values.compactMap { node -> CN1DocumentItem? in
+                guard node.id != index.rootId else { return nil }
+                let parentId = index.parents[node.id]
+                let parent: NSFileProviderItemIdentifier =
+                    (parentId == nil || parentId == index.rootId)
+                        ? .rootContainer
+                        : NSFileProviderItemIdentifier(parentId!)
+                return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
+                                       revision: index.revision)
+            }
+            observer.didEnumerate(items)
+            observer.finishEnumerating(upTo: nil)
+            return
+        }
         let resolved = CN1DocumentEnumerator.resolve(containerId, in: index)
         guard let children = index.childIds[resolved] else {
             observer.finishEnumerating(upTo: nil)
@@ -55,7 +76,8 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
             : NSFileProviderItemIdentifier(resolved)
         let items = children.compactMap { id -> CN1DocumentItem? in
             guard let node = index.nodes[id] else { return nil }
-            return CN1DocumentItem(node: node, parentId: parent, revision: index.revision)
+            return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
+                                   revision: index.revision)
         }
         observer.didEnumerate(items)
         observer.finishEnumerating(upTo: nil)

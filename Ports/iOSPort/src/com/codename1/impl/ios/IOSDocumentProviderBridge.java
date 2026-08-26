@@ -199,17 +199,29 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         return container;
     }
 
+    /// Serializes replacements within this process. Two background flows calling publish() at
+    /// once previously shared one fixed ".tmp" path: whichever renamed first had its file pulled
+    /// out from under the other, which then deleted the freshly published target and failed to
+    /// find its own temporary -- leaving nothing published at all.
+    private static final Object WRITE_LOCK = new Object();
+
+    /// Counter for temporary names, so even a relaxed lock cannot put two writers on one path.
+    private static int tempCounter;
+
     private void writeAtomically(String dir, String name, byte[] data) throws IOException {
-        String target = dir + "/" + name;
-        String tmp = target + ".tmp";
-        write(tmp, data);
-        if (fs.exists(target)) {
-            fs.delete(target);
-        }
-        // a relative new name renames within the same directory
-        fs.rename(tmp, name);
-        if (!fs.exists(target)) {
-            throw new IOException("Failed to rename " + tmp + " to " + target);
+        synchronized (WRITE_LOCK) {
+            String target = dir + "/" + name;
+            String tmpName = name + "." + (tempCounter++) + ".tmp";
+            String tmp = dir + "/" + tmpName;
+            write(tmp, data);
+            if (fs.exists(target)) {
+                fs.delete(target);
+            }
+            // a relative new name renames within the same directory
+            fs.rename(tmp, name);
+            if (!fs.exists(target)) {
+                throw new IOException("Failed to rename " + tmp + " to " + target);
+            }
         }
     }
 

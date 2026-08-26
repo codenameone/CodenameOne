@@ -97,15 +97,33 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (ctx == null || authority == null) {
             return;
         }
+        ContentResolver resolver = ctx.getContentResolver();
+        // The roots URI is what the picker watches while the location is closed, so notifying
+        // only a document would leave a closed-and-reopened picker showing the previous publish.
+        notify(resolver, DocumentsContract.buildRootsUri(authority));
+        // Every folder cursor registers against its own child-documents URI, so an already open
+        // folder needs its own notification: the roots URI does not reach it.
+        //
+        // Deliberately not inside a catch(Throwable): the generic iteration below compiles to a
+        // checkcast, and ParparVM does not throw for a failed cast -- a handler wrapping this
+        // would be one the device can never run. Each notify guards itself instead.
+        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
+        if (index == null) {
+            return;
+        }
+        for (CN1DocumentStore.Node node : index.nodes.values()) {
+            if (node.folder) {
+                notify(resolver, DocumentsContract.buildChildDocumentsUri(authority, node.id));
+            }
+        }
+    }
+
+    /// A notification failure is never worth taking down the publish that already succeeded.
+    private static void notify(ContentResolver resolver, Uri uri) {
         try {
-            // Notifying the roots URI rather than a document one: the picker watches the roots
-            // while the location is closed, so notifying only a document would leave a
-            // closed-and-reopened picker showing the previous publish.
-            Uri roots = DocumentsContract.buildRootsUri(authority);
-            ContentResolver resolver = ctx.getContentResolver();
-            resolver.notifyChange(roots, null);
+            resolver.notifyChange(uri, null);
         } catch (Throwable t) {
-            Log.e(TAG, "Could not signal the document provider", t);
+            Log.e(TAG, "Could not signal the document provider for " + uri, t);
         }
     }
 

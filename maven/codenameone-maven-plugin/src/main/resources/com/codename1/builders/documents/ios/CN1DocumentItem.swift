@@ -35,16 +35,19 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     private let parentId: NSFileProviderItemIdentifier
     private let identifier: NSFileProviderItemIdentifier
     private let revision: String
+    private let containerURL: URL?
 
     /// The identifier is passed in rather than taken from the node because the tree's root has
     /// two names: whatever id the app gave it, and `.rootContainer`, which is the only one the
     /// system accepts back when it asked for the root. Answering with the app's id there is a
     /// mismatch the browser reads as "that is not the item I asked for".
     init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier,
-         identifier: NSFileProviderItemIdentifier? = nil, revision: String = "") {
+         identifier: NSFileProviderItemIdentifier? = nil, containerURL: URL? = nil,
+         revision: String = "") {
         self.node = node
         self.parentId = parentId
         self.identifier = identifier ?? NSFileProviderItemIdentifier(node.id)
+        self.containerURL = containerURL
         self.revision = revision
     }
 
@@ -120,17 +123,39 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     @available(iOS 16.0, macOS 13.0, *)
     var itemVersion: NSFileProviderItemVersion {
         // The browser caches content per version, so the version has to move whenever the bytes
-        // could have. Modification time and size are the node's own signals and are preferred,
-        // because they only change when that item changes. A node that declares neither carries
-        // no signal at all, and would otherwise keep the constant stamp "-1--1" across every
-        // republish -- the browser would go on serving cached bytes for content that changed.
-        // Those nodes fall back to the index revision, which moves on every publish: coarser
-        // (it re-fetches that item whenever anything is published) but never stale.
-        let known = node.lastModified != nil || node.size != nil
-        let stamp = known
-            ? "\(node.lastModified ?? -1)-\(node.size ?? -1)"
-            : "rev-\(revision)"
-        let data = Data(stamp.utf8)
+        // could have -- and it cannot be left to the app to remember to say so.
+        //
+        // For a file backed by the shared directory the bytes are right there, so the file's own
+        // size and modification time are used and are authoritative: they move when the content
+        // moves, whatever the app did or did not declare about it.
+        //
+        // A remote node has no local bytes to measure, so its declared size and date are the
+        // only per-item signal. A node declaring neither -- or declaring values it never updates
+        // -- would otherwise hold one constant stamp across every republish and the browser would
+        // go on serving cached bytes. Those fall back to the index revision, which moves on every
+        // publish: coarser, since it re-fetches that item whenever anything is published, but
+        // never stale.
+        let data = Data(contentStamp.utf8)
         return NSFileProviderItemVersion(contentVersion: data, metadataVersion: data)
+    }
+
+    private var contentStamp: String {
+        if let path = node.path, !path.isEmpty, let container = containerURL,
+           let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
+            let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
+            let modified = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
+            return "disk-\(size)-\(modified)"
+        }
+        // Remote content has no local bytes to measure, so the app's declared size and date are
+        // the only per-item signal there is. They are trusted rather than overridden with the
+        // revision on purpose: folding the revision in here would re-fetch every opened remote
+        // document after any publish, which for a drive of any size is the expensive wrong
+        // default. DocumentNode documents the other half of that bargain -- declare them, and
+        // keep them accurate.
+        if node.remoteId != nil, node.lastModified != nil || node.size != nil {
+            return "meta-\(node.lastModified ?? -1)-\(node.size ?? -1)"
+        }
+        return "rev-\(revision)"
     }
 }

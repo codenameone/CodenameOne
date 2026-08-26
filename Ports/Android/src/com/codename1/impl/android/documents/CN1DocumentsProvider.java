@@ -93,7 +93,17 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         row.add(DocumentsContract.Root.COLUMN_FLAGS,
                 DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD);
         row.add(DocumentsContract.Root.COLUMN_ICON, applicationIcon());
+        // Without this the picker has no observer registered against the roots URI, so the
+        // notifyChange() the bridge fires on publish or clear invalidates nothing and an open
+        // DocumentsUI keeps showing the previous tree until it happens to requery.
+        result.setNotificationUri(getContext().getContentResolver(),
+                DocumentsContract.buildRootsUri(authority()));
         return result;
+    }
+
+    /// The authority the builder gave this provider in the manifest.
+    private String authority() {
+        return getContext().getPackageName() + ".documents";
     }
 
     @Override
@@ -126,6 +136,10 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 addRow(result, child);
             }
         }
+        // Same reason as queryRoots: an open folder has to be observing something for the
+        // publish-time notify to reach it.
+        result.setNotificationUri(getContext().getContentResolver(),
+                DocumentsContract.buildChildDocumentsUri(authority(), parentDocumentId));
         return result;
     }
 
@@ -164,8 +178,8 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // A local copy always wins, which is what makes a cached remote document open without a
         // round trip.
         if (node.path != null && node.path.length() > 0) {
-            File local = new File(CN1DocumentStore.filesDir(getContext()), node.path);
-            if (local.exists()) {
+            File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
+            if (local != null && local.exists()) {
                 return ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
             }
         }

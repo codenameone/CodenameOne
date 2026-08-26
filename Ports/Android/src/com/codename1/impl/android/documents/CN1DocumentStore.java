@@ -66,6 +66,30 @@ public final class CN1DocumentStore {
         return new File(baseDir(ctx), "files");
     }
 
+    /// Resolves a published relative path, refusing anything that escapes the shared directory.
+    ///
+    /// A path is app-supplied data and may have come from a server, so ".." in it must not be
+    /// able to reach the app's own databases or preferences and hand them to the system picker.
+    /// Canonicalizing first is what makes the prefix test meaningful: without it "a/../../x"
+    /// still starts with the directory it escapes.
+    static File resolveLocal(Context ctx, String path) {
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        try {
+            File base = filesDir(ctx).getCanonicalFile();
+            File candidate = new File(base, path).getCanonicalFile();
+            String basePath = base.getPath();
+            if (!basePath.endsWith(File.separator)) {
+                basePath = basePath + File.separator;
+            }
+            return candidate.getPath().startsWith(basePath) ? candidate : null;
+        } catch (IOException err) {
+            Log.w(TAG, "Could not resolve the published path " + path, err);
+            return null;
+        }
+    }
+
     static File indexFile(Context ctx) {
         return new File(baseDir(ctx), "index.json");
     }
@@ -129,7 +153,13 @@ public final class CN1DocumentStore {
         node.remoteId = json.optString("remoteId", null);
         node.size = json.optLong("size", -1);
         node.lastModified = json.optLong("lastModified", -1);
-        index.nodes.put(node.id, node);
+        if (index.nodes.put(node.id, node) != null) {
+            // Two nodes sharing an id resolve to whichever was read last while both parents keep
+            // listing it, so the picker shows two rows that open the same content. The publisher
+            // refuses this, and a hand-written index that slips through is rejected rather than
+            // half-served.
+            throw new JSONException("Duplicate document id " + node.id);
+        }
         JSONArray children = json.optJSONArray("children");
         if (children != null) {
             for (int i = 0; i < children.length(); i++) {
@@ -163,23 +193,43 @@ public final class CN1DocumentStore {
     }
 
     /// Replaces a file's contents write-then-rename, so a reader never observes a partial file.
+    /// Serializes replacements within this process. Two background flows calling publish() at
+    /// once previously shared one fixed ".tmp" path: whichever renamed first had its file pulled
+    /// out from under the other, which then deleted the freshly published target and failed to
+    /// find its own temporary -- leaving no index.json at all.
+    private static final Object WRITE_LOCK = new Object();
+
     static void writeAtomically(File target, byte[] data) throws IOException {
         File parent = target.getParentFile();
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
             throw new IOException("Could not create " + parent);
         }
-        File tmp = new File(target.getPath() + ".tmp");
-        FileOutputStream out = new FileOutputStream(tmp);
-        try {
-            out.write(data);
-        } finally {
-            out.close();
-        }
-        if (target.exists() && !target.delete()) {
-            throw new IOException("Could not replace " + target);
-        }
-        if (!tmp.renameTo(target)) {
-            throw new IOException("Could not rename " + tmp + " to " + target);
+        synchronized (WRITE_LOCK) {
+            // A name nobody else can be holding, even if the lock is ever relaxed.
+            File tmp = File.createTempFile("index", ".tmp", parent);
+            FileOutputStream out = new FileOutputStream(tmp);
+            try {
+                out.write(data);
+            } finally {
+                out.close();
+            }
+            if (!tmp.renameTo(target)) {
+                // Some filesystems refuse a rename onto an existing name. Deleting first opens a
+                // window where the index is absent, which is why it is the fallback rather than
+                // the path always taken.
+                if (target.exists() && !target.delete()) {
+                    if (!tmp.delete()) {
+                        Log.w(TAG, "Could not delete " + tmp);
+                    }
+                    throw new IOException("Could not replace " + target);
+                }
+                if (!tmp.renameTo(target)) {
+                    if (!tmp.delete()) {
+                        Log.w(TAG, "Could not delete " + tmp);
+                    }
+                    throw new IOException("Could not rename " + tmp + " to " + target);
+                }
+            }
         }
     }
 

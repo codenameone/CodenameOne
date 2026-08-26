@@ -69,7 +69,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         let identifier: NSFileProviderItemIdentifier? =
             resolved == index.rootId ? .rootContainer : nil
         completionHandler(CN1DocumentItem(node: node, parentId: parent, identifier: identifier,
-                               revision: index.revision),
+                               containerURL: containerURL, revision: index.revision),
                           nil)
         progress.completedUnitCount = 1
         return progress
@@ -96,15 +96,17 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
             : NSFileProviderItemIdentifier(parentId!)
-        let item = CN1DocumentItem(node: node, parentId: parent, revision: index.revision)
+        let item = CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
+                                   revision: index.revision)
 
         // A local copy always wins, which is what makes a cached remote document open without a
         // round trip.
         if let path = node.path, !path.isEmpty {
-            let local = containerURL
-                .appendingPathComponent("cn1documents/files")
-                .appendingPathComponent(path)
-            if FileManager.default.fileExists(atPath: local.path) {
+            // Resolved through the containment check: a published path is app data and may
+            // have come from a server, so "../" in it must not be able to reach the app's own
+            // storage and hand it to the system picker.
+            if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
+               FileManager.default.fileExists(atPath: local.path) {
                 completionHandler(local, item, nil)
                 progress.completedUnitCount = 1
                 return progress

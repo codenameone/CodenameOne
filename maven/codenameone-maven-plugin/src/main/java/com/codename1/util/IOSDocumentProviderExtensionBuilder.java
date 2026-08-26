@@ -261,24 +261,25 @@ public class IOSDocumentProviderExtensionBuilder {
         plistKeyString(sb, "CFBundleShortVersionString", shortVersion);
         plistKeyString(sb, "CFBundleVersion", bundleVersion);
         plistKeyString(sb, APP_GROUP_PLIST_KEY, appGroupId);
-        // The system resolves the provider's own storage from this key, and it has to name the
-        // same group the Swift resolves its container from or the two look at different
-        // directories and the browser shows an empty location.
-        plistKeyString(sb, "NSExtensionFileProviderDocumentGroup", appGroupId);
         sb.append("    <key>NSExtension</key>\n");
         sb.append("    <dict>\n");
         sb.append("        <key>NSExtensionPointIdentifier</key>\n");
         sb.append("        <string>com.apple.fileprovider-nonui</string>\n");
+        // Inside NSExtension, not at the top level: it is an extension-point attribute, and
+        // Apple's own File Provider template puts it here. At the top level the system never
+        // associates the provider with the group, so NSFileProviderManager.documentStorageURL
+        // errors and the classic provider cannot materialize anything it publishes.
+        sb.append("        <key>NSExtensionFileProviderDocumentGroup</key>\n");
+        sb.append("        <string>").append(escapeXml(appGroupId)).append("</string>\n");
         sb.append("        <key>NSExtensionPrincipalClass</key>\n");
         sb.append("        <string>$(PRODUCT_MODULE_NAME).")
                 .append(usesReplicatedApi() ? "CN1FileProviderExtension" : "CN1FileProviderClassic")
                 .append("</string>\n");
-        if (!usesReplicatedApi()) {
-            // Only the classic provider advertises this; the replicated API enumerates by
-            // definition and the key is meaningless there.
-            sb.append("        <key>NSExtensionFileProviderSupportsEnumeration</key>\n");
-            sb.append("        <true/>\n");
-        }
+        // Emitted for both providers, as Apple's template does. The classic provider needs it --
+        // without it the system never asks it to enumerate -- and on the replicated provider,
+        // which enumerates by definition, it is inert rather than wrong.
+        sb.append("        <key>NSExtensionFileProviderSupportsEnumeration</key>\n");
+        sb.append("        <true/>\n");
         sb.append("    </dict>\n");
         sb.append("</dict>\n");
         sb.append("</plist>\n");

@@ -27,9 +27,11 @@ import com.codename1.io.JSONWriter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// Converts a published document tree to and from the `index.json` the platform readers consume.
 ///
@@ -60,6 +62,16 @@ public final class DocumentIndexSerializer {
         if (root == null) {
             throw new IllegalArgumentException("A document index needs a root node");
         }
+        // Refused here rather than left to the readers. Two nodes sharing an id resolve to
+        // whichever the reader indexed last while both parents keep listing it, so the browser
+        // shows two entries that open the same content -- a defect that surfaces on a device,
+        // far from the publish that caused it.
+        Set<String> seen = new HashSet<String>();
+        String duplicate = findDuplicateId(root, seen);
+        if (duplicate != null) {
+            throw new IllegalArgumentException("Two document nodes share the id \"" + duplicate
+                    + "\". Ids must be unique across the whole published tree.");
+        }
         Map<String, Object> doc = new LinkedHashMap<String, Object>();
         doc.put("v", Integer.valueOf(VERSION));
         doc.put("root", toMap(root));
@@ -89,6 +101,19 @@ public final class DocumentIndexSerializer {
             throw new IOException("Document index has no root object");
         }
         return fromMap((Map) root);
+    }
+
+    private static String findDuplicateId(DocumentNode node, Set<String> seen) {
+        if (!seen.add(node.getId())) {
+            return node.getId();
+        }
+        for (DocumentNode child : node.getChildren()) {
+            String duplicate = findDuplicateId(child, seen);
+            if (duplicate != null) {
+                return duplicate;
+            }
+        }
+        return null;
     }
 
     private static Map<String, Object> toMap(DocumentNode node) {

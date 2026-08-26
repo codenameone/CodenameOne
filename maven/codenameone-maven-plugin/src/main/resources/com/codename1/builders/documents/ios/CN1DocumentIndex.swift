@@ -76,6 +76,27 @@ final class CN1DocumentIndex {
 
     /// Reads the index the app last published into the shared container. Returns nil when the app
     /// has published nothing yet, which is an empty file browser rather than an error.
+    /// The directory published `path` values are relative to.
+    static func filesDirectory(containerURL: URL) -> URL {
+        containerURL.appendingPathComponent("cn1documents/files", isDirectory: true)
+    }
+
+    /// Resolves a published relative path, refusing anything that escapes the shared directory.
+    ///
+    /// A path is app-supplied data and may have come from a server, so ".." in it must not be
+    /// able to reach the app's own databases or preferences and hand them to the system picker.
+    /// Standardizing first is what makes the prefix check meaningful: without it "a/../../x"
+    /// still starts with the directory it escapes.
+    static func resolveLocal(path: String, containerURL: URL) -> URL? {
+        let base = filesDirectory(containerURL: containerURL).standardizedFileURL
+        let candidate = base.appendingPathComponent(path).standardizedFileURL
+        var basePath = base.path
+        if !basePath.hasSuffix("/") {
+            basePath += "/"
+        }
+        return candidate.path.hasPrefix(basePath) ? candidate : nil
+    }
+
     static func load(containerURL: URL) -> CN1DocumentIndex? {
         let url = containerURL.appendingPathComponent("cn1documents/index.json")
         guard let data = try? Data(contentsOf: url) else {

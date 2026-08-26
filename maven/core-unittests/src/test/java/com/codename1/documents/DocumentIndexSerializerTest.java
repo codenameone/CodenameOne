@@ -144,6 +144,27 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesATreeWithDuplicateIds() {
+        // Two nodes sharing an id resolve to whichever the reader indexed last while both parents
+        // keep listing it, so the browser shows two entries that open the same content. Caught at
+        // publish, where the developer is, rather than on a device.
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        DocumentNode a = DocumentNode.folder("a", "A");
+        DocumentNode b = DocumentNode.folder("b", "B");
+        a.add(DocumentNode.file("same", "one.txt"));
+        b.add(DocumentNode.file("same", "two.txt"));
+        root.add(a).add(b);
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(root));
+        assertTrue(err.getMessage().contains("same"), err.getMessage());
+        // The root's own id counts too.
+        DocumentNode clash = DocumentNode.folder("root", "Root");
+        clash.add(DocumentNode.file("root", "root.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(clash));
+    }
+
+    @Test
     void refusesToNestUnderAFile() {
         assertThrows(IllegalStateException.class,
                 () -> DocumentNode.file("f", "f.txt").add(DocumentNode.file("g", "g.txt")));

@@ -78,6 +78,13 @@ public class IOSDocumentProviderExtensionBuilderTest {
         String plist = text(files, "Info.plist");
         assertTrue(plist.contains("CN1FileProviderClassic"), plist);
         assertTrue(plist.contains("NSExtensionFileProviderSupportsEnumeration"), plist);
+        // The document group is an extension-point attribute. At the top level the system never
+        // associates the provider with the group, documentStorageURL errors, and the classic
+        // provider cannot materialize anything -- so assert it sits inside NSExtension.
+        int nsExtension = plist.indexOf("<key>NSExtension</key>");
+        int group = plist.indexOf("<key>NSExtensionFileProviderDocumentGroup</key>");
+        assertTrue(nsExtension >= 0 && group > nsExtension,
+                "NSExtensionFileProviderDocumentGroup must be inside NSExtension: " + plist);
     }
 
     @Test
@@ -101,7 +108,10 @@ public class IOSDocumentProviderExtensionBuilderTest {
     public void plistNamesTheGroupTwiceBecauseTheSystemAndTheSwiftReadDifferentKeys() throws Exception {
         String plist = text(validBuilder().buildFileMap(), "Info.plist");
         assertTrue(plist.contains("<key>CN1DocumentsAppGroup</key>"), plist);
-        assertTrue(plist.contains("<key>NSExtensionFileProviderDocumentGroup</key>"), plist);
+        int nsExt = plist.indexOf("<key>NSExtension</key>");
+        int docGroup = plist.indexOf("<key>NSExtensionFileProviderDocumentGroup</key>");
+        assertTrue(nsExt >= 0 && docGroup > nsExt,
+                "NSExtensionFileProviderDocumentGroup must be inside NSExtension: " + plist);
         assertTrue(plist.contains("com.apple.fileprovider-nonui"), plist);
         assertTrue(plist.contains("$(PRODUCT_MODULE_NAME).CN1FileProviderExtension"), plist);
         assertEquals(2, countOccurrences(plist, "group.com.example.myapp"),

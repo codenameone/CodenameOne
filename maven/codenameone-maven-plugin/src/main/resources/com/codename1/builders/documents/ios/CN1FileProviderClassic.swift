@@ -59,7 +59,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         let identifier: NSFileProviderItemIdentifier? =
             resolved == index.rootId ? .rootContainer : nil
         return CN1DocumentItem(node: node, parentId: parent, identifier: identifier,
-                               revision: index.revision)
+                               containerURL: containerURL, revision: index.revision)
     }
 
     override func urlForItem(withPersistentIdentifier identifier: NSFileProviderItemIdentifier)
@@ -135,10 +135,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             return
         }
         if let path = node.path, !path.isEmpty {
-            let local = containerURL
-                .appendingPathComponent("cn1documents/files")
-                .appendingPathComponent(path)
-            if FileManager.default.fileExists(atPath: local.path) {
+            // Resolved through the containment check: a published path is app data and may
+            // have come from a server, so "../" in it must not be able to reach the app's own
+            // storage and hand it to the system picker.
+            if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
+               FileManager.default.fileExists(atPath: local.path) {
                 completionHandler(CN1FileProviderClassic.place(local, at: url, copy: true))
                 return
             }
