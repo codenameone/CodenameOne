@@ -321,7 +321,30 @@ public class Parser extends ClassVisitor {
             // reports Object[] rather than the source array type. Kept as a
             // known limitation until ParparVM's array layout is generalised.
             if (BytecodeMethod.isInterpHost()) {
-                int arrayId = classes.size() + 1 + 100;
+                int arrayStart = classes.size() + 1;
+                // The 100 reserved slots between arrayStart and arrayStart+100
+                // are the primitive-array ids `cn1_array_N_id_JAVA_TYPE`
+                // defines in cn1_globals.h -- rank 1..3 for each of the eight
+                // primitives, laid out four slots per primitive. Pushed code
+                // evaluating a primitive-array literal like `int[].class` uses
+                // the LDC descriptor `[I`, and iOS resolves it only through
+                // this sidecar; without these rows classIds never sees `[I`
+                // and the otherwise-valid literal raises NoClassDefFoundError.
+                String[] primNames  = { "JAVA_BOOLEAN", "JAVA_CHAR", "JAVA_BYTE", "JAVA_SHORT",
+                                        "JAVA_INT", "JAVA_LONG", "JAVA_FLOAT", "JAVA_DOUBLE" };
+                char[]   primLetter = { 'Z', 'C', 'B', 'S', 'I', 'J', 'F', 'D' };
+                for (int p = 0; p < primNames.length; p++) {
+                    int base = arrayStart + p * 4;
+                    for (int rank = 1; rank <= 3; rank++) {
+                        StringBuilder brackets = new StringBuilder();
+                        for (int i = 0; i < rank; i++) {
+                            brackets.append('[');
+                        }
+                        w.write("class\t" + (base + rank) + "\tarray" + rank + "__" + primNames[p]
+                                + "\t\t-1\t" + brackets + primLetter[p] + "\t\n");
+                    }
+                }
+                int arrayId = arrayStart + 100;
                 for (ByteCodeClass bc : classes) {
                     String jvmName = bc.getOriginalClassName();
                     if (jvmName == null || jvmName.isEmpty()) {

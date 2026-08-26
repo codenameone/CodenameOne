@@ -951,9 +951,14 @@ public class DeviceRuntimeService {
      * derived here is never sent -- both ends compute it from the code, the peer
      * id and the device id -- so what an eavesdropper sees is a nonce and an
      * HMAC over it.</p>
+     *
+     * <p>Returns {@code true} once the prompt slot is released so the caller's
+     * finally does not release it a second time -- which would clear a slot the
+     * next computer had already claimed for its own dialog, letting a third
+     * connection open yet another prompt while the second is still on screen.</p>
      */
-    private void handlePairing(String peerId, String peerName, Progress progress,
-                               DataInputStream in, DataOutputStream out) throws IOException {
+    private boolean handlePairing(String peerId, String peerName, Progress progress,
+                                  DataInputStream in, DataOutputStream out) throws IOException {
         String code = DeviceRuntimePairing.promptForCode(peerId, peerName);
         // The dialog is closed: the prompt slot goes back so the next computer
         // can pair, and the connection goes back to a bounded wait -- what
@@ -965,7 +970,7 @@ public class DeviceRuntimeService {
             out.writeByte(0);
             out.writeUTF(DeviceRuntimePairing.lastFailure());
             out.flush();
-            return;
+            return true;
         }
         String deviceId = DeviceRuntimePairing.deviceId();
         String challenge = InterpPairingSecret.challenge();
@@ -985,13 +990,14 @@ public class DeviceRuntimeService {
             out.writeByte(0);
             out.writeUTF(DeviceRuntimePairing.lastFailure());
             out.flush();
-            return;
+            return true;
         }
         DeviceRuntimePairing.completePairing(peerId, peerName, secret);
         status = "paired with " + peerName;
         out.writeByte(1);
         out.writeUTF("paired with this device as \"" + peerName + "\"");
         out.flush();
+        return true;
     }
 
     /**
@@ -1118,6 +1124,7 @@ public class DeviceRuntimeService {
                             out.flush();
                             return true;
                         }
+                        boolean released = false;
                         try {
                             // A person is about to be asked to type six digits,
                             // which is exactly the case an unbounded wait is
@@ -1125,9 +1132,19 @@ public class DeviceRuntimeService {
                             // slot was claimed, so it cannot be claimed by
                             // everything at once.
                             progress.allowLongWait();
-                            handlePairing(peerId, peerName, progress, in, out);
+                            released = handlePairing(peerId, peerName, progress, in, out);
                         } finally {
-                            releasePairingPrompt();
+                            // handlePairing releases the slot at line 963 once
+                            // the dialog closes, so another computer can pair
+                            // during the challenge round trip. A blind release
+                            // here would then clear the slot that computer had
+                            // already claimed for its own dialog, letting a
+                            // third connection stack another prompt. Only
+                            // release when handlePairing did not -- i.e. it
+                            // threw before reaching the early release.
+                            if (!released) {
+                                releasePairingPrompt();
+                            }
                         }
                         return true;
                     } else if (frame == FRAME_PUSH) {
