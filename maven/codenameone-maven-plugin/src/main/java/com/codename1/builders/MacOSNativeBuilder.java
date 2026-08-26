@@ -476,6 +476,18 @@ public class MacOSNativeBuilder extends Executor {
                 "com/codename1/generated/svg/SVGRegistry.class").isFile()
                 ? "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n"
                 : "";
+        // Discovery reads classesDir, which is where the classes the customer
+        // submitted land -- including a dependency's, because the Maven plugin
+        // uploads a jar-with-dependencies and everything on the app's classpath is
+        // merged into it. A cn1lib's NativeInterface therefore arrives here, and
+        // findNativeClassesInDir descends into any .jar it finds beside them.
+        //
+        // Not buildinRes as well, which is where unzip routes a jar submitted as a
+        // separate artifact. Reaching those would mean changing findNativeInterfaces,
+        // which scans only its first root and is shared by every builder --
+        // IPhoneBuilder passes exactly classesDir here too, and has for years.
+        // Widening it would newly generate stubs on every platform, which is not a
+        // change that belongs beside a macOS port.
         String registerNatives = registerNativeImplementationsAndCreateStubs(
                 new java.net.URLClassLoader(new java.net.URL[]{getCodenameOneJar().toURI().toURL()}),
                 stubSource, classesDir);
