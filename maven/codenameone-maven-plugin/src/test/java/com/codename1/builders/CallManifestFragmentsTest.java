@@ -189,6 +189,36 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void everyCompileSdkRaiseIsInTheHelper() {
+        // The service-type decision is read thousands of lines before the
+        // gradle file is written, and THREE separate raises turned out to
+        // apply only at the later site -- the target raise, the ranging
+        // raise, and the 33 floor every nearby cluster carries. Each time the
+        // manifest got a preliminary answer, dropped the phoneCall service
+        // type, and shipped an app that compiled against something newer,
+        // where startForeground refuses a type the manifest never declared.
+        //
+        // This pins the enumeration rather than any one raise: a raise added
+        // to the generation below must be added to the helper too, or these
+        // stop matching.
+        assertEquals(36, AndroidGradleBuilder.RANGING_MIN_COMPILE_SDK);
+        assertEquals(33, AndroidGradleBuilder.NEARBY_MIN_COMPILE_SDK);
+        // Ranging alone reaches 36 even when the ladder and the target are
+        // far below it.
+        assertEquals(36, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                true, true));
+        // Transport or companion without ranging still reaches 33.
+        assertEquals(33, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, true));
+        // No nearby at all: the ladder and the target decide.
+        assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false));
+        assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "34",
+                false, false),
+                "the compile SDK is never below the target");
+    }
+
+    @Test
     public void thePhoneCallServiceTypeNeedsApi29ToCompile() {
         // android:foregroundServiceType="phoneCall" arrived in API 29, and
         // AAPT REJECTS a manifest naming an enum value the compile SDK does

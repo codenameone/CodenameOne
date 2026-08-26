@@ -2867,7 +2867,9 @@ public class AndroidGradleBuilder extends Executor {
                     usesCallSession, usesCallVoip, usesCallDirectory,
                     existingApplication,
                     compileSdkInt(maxPlatformVersion, buildToolsVersion,
-                            targetNumber));
+                            targetNumber, usesNearbyRanging,
+                            usesNearbyRanging || usesNearbyTransport
+                                    || usesNearbyCompanion));
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
@@ -7050,7 +7052,9 @@ public class AndroidGradleBuilder extends Executor {
         // the compile SDK is an AAPT failure, not a runtime one. The
         // support-lib ladder is NOT the same mapping and stays as it is.
         compileSdkVersion = String.valueOf(compileSdkInt(maxPlatformVersion,
-                buildToolsVersion, targetNumber));
+                buildToolsVersion, targetNumber, usesNearbyRanging,
+                usesNearbyRanging || usesNearbyTransport
+                        || usesNearbyCompanion));
         String supportLibVersion = maxPlatformVersion;
         String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
             "35", "36"};
@@ -7068,8 +7072,9 @@ public class AndroidGradleBuilder extends Executor {
             // ranging is supported on a target-30 app and that app still has
             // to COMPILE against 36. (The AAR also wants AGP 8.9.1 or newer;
             // ANDROID_GRADLE_PLUGIN_8_VERSION is well past that.)
+            // compileSdkInt applies this too; a no-op wherever it wrote.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
-                    compileSdkVersion, "36");
+                    compileSdkVersion, String.valueOf(RANGING_MIN_COMPILE_SDK));
         }
         if (usesNearbyRanging || usesNearbyTransport || usesNearbyCompanion) {
             // 33, and for ANY of the three clusters, not just the one whose
@@ -7094,8 +7099,9 @@ public class AndroidGradleBuilder extends Executor {
             // runtime SDK_INT check, exactly so this floor does not have to
             // move for a hint that costs the app nothing at compile time.
             // Raising it to 34 would raise it for every companion build.
+            // compileSdkInt applies this too; a no-op wherever it wrote.
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
-                    compileSdkVersion, "33");
+                    compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
         }
         jcenter =
                 "      google()\n" +
@@ -10313,8 +10319,15 @@ public class AndroidGradleBuilder extends Executor {
      * @param targetNumber       the {@code android.targetSDKVersion} in force
      * @return the API level, or 0 when it cannot be determined
      */
+    /** The compile SDK androidx.core.uwb's AAR metadata demands. */
+    static final int RANGING_MIN_COMPILE_SDK = 36;
+
+    /** The compile SDK any nearby cluster demands; see the block below. */
+    static final int NEARBY_MIN_COMPILE_SDK = 33;
+
     static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
-            String targetNumber) {
+            String targetNumber, boolean usesNearbyRanging,
+            boolean usesAnyNearby) {
         String compileSdkVersion = maxPlatformVersion;
         String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
         for (int i = 0; i < ladder.length; i++) {
@@ -10325,6 +10338,21 @@ public class AndroidGradleBuilder extends Executor {
         }
         compileSdkVersion =
                 ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
+        // EVERY feature raise, in the same order the generation below applies
+        // them. Leaving one out gave the manifest fragments a preliminary
+        // answer: a VoIP app that also used nearby dropped
+        // android:foregroundServiceType="phoneCall" and then compiled against
+        // 33 or 36, where startForeground refuses a type the manifest never
+        // declared. A new raise belongs here, and the block that applies it
+        // below becomes a no-op once it is.
+        if (usesNearbyRanging) {
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(RANGING_MIN_COMPILE_SDK));
+        }
+        if (usesAnyNearby) {
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
+        }
         try {
             return Integer.parseInt(compileSdkVersion.trim());
         } catch (NumberFormatException notANumber) {

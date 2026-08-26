@@ -219,6 +219,28 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aProviderResetEndsTheSessionsTheAppStillHolds() {
+        // Clearing the map is not enough: an app keeps the CallSession a
+        // report handed it, and a reset says every call is gone. Left
+        // RINGING or ACTIVE, that object contradicts both the reset and
+        // CallState's terminal contract -- and would still take a
+        // reportConnected for a call the provider destroyed.
+        CallSession s = ring(CallId.random());
+        assertSame(CallState.RINGING, s.getState());
+
+        bridge.simulateProviderReset();
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSessions().length > 0
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertSame(CallState.ENDED, s.getState(),
+                "a reset must end the sessions the app is still holding");
+        s.reportConnected();
+        assertSame(CallState.ENDED, s.getState());
+    }
+
+    @Test
     public void anIgnoredActionIsFulfilledRatherThanDropped() {
         // Silence has to mean "done": the platform kills a call whose action
         // goes unanswered, so a listener that does nothing must still answer.

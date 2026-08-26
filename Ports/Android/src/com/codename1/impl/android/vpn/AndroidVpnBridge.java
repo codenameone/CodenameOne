@@ -467,11 +467,31 @@ public class AndroidVpnBridge implements VpnBridge {
             // said NOT_CONFIGURED had getStatus() contradict the error the
             // caller had just been handed.
             boolean absent = isNotProvisioned(e);
+            if (absent) {
+                // The platform is authoritative here, and it says there is no
+                // profile; the record this port kept is stale.
+                forgetInstalledProfile();
+            }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED
                     : VpnStatus.DISCONNECTED);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
                     describe(e));
+        }
+    }
+
+    /// Drops the record of an installed profile, cached and persisted.
+    ///
+    /// Called only where the PLATFORM has said there is no profile. Setting
+    /// NOT_CONFIGURED without this achieved nothing: reconciledStatus() sees
+    /// the record storedWire() still answers from and moves the status
+    /// straight back to DISCONNECTED, while load() keeps describing a profile
+    /// Android does not have -- after restored app data, or after the user
+    /// removed the profile from Settings.
+    private void forgetInstalledProfile() {
+        synchronized (this) {
+            installedWire = null;
+            Preferences.delete(WIRE_PREF);
         }
     }
 
@@ -506,6 +526,9 @@ public class AndroidVpnBridge implements VpnBridge {
             // would go unseen for ever. Only a platform saying there is no
             // profile at all justifies keeping it clear.
             startRequested = wasRequested && !absent;
+            if (absent) {
+                forgetInstalledProfile();
+            }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));

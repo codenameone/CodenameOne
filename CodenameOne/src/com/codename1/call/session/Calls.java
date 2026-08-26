@@ -905,7 +905,18 @@ public final class Calls {
                     // Sessions go first: a listener that iterates getSessions()
                     // during providerReset must not see calls the system has
                     // already destroyed.
+                    //
+                    // MARKED ended, not merely dropped. An app holding the
+                    // CallSession a report handed it keeps that object after
+                    // the map is cleared, and leaving it RINGING or ACTIVE
+                    // contradicts both the reset -- which says every call is
+                    // gone -- and CallState's terminal-state contract. The
+                    // object would still accept a reportConnected for a call
+                    // the provider destroyed.
                     synchronized (SESSIONS) {
+                        for (CallSession s : SESSIONS.values()) {
+                            s.setStateInternal(CallState.ENDED);
+                        }
                         SESSIONS.clear();
                     }
                     // Then everything in flight. The provider is gone and the
