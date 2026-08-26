@@ -61,6 +61,23 @@ NSView *CN1MacPeerHostView(void) {
     return [CN1MacHost sharedHost].activeRenderingView;
 }
 
+NSView *CN1MacKeyRenderingHostView(void) {
+    NSWindow *key = [NSApp keyWindow];
+    if (key != nil && [key.contentView conformsToProtocol:@protocol(NSTextInputClient)]) {
+        return key.contentView;
+    }
+    return [CN1MacHost sharedHost].renderingView;
+}
+
+CGFloat CN1MacHostViewScale(NSView *host) {
+    extern float scaleValue;
+    CGFloat scale = (host != nil && host.window != nil) ? host.window.backingScaleFactor : 0;
+    if (scale <= 0) {
+        scale = scaleValue > 0 ? scaleValue : 1;
+    }
+    return scale;
+}
+
 void CN1MacRefreshScaleValue(void) {
     extern float scaleValue;
     NSWindow *w = [CN1MacHost sharedHost].window;

@@ -74,5 +74,28 @@
 
 @end
 
+/// The rendering view that should host a native popover, sheet or picker.
+///
+/// The key window's view when that window is one of ours, and the main window's
+/// otherwise. Resolved through the key window rather than by threading an id
+/// down from Java: this kind of UI opens in response to a click, and the window
+/// that received the click is the key one. Conformance to NSTextInputClient is
+/// what marks a Codename One rendering view, which needs no header of the
+/// view's own.
+///
+/// Anchoring to the main window instead puts the UI in the wrong window at
+/// unrelated coordinates, and cannot present it at all when that window is
+/// hidden.
+NSView *CN1MacKeyRenderingHostView(void);
+
+/// The backing scale to divide a Codename One pixel coordinate by before
+/// handing it to AppKit as a point coordinate in `host`.
+///
+/// That window's own scale, not the process-wide one: scaleValue tracks the
+/// MAIN window and is the wrong divisor for a window on a display of a
+/// different density.
+CGFloat CN1MacHostViewScale(NSView *host);
+
+
 #endif
 #endif

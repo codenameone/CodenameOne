@@ -65,6 +65,7 @@
  */
 #import "CN1MacHost.h"
 #import "CN1AppKitCompat.h"
+#import "CN1MacShare.h"
 #import "METALView.h"
 #endif
 
@@ -1183,18 +1184,14 @@ JAVA_OBJECT getClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString
     );
 }
 
+// Reads a Java client property. Nothing platform-specific about it -- guarding
+// it out made every client property read false on macOS.
 BOOL getBooleanClientProperty(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o, NSString* key){
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return NO;
-#else
     JAVA_OBJECT val = getClientProperty(CN1_THREAD_STATE_PASS_ARG o, key);
     if(val == JAVA_NULL){
         return NO;
     }
     return val == get_static_java_lang_Boolean_TRUE(threadStateData);
-#endif
 }
 
 #ifndef NEW_CODENAME_ONE_VM
@@ -3536,17 +3533,16 @@ void connectionReceivedData(void* peer, NSData* data) {
 
 }
 
+// Platform-neutral despite living among the UIKit helpers: the whole body is a
+// string conversion and a Java callback. It was guarded out of the macOS build
+// during bring-up by mistake, and because ensureConnection() blocks until either
+// this or a success callback fires, every failed request -- offline host, DNS
+// failure, timeout, rejected TLS -- hung its thread forever instead of throwing.
 void connectionError(void* peer, NSString* message) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
     POOL_BEGIN();
-    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG message);
     com_codename1_impl_ios_IOSImplementation_networkError___long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG peer, str);
     POOL_END();
-#endif
 }
 
 
@@ -4125,7 +4121,10 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
 #if !TARGET_OS_WATCH
 #if TARGET_OS_OSX
     extern NSView *CN1MacPeerHostView(void);
-    CN1View *peerHost = (CN1View *)CN1MacPeerHostView();
+    // Typed as the rendering view it actually is: addPeerComponent: is declared
+    // on METALView, not on NSView, and an id-typed receiver would take a bad
+    // selector to runtime instead of to the compiler.
+    METALView *peerHost = (METALView *)CN1MacPeerHostView();
 #endif
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -4140,7 +4139,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
                 // Re-shown into its own window, for the same reason it was added
                 // there: eaglView is the main surface on this port.
                 [(peerHost != nil ? peerHost
-                     : (CN1View *)[[CodenameOne_GLViewController instance] eaglView])
+                     : (METALView *)[[CodenameOne_GLViewController instance] eaglView])
                         addPeerComponent:v];
 #else
                 [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
@@ -4224,7 +4223,10 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
     // port, so without this a peer belonging to a secondary Window was added to
     // the main one and drawn there at coordinates meant for its own.
     extern NSView *CN1MacPeerHostView(void);
-    CN1View *peerHost = (CN1View *)CN1MacPeerHostView();
+    // Typed as the rendering view it actually is: addPeerComponent: is declared
+    // on METALView, not on NSView, and an id-typed receiver would take a bad
+    // selector to runtime instead of to the compiler.
+    METALView *peerHost = (METALView *)CN1MacPeerHostView();
     // A peer created during initComponentImpl, before its window has ever
     // painted, still lands on the main surface: at that moment there is nothing
     // that says which window it belongs to.
@@ -4247,7 +4249,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
         if([v superview] == nil) {
             [(peerHost != nil ? peerHost
-                 : (CN1View *)[[CodenameOne_GLViewController instance] eaglView])
+                 : (METALView *)[[CodenameOne_GLViewController instance] eaglView])
                     addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
@@ -7147,19 +7149,18 @@ void com_codename1_impl_ios_IOSNative_wifiUninstallTypeListener__(CN1_THREAD_STA
 static SCNetworkReachabilityRef cn1ReachabilityRef = NULL;
 
 static int cn1NetworkTypeFromFlags(SCNetworkReachabilityFlags flags) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-    return 0;
-#else
     if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
         return 0; // NETWORK_TYPE_NONE
     }
+    // Only the WWAN flag is iOS-only; SystemConfiguration reachability itself is
+    // the same API on macOS. Reporting NONE there made every connectivity check
+    // on the desktop answer "offline".
+#if !TARGET_OS_OSX
     if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
         return 2; // NETWORK_TYPE_CELLULAR
     }
-    return 1; // NETWORK_TYPE_WIFI -- iOS treats everything non-WWAN as wifi
 #endif
+    return 1; // NETWORK_TYPE_WIFI -- everything non-WWAN counts as wifi
 }
 
 static int cn1ReadNetworkType() {
@@ -10121,10 +10122,32 @@ void com_codename1_impl_ios_IOSNative_registerPushCategories__(CN1_THREAD_STATE_
 }
 
 CN1Image* scaleImage(int destWidth, int destHeight, CN1Image *img) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
-    return nil;
+    // Only the orientation fixup above is UIKit -- an NSImage carries no
+    // imageOrientation, because a source that has one has already been resolved
+    // by the time it becomes a representation. Everything else is CoreGraphics
+    // and identical. Returning nil here made every scaled encode (the resizing
+    // overload of createImageFile) hand back no data at all.
+    CGImageRef src = CN1AppKitCGImageFromNSImage(img);
+    if (src == NULL) {
+        return nil;
+    }
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmContext = CGBitmapContextCreate(NULL, destWidth, destHeight, 8, destWidth * 4,
+            space, kCGBitmapByteOrderDefault | kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(space);
+    if (bmContext == NULL) {
+        return nil;
+    }
+    CGContextSetShouldAntialias(bmContext, true);
+    CGContextSetAllowsAntialiasing(bmContext, true);
+    CGContextSetInterpolationQuality(bmContext, kCGInterpolationHigh);
+    CGContextDrawImage(bmContext, CGRectMake(0, 0, destWidth, destHeight), src);
+    CGImageRef scaledImageRef = CGBitmapContextCreateImage(bmContext);
+    CGContextRelease(bmContext);
+    CN1Image *scaled = CN1AppKitNSImageFromCGImage(scaledImageRef);
+    CGImageRelease(scaledImageRef);
+    return scaled;
 #else
     CN1Image* scaledInstance = nil;
     const size_t originalWidth = img.size.width;
@@ -12534,11 +12557,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     BOOL useRect = rectangle ? YES : NO;
     __block CGRect cgrect = CGRectMake(0, 0, 0, 0);
     if (useRect) {
+        // Left in Codename One pixels: the sheet is anchored against the scale of
+        // the window it opens in, which is not the process-wide one when that
+        // window is on a display of a different density.
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -12558,21 +12580,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         } else if (someText != nil) {
             [dataToShare addObject:someText];
         }
-        if (dataToShare.count == 0) {
-            POOL_END();
-            return;
-        }
-        // A picker anchored to the component that asked to share, which is what
-        // the rectangle is for -- an unanchored Mac share sheet appears in the
-        // window's corner with no relation to what the user clicked.
-        NSSharingServicePicker* picker = [[NSSharingServicePicker alloc] initWithItems:dataToShare];
-        NSView* host = [CN1MacHost sharedHost].renderingView;
-        NSRect anchor = useRect ? cgrect : NSMakeRect(host.bounds.size.width / 2,
-                                                      host.bounds.size.height / 2, 1, 1);
-        [picker showRelativeToRect:anchor ofView:host preferredEdge:NSMinYEdge];
-#ifndef CN1_USE_ARC
-        [picker release];
-#endif
+        // Anchored to the component that asked to share, in the window that
+        // asked -- an unanchored Mac share sheet appears in a corner with no
+        // relation to what the user clicked.
+        CN1MacPresentSharePicker(dataToShare, useRect, cgrect, 0);
         POOL_END();
     });
 #else
@@ -12653,11 +12664,10 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     BOOL useRect = rectangle ? YES : NO;
     __block CGRect cgrect = CGRectMake(0, 0, 0, 0);
     if (useRect) {
+        // Left in Codename One pixels: the sheet is anchored against the scale of
+        // the window it opens in, which is not the process-wide one when that
+        // window is on a display of a different density.
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
-        cgrect.origin.x = cgrect.origin.x / scaleValue;
-        cgrect.origin.y = cgrect.origin.y / scaleValue;
-        cgrect.size.width = cgrect.size.width / scaleValue;
-        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     int cbId = (int)callbackId;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -12675,24 +12685,10 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         } else if (someText != nil) {
             [dataToShare addObject:someText];
         }
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        if (dataToShare.count == 0) {
-            com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_int_java_lang_String_java_lang_String(threadStateData, (JAVA_INT)cbId, 2, JAVA_NULL, JAVA_NULL);
-            POOL_END();
-            return;
-        }
-        NSSharingServicePicker* picker = [[NSSharingServicePicker alloc] initWithItems:dataToShare];
-        NSView* host = [CN1MacHost sharedHost].renderingView;
-        NSRect anchor = useRect ? cgrect : NSMakeRect(host.bounds.size.width / 2,
-                                                      host.bounds.size.height / 2, 1, 1);
-        [picker showRelativeToRect:anchor ofView:host preferredEdge:NSMinYEdge];
-        // NSSharingServicePicker reports the chosen service through a delegate
-        // rather than a completion handler, and the framework only wants to know
-        // that the sheet was shown, so completion is reported here.
-        com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_int_java_lang_String_java_lang_String(threadStateData, (JAVA_INT)cbId, 1, JAVA_NULL, JAVA_NULL);
-#ifndef CN1_USE_ARC
-        [picker release];
-#endif
+        // The real outcome, through the picker's and then the service's
+        // delegate. Reporting SHARED_TO when the sheet opened made a dismissed
+        // sheet indistinguishable from a completed share.
+        CN1MacPresentSharePicker(dataToShare, useRect, cgrect, cbId);
         POOL_END();
     });
 #else
@@ -19033,11 +19029,11 @@ void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_ja
     POOL_END();
 }
 
+// The keychain is the same API on macOS, and every other secure-storage entry
+// point here is already unguarded. Guarding only the update meant a set over an
+// existing key returned neither a result nor an error, so the Java request never
+// completed.
 static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString *nsAccount, NSString *nsValue, NSString *appName, NSString *accessGroup) {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
     NSMutableDictionary *q = [NSMutableDictionary dictionary];
     [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
     [q setObject:nsAccount forKey:(__bridge id)kSecAttrAccount];
@@ -19055,7 +19051,6 @@ static void cn1_secureStorageUpdate(int requestId, NSString *nsReason, NSString 
         JAVA_OBJECT jmsg = fromNSString(getThreadLocalData(), [NSString stringWithFormat:@"OSStatus %d", (int)status]);
         com_codename1_impl_ios_IOSSecureStorage_nativeStorageError___int_int_java_lang_String(getThreadLocalData(), requestId, (int)status, jmsg);
     }
-#endif
 }
 
 void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account, JAVA_OBJECT value) {

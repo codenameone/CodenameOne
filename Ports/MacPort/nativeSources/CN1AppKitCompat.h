@@ -66,6 +66,9 @@ CGImageRef _Nullable CN1AppKitCGImageFromNSImage(NSImage * _Nullable image);
 
 /// An NSImage wrapping a CGImage at its pixel size, tagged so that AppKit does
 /// not rescale it for the current display.
+///
+/// Autoreleased -- the caller does not own it. Same for every function here
+/// that returns an NSImage.
 NSImage * _Nullable CN1AppKitNSImageFromCGImage(CGImageRef _Nullable cgImage);
 
 /// Reads a CGImage into a caller-supplied ARGB buffer, premultiplied, in the

@@ -64,7 +64,15 @@ NSImage *CN1AppKitNSImageFromCGImage(CGImageRef cgImage) {
     if (w == 0 || h == 0) {
         return nil;
     }
-    return [[NSImage alloc] initWithCGImage:cgImage size:NSMakeSize(w, h)];
+    NSImage *image = [[NSImage alloc] initWithCGImage:cgImage size:NSMakeSize(w, h)];
+    // Autoreleased, so this reads as an ordinary Cocoa factory rather than a
+    // create/copy. The project is manual retain/release, the blur and glass ops
+    // call this once per drawn frame, and a +1 return that every caller has to
+    // remember to balance is a per-frame leak waiting to be reintroduced.
+#ifndef CN1_USE_ARC
+    [image autorelease];
+#endif
+    return image;
 }
 
 BOOL CN1AppKitReadARGB(CGImageRef cgImage, unsigned int *argb, int width, int height) {

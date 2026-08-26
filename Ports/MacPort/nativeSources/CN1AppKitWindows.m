@@ -616,6 +616,10 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetAlwaysOnTop___int_boolean
     });
 }
 
+/// Defined below, next to the modality natives it belongs with; the utility
+/// rebuild needs it too.
+static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled);
+
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN utility) {
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);
@@ -641,6 +645,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         NSWindowLevel level = old.level;
         NSSize minSize = old.contentMinSize;
         NSWindow *owner = old.parentWindow;
+        // A modal session belongs to the window it was begun for, so it cannot
+        // outlive this one: left alone it would keep the CLOSED window modal and
+        // leave the visible replacement ordinary. Ended here, restarted below.
+        BOOL wasModal = rec.modalSession != NULL;
+        if (wasModal) {
+            [NSApp endModalSession:rec.modalSession];
+            rec.modalSession = NULL;
+        }
 
         [view removeFromSuperview];
         old.delegate = nil;
@@ -665,10 +677,17 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
             // conversion does not order it in early.
             [owner addChildWindow:fresh ordered:NSWindowAbove];
         }
+        // The view carries cn1InputEnabled across with it, but the chrome is the
+        // new window's own: a window blocked by a modal dialog would otherwise
+        // come back with live close and minimize buttons.
+        cn1SetWindowChromeEnabled(fresh, rec.inputEnabled);
         if (wasVisible) {
             [fresh makeKeyAndOrderFront:nil];
         }
         [fresh makeFirstResponder:view];
+        if (wasModal) {
+            rec.modalSession = [NSApp beginModalSessionForWindow:fresh];
+        }
 #ifndef CN1_USE_ARC
         [fresh release];
 #endif

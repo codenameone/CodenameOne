@@ -854,7 +854,15 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/bluetooth/")) {
                 caps.usesBluetooth = true;
             }
-            if (cls.startsWith("com/codename1/location/") || cls.startsWith("com/codename1/maps/")) {
+            // MapComponent by name rather than the whole maps package. Only that
+            // class reads the LocationManager; LatLng, Coord, WebMercator and the
+            // tile renderers are geometry and drawing. Scanning the app's own
+            // classes cannot see the call itself -- an app that uses MapComponent
+            // never names LocationManager, so the reference lives in a framework
+            // class this scan does not read -- which is why the CLASS is the test
+            // rather than the location API.
+            if (cls.startsWith("com/codename1/location/")
+                    || cls.equals("com/codename1/maps/MapComponent")) {
                 caps.usesLocation = true;
             }
             if (cls.startsWith("com/codename1/io/websocket/")

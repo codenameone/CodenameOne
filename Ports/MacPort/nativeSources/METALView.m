@@ -124,7 +124,23 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     self.layerContentsPlacement = NSViewLayerContentsPlacementTopLeft;
 
     CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
-    metalLayer.device = MTLCreateSystemDefaultDevice();
+    // The FIRST view to get here decides the device and the command queue for
+    // the whole process; every later window reuses them.
+    //
+    // Not a micro-optimisation. Mutable-image work commits to the queue
+    // CN1Metalcompat publishes and relies on FIFO ordering against the screen
+    // render, so a second window that minted its own queue and republished it
+    // would leave the first window's screen render on a queue Metal orders
+    // against nothing -- a mutable sampled before its writes land, which shows
+    // up as a stale or torn frame rather than as an error. A texture is also
+    // bound to the device that made it, so two devices cannot share one.
+    id<MTLDevice> device = CN1MetalDevice();
+    BOOL ownsDevice = NO;
+    if (device == nil) {
+        device = MTLCreateSystemDefaultDevice();
+        ownsDevice = YES;
+    }
+    metalLayer.device = device;
     metalLayer.opaque = YES;
     metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     // Must be NO: presentFramebuffer blits screenTexture into the drawable, and
@@ -140,15 +156,30 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
         CGColorSpaceRelease(cs);
     }
 
-    id<MTLCommandQueue> newQueue = [metalLayer.device newCommandQueue];
-    self.commandQueue = newQueue;
+    id<MTLCommandQueue> queue = CN1MetalCommandQueue();
+    if (queue == nil) {
+        queue = [device newCommandQueue];
+        self.commandQueue = queue;
 #ifndef CN1_USE_ARC
-    [newQueue release];
+        [queue release];
 #endif
-    // Publish device and queue once, on the main thread, so CN1Metalcompat's
-    // accessors are cheap static reads from the EDT and any background queue
-    // rather than a dereference of this view's layer.
-    CN1MetalSetDeviceAndCommandQueue(metalLayer.device, self.commandQueue);
+    } else {
+        self.commandQueue = queue;
+    }
+    // Published once, on the main thread, so CN1Metalcompat's accessors are
+    // cheap static reads from the EDT and any background queue rather than a
+    // dereference of this view's layer. A repeat call with the values already
+    // held is a no-op, which is what every window after the first makes.
+    CN1MetalSetDeviceAndCommandQueue(device, self.commandQueue);
+#ifndef CN1_USE_ARC
+    if (ownsDevice) {
+        // MTLCreateSystemDefaultDevice returns +1; the layer and the compat
+        // cache both hold their own retain by now.
+        [device release];
+    }
+#else
+    (void)ownsDevice;
+#endif
 
     [self updateBackingSize];
 }
