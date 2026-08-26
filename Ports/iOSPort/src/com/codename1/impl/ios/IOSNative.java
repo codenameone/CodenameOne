@@ -1329,6 +1329,41 @@ public final class IOSNative {
     /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
     native boolean surfacesActivitiesSupported();
 
+    // --- Document provider (FileProvider) -----------------------------------
+    // All gated natively by CN1_USE_DOCUMENTS (the build flips it on when the app references
+    // com.codename1.documents). When the define is off these compile to harmless stubs so the
+    // symbols always resolve. The reader is the generated CN1Documents app extension, a
+    // separate process that cannot call Java, so nothing here hands it data: the Java side
+    // (IOSDocumentProviderBridge) writes the index and the endpoint settings into the App Group
+    // container, and these natives only tell the system that a provider exists and that what it
+    // published has changed.
+
+    /**
+     * Returns the filesystem path of the App Group container shared with the CN1Documents
+     * extension (group id from the CN1DocumentsAppGroup Info.plist key), or an empty string
+     * when no usable app group exists.
+     */
+    native String getDocumentsContainerPath();
+
+    /**
+     * Registers this app's provider domain with the system, so the location appears in the file
+     * browser. Idempotent: registering a domain that already exists is not an error and is how
+     * this is called on every publish rather than once.
+     */
+    native void documentsRegisterDomain();
+
+    /** Removes the provider domain, so the location disappears from the file browser. */
+    native void documentsRemoveDomain();
+
+    /**
+     * Tells the system that the published tree changed and its enumerators are stale. The
+     * browser re-enumerates on its own schedule; this is a hint, not a synchronous refresh.
+     */
+    native void documentsSignalChange();
+
+    /** True when this build linked the document provider natives and the app group resolves. */
+    native boolean documentProviderSupported();
+
     // --- App intents (Core Spotlight + App Intents) -------------------------
     // Backs com.codename1.intents. Two frameworks with different floors sit behind these:
     // Core Spotlight is Objective-C and available well below this port's minimum, while App

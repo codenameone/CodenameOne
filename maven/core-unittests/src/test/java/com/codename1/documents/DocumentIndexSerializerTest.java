@@ -1,0 +1,155 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.documents;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The on-disk contract between the app and the platform readers. Everything the Swift extension and
+ * the Android provider parse is produced here, and neither of them is exercised by a JVM test, so a
+ * silent change to this format is a feature that goes inert on device with a green build.
+ */
+class DocumentIndexSerializerTest {
+
+    @Test
+    void roundTripsAWholeTree() throws Exception {
+        DocumentNode root = DocumentNode.folder("root", "My Invoices");
+        DocumentNode year = DocumentNode.folder("y2031", "2031");
+        year.add(DocumentNode.file("inv-1", "January.pdf")
+                .setContentType("application/pdf")
+                .setPath("invoices/january.pdf")
+                .setSize(4096L)
+                .setLastModified(1735689600000L));
+        year.add(DocumentNode.file("inv-2", "February.pdf")
+                .setContentType("application/pdf")
+                .setRemoteId("s3://bucket/feb")
+                .setReadOnly(true));
+        root.add(year);
+
+        DocumentNode back = DocumentIndexSerializer.deserialize(
+                DocumentIndexSerializer.serialize(root));
+
+        assertEquals("root", back.getId());
+        assertEquals("My Invoices", back.getName());
+        assertTrue(back.isFolder());
+        assertEquals(1, back.getChildren().size());
+
+        DocumentNode backYear = back.getChildren().get(0);
+        assertEquals("y2031", backYear.getId());
+        assertEquals(2, backYear.getChildren().size());
+
+        DocumentNode jan = backYear.getChildren().get(0);
+        assertEquals("inv-1", jan.getId());
+        assertEquals("January.pdf", jan.getName());
+        assertFalse(jan.isFolder());
+        assertEquals("application/pdf", jan.getContentType());
+        assertEquals("invoices/january.pdf", jan.getPath());
+        assertEquals(4096L, jan.getSize());
+        assertEquals(1735689600000L, jan.getLastModified());
+        assertFalse(jan.isReadOnly());
+
+        DocumentNode feb = backYear.getChildren().get(1);
+        assertEquals("s3://bucket/feb", feb.getRemoteId());
+        assertNull(feb.getPath());
+        assertTrue(feb.isReadOnly());
+    }
+
+    @Test
+    void childOrderIsPreserved() throws Exception {
+        // The browser lists children in index order, so a serializer that used a hash map here
+        // would reshuffle the user's folder on every publish.
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        for (int i = 0; i < 25; i++) {
+            root.add(DocumentNode.file("f" + i, "File " + i + ".txt"));
+        }
+        DocumentNode back = DocumentIndexSerializer.deserialize(
+                DocumentIndexSerializer.serialize(root));
+        assertEquals(25, back.getChildren().size());
+        for (int i = 0; i < 25; i++) {
+            assertEquals("f" + i, back.getChildren().get(i).getId());
+        }
+    }
+
+    @Test
+    void omitsUnknownAndDefaultFieldsRatherThanWritingNulls() {
+        String json = DocumentIndexSerializer.serialize(
+                DocumentNode.folder("root", "Root").add(DocumentNode.file("f", "f.txt")));
+        // A reader distinguishes "absent" from "present but null"; writing nulls would make every
+        // unset field look like a deliberate erasure.
+        assertFalse(json.contains("null"), json);
+        assertFalse(json.contains("remoteId"), json);
+        assertFalse(json.contains("readOnly"), json);
+        assertFalse(json.contains("\"size\""), json);
+    }
+
+    @Test
+    void carriesTheSchemaVersion() {
+        assertTrue(DocumentIndexSerializer.serialize(DocumentNode.folder("root", "Root"))
+                .contains("\"v\""));
+    }
+
+    @Test
+    void unknownSizeAndDateRoundTripAsUnknown() throws Exception {
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        root.add(DocumentNode.file("f", "f.txt"));
+        DocumentNode back = DocumentIndexSerializer.deserialize(
+                DocumentIndexSerializer.serialize(root));
+        assertEquals(-1L, back.getChildren().get(0).getSize());
+        assertEquals(-1L, back.getChildren().get(0).getLastModified());
+    }
+
+    @Test
+    void toleratesAnIntegerLiteralForSize() throws Exception {
+        // The JSON parser is free to hand back a Double for a plain integer literal, and a
+        // hand-written or server-produced index is not obliged to match our own number formatting.
+        DocumentNode back = DocumentIndexSerializer.deserialize(
+                "{\"v\":1,\"root\":{\"id\":\"root\",\"folder\":true,\"children\":["
+                        + "{\"id\":\"f\",\"name\":\"f.txt\",\"folder\":false,\"size\":12345}]}}");
+        assertEquals(12345L, back.getChildren().get(0).getSize());
+    }
+
+    @Test
+    void rejectsAnIndexWithNoRoot() {
+        assertThrows(IOException.class, () -> DocumentIndexSerializer.deserialize("{\"v\":1}"));
+        assertThrows(IOException.class, () -> DocumentIndexSerializer.deserialize(null));
+    }
+
+    @Test
+    void rejectsANodeWithNoId() {
+        assertThrows(IllegalArgumentException.class, () -> DocumentNode.file(null, "x"));
+        assertThrows(IllegalArgumentException.class, () -> DocumentNode.file("", "x"));
+    }
+
+    @Test
+    void refusesToNestUnderAFile() {
+        assertThrows(IllegalStateException.class,
+                () -> DocumentNode.file("f", "f.txt").add(DocumentNode.file("g", "g.txt")));
+    }
+}

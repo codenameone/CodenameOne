@@ -16379,6 +16379,157 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- Document provider (FileProvider) ----------------------------------------
+// Gated by CN1_USE_DOCUMENTS, which the builder defines when the app references
+// com.codename1.documents. It also generates the CN1Documents extension target and injects
+// the CN1DocumentsAppGroup Info.plist key. Builds without the define compile the stub branch
+// and link no framework.
+//
+// Nothing here hands the extension any data. The extension is a separate process that runs
+// while this one is dead, so the Java side writes the index and the endpoint settings into the
+// App Group container and these natives only tell the system that the provider exists and that
+// what it published has changed.
+//
+// TARGET_OS_* rather than a restructure: this file is shared verbatim with the AppKit macOS
+// port, and the iOS slice has to stay byte-for-byte what it was.
+#if defined(CN1_USE_DOCUMENTS) && (TARGET_OS_IOS || TARGET_OS_OSX)
+#import <FileProvider/FileProvider.h>
+
+// The domain identifier is fixed rather than derived from the bundle id: it is scoped to this
+// app already, and the extension resolves its container from the app group, not from this.
+#define CN1_DOCUMENTS_DOMAIN_ID @"CN1Documents"
+
+static NSString *cn1DocumentsGroupId(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSString *cn1DocumentsContainerPath(void) {
+    NSString *group = cn1DocumentsGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    return container == nil ? nil : container.path;
+}
+
+// The display name shown for this location in the file browser. The builder writes it next to
+// the group id; falling back to the app's own name keeps an unnamed location from appearing as
+// a bare identifier.
+static NSString *cn1DocumentsDisplayName(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsDisplayName"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        return (NSString *)v;
+    }
+    id name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+    if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+        return (NSString *)name;
+    }
+    return @"Documents";
+}
+
+// ARC is off in this port, so the domain is autoreleased at the point of creation rather than
+// left to leak on every publish.
+API_AVAILABLE(ios(16.0), macos(13.0))
+static NSFileProviderDomain *cn1DocumentsDomain(void) {
+    return [[[NSFileProviderDomain alloc] initWithIdentifier:CN1_DOCUMENTS_DOMAIN_ID
+                                                displayName:cn1DocumentsDisplayName()] autorelease];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *path = cn1DocumentsContainerPath();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (path == nil ? @"" : path));
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        if (cn1DocumentsGroupId() != nil) {
+            // Adding a domain that already exists succeeds, which is what lets this be called on
+            // every publish instead of tracked. The error is logged rather than propagated: a
+            // failure here means the location does not appear, and taking down the publish that
+            // already wrote the index would help nobody.
+            [NSFileProviderManager addDomain:cn1DocumentsDomain() completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not register the document provider domain: %@", error);
+                }
+            }];
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        [NSFileProviderManager removeDomain:cn1DocumentsDomain() completionHandler:^(NSError *error) {
+            if (error != nil) {
+                NSLog(@"Codename One: could not remove the document provider domain: %@", error);
+            }
+        }];
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager managerForDomain:cn1DocumentsDomain()];
+        // The working set is signalled rather than the root: it is the container the browser
+        // watches while the location is not open, so signalling only the root would leave a
+        // closed-and-reopened browser showing the previous publish.
+        [mgr signalEnumeratorForContainerItemIdentifier:NSFileProviderWorkingSetContainerItemIdentifier
+                                      completionHandler:^(NSError *error) {
+            if (error != nil) {
+                NSLog(@"Codename One: could not signal the document provider: %@", error);
+            }
+        }];
+        POOL_END();
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        // Both halves are load-bearing: without the group there is no container for the two
+        // processes to meet in, and the extension would enumerate an empty tree forever.
+        BOOL ok = cn1DocumentsContainerPath() != nil;
+        POOL_END();
+        return ok ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+#else
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+#endif // CN1_USE_DOCUMENTS
+
+// New-VM (return-type-encoded) manglings for the value-returning document provider natives.
+// Defined after the implementations/stubs above so each call is to an already-declared
+// function. The void documents* methods need no _R_ wrapper.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 // --- App intents (Core Spotlight + App Intents) ------------------------------
 // Gated by CN1_USE_INTENTS, which the builder defines when the app references
 // com.codename1.intents. Two frameworks with very different availability sit behind this:

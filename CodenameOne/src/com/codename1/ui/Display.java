@@ -5736,6 +5736,18 @@ public final class Display extends CN1Constants {
         return impl.getSurfaceBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.documents` API to expose the
+    /// application's documents to the system file browser, or null when unsupported on this port.
+    /// Internal -- application code uses the `com.codename1.documents` API rather than this bridge
+    /// directly.
+    ///
+    /// #### Returns
+    ///
+    /// the document provider bridge, or null
+    public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        return impl.getDocumentProviderBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.intents` API to expose the
     /// application's capabilities to the system, or null when unsupported on this port. Internal --
     /// application code uses the `com.codename1.intents` API rather than this bridge directly.

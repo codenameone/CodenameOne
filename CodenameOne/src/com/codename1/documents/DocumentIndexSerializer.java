@@ -1,0 +1,181 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.documents;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.JSONWriter;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Converts a published document tree to and from the `index.json` the platform readers consume.
+///
+/// The format is deliberately small and forward-compatible: absent keys mean "unknown", which is
+/// what lets a reader written against one version of the schema survive a newer publisher. `v`
+/// carries the schema version so a future reader can tell a missing key from a renamed one.
+///
+/// The reader half exists for the simulator and for tests. On device the parsing is done natively
+/// -- Swift in the Apple extension, Java in the Android provider -- because the app process is not
+/// running when the browser asks.
+public final class DocumentIndexSerializer {
+    /// The schema version written into every index.
+    public static final int VERSION = 1;
+
+    private DocumentIndexSerializer() {
+    }
+
+    /// Serializes a document tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root node, must not be null
+    ///
+    /// #### Returns
+    ///
+    /// the index JSON
+    public static String serialize(DocumentNode root) {
+        if (root == null) {
+            throw new IllegalArgumentException("A document index needs a root node");
+        }
+        Map<String, Object> doc = new LinkedHashMap<String, Object>();
+        doc.put("v", Integer.valueOf(VERSION));
+        doc.put("root", toMap(root));
+        return JSONWriter.toJson(doc);
+    }
+
+    /// Parses an index produced by `serialize`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the index JSON
+    ///
+    /// #### Returns
+    ///
+    /// the root node
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not readable as an index
+    public static DocumentNode deserialize(String json) throws IOException {
+        if (json == null) {
+            throw new IOException("Empty document index");
+        }
+        Map<String, Object> doc = JSONParser.parseJSON(json);
+        Object root = doc == null ? null : doc.get("root");
+        if (!(root instanceof Map)) {
+            throw new IOException("Document index has no root object");
+        }
+        return fromMap((Map) root);
+    }
+
+    private static Map<String, Object> toMap(DocumentNode node) {
+        Map<String, Object> m = new LinkedHashMap<String, Object>();
+        m.put("id", node.getId());
+        if (node.getName() != null) {
+            m.put("name", node.getName());
+        }
+        m.put("folder", Boolean.valueOf(node.isFolder()));
+        if (node.getContentType() != null) {
+            m.put("contentType", node.getContentType());
+        }
+        if (node.getPath() != null) {
+            m.put("path", node.getPath());
+        }
+        if (node.getRemoteId() != null) {
+            m.put("remoteId", node.getRemoteId());
+        }
+        if (node.getSize() >= 0) {
+            m.put("size", Long.valueOf(node.getSize()));
+        }
+        if (node.getLastModified() >= 0) {
+            m.put("lastModified", Long.valueOf(node.getLastModified()));
+        }
+        if (node.isReadOnly()) {
+            m.put("readOnly", Boolean.TRUE);
+        }
+        if (node.isFolder()) {
+            List<DocumentNode> kids = node.getChildren();
+            List<Object> out = new ArrayList<Object>(kids.size());
+            for (DocumentNode k : kids) {
+                out.add(toMap(k));
+            }
+            m.put("children", out);
+        }
+        return m;
+    }
+
+    private static DocumentNode fromMap(Map m) throws IOException {
+        Object id = m.get("id");
+        if (id == null) {
+            throw new IOException("Document node has no id");
+        }
+        DocumentNode node = new DocumentNode(id.toString(), str(m.get("name")),
+                bool(m.get("folder")));
+        node.setContentType(str(m.get("contentType")));
+        node.setPath(str(m.get("path")));
+        node.setRemoteId(str(m.get("remoteId")));
+        node.setSize(num(m.get("size")));
+        node.setLastModified(num(m.get("lastModified")));
+        node.setReadOnly(bool(m.get("readOnly")));
+        Object children = m.get("children");
+        if (children instanceof List) {
+            for (Object child : (List) children) {
+                if (child instanceof Map) {
+                    node.add(fromMap((Map) child));
+                }
+            }
+        }
+        return node;
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : o.toString();
+    }
+
+    private static boolean bool(Object o) {
+        if (o instanceof Boolean) {
+            return ((Boolean) o).booleanValue();
+        }
+        return o != null && "true".equals(o.toString());
+    }
+
+    // The parser hands back whatever number type the text implied -- Double for a plain integer
+    // literal in most cases -- so this reads through Number rather than casting to Long, which
+    // would be a cast whose failure iOS could not report (see the CHECKCAST note in CLAUDE.md).
+    private static long num(Object o) {
+        if (o instanceof Number) {
+            return ((Number) o).longValue();
+        }
+        if (o == null) {
+            return -1;
+        }
+        try {
+            return Long.parseLong(o.toString().trim());
+        } catch (NumberFormatException err) {
+            return -1;
+        }
+    }
+}
