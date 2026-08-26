@@ -366,7 +366,8 @@ public class MacOSNativeBuilder extends Executor {
         String bundleVersion = request.getArg("macos.bundleVersion",
                 request.getArg("ios.bundleVersion", version));
         try {
-            writeGeneratedPlists(request, hints, srcRoot, appName, version, bundleVersion, classesDir);
+            writeGeneratedPlists(request, hints, srcRoot, appName, version, bundleVersion,
+                classesDir, buildinRes);
         } catch (IOException ex) {
             throw new BuildException("Failed to write the macOS bundle metadata", ex);
         }
@@ -530,7 +531,8 @@ public class MacOSNativeBuilder extends Executor {
      * refused, and there is no textual substitution that can half-apply.</p>
      */
     private void writeGeneratedPlists(BuildRequest request, MacOSBuildHints hints, File srcRoot,
-            String appName, String version, String bundleVersion, File classesDir) throws IOException {
+            String appName, String version, String bundleVersion, File classesDir,
+            File buildinRes) throws IOException {
         // Scanned once, up front. The same answer decides two things that have to
         // agree: which sandbox entitlements the signature carries, and which
         // usage descriptions the bundle carries. An entitlement without its
@@ -539,6 +541,10 @@ public class MacOSNativeBuilder extends Executor {
         MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
         try {
             scanClassesForPermissions(classesDir, new CapabilityScanner(caps));
+            // btres too: unzip routes a submitted library's jar there rather
+            // than unpacking it beside the loose classes, so a capability that
+            // only a cn1lib reaches is invisible in classesDir alone.
+            scanClassesForPermissions(buildinRes, new CapabilityScanner(caps));
         } catch (IOException ex) {
             // A failed scan must not silently produce an entitlement set that
             // omits a capability the application uses, because the failure then

@@ -96,7 +96,12 @@ class MacNative {
     native void macMainWindowSetInputEnabled(boolean enabled);
 
     /// Begins a modal session for the window, or ends the one it holds.
-    native void macWindowSetModal(int slot, boolean modal);
+    /// `applicationWide` distinguishes MODALITY_APPLICATION from
+    /// MODALITY_WINDOW. Only the former runs an AppKit modal session: that stops
+    /// every other window taking focus, which is right for application modality
+    /// and wrong for window modality, where an unrelated top-level window has to
+    /// stay usable.
+    native void macWindowSetModal(int slot, boolean modal, boolean applicationWide);
 
     native boolean macWindowReopen(int slot);
 

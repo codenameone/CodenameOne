@@ -701,6 +701,27 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRequestFocus___int(CODENAME_
     });
 }
 
+/// The window's own chrome, which the framework's input filter cannot reach.
+///
+/// Disabling the rendering view stops content events and nothing else: the title
+/// bar belongs to AppKit, so the close button of a window blocked by a modal
+/// dialog still reached the application and disposed it. That is the exact case
+/// WindowManager.setInputEnabled documents as its reason for existing.
+static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled) {
+    if (w == nil) {
+        return;
+    }
+    NSWindowButton buttons[] = {
+        NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton
+    };
+    for (unsigned i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+        NSButton *b = [w standardWindowButton:buttons[i]];
+        if (b != nil) {
+            b.enabled = enabled;
+        }
+    }
+}
+
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetInputEnabled___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);
@@ -709,6 +730,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetInputEnabled___int_boolea
         }
         rec.inputEnabled = enabled != 0;
         rec.view.cn1InputEnabled = enabled != 0;
+        cn1SetWindowChromeEnabled(rec.window, enabled != 0);
     });
 }
 
@@ -716,13 +738,29 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macMainWindowSetInputEnabled___boolea
     cn1OnMain(^{
         METALView *v = (METALView *)[CN1MacHost sharedHost].renderingView;
         v.cn1InputEnabled = enabled != 0;
+        // The main window has a title bar too, and blocking it is the whole
+        // point when a modal dialog is up.
+        cn1SetWindowChromeEnabled([CN1MacHost sharedHost].window, enabled != 0);
     });
 }
 
-JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetModal___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN modal) {
+JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetModal___int_boolean_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_BOOLEAN modal, JAVA_BOOLEAN applicationWide) {
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);
         if (rec == nil) {
+            return;
+        }
+        // An AppKit modal session stops EVERY other window taking focus, which
+        // is what MODALITY_APPLICATION means and is wrong for MODALITY_WINDOW:
+        // that one blocks the dialog's owner only, and an unrelated top-level
+        // window has to stay usable. Window modality is left to the framework,
+        // which disables the blocked window's input -- and now its chrome too --
+        // through setInputEnabled.
+        if (modal != 0 && applicationWide == 0) {
+            if (rec.modalSession != NULL) {
+                [NSApp endModalSession:rec.modalSession];
+                rec.modalSession = NULL;
+            }
             return;
         }
         if (modal != 0) {

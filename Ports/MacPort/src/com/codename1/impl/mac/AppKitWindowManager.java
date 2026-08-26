@@ -289,7 +289,15 @@ class AppKitWindowManager extends WindowManager {
         // Mac modal window, which is a different thing the user can see: the
         // window keeps key focus and the application's other windows do not take
         // it back by being clicked.
-        nativeInstance.macWindowSetModal(s, modal);
+        //
+        // The scope is passed through rather than collapsed. An AppKit modal
+        // session freezes every other window, which is what MODALITY_APPLICATION
+        // means; MODALITY_WINDOW blocks the dialog's owner only, and an
+        // unrelated top-level window has to stay usable. ownerPeer is still
+        // unused here because the framework has already decided who is blocked
+        // and says so through setInputEnabled -- the SPI is explicit that a port
+        // must not re-derive that from setModal.
+        nativeInstance.macWindowSetModal(s, modal, applicationWide);
     }
 
     @Override

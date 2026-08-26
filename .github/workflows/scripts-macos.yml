@@ -220,6 +220,22 @@ jobs:
           # compared. Enforced centrally in scripts/lib/cn1ss.sh.
           CN1SS_FAIL_ON_MISMATCH: '1'
           CN1SS_ALLOWED_MISSING: '0'
+          # SEEDING ONLY -- remove in the commit that adopts the baseline, along
+          # with the "Initial state" section of scripts/macos/screenshots/README.md.
+          #
+          # cn1ss.sh has a THIRD guard beyond mismatch and count: a capture with
+          # no committed golden is "missing_expected" and exits 18, tolerating
+          # CN1SS_ALLOWED_MISSING_EXPECTED (default 0). It exists so a new test's
+          # golden cannot be left unintegrated. While this directory holds no
+          # goldens at all, EVERY capture is missing_expected, so the first run
+          # could only ever fail -- the README claimed it would be green and was
+          # wrong about this guard.
+          #
+          # CN1SS_SKIP_COUNT_CHECK is the bypass cn1ss.sh documents for exactly
+          # this, and it is safe here only because there is nothing to count yet.
+          # CN1SS_FAIL_ON_TEST_PROBLEMS stays on: a test that crashes or never
+          # runs must fail even while the baseline is being seeded.
+          CN1SS_SKIP_COUNT_CHECK: '1'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

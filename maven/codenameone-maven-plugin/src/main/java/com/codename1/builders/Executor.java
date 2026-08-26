@@ -1204,11 +1204,93 @@ public abstract class Executor {
         }
         return out.toByteArray();
     }
+
+    /**
+     * Scans the class entries of a library archive for permissions.
+     *
+     * <p>Extracted to a temporary directory and handed back to
+     * {@link #scanClassesForPermissions}, rather than read straight out of the
+     * zip, so the ASM-version fallbacks stay in one place: this codebase reads
+     * bytecode with ASM 5 and drops to a constant-pool scan for anything newer,
+     * and duplicating that decision here is how the two would drift.</p>
+     */
+    private void scanArchiveForPermissions(File archive, ClassScanner scanner) throws IOException {
+        File tmp = File.createTempFile("cn1-perm-scan", ".d");
+        if (!tmp.delete() || !tmp.mkdirs()) {
+            return;
+        }
+        try {
+            java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
+            try {
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+                int extracted = 0;
+                while (entries.hasMoreElements()) {
+                    java.util.zip.ZipEntry entry = entries.nextElement();
+                    if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                        continue;
+                    }
+                    // Flattened onto a counter rather than the entry's own path:
+                    // the scanner reads the class's own name out of its bytecode,
+                    // never off the file system, and a flat name cannot escape
+                    // the temporary directory the way an archive path could.
+                    File out = new File(tmp, (extracted++) + ".class");
+                    InputStream in = zip.getInputStream(entry);
+                    try {
+                        FileOutputStream fos = new FileOutputStream(out);
+                        try {
+                            byte[] buf = new byte[8192];
+                            int n;
+                            while ((n = in.read(buf)) != -1) {
+                                fos.write(buf, 0, n);
+                            }
+                        } finally {
+                            fos.close();
+                        }
+                    } finally {
+                        in.close();
+                    }
+                }
+            } finally {
+                zip.close();
+            }
+            scanClassesForPermissions(tmp, scanner);
+        } catch (IOException ex) {
+            // A library that cannot be read must not fail the build, but it must
+            // not pass silently either: the entitlements it would have justified
+            // are the ones now missing.
+            message.append("WARNING: could not scan ").append(archive.getName())
+                    .append(" for protected API usage (").append(ex.toString()).append(")\n");
+        } finally {
+            deletePermissionScanTemp(tmp);
+        }
+    }
+
+    private static void deletePermissionScanTemp(File f) {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deletePermissionScanTemp(child);
+            }
+        }
+        f.delete();
+    }
+
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {
             if (current.isDirectory()) {
                 scanClassesForPermissions(current, scanner);
+            } else if (current.getName().endsWith(".jar") || current.getName().endsWith(".aar")) {
+                // A submitted library can be the only thing that reaches a
+                // protected API: the application calls the cn1lib, and unzip()
+                // routes library jars to btres rather than unpacking them beside
+                // the loose classes. Reading loose classes alone therefore
+                // reported no camera, microphone, Bluetooth or location use and
+                // produced a bundle with neither the entitlement nor the usage
+                // description -- which macOS answers by killing the process.
+                // scanForDatabaseUsage already descends into archives for the
+                // same reason; this is that rule applied to permissions.
+                scanArchiveForPermissions(current, scanner);
             } else {
                 if (current.getName().endsWith(".class")) {
                     InputStream is = new FileInputStream(current);

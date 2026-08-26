@@ -30,14 +30,25 @@ set with a loose tolerance.
 ## Initial state
 
 **This directory ships with no goldens.** The first CI run establishes the
-baseline, and it is green rather than red while it does: with zero references
-every capture is reported as "new" and never as "differs", so the mismatch gate
-cannot fire, and the count floor is the size of this directory -- zero -- so the
-regression gate cannot fire either. `CN1SS_FAIL_ON_TEST_PROBLEMS` is on from the
-first run regardless, because a test that crashes or never runs has to fail even
-while the baseline is being seeded.
+baseline, and `scripts-macos.yml` sets `CN1SS_SKIP_COUNT_CHECK=1` so that run
+can be green while it does.
 
-*Delete this section in the commit that adopts the baseline.*
+That bypass is required, not belt and braces. `scripts/lib/cn1ss.sh` has three
+guards, and only two of them are inert without goldens: with zero references
+every capture is reported as "new" rather than "differs" so the mismatch gate
+cannot fire, and the count floor is this directory's size -- zero -- so the
+regression gate cannot fire. The third one can: a capture with no committed
+golden is `missing_expected` and exits 18, tolerating
+`CN1SS_ALLOWED_MISSING_EXPECTED` (default 0). It exists so a new test's golden
+cannot be left unintegrated, and while this directory is empty it matches
+*every* capture.
+
+`CN1SS_FAIL_ON_TEST_PROBLEMS` stays on from the first run regardless, because a
+test that crashes or never runs has to fail even while the baseline is being
+seeded.
+
+*Delete this section, and the `CN1SS_SKIP_COUNT_CHECK` line in
+`.github/workflows/scripts-macos.yml`, in the commit that adopts the baseline.*
 
 ## Adopting the first baseline
 
