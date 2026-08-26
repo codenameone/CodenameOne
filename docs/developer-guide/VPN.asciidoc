@@ -11,11 +11,8 @@ developer account can switch on, and is what almost every app that says
 what this chapter is mostly about.
 
 The second is *shipping a tunnel of your own* that receives raw IP packets and
-decides what to do with them. On iOS that code runs in a separate process with
-its own memory limit and no Java virtual machine inside it, so it can't be
-written in this framework at all, and the entitlement for it's one Apple
-grants case by case. That's `com.codename1.vpn.tunnel`, and the section on it
-is mostly about what it can't do.
+decides what to do with them. **Codename One doesn't offer that**, and the
+section below says why and what to do instead.
 
 [options="header"]
 |===
@@ -24,7 +21,7 @@ is mostly about what it can't do.
 | IPsec with a pre-shared key | yes | -- | simulated | --
 | Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
 | Always-on / on-demand | yes | yes | simulated | --
-| A tunnel your app implements | extension only, not in Java | yes (VpnService) | -- | --
+| A tunnel your app implements | -- | -- | -- | --
 | Detect that some VPN is active | yes | yes | yes | --
 |===
 
@@ -103,28 +100,28 @@ request was accepted, not that the tunnel is up. Watch the status.
 === A Tunnel Your App Implements
 
 If your VPN speaks a protocol the platforms don't implement -- anything that
-isn't IKEv2 or IPsec -- you need a packet tunnel, and you should understand
-what you are taking on before you start.
+isn't IKEv2 or IPsec -- you need a packet tunnel, and Codename One doesn't
+provide one.
 
-On iOS a packet tunnel is a *Network Extension*: a separate process, with its
-own bundle identifier, its own provisioning profile and a hard memory limit,
-and *no Codename One inside it*. There is no Java virtual machine in that
-process, so the tunnel body is Objective-C or Swift that you write and
-maintain. Referencing `com.codename1.vpn.tunnel` makes the build generate the
-extension target and its skeleton; filling it in is yours.
+The reason is structural rather than a gap in the roadmap. On iOS a packet
+tunnel is a *Network Extension*: a separate process, with its own bundle
+identifier, its own provisioning profile, a hard memory limit, and **no
+Codename One inside it**. There's no Java virtual machine in that process, so
+the tunnel body can't be written in this framework however the target is
+generated. It also needs the
+`com.apple.developer.networking.networkextension` entitlement, which Apple
+grants case by case rather than self-serve.
 
-It also needs the `com.apple.developer.networking.networkextension`
-entitlement, which *Apple grants case by case* -- unlike the Personal VPN
-capability, which any paid account can enable itself. Codename One never
-injects it, because an entitlement an App ID doesn't carry fails codesigning
-with an error naming the entitlement and not the reason it appeared. The build
-fails early instead, with a message saying what to enable.
+Your options, in the order worth trying them:
 
-On Android the equivalent is a `VpnService` your app hosts, which does run in
-your own process, and referencing the same package declares it.
-
-If you can express your requirement as an IKEv2 configuration, do that instead.
-It's portable, needs no special grant, and is a fraction of the work.
+* *Express the requirement as IKEv2.* If the far end can speak it, everything
+  above applies and nothing else is needed.
+* *Write the extension natively and ship it alongside.* An iOS app extension
+  can be dropped into `ios/app_extensions/<Name>/` and is built and signed
+  with the app; see the app-extension build hints in
+  <<Advanced-Topics-Under-The-Hood.asciidoc#,Advanced Topics>>. The Android
+  half is an ordinary `VpnService` in a native Android module. This is real
+  work in two native languages, and it's the honest cost of a custom tunnel.
 
 === Developing Without Hardware
 
@@ -154,10 +151,14 @@ Every item is also callable from a test with `CN.execute("vpn:itemN")`.
 |===
 | Hint | Default | What it does
 | `ios.entitlements.com.apple.developer.networking.vpn.api` | injected as `allow-vpn` | The Personal VPN capability. Enable it on the App ID or the app won't sign.
-| `ios.entitlements.com.apple.developer.networking.networkextension` | none | Required by `com.codename1.vpn.tunnel`, and never injected. Set it to `packet-tunnel-provider` once Apple has granted the capability.
 |===
 
-Everything else is automatic. Referencing `com.codename1.vpn.profile` links
-`NetworkExtension.framework` and injects the Personal VPN entitlement;
-referencing `com.codename1.vpn.tunnel` additionally generates the extension
-target and requires the granted entitlement above.
+Everything else is automatic: referencing `com.codename1.vpn.profile` links
+`NetworkExtension.framework` and injects the Personal VPN entitlement.
+
+Note there's no hint for `com.apple.developer.networking.networkextension`.
+Codename One never injects it, because an entitlement an App ID doesn't carry
+fails codesigning with an error naming the entitlement and not the reason it
+appeared -- and nothing here needs it, since no packet tunnel is generated. An
+app shipping its own extension declares it through that extension's own
+entitlements file.

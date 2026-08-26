@@ -128,8 +128,30 @@ final class CallManifestFragments {
      * @return the elements, or the empty string when none are needed
      */
     static String services(boolean session, boolean voip, boolean directory) {
+        return services(session, voip, directory, "");
+    }
+
+    /**
+     * Returns the {@code <service>} elements the call packages need that
+     * {@code existing} does not already declare.
+     *
+     * <p>Suppression is per service rather than for the block as a whole. An
+     * app that hand-declared one of the two in {@code android.xapplication}
+     * used to suppress both, so the other went missing and either Telecom
+     * could not create the app's calls or Android could not bind the
+     * screening service.</p>
+     *
+     * @param session   {@code com.codename1.call.session} usage detected
+     * @param voip      {@code com.codename1.call.voip} usage detected
+     * @param directory {@code com.codename1.call.directory} usage detected
+     * @param existing  the application fragment the project already supplies
+     * @return the elements still needed, or the empty string when none are
+     */
+    static String services(boolean session, boolean voip, boolean directory,
+            String existing) {
+        String have = existing == null ? "" : existing;
         StringBuilder sb = new StringBuilder();
-        if (session || voip) {
+        if ((session || voip) && !have.contains(CONNECTION_SERVICE)) {
             // exported=true is required rather than careless: Telecom is a
             // different process and cannot bind an unexported service. The
             // android:permission attribute is what keeps anything other than
@@ -146,7 +168,7 @@ final class CallManifestFragments {
                     .append("            </intent-filter>\n")
                     .append("        </service>\n");
         }
-        if (directory) {
+        if (directory && !have.contains(SCREENING_SERVICE)) {
             sb.append("        <service android:name=\"")
                     .append(SCREENING_SERVICE)
                     .append("\"\n                 android:permission=")

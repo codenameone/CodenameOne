@@ -749,6 +749,39 @@ public class AndroidGradleBuilder extends Executor {
     // MANAGE_OWN_CALLS and an API 26 floor; ringing while backgrounded adds a
     // foreground service; labelling somebody else's caller buys neither and
     // must not, because Play Console flags gratuitous telephony permissions.
+
+    /// Class-name prefixes whose presence in a submitted library counts the
+    /// same as presence in the application's own classes.
+    ///
+    /// The builder's scanner reads only the app's compiled classes, so a
+    /// feature used exclusively by a cn1lib was invisible to it: no
+    /// permissions, no services, no native defines, and a library calling an
+    /// API that was never switched on.
+    private static final String[] CALL_VPN_LIB_PREFIXES = {
+        "com/codename1/call/session/",
+        "com/codename1/call/voip/",
+        "com/codename1/call/directory/",
+        "com/codename1/vpn/profile/",
+    };
+
+    /// Folds call and VPN usage found inside submitted libraries into the
+    /// scanner's flags.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    private void foldInCallAndVpnLibraryUsage(java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir,
+                        CALL_VPN_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return;
+        }
+        debug("Call/VPN usage found inside a submitted library: " + found);
+        usesCallSession |= found.contains("com/codename1/call/session/");
+        usesCallVoip |= found.contains("com/codename1/call/voip/");
+        usesCallDirectory |= found.contains("com/codename1/call/directory/");
+        usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+    }
+
     private boolean usesCallSession;
     private boolean usesCallVoip;
     private boolean usesCallDirectory;
@@ -2174,8 +2207,7 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/call/directory/") == 0) {
                         usesCallDirectory = true;
                     }
-                    if (cls.indexOf("com/codename1/vpn/profile/") == 0
-                            || cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                    if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
                     }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
@@ -2526,6 +2558,7 @@ public class AndroidGradleBuilder extends Executor {
         // trees for exactly that reason; this is the same fix for the same
         // hazard, kept to the feature whose implementation gets deleted
         // rather than turned on for every flag the scanner carries.
+        foldInCallAndVpnLibraryUsage(libsDir);
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(libsDir);
         if (!libraryNearby.isEmpty()) {
@@ -2793,16 +2826,15 @@ public class AndroidGradleBuilder extends Executor {
             xPermissions = CallManifestFragments.injectPermissions(
                     xPermissions, usesCallSession, usesCallVoip,
                     usesCallDirectory, targetSDKVersionInt);
+            // Suppression is per service, inside services(): an app that
+            // hand-declared one of the two used to suppress both.
+            String existingApplication = request.getArg("android.xapplication", "");
             String callServices = CallManifestFragments.services(
-                    usesCallSession, usesCallVoip, usesCallDirectory);
-            if (callServices.length() > 0
-                    && !request.getArg("android.xapplication", "")
-                            .contains(CallManifestFragments.CONNECTION_SERVICE)
-                    && !request.getArg("android.xapplication", "")
-                            .contains(CallManifestFragments.SCREENING_SERVICE)) {
+                    usesCallSession, usesCallVoip, usesCallDirectory,
+                    existingApplication);
+            if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
-                        request.getArg("android.xapplication", "")
-                                + callServices);
+                        existingApplication + callServices);
             }
         }
 

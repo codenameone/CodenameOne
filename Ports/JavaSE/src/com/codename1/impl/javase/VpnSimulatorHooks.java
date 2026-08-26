@@ -81,9 +81,4 @@ public final class VpnSimulatorHooks {
     public static void makeVpnSupported() {
         bridge().setSupported(true);
     }
-
-    /// Claims custom packet-tunnel support, which no desktop really has.
-    public static void enableCustomTunnel() {
-        bridge().setTunnelSupported(true);
-    }
 }

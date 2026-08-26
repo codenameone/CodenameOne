@@ -369,16 +369,13 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // this device's traffic.
 //#define CN1_INCLUDE_VPN
 
-// The packet tunnel. Much more expensive than the rest: it needs its own app
-// extension target and the com.apple.developer.networking.networkextension
-// entitlement, which Apple grants case by case -- so IPhoneBuilder refuses to
-// inject that one and fails the build asking for it instead.
-//#define CN1_VPN_TUNNEL
+// There is deliberately no CN1_VPN_TUNNEL. A packet tunnel runs in a Network
+// Extension: a separate process with no ParparVM in it, so the tunnel body
+// could not be written in this framework even if the target were generated.
 
 // NetworkExtension's VPN manager is unavailable on tvOS and watchOS.
 #if TARGET_OS_TV || TARGET_OS_WATCH
 #undef CN1_INCLUDE_VPN
-#undef CN1_VPN_TUNNEL
 #endif
 
 // CN1_INCLUDE_MATTER_SETUP gates the MatterSupport add-device flow, which is

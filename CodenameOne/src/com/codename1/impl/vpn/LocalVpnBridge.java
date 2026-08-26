@@ -49,7 +49,6 @@ public class LocalVpnBridge implements VpnBridge {
     private List<Runnable> deferred;
 
     private boolean supported = true;
-    private boolean tunnelSupported;
     private boolean userAccepts = true;
     private boolean authenticates = true;
     private String profileWire;
@@ -64,11 +63,6 @@ public class LocalVpnBridge implements VpnBridge {
     /// Whether this bridge claims VPN support.
     public void setSupported(boolean value) {
         this.supported = value;
-    }
-
-    /// Whether this bridge claims custom packet-tunnel support.
-    public void setTunnelSupported(boolean value) {
-        this.tunnelSupported = value;
     }
 
     /// Whether the simulated user accepts the install prompt. Setting this
@@ -95,7 +89,10 @@ public class LocalVpnBridge implements VpnBridge {
 
     @Override
     public boolean isCustomTunnelSupported() {
-        return supported && tunnelSupported;
+        // False here as on every port: a packet tunnel the app implements is
+        // not shipped, and a simulation that offered one would be the only
+        // place an app's tunnel code appeared to work.
+        return false;
     }
 
     @Override
@@ -105,11 +102,7 @@ public class LocalVpnBridge implements VpnBridge {
         }
         // No CAPABILITY_ALWAYS_ON: no ordinary app can ask either platform
         // for it, so the simulation must not be the one place it works.
-        int caps = CAPABILITY_IKEV2 | CAPABILITY_IPSEC | CAPABILITY_ON_DEMAND;
-        if (tunnelSupported) {
-            caps |= CAPABILITY_CUSTOM_TUNNEL;
-        }
-        return caps;
+        return CAPABILITY_IKEV2 | CAPABILITY_IPSEC | CAPABILITY_ON_DEMAND;
     }
 
     @Override

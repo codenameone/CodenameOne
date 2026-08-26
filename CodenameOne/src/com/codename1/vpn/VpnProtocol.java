@@ -38,9 +38,5 @@ public enum VpnProtocol {
     /// IPsec with a pre-shared key. Available on iOS; Android's managed
     /// profile API does not offer it, and reports
     /// [VpnError#NOT_SUPPORTED].
-    IPSEC,
-
-    /// A tunnel this app implements, through
-    /// [com.codename1.vpn.tunnel].
-    CUSTOM
+    IPSEC
 }

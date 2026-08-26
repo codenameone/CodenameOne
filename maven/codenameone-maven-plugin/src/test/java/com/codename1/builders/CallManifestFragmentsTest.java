@@ -129,6 +129,36 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void oneHandDeclaredServiceDoesNotSuppressTheOther() {
+        // The bug: an app that declared either service itself in
+        // android.xapplication used to suppress the whole generated block,
+        // so the other went missing and either Telecom could not create the
+        // app's calls or Android could not bind the screening service.
+        String mine = "        <service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\" />\n";
+        String out = CallManifestFragments.services(true, false, true, mine);
+        assertFalse(out.contains(CallManifestFragments.CONNECTION_SERVICE),
+                "a service the project declared must not be generated again");
+        assertTrue(out.contains(CallManifestFragments.SCREENING_SERVICE),
+                "the other service is still required");
+    }
+
+    @Test
+    public void aHandDeclaredScreeningServiceLeavesTheConnectionService() {
+        String mine = "        <service android:name=\""
+                + CallManifestFragments.SCREENING_SERVICE + "\" />\n";
+        String out = CallManifestFragments.services(true, false, true, mine);
+        assertTrue(out.contains(CallManifestFragments.CONNECTION_SERVICE));
+        assertFalse(out.contains(CallManifestFragments.SCREENING_SERVICE));
+    }
+
+    @Test
+    public void declaringBothLeavesNothingToGenerate() {
+        String mine = CallManifestFragments.services(true, false, true, "");
+        assertEquals("", CallManifestFragments.services(true, false, true, mine));
+    }
+
+    @Test
     public void noServicesWithoutDetection() {
         assertEquals("", CallManifestFragments.services(false, false, false));
         assertEquals("", CallManifestFragments.injectPermissions("", false,

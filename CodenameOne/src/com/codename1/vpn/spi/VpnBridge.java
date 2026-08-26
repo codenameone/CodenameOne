@@ -45,7 +45,12 @@ public interface VpnBridge {
     /// [#getVpnCapabilities()] bit: an IPsec configuration can be installed.
     int CAPABILITY_IPSEC = 2;
 
-    /// [#getVpnCapabilities()] bit: the app ships its own packet tunnel.
+    /// Reserved. **No port sets this.** A packet tunnel the app implements
+    /// is not shipped: on iOS it runs in an app extension with no Java
+    /// virtual machine in it, so its body could not be written in this
+    /// framework, and on Android it needs a bound `VpnService` and a packet
+    /// API that does not exist here. The constant and
+    /// [#isCustomTunnelSupported()] are kept as the seam it would attach to.
     int CAPABILITY_CUSTOM_TUNNEL = 4;
 
     /// [#getVpnCapabilities()] bit: on-demand rules are honoured.
@@ -72,6 +77,8 @@ public interface VpnBridge {
     boolean isVpnSupported();
 
     /// Whether this port can run a packet tunnel this app implements.
+    ///
+    /// Every port answers false today; see [#CAPABILITY_CUSTOM_TUNNEL].
     boolean isCustomTunnelSupported();
 
     /// The `CAPABILITY_*` bit mask this port supports.

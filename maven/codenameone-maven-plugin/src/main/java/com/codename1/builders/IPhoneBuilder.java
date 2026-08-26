@@ -865,11 +865,43 @@ public class IPhoneBuilder extends Executor {
     // running adds PushKit and the voip background mode, which Apple rejects
     // an app for carrying without a working call implementation; labelling
     // somebody else's caller needs neither and gets its own extension.
+
+    /// Class-name prefixes whose presence in a submitted library counts the
+    /// same as presence in the application's own classes.
+    ///
+    /// The builder's scanner reads only the app's compiled classes, so a
+    /// feature used exclusively by a cn1lib was invisible to it: no
+    /// permissions, no services, no native defines, and a library calling an
+    /// API that was never switched on.
+    private static final String[] CALL_VPN_LIB_PREFIXES = {
+        "com/codename1/call/session/",
+        "com/codename1/call/voip/",
+        "com/codename1/call/directory/",
+        "com/codename1/vpn/profile/",
+    };
+
+    /// Folds call and VPN usage found inside submitted libraries into the
+    /// scanner's flags.
+    ///
+    /// @param libsDir the submitted-libraries folder
+    private void foldInCallAndVpnLibraryUsage(java.io.File libsDir) {
+        java.util.Set<String> found =
+                LibraryClassPrefixScan.prefixesFound(libsDir,
+                        CALL_VPN_LIB_PREFIXES);
+        if (found.isEmpty()) {
+            return;
+        }
+        debug("Call/VPN usage found inside a submitted library: " + found);
+        usesCallSession |= found.contains("com/codename1/call/session/");
+        usesCallVoip |= found.contains("com/codename1/call/voip/");
+        usesCallDirectory |= found.contains("com/codename1/call/directory/");
+        usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+    }
+
     private boolean usesCallSession;
     private boolean usesCallVoip;
     private boolean usesCallDirectory;
     private boolean usesManagedVpn;
-    private boolean usesVpnTunnel;
 
     /// Whether the Info.plist needs the CN1Call* provider block.
     private boolean callPlistWanted;
@@ -2045,9 +2077,6 @@ public class IPhoneBuilder extends Executor {
                     if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
                     }
-                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
-                        usesVpnTunnel = true;
-                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -2395,6 +2424,7 @@ public class IPhoneBuilder extends Executor {
         // undefined and the frameworks unlinked. The feature was simply
         // absent from a build that looked clean. The database scan above
         // reads both trees for the same reason.
+        foldInCallAndVpnLibraryUsage(buildinRes);
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(buildinRes);
         if (!libraryNearby.isEmpty()) {
@@ -4799,40 +4829,24 @@ public class IPhoneBuilder extends Executor {
             // generic ios.entitlements.<key> namespace cannot encode -- it
             // reads a value with no newline as a <string> -- so they are
             // written in the array form the namespace does understand.
-            if (usesManagedVpn || usesVpnTunnel) {
+            if (usesManagedVpn) {
                 enableFeatureDefine(buildinRes, "CN1_INCLUDE_VPN",
                         "com.codename1.vpn");
                 // Personal VPN. Self-serve: any paid account can enable the
                 // capability on the App ID, but it must BE enabled or the app
                 // will not sign.
+                //
+                // Deliberately the only entitlement written here. There is no
+                // packet-tunnel branch: com.codename1.vpn.tunnel does not
+                // exist, because a tunnel body cannot be written in this
+                // framework -- the extension it runs in has no Java virtual
+                // machine. Injecting the specially-granted networkextension
+                // entitlement for a package nobody can import would fail
+                // codesigning for no reason anyone could act on.
                 if (request.getArg("ios.entitlements.com.apple.developer"
                         + ".networking.vpn.api", null) == null) {
                     request.putArgument("ios.entitlements.com.apple.developer"
-                            + ".networking.vpn.api", "allow-vpn\n");
-                }
-                if (usesVpnTunnel) {
-                    enableFeatureDefine(buildinRes, "CN1_VPN_TUNNEL",
-                            "com.codename1.vpn.tunnel");
-                    // NOT injected automatically. Apple grants
-                    // com.apple.developer.networking.networkextension case by
-                    // case, and an App ID that does not carry it fails
-                    // codesigning with an error naming the entitlement and
-                    // not the reason it appeared -- the same trap the HomeKit
-                    // and nearby-interaction entitlements document. So the
-                    // build asks rather than guesses.
-                    if (request.getArg("ios.entitlements.com.apple.developer"
-                            + ".networking.networkextension", null) == null) {
-                        throw new BuildException("This app uses"
-                                + " com.codename1.vpn.tunnel, which needs the"
-                                + " com.apple.developer.networking"
-                                + ".networkextension entitlement. Apple grants"
-                                + " that one case by case, so it is never"
-                                + " injected automatically: enable the Network"
-                                + " Extensions capability on the App ID, then"
-                                + " set ios.entitlements.com.apple.developer"
-                                + ".networking.networkextension=packet-tunnel-provider"
-                                + " in the build hints.");
-                    }
+                            + ".networking.vpn.api", "allow-vpn");
                 }
             }
 

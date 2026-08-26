@@ -777,13 +777,6 @@ public final class PlatformFeatureCatalog {
                 // feature is worth.
                 .description("Managed VPN configurations (IKEv2, IPsec)"));
 
-        // The expensive half: a tunnel the app implements itself, which needs
-        // an app extension on iOS and a bound VpnService on Android.
-        e.add(new Entry("com/codename1/vpn/tunnel/")
-                .iosFrameworks("NetworkExtension")
-                .androidMinimumSdk(24)
-                .description("Custom packet tunnel"));
-
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

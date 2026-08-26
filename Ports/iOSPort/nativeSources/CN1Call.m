@@ -140,6 +140,15 @@ static int64_t cn1clNextActionToken = 1;
 /// Calls reported to CallKit that Java has not yet seen.
 static NSMutableArray *cn1clPending = nil;
 
+/// Pushed calls the application has not yet taken responsibility for.
+///
+/// The TTL watchdog exists to end a call the app never learned about, so
+/// "still ringing" is the wrong test -- an ANSWERED call is still in
+/// cn1clCalls, and testing only that ended live calls as Unanswered once the
+/// TTL elapsed. A call leaves this set when Java is told about it or when the
+/// user acts on it through the system UI; either means somebody owns it now.
+static NSMutableSet *cn1clUnclaimed = nil;
+
 /// Whether application code has installed a VoIP listener.
 static BOOL cn1clJavaReady = NO;
 
@@ -155,6 +164,7 @@ static void cn1clEnsureState(void) {
         cn1clCalls = [[NSMutableDictionary alloc] init];
         cn1clActions = [[NSMutableDictionary alloc] init];
         cn1clPending = [[NSMutableArray alloc] init];
+        cn1clUnclaimed = [[NSMutableSet alloc] init];
         cn1clLock = [[NSObject alloc] init];
     });
 }
@@ -163,6 +173,17 @@ static void cn1clEnsureState(void) {
 // the provider delegate
 // ---------------------------------------------------------------------
 
+/// Marks a pushed call as owned, so the TTL watchdog leaves it alone.
+static void cn1clClaim(NSString *uuidString) {
+    if (uuidString == nil) {
+        return;
+    }
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clUnclaimed removeObject:uuidString];
+    }
+}
+
 /// Allocates a token for a CXAction and remembers it.
 ///
 /// Java answers with completeAction; until it does, the action is neither
@@ -170,6 +191,10 @@ static void cn1clEnsureState(void) {
 /// the Java facade answers automatically for a listener that ignores one.
 static int64_t cn1clTrackAction(CXAction *action) {
     cn1clEnsureState();
+    if ([action isKindOfClass:[CXCallAction class]]) {
+        // The user acted on it, so it is owned whatever the app does next.
+        cn1clClaim([[(CXCallAction *)action callUUID] UUIDString]);
+    }
     @synchronized (cn1clLock) {
         int64_t token = cn1clNextActionToken++;
         [cn1clActions setObject:action forKey:[NSNumber numberWithLongLong:token]];
@@ -431,6 +456,9 @@ static void cn1clQueuePushed(NSString *uuid, NSString *handleWire,
             nil];
     @synchronized (cn1clLock) {
         [cn1clPending addObject:rec];
+        if (uuid != nil && !stale) {
+            [cn1clUnclaimed addObject:uuid];
+        }
     }
 }
 
@@ -443,6 +471,8 @@ static void cn1clDrain(int requestId) {
     }
     for (NSDictionary *rec in batch) {
         NSString *uuid = [rec objectForKey:@"uuid"];
+        // Java is being told about it now, so it is no longer unclaimed.
+        cn1clClaim(uuid);
         BOOL stale = [[rec objectForKey:@"stale"] boolValue];
         if (!stale) {
             // A call whose uuid is no longer live ended while the app was
@@ -633,7 +663,11 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
             dispatch_get_main_queue(), ^{
         BOOL live = NO;
         @synchronized (cn1clLock) {
-            live = [cn1clCalls objectForKey:uuidString] != nil;
+            // BOTH conditions. Presence in cn1clCalls alone is true of an
+            // answered, active call, and ending one of those as Unanswered is
+            // exactly the bug this test used to have.
+            live = [cn1clCalls objectForKey:uuidString] != nil
+                    && [cn1clUnclaimed containsObject:uuidString];
         }
         if (live) {
             NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
@@ -641,6 +675,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                     reason:CXCallEndedReasonUnanswered];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
+                [cn1clUnclaimed removeObject:uuidString];
             }
         }
     });
@@ -724,9 +759,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callDirectorySupported___R_boolean
 JAVA_INT com_codename1_impl_ios_IOSNative_callCapabilities___R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
 #ifdef CN1_CALL_HAS_CALLKIT
+    // Deliberately NO CN1_CALL_CAP_ROUTE_PICKER. CallKit has no system audio
+    // route picker to present -- AVRoutePickerView is a view an app places
+    // itself -- so advertising the bit only leads apps to call a method that
+    // always answers NOT_SUPPORTED.
     int caps = CN1_CALL_CAP_SYSTEM_UI | CN1_CALL_CAP_OUTGOING
             | CN1_CALL_CAP_HOLD | CN1_CALL_CAP_MUTE | CN1_CALL_CAP_DTMF
-            | CN1_CALL_CAP_VIDEO | CN1_CALL_CAP_ROUTE_PICKER;
+            | CN1_CALL_CAP_VIDEO;
 #ifdef CN1_CALL_HAS_PUSHKIT
     caps |= CN1_CALL_CAP_VOIP_PUSH;
 #endif

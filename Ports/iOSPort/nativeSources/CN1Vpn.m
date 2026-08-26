@@ -191,22 +191,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_vpnSupported___R_boolean(
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_vpnTunnelSupported___R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
-#if defined(CN1_VPN_HAS_NE) && defined(CN1_VPN_TUNNEL)
-    return JAVA_TRUE;
-#else
+    // Always false. A packet tunnel runs in a Network Extension, which is a
+    // separate process with no ParparVM in it, so there is no way to carry a
+    // tunnel written in this framework into one.
     return JAVA_FALSE;
-#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_vpnCapabilities___R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
 #ifdef CN1_VPN_HAS_NE
-    int caps = CN1_VPN_CAP_IKEV2 | CN1_VPN_CAP_IPSEC | CN1_VPN_CAP_ON_DEMAND
-            | CN1_VPN_CAP_ALWAYS_ON;
-#ifdef CN1_VPN_TUNNEL
-    caps |= CN1_VPN_CAP_CUSTOM_TUNNEL;
-#endif
-    return caps;
+    // No CN1_VPN_CAP_ALWAYS_ON: always-on VPN on iOS needs a supervised
+    // device and an MDM payload, not something an app may request.
+    // No CN1_VPN_CAP_CUSTOM_TUNNEL: see vpnTunnelSupported above.
+    return CN1_VPN_CAP_IKEV2 | CN1_VPN_CAP_IPSEC | CN1_VPN_CAP_ON_DEMAND;
 #else
     return 0;
 #endif
@@ -238,7 +235,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
     NSString *user = cn1vpField(f, 4);
     NSString *pass = cn1vpField(f, 5);
     NSString *psk = cn1vpField(f, 6);
-    BOOL alwaysOn = [cn1vpField(f, 8) isEqualToString:@"1"];
+    // Fields 7 and 8 are reserved empty slots; see VpnWire.
     BOOL onDemand = [cn1vpField(f, 9) isEqualToString:@"1"];
     NSString *name = cn1vpField(f, 10);
 
@@ -289,8 +286,8 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         manager.localizedDescription = [name length] > 0
                 ? name : cn1vpSanitize(server);
         manager.enabled = YES;
-        manager.onDemandEnabled = onDemand || alwaysOn;
-        if (onDemand || alwaysOn) {
+        manager.onDemandEnabled = onDemand;
+        if (onDemand) {
             NEOnDemandRuleConnect *rule = [[NEOnDemandRuleConnect alloc] init];
             manager.onDemandRules = [NSArray arrayWithObject:rule];
         }

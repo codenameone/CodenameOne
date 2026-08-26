@@ -169,12 +169,20 @@ public class LocalVpnTest {
     }
 
     @Test
-    public void customTunnelIsOffUnlessThePortSaysOtherwise() {
+    public void noPortClaimsACustomPacketTunnel() {
+        // com.codename1.vpn.tunnel is not shipped: on iOS the tunnel body
+        // would run in an extension with no Java virtual machine in it. The
+        // simulation must not be the one place it appears to work.
         assertEquals(0, Vpn.getCapabilities()
                 & com.codename1.vpn.spi.VpnBridge.CAPABILITY_CUSTOM_TUNNEL);
-        bridge.setTunnelSupported(true);
-        assertTrue((Vpn.getCapabilities()
-                & com.codename1.vpn.spi.VpnBridge.CAPABILITY_CUSTOM_TUNNEL) != 0);
+    }
+
+    @Test
+    public void noPortClaimsAlwaysOn() {
+        // Always-on needs a supervised device and MDM on iOS, and a Settings
+        // toggle or device-owner API on Android; an app cannot ask for it.
+        assertEquals(0, Vpn.getCapabilities()
+                & com.codename1.vpn.spi.VpnBridge.CAPABILITY_ALWAYS_ON);
     }
 
     /** Collects statuses. A named class so it holds no outer reference. */

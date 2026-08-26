@@ -135,8 +135,7 @@ class PlatformFeatureCatalogTest {
         String[] prefixes = {"com/codename1/call/session/Calls",
             "com/codename1/call/voip/VoipPush",
             "com/codename1/call/directory/CallDirectory",
-            "com/codename1/vpn/profile/Vpn",
-            "com/codename1/vpn/tunnel/PacketTunnel"};
+            "com/codename1/vpn/profile/Vpn"};
         for (String prefix : prefixes) {
             for (PlatformFeatureCatalog.Entry e
                     : PlatformFeatureCatalog.matchesFor(prefix)) {
