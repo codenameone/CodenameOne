@@ -611,6 +611,14 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event {
+    // Gated like the mouse, wheel and key paths. A window the modal
+    // stack has declared non-interactive could still be pinched and
+    // rotated, which is content the user is not supposed to be able to
+    // touch -- and unlike a click there is no framework-side filter
+    // behind this one.
+    if (!self.cn1InputEnabled) {
+        return;
+    }
     CGPoint p = [self cn1PointFromEvent:event];
     // AppKit reports the increment since the last event; Codename One's pinch
     // wants a factor, and 1 + increment is that factor.
@@ -623,6 +631,14 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 }
 
 - (void)rotateWithEvent:(NSEvent *)event {
+    // Gated like the mouse, wheel and key paths. A window the modal
+    // stack has declared non-interactive could still be pinched and
+    // rotated, which is content the user is not supposed to be able to
+    // touch -- and unlike a click there is no framework-side filter
+    // behind this one.
+    if (!self.cn1InputEnabled) {
+        return;
+    }
     CGPoint p = [self cn1PointFromEvent:event];
     // AppKit gives degrees counter-clockwise, the callback wants radians
     // clockwise.

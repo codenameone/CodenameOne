@@ -594,6 +594,14 @@ public class MacOSNativeBuilder extends Executor {
                     }
                 }));
 
+        List<Object> urlTypes = MacOSXcodeProject.urlTypes(hints.getBundleId(),
+                request.getArg("macos.urlSchemes",
+                        request.getArg("ios.urlSchemes",
+                                request.getArg("ios.urlScheme", null))));
+        if (urlTypes != null) {
+            plist.put("CFBundleURLTypes", urlTypes);
+        }
+
         String inject = request.getArg("macos.plistInject", null);
         if (inject != null && inject.trim().length() > 0) {
             Map<String, Object> extra = new LinkedHashMap<String, Object>();
@@ -782,7 +790,15 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null) {
                 return;
             }
-            if (cls.startsWith("com/codename1/capture/") || cls.startsWith("com/codename1/media/")) {
+            // com.codename1.capture exists only to capture, so a reference to it
+            // is a reference to the camera and the microphone. com.codename1.media
+            // is NOT the same: it is overwhelmingly playback, and treating the
+            // whole package as capture gave an audio player the camera and
+            // microphone entitlements plus two privacy prompts it never uses --
+            // a broader sandbox than the app asked for and a misleading privacy
+            // declaration at review. Recording inside that package is picked out
+            // by method below.
+            if (cls.startsWith("com/codename1/capture/")) {
                 caps.usesCamera = true;
                 caps.usesMicrophone = true;
             }
@@ -800,6 +816,17 @@ public class MacOSNativeBuilder extends Executor {
 
         @Override
         public void usesClassMethod(String cls, String method) {
+            if (cls == null || method == null) {
+                return;
+            }
+            // The recorder is the one thing in com.codename1.media that opens a
+            // microphone; createMedia and the player APIs only read a file or a
+            // stream. Matched by method for the same reason the Android builder
+            // matches createMediaRecorder before adding RECORD_AUDIO.
+            if (cls.startsWith("com/codename1/media/")
+                    && method.indexOf("createMediaRecorder") > -1) {
+                caps.usesMicrophone = true;
+            }
         }
     }
 

@@ -27,6 +27,7 @@ import org.junit.Test;
 import java.io.File;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -266,5 +267,41 @@ public class MacOSXcodeProjectTest {
                 });
         assertEquals("we schedule your workouts", out.get("NSRemindersFullAccessUsageDescription"));
         assertTrue(((String) out.get("NSCalendarsFullAccessUsageDescription")).length() > 0);
+    }
+
+    /**
+     * A deep link reaches the app only if the bundle claims the scheme. The stub
+     * implements shouldApplicationHandleURL either way, so without
+     * CFBundleURLTypes the callback simply never fires and there is nothing to
+     * see.
+     */
+    @Test
+    public void urlSchemesAreLiftedOutOfTheIosHintMarkup() {
+        // The iOS hint carries raw plist markup, because that is what the iOS
+        // path pastes straight into its template.
+        List<Object> types = MacOSXcodeProject.urlTypes("com.example.app",
+                "<string>myapp</string><string>myapp-alt</string>");
+        assertNotNull(types);
+        assertEquals(1, types.size());
+        Map<?, ?> type = (Map<?, ?>) types.get(0);
+        assertEquals("com.example.app", type.get("CFBundleURLName"));
+        assertEquals(Arrays.asList("myapp", "myapp-alt"), type.get("CFBundleURLSchemes"));
+    }
+
+    /** A hand-written hint with no markup is one scheme, not a parse failure. */
+    @Test
+    public void aBareSchemeNameIsAccepted() {
+        List<Object> types = MacOSXcodeProject.urlTypes("com.example.app", "myapp");
+        assertNotNull(types);
+        assertEquals(Arrays.asList("myapp"),
+                ((Map<?, ?>) types.get(0)).get("CFBundleURLSchemes"));
+    }
+
+    /** No hint means no key at all, rather than an empty array Xcode complains about. */
+    @Test
+    public void noSchemesMeansNoKey() {
+        assertNull(MacOSXcodeProject.urlTypes("com.example.app", null));
+        assertNull(MacOSXcodeProject.urlTypes("com.example.app", "   "));
+        assertNull(MacOSXcodeProject.urlTypes("com.example.app", "<string></string>"));
     }
 }

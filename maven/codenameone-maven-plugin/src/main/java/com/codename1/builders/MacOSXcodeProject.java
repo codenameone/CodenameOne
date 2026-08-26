@@ -129,6 +129,59 @@ public class MacOSXcodeProject {
     }
 
     /**
+     * The {@code CFBundleURLTypes} entry for the configured URL schemes, or null.
+     *
+     * <p>Reads {@code ios.urlSchemes} / {@code ios.urlScheme}, which is where a
+     * project migrating off Catalyst already has them and which the iOS plist
+     * path registers the same way. Without this the generated stub implements
+     * {@code shouldApplicationHandleURL} and macOS never routes a deep link to
+     * the application, because nothing claimed the scheme.</p>
+     *
+     * <p>{@code macos.plistInject} cannot stand in for it: every injected value
+     * is serialized as a string, and this key is an array of dictionaries.</p>
+     *
+     * <p>The hint carries raw plist markup on the iOS side --
+     * {@code <string>a</string><string>b</string>} -- so the scheme names are
+     * lifted out of it rather than pasted in, since this plist is built from a
+     * map. A value with no markup at all is taken as a single scheme, which is
+     * what someone writing the hint by hand tends to produce.</p>
+     */
+    public static List<Object> urlTypes(String bundleId, String schemesHint) {
+        if (schemesHint == null || schemesHint.trim().length() == 0) {
+            return null;
+        }
+        List<Object> schemes = new ArrayList<Object>();
+        String hint = schemesHint.trim();
+        int at = hint.indexOf("<string>");
+        if (at < 0) {
+            schemes.add(hint);
+        } else {
+            while (at >= 0) {
+                int end = hint.indexOf("</string>", at);
+                if (end < 0) {
+                    break;
+                }
+                String scheme = hint.substring(at + "<string>".length(), end).trim();
+                if (scheme.length() > 0) {
+                    schemes.add(scheme);
+                }
+                at = hint.indexOf("<string>", end);
+            }
+        }
+        if (schemes.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> type = new LinkedHashMap<String, Object>();
+        if (bundleId != null && bundleId.length() > 0) {
+            type.put("CFBundleURLName", bundleId);
+        }
+        type.put("CFBundleURLSchemes", schemes);
+        List<Object> types = new ArrayList<Object>();
+        types.add(type);
+        return types;
+    }
+
+    /**
      * Merges an app-supplied plist fragment over the generated one.
      *
      * <p>Returns the keys that were already present, so the caller can refuse a
