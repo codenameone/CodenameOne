@@ -514,4 +514,28 @@
             <Bug pattern="MS_EXPOSE_REP" />
         </Or>
     </Match>
+
+    <!--
+    The call and VPN bridges reach APIs newer than the android.jar this port compiles against.
+    android.net.VpnManager and android.net.Ikev2VpnProfile are API 30, and
+    android.app.role.RoleManager is API 29, so all three are used reflectively. Naming them
+    directly would mean raising the SDK the whole port builds against, to buy capabilities that
+    degrade perfectly well; raising the app's minSdkVersion to 30 for a feature it can report
+    absent would cost far more than the feature is worth.
+
+    Reflection throws six different checked exceptions, and every one of them means exactly the
+    same thing here: this device does not have the API, so report the capability unsupported. At
+    maven.compiler.source 6 there is no multi-catch and no ReflectiveOperationException, so the
+    alternative to catching Exception is six identical catch blocks at each of three sites. That is
+    worse code rather than safer code, and REC_CATCH_EXCEPTION is a style rule that does not model
+    reflection.
+    -->
+    <Match>
+        <Or>
+            <Class name="com.codename1.impl.android.vpn.AndroidVpnBridge" />
+            <Class name="com.codename1.impl.android.vpn.AndroidVpnBridge$Reflect" />
+            <Class name="com.codename1.impl.android.call.CN1CallScreeningService" />
+        </Or>
+        <Bug pattern="REC_CATCH_EXCEPTION" />
+    </Match>
 </FindBugsFilter>

@@ -1,0 +1,199 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android.call;
+
+import android.os.Build;
+import android.telecom.CallAudioState;
+import android.telecom.Connection;
+import android.telecom.DisconnectCause;
+
+import com.codename1.call.CallEndReason;
+import com.codename1.call.session.CallAudioRoute;
+import com.codename1.call.session.Calls;
+
+/// One call, as Telecom sees it.
+///
+/// Telecom owns this object: it is created by [CN1ConnectionService] and
+/// destroyed when the call ends, and every method here is the **system**
+/// asking the application to do something rather than the other way round.
+/// Each one turns into a `Calls.deliver...` call carrying an action token the
+/// facade answers.
+///
+/// #### Android has no audio-session handoff, so this synthesizes one
+///
+/// iOS activates the audio session and tells the app; Android just expects
+/// the app to have started. Rather than let application code branch on the
+/// platform -- which would mean the iOS path was the only one tested -- this
+/// fires `audioSessionActivated` as soon as the connection goes active, so
+/// "start media when the audio session arrives" is correct everywhere.
+public class CN1Connection extends Connection {
+
+    private final String callId;
+    private final CN1ConnectionService service;
+    private boolean audioAnnounced;
+
+    CN1Connection(CN1ConnectionService service, String callId) {
+        this.service = service;
+        this.callId = callId;
+        setConnectionProperties(PROPERTY_SELF_MANAGED);
+        setAudioModeIsVoip(true);
+    }
+
+    /// The identifier this call is known by everywhere else.
+    public String getCallId() {
+        return callId;
+    }
+
+    @Override
+    public void onAnswer() {
+        setActive();
+        announceAudio();
+        Calls.deliverAnswer(callId, service.nextActionToken(this, ACTION_ANSWER));
+    }
+
+    @Override
+    public void onAnswer(int videoState) {
+        onAnswer();
+    }
+
+    @Override
+    public void onReject() {
+        Calls.deliverEndRequest(callId,
+                service.nextActionToken(this, ACTION_REJECT));
+    }
+
+    @Override
+    public void onDisconnect() {
+        Calls.deliverEndRequest(callId,
+                service.nextActionToken(this, ACTION_DISCONNECT));
+    }
+
+    @Override
+    public void onAbort() {
+        onDisconnect();
+    }
+
+    @Override
+    public void onHold() {
+        setOnHold();
+        Calls.deliverHold(callId, true,
+                service.nextActionToken(this, ACTION_HOLD));
+    }
+
+    @Override
+    public void onUnhold() {
+        setActive();
+        Calls.deliverHold(callId, false,
+                service.nextActionToken(this, ACTION_UNHOLD));
+    }
+
+    @Override
+    public void onPlayDtmfTone(char c) {
+        Calls.deliverDtmf(callId, String.valueOf(c),
+                service.nextActionToken(this, ACTION_DTMF));
+    }
+
+    @Override
+    public void onCallAudioStateChanged(CallAudioState state) {
+        if (state == null) {
+            return;
+        }
+        Calls.deliverMute(callId, state.isMuted(),
+                service.nextActionToken(this, ACTION_MUTE));
+        CN1ConnectionService.setRoute(routeOf(state.getRoute()));
+    }
+
+    @Override
+    public void onStateChanged(int state) {
+        if (state == STATE_ACTIVE) {
+            announceAudio();
+        }
+    }
+
+    /// Ends the call and removes it from Telecom.
+    void finish(CallEndReason reason) {
+        setDisconnected(new DisconnectCause(causeOf(reason)));
+        if (audioAnnounced) {
+            Calls.deliverAudioDeactivated(callId);
+            audioAnnounced = false;
+        }
+        destroy();
+    }
+
+    /// Fires the synthesized audio-session activation, exactly once.
+    private void announceAudio() {
+        if (audioAnnounced) {
+            return;
+        }
+        audioAnnounced = true;
+        Calls.deliverAudioActivated(callId, CN1ConnectionService.getRoute());
+    }
+
+    private static int routeOf(int androidRoute) {
+        if ((androidRoute & CallAudioState.ROUTE_BLUETOOTH) != 0) {
+            return CallAudioRoute.BLUETOOTH.ordinal();
+        }
+        if ((androidRoute & CallAudioState.ROUTE_WIRED_HEADSET) != 0) {
+            return CallAudioRoute.WIRED_HEADSET.ordinal();
+        }
+        if ((androidRoute & CallAudioState.ROUTE_SPEAKER) != 0) {
+            return CallAudioRoute.SPEAKER.ordinal();
+        }
+        if ((androidRoute & CallAudioState.ROUTE_EARPIECE) != 0) {
+            return CallAudioRoute.EARPIECE.ordinal();
+        }
+        return CallAudioRoute.UNKNOWN.ordinal();
+    }
+
+    /// Maps a portable reason onto the cause Telecom writes in the call log.
+    ///
+    /// The value is user-visible -- a call logged as REJECTED shows
+    /// differently from one logged as MISSED -- so this is not cosmetic.
+    private static int causeOf(CallEndReason reason) {
+        if (reason == null) {
+            return DisconnectCause.LOCAL;
+        }
+        switch (reason) {
+            case REMOTE_ENDED:
+                return DisconnectCause.REMOTE;
+            case LOCAL_ENDED:
+                return DisconnectCause.LOCAL;
+            case UNANSWERED:
+                return DisconnectCause.MISSED;
+            case BUSY:
+                return DisconnectCause.BUSY;
+            case FILTERED:
+                return DisconnectCause.REJECTED;
+            default:
+                return DisconnectCause.ERROR;
+        }
+    }
+
+    static final int ACTION_ANSWER = 1;
+    static final int ACTION_REJECT = 2;
+    static final int ACTION_DISCONNECT = 3;
+    static final int ACTION_HOLD = 4;
+    static final int ACTION_UNHOLD = 5;
+    static final int ACTION_DTMF = 6;
+    static final int ACTION_MUTE = 7;
+}

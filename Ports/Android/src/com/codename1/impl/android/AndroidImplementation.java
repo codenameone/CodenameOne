@@ -13522,6 +13522,42 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return nearbyBridge;
     }
 
+    private com.codename1.impl.android.call.AndroidCallBridge callBridge;
+
+    private com.codename1.impl.android.vpn.AndroidVpnBridge vpnBridge;
+
+    /// The call bridge, on Telecom.
+    ///
+    /// Always returned rather than conditionally null: the bridge answers
+    /// every capability query honestly, including reporting no support at all
+    /// below API 26 where a self-managed ConnectionService does not exist, so
+    /// the public API degrades without this getter having to know the OS
+    /// version.
+    ///
+    /// Synchronized for the reason the nearby getter is: the bridge holds the
+    /// registered PhoneAccount, and two threads racing this would each build
+    /// one, with the loser's registration unreachable.
+    @Override
+    public synchronized com.codename1.call.spi.CallBridge getCallBridge() {
+        if (callBridge == null) {
+            callBridge = new com.codename1.impl.android.call.AndroidCallBridge(
+                    getActivity());
+        }
+        return callBridge;
+    }
+
+    /// The VPN bridge, on the platform's managed IKEv2 client.
+    ///
+    /// Reports no support below API 30, where `VpnManager` does not exist.
+    @Override
+    public synchronized com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        if (vpnBridge == null) {
+            vpnBridge = new com.codename1.impl.android.vpn.AndroidVpnBridge(
+                    getActivity());
+        }
+        return vpnBridge;
+    }
+
     @Override
     public com.codename1.impl.VisionImpl createVisionImpl() {
         return (com.codename1.impl.VisionImpl) createOptionalAiBackend(

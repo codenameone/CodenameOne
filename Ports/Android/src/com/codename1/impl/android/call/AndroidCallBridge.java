@@ -1,0 +1,513 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.android.call;
+
+import android.Manifest;
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.telecom.PhoneAccount;
+import android.telecom.PhoneAccountHandle;
+import android.telecom.TelecomManager;
+
+import com.codename1.call.CallAvailability;
+import com.codename1.call.CallError;
+import com.codename1.call.CallHandle;
+import com.codename1.call.CallHandleType;
+import com.codename1.call.session.CallAudioRoute;
+import com.codename1.call.session.Calls;
+import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.call.CallWire;
+
+/// The Android half of `com.codename1.call`, on Telecom.
+///
+/// #### Everything here is guarded on API 26
+///
+/// A **self-managed** `ConnectionService` -- an app owning its own calls
+/// rather than managing the SIM's -- arrives exactly at API 26, and below it
+/// Telecom offers nothing to degrade to. So the port reports the capability
+/// absent rather than the app's minimum being raised, and application code
+/// branches on `Calls.isSupported()`.
+///
+/// #### Configuring is not optional and its absence is silent
+///
+/// `TelecomManager.addNewIncomingCall` **does nothing at all** if no
+/// `PhoneAccount` has been registered, or if one was registered without
+/// `CAPABILITY_SELF_MANAGED`: no exception, no log line, no call. That is why
+/// [#configureProvider] exists as its own step and why every report checks it
+/// first -- an answer of `CALL_REFUSED` is a great deal more use than the
+/// silence the platform offers.
+public class AndroidCallBridge implements CallBridge {
+
+    private static final int MIN_SELF_MANAGED_SDK = 26;
+
+    private final Context context;
+    private PhoneAccountHandle handle;
+    private boolean configured;
+
+    public AndroidCallBridge(Context context) {
+        this.context = context;
+    }
+
+    private TelecomManager telecom() {
+        return (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
+    }
+
+    private static boolean selfManagedAvailable() {
+        return Build.VERSION.SDK_INT >= MIN_SELF_MANAGED_SDK;
+    }
+
+    @Override
+    public boolean isCallSupported() {
+        return selfManagedAvailable() && telecom() != null;
+    }
+
+    @Override
+    public boolean isVoipPushSupported() {
+        // The wake-up is an ordinary high-priority FCM message the app's own
+        // push service delivers, so there is nothing extra for this port to
+        // support beyond calls themselves.
+        return isCallSupported();
+    }
+
+    @Override
+    public boolean isDirectorySupported() {
+        // CallScreeningService is API 24, but the role that makes it fire is
+        // API 29; below that an app can be granted screening only through a
+        // dialog this API does not expose.
+        return Build.VERSION.SDK_INT >= 29;
+    }
+
+    @Override
+    public int getCallCapabilities() {
+        if (!isCallSupported()) {
+            return 0;
+        }
+        int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
+                | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_VIDEO
+                | CAPABILITY_VOIP_PUSH;
+        if (isDirectorySupported()) {
+            caps |= CAPABILITY_DIRECTORY | CAPABILITY_SCREENING;
+        }
+        // Deliberately no CAPABILITY_GROUPING or CAPABILITY_ROUTE_PICKER:
+        // Telecom conferences self-managed calls only through a
+        // ConnectionService conference this port does not build, and there is
+        // no system route picker to show.
+        return caps;
+    }
+
+    @Override
+    public int getCallAvailability() {
+        if (!isCallSupported()) {
+            return CallAvailability.UNSUPPORTED.ordinal();
+        }
+        if ((getGrantedPermissions() & PERMISSION_MANAGE_CALLS) == 0) {
+            return CallAvailability.NOT_PERMITTED.ordinal();
+        }
+        TelecomManager tm = telecom();
+        if (tm != null && Build.VERSION.SDK_INT >= 26 && tm.isInCall()) {
+            // Being in a call is not by itself a refusal -- this app may own
+            // it -- but Telecom will refuse a second self-managed call from a
+            // different owner, and this is the only signal available before
+            // trying.
+            return CallAvailability.OTHER_APP_IN_CALL.ordinal();
+        }
+        return CallAvailability.AVAILABLE.ordinal();
+    }
+
+    @Override
+    public int getGrantedPermissions() {
+        int mask = 0;
+        if (granted("android.permission.MANAGE_OWN_CALLS")) {
+            mask |= PERMISSION_MANAGE_CALLS;
+        }
+        if (granted(Manifest.permission.RECORD_AUDIO)) {
+            mask |= PERMISSION_MICROPHONE;
+        }
+        if (granted(Manifest.permission.CAMERA)) {
+            mask |= PERMISSION_CAMERA;
+        }
+        if (Build.VERSION.SDK_INT < 33
+                || granted("android.permission.POST_NOTIFICATIONS")) {
+            mask |= PERMISSION_NOTIFICATIONS;
+        }
+        return mask;
+    }
+
+    private boolean granted(String permission) {
+        return context.checkSelfPermission(permission)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void requestPermissions(int requestId, int permissionBits) {
+        // MANAGE_OWN_CALLS is a normal permission granted at install time and
+        // the rest are handled by the framework's own permission flow, so
+        // there is nothing to prompt for here beyond reporting the truth.
+        Calls.deliverPermissionResult(requestId, getGrantedPermissions());
+    }
+
+    @Override
+    public void configureProvider(int requestId, String configWire) {
+        if (!isCallSupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Self-managed calls need Android 8.0 or newer");
+            return;
+        }
+        String[] f = CallWire.split(configWire);
+        String label = CallWire.field(f, 0);
+        if (label.length() == 0) {
+            label = context.getApplicationInfo()
+                    .loadLabel(context.getPackageManager()).toString();
+        }
+        boolean video = CallWire.flag(f, 1);
+        try {
+            handle = new PhoneAccountHandle(
+                    new ComponentName(context, CN1ConnectionService.class), "cn1");
+            int caps = PhoneAccount.CAPABILITY_SELF_MANAGED;
+            if (video) {
+                caps |= PhoneAccount.CAPABILITY_SUPPORTS_VIDEO_CALLING
+                        | PhoneAccount.CAPABILITY_VIDEO_CALLING;
+            }
+            PhoneAccount account = PhoneAccount.builder(handle, label)
+                    .setCapabilities(caps)
+                    .addSupportedUriScheme(PhoneAccount.SCHEME_TEL)
+                    .addSupportedUriScheme(PhoneAccount.SCHEME_SIP)
+                    .build();
+            telecom().registerPhoneAccount(account);
+            configured = true;
+            Calls.deliverAck(requestId, true, 0, null);
+        } catch (SecurityException e) {
+            configured = false;
+            Calls.deliverAck(requestId, false, CallError.UNAUTHORIZED.ordinal(),
+                    "MANAGE_OWN_CALLS is required to own calls: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void reportIncomingCall(int requestId, String callId,
+            String handleWire, String displayName, int capabilityBits,
+            boolean hasVideo) {
+        if (!ready(requestId)) {
+            return;
+        }
+        Bundle extras = extrasFor(callId, handleWire, displayName);
+        CN1ConnectionService.expectReport(requestId, callId);
+        try {
+            telecom().addNewIncomingCall(handle, extras);
+        } catch (SecurityException e) {
+            CN1ConnectionService.failParkedReport(
+                    CallError.UNAUTHORIZED.ordinal(), e.getMessage());
+        }
+    }
+
+    @Override
+    public void reportOutgoingCall(int requestId, String callId,
+            String handleWire, String displayName, int capabilityBits,
+            boolean hasVideo) {
+        if (!ready(requestId)) {
+            return;
+        }
+        Bundle extras = extrasFor(callId, handleWire, displayName);
+        Bundle outer = new Bundle();
+        outer.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);
+        outer.putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, extras);
+        CN1ConnectionService.expectReport(requestId, callId);
+        try {
+            telecom().placeCall(uriFor(handleWire), outer);
+        } catch (SecurityException e) {
+            CN1ConnectionService.failParkedReport(
+                    CallError.UNAUTHORIZED.ordinal(), e.getMessage());
+        }
+    }
+
+    /// Whether a report can proceed, answering the request when it cannot.
+    private boolean ready(int requestId) {
+        if (!isCallSupported()) {
+            Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                    "Self-managed calls need Android 8.0 or newer");
+            return false;
+        }
+        if (!configured || handle == null) {
+            // The silent case, made loud. Without this Telecom drops the call
+            // and says nothing at all.
+            Calls.deliverAck(requestId, false, CallError.CALL_REFUSED.ordinal(),
+                    "Calls.configure() must run before a call is reported:"
+                    + " Telecom ignores calls from an unregistered account");
+            return false;
+        }
+        return true;
+    }
+
+    private Bundle extrasFor(String callId, String handleWire, String name) {
+        Bundle b = new Bundle();
+        b.putString(CN1ConnectionService.EXTRA_CALL_ID, callId);
+        b.putParcelable(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS,
+                uriFor(handleWire));
+        if (name != null) {
+            b.putString(TelecomManager.EXTRA_CALL_SUBJECT, name);
+        }
+        return b;
+    }
+
+    /// The address Telecom shows and dials.
+    ///
+    /// The scheme matters: a `tel:` address is matched against the address
+    /// book and can be called back from Recents, while a username sent as
+    /// `tel:` produces a call log entry the user cannot use.
+    private static Uri uriFor(String handleWire) {
+        CallHandle h = CallWire.decodeHandle(handleWire);
+        if (h == null) {
+            return Uri.fromParts(PhoneAccount.SCHEME_TEL, "", null);
+        }
+        String scheme = h.getType() == CallHandleType.PHONE_NUMBER
+                ? PhoneAccount.SCHEME_TEL : PhoneAccount.SCHEME_SIP;
+        return Uri.fromParts(scheme, h.getValue(), null);
+    }
+
+    @Override
+    public void reportOutgoingStartedConnecting(String callId, long timestampMs) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.setDialing();
+        }
+    }
+
+    @Override
+    public void reportOutgoingConnected(String callId, long timestampMs) {
+        activate(callId);
+    }
+
+    @Override
+    public void reportIncomingConnected(String callId, long timestampMs) {
+        activate(callId);
+    }
+
+    private static void activate(String callId) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.setActive();
+        }
+    }
+
+    @Override
+    public void updateCall(String callId, String handleWire, String displayName,
+            int capabilityBits, boolean hasVideo) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            return;
+        }
+        if (handleWire != null && handleWire.length() > 0) {
+            c.setAddress(uriFor(handleWire), TelecomManager.PRESENTATION_ALLOWED);
+        }
+        if (displayName != null) {
+            c.setCallerDisplayName(displayName,
+                    TelecomManager.PRESENTATION_ALLOWED);
+        }
+    }
+
+    @Override
+    public void reportCallEnded(String callId, int endReasonOrdinal,
+            long timestampMs) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c != null) {
+            c.finish(CallWire.endReason(endReasonOrdinal));
+            CN1ConnectionService.forget(callId);
+        }
+    }
+
+    @Override
+    public void endCall(int requestId, String callId, int endReasonOrdinal) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "No such call: " + callId);
+            return;
+        }
+        c.finish(CallWire.endReason(endReasonOrdinal));
+        CN1ConnectionService.forget(callId);
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void setHeld(int requestId, String callId, boolean held) {
+        CN1Connection c = CN1ConnectionService.find(callId);
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "No such call: " + callId);
+            return;
+        }
+        if (held) {
+            c.setOnHold();
+        } else {
+            c.setActive();
+        }
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void setMuted(int requestId, String callId, boolean muted) {
+        // Telecom owns the mute control for a self-managed call and does not
+        // take instruction about it from the app; the app mutes its own
+        // media. Answering true rather than failing keeps a portable app from
+        // treating a platform difference as an error.
+        Calls.deliverAck(requestId,
+                CN1ConnectionService.find(callId) != null,
+                CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+    }
+
+    @Override
+    public void sendDtmf(int requestId, String callId, String digits) {
+        // Outbound DTMF is carried by the app's own media, not by Telecom.
+        Calls.deliverAck(requestId,
+                CN1ConnectionService.find(callId) != null,
+                CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+    }
+
+    @Override
+    public void setCallGroup(int requestId, String callId, String otherCallId) {
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Telecom does not conference self-managed calls");
+    }
+
+    @Override
+    public int getAudioRoute() {
+        return CN1ConnectionService.getRoute();
+    }
+
+    @Override
+    public void setAudioRoute(int requestId, int routeOrdinal) {
+        CN1Connection c = null;
+        for (com.codename1.call.session.CallSession s : Calls.getSessions()) {
+            c = CN1ConnectionService.find(s.getCallId());
+            if (c != null) {
+                break;
+            }
+        }
+        if (c == null) {
+            Calls.deliverAck(requestId, false, CallError.INVALID_ID.ordinal(),
+                    "There is no call to route audio for");
+            return;
+        }
+        c.setAudioRoute(androidRouteOf(routeOrdinal));
+        CN1ConnectionService.setRoute(routeOrdinal);
+        Calls.deliverAck(requestId, true, 0, null);
+    }
+
+    private static int androidRouteOf(int ordinal) {
+        CallAudioRoute[] values = CallAudioRoute.values();
+        CallAudioRoute r = ordinal < 0 || ordinal >= values.length
+                ? CallAudioRoute.UNKNOWN : values[ordinal];
+        switch (r) {
+            case SPEAKER:
+                return android.telecom.CallAudioState.ROUTE_SPEAKER;
+            case BLUETOOTH:
+                return android.telecom.CallAudioState.ROUTE_BLUETOOTH;
+            case WIRED_HEADSET:
+                return android.telecom.CallAudioState.ROUTE_WIRED_HEADSET;
+            default:
+                return android.telecom.CallAudioState.ROUTE_EARPIECE;
+        }
+    }
+
+    @Override
+    public void showAudioRoutePicker(int requestId, String callId) {
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Android has no system audio route picker to show");
+    }
+
+    @Override
+    public void completeAction(long actionToken, boolean fulfilled) {
+        CN1ConnectionService.completeAction(actionToken, fulfilled);
+    }
+
+    @Override
+    public void registerVoipPush(int requestId) {
+        // The wake-up is an ordinary high-priority FCM message, so the token
+        // is the app's existing push registration and there is nothing
+        // separate to register for. Answering with an empty token rather than
+        // failing keeps portable code from treating this as an error.
+        com.codename1.call.voip.VoipPush.deliverToken(requestId, "");
+    }
+
+    @Override
+    public void unregisterVoipPush(int requestId) {
+    }
+
+    @Override
+    public void setJavaReady(boolean ready) {
+        // Nothing to hold. Unlike iOS, Android never reports a call to the
+        // system before this app's code has run -- the FCM message arrives in
+        // Java first -- so there is no queue to drain.
+    }
+
+    @Override
+    public void drainPendingCalls(int requestId) {
+        com.codename1.call.voip.VoipPush.deliverPendingCallsDrained(requestId, 0);
+    }
+
+    @Override
+    public void setDirectorySource(int requestId, String filePath) {
+        Calls.deliverAck(requestId, isDirectorySupported(),
+                CallError.NOT_SUPPORTED.ordinal(),
+                "Call screening needs Android 10 or newer");
+    }
+
+    @Override
+    public void reloadDirectory(int requestId) {
+        Calls.deliverAck(requestId, isDirectorySupported(),
+                CallError.NOT_SUPPORTED.ordinal(),
+                "Call screening needs Android 10 or newer");
+    }
+
+    @Override
+    public void getDirectoryStatus(int requestId) {
+        com.codename1.call.directory.CallDirectory.deliverStatus(requestId,
+                CallWire.join(new String[]{
+                    CallWire.flagOf(CN1CallScreeningService.isEnabled()),
+                    "-1", "android"}));
+    }
+
+    @Override
+    public void requestScreeningRole(int requestId) {
+        Activity a = context instanceof Activity ? (Activity) context : null;
+        if (a == null || !isDirectorySupported()) {
+            Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                    "Call screening needs Android 10 or newer and a foreground"
+                    + " activity");
+            return;
+        }
+        CN1CallScreeningService.requestRole(a, requestId);
+    }
+
+    /// Clears every call this port knows about, for a provider reset.
+    public static void resetProvider() {
+        CN1ConnectionService.reset();
+        Calls.deliverProviderReset();
+    }
+}
