@@ -872,13 +872,20 @@ static int CN1MacKeyCode(NSEvent *event) {
 
 // ---- NSTextInputClient ---------------------------------------------------
 
-- (BOOL)cn1ReplaceRange:(NSRange)range withString:(NSString *)string {
+/// Applies an edit and answers how many characters were ACTUALLY inserted, or
+/// -1 when the edit was refused.
+///
+/// Not a BOOL: a length-limited field truncates what it accepts, and a caller
+/// that places the caret using the length it asked for puts it past the end of
+/// the text. The next edit then fails the range guard and every text-input
+/// query sees an invalid selection.
+- (NSInteger)cn1ReplaceRange:(NSRange)range withString:(NSString *)string {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     if (range.location == NSNotFound) {
-        return NO;
+        return -1;
     }
     if (NSMaxRange(range) > session.text.length) {
-        return NO;
+        return -1;
     }
     NSString *inserted = string != nil ? string : @"";
     // The field's maximum, enforced here because nothing after this point does.
@@ -891,7 +898,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         if (remaining >= session.maxSize) {
             // Already full, and this edit adds rather than replaces.
             if (inserted.length > 0) {
-                return NO;
+                return -1;
             }
         } else if (inserted.length > session.maxSize - remaining) {
             inserted = [inserted substringToIndex:session.maxSize - remaining];
@@ -903,7 +910,7 @@ static int CN1MacKeyCode(NSEvent *event) {
     // cannot take a whole-text replacement; the legacy path ignores this and
     // sends the document at commit instead.
     CN1MacTextInputNotifyReplace(range, inserted);
-    return YES;
+    return (NSInteger)inserted.length;
 }
 
 /// The range an edit applies to: an explicit one if the input method gave one,
@@ -940,11 +947,15 @@ static int CN1MacKeyCode(NSEvent *event) {
                     componentsJoinedByString:@" "];
     }
     NSRange range = [self cn1EffectiveRange:replacementRange];
-    if (![self cn1ReplaceRange:range withString:inserted]) {
+    NSInteger accepted = [self cn1ReplaceRange:range withString:inserted];
+    if (accepted < 0) {
         return;
     }
     session.markedRange = NSMakeRange(NSNotFound, 0);
-    session.selectedRange = NSMakeRange(range.location + inserted.length, 0);
+    // The ACCEPTED length, not the requested one: a length-limited field
+    // truncates a paste, and counting the original left the caret past the end
+    // of the text that actually landed.
+    session.selectedRange = NSMakeRange(range.location + (NSUInteger)accepted, 0);
     [session commitFinished:NO];
 }
 
@@ -962,8 +973,14 @@ static int CN1MacKeyCode(NSEvent *event) {
         marked = @"";
     }
     NSRange range = [self cn1EffectiveRange:replacementRange];
-    if (![self cn1ReplaceRange:range withString:marked]) {
+    NSInteger acceptedMarked = [self cn1ReplaceRange:range withString:marked];
+    if (acceptedMarked < 0) {
         return;
+    }
+    if ((NSUInteger)acceptedMarked < marked.length) {
+        // Truncated by the field's maximum, so the composing run is only as long
+        // as what landed.
+        marked = [marked substringToIndex:(NSUInteger)acceptedMarked];
     }
     // The marked run is pushed into the framework's text so a composition is
     // visible as it is typed. Codename One has no way to express the system

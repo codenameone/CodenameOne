@@ -178,6 +178,10 @@ void CN1MacTextInputNotifyEditorAction(void) {
     return ++editSeq;
 }
 
+- (int)currentEditSeq {
+    return editSeq;
+}
+
 - (void)commitFinished:(BOOL)finished {
     if (self.pureEditor) {
         // The pure editor has already been told about the edit itself, operation
@@ -230,7 +234,19 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_stopTextInput__(CODENAME_ONE_THREAD_S
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    // The caret geometry is taken from every push, stale or not: it is where the
+    // framework last drew the caret and an input method needs somewhere to put
+    // its candidate window.
     session.caretRect = CGRectMake(caretX, caretY, caretW, caretH);
+    // The TEXT and the selection are not, when the echo is stale. Java echoes
+    // the sequence of the edit it applied, and a push for edit N that arrives
+    // after the user has already typed N+1 would otherwise overwrite the newer
+    // native text -- and the next keystroke would then be applied to a document
+    // the user has moved past, losing or misplacing what they typed. The UIKit
+    // path drops the same echo for the same reason.
+    if (seq != (JAVA_INT)[session currentEditSeq]) {
+        return;
+    }
     if (session.markedRange.location != NSNotFound) {
         // Mid composition the input method owns the text. Taking the
         // framework's copy back here would drop the marked run and make the

@@ -83,6 +83,14 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// push, so a slow round trip cannot regress the shadow under fast typing.
 - (int)nextEditSeq;
 
+/// The sequence of the last edit this session produced.
+///
+/// Java echoes it back with each state push so a push that crossed a newer
+/// keystroke can be recognised and dropped. Without the comparison the older
+/// echo overwrites the newer native text and the next keystroke is applied to
+/// text the user has already moved past.
+- (int)currentEditSeq;
+
 /// Caret rectangle in Codename One pixels, as last reported by the framework.
 @property (nonatomic) CGRect caretRect;
 
