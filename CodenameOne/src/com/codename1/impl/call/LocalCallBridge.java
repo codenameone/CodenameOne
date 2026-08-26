@@ -80,6 +80,7 @@ public class LocalCallBridge implements CallBridge {
     private boolean configured;
     private boolean javaReady;
     private boolean directoryEnabled = true;
+    private boolean audioWithheld;
     private int availability;
     private int grantedPermissions = PERMISSION_MANAGE_CALLS | PERMISSION_MICROPHONE;
     private int route = CallAudioRoute.EARPIECE.ordinal();
@@ -149,6 +150,17 @@ public class LocalCallBridge implements CallBridge {
     /// Whether the user has switched caller identification on.
     public void setDirectoryEnabled(boolean value) {
         this.directoryEnabled = value;
+    }
+
+    /// Stops the audio session ever being activated.
+    ///
+    /// The simulation's most useful trap. An app that starts media when the
+    /// user answers rather than when the audio session activates behaves
+    /// correctly everywhere except a device, where CallKit owns the session
+    /// and the call is silent. Withholding it here makes that mistake
+    /// reproduce off-device, which is the only place it is cheap to find.
+    public void setAudioSessionWithheld(boolean value) {
+        this.audioWithheld = value;
     }
 
     /// The path the last [#setDirectorySource] was given, or null.
@@ -257,7 +269,7 @@ public class LocalCallBridge implements CallBridge {
         c.state = CallState.ACTIVE;
         final long token = nextToken();
         later(LATENCY_MILLIS, new AnswerDelivery(callId, token));
-        later(AUDIO_MILLIS, new AudioDelivery(callId, route, true));
+        audioOn(callId);
     }
 
     /// Simulates the user hanging up through the system UI.
@@ -446,7 +458,7 @@ public class LocalCallBridge implements CallBridge {
             return;
         }
         c.state = CallState.ACTIVE;
-        later(AUDIO_MILLIS, new AudioDelivery(callId, route, true));
+        audioOn(callId);
     }
 
     @Override
@@ -620,6 +632,14 @@ public class LocalCallBridge implements CallBridge {
     // ------------------------------------------------------------------
     // internals
     // ------------------------------------------------------------------
+
+    /// Activates the audio session unless the trap switch is on.
+    private void audioOn(String callId) {
+        if (audioWithheld) {
+            return;
+        }
+        later(AUDIO_MILLIS, new AudioDelivery(callId, route, true));
+    }
 
     private SimCall find(String callId) {
         synchronized (calls) {

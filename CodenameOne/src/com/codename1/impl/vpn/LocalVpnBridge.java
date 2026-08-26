@@ -205,7 +205,11 @@ public class LocalVpnBridge implements VpnBridge {
     }
 
     /// Moves to a new status, telling the facade when anyone is listening.
-    void setStatus(VpnStatus s) {
+    ///
+    /// Public because the simulator drives it directly: a tunnel dropping
+    /// underneath a running app is a state the app has to handle and cannot
+    /// otherwise be produced on a desktop.
+    public void setStatus(VpnStatus s) {
         this.status = s;
         if (listening) {
             later(LATENCY_MILLIS, new StatusDelivery(s.ordinal()));

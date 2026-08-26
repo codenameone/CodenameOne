@@ -16391,6 +16391,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static com.codename1.impl.nearby.LocalNearbyBridge nearbyBridge;
 
+    private static com.codename1.impl.call.LocalCallBridge callBridge;
+
+    private static com.codename1.impl.vpn.LocalVpnBridge vpnBridge;
+
     /// Returns the simulator's smart home. There is no desktop HomeKit or
     /// Google Home, so this is a local simulated house reporting
     /// {@code HomeAvailability.LOCAL_ONLY}: the accessories come from
@@ -16430,6 +16434,59 @@ public class JavaSEPort extends CodenameOneImplementation {
                 nearbyBridge = local;
             }
             return nearbyBridge;
+        }
+    }
+
+    /// The call bridge for the simulator and desktop builds.
+    ///
+    /// A simulated call stack rather than no call stack, for the reason
+    /// [#getNearbyBridge()] carries one: a calling app is mostly a ringing
+    /// screen, an in-call screen, a media lifecycle and a state machine, and
+    /// none of that has anything to do with CallKit. A port that reported
+    /// nothing would make every bit of it testable only on a device.
+    ///
+    /// The simulation deliberately keeps the awkward orderings a device has:
+    /// the audio session arrives well after the answer, and a call pushed
+    /// before the app was listening is queued rather than delivered. Both are
+    /// scriptable from the Simulate menu.
+    @Override
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        return getSimulatedCalls();
+    }
+
+    /// The simulated call stack, for the Simulate menu to script.
+    ///
+    /// Static and class-guarded for the reason the nearby bridge is: it holds
+    /// the live calls and the pending push queue, and two threads racing this
+    /// getter would each get their own, so a call rung through one would be
+    /// invisible to the other.
+    public static com.codename1.impl.call.LocalCallBridge getSimulatedCalls() {
+        synchronized (JavaSEPort.class) {
+            if (callBridge == null) {
+                callBridge = new com.codename1.impl.call.LocalCallBridge();
+            }
+            return callBridge;
+        }
+    }
+
+    /// The VPN bridge for the simulator and desktop builds: a simulated
+    /// configuration store that tunnels nothing.
+    ///
+    /// Note this is not the same question as whether a VPN is running --
+    /// `com.codename1.io.NetworkManager#isVPNActive()` answers that one for
+    /// real on the desktop, and keeps doing so.
+    @Override
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        return getSimulatedVpn();
+    }
+
+    /// The simulated VPN, for the Simulate menu to script.
+    public static com.codename1.impl.vpn.LocalVpnBridge getSimulatedVpn() {
+        synchronized (JavaSEPort.class) {
+            if (vpnBridge == null) {
+                vpnBridge = new com.codename1.impl.vpn.LocalVpnBridge();
+            }
+            return vpnBridge;
         }
     }
 
