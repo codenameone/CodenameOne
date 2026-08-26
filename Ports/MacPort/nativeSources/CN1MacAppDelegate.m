@@ -27,6 +27,7 @@
 #include "cn1_globals.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_Display.h"
+#include "com_codename1_push_PushContent.h"
 
 /*
  * The application delegate.
@@ -114,12 +115,36 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
     id meta = [userInfo objectForKey:@"meta"];
     BOOL includedBody = NO;
 
+    // PushContent is filled in BEFORE any callback, the way the UIKit router
+    // does it. An application that reads PushContent.get() inside
+    // PushCallback.push() saw exists() false, or fields left from the previous
+    // push, even though the callback itself arrived.
+    com_codename1_push_PushContent_reset__(threadStateData);
+    id mediaUrl = [userInfo objectForKey:@"media-url"];
+    if ([mediaUrl isKindOfClass:[NSString class]]) {
+        com_codename1_push_PushContent_setImageUrl___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)mediaUrl));
+    }
+    if ([meta isKindOfClass:[NSString class]]) {
+        com_codename1_push_PushContent_setMetaData___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)meta));
+    }
+    id category = aps != nil ? [aps objectForKey:@"category"] : nil;
+    if ([category isKindOfClass:[NSString class]]) {
+        com_codename1_push_PushContent_setCategory___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)category));
+    }
+
     if ([alert isKindOfClass:[NSDictionary class]]) {
         NSDictionary *alertDict = (NSDictionary *)alert;
         NSString *title = [alertDict objectForKey:@"title"];
         NSString *body = [alertDict objectForKey:@"body"];
         if (title != nil && body != nil) {
             includedBody = YES;
+            com_codename1_push_PushContent_setTitle___java_lang_String(
+                threadStateData, fromNSString(threadStateData, title));
+            com_codename1_push_PushContent_setBody___java_lang_String(
+                threadStateData, fromNSString(threadStateData, body));
             // "title;body" is the type 4 wire form the Java side parses.
             NSString *combined = [NSString stringWithFormat:@"%@;%@", title, body];
             com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
@@ -128,6 +153,8 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
         }
     } else if ([alert isKindOfClass:[NSString class]]) {
         includedBody = YES;
+        com_codename1_push_PushContent_setBody___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)alert));
         com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
             threadStateData, fromNSString(threadStateData, (NSString *)alert),
             fromNSString(threadStateData, meta != nil ? @"3" : @"1"));
@@ -142,6 +169,33 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
             threadStateData, fromNSString(threadStateData, metaText),
             includedBody ? JAVA_NULL : fromNSString(threadStateData, @"2"));
     }
+}
+
+/// Delivers a push payload, or holds it until the Java side exists.
+///
+/// Queued like the lifecycle transitions and the launch URL, and for the sharper
+/// version of the same reason: a notification that LAUNCHED the app arrives
+/// before the Java bootstrap has run, IOSImplementation.pushCallback is still
+/// null, and pushReceived() drops the payload on the floor. The application then
+/// never learns about the push that started it -- the one push it most needs.
+///
+/// The whole payload is held, not a decoded body: the decode decides the push
+/// TYPE, and doing it here would have to be repeated on replay anyway.
+///
+/// Shared by the remote-notification hook and by both notification-center
+/// delegate methods, so none of them can be the one that forgets to wait.
+static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
+    if (userInfo == nil) {
+        return;
+    }
+    if (!cn1MacJavaReady) {
+        if (cn1MacPendingPushes == nil) {
+            cn1MacPendingPushes = [[NSMutableArray alloc] init];
+        }
+        [cn1MacPendingPushes addObject:userInfo];
+        return;
+    }
+    cn1MacDeliverPush(userInfo);
 }
 
 static void cn1MacDeliverURL(NSString *url) {
@@ -197,7 +251,7 @@ BOOL cn1MacRuntimeIsJavaReady(void) {
 /// UIKit flag the shared code reads to decide whether it may paint.
 extern BOOL isAppSuspended;
 
-@interface CN1MacAppDelegate : NSObject <NSApplicationDelegate>
+@interface CN1MacAppDelegate : NSObject <NSApplicationDelegate, UNUserNotificationCenterDelegate>
 @end
 
 @implementation CN1MacAppDelegate
@@ -212,6 +266,64 @@ extern BOOL isAppSuspended;
 
 // isAppSuspended is set whether or not Java is up: it is C state the shared
 // paint path reads, and it has to be right from the first frame.
+
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    // Installed unconditionally, and this early. A scheduled notification is
+    // delivered through this delegate whether it fires while the application is
+    // frontmost or the user opens it from Notification Center, so without it a
+    // notification is displayed and localNotificationReceived() is never called.
+    //
+    // Not gated on the notifications build flag: that one is a #define inside
+    // IOSNative.m and is not visible here, and installing a delegate an
+    // application never triggers costs nothing.
+    [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+}
+
+/// A local notification that fired while the application is frontmost.
+///
+/// __ios_id__ is what marks one of ours; anything else is a remote payload and
+/// goes to the push router. The presentation option mirrors the UIKit delegate:
+/// a notification asking to be seen in the foreground is shown, and one that did
+/// not is delivered silently to the application.
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+    NSDictionary *info = notification.request.content.userInfo;
+    id localId = [info objectForKey:@"__ios_id__"];
+    if ([localId isKindOfClass:[NSString class]]) {
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)localId));
+        if (completionHandler != nil) {
+            completionHandler([info objectForKey:@"foreground"] != nil
+                ? UNNotificationPresentationOptionAlert
+                : UNNotificationPresentationOptionNone);
+        }
+        return;
+    }
+    cn1MacQueueOrDeliverPush(info);
+    if (completionHandler != nil) {
+        completionHandler(UNNotificationPresentationOptionAlert);
+    }
+}
+
+/// The user acted on a notification -- opened it, or chose one of its actions.
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler {
+    NSDictionary *info = response.notification.request.content.userInfo;
+    id localId = [info objectForKey:@"__ios_id__"];
+    if ([localId isKindOfClass:[NSString class]]) {
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)localId));
+    } else {
+        cn1MacQueueOrDeliverPush(info);
+    }
+    if (completionHandler != nil) {
+        completionHandler();
+    }
+}
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
     isAppSuspended = NO;
@@ -318,26 +430,7 @@ extern BOOL isAppSuspended;
 
 - (void)application:(NSApplication *)application
         didReceiveRemoteNotification:(NSDictionary *)userInfo {
-    if (userInfo == nil) {
-        return;
-    }
-    // Queued like the lifecycle transitions and the launch URL, and for the
-    // sharper version of the same reason: a notification that LAUNCHED the app
-    // arrives before the Java bootstrap has run, IOSImplementation.pushCallback
-    // is still null, and pushReceived() drops the payload on the floor. The
-    // application then never learns about the push that started it -- the one
-    // push it most needs.
-    //
-    // The whole payload is held, not a decoded body: the decode decides the push
-    // TYPE, and doing it here would have to be repeated on replay anyway.
-    if (!cn1MacJavaReady) {
-        if (cn1MacPendingPushes == nil) {
-            cn1MacPendingPushes = [[NSMutableArray alloc] init];
-        }
-        [cn1MacPendingPushes addObject:userInfo];
-        return;
-    }
-    cn1MacDeliverPush(userInfo);
+    cn1MacQueueOrDeliverPush(userInfo);
 }
 
 @end

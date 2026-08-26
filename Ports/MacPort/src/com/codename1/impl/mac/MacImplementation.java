@@ -69,6 +69,23 @@ public class MacImplementation extends IOSImplementation {
         return true;
     }
 
+    /// @inheritDoc
+    ///
+    /// False until there is an AppKit capture path. The inherited answer is an
+    /// unconditional true, but capturePhoto() and captureVideo() are inherited
+    /// from the iOS port and cannot work here: the macOS builder never sets
+    /// INCLUDE_CAMERA_USAGE, and the native behind them is UIImagePickerController,
+    /// which macOS does not have. An application told yes selects the capture
+    /// path and gets an iOS build-hint exception instead of a photo.
+    ///
+    /// AVFoundation capture does exist on macOS. This is a port that has not
+    /// been written, not a platform that cannot; the ledger records it beside
+    /// the photo picker.
+    @Override
+    public boolean hasCamera() {
+        return false;
+    }
+
     private AppKitWindowManager windowManager;
 
     /// @inheritDoc
