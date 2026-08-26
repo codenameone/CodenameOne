@@ -38,8 +38,7 @@ import java.lang.annotation.Target;
 /// The platform and the builders that read these hints are stated once on the
 /// annotation, not on every attribute. An attribute repeats one only to
 /// disagree with it.
-@Hint(platform = "desktop",
-        consumedBy = {"GenerateDesktopAppWrapperMojo"})
+@Hint(platform = "desktop")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface DesktopBuild {

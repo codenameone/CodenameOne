@@ -97,7 +97,7 @@ public class BuildHintAnnotationProcessorTest {
         Properties p = hintsOf("@Android(installLocation = InstallLocation.INTERNAL_ONLY)");
         assertEquals("internalOnly", p.getProperty("codename1.arg.android.installLocation"));
 
-        p = hintsOf("@Ios(themeMode = IosThemeMode.IOS7)");
+        p = hintsOf("@Ios(themeMode = ThemeMode.IOS7)");
         assertEquals("ios7", p.getProperty("codename1.arg.ios.themeMode"));
 
         p = hintsOf("@DesktopBuild(titleBar = DesktopTitleBar.TOOLBAR)");
@@ -166,7 +166,7 @@ public class BuildHintAnnotationProcessorTest {
     /// ...and so does an enum's own unset constant.
     @Test
     public void anEnumsUnsetConstantSendsNothing() throws Exception {
-        Properties p = hintsOf("@Ios(themeMode = IosThemeMode.DEFAULT, teamId = \"T\")");
+        Properties p = hintsOf("@Ios(themeMode = ThemeMode.DEFAULT, teamId = \"T\")");
         assertEquals("T", p.getProperty("codename1.arg.ios.teamId"));
         assertNull(p.getProperty("codename1.arg.ios.themeMode"));
     }
@@ -304,7 +304,7 @@ public class BuildHintAnnotationProcessorTest {
     public void aDeprecatedAliasOfAnAnnotatedHintIsAConflict() throws Exception {
         Properties s = settings();
         s.setProperty("codename1.arg.cn1.androidTheme", "legacy");
-        File classes = compile("@Android(themeMode = AndroidThemeMode.MODERN)");
+        File classes = compile("@Android(themeMode = ThemeMode.MODERN)");
         ProcessorContext ctx = run(classes, s, MAIN, false);
         assertErrorContaining(ctx, "codename1.arg.cn1.androidTheme is declared twice");
     }
@@ -1320,7 +1320,13 @@ public class BuildHintAnnotationProcessorTest {
         ProcessorContext ctx = new ProcessorContext(classes, tmp.newFolder(), index,
                 new SystemStreamLog(), tmp.newFolder(), settings, mainClass,
                 sourceRoot == null ? null
-                        : java.util.Collections.singletonList(sourceRoot.getAbsolutePath()));
+                        : java.util.Collections.singletonList(sourceRoot.getAbsolutePath()),
+                null,
+                // The processor reads what a member sets from the ANNOTATIONS,
+                // so the classpath they live on is not optional any more. A real
+                // build always has it; a test that omitted it was testing a
+                // project with no build hint annotations available at all.
+                java.util.Collections.singletonList(coreJar().getAbsolutePath()));
         proc.start(ctx);
         for (AnnotatedClass cls : index.values()) {
             proc.processClass(cls, ctx);

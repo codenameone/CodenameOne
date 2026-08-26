@@ -432,7 +432,7 @@ public class AnnotationBuildHintMergeTest {
         m.setAccessible(true);
         try {
             m.invoke(mojo, new Properties(),
-                    Collections.singletonList(classes.getAbsolutePath()));
+                    withAnnotations(Collections.singletonList(classes.getAbsolutePath())));
             fail("expected the misplaced annotation to be refused");
         } catch (InvocationTargetException ex) {
             assertTrue(String.valueOf(ex.getCause().getMessage()),
@@ -542,6 +542,19 @@ public class AnnotationBuildHintMergeTest {
         return classes;
     }
 
+    /// `elements` plus the jar the build hint annotations live in.
+    ///
+    /// The merge reads the annotation package off the compile classpath to know
+    /// which types are build hint annotations at all. Every real build has it
+    /// there; a fixture that leaves it out is not a project with no misplaced
+    /// annotation, it is a project where none can be recognised.
+    private static List<String> withAnnotations(List<String> elements) throws Exception {
+        List<String> out = new java.util.ArrayList<String>(elements);
+        out.add(new File(Class.forName("com.codename1.annotations.buildhints.Ios")
+                .getProtectionDomain().getCodeSource().getLocation().toURI()).getAbsolutePath());
+        return out;
+    }
+
     /** Compiles a main class carrying one build hint annotation. */
     private void writeAnnotatedClass(File classes) throws Exception {
         com.codename1.maven.annotations.JavaSourceCompiler.compile(
@@ -574,6 +587,7 @@ public class AnnotationBuildHintMergeTest {
         for (File f : elements) {
             cp.add(f.getAbsolutePath());
         }
+        cp = withAnnotations(cp);
         Method m = findMethod(mojo.getClass(), "mergeAnnotationBuildHints",
                 Properties.class, List.class);
         m.setAccessible(true);
@@ -603,7 +617,8 @@ public class AnnotationBuildHintMergeTest {
         props.setAccessible(true);
         props.set(mojo, settings);
 
-        List<String> cp = Collections.singletonList(classesDir.getAbsolutePath());
+        List<String> cp = withAnnotations(Collections.singletonList(
+                classesDir.getAbsolutePath()));
         Method m = findMethod(mojo.getClass(), "mergeAnnotationBuildHints",
                 Properties.class, List.class);
         m.setAccessible(true);

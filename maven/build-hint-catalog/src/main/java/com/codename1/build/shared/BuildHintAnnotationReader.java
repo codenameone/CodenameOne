@@ -278,11 +278,19 @@ public final class BuildHintAnnotationReader {
     }
 
     private static Scanned scan(File classFile) throws IOException {
-        final Scanned scanned = new Scanned();
-        scanned.simpleName = classFile.getName().substring(0,
-                classFile.getName().length() - ".class".length());
+        String name = classFile.getName();
         InputStream in = new FileInputStream(classFile);
         try {
+            return scan(name.substring(0, name.length() - ".class".length()), in);
+        } finally {
+            in.close();
+        }
+    }
+
+    private static Scanned scan(String simpleName, InputStream in) throws IOException {
+        final Scanned scanned = new Scanned();
+        scanned.simpleName = simpleName;
+        {
             new ClassReader(in).accept(new ClassVisitor(API) {
                 private boolean isAnnotation;
                 private boolean isEnum;
@@ -420,10 +428,155 @@ public final class BuildHintAnnotationReader {
                     };
                 }
             }, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
-        } finally {
-            in.close();
         }
         return scanned;
+    }
+
+    /// The package the annotations live in, as a JVM path.
+    private static final String PKG_PATH = "com/codename1/annotations/buildhints/";
+
+    /// Everything the annotation package declares, read off `classpath`.
+    ///
+    /// The package is ENUMERATED, never listed. A generated table naming each
+    /// annotation was a second place the set of them existed, and adding one
+    /// meant remembering to regenerate; this finds whatever is in the package,
+    /// which is the only statement of what a build hint annotation is.
+    ///
+    /// Read as bytecode rather than through reflection because `@Hint` has CLASS
+    /// retention: loading these types and asking them would return nothing.
+    public static Bindings bindingsFromClasspath(List<String> classpath) throws IOException {
+        Map<String, EnumDomain> enums = new LinkedHashMap<String, EnumDomain>();
+        List<Annotation> groups = new ArrayList<Annotation>();
+        if (classpath != null) {
+            for (String element : classpath) {
+                if (element == null || element.length() == 0) {
+                    continue;
+                }
+                scanElement(new File(element), enums, groups);
+            }
+        }
+        return new Bindings(groups, enums);
+    }
+
+    /// A binding that knows nothing, for a classpath that could not be read.
+    public static Bindings emptyBindings() {
+        return new Bindings(new ArrayList<Annotation>(), new LinkedHashMap<String, EnumDomain>());
+    }
+
+    private static void scanElement(File element, Map<String, EnumDomain> enums,
+                                    List<Annotation> groups) throws IOException {
+        if (element.isDirectory()) {
+            File dir = new File(element, PKG_PATH);
+            File[] files = dir.listFiles();
+            if (files == null) {
+                return;
+            }
+            for (File f : files) {
+                if (f.getName().endsWith(".class")) {
+                    collect(scan(f), enums, groups);
+                }
+            }
+            return;
+        }
+        if (!element.isFile() || !element.getName().endsWith(".jar")) {
+            return;
+        }
+        java.util.zip.ZipFile zip = new java.util.zip.ZipFile(element);
+        try {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!name.startsWith(PKG_PATH) || !name.endsWith(".class")
+                        || name.indexOf('/', PKG_PATH.length()) >= 0) {
+                    continue;
+                }
+                String simple = name.substring(PKG_PATH.length(),
+                        name.length() - ".class".length());
+                InputStream in = zip.getInputStream(entry);
+                try {
+                    collect(scan(simple, in), enums, groups);
+                } finally {
+                    in.close();
+                }
+            }
+        } finally {
+            zip.close();
+        }
+    }
+
+    private static void collect(Scanned scanned, Map<String, EnumDomain> enums,
+                                List<Annotation> groups) {
+        if (scanned.enumDomain != null) {
+            enums.put(scanned.simpleName, scanned.enumDomain);
+        } else if (scanned.annotation != null) {
+            groups.add(scanned.annotation);
+        }
+    }
+
+    /// What an annotation member sets and what an enum constant sends, read from
+    /// the annotation classes rather than from a table generated beside them.
+    public static final class Bindings {
+        private final Map<String, String> hints = new LinkedHashMap<String, String>();
+        private final Map<String, String> wire = new LinkedHashMap<String, String>();
+        private final java.util.Set<String> unset = new java.util.HashSet<String>();
+        private final List<String> descriptors = new ArrayList<String>();
+
+        Bindings(List<Annotation> groups, Map<String, EnumDomain> enums) {
+            for (Annotation group : groups) {
+                HintGroup g = groupNamed(group.simpleName);
+                String descriptor = "L" + PKG_PATH + group.simpleName + ";";
+                descriptors.add(descriptor);
+                for (Attribute a : group.attributes) {
+                    BuildHints.Hint h = a.toHint(group.simpleName, group.defaults, enums);
+                    hints.put(descriptor + "#" + a.name, h.name());
+                }
+                if (g == null) {
+                    continue;
+                }
+            }
+            for (Map.Entry<String, EnumDomain> e : enums.entrySet()) {
+                for (Map.Entry<String, String> v : e.getValue().wire.entrySet()) {
+                    wire.put(e.getKey() + "#" + v.getKey(), v.getValue());
+                }
+                if (e.getValue().unset != null) {
+                    unset.add(e.getKey() + "#" + e.getValue().unset);
+                }
+            }
+        }
+
+        /// Every build hint annotation descriptor, in JVM internal form.
+        public java.util.Collection<String> descriptors() {
+            return Collections.unmodifiableList(descriptors);
+        }
+
+        /// The hint an annotation member sets, or null when the pair is not one.
+        public String hintFor(String descriptor, String member) {
+            return hints.get(descriptor + "#" + member);
+        }
+
+        /// The value the build receives for an enum constant, or null.
+        public String wireValue(String enumDescriptorOrName, String constant) {
+            return wire.get(simpleNameOf(enumDescriptorOrName) + "#" + constant);
+        }
+
+        /// Whether a constant means the developer said nothing, so the hint is
+        /// not written at all and the build server applies its own default.
+        public boolean isUnset(String enumDescriptorOrName, String constant) {
+            return unset.contains(simpleNameOf(enumDescriptorOrName) + "#" + constant);
+        }
+
+        private static String simpleNameOf(String enumDescriptorOrName) {
+            String simple = enumDescriptorOrName;
+            int slash = simple.lastIndexOf('/');
+            if (slash >= 0) {
+                simple = simple.substring(slash + 1);
+            }
+            if (simple.endsWith(";")) {
+                simple = simple.substring(0, simple.length() - 1);
+            }
+            return simple;
+        }
     }
 
     /// The group `@Name` exposes, or null when the annotation is not one.
@@ -512,13 +665,6 @@ public final class BuildHintAnnotationReader {
             if (link.length() > 0) {
                 hint.link(link);
             }
-            List<String> by = arrays.get("consumedBy");
-            if (by == null || by.isEmpty()) {
-                by = groupDefaults.arrays.get("consumedBy");
-            }
-            if (by != null && !by.isEmpty()) {
-                hint.consumedBy(by.toArray(new String[by.size()]));
-            }
             return hint.doc(value("doc", ""));
         }
 
@@ -548,8 +694,22 @@ public final class BuildHintAnnotationReader {
                 hint.type(kindType(value("kind", "DEFAULT")));
                 return;
             }
-            List<String> wire = new ArrayList<String>(domain.wire.values());
-            List<String> constants = new ArrayList<String>(domain.wire.keySet());
+            // A shared enum, narrowed to what THIS hint accepts. ThemeMode is one
+            // type for every hint that picks a theme -- three near-identical
+            // enums were three things to keep in step -- and the attribute's
+            // valuePattern says which of its constants the hint really takes.
+            // Recording the whole union instead would offer `ios7` in the Android
+            // editor and document it as a legal Android value.
+            String accepted = value("valuePattern", "");
+            List<String> wire = new ArrayList<String>();
+            List<String> constants = new ArrayList<String>();
+            for (Map.Entry<String, String> e : domain.wire.entrySet()) {
+                if (accepted.length() > 0 && !e.getValue().matches(accepted)) {
+                    continue;
+                }
+                constants.add(e.getKey());
+                wire.add(e.getValue());
+            }
             hint.values(simple, wire.toArray(new String[wire.size()]));
             hint.valueConstants(constants.toArray(new String[constants.size()]));
             if (domain.unset != null) {
@@ -567,14 +727,20 @@ public final class BuildHintAnnotationReader {
             if (!domain.accepts.isEmpty()) {
                 List<String> pairs = new ArrayList<String>();
                 for (Map.Entry<String, String> e : domain.accepts.entrySet()) {
+                    String target = domain.wire.get(e.getValue());
+                    // An alias for a value this hint does not accept is not an
+                    // alias this hint has.
+                    if (target == null || !wire.contains(target)) {
+                        continue;
+                    }
                     pairs.add(e.getKey());
-                    pairs.add(domain.wire.get(e.getValue()));
+                    pairs.add(target);
                 }
                 hint.valueAliases(pairs.toArray(new String[pairs.size()]));
             }
             if (!domain.labels.isEmpty()) {
                 List<String> labels = new ArrayList<String>();
-                for (String constant : domain.wire.keySet()) {
+                for (String constant : constants) {
                     String label = domain.labels.get(constant);
                     labels.add(label == null ? "" : label);
                 }

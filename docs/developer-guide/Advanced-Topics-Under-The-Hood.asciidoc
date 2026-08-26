@@ -36,6 +36,28 @@ is accepted, never read, and has no effect. The Annotation column below
 names that form where one exists. Setting the same hint both ways fails the
 build.
 
+[IMPORTANT]
+====
+Build hints are the one part of Codename One that doesn't promise source
+compatibility, and that's deliberate.
+
+Everywhere else, code that compiles against one release keeps compiling against
+the next. Here, a hint that changes its name, its type or its accepted values is
+meant to stop compiling, so you find out at your desk. The alternative is what
+the properties file has always done: accept the line, never read it, and leave
+you with a build that succeeds and an app that doesn't do what you asked.
+
+The failure is always on the client side, never on the build service. A hint
+reaches the service as a name and a string, and the service goes on accepting
+the strings it always did -- an app already built keeps building, and an older
+Codename One keeps talking to a newer service. A changed hint breaks a compile
+in your project, with the attribute named.
+
+If a release does take an annotation away, the properties form of the same hint
+still works, so the upgrade costs a line in `codenameone_settings.properties`
+rather than being one you can't take.
+====
+
 .Build hints
 include::_generated-build-hints.adoc[]
 

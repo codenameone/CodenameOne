@@ -115,7 +115,11 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                 // back decodes the text that was actually compiled rather than
                 // one of the single-byte encodings that all decode without
                 // error and disagree about every non-ASCII character.
-                sourceEncodingOf(project, userProperties()));
+                sourceEncodingOf(project, userProperties()),
+                // Where the build hint annotations are, so the processor reads
+                // what a member sets from the annotation rather than from a
+                // generated table naming each of them.
+                compileClasspathOf(project));
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {
@@ -328,5 +332,23 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
             return main;
         }
         return pkg.trim() + "." + main;
+    }
+
+    /// The module's compile classpath, or an empty list when Maven cannot
+    /// resolve it.
+    ///
+    /// Not fatal: a processor that cannot find the annotations says so itself,
+    /// and failing the build here would break goals that do not need them.
+    private java.util.List<String> compileClasspathOf(
+            org.apache.maven.project.MavenProject module) {
+        if (module == null) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            return module.getCompileClasspathElements();
+        } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+            getLog().debug("cn1: compile classpath unresolved for " + module.getArtifactId(), ex);
+            return java.util.Collections.emptyList();
+        }
     }
 }

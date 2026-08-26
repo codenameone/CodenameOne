@@ -34,7 +34,6 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
-@Hint(consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Build {
@@ -46,8 +45,7 @@ public @interface Build {
     String facebookAppId() default "";
 
     /// The Android/chrome push identifier, see the push section for more details
-    @Hint(name = "gcm.sender_id",
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(name = "gcm.sender_id")
     String gcmSenderId() default "";
 
     /// `modern`, `legacy`, `custom` (default unset). Cross-platform override that
@@ -55,7 +53,8 @@ public @interface Build {
     /// set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat
     /// + Holo Light, `custom` disables the framework native theme entirely. The
     /// legacy alias `cn1.nativeTheme` is still accepted.
-    NativeThemeMode nativeTheme() default NativeThemeMode.DEFAULT;
+    @Hint(valuePattern = "modern|legacy|custom")
+    ThemeMode nativeTheme() default ThemeMode.DEFAULT;
 
     /// true/false (defaults to false). Blocks codename one from injecting its own
     /// resources when set to true, the only effect this has is in slightly

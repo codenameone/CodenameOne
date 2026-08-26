@@ -38,8 +38,7 @@ import java.lang.annotation.Target;
 /// The platform and the builders that read these hints are stated once on the
 /// annotation, not on every attribute. An attribute repeats one only to
 /// disagree with it.
-@Hint(platform = "android",
-        consumedBy = {"AndroidGradleBuilder"})
+@Hint(platform = "android")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Android {
@@ -85,8 +84,7 @@ public @interface Android {
 
     /// Gradle dependency statements to add to the app module, such as
     /// implementation 'com.example:lib:1.0'.
-    @Hint(appendable = true,
-            separator = ";")
+    @Hint(appendable = true, separator = ";")
     String[] gradleDep() default {};
 
     /// Hides the Android status bar.
@@ -118,8 +116,7 @@ public @interface Android {
 
     /// Arguments for the keep option in proguard allowing you to keep a pattern of
     /// files for example, `-keep class com.mypackage.ProblemClass { *; }`
-    @Hint(appendable = true,
-            separator = "\n")
+    @Hint(appendable = true, separator = "\n")
     String[] proguardKeep() default {};
 
     /// true/false defaults to true - indicates whether to include the release
@@ -127,9 +124,7 @@ public @interface Android {
     Toggle release() default Toggle.DEFAULT;
 
     /// Extra Gradle repositories to resolve dependencies from.
-    @Hint(appendable = true,
-            separator = "\n",
-            consumedBy = {"AndroidGradleBuilder", "MapsProviderInjector"})
+    @Hint(appendable = true, separator = "\n")
     String[] repositories() default {};
 
     /// The Android SDK the build compiles against. Unset, the build server uses
@@ -146,13 +141,12 @@ public @interface Android {
     /// legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true`
     /// still maps to `hololight`. The default stays on `hololight` for existing
     /// apps until you flip in a future release.
-    @Hint(name = "and.themeMode")
-    AndroidThemeMode themeMode() default AndroidThemeMode.DEFAULT;
+    @Hint(name = "and.themeMode", valuePattern = "auto|modern|hololight|legacy")
+    ThemeMode themeMode() default ThemeMode.DEFAULT;
 
     /// Statements added to the top-level Gradle build file rather than the app
     /// module.
-    @Hint(appendable = true,
-            separator = "\n")
+    @Hint(appendable = true, separator = "\n")
     String[] topDependency() default {};
 
     /// Use Android X instead of support libraries. This will also run a
@@ -163,17 +157,14 @@ public @interface Android {
     /// defaults to an empty string. Allows developers of native Android code to
     /// add text within the application block to define things such as widgets,
     /// services etc.
-    @Hint(appendable = true,
-            kind = HintKind.XML)
+    @Hint(appendable = true, kind = HintKind.XML)
     String xapplication() default "";
 
     /// Arbitrary text spliced into the generated app-module Gradle file.
-    @Hint(appendable = true,
-            separator = "\n")
+    @Hint(appendable = true, separator = "\n")
     String[] xgradle() default {};
 
     /// more permissions for the Android manifest
-    @Hint(appendable = true,
-            kind = HintKind.XML)
+    @Hint(appendable = true, kind = HintKind.XML)
     String xpermissions() default "";
 }

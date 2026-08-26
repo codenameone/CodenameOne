@@ -34,7 +34,6 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
-@Hint(consumedBy = {"CN1BuildMojo"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Hardening {
@@ -52,13 +51,11 @@ public @interface Hardening {
     /// syntax as android.proguardKeep, so existing rules port directly. Rules are
     /// separated by newlines only, because a semicolon is legal inside a rule body
     /// such as { *; }.
-    @Hint(kind = HintKind.TEXT_BLOCK,
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(kind = HintKind.TEXT_BLOCK)
     String keep() default "";
 
     /// Master switch for app hardening: off, standard, aggressive or paranoid. An
     /// unrecognized value fails the build rather than being treated as off.
-    @Hint(consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo", "Executor"})
     HardenLevel level() default HardenLevel.DEFAULT;
 
     /// Overrides symbol renaming independently of harden.level.

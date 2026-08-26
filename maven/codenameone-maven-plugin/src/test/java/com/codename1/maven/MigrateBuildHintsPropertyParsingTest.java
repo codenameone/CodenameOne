@@ -175,9 +175,9 @@ public class MigrateBuildHintsPropertyParsingTest {
         MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
         com.codename1.build.shared.BuildHints.Hint ios =
                 com.codename1.build.shared.BuildHints.byName("ios.themeMode");
-        assertEquals("IosThemeMode.IOS7", mojo.toSourceLiteral(ios, "flat", false));
-        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "liquid", false));
-        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
+        assertEquals("ThemeMode.IOS7", mojo.toSourceLiteral(ios, "flat", false));
+        assertEquals("ThemeMode.MODERN", mojo.toSourceLiteral(ios, "liquid", false));
+        assertEquals("ThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
         assertNull(mojo.toSourceLiteral(ios, "nonsense", false));
     }
 
@@ -237,7 +237,7 @@ public class MigrateBuildHintsPropertyParsingTest {
 
         com.codename1.build.shared.BuildHints.Hint ios =
                 com.codename1.build.shared.BuildHints.byName("ios.themeMode");
-        assertEquals("IosThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
+        assertEquals("ThemeMode.MODERN", mojo.toSourceLiteral(ios, "modern", false));
         assertNull(mojo.toSourceLiteral(ios, "MODERN", false));
     }
 
@@ -801,7 +801,7 @@ public class MigrateBuildHintsPropertyParsingTest {
         String migrated = migrate("package com.example;\n"
                         + "import com.example.other.Build;\n"
                         + "public class MyApp {\n}\n",
-                "@Build(nativeTheme = NativeThemeMode.MODERN)\n@Ios(teamId = \"X\")\n");
+                "@Build(nativeTheme = ThemeMode.MODERN)\n@Ios(teamId = \"X\")\n");
 
         // The taken name is qualified and not imported...
         assertTrue(migrated,
@@ -857,27 +857,27 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertTrue(free, free.contains("@Ios(teamId"));
     }
 
-    /// An enum-valued hint renders as `IosThemeMode.MODERN`, which is a second
+    /// An enum-valued hint renders as `ThemeMode.MODERN`, which is a second
     /// type to account for: without its own import the generated annotation does
     /// not compile, so every enum-valued migration was rolled back by its own
     /// verification build.
     @Test
     public void anEnumValueBringsItsOwnType() throws Exception {
         String migrated = migrate("package com.example;\npublic class MyApp {\n}\n",
-                "@Ios(themeMode = IosThemeMode.MODERN)\n");
+                "@Ios(themeMode = ThemeMode.MODERN)\n");
         assertTrue(migrated,
-                migrated.contains("import com.codename1.annotations.buildhints.IosThemeMode;"));
-        assertTrue(migrated, migrated.contains("@Ios(themeMode = IosThemeMode.MODERN)"));
+                migrated.contains("import com.codename1.annotations.buildhints.ThemeMode;"));
+        assertTrue(migrated, migrated.contains("@Ios(themeMode = ThemeMode.MODERN)"));
 
         // A file that has given that name away gets the qualified form instead.
         String taken = migrate("package com.example;\n"
-                        + "import com.example.other.IosThemeMode;\n"
+                        + "import com.example.other.ThemeMode;\n"
                         + "public class MyApp {\n}\n",
-                "@Ios(themeMode = IosThemeMode.MODERN)\n");
+                "@Ios(themeMode = ThemeMode.MODERN)\n");
         assertTrue(taken, taken.contains(
-                "themeMode = com.codename1.annotations.buildhints.IosThemeMode.MODERN"));
+                "themeMode = com.codename1.annotations.buildhints.ThemeMode.MODERN"));
         assertFalse(taken,
-                taken.contains("import com.codename1.annotations.buildhints.IosThemeMode;"));
+                taken.contains("import com.codename1.annotations.buildhints.ThemeMode;"));
     }
 
     /// A `typealias` is a declaration this file makes, so it takes the name as

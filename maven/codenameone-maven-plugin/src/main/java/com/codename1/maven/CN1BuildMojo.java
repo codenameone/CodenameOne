@@ -2831,8 +2831,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (expectedMain == null) {
             return;
         }
-        java.util.Collection<String> descriptors =
-                com.codename1.build.shared.BuildHintAnnotationBinding.descriptors();
+        java.util.Collection<String> descriptors = hintAnnotationDescriptors(classpathElements);
         for (String element : classpathElements) {
             String live = liveAnnotatedClass(new File(element), descriptors, expectedMain);
             if (live != null) {
@@ -2993,8 +2992,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     private String classCarryingBuildHintAnnotations(List<String> classpathElements,
                                                      String expectedMain) {
-        java.util.Collection<String> descriptors =
-                com.codename1.build.shared.BuildHintAnnotationBinding.descriptors();
+        java.util.Collection<String> descriptors = hintAnnotationDescriptors(classpathElements);
         if (expectedMain != null) {
             for (String element : classpathElements) {
                 try {
@@ -3270,6 +3268,22 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      *
      * @return the properties, or null when this element carries none
      */
+    /// The build hint annotation types, read off the classpath they live on.
+    ///
+    /// The package is enumerated rather than listed: a generated table naming
+    /// each annotation was a second statement of which ones exist, and it went
+    /// stale the moment one was added without regenerating it.
+    private java.util.Collection<String> hintAnnotationDescriptors(
+            List<String> classpathElements) {
+        try {
+            return com.codename1.build.shared.BuildHintAnnotationReader
+                    .bindingsFromClasspath(classpathElements).descriptors();
+        } catch (IOException ex) {
+            getLog().debug("cn1: could not read the build hint annotations", ex);
+            return java.util.Collections.emptyList();
+        }
+    }
+
     private Properties readAnnotationHints(File element) {
         if (element == null || !element.exists()) {
             return null;

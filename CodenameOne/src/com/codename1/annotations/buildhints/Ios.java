@@ -38,17 +38,14 @@ import java.lang.annotation.Target;
 /// The platform and the builders that read these hints are stated once on the
 /// annotation, not on every attribute. An attribute repeats one only to
 /// disagree with it.
-@Hint(platform = "ios",
-        consumedBy = {"IPhoneBuilder"})
+@Hint(platform = "ios")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Ios {
 
     /// A semicolon separated list of libraries that should be linked to the app to
     /// build it
-    @Hint(appendable = true,
-            name = "ios.add_libs",
-            separator = ";")
+    @Hint(appendable = true, name = "ios.add_libs", separator = ";")
     String[] addLibs() default {};
 
     /// Comma separated list of url schemes that `canExecute` will respect on iOS.
@@ -57,8 +54,7 @@ public @interface Ios {
     /// used with the `<key>LSApplicationQueriesSchemes</key>...` value so you
     /// should use one or the other. For example, to enable `canExecute` for a url
     /// like `myurl://xys` you can use: `myurl,myotherurl`
-    @Hint(appendable = true,
-            separator = ",")
+    @Hint(appendable = true, separator = ",")
     String[] applicationQueriesSchemes() default {};
 
     /// Objective-C code that can be injected into the iOS app delegate at the top
@@ -68,21 +64,18 @@ public @interface Ios {
 
     /// Indicates the version number of the bundle, this is useful if you want to
     /// create a minor version number change for the beta testing support
-    @Hint(kind = HintKind.VERSION,
-            consumedBy = {"IPhoneBuilder", "WatchNativeBuilder"})
+    @Hint(kind = HintKind.VERSION)
     String bundleVersion() default "";
 
     /// Which native dependency manager to use: auto picks one from whichever of
     /// ios.pods and ios.spm.packages is set, and cocoapods, spm or both require
     /// the matching hint to be set. An unrecognized value fails the build.
-    @Hint(consumedBy = {"IOSDependencyManager"})
     IosDependencyManager dependencyManager() default IosDependencyManager.DEFAULT;
 
     /// Minimum iOS version the build targets. Set it to the lowest iOS you
     /// actually support; a higher value excludes older devices from the App Store
     /// listing.
-    @Hint(name = "ios.deployment_target",
-            kind = HintKind.VERSION)
+    @Hint(name = "ios.deployment_target", kind = HintKind.VERSION)
     String deploymentTarget() default "";
 
     /// Objective-C code that can be injected into the iOS app delegate at the top
@@ -129,29 +122,23 @@ public @interface Ios {
     Toggle objC() default Toggle.DEFAULT;
 
     /// entries to inject into the iOS plist file during build.
-    @Hint(appendable = true,
-            kind = HintKind.XML,
-            consumedBy = {"IPhoneBuilder", "WatchNativeBuilder"})
+    @Hint(appendable = true, kind = HintKind.XML)
     String plistInject() default "";
 
     /// A comma separated list of https://cocoapods.org/[Cocoa Pods] that should be
     /// linked to the app to build it. For example, `AFNetworking ~> 2.6,
     /// ORStackView ~> 3.0, SwiftyJSON ~> 2.3`
-    @Hint(appendable = true,
-            separator = ",")
+    @Hint(appendable = true, separator = ",")
     String[] pods() default {};
 
     /// Sets the Cocoapods 'platform' for the Cocoapods. Some Cocoapods require a
     /// minimum platform level. For example, `ios.pods.platform=7.0`.
-    @Hint(name = "ios.pods.platform",
-            kind = HintKind.VERSION)
+    @Hint(name = "ios.pods.platform", kind = HintKind.VERSION)
     String podsPlatform() default "";
 
     /// Extra CocoaPods spec repositories to search, in addition to the default
     /// trunk.
-    @Hint(appendable = true,
-            name = "ios.pods.sources",
-            separator = ",")
+    @Hint(appendable = true, name = "ios.pods.sources", separator = ",")
     String[] podsSources() default {};
 
     /// true/false defaults to false. The iOS build process adapts the submitted
@@ -165,22 +152,17 @@ public @interface Ios {
     /// binary is targeted to the iphone only or ipad only. Notice that the IDE
     /// plugin has a "Project Type" combo box you *should* use under the iOS
     /// section.
-    @Hint(name = "ios.project_type",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.project_type")
     IosProjectType projectType() default IosProjectType.DEFAULT;
 
     /// Swift Package Manager packages to link, one per entry, each written as
     /// identity|url|requirement.
-    @Hint(appendable = true,
-            name = "ios.spm.packages",
-            separator = ";",
-            consumedBy = {"IOSDependencyManager", "IPhoneBuilder"})
+    @Hint(appendable = true, name = "ios.spm.packages", separator = ";")
     String[] spmPackages() default {};
 
     /// Specifies the team ID associated with the iOS provisioning profile and
     /// certificate. Use `ios.debug.teamId` and `ios.release.teamId` to specify
     /// different team IDs for debug and release builds respectively.
-    @Hint(consumedBy = {"IPhoneBuilder", "MacNativeBuilder", "TvNativeBuilder", "WatchNativeBuilder"})
     String teamId() default "";
 
     /// `auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the
@@ -190,7 +172,8 @@ public @interface Ios {
     /// `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto`
     /// - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7
     /// iPhone theme. The `auto` -> modern flip is planned for a future release.
-    IosThemeMode themeMode() default IosThemeMode.DEFAULT;
+    @Hint(valuePattern = "auto|modern|ios7|legacy")
+    ThemeMode themeMode() default ThemeMode.DEFAULT;
 
     /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
     /// UIScene lets iOS manage one or more app UI sessions independently,

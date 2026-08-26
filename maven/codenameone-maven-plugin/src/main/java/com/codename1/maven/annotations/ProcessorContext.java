@@ -64,6 +64,7 @@ public final class ProcessorContext {
     private final String mainClassBinaryName;
     private final List<String> compileSourceRoots;
     private final String sourceEncoding;
+    private final List<String> compileClasspath;
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
@@ -111,6 +112,25 @@ public final class ProcessorContext {
                              File projectDir, Properties projectSettings,
                              String mainClassBinaryName, List<String> compileSourceRoots,
                              String sourceEncoding) {
+        this(outputClassDir, stubSourceDir, classIndex, log, projectDir, projectSettings,
+                mainClassBinaryName, compileSourceRoots, sourceEncoding, null);
+    }
+
+    /// Adds the compile classpath, which is where the build hint ANNOTATIONS
+    /// live.
+    ///
+    /// A processor that must know what an annotation member sets reads the
+    /// annotation itself, off this classpath. The alternative was a generated
+    /// table listing every annotation by name -- a second statement of which
+    /// types exist, which had to be regenerated whenever one was added.
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log,
+                             File projectDir, Properties projectSettings,
+                             String mainClassBinaryName, List<String> compileSourceRoots,
+                             String sourceEncoding, List<String> compileClasspath) {
+        this.compileClasspath = compileClasspath == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileClasspath));
         this.sourceEncoding = sourceEncoding == null || sourceEncoding.trim().length() == 0
                 ? null : sourceEncoding.trim();
         this.outputClassDir = outputClassDir;
@@ -126,6 +146,9 @@ public final class ProcessorContext {
                 ? Collections.<String>emptyList()
                 : Collections.unmodifiableList(new ArrayList<String>(compileSourceRoots));
     }
+
+    /// The compile classpath, where the build hint annotations are found.
+    public List<String> getCompileClasspath() { return compileClasspath; }
 
     /// The encoding the module's sources are compiled with, null when unknown.
     public String getSourceEncoding() { return sourceEncoding; }

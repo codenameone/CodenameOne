@@ -22,7 +22,7 @@
  */
 package com.codename1.maven.processors;
 
-import com.codename1.build.shared.BuildHintAnnotationBinding;
+import com.codename1.build.shared.BuildHintAnnotationReader;
 import com.codename1.build.shared.BuildHints;
 import com.codename1.maven.annotations.AbstractAnnotationProcessor;
 import com.codename1.maven.annotations.AnnotatedClass;
@@ -114,7 +114,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public Set<String> getAnnotationDescriptors() {
-        return new LinkedHashSet<String>(BuildHintAnnotationBinding.descriptors());
+        return new LinkedHashSet<String>(bindings(context).descriptors());
     }
 
     @Override
@@ -122,7 +122,14 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         hints.clear();
         origins.clear();
         annotated.clear();
+        // getAnnotationDescriptors() has no context of its own and the mojo asks
+        // it after start(), so this is where the classpath the annotations live
+        // on becomes available.
+        context = ctx;
+        bindings = null;
     }
+
+    private ProcessorContext context;
 
     @Override
     public void processClass(AnnotatedClass cls, ProcessorContext ctx) throws ProcessingException {
@@ -177,7 +184,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             // value. Reading through a getXxxOrDefault here would write a hint
             // for every attribute of every annotation used.
             for (Map.Entry<String, Object> member : values.all().entrySet()) {
-                String hint = BuildHintAnnotationBinding.hintFor(descriptor, member.getKey());
+                String hint = bindings(ctx).hintFor(descriptor, member.getKey());
                 if (hint == null) {
                     ctx.error(cls, "@" + simpleName(descriptor) + "(" + member.getKey()
                             + ") is not a known build hint. The catalog and the annotation "
@@ -1693,6 +1700,31 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return "not a valid " + hint + ": \"" + value + "\" does not match " + pattern;
     }
 
+    /// The annotations as they are declared, read off this project's classpath.
+    ///
+    /// Cached per run, because it reads class files. Empty when the annotations
+    /// are not on the classpath at all, which is a project that cannot be using
+    /// them.
+    private BuildHintAnnotationReader.Bindings bindings(ProcessorContext ctx) {
+        if (bindings == null) {
+            try {
+                bindings = BuildHintAnnotationReader.bindingsFromClasspath(
+                        ctx == null ? null : ctx.getCompileClasspath());
+            } catch (IOException ex) {
+                // Unreadable is not a reason to fail every goal that touches
+                // this processor; a project whose annotations cannot be found
+                // has no annotated hints, which is what an empty binding says.
+                if (ctx != null) {
+                    ctx.getLog().debug("cn1: could not read the build hint annotations", ex);
+                }
+                bindings = BuildHintAnnotationReader.emptyBindings();
+            }
+        }
+        return bindings;
+    }
+
+    private BuildHintAnnotationReader.Bindings bindings;
+
     private String wireValue(AnnotatedClass cls, String descriptor, String member, Object raw,
                              String hint, ProcessorContext ctx) {
         if (raw instanceof Boolean || raw instanceof Number || raw instanceof Character) {
@@ -1708,7 +1740,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (raw instanceof String[]) {
             String[] pair = (String[]) raw;
             if (pair.length == 2) {
-                if (BuildHintAnnotationBinding.isUnset(pair[0], pair[1])) {
+                if (bindings.isUnset(pair[0], pair[1])) {
                     // The developer named the constant that says nothing --
                     // Toggle.DEFAULT and its per-enum siblings. Writing it is the
                     // same statement as leaving the attribute out, so the hint is
@@ -1718,7 +1750,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                     // silently ignores.
                     return null;
                 }
-                String wire = BuildHintAnnotationBinding.wireValue(pair[0], pair[1]);
+                String wire = bindings.wireValue(pair[0], pair[1]);
                 if (wire == null) {
                     ctx.error(cls, "@" + simpleName(descriptor) + "(" + member + ") uses the "
                             + "constant " + pair[1] + ", which the build hint catalog does not "
@@ -1789,14 +1821,25 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// different value, an added or removed attribute, a whole annotation
     /// gained or lost. Two builds of the same source produce the same string;
     /// there is no timestamp or path in it.
+    /// Whether `descriptor` names a type in the build hint annotation package.
+    static boolean isBuildHintAnnotation(String descriptor) {
+        return descriptor != null
+                && descriptor.startsWith("Lcom/codename1/annotations/buildhints/")
+                && descriptor.indexOf('/', "Lcom/codename1/annotations/buildhints/".length()) < 0;
+    }
+
     public static String sourceDigest(AnnotatedClass cls) throws ProcessingException {
         StringBuilder sb = new StringBuilder();
-        Set<String> known = new HashSet<String>(BuildHintAnnotationBinding.descriptors());
+        // By PACKAGE, not by a list of types. This is static -- callers have no
+        // processor and no classpath -- and the package is what a build hint
+        // annotation is: anything in it counts, and nothing has to be told about
+        // a new one.
+        //
         // Sorted, because the class file's annotation order is the source's and a
         // reordering is not a change.
         for (String descriptor : new TreeMap<String, AnnotationValues>(
                 cls.getClassAnnotations()).keySet()) {
-            if (!known.contains(descriptor)) {
+            if (!isBuildHintAnnotation(descriptor)) {
                 continue;
             }
             emit(sb, descriptor);

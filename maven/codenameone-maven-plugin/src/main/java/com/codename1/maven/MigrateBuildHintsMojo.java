@@ -704,7 +704,11 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         // reacts to that by rolling the WHOLE migration back -- so one misspelled
         // ios.interface_orientation would cost a project every other hint's
         // migration, instead of being left in the properties file where it is.
-        if (violatesPattern(hint, v)) {
+        // Against the CANONICAL value. `flat` is a documented spelling of
+        // `ios7` and migrates to the constant it means, so testing the raw text
+        // refused a value the goal is specifically there to translate.
+        String canonicalForPattern = hint.canonicalValue(v);
+        if (violatesPattern(hint, canonicalForPattern == null ? v : canonicalForPattern)) {
             return null;
         }
         switch (hint.type()) {

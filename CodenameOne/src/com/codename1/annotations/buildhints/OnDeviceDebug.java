@@ -34,7 +34,6 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
-@Hint(consumedBy = {"IPhoneBuilder"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface OnDeviceDebug {
@@ -49,9 +48,7 @@ public @interface OnDeviceDebug {
     /// Has no effect on builds that don't carry it -- release builds are
     /// unaffected. See the On-Device Debugging (Android) chapter for the full
     /// flow.
-    @Hint(name = "android.onDeviceDebug",
-            platform = "android",
-            consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo"})
+    @Hint(name = "android.onDeviceDebug", platform = "android")
     Toggle android() default Toggle.DEFAULT;
 
     /// Boolean true/false defaults to false. When `true`, the iOS build links a
@@ -60,29 +57,25 @@ public @interface OnDeviceDebug {
     /// proxy can serve the running app to any JDWP-speaking debugger. Has no
     /// effect on release builds. See the On-Device Debugging (iOS) chapter for the
     /// full flow.
-    @Hint(name = "ios.onDeviceDebug",
-            platform = "ios")
+    @Hint(name = "ios.onDeviceDebug", platform = "ios")
     Toggle ios() default Toggle.DEFAULT;
 
     /// Hostname or IP address the device-side listener dials to reach the desktop
     /// proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a
     /// physical device, set this to the developer laptop's LAN IP. Has no effect
     /// unless `ios.onDeviceDebug=true`.
-    @Hint(name = "ios.onDeviceDebug.proxyHost",
-            platform = "ios")
+    @Hint(name = "ios.onDeviceDebug.proxyHost", platform = "ios")
     String iosProxyHost() default "";
 
     /// TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for
     /// the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.
-    @Hint(name = "ios.onDeviceDebug.proxyPort",
-            platform = "ios")
+    @Hint(name = "ios.onDeviceDebug.proxyPort", platform = "ios")
     int iosProxyPort() default 0;
 
     /// Boolean true/false defaults to false. When `true`, the app blocks at
     /// startup until the proxy connects and the IDE tells the VM to continue.
     /// Useful when the breakpoint to investigate fires during app boot. Has no
     /// effect unless `ios.onDeviceDebug=true`.
-    @Hint(name = "ios.onDeviceDebug.waitForAttach",
-            platform = "ios")
+    @Hint(name = "ios.onDeviceDebug.waitForAttach", platform = "ios")
     Toggle iosWaitForAttach() default Toggle.DEFAULT;
 }

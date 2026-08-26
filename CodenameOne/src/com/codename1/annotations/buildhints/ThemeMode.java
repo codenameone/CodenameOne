@@ -22,24 +22,44 @@
  */
 package com.codename1.annotations.buildhints;
 
-/// Accepted values of the `ios.themeMode` build hint.
+/// The look a build asks the platform for.
 ///
-/// Each constant's `@HintValue` carries the string the build actually receives,
-/// which is not always the constant's own name.
-public enum IosThemeMode {
+/// ONE enum for every hint that selects a theme, not one per platform. The
+/// domains overlap almost entirely and differ in a constant or two, which is not
+/// a reason to make a developer learn three names for `modern` -- and three
+/// enums drift, which is worse than the thing they were separated to prevent.
+///
+/// Where a hint really does accept less than all of this, its attribute says so
+/// with `@Hint(valuePattern = ...)` and the annotation processor refuses the
+/// rest. That is a build error naming the constant and the hint, which is what
+/// the old arrangement could not give: passing a constant the builder does not
+/// recognise is not an error there, it is a silent fallback to the default.
+public enum ThemeMode {
     /// Say nothing, and let the build server apply its own default.
     @HintUnset
     DEFAULT,
 
+    /// Follow the device's own light/dark setting.
     @HintValue("auto")
     AUTO,
 
-    @HintValue(value = "modern", accepts = {"liquid"})
+    /// The current platform look.
+    @HintValue(value = "modern", accepts = {"liquid", "material"})
     MODERN,
 
+    /// The flat iOS 7 look.
     @HintValue(value = "ios7", accepts = {"flat"})
     IOS7,
 
+    /// The Android Holo light look.
+    @HintValue(value = "hololight", accepts = {"holo"})
+    HOLOLIGHT,
+
+    /// The pre-modern look for the platform.
     @HintValue(value = "legacy", accepts = {"iphone"})
-    LEGACY;
+    LEGACY,
+
+    /// The theme the application ships, rather than a platform one.
+    @HintValue("custom")
+    CUSTOM;
 }

@@ -40,8 +40,7 @@ import java.lang.annotation.Target;
 /// The platform and the builders that read these hints are stated once on the
 /// annotation, not on every attribute. An attribute repeats one only to
 /// disagree with it.
-@Hint(platform = "ios",
-        consumedBy = {"IPhoneBuilder"})
+@Hint(platform = "ios")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface IosPrivacy {
@@ -60,30 +59,26 @@ public @interface IosPrivacy {
     /// The text iOS shows when the app first asks for the calendars full access.
     /// It becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`.
     /// The App Store rejects an app that touches this resource without one.
-    @Hint(name = "ios.NSCalendarsFullAccessUsageDescription",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.NSCalendarsFullAccessUsageDescription")
     String calendarsFullAccessUsageDescription() default "";
 
     /// The text iOS shows when the app first asks for the calendars. It becomes
     /// the `NSCalendarsUsageDescription` key in `Info.plist`. The App Store
     /// rejects an app that touches this resource without one.
-    @Hint(name = "ios.NSCalendarsUsageDescription",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.NSCalendarsUsageDescription")
     String calendarsUsageDescription() default "";
 
     /// The text iOS shows when the app first asks for the calendars write only
     /// access. It becomes the `NSCalendarsWriteOnlyAccessUsageDescription` key in
     /// `Info.plist`. The App Store rejects an app that touches this resource
     /// without one.
-    @Hint(name = "ios.NSCalendarsWriteOnlyAccessUsageDescription",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.NSCalendarsWriteOnlyAccessUsageDescription")
     String calendarsWriteOnlyAccessUsageDescription() default "";
 
     /// The text iOS shows when the app first asks for the camera. It becomes the
     /// `NSCameraUsageDescription` key in `Info.plist`. The App Store rejects an
     /// app that touches this resource without one.
-    @Hint(name = "ios.NSCameraUsageDescription",
-            consumedBy = {"MacNativeBuilder"})
+    @Hint(name = "ios.NSCameraUsageDescription")
     String cameraUsageDescription() default "";
 
     /// The text iOS shows when the app first asks for the health share. It becomes
@@ -126,8 +121,7 @@ public @interface IosPrivacy {
     /// The text iOS shows when the app first asks for the microphone. It becomes
     /// the `NSMicrophoneUsageDescription` key in `Info.plist`. The App Store
     /// rejects an app that touches this resource without one.
-    @Hint(name = "ios.NSMicrophoneUsageDescription",
-            consumedBy = {"MacNativeBuilder"})
+    @Hint(name = "ios.NSMicrophoneUsageDescription")
     String microphoneUsageDescription() default "";
 
     /// The pre-iOS 16 spelling of the nearby-interaction usage description,
@@ -144,15 +138,13 @@ public @interface IosPrivacy {
     /// The text iOS shows when the app first asks for the reminders full access.
     /// It becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`.
     /// The App Store rejects an app that touches this resource without one.
-    @Hint(name = "ios.NSRemindersFullAccessUsageDescription",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.NSRemindersFullAccessUsageDescription")
     String remindersFullAccessUsageDescription() default "";
 
     /// The text iOS shows when the app first asks for the reminders. It becomes
     /// the `NSRemindersUsageDescription` key in `Info.plist`. The App Store
     /// rejects an app that touches this resource without one.
-    @Hint(name = "ios.NSRemindersUsageDescription",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
+    @Hint(name = "ios.NSRemindersUsageDescription")
     String remindersUsageDescription() default "";
 
     /// Why the app sends speech for recognition. Supplied automatically when the

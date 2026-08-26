@@ -62,8 +62,9 @@ if [ "$check" -eq 1 ]; then
   # truth for the hints they expose, and BuildHintAnnotationReader reads them
   # back rather than any file restating them. Policing them here would report a
   # deliberate edit as drift.
-  targets=("maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
-           "maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintsFromAnnotations.java"
+  # BuildHintAnnotationBinding is gone: the processor reads the annotation
+  # package off the classpath instead of consulting a generated mirror of it.
+  targets=("maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintsFromAnnotations.java"
            "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then

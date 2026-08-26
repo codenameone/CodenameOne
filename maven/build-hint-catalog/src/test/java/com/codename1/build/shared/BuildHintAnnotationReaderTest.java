@@ -194,10 +194,10 @@ public class BuildHintAnnotationReaderTest {
     @Test
     public void everyHintEnumDeclaresOneUnsetConstant() throws Exception {
         File dir = new File("../../CodenameOne/src/com/codename1/annotations/buildhints");
-        for (String e : new String[]{"Toggle", "AndroidThemeMode", "IosThemeMode",
+        for (String e : new String[]{"Toggle", "ThemeMode", "ThemeMode",
                                      "IosProjectType", "IosDependencyManager", "InstallLocation",
                                      "HardenStrings", "HardenLevel", "HardenControlFlow",
-                                     "DesktopTitleBar", "NativeThemeMode"}) {
+                                     "DesktopTitleBar", "ThemeMode"}) {
             File f = new File(dir, e + ".java");
             assertTrue(f.isFile(), f.getAbsolutePath());
             String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8");
