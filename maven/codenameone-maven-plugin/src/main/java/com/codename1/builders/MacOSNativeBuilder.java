@@ -1023,6 +1023,7 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/bluetooth/")) {
                 usesBluetooth[0] = true;
             }
+
             if (cls.startsWith("com/codename1/calendar/LocalCalendarSource")) {
                 usesCalendar[0] = true;
             }
@@ -1051,6 +1052,13 @@ public class MacOSNativeBuilder extends Executor {
             }
             if (usesLocalCalendar(cls, method)) {
                 usesCalendar[0] = true;
+            }
+            if (isDisplay(cls) && method.indexOf("getBluetooth") > -1) {
+                // Display.getBluetooth() names com.codename1.bluetooth only in
+                // its return type, which this scan does not read. An application
+                // that goes on to call something on the result is caught by the
+                // owner of THAT call; one that only obtains it is not.
+                usesBluetooth[0] = true;
             }
         }
     }
@@ -1116,7 +1124,30 @@ public class MacOSNativeBuilder extends Executor {
         if (cls.startsWith("com/codename1/capture/")) {
             return method.indexOf("captureAudio") > -1 || method.indexOf("captureVideo") > -1;
         }
-        return false;
+        // Display carries its own overloads of all three, and an application
+        // that calls those names them on Display rather than on the feature
+        // class -- the invocation's owner is what the scan sees. Missing them
+        // left a recording application with no define, no entitlement and no
+        // usage description, and an implementation that then refused to record.
+        return isDisplay(cls)
+                && (method.indexOf("createMediaRecorder") > -1
+                    || method.indexOf("captureAudio") > -1
+                    || method.indexOf("captureVideo") > -1);
+    }
+
+    /** Whether an invoked method opens the camera. */
+    static boolean opensCamera(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        // Video records a picture as well as sound, so it counts for both.
+        boolean captures = method.indexOf("capturePhoto") > -1
+                || method.indexOf("captureVideo") > -1;
+        return captures && (cls.startsWith("com/codename1/capture/") || isDisplay(cls));
+    }
+
+    private static boolean isDisplay(String cls) {
+        return "com/codename1/ui/Display".equals(cls) || "com/codename1/ui/CN".equals(cls);
     }
 
     /** Maps class references onto the entitlements they require. */
@@ -1164,15 +1195,13 @@ public class MacOSNativeBuilder extends Executor {
             if (opensMicrophone(cls, method)) {
                 caps.usesMicrophone = true;
             }
-            // Capture is matched by method one step finer than by package: the
+            // Matched by method one step finer than by package: the capture
             // package is entirely capture, but each entry point opens a
             // different device. Granting both for any reference to it declared
             // the camera for an audio-only recorder and the microphone for a
             // photo app -- and merely naming VideoCaptureConstraints, or asking
             // hasCamera(), declared both while opening nothing.
-            if (cls.startsWith("com/codename1/capture/")
-                    && (method.indexOf("capturePhoto") > -1
-                        || method.indexOf("captureVideo") > -1)) {
+            if (opensCamera(cls, method)) {
                 caps.usesCamera = true;
             }
         }

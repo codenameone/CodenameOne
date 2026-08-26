@@ -67,6 +67,36 @@ public class MacOSNativeBuilderScanTest {
     }
 
     /**
+     * Display carries its own overloads of the capture and recorder entry
+     * points, and the scan sees the OWNER of the invocation -- so an application
+     * that calls Display.createMediaRecorder names Display, not the media
+     * package. Missing that left a recording application with no define, no
+     * entitlement and no usage description.
+     */
+    @Test
+    public void theDisplayOverloadsCountAsTheirFeature() {
+        assertTrue(MacOSNativeBuilder.opensMicrophone(
+                "com/codename1/ui/Display", "createMediaRecorder"));
+        assertTrue(MacOSNativeBuilder.opensMicrophone(
+                "com/codename1/ui/Display", "captureAudio"));
+        assertTrue(MacOSNativeBuilder.opensMicrophone(
+                "com/codename1/ui/Display", "captureVideo"));
+        assertTrue(MacOSNativeBuilder.opensCamera("com/codename1/ui/Display", "capturePhoto"));
+        assertTrue(MacOSNativeBuilder.opensCamera("com/codename1/ui/Display", "captureVideo"));
+        assertTrue(MacOSNativeBuilder.opensCamera("com/codename1/capture/Capture", "capturePhoto"));
+
+        assertFalse("a photo opens no microphone, whoever it was asked of",
+                MacOSNativeBuilder.opensMicrophone("com/codename1/ui/Display", "capturePhoto"));
+        assertFalse("audio opens no camera",
+                MacOSNativeBuilder.opensCamera("com/codename1/ui/Display", "captureAudio"));
+        // Display is called by every application in existence, so the method has
+        // to carry the meaning -- matching on the class alone would declare the
+        // camera and the microphone for every build ever made.
+        assertFalse(MacOSNativeBuilder.opensMicrophone("com/codename1/ui/Display", "getWidth"));
+        assertFalse(MacOSNativeBuilder.opensCamera("com/codename1/ui/Display", "getWidth"));
+    }
+
+    /**
      * The package test in usesClass covers an application that names a
      * notification type. This covers the one that does not: a lambda passed to
      * requestNotificationPermission compiles to an invokedynamic whose reported
