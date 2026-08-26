@@ -233,9 +233,30 @@ public class TextComponent extends InputComponent {
         }
     }
 
+    /// Puts the hint where the current focus says it belongs, with no animation.
+    ///
+    /// Committing an abandoned transition's end state is not enough on its own, because focus may
+    /// have moved on while that transition was still queued: focus a field, select the next one
+    /// before typing, then leave the form, and the first field would come to rest showing the
+    /// floating label over an empty, unfocused field with no hint. Returning to the form fires no
+    /// focus event for it, so nothing would correct that until the next focus cycle.
+    private void snapHintToFocus() {
+        if (animationLayer == null || !isFocusAnimation()) {
+            return;
+        }
+        if (field.hasFocus()) {
+            field.setHint("");
+            getLabel().setVisible(true);
+        } else if (getText().length() == 0 && isOnTopMode()) {
+            field.setHint(getLabel().getText());
+            getLabel().setVisible(false);
+        }
+    }
+
     @Override
     protected void deinitialize() {
         finishHintAnimation();
+        snapHintToFocus();
         super.deinitialize();
     }
 

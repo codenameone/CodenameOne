@@ -161,4 +161,23 @@ class TextComponentFocusHintTest extends UITestBase {
         pump(form);
         assertFocused(first, "Firstname");
     }
+
+    @FormTest
+    void abandoningATransitionAfterFocusMovedOnRestsInTheBlurredState() {
+        Form form = new Form("TextComponent Test", BoxLayout.y());
+        TextComponent first = floatingHintComponent("Firstname");
+        TextComponent last = floatingHintComponent("Lastname");
+        form.addAll(first, last);
+        form.show();
+        form.revalidate();
+
+        // the first field's hint-to-label transition is still queued when focus moves on, so the
+        // reverse transition is never started; leaving the form must not commit the stale end state
+        first.getField().requestFocus();
+        last.getField().requestFocus();
+        Form other = new Form("Elsewhere", BoxLayout.y());
+        other.show();
+
+        assertBlurred(first, "Firstname");
+    }
 }
