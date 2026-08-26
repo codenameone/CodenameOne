@@ -635,11 +635,19 @@
         },
         {
           "ports": [
-            "macos", "mac-catalyst"
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "Calendar only",
+          "detail": "EventKit calendar access is available once the application references it, which is what links the framework and requests the entitlement. Contacts are not: the legacy AddressBook C API the shared implementation uses does not exist on macOS and no Contacts.framework backend has been written, so isContactsPermissionGranted() reports false."
+        },
+        {
+          "ports": [
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "Apple services",
-          "detail": "Availability depends on the macOS target, entitlement, and user account."
+          "detail": "Availability depends on the Catalyst target, entitlement, and user account."
         },
         {
           "ports": [

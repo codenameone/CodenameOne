@@ -1214,6 +1214,35 @@ public abstract class Executor {
      * bytecode with ASM 5 and drops to a constant-pool scan for anything newer,
      * and duplicating that decision here is how the two would drift.</p>
      */
+    /**
+     * Extracts the {@code .class} entries of a nested archive, continuing the
+     * caller's flat numbering.
+     *
+     * @return the next free number
+     */
+    private int extractNestedClassesForPermissions(InputStream nested, File tmp, int extracted)
+            throws IOException {
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
+        java.util.zip.ZipEntry inner;
+        while ((inner = zis.getNextEntry()) != null) {
+            if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
+                continue;
+            }
+            File out = new File(tmp, (extracted++) + ".class");
+            FileOutputStream fos = new FileOutputStream(out);
+            try {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = zis.read(buf)) != -1) {
+                    fos.write(buf, 0, n);
+                }
+            } finally {
+                fos.close();
+            }
+        }
+        return extracted;
+    }
+
     private void scanArchiveForPermissions(File archive, ClassScanner scanner) throws IOException {
         File tmp = File.createTempFile("cn1-perm-scan", ".d");
         if (!tmp.delete() || !tmp.mkdirs()) {
@@ -1226,7 +1255,39 @@ public abstract class Executor {
                 int extracted = 0;
                 while (entries.hasMoreElements()) {
                     java.util.zip.ZipEntry entry = entries.nextElement();
-                    if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+                    if (entry.getName().endsWith(".jar")) {
+                        // An Android archive keeps its bytecode in a nested
+                        // classes.jar, so an .aar scanned for .class entries
+                        // alone yields nothing at all -- and the permissions it
+                        // would have justified are simply absent from the
+                        // signature, which shows up as a denial on the device
+                        // rather than as a build failure. The database scan
+                        // beside this one already descends for the same reason.
+                        //
+                        // Caught per entry: a name ending in .jar need not be an
+                        // archive, and one unreadable entry says nothing about
+                        // the rest of the library.
+                        try {
+                            InputStream nested = zip.getInputStream(entry);
+                            try {
+                                extracted = extractNestedClassesForPermissions(
+                                        nested, tmp, extracted);
+                            } finally {
+                                nested.close();
+                            }
+                        } catch (IOException cannotReadEntry) {
+                            message.append("WARNING: could not read ")
+                                    .append(entry.getName()).append(" inside ")
+                                    .append(archive.getName())
+                                    .append(" while looking for protected API usage; the rest of "
+                                            + "the archive was still read\n");
+                        }
+                        continue;
+                    }
+                    if (!entry.getName().endsWith(".class")) {
                         continue;
                     }
                     // Flattened onto a counter rather than the entry's own path:

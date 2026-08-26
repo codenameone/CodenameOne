@@ -156,9 +156,12 @@ static id<NSObject> cn1MacIdleActivity = nil;
 #endif
 #endif
 
-#if TARGET_OS_MACCATALYST
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
 // AddressBook.framework (the C ABAddressBookRef API) is unavailable on Mac
-// Catalyst. Suppress the legacy contacts code path on Mac so the build links.
+// Catalyst AND on native macOS. Suppress the legacy contacts code path on both
+// so the build links -- the native macOS port never sets this define either,
+// and this is what keeps a project that supplies the iOS usage-description hint
+// from turning on code that cannot compile here.
 #ifdef INCLUDE_CONTACTS_USAGE
 #undef INCLUDE_CONTACTS_USAGE
 #endif

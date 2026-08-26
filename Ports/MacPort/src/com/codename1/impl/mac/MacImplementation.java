@@ -187,6 +187,21 @@ public class MacImplementation extends IOSImplementation {
         return false;
     }
 
+    /// @inheritDoc
+    ///
+    /// False: there is no contacts backend on this port. The shared
+    /// implementation is the legacy AddressBook C API, which does not exist on
+    /// macOS -- the Catalyst slice already undefines the gate for the same
+    /// reason -- and no Contacts.framework backend has been written.
+    ///
+    /// Reported rather than left at the inherited true so an application that
+    /// checks before reading contacts takes its unsupported path, instead of
+    /// calling in and receiving an iOS build-hint exception.
+    @Override
+    public boolean isContactsPermissionGranted() {
+        return false;
+    }
+
     private AppKitWindowManager windowManager;
 
     /// @inheritDoc
