@@ -2699,6 +2699,71 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.configuredOutputDirectory(pluginOnly));
     }
 
+    /// A child disables an inherited ACTIVE execution, not only a managed one.
+    ///
+    /// Maven merges the active `<plugins>` of a parent and a child by plugin and
+    /// then by execution id; this reader parses each POM independently, so the
+    /// parent's enabled copy survived the child's `<phase>none</phase>` and a
+    /// root the build does not compile went into the scan.
+    @Test
+    public void aChildDisablesAnInheritedActiveExecution() {
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>parent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, child)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(parent, child)).toString());
+
+        // A different id, and a different PLUGIN, are both untouched.
+        String otherId = child.replace("<id>add</id>", "<id>other</id>");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, otherId))
+                .contains("parent/gen"));
+        String otherPlugin = child.replace("build-helper-maven-plugin", "some-other-plugin");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, otherPlugin))
+                .contains("parent/gen"));
+    }
+
+    /// An explicitly written unset constant does not claim ownership.
+    ///
+    /// `@Android(appBundle = Toggle.DEFAULT)` emits no hint -- the processor
+    /// treats it exactly as an omitted attribute -- so a properties line for it
+    /// is legal. Marking it owned on the attribute NAME alone hid the editor,
+    /// refused Add, and called a value the build accepts a duplicate.
+    @Test
+    public void anExplicitUnsetConstantIsNotOwnership() {
+        com.codename1.build.shared.BuildHints.Hint appBundle =
+                com.codename1.build.shared.BuildHints.byName("android.appBundle");
+        assertNotNull(appBundle.unsetConstant());
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.DEFAULT"));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "DEFAULT"));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.ON"));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.OFF"));
+
+        // A hint with no unset constant is never read as unset.
+        com.codename1.build.shared.BuildHints.Hint teamId =
+                com.codename1.build.shared.BuildHints.byName("ios.teamId");
+        assertFalse(CodenameOneSettings.isUnsetValue(teamId, "DEFAULT"));
+
+        assertEquals("Toggle.DEFAULT",
+                CodenameOneSettings.attributeValue("appBundle = Toggle.DEFAULT, teamId = \"T\"",
+                        "appBundle", false));
+        assertEquals("\"T\"",
+                CodenameOneSettings.attributeValue("appBundle = Toggle.DEFAULT, teamId = \"T\"",
+                        "teamId", false));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

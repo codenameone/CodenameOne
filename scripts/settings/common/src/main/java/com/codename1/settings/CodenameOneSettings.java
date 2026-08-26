@@ -3244,6 +3244,9 @@ public class CodenameOneSettings extends Lifecycle {
         java.util.List<String> out = new java.util.ArrayList<>();
         String path = binding == null ? null : binding.pom();
         String text = pomText();
+        // The module's own POM: what it switches off, it switches off for the
+        // declarations it inherits.
+        String own = text;
         for (int depth = 0; depth < 8 && path != null && text != null; depth++) {
             // Stripped HERE rather than in the seven walks over this list, so a
             // walk added later cannot be the one that forgets. A plugin or
@@ -3254,7 +3257,16 @@ public class CodenameOneSettings extends Lifecycle {
             // shadows the live annotated source. depth 0 is this module's own
             // POM, which applies its declarations whatever it says about
             // children.
-            out.add(depth == 0 ? text : withoutNonInheritedPlugins(text));
+            // Two things an ANCESTOR's declarations are subject to and its own
+            // are not, both applied here rather than in the seven walks over
+            // this list. Maven merges the active <plugins> of a parent and a
+            // child by plugin and then by execution id, and this reader parses
+            // each POM independently -- so a child that switches an inherited
+            // execution off with <phase>none</phase> still got the parent's
+            // enabled copy, and a root the build does not compile went into the
+            // scan.
+            out.add(depth == 0 ? text
+                    : withoutExecutionsDisabledBy(withoutNonInheritedPlugins(text), own));
             String parent = parentPomPath(path, text);
             if (parent == null || parent.equals(path)) {
                 break;
@@ -4640,6 +4652,41 @@ public class CodenameOneSettings extends Lifecycle {
         return out == null ? "" : out;
     }
 
+    /// `pomText` with the executions `childPom` switches off by id removed.
+    ///
+    /// Per plugin, because an execution id is only meaningful within one: two
+    /// plugins may both declare `default` and disabling one says nothing about
+    /// the other.
+    static String withoutExecutionsDisabledBy(String pomText, String childPom) {
+        if (pomText == null || childPom == null || childPom.indexOf("<phase>") < 0) {
+            return pomText;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pomText.indexOf("<plugin>", at);
+            if (open < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            int close = pomText.indexOf("</plugin>", open);
+            if (close < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            close += "</plugin>".length();
+            out.append(pomText, at, open);
+            String plugin = pomText.substring(open, close);
+            String artifactId = elementValue(plugin, "artifactId");
+            String childsCopy = artifactId == null ? null
+                    : pluginBlock(withoutElement(childPom, "pluginManagement"),
+                            artifactId.trim());
+            out.append(childsCopy == null ? plugin
+                    : withoutDisabledExecutions(plugin, childsCopy));
+            at = close;
+        }
+    }
+
     /// `pomText` with the plugin and execution blocks a child does NOT inherit
     /// removed.
     ///
@@ -5401,6 +5448,13 @@ public class CodenameOneSettings extends Lifecycle {
                     if (open >= 0 && source.charAt(open) == '(') {
                         String args = balancedArgs(source, open, kotlin);
                         if (args != null && declaresAttribute(args, h.attr(), kotlin)) {
+                            // Written down, but saying nothing: the processor
+                            // emits no hint for the unset constant, so the
+                            // properties file may legally declare it and this
+                            // must not claim ownership.
+                            if (isUnsetValue(h, attributeValue(args, h.attr(), kotlin))) {
+                                break;
+                            }
                             out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
                                     "@" + simple + "(" + h.attr() + ")");
                             found = true;
@@ -5442,6 +5496,84 @@ public class CodenameOneSettings extends Lifecycle {
 
     /// Whether `args` assigns `attr` at the top level, ignoring anything inside a
     /// nested value, a string, a character literal or a comment.
+    /// The text `attr` is assigned inside `args`, or null when it is not there.
+    ///
+    /// Walks the arguments the same way `declaresAttribute` does, because the
+    /// two answers have to agree: one decides that an attribute is present and
+    /// the other decides whether what it says means anything.
+    static String attributeValue(String args, String attr, boolean kotlin) {
+        int depth = 0;
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i < args.length(); i++) {
+            int skipped = skipNonCode(args, i, kotlin);
+            if (skipped > i) {
+                i = skipped - 1;
+                continue;
+            }
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == '='
+                    && (i + 1 >= args.length() || args.charAt(i + 1) != '=')) {
+                if (word.toString().trim().equals(attr)) {
+                    return valueAfter(args, i + 1, kotlin);
+                }
+                word.setLength(0);
+            } else if (depth == 0 && c == ',') {
+                word.setLength(0);
+            } else if (depth == 0) {
+                word.append(c);
+            }
+        }
+        return null;
+    }
+
+    /// The argument value beginning at `from`, up to the next top-level comma.
+    private static String valueAfter(String args, int from, boolean kotlin) {
+        int depth = 0;
+        StringBuilder out = new StringBuilder();
+        for (int i = from; i < args.length(); i++) {
+            int skipped = skipNonCode(args, i, kotlin);
+            if (skipped > i) {
+                out.append(args, i, skipped);
+                i = skipped - 1;
+                continue;
+            }
+            char c = args.charAt(i);
+            if (c == '(' || c == '{' || c == '[') {
+                depth++;
+            } else if (c == ')' || c == '}' || c == ']') {
+                depth--;
+            } else if (depth == 0 && c == ',') {
+                break;
+            }
+            out.append(c);
+        }
+        return out.toString().trim();
+    }
+
+    /// Whether `value` is the constant that sends nothing for `hint`.
+    ///
+    /// `@Android(appBundle = Toggle.DEFAULT)` is written down but emits no hint,
+    /// exactly as leaving the attribute out does -- so a properties line for it
+    /// is legal, and calling the hint annotation-owned hid the editor, refused
+    /// Add, and reported a value the build accepts as a duplicate.
+    ///
+    /// Compared against the constant the CATALOG records, not against the name
+    /// `DEFAULT`: every unset constant is spelled that way today and none of
+    /// this should depend on it staying that way.
+    static boolean isUnsetValue(com.codename1.build.shared.BuildHints.Hint hint, String value) {
+        String unset = hint == null ? null : hint.unsetConstant();
+        if (unset == null || value == null) {
+            return false;
+        }
+        String written = value.trim();
+        int dot = written.lastIndexOf('.');
+        return unset.equals(dot < 0 ? written : written.substring(dot + 1).trim());
+    }
+
     private static boolean declaresAttribute(String args, String attr, boolean kotlin) {
         int depth = 0;
         StringBuilder word = new StringBuilder();
