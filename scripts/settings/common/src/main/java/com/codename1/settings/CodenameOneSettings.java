@@ -4270,7 +4270,7 @@ public class CodenameOneSettings extends Lifecycle {
         }
         String managed = pluginBlock(managementOnly(pomText), artifactId);
         if (managed == null || managed.indexOf("<" + element + ">") < 0) {
-            String inherited = pluginBlock(managedFromChain, artifactId);
+            String inherited = managedBlockDeclaring(managedFromChain, artifactId, element);
             if (inherited != null && inherited.indexOf("<" + element + ">") >= 0) {
                 return inherited;
             }
@@ -4480,7 +4480,36 @@ public class CodenameOneSettings extends Lifecycle {
         }
         // Bound by the default lifecycle, so an ancestor's managed configuration
         // applies with no <plugins> entry anywhere.
-        return pluginBlock(managedFromChain, "maven-compiler-plugin");
+        return managedBlockDeclaring(managedFromChain, "maven-compiler-plugin", "encoding");
+    }
+
+    /// The managed block for `artifactId` that declares `element`, else the
+    /// first managed block for it, else null.
+    ///
+    /// The chain is every POM's `<pluginManagement>` concatenated, and Maven
+    /// MERGES them, so the configuration may sit further up than the nearest
+    /// declaration does. `pluginBlock` returns the first match and stops: a
+    /// parent managing only the version hid an ancestor's `<sourceDirs>` or
+    /// `<encoding>`, the element read as absent, and the source root it
+    /// configures never reached the scan -- which is how a dormant copy of the
+    /// main class answers for the compiled one and its annotation-owned hints
+    /// look editable.
+    ///
+    /// Falling back to the first block matters as much as the search: a caller
+    /// asking for a block that declares nothing in particular still wants the
+    /// declaration, and returning null there would drop the plugin entirely.
+    static String managedBlockDeclaring(String managedFromChain, String artifactId,
+                                        String element) {
+        String first = null;
+        for (String block : pluginBlocks(managedFromChain, artifactId)) {
+            if (first == null) {
+                first = block;
+            }
+            if (element == null || block.indexOf("<" + element + ">") >= 0) {
+                return block;
+            }
+        }
+        return first;
     }
 
     /// The `<plugin>` element declaring `artifactId`, or null.

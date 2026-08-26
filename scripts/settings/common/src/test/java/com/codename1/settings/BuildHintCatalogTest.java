@@ -2296,6 +2296,71 @@ public class BuildHintCatalogTest {
         return out.toString();
     }
 
+    /// An ancestor's managed CONFIGURATION survives a version-only parent.
+    ///
+    /// The executions were merged across the whole chain while the configuration
+    /// lookup still stopped at the first managed block. A nearer POM managing
+    /// only the version therefore hid an ancestor's `<sourceDirs>`, the element
+    /// read as absent, and the root it declares never reached the scan.
+    @Test
+    public void anAncestorsManagedConfigurationSurvivesAVersionOnlyParent() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>";
+        // The module declares the plugin but configures nothing.
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom, "kotlin-maven-plugin",
+                "sourceDirs", null, chain);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/kt"),
+                "the version-only managed block hid the ancestor's sourceDirs: " + block);
+    }
+
+    /// The same for the compiler's `<encoding>`, read through its own helper.
+    @Test
+    public void anAncestorsManagedEncodingSurvivesAVersionOnlyParent() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<version>3.11.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>windows-1251</encoding></configuration>"
+                + "</plugin></plugins></pluginManagement>";
+        String pom = "<project><build></build></project>";
+        String block = CodenameOneSettings.compilerPluginBlock(pom, chain);
+        assertNotNull(block);
+        assertTrue(block.contains("windows-1251"),
+                "the version-only managed block hid the ancestor's encoding: " + block);
+    }
+
+    /// A caller asking for no particular element still gets the declaration.
+    ///
+    /// The search prefers a block declaring the element; with none asked for,
+    /// returning null would drop a plugin the chain really does manage.
+    @Test
+    public void aManagedBlockIsStillReturnedWhenNoElementIsWanted() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>";
+        assertNotNull(CodenameOneSettings.managedBlockDeclaring(chain, "kotlin-maven-plugin",
+                "sourceDirs"));
+        assertNull(CodenameOneSettings.managedBlockDeclaring(chain, "maven-surefire-plugin",
+                null));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
