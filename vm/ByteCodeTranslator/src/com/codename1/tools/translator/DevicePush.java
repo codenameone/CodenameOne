@@ -44,10 +44,12 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -721,8 +723,23 @@ public final class DevicePush {
         }
         String id = hex(randomBytes(16));
         createParent(f);
-        Files.write(f, id.getBytes(StandardCharsets.UTF_8));
-        return id;
+        // CREATE_NEW gives us an atomic "create if absent" on both POSIX and
+        // Windows. Two concurrent pushes (a Maven build and an IDE run
+        // starting at the same time) would otherwise both pass the existence
+        // check above, generate different ids, race on the write, and end up
+        // returning ids that no longer match the file on disk. Every pairing
+        // secret keyed by those ids would then belong to whichever id one
+        // process happens to hold in memory -- and a later push could not
+        // reuse a pairing established by the loser. Losing the CREATE_NEW
+        // race means the other process just persisted the winner's id; read
+        // and return that instead.
+        try {
+            Files.write(f, id.getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            return id;
+        } catch (FileAlreadyExistsException raced) {
+            return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
+        }
     }
 
     /**

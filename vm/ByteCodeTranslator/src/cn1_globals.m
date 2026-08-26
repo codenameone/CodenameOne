@@ -810,6 +810,47 @@ struct clazz class_array3__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
+#ifdef CN1_ON_DEVICE_DEBUG
+extern void cn1_debugger_register_class(int classId, struct clazz* cls);
+
+// Primitive-array class objects are static globals declared just above, not
+// members of any generated class's __cn1_dbg_register constructor. Pushed
+// code evaluating `int[].class` (LDC descriptor `[I`) resolves to a class id
+// through the sidecar rows Parser.writeSymbolSidecar advertises for these
+// primitives, and the id -> clazz lookup then has to find one. Without this
+// bootstrap the lookup returns null, and the class literal is pushed as null
+// -- the first Class method call NPEs. Register all 24 (eight primitives x
+// ranks 1..3) once, before any translation unit's own __attribute__((constructor))
+// runs its interpreter-related init: cn1_debugger_register_class is protected
+// by a pthread mutex and is safe to call from a constructor.
+__attribute__((constructor)) static void __cn1_register_primitive_array_classes(void) {
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_BOOLEAN, &class_array1__JAVA_BOOLEAN);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_BOOLEAN, &class_array2__JAVA_BOOLEAN);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_BOOLEAN, &class_array3__JAVA_BOOLEAN);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_CHAR, &class_array1__JAVA_CHAR);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_CHAR, &class_array2__JAVA_CHAR);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_CHAR, &class_array3__JAVA_CHAR);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_BYTE, &class_array1__JAVA_BYTE);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_BYTE, &class_array2__JAVA_BYTE);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_BYTE, &class_array3__JAVA_BYTE);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_SHORT, &class_array1__JAVA_SHORT);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_SHORT, &class_array2__JAVA_SHORT);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_SHORT, &class_array3__JAVA_SHORT);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_INT, &class_array1__JAVA_INT);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_INT, &class_array2__JAVA_INT);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_INT, &class_array3__JAVA_INT);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_LONG, &class_array1__JAVA_LONG);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_LONG, &class_array2__JAVA_LONG);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_LONG, &class_array3__JAVA_LONG);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_FLOAT, &class_array1__JAVA_FLOAT);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_FLOAT, &class_array2__JAVA_FLOAT);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_FLOAT, &class_array3__JAVA_FLOAT);
+    cn1_debugger_register_class(cn1_array_1_id_JAVA_DOUBLE, &class_array1__JAVA_DOUBLE);
+    cn1_debugger_register_class(cn1_array_2_id_JAVA_DOUBLE, &class_array2__JAVA_DOUBLE);
+    cn1_debugger_register_class(cn1_array_3_id_JAVA_DOUBLE, &class_array3__JAVA_DOUBLE);
+}
+#endif
+
 
 void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
     while(count > 0) {
