@@ -126,6 +126,18 @@ static inline void UIGraphicsBeginImageContextWithOptions(CGSize size, BOOL opaq
     CGContextRelease(ctx);
 }
 
+/*
+ * Ownership, for every wrapper below that hands back an object.
+ *
+ * These stand in for UIKit convenience methods, and the point of them is that
+ * the shared call sites read identically -- which means they have to BEHAVE
+ * identically, ownership included. A UIKit convenience method returns an
+ * autoreleased object, so a caller written against it does not release what it
+ * got back. Returning +1 from here therefore leaks once per call under this
+ * project's manual retain/release, silently and forever: an image handed to
+ * GLUIImage is retained again by the initializer, and destroying the Java image
+ * releases only that one.
+ */
 static inline CN1Image * _Nullable UIGraphicsGetImageFromCurrentImageContext(void) {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
     // Nil when the context was never created -- a zero-sized image, or an
@@ -137,6 +149,9 @@ static inline CN1Image * _Nullable UIGraphicsGetImageFromCurrentImageContext(voi
     NSImage *img = [[NSImage alloc] initWithCGImage:cg
                                                size:NSMakeSize(CGImageGetWidth(cg), CGImageGetHeight(cg))];
     CGImageRelease(cg);
+#ifndef CN1_USE_ARC
+    [img autorelease];
+#endif
     return img;
 }
 
@@ -166,12 +181,23 @@ static inline NSImage * _Nullable CN1AppleImageWithCGImage(CGImageRef _Nullable 
     if (cg == NULL) {
         return nil;
     }
-    return [[NSImage alloc] initWithCGImage:cg
-                                       size:NSMakeSize(CGImageGetWidth(cg), CGImageGetHeight(cg))];
+    NSImage *img = [[NSImage alloc] initWithCGImage:cg
+                                              size:NSMakeSize(CGImageGetWidth(cg), CGImageGetHeight(cg))];
+#ifndef CN1_USE_ARC
+    [img autorelease];
+#endif
+    return img;
 }
 
 static inline NSImage * _Nullable CN1AppleImageWithData(NSData * _Nullable data) {
-    return data == nil ? nil : [[NSImage alloc] initWithData:data];
+    if (data == nil) {
+        return nil;
+    }
+    NSImage *img = [[NSImage alloc] initWithData:data];
+#ifndef CN1_USE_ARC
+    [img autorelease];
+#endif
+    return img;
 }
 
 static inline CGImageRef _Nullable CN1AppleCGImageOf(NSImage * _Nullable image) {
@@ -236,6 +262,13 @@ static inline NSBitmapImageRep * _Nullable CN1AppleBitmapRep(NSImage * _Nullable
     }
     NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithCGImage:cg];
     rep.size = image.size;
+    // Autoreleased for the same reason as the image wrappers above: both callers
+    // hand back the encoded NSData and never see the representation again, so a
+    // +1 return leaked a whole bitmap on every PNG or JPEG encode -- every image
+    // save, every screenshot, every Printer.printImage().
+#ifndef CN1_USE_ARC
+    [rep autorelease];
+#endif
     return rep;
 }
 

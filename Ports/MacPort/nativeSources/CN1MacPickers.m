@@ -170,6 +170,15 @@ static void cn1PickerFinish(JAVA_LONG result) {
     [_datePicker release];
     [_listView release];
     [_choices release];
+    // The duration fields are retain properties too, and were added to the
+    // class without being added here -- so a duration picker leaked both of
+    // them, and the stepper each one is bound to, every time it was opened.
+    // Unbound first: the binding is what holds the stepper, and a value binding
+    // left in place on a deallocated field is a dangling observer.
+    [_durationHoursField unbind:NSValueBinding];
+    [_durationMinutesField unbind:NSValueBinding];
+    [_durationHoursField release];
+    [_durationMinutesField release];
     [super dealloc];
 }
 #endif
