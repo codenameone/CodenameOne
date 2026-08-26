@@ -1047,7 +1047,7 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add("--component");
         cmd.add(bundle.getAbsolutePath());
         cmd.add("/Applications");
-        String installer = emptyToNull(hints.getInstallerIdentity());
+        String installer = emptyToNull(hints.getInstallerIdentityFor(channel));
         if (installer != null) {
             cmd.add("--sign");
             cmd.add(installer);

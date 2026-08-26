@@ -82,6 +82,8 @@ public class MacOSBuildHints {
     private String packaging;
     private boolean packagingExplicit;
     private String installerIdentity;
+    private String installerIdentityAppStore;
+    private String installerIdentityDeveloperID;
     private Boolean sandbox;
     private boolean hardenedRuntime = true;
     private boolean notarize;
@@ -233,6 +235,10 @@ public class MacOSBuildHints {
         // identity produces a package the store rejects, so it is asked for
         // separately rather than derived.
         installerIdentity = hint(src, "signingIdentity.installer", null);
+        // Per-channel spellings, for distribution=both where the two packages
+        // need different installer certificates.
+        installerIdentityAppStore = hint(src, "signingIdentity.installer.appStore", null);
+        installerIdentityDeveloperID = hint(src, "signingIdentity.installer.developerID", null);
 
         String sandboxHint = hint(src, "sandbox", null);
         // Unset rather than false: the App Store requires the sandbox and direct
@@ -313,6 +319,28 @@ public class MacOSBuildHints {
 
     /** The installer certificate productbuild signs a {@code .pkg} with, or null. */
     public String getInstallerIdentity() {
+        return installerIdentity;
+    }
+
+    /**
+     * The installer certificate for one channel.
+     *
+     * <p>Per channel because they are different certificates: the App Store
+     * wants a "3rd Party Mac Developer Installer" and Developer ID a "Developer
+     * ID Installer". With {@code distribution=both} and a pkg on each side, one
+     * shared value signed both packages with the same certificate and exactly
+     * one of them was then unusable -- which the channel-specific error message
+     * this class already produces was implicitly promising not to do.</p>
+     *
+     * <p>{@code macos.signingIdentity.installer} stays as the value for a build
+     * that ships one channel, which is nearly all of them.</p>
+     */
+    public String getInstallerIdentityFor(String channel) {
+        String perChannel = DISTRIBUTION_APP_STORE.equals(channel)
+                ? installerIdentityAppStore : installerIdentityDeveloperID;
+        if (perChannel != null && perChannel.trim().length() > 0) {
+            return perChannel;
+        }
         return installerIdentity;
     }
 

@@ -251,6 +251,10 @@ public class MacOSXcodeProjectTest {
         assertTrue(granted.containsKey("NSCalendarsFullAccessUsageDescription"));
         assertTrue(granted.containsKey("NSCalendarsWriteOnlyAccessUsageDescription"));
         assertTrue(granted.containsKey("NSRemindersFullAccessUsageDescription"));
+        // And the pre-14 spellings: the deployment floor is 11.0, and macOS 11
+        // through 13 read only these.
+        assertTrue(granted.containsKey("NSCalendarsUsageDescription"));
+        assertTrue(granted.containsKey("NSRemindersUsageDescription"));
     }
 
     /** The application's own wording wins over the generated floor. */

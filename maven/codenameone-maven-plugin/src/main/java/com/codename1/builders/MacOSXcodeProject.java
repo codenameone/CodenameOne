@@ -86,6 +86,13 @@ public class MacOSXcodeProject {
     static final String USAGE_CALENDARS = "NSCalendarsFullAccessUsageDescription";
     static final String USAGE_CALENDARS_WRITE = "NSCalendarsWriteOnlyAccessUsageDescription";
     static final String USAGE_REMINDERS = "NSRemindersFullAccessUsageDescription";
+    /// The pre-14 spellings. Not legacy clutter: the deployment floor is 11.0,
+    /// and macOS 11 through 13 read ONLY these -- an app carrying just the
+    /// macOS 14 keys cannot be authorized for EventKit there at all, however
+    /// complete its entitlements. Both sets ship, which is what Apple's own
+    /// migration guidance says to do while a build still supports both.
+    static final String USAGE_CALENDARS_LEGACY = "NSCalendarsUsageDescription";
+    static final String USAGE_REMINDERS_LEGACY = "NSRemindersUsageDescription";
 
     private MacOSXcodeProject() {
     }
@@ -328,6 +335,12 @@ public class MacOSXcodeProject {
             put(out, resolver, USAGE_CALENDARS_WRITE,
                     "This app adds events to your calendar at your request.");
             put(out, resolver, USAGE_REMINDERS,
+                    "This app reads and updates your reminders at your request.");
+            // And the pre-14 keys, which macOS 11 through 13 are the only ones
+            // that read -- and the deployment floor is 11.0.
+            put(out, resolver, USAGE_CALENDARS_LEGACY,
+                    "This app reads and updates your calendar at your request.");
+            put(out, resolver, USAGE_REMINDERS_LEGACY,
                     "This app reads and updates your reminders at your request.");
         }
         if (caps == null) {

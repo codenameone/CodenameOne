@@ -637,6 +637,12 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macos.packaging
 |macOS builds. `app`, `dmg`, `pkg` or `both`. Unset, each channel takes its own default -- `pkg` for `appStore`, because productbuild's output is what you upload, and `dmg` for `developerID`. Set explicitly, the value applies to every channel. A cloud build always ships a file, so `app` there means the bundle zipped with `ditto` rather than the raw `.app` directory.
 
+|macos.signingIdentity.installer.appStore
+|macOS builds. The installer certificate for the App Store channel specifically, when `macos.distribution=both` produces a package on each side. They're different certificates, so one shared value signs both packages with the same one and leaves one of them unusable. Unset, the shared `macos.signingIdentity.installer` applies.
+
+|macos.signingIdentity.installer.developerID
+|macOS builds. The installer certificate for the Developer ID channel specifically. Unset, the shared `macos.signingIdentity.installer` applies.
+
 |macos.signingIdentity.installer
 |macOS builds. The certificate `productbuild` signs a `.pkg` with -- `3rd Party Mac Developer Installer` for the App Store, `Developer ID Installer` for direct distribution. This is a different certificate from `macos.signingIdentity.appStore`, which signs the application, so it has a hint of its own rather than being derived from that one. Unset, the package is built unsigned, which the App Store upload refuses.
 
