@@ -293,26 +293,32 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private static <T> AsyncResource<T> publishBeforeDone(
             final AsyncResource<T> out, final AsyncResult<T> apply) {
         final AsyncResource<T> inner = new AsyncResource<T>();
+        // One publication, whatever happens to `inner`.
+        //
+        // AsyncResource runs its callbacks once per completion and does not
+        // refuse a second one, and TWO things write to inner: the queue's
+        // timeout and the platform. Testing out.isDone() was not enough --
+        // both listeners could read it false before either completed -- so
+        // the transition itself is the thing that has to be exclusive. A
+        // late success then publishes nothing and cannot overwrite the
+        // timeout that a LATER operation has already moved past.
+        final boolean[] published = new boolean[1];
         inner.onResult(new AsyncResult<T>() {
             @Override
             public void onReady(T value, Throwable err) {
-                if (out.isDone()) {
-                    // Belt and braces now that the queue watches `inner`:
-                    // nothing else completes `out`, but a platform that
-                    // answers a timed-out request twice would otherwise
-                    // publish the service cache or the MTU that a LATER
-                    // operation has since established.
-                    return;
+                synchronized (published) {
+                    if (published[0]) {
+                        return;
+                    }
+                    published[0] = true;
                 }
                 try {
                     apply.onReady(value, err);
                 } finally {
-                    if (!out.isDone()) {
-                        if (err == null) {
-                            out.complete(value);
-                        } else {
-                            out.error(err);
-                        }
+                    if (err == null) {
+                        out.complete(value);
+                    } else {
+                        out.error(err);
                     }
                 }
             }

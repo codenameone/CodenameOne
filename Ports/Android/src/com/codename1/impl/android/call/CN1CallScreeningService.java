@@ -31,9 +31,10 @@ import android.telecom.CallScreeningService;
 
 import com.codename1.call.session.Calls;
 import com.codename1.impl.call.CallWire;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.util.StringUtil;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -96,26 +97,34 @@ public class CN1CallScreeningService extends CallScreeningService {
     }
 
     private boolean isBlocked(long number) {
-        Map<Long, Boolean> table = load();
+        Map<Long, Boolean> table = load(this);
         Boolean b = table.get(Long.valueOf(number));
         return b != null && b.booleanValue();
     }
 
     /// Reads the installed directory, once per process.
-    private static synchronized Map<Long, Boolean> load() {
+    ///
+    /// Through the SERVICE's own Context rather than FileSystemStorage.
+    /// Android starts this service in a cold process to screen a call, which
+    /// is exactly the case where Display.init has not run -- and
+    /// getAppHomePath() then dereferences a null implementation and throws an
+    /// NPE that the IOException handler below does not catch. onScreenCall
+    /// never reached respondToCall, so a number the user had blocked rang
+    /// every time screening woke the app from stopped.
+    ///
+    /// It is the same file: getAppHomePath() on this platform is
+    /// getFilesDir() with a file: prefix, so CallDirectory's writer and this
+    /// reader address one path by two routes.
+    private static synchronized Map<Long, Boolean> load(Context context) {
         if (blocked != null) {
             return blocked;
         }
         Map<Long, Boolean> table = new HashMap<Long, Boolean>();
         try {
-            FileSystemStorage fs = FileSystemStorage.getInstance();
-            String path = fs.getAppHomePath();
-            if (!path.endsWith("/")) {
-                path = path + "/";
-            }
-            path = path + "cn1calldirectory.tsv";
-            if (fs.exists(path)) {
-                InputStream in = fs.openInputStream(path);
+            File file = new File(context.getFilesDir(),
+                    "cn1calldirectory.tsv");
+            if (file.exists()) {
+                InputStream in = new FileInputStream(file);
                 try {
                     StringBuilder sb = new StringBuilder();
                     byte[] buf = new byte[4096];
