@@ -182,23 +182,28 @@ public final class Vpn {
             }
             first = LISTENERS.isEmpty();
             LISTENERS.add(l);
-        }
-        VpnBridge b = VpnRequests.bridge();
-        if (first && b != null) {
-            b.setStatusListening(true);
+            // Inside the lock, with the mutation that decided it. Told
+            // afterwards, a replacement listener could turn delivery ON
+            // before a departing one -- whose emptiness was computed
+            // earlier -- turned it OFF, leaving a registered listener that
+            // never heard another transition.
+            VpnBridge b = VpnRequests.bridge();
+            if (first && b != null) {
+                b.setStatusListening(true);
+            }
         }
     }
 
     /// Removes a status listener, stopping delivery when the last one goes.
     public static void removeStatusListener(VpnStatusListener l) {
-        boolean last;
         synchronized (LISTENERS) {
             LISTENERS.remove(l);
-            last = LISTENERS.isEmpty();
-        }
-        VpnBridge b = VpnRequests.bridge();
-        if (last && b != null) {
-            b.setStatusListening(false);
+            // Inside the lock; see addStatusListener.
+            boolean last = LISTENERS.isEmpty();
+            VpnBridge b = VpnRequests.bridge();
+            if (last && b != null) {
+                b.setStatusListening(false);
+            }
         }
     }
 

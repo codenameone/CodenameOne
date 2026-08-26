@@ -153,23 +153,34 @@ public final class CallRequests {
     ///
     /// @hidden not part of the public API.
     public static void setActionsWanted(boolean wanted) {
-        updateReadiness(wanted, pushesWanted);
+        updateReadiness(true, wanted);
     }
 
     /// Records that a VoIP push listener is or is not registered.
     ///
     /// @hidden not part of the public API.
     public static void setPushesWanted(boolean wanted) {
-        updateReadiness(actionsWanted, wanted);
+        updateReadiness(false, wanted);
     }
 
-    private static void updateReadiness(boolean actions, boolean pushes) {
+    /// Sets ONE of the two flags and recomputes readiness from both.
+    ///
+    /// The other flag is read inside the lock rather than passed in: reading
+    /// it at the call site let two threads registering different listener
+    /// types each carry a stale copy of the other's, so one update overwrote
+    /// the other. Removing the surviving listener then told the port Java had
+    /// stopped listening while the other listener was still installed -- and
+    /// on iOS that means every CallKit action is held until it times out.
+    private static void updateReadiness(boolean isActions, boolean wanted) {
         boolean before;
         boolean after;
         synchronized (CallRequests.class) {
             before = actionsWanted || pushesWanted;
-            actionsWanted = actions;
-            pushesWanted = pushes;
+            if (isActions) {
+                actionsWanted = wanted;
+            } else {
+                pushesWanted = wanted;
+            }
             after = actionsWanted || pushesWanted;
         }
         if (before == after) {

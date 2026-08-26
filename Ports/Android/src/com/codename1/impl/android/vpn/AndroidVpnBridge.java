@@ -202,15 +202,25 @@ public class AndroidVpnBridge implements VpnBridge {
             // profile. Rejecting is better than queueing: the user is looking
             // at a prompt for the OTHER profile, and an install that lands
             // behind it is not what the app asked for.
-            if (consentPending) {
-                fail(requestId, VpnError.UNKNOWN,
-                        "A VPN consent prompt is already on screen; wait for"
-                        + " it to be answered before installing again");
-                return;
+            String previous;
+            synchronized (this) {
+                if (consentPending) {
+                    fail(requestId, VpnError.UNKNOWN,
+                            "A VPN consent prompt is already on screen; wait"
+                            + " for it to be answered before installing"
+                            + " again");
+                    return;
+                }
+                // Test AND reservation together. Split, two installs could
+                // both read it as free, both overwrite installedWire and both
+                // reach for the single activity-result listener -- where the
+                // second claim is refused in silence, leaving one request
+                // pending for ever while the first callback persisted the
+                // other profile's record.
+                consentPending = true;
+                previous = storedWire();
+                installedWire = wire;
             }
-            String previous = storedWire();
-            consentPending = true;
-            installedWire = wire;
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(consent,
@@ -223,8 +233,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 // every later install was refused as though a dialog were
                 // still up -- and the cached record described a profile that
                 // was never installed.
-                consentPending = false;
-                installedWire = previous;
+                synchronized (this) {
+                    consentPending = false;
+                    installedWire = previous;
+                }
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "The VPN consent prompt could not be shown: "
                                 + describe(launchFailed));
@@ -257,7 +269,9 @@ public class AndroidVpnBridge implements VpnBridge {
             // First, and whatever the outcome: the channel is free again and
             // a refused install that never cleared this would block every
             // later one for the life of the process.
-            bridge.consentPending = false;
+            synchronized (bridge) {
+                bridge.consentPending = false;
+            }
             if (resultCode == Activity.RESULT_OK) {
                 Preferences.set(WIRE_PREF, strip(bridge.installedWire));
                 bridge.setStatus(VpnStatus.DISCONNECTED);
@@ -287,7 +301,11 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
             return;
         }
-        if (consentPending) {
+        boolean prompting;
+        synchronized (this) {
+            prompting = consentPending;
+        }
+        if (prompting) {
             // A prompt for a profile this would delete is on screen. Removing
             // underneath it answered success, and then the user's approval
             // answered success too -- persisting the wire this method had
