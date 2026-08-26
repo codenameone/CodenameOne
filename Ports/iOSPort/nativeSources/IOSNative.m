@@ -2436,6 +2436,14 @@ void CN1MacWindowDeliverMonitorsChanged(void) {
     com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+void CN1MacWindowDeliverMoved(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowMovedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
+void CN1MacWindowDeliverWindowMonitorChanged(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_windowMonitorChangedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
+}
+
 void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
     com_codename1_impl_ios_IOSImplementation_windowFocusCallback___int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, gained ? JAVA_TRUE : JAVA_FALSE);
 }
@@ -8492,6 +8500,22 @@ void com_codename1_impl_ios_IOSNative_stopUpdatingBackgroundLocation___long(CN1_
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGeofencingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj) {
+// The platforms whose addGeofencing below is an empty body. Saying yes there
+// left the application persisting a listener and waiting on a region the OS was
+// never asked to monitor -- indistinguishable, from the app's side, from a fence
+// that simply never triggers.
+//
+// CoreLocation region monitoring does exist on macOS; this is a port that has
+// not been written, and the delegate that would receive didEnterRegion is the
+// UIKit view controller. watchOS and tvOS have no region monitoring at all.
+#if TARGET_OS_OSX || TARGET_OS_WATCH || TARGET_OS_TV
+    return JAVA_FALSE;
+#else
+    return JAVA_TRUE;
+#endif
+}
 
 //native void addGeofencing(long peer, double lat, double lng, double radius, long expiration, String id);
 void com_codename1_impl_ios_IOSNative_addGeofencing___long_double_double_double_long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObj, JAVA_LONG peer, JAVA_DOUBLE lat, JAVA_DOUBLE lng, JAVA_DOUBLE radius, JAVA_LONG expires, JAVA_OBJECT geoId) {
@@ -15445,12 +15469,15 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_requestNotificationPermission___int(C
                 if (@available(iOS 12.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusProvisional) { level = 3; }
                 }
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
-                // UNAuthorizationStatusEphemeral is unavailable on watchOS/tvOS.
+#if !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
+                // UNAuthorizationStatusEphemeral is an App Clip state, so it is
+                // unavailable on watchOS, tvOS and macOS. Note @available's `*`
+                // wildcard does NOT keep it out of the macOS build: the wildcard
+                // is about OS versions, not about whether the symbol exists.
                 if (@available(iOS 14.0, *)) {
                     if (settings.authorizationStatus == UNAuthorizationStatusEphemeral) { level = 4; }
                 }
-#endif // !TARGET_OS_WATCH && !TARGET_OS_TV
+#endif // !TARGET_OS_WATCH && !TARGET_OS_TV && !TARGET_OS_OSX
                 BOOL g = (level == 2 || level == 3 || level == 4);
                 com_codename1_impl_ios_IOSImplementation_notificationPermissionResult___boolean_int(CN1_THREAD_GET_STATE_PASS_ARG g ? JAVA_TRUE : JAVA_FALSE, level);
             }];

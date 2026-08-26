@@ -533,6 +533,13 @@ public final class IOSNative {
     native void startUpdatingBackgroundLocation(long clLocation);
     native void stopUpdatingBackgroundLocation(long clLocation);
     
+    /// Whether this platform actually monitors a region.
+    ///
+    /// addGeofencing below is an empty body on macOS, watchOS and tvOS, and a
+    /// caller that cannot tell persists a listener and waits for a callback that
+    /// nothing will ever send.
+    native boolean isGeofencingSupported();
+
     native void addGeofencing(long clLocation, double lat, double lng, double radius, long expiration, String id);
     native void removeGeofencing(long clLocation, String id);
     

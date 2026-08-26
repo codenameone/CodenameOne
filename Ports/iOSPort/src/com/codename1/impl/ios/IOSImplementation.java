@@ -2022,8 +2022,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /// Invoked when a display is attached, removed or changes mode.
+    ///
+    /// The whole topology, not one window moving between displays -- that is
+    /// `#windowMonitorChangedCallback(int)`. Reporting a drag onto a second
+    /// screen here would fire every application monitor listener and relayout
+    /// every window for something that changed one of them.
     public static void monitorsChangedCallback() {
         Desktop.getInstance().monitorsChanged();
+    }
+
+    /// Invoked when the user moves a native window.
+    public static void windowMovedCallback(int windowId) {
+        Desktop.getInstance().windowMoved(windowId);
+    }
+
+    /// Invoked when a window crosses onto a display with different
+    /// characteristics, so its scale and layout are recomputed. Only that
+    /// window's.
+    public static void windowMonitorChangedCallback(int windowId) {
+        Desktop.getInstance().windowMonitorChanged(windowId);
     }
 
     /// Invoked for a mouse or trackpad hover over a secondary window. Catalyst
@@ -4853,7 +4870,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public boolean isGeofenceSupported() {
-            return true;
+            // Asked of the native layer rather than answered true: addGeofencing
+            // is an empty body on macOS, watchOS and tvOS, and a caller told yes
+            // there registers a fence the OS was never asked to monitor.
+            return nativeInstance.isGeofencingSupported();
         }
         
         @Override

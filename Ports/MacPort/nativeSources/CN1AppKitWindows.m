@@ -32,6 +32,8 @@
 extern void CN1MacWindowDeliverClose(int windowId);
 extern void CN1MacWindowDeliverClosed(int windowId);
 extern void CN1MacWindowDeliverMonitorsChanged(void);
+extern void CN1MacWindowDeliverMoved(int windowId);
+extern void CN1MacWindowDeliverWindowMonitorChanged(int windowId);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverContentReady(int windowId);
 extern void CN1MacWindowDeliverVisibility(int windowId, BOOL shown);
@@ -97,13 +99,37 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
     CN1MacWindowDeliverFocus(self.windowId, NO);
 }
 
+- (void)windowDidMove:(NSNotification *)notification {
+    // Nothing else reports a user drag, so without this Window.moved() never
+    // runs and an application cannot persist where its windows were left.
+    CN1MacWindowDeliverMoved(self.windowId);
+}
+
+- (void)windowDidMiniaturize:(NSNotification *)notification {
+    // A minimized window is a hidden one as far as the framework is concerned:
+    // nativeVisible stays true otherwise, so it keeps painting and animating
+    // into a window nobody can see, and the Minimized event never fires. The
+    // same callback the show/hide path uses, so the owner cascade is identical
+    // whichever way the window went away.
+    CN1MacWindowDeliverVisibility(self.windowId, NO);
+}
+
+- (void)windowDidDeminiaturize:(NSNotification *)notification {
+    CN1MacWindowDeliverVisibility(self.windowId, YES);
+}
+
 - (void)windowDidChangeScreen:(NSNotification *)notification {
-    CN1MacWindowDeliverMonitorsChanged();
+    // This window's own change, not the topology's. Reporting a drag onto a
+    // second display as monitorsChanged fired every application monitor
+    // listener and relayed out every window, for something that happened to
+    // one of them; monitorsChanged is for a display being attached, removed or
+    // reconfigured.
+    CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
 }
 
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification {
     [self windowDidResize:notification];
-    CN1MacWindowDeliverMonitorsChanged();
+    CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
 }
 
 #ifndef CN1_USE_ARC
