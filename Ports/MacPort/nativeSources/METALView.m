@@ -53,6 +53,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     NSMutableIndexSet *consumedKeys;
     NSUInteger selectionAnchor;
     BOOL selectionAnchorValid;
+    /// The magnify gesture's factor since it began. AppKit reports increments;
+    /// pinch() wants the total, so it is accumulated across the phase.
+    double cn1PinchScale;
 }
 
 @synthesize commandQueue;
@@ -506,6 +509,7 @@ extern void pointerPressed(int *x, int *y, int length);
 extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
 extern void CN1MacPointerButton(int button, int mask);
+extern void CN1MacPinchRelease(int x, int y);
 extern void pointerHoverNative(int x, int y);
 extern void pointerHoverPressedNative(int x, int y);
 extern void pointerHoverReleasedNative(int x, int y);
@@ -559,6 +563,8 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 #define CN1_PE_BUTTON_SECONDARY 1
 #define CN1_PE_MASK_PRIMARY     (1 << 0)
 #define CN1_PE_MASK_SECONDARY   (1 << 1)
+#define CN1_PE_BUTTON_MIDDLE    2
+#define CN1_PE_MASK_MIDDLE      (1 << 2)
 
 - (void)mouseDown:(NSEvent *)event {
     CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
@@ -572,6 +578,24 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 
 - (void)mouseUp:(NSEvent *)event {
     CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
+    [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
+}
+
+// The middle button. AppKit routes it through otherMouse*, so without these
+// three a middle click produced no pointer event at all and BUTTON_MIDDLE could
+// never be observed on this port.
+- (void)otherMouseDown:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
+    [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
+}
+
+- (void)otherMouseDragged:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
+    [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
+}
+
+- (void)otherMouseUp:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -706,9 +730,24 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
         return;
     }
     CGPoint p = [self cn1PointFromEvent:event];
-    // AppKit reports the increment since the last event; Codename One's pinch
-    // wants a factor, and 1 + increment is that factor.
-    float scale = (float)(1.0 + event.magnification);
+    // AppKit reports the increment since the LAST event. Codename One's pinch()
+    // wants the factor since the gesture STARTED: ImageViewer computes
+    // currentZoom * scale against the zoom it saved when the gesture began, so
+    // feeding it increments left the image parked at one increment's worth of
+    // zoom however far the user pinched.
+    if (event.phase == NSEventPhaseBegan) {
+        cn1PinchScale = 1.0;
+    }
+    cn1PinchScale *= (1.0 + event.magnification);
+    float scale = (float)cn1PinchScale;
+    if (event.phase == NSEventPhaseEnded || event.phase == NSEventPhaseCancelled) {
+        // A trackpad gesture produces no pointer events, so the two-pointer path
+        // that normally ends a pinch never runs here and the component would
+        // stay in its pinching state after the user's fingers left.
+        cn1PinchScale = 1.0;
+        CN1MacPinchRelease((int)p.x, (int)p.y);
+        return;
+    }
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverPinch(self.cn1WindowId, scale, (int)p.x, (int)p.y);
         return;
@@ -923,7 +962,16 @@ static int CN1MacKeyCode(NSEvent *event) {
     if (clamped.length == 0) {
         return nil;
     }
-    return [[NSAttributedString alloc] initWithString:[text substringWithRange:clamped]];
+    NSAttributedString *result =
+        [[NSAttributedString alloc] initWithString:[text substringWithRange:clamped]];
+    // AppKit does not take ownership of what this returns, and an input method
+    // asks for it repeatedly while composing -- so a +1 return under this
+    // project's manual retain/release leaks once per query, for as long as the
+    // user is typing.
+#ifndef CN1_USE_ARC
+    [result autorelease];
+#endif
+    return result;
 }
 
 - (NSArray<NSAttributedStringKey> *)validAttributesForMarkedText {

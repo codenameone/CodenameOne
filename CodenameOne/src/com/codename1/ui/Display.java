@@ -8569,9 +8569,36 @@ public final class Display extends CN1Constants {
         }
         while (cmp != null) {
             if (cmp.pinch(scale)) {
+                pinchGestureTarget = cmp;
                 return;
             }
             cmp = cmp.getParent();
+        }
+    }
+
+    /// The component that consumed the magnify gesture currently in progress.
+    ///
+    /// Held so the end of the gesture can reach the same component. A touch
+    /// pinch also arrives as two pointers, and `Component#pointerDragged(int[], int[])`
+    /// ends it from there; a trackpad gesture produces no pointer events at all,
+    /// so without this a component that zooms would stay in its pinching state
+    /// after the user's fingers left the trackpad.
+    private Component pinchGestureTarget;
+
+    /// Ends the magnify (pinch) gesture in progress, notifying whichever component
+    /// consumed it. Invoked by the implementation when the platform reports that
+    /// the gesture finished; does nothing when no component took the gesture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the gesture x position in display pixels
+    ///
+    /// - `y`: the gesture y position in display pixels
+    public void firePinchReleaseGesture(int x, int y) {
+        Component cmp = pinchGestureTarget;
+        pinchGestureTarget = null;
+        if (cmp != null) {
+            cmp.pinchReleased(x, y);
         }
     }
 
