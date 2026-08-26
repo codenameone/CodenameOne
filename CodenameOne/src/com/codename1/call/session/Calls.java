@@ -484,6 +484,28 @@ public final class Calls {
                 null, false));
     }
 
+    /// Marks a call ended and forgets it, once the end action is fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class EndCleanup implements Runnable {
+        private final String callId;
+        private final CallSession session;
+
+        EndCleanup(String callId, CallSession session) {
+            this.callId = callId;
+            this.session = session;
+        }
+
+        @Override
+        public void run() {
+            if (session != null) {
+                session.setStateInternal(CallState.ENDED);
+            }
+            forget(callId);
+        }
+    }
+
     private static void dispatch(ActionEvent e) {
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(e);
@@ -557,21 +579,16 @@ public final class Calls {
                     for (CallActionListener l : ls) {
                         l.endRequested(callId, a);
                     }
+                    // Registered BEFORE settle(), and deliberately a hook
+                    // rather than a check. Forgetting unconditionally left an
+                    // app that failed the action holding a live system call
+                    // getSession() could not address; checking isAnswered()
+                    // straight after dispatch instead missed the opposite
+                    // case, where a listener defers and fulfils later and the
+                    // ended call was never forgotten at all. Only a fulfilled
+                    // end forgets, whenever it happens.
+                    a.whenFulfilled(new EndCleanup(callId, session));
                     settle(a);
-                    // Deliberately NOT unconditional, and deliberately after
-                    // settle(). A listener that defers and then fails is
-                    // saying it could not end the call, and the system UI
-                    // restores it -- so forgetting the session here left the
-                    // app with a live system call that getSession() could no
-                    // longer address. An action nobody deferred is already
-                    // fulfilled by settle(), so the common case still ends
-                    // here and now.
-                    if (a.isAnswered() && a.wasFulfilled()) {
-                        if (session != null) {
-                            session.setStateInternal(CallState.ENDED);
-                        }
-                        forget(callId);
-                    }
                     break;
                 }
                 case HOLD: {

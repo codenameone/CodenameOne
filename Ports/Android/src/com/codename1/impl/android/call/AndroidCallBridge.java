@@ -42,6 +42,7 @@ import com.codename1.call.session.CallAudioRoute;
 import com.codename1.call.session.Calls;
 import com.codename1.call.spi.CallBridge;
 import com.codename1.impl.call.CallWire;
+import com.codename1.ui.Display;
 
 /// The Android half of `com.codename1.call`, on Telecom.
 ///
@@ -164,11 +165,40 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     @Override
-    public void requestPermissions(int requestId, int permissionBits) {
-        // MANAGE_OWN_CALLS is a normal permission granted at install time and
-        // the rest are handled by the framework's own permission flow, so
-        // there is nothing to prompt for here beyond reporting the truth.
-        Calls.deliverPermissionResult(requestId, getGrantedPermissions());
+    public void requestPermissions(final int requestId, final int permissionBits) {
+        // Actually asks. Reporting the current mask and stopping there meant
+        // an app calling the method whose contract says it REQUESTS the bits
+        // always saw a denial, and had to reach for another permission API to
+        // get call audio at all.
+        //
+        // MANAGE_OWN_CALLS is exempt: it is a normal permission granted at
+        // install time, so there is nothing to prompt for and asking would
+        // show the user a dialog that cannot change anything.
+        //
+        // Off the EDT because checkForPermission blocks on the dialog, and
+        // the answer is delivered through the facade, which marshals back.
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                if ((permissionBits & PERMISSION_MICROPHONE) != 0) {
+                    com.codename1.impl.android.AndroidImplementation
+                            .checkForPermission(Manifest.permission.RECORD_AUDIO,
+                                    "This is required to carry the audio of a call");
+                }
+                if ((permissionBits & PERMISSION_CAMERA) != 0) {
+                    com.codename1.impl.android.AndroidImplementation
+                            .checkForPermission(Manifest.permission.CAMERA,
+                                    "This is required for video calls");
+                }
+                if ((permissionBits & PERMISSION_NOTIFICATIONS) != 0
+                        && Build.VERSION.SDK_INT >= 33) {
+                    com.codename1.impl.android.AndroidImplementation
+                            .checkForPermission("android.permission.POST_NOTIFICATIONS",
+                                    "This is required to show an incoming call");
+                }
+                Calls.deliverPermissionResult(requestId, getGrantedPermissions());
+            }
+        });
     }
 
     @Override

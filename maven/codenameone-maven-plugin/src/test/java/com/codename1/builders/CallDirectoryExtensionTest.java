@@ -124,8 +124,30 @@ public class CallDirectoryExtensionTest {
         // Failing the request makes iOS disable the extension; completing
         // with no entries is the correct answer before setEntries has run.
         String handler = text(files(), "CN1CallDirectoryHandler.m");
-        assertTrue(handler.contains("body == nil"));
+        assertTrue(handler.contains("data == nil"));
         assertTrue(handler.contains("completeRequestWithCompletionHandler"));
+    }
+
+    @Test
+    public void theListIsMappedRatherThanReadIntoMemory() {
+        // A production blocklist runs to six figures and the extension has a
+        // tight memory budget; reading it into an NSString is how the
+        // extension gets killed and the reload silently fails.
+        String handler = text(files(), "CN1CallDirectoryHandler.m");
+        assertTrue(handler.contains("NSDataReadingMappedIfSafe"),
+                "the directory must be memory-mapped, not read");
+        assertFalse(handler.contains("stringWithContentsOfURL"),
+                "reading the whole file into a string is what this avoids");
+        assertTrue(handler.contains("@autoreleasepool"));
+    }
+
+    @Test
+    public void theCommonRowAllocatesNothing() {
+        // The number is parsed from the raw bytes; only a row that carries a
+        // label builds an NSString.
+        String handler = text(files(), "CN1CallDirectoryHandler.m");
+        assertTrue(handler.contains("number * 10 + (bytes[cursor] - '0')"));
+        assertTrue(handler.contains("initWithBytes:bytes + labelStart"));
     }
 
     @Test

@@ -846,11 +846,49 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT configWire) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    // The provider's configuration is read from Info.plist rather than from
-    // this record, because a pushed call is reported before any of it could
-    // have been set. What this call does is prove the provider exists and
-    // give the Java side something to sequence against.
-    cn1clEnsureProvider();
+    // Info.plist supplies the defaults, because a pushed call is reported
+    // before any of this could have been set -- but the record is applied on
+    // top of them, which is what CallConfiguration documents. Ignoring it
+    // meant includesCallsInRecents, the handle types, video support and the
+    // display name had no effect even once the app was running.
+    CXProvider *provider = cn1clEnsureProvider();
+    NSArray *cfgFields = cn1clSplit(toNSString(threadStateData, configWire));
+    CXProviderConfiguration *cfg = cn1clConfiguration();
+    NSString *name = cn1clField(cfgFields, 0);
+    if ([name length] > 0) {
+        // localizedName is read-only from iOS 14, where the configuration is
+        // built without a name and the bundle supplies it; setting it there
+        // would throw.
+        if (![cfg respondsToSelector:@selector(setLocalizedName:)]) {
+            cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+            cfg.ringtoneSound = cn1clPlistString(@"CN1CallRingtoneSound", nil);
+        }
+    }
+    cfg.supportsVideo = [cn1clField(cfgFields, 1) isEqualToString:@"1"];
+    cfg.includesCallsInRecents =
+            [cn1clField(cfgFields, 2) isEqualToString:@"1"];
+    NSInteger groups = [cn1clField(cfgFields, 3) integerValue];
+    NSInteger perGroup = [cn1clField(cfgFields, 4) integerValue];
+    cfg.maximumCallGroups = groups > 0 ? groups : 1;
+    cfg.maximumCallsPerCallGroup = perGroup > 0 ? perGroup : 1;
+    NSString *types = cn1clField(cfgFields, 5);
+    if ([types length] > 0) {
+        NSMutableSet *set = [NSMutableSet set];
+        for (NSString *t in [types componentsSeparatedByString:@","]) {
+            int ordinal = [t intValue];
+            if (ordinal == CN1_CALL_HANDLE_PHONE) {
+                [set addObject:[NSNumber numberWithInteger:CXHandleTypePhoneNumber]];
+            } else if (ordinal == CN1_CALL_HANDLE_EMAIL) {
+                [set addObject:[NSNumber numberWithInteger:CXHandleTypeEmailAddress]];
+            } else {
+                [set addObject:[NSNumber numberWithInteger:CXHandleTypeGeneric]];
+            }
+        }
+        if ([set count] > 0) {
+            cfg.supportedHandleTypes = set;
+        }
+    }
+    provider.configuration = cfg;
     cn1clConfigured = YES;
     cn1clAck(requestId, YES, 0, nil);
 #else
@@ -1018,15 +1056,20 @@ void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
     CXEndCallAction *action = [[CXEndCallAction alloc] initWithCallUUID:uuid];
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
-        @synchronized (cn1clLock) {
-            [cn1clCalls removeObjectForKey:uuidString];
-        }
         if (error != nil) {
+            // The call is STILL LIVE: CallKit refused the transaction. It
+            // used to be forgotten here regardless, so a retry answered
+            // INVALID_ID and no later update or remote-end report could reach
+            // a call the system was still showing.
             cn1clAck(requestId, NO, CN1_CALL_ERR_UNKNOWN,
                     [error localizedDescription]);
-        } else {
-            cn1clAck(requestId, YES, 0, nil);
+            return;
         }
+        @synchronized (cn1clLock) {
+            [cn1clCalls removeObjectForKey:uuidString];
+            [cn1clUnclaimed removeObject:uuidString];
+        }
+        cn1clAck(requestId, YES, 0, nil);
     }];
 #else
     cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);

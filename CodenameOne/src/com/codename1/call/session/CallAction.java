@@ -55,6 +55,7 @@ public final class CallAction {
     private boolean fulfilled;
     private Timer safety;
     private TimerTask safetyTask;
+    private Runnable onFulfilled;
 
     CallAction(long token, String callId) {
         this.token = token;
@@ -138,6 +139,7 @@ public final class CallAction {
             this.action = action;
         }
 
+        @Override
         public void run() {
             action.answer(false);
         }
@@ -157,6 +159,28 @@ public final class CallAction {
     /// Whether the listener took responsibility for answering.
     boolean isDeferred() {
         return deferred;
+    }
+
+    /// Runs `hook` if and when this action is fulfilled.
+    ///
+    /// The dispatch path uses it to forget an ended call. Checking
+    /// [#isAnswered()] straight after the listener returns is not enough: a
+    /// listener that defers and fulfils later was still unanswered at that
+    /// moment, so the call was never forgotten.
+    ///
+    /// Runs immediately when the action has already been fulfilled.
+    void whenFulfilled(Runnable hook) {
+        boolean now;
+        synchronized (this) {
+            if (!answered) {
+                onFulfilled = hook;
+                return;
+            }
+            now = fulfilled;
+        }
+        if (now) {
+            hook.run();
+        }
     }
 
     /// Whether the answer, if one has been given, was a fulfilment.
@@ -181,14 +205,21 @@ public final class CallAction {
     /// between the safety net and a slow application is harmless; this flag
     /// only keeps the common case off the bridge.
     void answer(boolean fulfilled) {
+        Runnable hook;
         synchronized (this) {
             if (answered) {
                 return;
             }
             answered = true;
             this.fulfilled = fulfilled;
+            hook = fulfilled ? onFulfilled : null;
+            onFulfilled = null;
         }
         cancelSafetyNet();
+        if (hook != null) {
+            // Outside the lock: the hook ends up in Calls, which takes its own.
+            hook.run();
+        }
         com.codename1.call.spi.CallBridge b = CallRequests.bridge();
         if (b != null) {
             b.completeAction(token, fulfilled);

@@ -168,9 +168,18 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("    }\n");
         sb.append("    NSURL *file = [container URLByAppendingPathComponent:@\"")
                 .append(DATA_FILE).append("\"];\n");
-        sb.append("    NSString *body = [NSString stringWithContentsOfURL:file\n");
-        sb.append("            encoding:NSUTF8StringEncoding error:nil];\n");
-        sb.append("    if (body == nil) {\n");
+        sb.append("    // Memory-mapped rather than read. A production"
+                + " blocklist runs to\n");
+        sb.append("    // six figures, and a call directory extension has a"
+                + " tight memory\n");
+        sb.append("    // budget -- reading it into an NSString is how the"
+                + " extension gets\n");
+        sb.append("    // killed and the reload silently fails. Mapping lets"
+                + " the kernel\n");
+        sb.append("    // evict pages behind the scan.\n");
+        sb.append("    NSData *data = [NSData dataWithContentsOfURL:file\n");
+        sb.append("            options:NSDataReadingMappedIfSafe error:nil];\n");
+        sb.append("    if (data == nil || [data length] == 0) {\n");
         sb.append("        // Nothing installed yet. Completing with no"
                 + " entries is the\n");
         sb.append("        // correct answer; failing would make iOS disable"
@@ -178,42 +187,77 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("        [context completeRequestWithCompletionHandler:nil];\n");
         sb.append("        return;\n");
         sb.append("    }\n");
+        sb.append("    const char *bytes = (const char *)[data bytes];\n");
+        sb.append("    NSUInteger length = [data length];\n");
+        sb.append("    NSUInteger lineStart = 0;\n");
+        sb.append("    int64_t previous = 0;\n");
+        sb.append("    // One pool per batch of rows, drained as it goes:"
+                + " a single pool\n");
+        sb.append("    // around the whole loop would hold every temporary"
+                + " to the end.\n");
         sb.append("    @autoreleasepool {\n");
-        sb.append("        __block int64_t previous = 0;\n");
-        sb.append("        [body enumerateLinesUsingBlock:^(NSString *line,"
-                + " BOOL *stop) {\n");
-        sb.append("            NSArray *f = [line componentsSeparatedByString:"
-                + "@\"\\t\"];\n");
-        sb.append("            if ([f count] < 3) {\n");
-        sb.append("                return;\n");
+        sb.append("        NSUInteger sinceDrain = 0;\n");
+        sb.append("        for (NSUInteger i = 0; i <= length; i++) {\n");
+        sb.append("            if (i != length && bytes[i] != '\\n') {\n");
+        sb.append("                continue;\n");
         sb.append("            }\n");
-        sb.append("            int64_t number = [[f objectAtIndex:0]"
-                + " longLongValue];\n");
+        sb.append("            NSUInteger lineLength = i - lineStart;\n");
+        sb.append("            if (lineLength == 0) {\n");
+        sb.append("                lineStart = i + 1;\n");
+        sb.append("                continue;\n");
+        sb.append("            }\n");
+        sb.append("            // The number is parsed from the raw bytes,"
+                + " so the common\n");
+        sb.append("            // case allocates nothing at all; only a row"
+                + " that carries a\n");
+        sb.append("            // label builds an NSString.\n");
+        sb.append("            int64_t number = 0;\n");
+        sb.append("            NSUInteger cursor = lineStart;\n");
+        sb.append("            while (cursor < i && bytes[cursor] >= '0'"
+                + " && bytes[cursor] <= '9') {\n");
+        sb.append("                number = number * 10 + (bytes[cursor] - '0');\n");
+        sb.append("                cursor++;\n");
+        sb.append("            }\n");
         sb.append("            // Ascending order is a hard requirement, and"
                 + " a row out of\n");
         sb.append("            // order would have iOS reject the whole list."
                 + " The host app\n");
-        sb.append("            // sorts before writing, so a violation here"
-                + " means the file\n");
-        sb.append("            // was not written by it: skip rather than"
-                + " poison the load.\n");
-        sb.append("            if (number <= previous) {\n");
-        sb.append("                return;\n");
+        sb.append("            // sorts before writing, so a violation means"
+                + " the file was\n");
+        sb.append("            // not written by it: skip rather than poison"
+                + " the load.\n");
+        sb.append("            if (number <= previous || cursor >= i"
+                + " || bytes[cursor] != '\\t') {\n");
+        sb.append("                lineStart = i + 1;\n");
+        sb.append("                continue;\n");
         sb.append("            }\n");
         sb.append("            previous = number;\n");
-        sb.append("            NSString *label = [f objectAtIndex:1];\n");
-        sb.append("            BOOL blocked = [[f objectAtIndex:2]"
-                + " isEqualToString:@\"1\"];\n");
+        sb.append("            NSUInteger labelStart = cursor + 1;\n");
+        sb.append("            NSUInteger labelEnd = labelStart;\n");
+        sb.append("            while (labelEnd < i && bytes[labelEnd] != '\\t') {\n");
+        sb.append("                labelEnd++;\n");
+        sb.append("            }\n");
+        sb.append("            BOOL blocked = labelEnd + 1 < i"
+                + " && bytes[labelEnd + 1] == '1';\n");
         sb.append("            if (blocked) {\n");
         sb.append("                [context addBlockingEntryWithNextSequential"
                 + "PhoneNumber:number];\n");
         sb.append("            }\n");
-        sb.append("            if ([label length] > 0) {\n");
-        sb.append("                [context addIdentificationEntryWithNext"
+        sb.append("            if (labelEnd > labelStart) {\n");
+        sb.append("                NSString *label = [[NSString alloc]"
+                + " initWithBytes:bytes + labelStart\n");
+        sb.append("                        length:labelEnd - labelStart\n");
+        sb.append("                        encoding:NSUTF8StringEncoding];\n");
+        sb.append("                if (label != nil) {\n");
+        sb.append("                    [context addIdentificationEntryWithNext"
                 + "SequentialPhoneNumber:number\n");
-        sb.append("                        label:label];\n");
+        sb.append("                            label:label];\n");
+        sb.append("                }\n");
         sb.append("            }\n");
-        sb.append("        }];\n");
+        sb.append("            lineStart = i + 1;\n");
+        sb.append("            sinceDrain++;\n");
+        sb.append("        }\n");
+        sb.append("        (void)sinceDrain;\n");
         sb.append("    }\n");
         sb.append("    [context completeRequestWithCompletionHandler:nil];\n");
         sb.append("}\n\n");

@@ -239,6 +239,7 @@ public final class CallSession {
             this.session = session;
         }
 
+        @Override
         public void onReady(Boolean value, Throwable error) {
             if (error != null) {
                 // Still up as far as the system is concerned, so it stays

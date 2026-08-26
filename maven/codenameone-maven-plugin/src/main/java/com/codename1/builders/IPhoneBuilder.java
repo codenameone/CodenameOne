@@ -885,18 +885,20 @@ public class IPhoneBuilder extends Executor {
     /// scanner's flags.
     ///
     /// @param libsDir the submitted-libraries folder
-    private void foldInCallAndVpnLibraryUsage(java.io.File libsDir) {
+    private java.util.Set<String> foldInCallAndVpnLibraryUsage(
+            java.io.File libsDir) {
         java.util.Set<String> found =
                 LibraryClassPrefixScan.prefixesFound(libsDir,
                         CALL_VPN_LIB_PREFIXES);
         if (found.isEmpty()) {
-            return;
+            return found;
         }
         debug("Call/VPN usage found inside a submitted library: " + found);
         usesCallSession |= found.contains("com/codename1/call/session/");
         usesCallVoip |= found.contains("com/codename1/call/voip/");
         usesCallDirectory |= found.contains("com/codename1/call/directory/");
         usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+        return found;
     }
 
     private boolean usesCallSession;
@@ -2431,7 +2433,21 @@ public class IPhoneBuilder extends Executor {
         // undefined and the frameworks unlinked. The feature was simply
         // absent from a build that looked clean. The database scan above
         // reads both trees for the same reason.
-        foldInCallAndVpnLibraryUsage(buildinRes);
+        java.util.Set<String> callVpnFromLibraries =
+                foldInCallAndVpnLibraryUsage(buildinRes);
+        // Consumed into the catalog as well as folded into the flags. The
+        // flags decide the defines and the extension targets; the CATALOG is
+        // what adds CallKit, PushKit, AVFoundation, NetworkExtension and the
+        // microphone privacy string. Setting only the flags left a
+        // library-only app with the defines enabled and the frameworks
+        // unlinked -- a build that fails late for a reason nothing in it
+        // names, exactly as the nearby comment below describes.
+        //
+        // The entry prefix IS the key: the catalog matches a consumed class
+        // by startsWith, and a prefix starts with itself.
+        for (String callVpnPrefix : callVpnFromLibraries) {
+            aiAcc.consume(callVpnPrefix);
+        }
         NearbyManifestFragments.NearbyUsage libraryNearby =
                 NearbyManifestFragments.scanForNearbyUsage(buildinRes);
         if (!libraryNearby.isEmpty()) {

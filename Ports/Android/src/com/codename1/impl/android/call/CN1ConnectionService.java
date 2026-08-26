@@ -29,6 +29,7 @@ import android.telecom.DisconnectCause;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 
+import com.codename1.call.CallEndReason;
 import com.codename1.call.CallError;
 import com.codename1.call.session.CallAudioRoute;
 import com.codename1.call.session.Calls;
@@ -242,7 +243,22 @@ public class CN1ConnectionService extends ConnectionService {
         synchronized (PENDING) {
             a = PENDING.remove(Long.valueOf(token));
         }
-        if (a == null || fulfilled) {
+        if (a == null) {
+            return;
+        }
+        if (fulfilled) {
+            // A reject or a hang-up the app agreed to still has to be carried
+            // out. Telecom asked; delivering the request to Java and letting
+            // the facade fulfil it is not the same as ending the call, and
+            // without this the call stayed alive in Telecom and in
+            // CONNECTIONS after the user had hung up.
+            if (a.kind == CN1Connection.ACTION_REJECT) {
+                a.connection.finish(CallEndReason.FILTERED);
+                forget(a.connection.getCallId());
+            } else if (a.kind == CN1Connection.ACTION_DISCONNECT) {
+                a.connection.finish(CallEndReason.LOCAL_ENDED);
+                forget(a.connection.getCallId());
+            }
             return;
         }
         // Telecom has no "this action failed" channel, so the only honest way

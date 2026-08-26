@@ -147,7 +147,12 @@ public class AndroidVpnBridge implements VpnBridge {
             Intent consent = asIntent(raw);
             installedWire = wire;
             if (raw == null) {
-                // Already consented; the profile is provisioned.
+                // Already consented; the profile is provisioned. Persisted
+                // here as well as in the consent callback -- replacing a
+                // profile a user had already approved takes this path, and
+                // leaving it out meant load() described the previous profile
+                // after a restart while Android ran the new one.
+                Preferences.set(WIRE_PREF, strip(wire));
                 setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;

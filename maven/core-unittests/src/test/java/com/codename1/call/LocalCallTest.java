@@ -337,6 +337,33 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aDeferredEndThatSucceedsLaterStillForgetsTheCall() {
+        // The gap the first fix left: checking isAnswered() straight after
+        // dispatch saw false for a deferred action, and a later fulfil had
+        // nothing watching -- so a call the app really did end stayed in
+        // getSessions() for the life of the process.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void endRequested(String callId, CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        waitFor(seen, 1);
+        assertNotNull(Calls.getSession(id), "still up until the app answers");
+        seen.get(0).fulfill();
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSession(id) != null && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertNull(Calls.getSession(id),
+                "a deferred end that is fulfilled must forget the call");
+    }
+
+    @Test
     public void anIgnoredEndStillForgetsTheCall() {
         // The common case must keep working: a listener that does nothing
         // fulfills the action, so the call really did end.
