@@ -2559,7 +2559,12 @@ public class CodenameOneSettings extends Lifecycle {
                 break;
             }
             String profile = pomText.substring(at, close);
-            if (profile.indexOf("<activeByDefault>true</activeByDefault>") >= 0) {
+            // Trimmed, through the same helper the goal, id, phase and
+            // extension reads already use. Maven trims the boolean, so a
+            // pretty-printed <activeByDefault>\n  true\n</activeByDefault>
+            // activates the profile while an exact substring test excluded it --
+            // and a compile root that profile declares then went missing.
+            if (declaresValue(profile, "activeByDefault", "true")) {
                 out.add(profile);
             }
             at = pomText.indexOf("<profile>", close);
@@ -3258,10 +3263,16 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomPath == null || pomText == null || pomText.indexOf("<parent>") < 0) {
             return null;
         }
-        String relative = elementValue(
-                pomText.substring(pomText.indexOf("<parent>")), "relativePath");
+        String parent = pomText.substring(pomText.indexOf("<parent>"));
+        String relative = elementValue(parent, "relativePath");
         if (relative == null) {
-            relative = "../pom.xml";
+            // `<relativePath/>` is Maven's way of saying "there is no local
+            // parent, resolve it from the repository". elementValue cannot see a
+            // self-closing element, so it read as ABSENT and this fell through to
+            // Maven's default of ../pom.xml -- inheriting properties, a build
+            // directory and managed roots from a POM the project does not
+            // inherit from at all.
+            relative = declaresEmptyElement(parent, "relativePath") ? "" : "../pom.xml";
         }
         relative = relative.trim().replace('\\', '/');
         if (relative.isEmpty()) {
@@ -4449,16 +4460,15 @@ public class CodenameOneSettings extends Lifecycle {
             return out;
         }
         String text = withoutComments(pomText);
-        String marker = "<artifactId>" + artifactId + "</artifactId>";
-        int at = text.indexOf(marker);
+        int at = indexOfArtifactId(text, artifactId, 0);
         while (at >= 0) {
             int open = text.lastIndexOf("<plugin>", at);
             int close = text.indexOf("</plugin>", at);
             if (open >= 0 && close > open) {
                 out.add(text.substring(open, close));
-                at = text.indexOf(marker, close);
+                at = indexOfArtifactId(text, artifactId, close);
             } else {
-                at = text.indexOf(marker, at + marker.length());
+                at = indexOfArtifactId(text, artifactId, at + 1);
             }
         }
         return out;
@@ -4575,6 +4585,49 @@ public class CodenameOneSettings extends Lifecycle {
         return first;
     }
 
+    /// Where an `<artifactId>` whose TRIMMED value is `artifactId` opens, at or
+    /// after `from`, or -1.
+    ///
+    /// Matched by value rather than as the serialized string
+    /// `<artifactId>x</artifactId>`. A POM may pretty-print it across lines and
+    /// Maven trims the text, so the plugin is active while the substring search
+    /// found nothing -- and the Kotlin or build-helper roots it configures went
+    /// missing from the scan, which is how a dormant copy of the main class ends
+    /// up answering for the compiled one.
+    private static int indexOfArtifactId(String xml, String artifactId, int from) {
+        String open = "<artifactId>";
+        String shut = "</artifactId>";
+        int at = xml.indexOf(open, from);
+        while (at >= 0) {
+            int close = xml.indexOf(shut, at + open.length());
+            if (close < 0) {
+                return -1;
+            }
+            if (artifactId.equals(xml.substring(at + open.length(), close).trim())) {
+                return at;
+            }
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return -1;
+    }
+
+    /// Whether `xml` declares `name` with nothing in it -- `<name/>` or
+    /// `<name></name>`.
+    ///
+    /// Present-and-empty is a statement in Maven, and a different one from
+    /// absent: `<relativePath/>` disables local parent lookup.
+    static boolean declaresEmptyElement(String xml, String name) {
+        if (xml == null) {
+            return false;
+        }
+        String selfClosing = "<" + name + "/>";
+        if (xml.indexOf(selfClosing) >= 0 || xml.indexOf("<" + name + " />") >= 0) {
+            return true;
+        }
+        String value = elementValue(xml, name);
+        return value != null && value.trim().isEmpty();
+    }
+
     /// The `<plugin>` element declaring `artifactId`, or null.
     static String pluginBlock(String pomText, String artifactId) {
         if (pomText == null) {
@@ -4586,7 +4639,7 @@ public class CodenameOneSettings extends Lifecycle {
         // where a dormant copy of the main class hides the compiled source, and
         // its annotation-owned hints look editable.
         pomText = withoutComments(pomText);
-        int at = pomText.indexOf("<artifactId>" + artifactId + "</artifactId>");
+        int at = indexOfArtifactId(pomText, artifactId, 0);
         if (at < 0) {
             return null;
         }

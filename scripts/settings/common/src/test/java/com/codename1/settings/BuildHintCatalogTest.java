@@ -2467,6 +2467,60 @@ public class BuildHintCatalogTest {
         }
     }
 
+    /// Maven trims these values, and so must every read of them.
+    ///
+    /// Three reads matched a serialized substring while the rest of this POM
+    /// handling goes through the trimming helpers. A POM that pretty-prints is
+    /// still a valid POM, and Maven activates the profile, resolves the plugin
+    /// and disables the parent lookup exactly as a compact one -- so each of
+    /// these silently dropped a compile root the build really has.
+    @Test
+    public void pomValuesAreReadTheWayMavenTrimsThem() {
+        // The profile is active; its build section is real.
+        String profile = "<project><profiles><profile>"
+                + "<activation><activeByDefault>\n    true\n  </activeByDefault></activation>"
+                + "<build><sourceDirectory>gen/from-profile</sourceDirectory></build>"
+                + "</profile></profiles></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(profile).contains("gen/from-profile"),
+                CodenameOneSettings.declaredSourceRoots(profile).toString());
+
+        // The plugin is active; its artifactId is simply not on one line.
+        String wrapped = "<project><build><plugins><plugin>"
+                + "<artifactId>\n    kotlin-maven-plugin\n  </artifactId>"
+                + "<executions><execution><id>compile</id>"
+                + "<goals><goal>compile</goal></goals></execution></executions>"
+                + "<configuration><sourceDirs><sourceDir>gen/kt</sourceDir></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertNotNull(CodenameOneSettings.pluginBlock(wrapped, "kotlin-maven-plugin"));
+        assertEquals(1, CodenameOneSettings.pluginBlocks(wrapped, "kotlin-maven-plugin").size());
+        assertTrue(CodenameOneSettings.declaredSourceRoots(wrapped).contains("gen/kt"),
+                CodenameOneSettings.declaredSourceRoots(wrapped).toString());
+    }
+
+    /// `<relativePath/>` means there is no local parent.
+    ///
+    /// Present-and-empty is a statement in Maven and a different one from
+    /// absent. Reading it as absent walked up to ../pom.xml and inherited
+    /// properties, a build directory and managed roots from a POM the project
+    /// does not inherit from.
+    @Test
+    public void aSelfClosingRelativePathDisablesTheParentLookup() {
+        String selfClosing = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version><relativePath/></parent>"
+                + "</project>";
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", selfClosing));
+
+        String spaced = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version><relativePath /></parent>"
+                + "</project>";
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", spaced));
+
+        // An ABSENT relativePath still means Maven's default of ../pom.xml.
+        String absent = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version></parent></project>";
+        assertNotNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", absent));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
