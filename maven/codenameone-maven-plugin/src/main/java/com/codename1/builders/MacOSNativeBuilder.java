@@ -357,6 +357,20 @@ public class MacOSNativeBuilder extends Executor {
         // The frameworks travel in the translator's addLibs argument, which this
         // target was passing as "none".
         List<String> extraFrameworks = new ArrayList<String>();
+        // Whatever the project asked for, before anything detected is appended.
+        // A migrated project carries the iOS spelling, because the target name
+        // did not change under it, and a submitted .m that needs a framework
+        // still compiles without one and then fails at the link.
+        String configuredLibs = request.getArg("macos.add_libs",
+                request.getArg("ios.add_libs", null));
+        if (configuredLibs != null) {
+            for (String lib : configuredLibs.split(";")) {
+                String trimmed = lib.trim();
+                if (trimmed.length() > 0 && !extraFrameworks.contains(trimmed)) {
+                    extraFrameworks.add(trimmed);
+                }
+            }
+        }
         // Unconditional, because the LAContext code in IOSNative.m is compiled
         // on every macOS build -- it is excluded only on tvOS -- so there is no
         // usage to detect.
