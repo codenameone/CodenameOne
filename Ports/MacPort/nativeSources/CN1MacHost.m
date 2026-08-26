@@ -45,6 +45,22 @@ static const CGFloat CN1_MAC_DEFAULT_HEIGHT = 685;
  * <p>Always the MAIN window, whoever calls: this is one process-wide value, and
  * a secondary window on another display must not claim it.</p>
  */
+/**
+ * The rendering view a native peer being placed right now belongs to.
+ *
+ * <p>The window manager sets activeRenderingView for the duration of a window's
+ * paint, so during that window's layout -- which is when its peers are created,
+ * shown and moved -- this answers that window's view. Outside a paint it falls
+ * back to the main surface, which is where an unowned peer belongs anyway.</p>
+ *
+ * <p>Read it BEFORE dispatching to the main queue: the bracket is cleared when
+ * the paint ends, so a block that asks later always gets the main window and the
+ * peer lands over the wrong one.</p>
+ */
+NSView *CN1MacPeerHostView(void) {
+    return [CN1MacHost sharedHost].activeRenderingView;
+}
+
 void CN1MacRefreshScaleValue(void) {
     extern float scaleValue;
     NSWindow *w = [CN1MacHost sharedHost].window;

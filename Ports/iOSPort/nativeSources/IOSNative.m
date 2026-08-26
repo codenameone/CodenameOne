@@ -4123,6 +4123,10 @@ void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_
 
 void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN b) {
 #if !TARGET_OS_WATCH
+#if TARGET_OS_OSX
+    extern NSView *CN1MacPeerHostView(void);
+    CN1View *peerHost = (CN1View *)CN1MacPeerHostView();
+#endif
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)peer);
@@ -4132,7 +4136,15 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
             }
         } else {
             if([v superview] == nil) {
+#if TARGET_OS_OSX
+                // Re-shown into its own window, for the same reason it was added
+                // there: eaglView is the main surface on this port.
+                [(peerHost != nil ? peerHost
+                     : (CN1View *)[[CodenameOne_GLViewController instance] eaglView])
+                        addPeerComponent:v];
+#else
                 [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
+#endif
             }
         }
         POOL_END();
@@ -4205,11 +4217,21 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
 
 void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
 #if TARGET_OS_OSX
+    // Resolved here, on the calling thread, rather than inside the block: the
+    // window manager marks the active rendering view only for the duration of a
+    // window's paint, and this dispatch runs after that bracket has been
+    // cleared. eaglView answers the MAIN window's view unconditionally on this
+    // port, so without this a peer belonging to a secondary Window was added to
+    // the main one and drawn there at coordinates meant for its own.
+    extern NSView *CN1MacPeerHostView(void);
+    CN1View *peerHost = (CN1View *)CN1MacPeerHostView();
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
         if([v superview] == nil) {
-            [[[CodenameOne_GLViewController instance] eaglView] addPeerComponent:v];
+            [(peerHost != nil ? peerHost
+                 : (CN1View *)[[CodenameOne_GLViewController instance] eaglView])
+                    addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;

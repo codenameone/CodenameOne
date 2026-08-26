@@ -152,11 +152,30 @@ static void cn1OnMain(dispatch_block_t block) {
 
 /// Codename One works in device pixels and AppKit in points, so every geometry
 /// value crossing the bridge is scaled by the window's backing factor.
+/// The window's OWN backing scale, for drawable sizes only.
+///
+/// Never for a desktop coordinate: see cn1DesktopScale.
 static CGFloat cn1WindowScale(CN1MacWindowRecord *rec) {
     if (rec != nil && rec.window != nil) {
         return rec.window.backingScaleFactor;
     }
     return [NSScreen mainScreen].backingScaleFactor;
+}
+
+/// The single scale every desktop coordinate is expressed in.
+///
+/// AppKit lays every screen out in ONE point space whose origin is the primary
+/// screen's bottom left, so a position only means something when the whole
+/// topology shares one conversion. Scaling each screen's origin by its own
+/// backing factor produced a space where the rectangles overlap: a 1440pt
+/// Retina primary reports 2880 wide, while the 1x display to its right still
+/// reports its origin as 1440, so placing a window there put it back on the
+/// primary. The primary's factor is the one that pairs with
+/// cn1PrimaryScreenHeight, which the y flip already uses for exactly this
+/// reason.
+static CGFloat cn1DesktopScale(void) {
+    CGFloat s = [NSScreen mainScreen].backingScaleFactor;
+    return s > 0 ? s : 1;
 }
 
 /// AppKit's global coordinate space has its origin at the primary screen's
@@ -399,7 +418,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetBounds___int_int_int_int_
         if (rec == nil) {
             return;
         }
-        CGFloat scale = cn1WindowScale(rec);
+        CGFloat scale = cn1DesktopScale();
         NSRect content = NSMakeRect(x / scale, y / scale,
                                     MAX(width / scale, 1), MAX(height / scale, 1));
         NSRect frame = [rec.window frameRectForContentRect:cn1ToAppKitFrame(content)];
@@ -421,9 +440,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowGetBounds___int_int_1ARRAY(C
         if (rec == nil) {
             return;
         }
-        CGFloat scale = cn1WindowScale(rec);
-        NSRect content = [rec.window contentRectForFrameRect:rec.window.frame];
-        NSRect topLeft = cn1FromAppKitFrame(content);
+        // The FRAME, not the content rect: WindowManager.getBounds is documented
+        // to include native chrome, setBounds accepts the same rectangle, and
+        // the Linux and Windows ports both report the outer one. Returning the
+        // content rect made the round trip disagree with the request by exactly
+        // the title bar, which is what breaks restoring a window where the user
+        // left it. getWidth/getHeight remain the drawable-size APIs.
+        CGFloat scale = cn1DesktopScale();
+        NSRect topLeft = cn1FromAppKitFrame(rec.window.frame);
         b.x = (int)(topLeft.origin.x * scale);
         b.y = (int)(topLeft.origin.y * scale);
         b.width = (int)(topLeft.size.width * scale);
@@ -550,7 +574,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetMinimumSize___int_int_int
             rec.window.contentMinSize = NSZeroSize;
             return;
         }
-        CGFloat scale = cn1WindowScale(rec);
+        CGFloat scale = cn1DesktopScale();
         rec.window.contentMinSize = NSMakeSize(width / scale, height / scale);
     });
 }
@@ -806,7 +830,11 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macMonitorBounds___int_boolean_int_1A
     }
     NSRect r = workArea != 0 ? screen.visibleFrame : screen.frame;
     NSRect topLeft = cn1FromAppKitFrame(r);
-    CGFloat scale = screen.backingScaleFactor;
+    // One scale for the whole desktop, not this screen's own -- see
+    // cn1DesktopScale. Per screen, the reported rectangles overlap on a
+    // mixed-DPI setup and a window placed at a monitor's origin lands on the
+    // wrong display.
+    CGFloat scale = cn1DesktopScale();
     JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
     data[0] = (int)(topLeft.origin.x * scale);
     data[1] = (int)(topLeft.origin.y * scale);

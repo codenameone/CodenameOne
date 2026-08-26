@@ -193,8 +193,32 @@ static void cn1PickerPresent(CN1MacPickerController *controller, NSView *content
     popover.delegate = controller;
     cn1MacPicker = popover;
 
-    NSView *host = [CN1MacHost sharedHost].renderingView;
-    CGFloat scale = scaleValue > 0 ? scaleValue : 1;
+    // Anchored in the window the picker was opened from, not always the main
+    // one. A Picker inside a secondary Window supplies coordinates relative to
+    // THAT window, so hard-coding the host's view opened the chooser over the
+    // main window at the wrong place -- and could not present it at all when the
+    // main window was hidden.
+    //
+    // Resolved through the key window rather than by threading an id down from
+    // Java: a picker opens in response to a tap, and the window that received
+    // the tap is the key one. Conformance to NSTextInputClient is what marks a
+    // Codename One rendering view, which is the same test the text-input session
+    // uses and needs no header of the view's own.
+    NSView *host = nil;
+    NSWindow *key = [NSApp keyWindow];
+    if (key != nil && [key.contentView conformsToProtocol:@protocol(NSTextInputClient)]) {
+        host = key.contentView;
+    }
+    if (host == nil) {
+        host = [CN1MacHost sharedHost].renderingView;
+    }
+    // That window's own backing scale, since the coordinates are its. The
+    // process-wide scaleValue tracks the MAIN window and is the wrong divisor
+    // for a window on a display of a different density.
+    CGFloat scale = host.window != nil ? host.window.backingScaleFactor : 0;
+    if (scale <= 0) {
+        scale = scaleValue > 0 ? scaleValue : 1;
+    }
     NSRect anchor = NSMakeRect(x / scale, y / scale, MAX(w / scale, 1), MAX(h / scale, 1));
     if (w <= 0 || h <= 0) {
         anchor = NSMakeRect(host.bounds.size.width / 2, host.bounds.size.height / 2, 1, 1);
