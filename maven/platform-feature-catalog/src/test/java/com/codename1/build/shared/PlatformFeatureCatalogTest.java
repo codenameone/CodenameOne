@@ -53,6 +53,103 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void callSessionBuysCallKitAndTheTelecomFloor() {
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/call/session/Calls");
+        assertEquals(1, hits.size(), "expected one entry to fire");
+        PlatformFeatureCatalog.Entry e = hits.get(0);
+        assertTrue(e.iosFrameworks().contains("CallKit"));
+        assertFalse(e.iosFrameworks().contains("PushKit"),
+                "owning a call must not buy the VoIP push machinery");
+        // A self-managed ConnectionService is exactly API 26; below it there
+        // is nothing to degrade to.
+        assertEquals(26, e.androidMinimumSdk());
+    }
+
+    @Test
+    void onlyTheVoipPackageBuysPushKit() {
+        // The voip background mode Apple rejects an app for carrying without
+        // cause rides along with PushKit, so this boundary is the thing that
+        // keeps an ordinary calling app shippable.
+        assertFalse(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/call/session/CallSession")
+                .get(0).iosFrameworks().contains("PushKit"));
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/call/voip/VoipPush")
+                .get(0).iosFrameworks().contains("PushKit"));
+    }
+
+    @Test
+    void theCallDirectoryIsNotASupersetOfOwningCalls() {
+        // The load-bearing property of the whole package split. A caller-ID
+        // app never owns a call, so referencing the directory must not drag
+        // in what session/voip cost. The prefix match cannot express an
+        // exclusion, so if these ever collapse into one entry this fails.
+        List<PlatformFeatureCatalog.Entry> dir =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/call/directory/CallDirectory");
+        assertEquals(1, dir.size());
+        assertFalse(dir.get(0).iosFrameworks().contains("PushKit"));
+        assertFalse(dir.get(0).iosFrameworks().contains("AVFoundation"),
+                "labelling a number does not carry audio");
+        assertTrue(dir.get(0).iosPlistEntries().isEmpty(),
+                "labelling a number needs no microphone permission");
+    }
+
+    @Test
+    void theSharedCallValueTypesCostNothing() {
+        // com.codename1.call itself holds only value types. If it ever gained
+        // an entry, every app that touched a CallHandle would start paying
+        // for CallKit.
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/call/CallHandle").isEmpty());
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/call/CallId").isEmpty());
+        assertTrue(PlatformFeatureCatalog.matchesFor(
+                "com/codename1/vpn/VpnStatus").isEmpty());
+    }
+
+    @Test
+    void managedVpnNeedsNoAndroidFloor() {
+        // VpnManager is API 30 but is reached reflectively, so the port
+        // reports the capability absent below 30 rather than the whole app
+        // refusing to install.
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/vpn/profile/Vpn");
+        assertEquals(1, hits.size());
+        assertTrue(hits.get(0).iosFrameworks().contains("NetworkExtension"));
+        assertEquals(0, hits.get(0).androidMinimumSdk(),
+                "a reflective platform API must not raise the app's floor");
+    }
+
+    @Test
+    void noCallOrVpnEntryInjectsAnEntitlement() {
+        // Both VPN entitlements are single-element arrays, which the
+        // ios.entitlements.<key> namespace cannot encode, and the
+        // packet-tunnel one must never appear on an App ID that was not
+        // granted it -- that fails codesigning with an error naming the
+        // entitlement and not the reason it appeared. IPhoneBuilder emits
+        // both explicitly; this table must stay out of it.
+        String[] prefixes = {"com/codename1/call/session/Calls",
+            "com/codename1/call/voip/VoipPush",
+            "com/codename1/call/directory/CallDirectory",
+            "com/codename1/vpn/profile/Vpn",
+            "com/codename1/vpn/tunnel/PacketTunnel"};
+        for (String prefix : prefixes) {
+            for (PlatformFeatureCatalog.Entry e
+                    : PlatformFeatureCatalog.matchesFor(prefix)) {
+                for (String[] plist : e.iosPlistEntries()) {
+                    assertFalse(plist[0].startsWith("com.apple.developer"),
+                            prefix + " must not inject an entitlement through"
+                            + " the plist table: " + plist[0]);
+                }
+            }
+        }
+    }
+
+    @Test
     void retiredCn1libsRetainPublishedDependencyMappings() {
         List<PlatformFeatureCatalog.Entry> mlKit =
                 PlatformFeatureCatalog.matchesFor(
