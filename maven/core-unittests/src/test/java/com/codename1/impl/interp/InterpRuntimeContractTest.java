@@ -507,6 +507,55 @@ class InterpRuntimeContractTest {
         public static int value = 3;
     }
 
+    /**
+     * A host field whose access modifier the installed framework has since
+     * narrowed to <code>private</code> must not bind. <code>setAccessible</code>
+     * would otherwise let the read/write through silently, and the JVM
+     * raises <code>IllegalAccessError</code> for GET/PUT against a private
+     * field from outside the declaring class. Field access has no
+     * <code>invokespecial</code>-equivalent legitimate route.
+     */
+    @Test
+    @DisplayName("field access refuses a field that became private")
+    void fieldAccessRefusesAFieldThatBecamePrivate() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.getStatic(
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$WasPublicField",
+                    "value", "I");
+            throw new AssertionError("read of a now-private field should have been refused");
+        } catch (IllegalAccessError expected) {
+            // JVMS 6.5.getstatic -- private outside declaring class is IAE.
+        }
+    }
+
+    static class WasPublicField {
+        @SuppressWarnings("unused")
+        private static int value = 3;
+    }
+
+    /**
+     * Same shape for constructors: <code>getDeclaredConstructor</code> finds
+     * it, but <code>setAccessible</code> would let <code>new Host(...)</code>
+     * succeed against a stale binding when the constructor is now private.
+     */
+    @Test
+    @DisplayName("construct refuses a constructor that became private")
+    void constructRefusesAConstructorThatBecamePrivate() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.construct(WasPublicCtor.class, "()V", new Object[0]);
+            throw new AssertionError("new on a now-private constructor should have been refused");
+        } catch (IllegalAccessError expected) {
+            // JVMS 6.5.invokespecial for <init> -- private outside declaring class is IAE.
+        }
+    }
+
+    static class WasPublicCtor {
+        private WasPublicCtor() {
+        }
+    }
+
 
     /**
      * A pushed program that never returns has to be stoppable, or the Stop

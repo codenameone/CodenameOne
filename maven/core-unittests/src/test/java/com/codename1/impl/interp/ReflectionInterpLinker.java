@@ -338,6 +338,15 @@ public class ReflectionInterpLinker implements InterpLinker {
         if (f == null) {
             throw new NoSuchFieldException(key);
         }
+        // A host field the installed framework has since made private is off
+        // limits to pushed code the same way an invokevirtual on a private
+        // method is: setAccessible(true) would silently let the read/write
+        // through, and the JVM would raise IllegalAccessError. Field access
+        // has no invokespecial-equivalent legitimate route, so this applies
+        // to every accessor.
+        if (Modifier.isPrivate(f.getModifiers())) {
+            throw new IllegalAccessError(owner.replace('/', '.') + "." + name + " is private");
+        }
         f.setAccessible(true);
         fieldCache.put(key, f);
         return f;
@@ -372,6 +381,15 @@ public class ReflectionInterpLinker implements InterpLinker {
         Constructor ctor = ctorCache.get(key);
         if (ctor == null) {
             ctor = c.getDeclaredConstructor(paramTypes(descriptor));
+            // A host constructor the installed framework has since made
+            // private cannot legitimately be called from outside the class;
+            // JVM would raise IllegalAccessError. setAccessible(true) would
+            // otherwise let `new Host(...)` from pushed code silently
+            // succeed on a stale binding.
+            if (Modifier.isPrivate(ctor.getModifiers())) {
+                throw new IllegalAccessError(c.getName() + "<init>" + descriptor
+                        + " is private");
+            }
             ctor.setAccessible(true);
             ctorCache.put(key, ctor);
         }
