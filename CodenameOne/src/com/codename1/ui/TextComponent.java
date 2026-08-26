@@ -83,7 +83,9 @@ import com.codename1.ui.layouts.LayeredLayout;
 /// @author Shai Almog
 public class TextComponent extends InputComponent {
     private static final int animationSpeed = 100;
-    private Container animationLayer;    private final TextField field = new TextField() {
+    private Container animationLayer;
+    private Runnable hintAnimationCleanup;
+    private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
             if (isFocusAnimation()) {
@@ -100,28 +102,7 @@ public class TextComponent extends InputComponent {
             super.focusGainedInternal();
             if (isInitialized() && isFocusAnimation()) {
                 getLabel().setFocus(true);
-                if (!getLabel().isVisible()) {
-                    final Label text = new Label(getHint(), "TextHint");
-                    setHint("");
-                    final Label placeholder = new Label();
-                    Component.setSameSize(placeholder, field);
-                    animationLayer.add(BorderLayout.NORTH, text);
-                    animationLayer.add(BorderLayout.CENTER, placeholder);
-                    text.setX(getX());
-                    text.setY(getY());
-                    text.setWidth(getWidth());
-                    text.setHeight(getHeight());
-                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
-                    getAnimationManager().addAnimation(anim, new Runnable() {
-                        @Override
-                        public void run() {
-                            Component.setSameSize(field);
-                            text.remove();
-                            placeholder.remove();
-                            getLabel().setVisible(true);
-                        }
-                    });
-                }
+                syncHintPosition();
             }
         }
 
@@ -130,36 +111,162 @@ public class TextComponent extends InputComponent {
             super.focusLostInternal();
             if (isInitialized() && isFocusAnimation()) {
                 getLabel().setFocus(false);
-                if (TextComponent.this.getText().length() == 0 && TextComponent.this.getLabel().isVisible() && isOnTopMode()) {
-                    final Label text = new Label(getLabel().getText(), getLabel().getUIID());
-                    final Label placeholder = new Label();
-                    Component.setSameSize(placeholder, getLabel());
-                    animationLayer.add(BorderLayout.NORTH, placeholder);
-                    animationLayer.add(BorderLayout.CENTER, text);
-                    text.setX(getLabel().getX());
-                    text.setY(getLabel().getY());
-                    text.setWidth(getLabel().getWidth());
-                    text.setHeight(getLabel().getHeight());
-                    String hintLabelUIID = "TextHint";
-                    if (getHintLabel() != null) {
-                        hintLabelUIID = getHintLabel().getUIID();
-                    }
-                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
-                    getAnimationManager().addAnimation(anim, new Runnable() {
-                        @Override
-                        public void run() {
-                            setHint(getLabel().getText());
-                            getLabel().setVisible(false);
-                            Component.setSameSize(getLabel());
-                            text.remove();
-                            placeholder.remove();
-                        }
-                    });
-                }
+                syncHintPosition();
             }
         }
     };
     private Boolean focusAnimation;
+
+    /// Moves the hint into or out of the floating label position so it matches the current focus,
+    /// animating the transition. Focus can change again while that animation is queued -- selecting the
+    /// next field before typing anything is enough -- so the transition is driven from the focus state
+    /// rather than from the step it happens to be on, only one runs at a time, and the state is
+    /// re-checked once it completes.
+    private void syncHintPosition() {
+        if (hintAnimationCleanup != null || animationLayer == null || !isInitialized() || !isFocusAnimation()) {
+            return;
+        }
+        if (field.hasFocus()) {
+            if (!getLabel().isVisible()) {
+                animateHintToLabel();
+            }
+        } else if (getText().length() > 0) {
+            // Content arrived while the reverse transition was queued, so the transition hid a label
+            // that a field with text has to keep -- the hint is not painted once there is text, which
+            // would leave nothing naming the field. Nothing to animate, only a state to correct.
+            if (!getLabel().isVisible()) {
+                field.setHint("");
+                getLabel().setVisible(true);
+            }
+        } else if (getLabel().isVisible() && isOnTopMode()) {
+            animateLabelToHint();
+        }
+    }
+
+    private void animateHintToLabel() {
+        final Label text = new Label(field.getHint(), "TextHint");
+        field.setHint("");
+        final Label placeholder = new Label();
+        Component.setSameSize(placeholder, field);
+        animationLayer.add(BorderLayout.NORTH, text);
+        animationLayer.add(BorderLayout.CENTER, placeholder);
+        text.setX(field.getX());
+        text.setY(field.getY());
+        text.setWidth(field.getWidth());
+        text.setHeight(field.getHeight());
+        hintAnimationCleanup = new Runnable() {
+            @Override
+            public void run() {
+                Component.setSameSize(field);
+                removeAnimationLabel(text);
+                removeAnimationLabel(placeholder);
+                getLabel().setVisible(true);
+            }
+        };
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                finishHintAnimation();
+                syncHintPosition();
+            }
+        });
+    }
+
+    private void animateLabelToHint() {
+        final Label text = new Label(getLabel().getText(), getLabel().getUIID());
+        final Label placeholder = new Label();
+        Component.setSameSize(placeholder, getLabel());
+        animationLayer.add(BorderLayout.NORTH, placeholder);
+        animationLayer.add(BorderLayout.CENTER, text);
+        text.setX(getLabel().getX());
+        text.setY(getLabel().getY());
+        text.setWidth(getLabel().getWidth());
+        text.setHeight(getLabel().getHeight());
+        String hintLabelUIID = "TextHint";
+        if (field.getHintLabel() != null) {
+            hintLabelUIID = field.getHintLabel().getUIID();
+        }
+        hintAnimationCleanup = new Runnable() {
+            @Override
+            public void run() {
+                field.setHint(getLabel().getText());
+                getLabel().setVisible(false);
+                Component.setSameSize(getLabel());
+                removeAnimationLabel(text);
+                removeAnimationLabel(placeholder);
+            }
+        };
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                finishHintAnimation();
+                syncHintPosition();
+            }
+        });
+    }
+
+    /// Takes one of the transition's temporary labels back out of the animation layer.
+    ///
+    /// `com.codename1.ui.Component#remove()` is not usable here. The cleanup runs from an animation
+    /// completion, and selecting the next field before typing anything leaves that field's own
+    /// transition queued behind this one -- so the animation manager is still animating, and
+    /// `com.codename1.ui.Container#removeComponent(Component)` takes its deferred path, which
+    /// queues the removal as an animation that reports `isInProgress()` false and is therefore
+    /// completed without ever being stepped. The removal is dropped and the label stays in the
+    /// hierarchy, painting on top of the field's own hint (issue #5600).
+    ///
+    /// Removing directly is safe precisely here: the animation over this layer is the one that just
+    /// finished, and the transitions queued behind it belong to other components' layers.
+    private void removeAnimationLabel(Label label) {
+        if (label.getParent() == animationLayer) { //NOPMD CompareObjectsWithEquals
+            animationLayer.removeComponentImplNoAnimationSafety(label);
+        } else {
+            label.remove();
+        }
+    }
+
+    /// Puts the transition in its end state exactly once, whether it got there by completing or by
+    /// being abandoned. `com.codename1.ui.Form#deinitializeImpl()` flushes the animation queue
+    /// without running completion callbacks, so a form torn down mid-transition would otherwise keep
+    /// the temporary labels in the animation layer, with `#syncHintPosition()` permanently guarded off.
+    private void finishHintAnimation() {
+        Runnable cleanup = hintAnimationCleanup;
+        if (cleanup != null) {
+            hintAnimationCleanup = null;
+            cleanup.run();
+        }
+    }
+
+    /// Puts the hint where the current focus says it belongs, with no animation.
+    ///
+    /// Committing an abandoned transition's end state is not enough on its own, because focus may
+    /// have moved on while that transition was still queued: focus a field, select the next one
+    /// before typing, then leave the form, and the first field would come to rest showing the
+    /// floating label over an empty, unfocused field with no hint. Returning to the form fires no
+    /// focus event for it, so nothing would correct that until the next focus cycle.
+    private void snapHintToFocus() {
+        if (animationLayer == null || !isFocusAnimation()) {
+            return;
+        }
+        if (field.hasFocus() || getText().length() > 0) {
+            // focused, or holding content: either way the label belongs above the field
+            field.setHint("");
+            getLabel().setVisible(true);
+        } else if (isOnTopMode()) {
+            field.setHint(getLabel().getText());
+            getLabel().setVisible(false);
+        }
+    }
+
+    @Override
+    protected void deinitialize() {
+        finishHintAnimation();
+        snapHintToFocus();
+        super.deinitialize();
+    }
+
     /// Default constructor allows us to create an arbitrary text component
     public TextComponent() {
         initInput();
