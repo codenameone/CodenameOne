@@ -2330,6 +2330,15 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
             if (e.getAppBundle() != null) {
                 getLog().info("Built native macOS application: " + e.getAppBundle().getAbsolutePath());
+                // Every artifact, not just the first bundle: with
+                // macos.distribution=both there are two, each with its own
+                // container, and a dmg or pkg nobody is told about is a dmg
+                // nobody ships.
+                for (java.io.File artifact : e.getArtifacts()) {
+                    if (!artifact.equals(e.getAppBundle())) {
+                        getLog().info("  also produced: " + artifact.getAbsolutePath());
+                    }
+                }
             } else if (e.getXcodeProjectDir() != null) {
                 getLog().info("Generated macOS Xcode project: " + e.getXcodeProjectDir().getAbsolutePath());
             }
