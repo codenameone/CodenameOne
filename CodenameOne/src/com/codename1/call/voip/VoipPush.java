@@ -170,9 +170,21 @@ public final class VoipPush {
             handle = CallHandle.generic("");
         }
         CallSession existing = Calls.getSession(id);
-        CallSession session = existing != null ? existing
-                : Calls.adoptSession(id, handle, displayName,
-                        stale ? CallState.ENDED : CallState.RINGING);
+        CallSession session;
+        if (existing != null) {
+            session = existing;
+        } else if (stale) {
+            // Detached on purpose. A stale call is already over, so
+            // registering it would leave every missed or cancelled cold-start
+            // push sitting in getSessions() for the life of the process --
+            // and those APIs promise CURRENT calls. The app still gets a
+            // session to read the handle and the id off, which is all a
+            // missed-call log needs.
+            session = Calls.detachedSession(id, handle, displayName);
+        } else {
+            session = Calls.adoptSession(id, handle, displayName,
+                    CallState.RINGING);
+        }
         post(new Delivery(new PushedCall(session, data, stale, synthesizedId,
                 receivedAt), null));
     }

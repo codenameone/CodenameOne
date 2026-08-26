@@ -75,6 +75,9 @@ public class AndroidVpnBridge implements VpnBridge {
     private boolean listening;
     private ConnectivityManager.NetworkCallback networkCallback;
 
+    /// Whether this app has asked for its tunnel to be up.
+    private volatile boolean startRequested;
+
     public AndroidVpnBridge(Context context) {
         this.context = context;
     }
@@ -276,6 +279,7 @@ public class AndroidVpnBridge implements VpnBridge {
         // profile the platform still holds. The platform's own refusal is
         // the authority, and it is mapped below.
         try {
+            startRequested = true;
             setStatus(VpnStatus.CONNECTING);
             Reflect.START.invoke(Reflect.manager(context));
             // The platform reports no completion, so the tunnel is CONNECTING
@@ -284,6 +288,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // all that is actually known.
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
+            startRequested = false;
             setStatus(VpnStatus.DISCONNECTED);
             // A SecurityException here is the platform saying no profile is
             // provisioned, which is a different answer from a tunnel that
@@ -302,6 +307,7 @@ public class AndroidVpnBridge implements VpnBridge {
         }
         // Not gated on installedWire; see startVpn.
         try {
+            startRequested = false;
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
             setStatus(VpnStatus.DISCONNECTED);
@@ -385,13 +391,30 @@ public class AndroidVpnBridge implements VpnBridge {
 
         @Override
         public void onAvailable(Network network) {
-            bridge.setStatus(VpnStatus.CONNECTED);
+            bridge.onTunnelTransport(true);
         }
 
         @Override
         public void onLost(Network network) {
-            bridge.setStatus(VpnStatus.DISCONNECTED);
+            bridge.onTunnelTransport(false);
         }
+    }
+
+    /// A VPN transport appeared or went away.
+    ///
+    /// Attributed to this app's profile only when this app asked for one.
+    /// Android gives an application no way to tell WHICH VPN a transport
+    /// belongs to, so another app's tunnel matches the same callback -- and
+    /// reporting that as CONNECTED had listeners and Vpn.getStatus()
+    /// describing somebody else's VPN. Gating on our own start request is not
+    /// perfect (a foreign tunnel coming up while ours is connecting is still
+    /// indistinguishable) but it removes the case that matters: an app that
+    /// never started a tunnel never hears that one is up.
+    void onTunnelTransport(boolean available) {
+        if (!startRequested) {
+            return;
+        }
+        setStatus(available ? VpnStatus.CONNECTED : VpnStatus.DISCONNECTED);
     }
 
     void setStatus(VpnStatus s) {

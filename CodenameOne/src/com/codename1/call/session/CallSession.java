@@ -177,9 +177,14 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        state = held ? CallState.HELD : CallState.ACTIVE;
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
+        // Applied from the acknowledgement, as end() does. Setting it up
+        // front left the session claiming HELD after a transaction the system
+        // had rejected -- for instance because the call ended while the
+        // request was in flight -- with nothing to roll it back.
+        r.onResult(new StateOutcome(this,
+                held ? CallState.HELD : CallState.ACTIVE));
         b.setHeld(id, callId, held);
         return r;
     }
@@ -194,9 +199,10 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        muted = value;
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
+        // Applied from the acknowledgement for the same reason as setHeld.
+        r.onResult(new MuteOutcome(this, value));
         b.setMuted(id, callId, value);
         return r;
     }
@@ -248,6 +254,48 @@ public final class CallSession {
             }
             session.state = CallState.ENDED;
             Calls.forget(session.getCallId());
+        }
+    }
+
+    /// Moves the session's state, but only once the system has accepted the
+    /// request that asked for it.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class StateOutcome
+            implements com.codename1.util.AsyncResult<Boolean> {
+        private final CallSession session;
+        private final CallState target;
+
+        StateOutcome(CallSession session, CallState target) {
+            this.session = session;
+            this.target = target;
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            if (error == null) {
+                session.state = target;
+            }
+        }
+    }
+
+    /// Records the mute flag once the system has accepted it.
+    private static final class MuteOutcome
+            implements com.codename1.util.AsyncResult<Boolean> {
+        private final CallSession session;
+        private final boolean target;
+
+        MuteOutcome(CallSession session, boolean target) {
+            this.session = session;
+            this.target = target;
+        }
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+            if (error == null) {
+                session.muted = target;
+            }
         }
     }
 

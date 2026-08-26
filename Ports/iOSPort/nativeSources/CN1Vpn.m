@@ -258,6 +258,10 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             }
             ipsec.localIdentifier = [localId length] > 0 ? localId : nil;
             ipsec.remoteIdentifier = [remoteId length] > 0 ? remoteId : server;
+            // The PSK-plus-user-credentials arrangement is the common one,
+            // and without this NetworkExtension never performs the user half:
+            // the profile saves cleanly and then cannot connect.
+            ipsec.useExtendedAuthentication = [user length] > 0;
             cfg = ipsec;
         } else {
             NEVPNProtocolIKEv2 *ike = [[NEVPNProtocolIKEv2 alloc] init];

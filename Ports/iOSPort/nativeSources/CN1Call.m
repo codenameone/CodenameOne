@@ -149,6 +149,12 @@ static NSMutableArray *cn1clPending = nil;
 /// user acts on it through the system UI; either means somebody owns it now.
 static NSMutableSet *cn1clUnclaimed = nil;
 
+/// Calls reported to CallKit whose completion has not come back yet.
+static NSMutableSet *cn1clReporting = nil;
+
+/// Java requests waiting on somebody else's in-flight report, by uuid.
+static NSMutableDictionary *cn1clReportWaiters = nil;
+
 /// Whether application code has installed a VoIP listener.
 static BOOL cn1clJavaReady = NO;
 
@@ -165,6 +171,8 @@ static void cn1clEnsureState(void) {
         cn1clActions = [[NSMutableDictionary alloc] init];
         cn1clPending = [[NSMutableArray alloc] init];
         cn1clUnclaimed = [[NSMutableSet alloc] init];
+        cn1clReporting = [[NSMutableSet alloc] init];
+        cn1clReportWaiters = [[NSMutableDictionary alloc] init];
         cn1clLock = [[NSObject alloc] init];
     });
 }
@@ -225,12 +233,15 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
-    NSString *uuid = [action.callUUID UUIDString];
+    // The call is NOT forgotten here. A listener that fails this action --
+    // with or without defer() -- is saying it could not end the call, and
+    // CallKit then restores it; forgetting the uuid on delivery meant a later
+    // CallSession.end() answered INVALID_ID for a call the system was still
+    // showing, and availability checks misread it as somebody else's.
+    // cn1clCompleteAction drops it once the action is fulfilled.
     com_codename1_impl_ios_IOSCallCallbacks_endRequested___java_lang_String_long(
-            getThreadLocalData(), cn1clJString(uuid), cn1clTrackAction(action));
-    @synchronized (cn1clLock) {
-        [cn1clCalls removeObjectForKey:uuid];
-    }
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            cn1clTrackAction(action));
 }
 
 - (void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action {
@@ -400,25 +411,52 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
     update.supportsUngrouping = NO;
 
     BOOL known = NO;
+    BOOL stillPending = NO;
     @synchronized (cn1clLock) {
         known = [cn1clCalls objectForKey:uuidString] != nil;
+        stillPending = [cn1clReporting containsObject:uuidString];
+        if (known && requestId >= 0 && stillPending) {
+            // The first report has not heard back from CallKit yet, so
+            // acknowledging this one as accepted would be a guess -- and if
+            // the original is then filtered or refused, its completion drops
+            // the uuid while Java holds a session with no system call behind
+            // it. Wait and share the original's answer instead.
+            NSMutableArray *waiters = [cn1clReportWaiters objectForKey:uuidString];
+            if (waiters == nil) {
+                waiters = [NSMutableArray array];
+                [cn1clReportWaiters setObject:waiters forKey:uuidString];
+            }
+            [waiters addObject:[NSNumber numberWithInt:requestId]];
+        }
     }
     if (known) {
         // Already ringing -- the other origin got here first.
         [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
-        if (requestId >= 0) {
+        if (requestId >= 0 && !stillPending) {
             cn1clAck(requestId, YES, 0, nil);
         }
         return;
     }
     @synchronized (cn1clLock) {
         [cn1clCalls setObject:uuidString forKey:uuidString];
+        [cn1clReporting addObject:uuidString];
     }
     [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid update:update
             completion:^(NSError *error) {
+        NSArray *waiters = nil;
+        @synchronized (cn1clLock) {
+            [cn1clReporting removeObject:uuidString];
+            waiters = [cn1clReportWaiters objectForKey:uuidString];
+            [cn1clReportWaiters removeObjectForKey:uuidString];
+        }
         if (error != nil) {
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
+                [cn1clUnclaimed removeObject:uuidString];
+            }
+            for (NSNumber *waiter in waiters) {
+                cn1clAck([waiter intValue], NO, CN1_CALL_ERR_CALL_REFUSED,
+                        [error localizedDescription]);
             }
             if (requestId >= 0) {
                 int code = CN1_CALL_ERR_CALL_REFUSED;
@@ -431,6 +469,9 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
                 cn1clAck(requestId, NO, code, [error localizedDescription]);
             }
             return;
+        }
+        for (NSNumber *waiter in waiters) {
+            cn1clAck([waiter intValue], YES, 0, nil);
         }
         if (requestId >= 0) {
             cn1clAck(requestId, YES, 0, nil);
@@ -812,6 +853,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callGrantedPermissions___R_int(
             == AVAudioSessionRecordPermissionGranted) {
         mask |= CN1_CALL_PERM_MICROPHONE;
     }
+    // The camera too, not just the microphone: an app branching on
+    // CAPABILITY_VIDEO could otherwise never see the bit turn on, whatever
+    // the user had granted.
+    if ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo]
+            == AVAuthorizationStatusAuthorized) {
+        mask |= CN1_CALL_PERM_CAMERA;
+    }
     return mask;
 #else
     return 0;
@@ -822,20 +870,34 @@ void com_codename1_impl_ios_IOSNative_callRequestPermissions___int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_INT permissionBits) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    if ((permissionBits & CN1_CALL_PERM_MICROPHONE) != 0) {
+    // Both prompts, chained, so a video app gets one answer covering the
+    // pair rather than having to ask twice through different APIs. Each is
+    // skipped when it was not asked for.
+    BOOL wantsMic = (permissionBits & CN1_CALL_PERM_MICROPHONE) != 0;
+    BOOL wantsCamera = (permissionBits & CN1_CALL_PERM_CAMERA) != 0;
+    void (^answer)(void) = ^{
+        com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
+                getThreadLocalData(), requestId,
+                com_codename1_impl_ios_IOSNative_callGrantedPermissions___R_int(
+                        getThreadLocalData(), JAVA_NULL));
+    };
+    void (^askCamera)(void) = ^{
+        if (!wantsCamera) {
+            answer();
+            return;
+        }
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                completionHandler:^(BOOL granted) {
+            answer();
+        }];
+    };
+    if (wantsMic) {
         [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
-            int mask = CN1_CALL_PERM_MANAGE_CALLS | CN1_CALL_PERM_NOTIFICATIONS;
-            if (granted) {
-                mask |= CN1_CALL_PERM_MICROPHONE;
-            }
-            com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
-                    getThreadLocalData(), requestId, mask);
+            askCamera();
         }];
         return;
     }
-    com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
-            getThreadLocalData(), requestId,
-            CN1_CALL_PERM_MANAGE_CALLS | CN1_CALL_PERM_NOTIFICATIONS);
+    askCamera();
 #else
     com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
             threadStateData, requestId, 0);
@@ -1246,6 +1308,15 @@ void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
         return;
     }
     if (fulfilled != JAVA_FALSE) {
+        // A fulfilled end is the only point at which the call is really over,
+        // so it is where the native bookkeeping drops it.
+        if ([action isKindOfClass:[CXEndCallAction class]]) {
+            NSString *uuid = [[(CXCallAction *)action callUUID] UUIDString];
+            @synchronized (cn1clLock) {
+                [cn1clCalls removeObjectForKey:uuid];
+                [cn1clUnclaimed removeObject:uuid];
+            }
+        }
         [action fulfill];
     } else {
         [action fail];

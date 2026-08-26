@@ -4827,10 +4827,30 @@ public class IPhoneBuilder extends Executor {
                     // carries it without a working call implementation, which
                     // is the entire reason com.codename1.call.voip is a
                     // separate package from com.codename1.call.session.
-                    String modes = request.getArg("ios.background_modes", "");
-                    if (!modes.contains("voip")) {
-                        request.putArgument("ios.background_modes",
-                                modes.length() == 0 ? "voip" : modes + ",voip");
+                    // Only when the project is not already declaring the
+                    // array itself. Plist assembly REFUSES a build that uses
+                    // both ios.background_modes and a UIBackgroundModes in
+                    // ios.plistInject, so setting the hint unconditionally
+                    // broke apps whose injected array already carried voip --
+                    // a configuration that worked until the scanner noticed
+                    // com.codename1.call.voip.
+                    String injected = request.getArg("ios.plistInject", "");
+                    if (injected.contains("UIBackgroundModes")) {
+                        if (!injected.contains("voip")) {
+                            log("This app uses com.codename1.call.voip, which"
+                                    + " needs \"voip\" in UIBackgroundModes."
+                                    + " The ios.plistInject build hint declares"
+                                    + " UIBackgroundModes itself, so add it"
+                                    + " there -- the two mechanisms cannot"
+                                    + " both be used.");
+                        }
+                    } else {
+                        String modes = request.getArg("ios.background_modes", "");
+                        if (!modes.contains("voip")) {
+                            request.putArgument("ios.background_modes",
+                                    modes.length() == 0 ? "voip"
+                                            : modes + ",voip");
+                        }
                     }
                 }
                 if (usesCallDirectory) {
@@ -4849,9 +4869,17 @@ public class IPhoneBuilder extends Executor {
                     callDirectoryAppGroup = group;
                     String appGroups = request.getArg("ios.app_groups", "");
                     if (!declaresAppGroup(appGroups, group)) {
+                        // SPACE, not a comma. generateEntitlements splits
+                        // ios.app_groups on " " alone, so a comma-joined pair
+                        // came out as a single <string> "group.a,group.b"
+                        // that matches neither configured group -- and the
+                        // host then cannot reach the container it shares with
+                        // the extension. declaresAppGroup above tolerates
+                        // either separator when READING, which is what hid
+                        // this.
                         request.putArgument("ios.app_groups",
                                 appGroups.trim().length() == 0 ? group
-                                        : appGroups.trim() + "," + group);
+                                        : appGroups.trim() + " " + group);
                     }
                 }
                 // The call provider's identity is written into Info.plist
@@ -4861,6 +4889,19 @@ public class IPhoneBuilder extends Executor {
                 // had a chance to configure anything, so the name, icon and
                 // ringtone have to be baked into the bundle.
                 callPlistWanted = true;
+                // iOS refuses the camera prompt outright without a purpose
+                // string, so a video app that asked for CAMERA got a denial
+                // it could not clear. Behind the project's own statement that
+                // it does video, for the reason the Android CAMERA
+                // permission is.
+                if ("true".equals(request.getArg("ios.call.video",
+                        request.getArg("call.video", "false")))) {
+                    if (request.getArg("ios.NSCameraUsageDescription",
+                            null) == null) {
+                        request.putArgument("ios.NSCameraUsageDescription",
+                                "Carries the video of a call.");
+                    }
+                }
             }
 
             // VPN configuration management.
@@ -10715,8 +10756,22 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.build_action_mask = \"2147483647\"\n"
                 + "embed_phase.dst_subfolder_spec = \"13\"\n"
                 + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
-                + "embed_phase.add_file_reference(fileref)\n"
-                + "service_target.build_configurations.each{|e| \n");
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Same guard the widget extension carries. This iOS build also
+            // produces a Mac Catalyst slice, and a Call Directory extension
+            // is iOS-only -- MacNativeBuilder marks only the APP target
+            // SUPPORTS_MACCATALYST and its Mac entitlements carry no app
+            // group, so building and embedding this target for the Mac
+            // destination fails the Catalyst archive. The iOS app keeps its
+            // directory; the Mac slice ships without one.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target"
+                    + " && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
             sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
                     + buildSettingsMap.get(buildSettingKey) + "\"\n");

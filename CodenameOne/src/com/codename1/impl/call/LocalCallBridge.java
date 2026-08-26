@@ -82,6 +82,7 @@ public class LocalCallBridge implements CallBridge {
     private boolean directoryEnabled = true;
     private boolean audioWithheld;
     private boolean endFails;
+    private boolean failNext;
     private int availability;
     private int grantedPermissions = PERMISSION_MANAGE_CALLS | PERMISSION_MICROPHONE;
     private int route = CallAudioRoute.EARPIECE.ordinal();
@@ -160,6 +161,16 @@ public class LocalCallBridge implements CallBridge {
     /// live call it had already forgotten about.
     public void primeEndFailure() {
         this.endFails = true;
+    }
+
+    /// Makes the next acknowledged operation be refused.
+    ///
+    /// Broader than [#primeEndFailure]: hold, resume, mute and the keypad can
+    /// all be rejected by a real platform -- most ordinarily when the call
+    /// ends while the request is in flight -- and code that assumed they
+    /// always succeed shows the user a state the system rejected.
+    public void primeOperationFailure() {
+        this.failNext = true;
     }
 
     /// Stops the audio session ever being activated.
@@ -678,6 +689,12 @@ public class LocalCallBridge implements CallBridge {
     }
 
     private void ok(int requestId) {
+        if (failNext) {
+            failNext = false;
+            fail(requestId, CallError.BUSY,
+                    "The simulated platform refused the request");
+            return;
+        }
         later(LATENCY_MILLIS, new AckDelivery(requestId, true, 0, null));
     }
 

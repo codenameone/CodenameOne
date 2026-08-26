@@ -2850,7 +2850,10 @@ public class AndroidGradleBuilder extends Executor {
                     + (usesCallDirectory ? " directory" : ""));
             xPermissions = CallManifestFragments.injectPermissions(
                     xPermissions, usesCallSession, usesCallVoip,
-                    usesCallDirectory, targetSDKVersionInt);
+                    usesCallDirectory,
+                    "true".equals(request.getArg("android.call.video",
+                            request.getArg("call.video", "false"))),
+                    targetSDKVersionInt);
             // Suppression is per service, inside services(): an app that
             // hand-declared one of the two used to suppress both.
             String existingApplication = request.getArg("android.xapplication", "");

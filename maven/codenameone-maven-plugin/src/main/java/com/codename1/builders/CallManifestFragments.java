@@ -79,6 +79,25 @@ final class CallManifestFragments {
      */
     static String injectPermissions(String xPermissions, boolean session,
             boolean voip, boolean directory, int targetSdkVersion) {
+        return injectPermissions(xPermissions, session, voip, directory, false,
+                targetSdkVersion);
+    }
+
+    /**
+     * Returns {@code xPermissions} with the call permissions prepended.
+     *
+     * @param xPermissions     the current accumulated manifest fragment
+     * @param session          {@code com.codename1.call.session} usage
+     * @param voip             {@code com.codename1.call.voip} usage
+     * @param directory        {@code com.codename1.call.directory} usage
+     * @param video            the project declares video calls, through the
+     *                         {@code call.video} build hint
+     * @param targetSdkVersion the build's target SDK level
+     * @return the fragment with the call entries prepended
+     */
+    static String injectPermissions(String xPermissions, boolean session,
+            boolean voip, boolean directory, boolean video,
+            int targetSdkVersion) {
         String out = xPermissions == null ? "" : xPermissions;
 
         if (session || voip) {
@@ -88,6 +107,16 @@ final class CallManifestFragments {
             // every reported call without it.
             out = addPermission(out, "android.permission.MANAGE_OWN_CALLS", "");
             out = addPermission(out, "android.permission.RECORD_AUDIO", "");
+            if (video) {
+                // Behind the hint rather than always. Android cannot grant a
+                // runtime permission the manifest does not declare, so
+                // Calls.requestPermissions(PERMISSION_CAMERA) reported a
+                // denial it could never clear -- but declaring CAMERA for
+                // every calling app costs a Play Console conversation and a
+                // prompt the user cannot explain, so it follows the project's
+                // own statement that it does video.
+                out = addPermission(out, "android.permission.CAMERA", "");
+            }
         }
 
         if (voip) {

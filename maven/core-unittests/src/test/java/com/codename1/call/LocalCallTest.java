@@ -511,6 +511,50 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aStaleCallIsNotRegisteredAsACurrentSession() {
+        // getSessions() promises current calls. Registering a stale one left
+        // every missed cold-start push sitting there for the life of the
+        // process.
+        String id = CallId.random();
+        bridge.enqueuePushedCall(id, CallHandle.phone("+1"), "Missed", false,
+                true, null);
+        final List<PushedCall> got = new ArrayList<PushedCall>();
+        VoipPush.setListener(new Collector(got));
+        waitFor(got, 1);
+        assertTrue(got.get(0).isStale());
+        assertNotNull(got.get(0).getSession(),
+                "the app still needs somewhere to read the handle from");
+        assertNull(Calls.getSession(id),
+                "a call that is already over is not a current call");
+        assertEquals(0, Calls.getSessions().length);
+    }
+
+    @Test
+    public void aRefusedHoldDoesNotMoveTheSessionState() {
+        // The platform can reject a hold -- the call ending while the request
+        // is in flight is the ordinary way -- and the session used to claim
+        // HELD anyway, with nothing to roll it back.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        CallAwait.value(s.setHeld(true));
+        assertSame(CallState.HELD, s.getState());
+        bridge.primeOperationFailure();
+        CallAwait.errorOf(s.setHeld(false));
+        assertSame(CallState.HELD, s.getState(),
+                "a rejected resume must leave the state where the system has it");
+    }
+
+    @Test
+    public void aRefusedMuteDoesNotMoveTheSessionFlag() {
+        String id = CallId.random();
+        CallSession s = ring(id);
+        bridge.primeOperationFailure();
+        CallAwait.errorOf(s.setMuted(true));
+        assertFalse(s.isMuted(),
+                "a rejected mute must not show as muted");
+    }
+
+    @Test
     public void registeringYieldsAToken() {
         String token = CallAwait.value(VoipPush.register());
         assertNotNull(token);

@@ -484,6 +484,28 @@ public final class Calls {
                 null, false));
     }
 
+    /// Moves a session's state once the action that asked for it is
+    /// fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class StateChange implements Runnable {
+        private final CallSession session;
+        private final CallState target;
+
+        StateChange(CallSession session, CallState target) {
+            this.session = session;
+            this.target = target;
+        }
+
+        @Override
+        public void run() {
+            if (session != null) {
+                session.setStateInternal(target);
+            }
+        }
+    }
+
     /// Marks a call ended and forgets it, once the end action is fulfilled.
     ///
     /// A named static class rather than an anonymous one so it holds no
@@ -564,42 +586,58 @@ public final class Calls {
             CallSession session = callId == null ? null : getSession(callId);
             switch (kind) {
                 case ANSWER: {
-                    if (session != null) {
-                        session.setStateInternal(CallState.ACTIVE);
-                    }
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.answerRequested(callId, a);
+                    // ACTIVE only once the answer is FULFILLED. Setting it
+                    // before dispatch left a listener that failed the action
+                    // -- directly, or through the deferred safety timer --
+                    // holding an active session over a call iOS had put back
+                    // to ringing and Android had destroyed.
+                    a.whenFulfilled(new StateChange(session, CallState.ACTIVE));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.answerRequested(callId, a);
+                        }
+                    } finally {
+                        settle(a);
                     }
-                    settle(a);
                     break;
                 }
                 case END: {
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.endRequested(callId, a);
-                    }
-                    // Registered BEFORE settle(), and deliberately a hook
+                    // Registered BEFORE dispatch, and deliberately a hook
                     // rather than a check. Forgetting unconditionally left an
                     // app that failed the action holding a live system call
                     // getSession() could not address; checking isAnswered()
                     // straight after dispatch instead missed the opposite
                     // case, where a listener defers and fulfils later and the
-                    // ended call was never forgotten at all. Only a fulfilled
-                    // end forgets, whenever it happens.
+                    // ended call was never forgotten at all. Registering it
+                    // first also means a listener that THROWS still gets the
+                    // cleanup, because the finally below fulfils the action.
                     a.whenFulfilled(new EndCleanup(callId, session));
-                    settle(a);
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.endRequested(callId, a);
+                        }
+                    } finally {
+                        settle(a);
+                    }
                     break;
                 }
                 case HOLD: {
-                    if (session != null) {
-                        session.setStateInternal(flag ? CallState.HELD : CallState.ACTIVE);
-                    }
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.holdRequested(callId, flag, a);
+                    // On fulfilment only, for the reason ANSWER gives.
+                    a.whenFulfilled(new StateChange(session,
+                            flag ? CallState.HELD : CallState.ACTIVE));
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.holdRequested(callId, flag, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
                     }
-                    settle(a);
                     break;
                 }
                 case MUTE: {
@@ -607,26 +645,44 @@ public final class Calls {
                         session.setMutedInternal(flag);
                     }
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.muteRequested(callId, flag, a);
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.muteRequested(callId, flag, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
                     }
-                    settle(a);
                     break;
                 }
                 case DTMF: {
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.dtmfRequested(callId, text, a);
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.dtmfRequested(callId, text, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
                     }
-                    settle(a);
                     break;
                 }
                 case START: {
                     CallAction a = new CallAction(token, callId);
-                    for (CallActionListener l : ls) {
-                        l.startCallRequested(callId, handle, video, a);
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.startCallRequested(callId, handle, video, a);
+                        }
+                    } finally {
+                        // A listener that throws must not leave the action
+                        // unanswered: the platform then times it out, and the
+                        // system UI and the app disagree with nothing in the log.
+                        settle(a);
                     }
-                    settle(a);
                     break;
                 }
                 case AUDIO_ON: {
@@ -678,6 +734,20 @@ public final class Calls {
                 a.answer(true);
             }
         }
+    }
+
+    /// Builds a session for a call that is already over, WITHOUT registering
+    /// it.
+    ///
+    /// Used for a pushed call that ended before the app heard about it: the
+    /// app needs somewhere to read the handle and the id from, and
+    /// getSessions() must not start listing calls that are finished.
+    ///
+    /// @hidden not part of the public API.
+    public static CallSession detachedSession(String callId, CallHandle handle,
+            String displayName) {
+        return new CallSession(callId, CallDirection.INCOMING, handle,
+                displayName, CallState.ENDED);
     }
 
     /// Clears every listener and session.
