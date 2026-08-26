@@ -192,6 +192,19 @@ class InterpRuntimeContractTest {
         // and refuse the class as missing source.
         assertEquals("foo.a{b", packageOfKotlin(
                 "package foo.`a{b`\n\nclass Test\n"));
+        // Kotlin treats a newline following a `.` as whitespace -- the
+        // qualified identifier can't end on a dot, so the header keeps
+        // reading on the next line. Stopping at the newline would key
+        // the source at `com/` and refuse the emitted `com/example/...`
+        // class as missing its source.
+        assertEquals("com.example", packageOfKotlin(
+                "package com.\nexample\n\nclass A\n"));
+        // Same shape but with a CRLF pair -- Windows-authored sources
+        // reach the scanner with `\r\n`, and the check has to look past
+        // the trailing `\r` when deciding whether the last significant
+        // token was a dot.
+        assertEquals("com.example", packageOfKotlin(
+                "package com.\r\nexample\r\n\r\nclass A\r\n"));
     }
 
     private static String packageOf(String source) throws Exception {

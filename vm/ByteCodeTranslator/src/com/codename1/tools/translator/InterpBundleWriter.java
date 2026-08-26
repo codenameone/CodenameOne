@@ -327,6 +327,25 @@ public class InterpBundleWriter {
                                 break;
                             }
                             if (!java && (t == '\n' || t == '\r')) {
+                                // Kotlin treats a newline that follows an
+                                // operator (a trailing `.` here) as
+                                // whitespace, because the qualified
+                                // identifier cannot terminate on it --
+                                // `package com.\nexample` is one name, and
+                                // stopping at the newline would key the
+                                // source at `com.` and the emitted
+                                // `com/example/...` class would be rejected
+                                // as missing its source. Skip a newline
+                                // whose nearest non-whitespace predecessor
+                                // is a dot.
+                                int look = end - 1;
+                                while (look > i && isKotlinLineWhitespace(code.charAt(look))) {
+                                    look--;
+                                }
+                                if (look >= i && code.charAt(look) == '.') {
+                                    end++;
+                                    continue;
+                                }
                                 break;
                             }
                         }
@@ -383,6 +402,15 @@ public class InterpBundleWriter {
         char c = code.charAt(j);
         // `X::class` -- the colon we land on is the second of a pair.
         return c == '.' || (c == ':' && j > 0 && code.charAt(j - 1) == ':');
+    }
+
+    /// Whether a character counts as intra-line whitespace when walking back
+    /// to decide if a Kotlin newline terminates the package directive. A CR
+    /// is included so `\r\n` on Windows sources is treated the same as `\n`
+    /// on Unix: the char immediately before the newline can be a CR that is
+    /// itself line whitespace, not the last significant token.
+    private static boolean isKotlinLineWhitespace(char c) {
+        return c == ' ' || c == '\t' || c == '\r';
     }
 
     /// Removes whitespace outside backtick-escaped segments and drops the
