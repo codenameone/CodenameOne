@@ -51,6 +51,20 @@ public @interface Hint {
     /// the authority on the spelling.
     String name() default "";
 
+    /// A regular expression the value must match, or "" for no check.
+    ///
+    /// For the hints whose type cannot express their shape. `String` says
+    /// nothing about `ios.interface_orientation`, whose value is a colon
+    /// separated list of four known constants -- and a misspelled one does not
+    /// fail, it just fails to match, so the builder keeps every orientation and
+    /// the app ships rotating in directions it was told not to.
+    ///
+    /// Checked by the annotation processor against the value that is about to be
+    /// written, so it fails the build that declared it rather than the device
+    /// that runs it. `java.util.regex` syntax, anchored implicitly: the WHOLE
+    /// value must match.
+    String valuePattern() default "";
+
     // There is deliberately no `def` member. The build server owns what happens
     // when a hint is not set, and it may change that; a copy of it here would be
     // a second answer, baked into every app already compiled against this

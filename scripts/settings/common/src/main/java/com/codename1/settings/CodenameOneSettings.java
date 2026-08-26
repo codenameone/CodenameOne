@@ -4362,9 +4362,13 @@ public class CodenameOneSettings extends Lifecycle {
         // the add-source execution and inherits <sources> from management ended
         // up with configuration and no binding, so compileGoalConfiguration read
         // the goal as unbound and omitted a root Maven really compiles.
-        String merged = chosen == active ? chosen : chosen + executionsOnly(active);
+        // The chosen block may be an ancestor's, carrying the very execution the
+        // child switched off; bindsGoal would find that enabled copy.
+        String merged = chosen == active ? chosen
+                : withoutDisabledExecutions(chosen, active) + executionsOnly(active);
         return bindsGoal(merged, goal) ? merged
-                : merged + mergedManagedExecutions(chain, artifactId);
+                : merged + mergedManagedExecutions(chain, artifactId,
+                        active);
     }
 
     /// `xml` with every `<!-- ... -->` removed.
@@ -4419,6 +4423,19 @@ public class CodenameOneSettings extends Lifecycle {
     /// along, because the active declaration already supplied the element and an
     /// active value REPLACES the managed one.
     private static String mergedManagedExecutions(String managedFromChain, String artifactId) {
+        return mergedManagedExecutions(managedFromChain, artifactId, null);
+    }
+
+    /// The same, without the executions `disabledBy` switches off by id.
+    ///
+    /// Maven merges executions by id, so a child that redeclares the parent's id
+    /// with `<phase>none</phase>` turns it off. Appending the managed set
+    /// unfiltered left the disabled child copy and the enabled ancestor copy
+    /// both present, and `bindsGoal` answered from whichever it reached first --
+    /// reporting a root the build does not compile.
+    private static String mergedManagedExecutions(String managedFromChain, String artifactId,
+                                                  String disabledBy) {
+        java.util.Set<String> off = disabledExecutionIds(disabledBy);
         java.util.List<String> blocks = pluginBlocks(managedFromChain, artifactId);
         if (blocks.isEmpty()) {
             return "";
@@ -4431,6 +4448,11 @@ public class CodenameOneSettings extends Lifecycle {
                 java.util.List<String> ids = elementValues(execution, "id");
                 // Maven's own name for an execution that does not give one.
                 String id = ids.isEmpty() ? "default" : ids.get(0).trim();
+                if (off.contains(id)) {
+                    // The active declaration switched this id off; the ancestor's
+                    // enabled copy of it is not a binding this module has.
+                    continue;
+                }
                 java.util.List<String> phases = elementValues(execution, "phase");
                 String phase = phases.isEmpty() ? null : phases.get(0).trim();
                 String goals = between(execution, "<goals>", "</goals>");
@@ -4462,6 +4484,59 @@ public class CodenameOneSettings extends Lifecycle {
             out.append("</execution>");
         }
         return out.append("</executions>").toString();
+    }
+
+    /// `block` without the executions `disabledBy` switches off by id.
+    ///
+    /// The block that supplied the CONFIGURATION carries its own executions, and
+    /// when that block came from an ancestor those are the ones the child was
+    /// overriding. Filtering only what gets appended left the ancestor's enabled
+    /// copy sitting inside the chosen block, where bindsGoal found it.
+    private static String withoutDisabledExecutions(String block, String disabledBy) {
+        java.util.Set<String> off = disabledExecutionIds(disabledBy);
+        if (block == null || off.isEmpty() || block.indexOf("<execution>") < 0) {
+            return block;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = block.indexOf("<execution>", at);
+            if (open < 0) {
+                out.append(block.substring(at));
+                return out.toString();
+            }
+            int close = block.indexOf("</execution>", open);
+            if (close < 0) {
+                out.append(block.substring(at));
+                return out.toString();
+            }
+            close += "</execution>".length();
+            out.append(block, at, open);
+            String execution = block.substring(open, close);
+            java.util.List<String> ids = elementValues(execution, "id");
+            if (!off.contains(ids.isEmpty() ? "default" : ids.get(0).trim())) {
+                out.append(execution);
+            }
+            at = close;
+        }
+    }
+
+    /// The execution ids `pluginBlock` switches off with `<phase>none</phase>`.
+    private static java.util.Set<String> disabledExecutionIds(String pluginBlock) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        for (String execution : executionBlocks(pluginBlock)) {
+            if (!declaresValue(execution, "phase", "none")) {
+                continue;
+            }
+            java.util.List<String> ids = elementValues(execution, "id");
+            // An execution with no id cannot be the override of a named one, and
+            // "default" is the name Maven gives it.
+            out.add(ids.isEmpty() ? "default" : ids.get(0).trim());
+        }
+        return out;
     }
 
     /// Every `<plugin>` block for `artifactId` in `pomText`, in document order.

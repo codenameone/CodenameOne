@@ -148,6 +148,24 @@ public final class BuildHintAnnotationBinding {
         HINTS.put("Lcom/codename1/annotations/buildhints/Build;#nativeTheme", "nativeTheme");
         HINTS.put("Lcom/codename1/annotations/buildhints/Build;#noExtraResources", "noExtraResources");
 
+        WIRE.put("AndroidMinSdk#API_19", "19");
+        WIRE.put("AndroidMinSdk#API_20", "20");
+        WIRE.put("AndroidMinSdk#API_21", "21");
+        WIRE.put("AndroidMinSdk#API_22", "22");
+        WIRE.put("AndroidMinSdk#API_23", "23");
+        WIRE.put("AndroidMinSdk#API_24", "24");
+        WIRE.put("AndroidMinSdk#API_25", "25");
+        WIRE.put("AndroidMinSdk#API_26", "26");
+        WIRE.put("AndroidMinSdk#API_27", "27");
+        WIRE.put("AndroidMinSdk#API_28", "28");
+        WIRE.put("AndroidMinSdk#API_29", "29");
+        WIRE.put("AndroidMinSdk#API_30", "30");
+        WIRE.put("AndroidMinSdk#API_31", "31");
+        WIRE.put("AndroidMinSdk#API_32", "32");
+        WIRE.put("AndroidMinSdk#API_33", "33");
+        WIRE.put("AndroidMinSdk#API_34", "34");
+        WIRE.put("AndroidMinSdk#API_35", "35");
+        WIRE.put("AndroidMinSdk#API_36", "36");
         WIRE.put("AndroidThemeMode#AUTO", "auto");
         WIRE.put("AndroidThemeMode#MODERN", "modern");
         WIRE.put("AndroidThemeMode#HOLOLIGHT", "hololight");
@@ -185,6 +203,7 @@ public final class BuildHintAnnotationBinding {
         WIRE.put("Toggle#ON", "true");
         WIRE.put("Toggle#OFF", "false");
 
+        UNSET.add("AndroidMinSdk#DEFAULT");
         UNSET.add("AndroidThemeMode#DEFAULT");
         UNSET.add("DesktopTitleBar#DEFAULT");
         UNSET.add("HardenControlFlow#DEFAULT");

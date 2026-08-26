@@ -218,6 +218,7 @@ public final class BuildHints {
         private final List<String> valueLabels = new ArrayList<String>();
         private final List<String> valueConstants = new ArrayList<String>();
         private String unsetConstant;
+        private String valuePattern;
         private String def;
         private String separator;
         private String platform = "general";
@@ -327,6 +328,12 @@ public final class BuildHints {
         public Hint valueConstants(String... constants) {
             this.valueConstants.clear();
             Collections.addAll(this.valueConstants, constants);
+            return this;
+        }
+
+        /// A regular expression the whole value must match, or null.
+        public Hint valuePattern(String regex) {
+            this.valuePattern = regex == null || regex.length() == 0 ? null : regex;
             return this;
         }
 
@@ -443,6 +450,19 @@ public final class BuildHints {
             return Collections.unmodifiableList(valueConstants);
         }
         public String unsetConstant() { return unsetConstant; }
+
+        /// The enum constant that sends `wire`, or null when nothing does.
+        ///
+        /// Recorded, never derived. Upper-casing the wire value works only while
+        /// the constant happens to be its spelling: Toggle.ON sends "true" and
+        /// AndroidMinSdk.API_23 sends "23", and a derivation produced TRUE and
+        /// V23 -- constants that do not exist. Null rather than a guess, so a
+        /// caller refuses instead of writing something that will not compile.
+        public String constantFor(String wire) {
+            int i = values.indexOf(wire);
+            return i >= 0 && i < valueConstants.size() ? valueConstants.get(i) : null;
+        }
+        public String valuePattern() { return valuePattern; }
         public String def() { return def; }
         public String separator() { return separator; }
         public String platform() { return platform; }

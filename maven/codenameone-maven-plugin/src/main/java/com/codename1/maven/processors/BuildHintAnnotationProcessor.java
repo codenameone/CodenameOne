@@ -190,6 +190,12 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 if (value == null) {
                     continue;
                 }
+                String malformed = patternViolation(hint, value);
+                if (malformed != null) {
+                    ctx.error(cls, "@" + simpleName(descriptor) + "(" + member.getKey()
+                            + ") is " + malformed);
+                    continue;
+                }
                 String origin = "@" + simpleName(descriptor) + "(" + member.getKey() + ")";
                 String previous = hints.put(hint, value);
                 if (previous != null && !previous.equals(value)) {
@@ -1659,6 +1665,34 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// Converts one annotation member value to the string the build receives.
     ///
     /// Returns null when the value could not be converted, having reported it.
+    /// Why `value` does not match the hint's declared pattern, or null.
+    ///
+    /// The type of an attribute cannot express every hint's shape. `String` says
+    /// nothing about a colon separated list of four known constants, and a
+    /// builder that does not recognise a value does not fail on it -- it falls
+    /// back to its default, so a misspelling ships as "no setting at all". This
+    /// turns that into an error against the build that declared it.
+    ///
+    /// The WHOLE value must match; `matches()` anchors on its own. A pattern the
+    /// catalog cannot compile is ignored rather than failing every build that
+    /// touches the hint -- the catalog's own tests are where a bad pattern
+    /// belongs, not here.
+    private static String patternViolation(String hint, String value) {
+        BuildHints.Hint described = BuildHints.byName(hint);
+        String pattern = described == null ? null : described.valuePattern();
+        if (pattern == null || pattern.length() == 0) {
+            return null;
+        }
+        try {
+            if (java.util.regex.Pattern.compile(pattern).matcher(value).matches()) {
+                return null;
+            }
+        } catch (java.util.regex.PatternSyntaxException badPattern) {
+            return null;
+        }
+        return "not a valid " + hint + ": \"" + value + "\" does not match " + pattern;
+    }
+
     private String wireValue(AnnotatedClass cls, String descriptor, String member, Object raw,
                              String hint, ProcessorContext ctx) {
         if (raw instanceof Boolean || raw instanceof Number || raw instanceof Character) {

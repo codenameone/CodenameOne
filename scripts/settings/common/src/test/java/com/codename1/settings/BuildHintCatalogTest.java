@@ -60,7 +60,15 @@ public class BuildHintCatalogTest {
         assertEquals(BuildHintType.BOOLEAN, catalog.get("android.debug").type());
         assertEquals(BuildHintType.XML, catalog.get("ios.plistInject").type());
         assertEquals(BuildHintType.INTEGER, catalog.get("java.version").type());
-        assertEquals(BuildHintType.INTEGER, catalog.get("android.min_sdk_version").type());
+        // The floor is a closed domain now: the editor offers the API levels
+        // this framework build supports rather than a free-text number, which is
+        // the same reason ios.themeMode is not a String.
+        assertEquals(BuildHintType.ENUM, catalog.get("android.min_sdk_version").type());
+        assertTrue(catalog.get("android.min_sdk_version").values().contains("23"),
+                catalog.get("android.min_sdk_version").values().toString());
+        // The TARGET stays an integer: the build server's default for it is the
+        // highest platform it has installed, so the domain is open-ended.
+        assertEquals(BuildHintType.INTEGER, catalog.get("android.targetSDKVersion").type());
         assertEquals(BuildHintType.BOOLEAN, catalog.get("android.useAndroidX").type());
         assertEquals(BuildHintType.CSV, catalog.get("ios.pods").type());
     }
@@ -2590,6 +2598,44 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.withoutNonInheritedPlugins(perExecution));
         assertTrue(roots.contains("is/inherited"), roots.toString());
         assertFalse(roots.contains("not/inherited"), roots.toString());
+    }
+
+    /// A child that switches an inherited execution off keeps it off.
+    ///
+    /// Maven merges executions by id, so redeclaring the parent's id with
+    /// `<phase>none</phase>` disables it. The managed set was appended
+    /// unfiltered, leaving the disabled child copy and the enabled ancestor copy
+    /// both present, and `bindsGoal` answered from whichever came first -- so a
+    /// root the build does not compile went into the scan, where a dormant copy
+    /// of the main class can shadow the compiled source.
+    @Test
+    public void aChildDisablingAnInheritedExecutionKeepsItDisabled() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>inherited/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        String block = CodenameOneSettings.activePluginBlock(child,
+                "build-helper-maven-plugin", "sources", "add-source", ancestor);
+        assertFalse(CodenameOneSettings.bindsGoal(block, "add-source"),
+                "a disabled execution was re-enabled by its ancestor: " + block);
+        assertFalse(CodenameOneSettings.declaredSourceRoots(child, null, ancestor)
+                        .contains("inherited/gen"),
+                CodenameOneSettings.declaredSourceRoots(child, null, ancestor).toString());
+
+        // A DIFFERENT id is untouched: disabling `add` does not disable `other`.
+        String otherId = child.replace("<id>add</id><phase>none</phase>",
+                "<id>other</id><phase>none</phase>");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(otherId, null, ancestor)
+                        .contains("inherited/gen"),
+                CodenameOneSettings.declaredSourceRoots(otherId, null, ancestor).toString());
     }
 
     /// Plugin-level configuration with no execution is dormant here too.

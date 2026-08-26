@@ -491,6 +491,10 @@ public final class BuildHintAnnotationReader {
                 hint.separator(separator);
             }
             applyType(hint, enums, separator);
+            String valuePattern = value("valuePattern", "");
+            if (valuePattern.length() > 0) {
+                hint.valuePattern(valuePattern);
+            }
             hint.platform(value("platform", groupDefaults.value("platform", "general")));
             if (values.containsKey("aliasOf")) {
                 hint.aliasOf(values.get("aliasOf"));

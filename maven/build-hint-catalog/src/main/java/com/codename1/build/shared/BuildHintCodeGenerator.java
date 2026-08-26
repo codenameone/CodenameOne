@@ -603,6 +603,10 @@ public final class BuildHintCodeGenerator {
         if (h.type() != HintType.ENUM) {
             sb.append("                .type(HintType.").append(h.type().name()).append(")\n");
         }
+        if (h.valuePattern() != null) {
+            sb.append("                .valuePattern(").append(quote(h.valuePattern()))
+              .append(")\n");
+        }
         if (h.def() != null && h.def().length() > 0) {
             sb.append("                .def(").append(quote(h.def())).append(")\n");
         }

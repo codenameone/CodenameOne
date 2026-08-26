@@ -171,6 +171,45 @@ public class BuildHintAnnotationProcessorTest {
         assertNull(p.getProperty("codename1.arg.ios.themeMode"));
     }
 
+    /// A value outside a hint's declared pattern fails the build that wrote it.
+    ///
+    /// `ios.interface_orientation` is a colon separated list of four known
+    /// constants and its type is only String, so nothing but this catches a
+    /// misspelling. The builder does not: it lowercases the value and asks
+    /// whether it CONTAINS each constant, so an unrecognised one simply matches
+    /// nothing and every orientation stays in the plist -- the app ships
+    /// rotating in directions it was told not to, with a green build.
+    @Test
+    public void aValueOutsideTheDeclaredPatternIsAnError() throws Exception {
+        ProcessorContext ctx = run(compile(
+                "@Ios(interfaceOrientation = \"UIInterfaceOrientationPortraitt\")"),
+                settings(), MAIN, false);
+        assertTrue("a misspelled orientation must be refused", ctx.hasErrors());
+        String message = ctx.getErrors().get(0).getMessage();
+        assertTrue(message, message.contains("ios.interface_orientation"));
+        assertTrue(message, message.contains("UIInterfaceOrientationPortraitt"));
+    }
+
+    /// ...and a value inside it is written unchanged.
+    @Test
+    public void aValueMatchingTheDeclaredPatternIsWritten() throws Exception {
+        Properties p = hintsOf("@Ios(interfaceOrientation = "
+                + "\"UIInterfaceOrientationPortrait:UIInterfaceOrientationLandscapeLeft\")");
+        assertEquals("UIInterfaceOrientationPortrait:UIInterfaceOrientationLandscapeLeft",
+                p.getProperty("codename1.arg.ios.interface_orientation"));
+    }
+
+    /// The Android floor is a constant now, and it sends the API level.
+    @Test
+    public void theMinSdkConstantSendsItsApiLevel() throws Exception {
+        Properties p = hintsOf("@Android(minSdkVersion = AndroidMinSdk.API_23)");
+        assertEquals("23", p.getProperty("codename1.arg.android.min_sdk_version"));
+
+        Properties unset = hintsOf("@Android(minSdkVersion = AndroidMinSdk.DEFAULT)");
+        assertNull("DEFAULT must leave the server's own floor in force",
+                unset.getProperty("codename1.arg.android.min_sdk_version"));
+    }
+
     // ------------------------------------------------------------------
     // determinism and cleanup
     // ------------------------------------------------------------------

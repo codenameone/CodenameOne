@@ -102,7 +102,13 @@ public @interface Ios {
     /// `UIInterfaceOrientationLandscapeLeft`,
     /// `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an
     /// "Interface Orientation" combo box you *should* use under the iOS section.
-    @Hint(name = "ios.interface_orientation")
+    @Hint(name = "ios.interface_orientation",
+            // Longest alternative first, and the group repeated rather than
+            // recursed: java.util.regex has no (?1).
+            valuePattern = "(?i)UIInterfaceOrientation(PortraitUpsideDown|Portrait"
+                    + "|LandscapeLeft|LandscapeRight)"
+                    + "(:UIInterfaceOrientation(PortraitUpsideDown|Portrait"
+                    + "|LandscapeLeft|LandscapeRight))*")
     String interfaceOrientation() default "";
 
     /// The null and empty-string reads of this hint are presence checks; 6.0 is

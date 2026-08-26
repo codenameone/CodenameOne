@@ -104,7 +104,7 @@ public @interface Android {
     /// functionality but can be as low as 7. This corresponds to the XML attribute
     /// `android:minSdkVersion`.
     @Hint(name = "android.min_sdk_version")
-    int minSdkVersion() default 0;
+    AndroidMinSdk minSdkVersion() default AndroidMinSdk.DEFAULT;
 
     /// Multidex lets an Android binary reference more than 65536 methods.
     /// Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default

@@ -35,6 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The simulator picks the build-hint manifest that belongs to THIS application.
@@ -183,6 +184,13 @@ public class SimulatorAnnotationManifestTest {
         } finally {
             os.close();
         }
+        // Timestamps set rather than inherited from the write order. The
+        // staleness check falls back to "is the class newer than the manifest",
+        // and writing the manifest first makes it so -- the test then passed or
+        // failed on whether the two writes landed in the same filesystem tick.
+        assertTrue(cls.setLastModified(1_000_000_000_000L));
+        assertTrue(new File(live, "META-INF/codenameone/build-hints.properties")
+                .setLastModified(1_000_000_600_000L));
 
         String cp = leftover.getAbsolutePath() + File.pathSeparator + live.getAbsolutePath();
         Simulator.FoundManifest found =

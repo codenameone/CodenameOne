@@ -738,7 +738,16 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 if (canonical == null || !exactlySpelled(hint, v)) {
                     return null;
                 }
-                return hint.enumName() + "." + enumConstant(canonical);
+                // The constant the enum really declares, from the catalog.
+                // Deriving it from the wire value gave V23 for AndroidMinSdk's
+                // "23" and TRUE for Toggle's "true" -- source that does not
+                // compile, written by a goal whose whole job is to migrate a
+                // project without breaking it.
+                String constant = hint.constantFor(canonical);
+                if (constant == null) {
+                    return null;
+                }
+                return hint.enumName() + "." + constant;
             }
             case STRING_LIST: {
                 String sep = hint.separator();
@@ -767,21 +776,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             default:
                 return quoteFor(v, kotlin);
         }
-    }
-
-    /** Mirrors the generator's wire-value to constant-name mapping. */
-    static String enumConstant(String wire) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < wire.length(); i++) {
-            char c = wire.charAt(i);
-            if (Character.isUpperCase(c) && sb.length() > 0
-                    && Character.isLowerCase(wire.charAt(i - 1))) {
-                sb.append('_');
-            }
-            sb.append(Character.isLetterOrDigit(c) ? Character.toUpperCase(c) : '_');
-        }
-        String out = sb.toString();
-        return out.length() > 0 && Character.isDigit(out.charAt(0)) ? "V" + out : out;
     }
 
     /**

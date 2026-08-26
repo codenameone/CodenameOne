@@ -131,7 +131,9 @@ final class BuildHintsFromAnnotations {
                 .doc("The license key for the Android app, this is required if you use in-app purchase on Android"));
         h.add(new BuildHints.Hint("android.min_sdk_version")
                 .annotatedAs(HintGroup.ANDROID, "minSdkVersion")
-                .type(HintType.INT)
+                .values("AndroidMinSdk", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36")
+                .valueConstants("API_19", "API_20", "API_21", "API_22", "API_23", "API_24", "API_25", "API_26", "API_27", "API_28", "API_29", "API_30", "API_31", "API_32", "API_33", "API_34", "API_35", "API_36")
+                .unsetConstant("DEFAULT")
                 .consumedBy("AndroidGradleBuilder")
                 .platform("android")
                 .doc("The least SDK required to run this app, the default value changes based on functionality but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`."));
@@ -510,6 +512,7 @@ final class BuildHintsFromAnnotations {
         h.add(new BuildHints.Hint("ios.interface_orientation")
                 .annotatedAs(HintGroup.IOS, "interfaceOrientation")
                 .type(HintType.STRING)
+                .valuePattern("(?i)UIInterfaceOrientation(PortraitUpsideDown|Portrait|LandscapeLeft|LandscapeRight)(:UIInterfaceOrientation(PortraitUpsideDown|Portrait|LandscapeLeft|LandscapeRight))*")
                 .consumedBy("IPhoneBuilder")
                 .platform("ios")
                 .doc("UIInterfaceOrientationPortrait by default. Indicates the orientation, one or more of (separated by colon :): `UIInterfaceOrientationPortrait`, `UIInterfaceOrientationPortraitUpsideDown`, `UIInterfaceOrientationLandscapeLeft`, `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an \"Interface Orientation\" combo box you *should* use under the iOS section."));

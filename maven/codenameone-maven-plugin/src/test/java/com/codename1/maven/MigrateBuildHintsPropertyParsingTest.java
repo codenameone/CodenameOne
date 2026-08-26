@@ -180,6 +180,23 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertNull(mojo.toSourceLiteral(ios, "nonsense", false));
     }
 
+    /// An enum constant comes from the catalog, never from the wire value.
+    ///
+    /// Upper-casing the value works only while the constant happens to be its
+    /// spelling. AndroidMinSdk.API_23 sends "23" and Toggle.ON sends "true", and
+    /// the derivation produced V23 and TRUE -- constants that do not exist, in
+    /// source written by the goal whose job is to migrate a project without
+    /// breaking it.
+    @Test
+    public void anEnumConstantComesFromTheCatalog() {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        com.codename1.build.shared.BuildHints.Hint min =
+                com.codename1.build.shared.BuildHints.byName("android.min_sdk_version");
+        assertEquals("AndroidMinSdk.API_23", mojo.toSourceLiteral(min, "23", false));
+        // A level the enum does not carry is refused rather than invented.
+        assertNull(mojo.toSourceLiteral(min, "7", false));
+    }
+
     /// A value that is not already canonical is refused, not normalised.
     /// AndroidGradleBuilder compares android.hideStatusBar with .equals("true"),
     /// so `TRUE` is false today and migrating it to `true` would flip the app's
@@ -206,11 +223,16 @@ public class MigrateBuildHintsPropertyParsingTest {
     }
 
     /// An int that does not round-trip would be rewritten too.
+    ///
+    /// android.targetSDKVersion, not android.min_sdk_version: the floor is an
+    /// AndroidMinSdk constant now, while the target stays an int because the
+    /// build server's default for it is the highest platform IT has installed --
+    /// an unbounded domain this framework build cannot enumerate ahead of time.
     @Test
     public void anIntThatDoesNotRoundTripIsRefused() {
         MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
         com.codename1.build.shared.BuildHints.Hint i =
-                com.codename1.build.shared.BuildHints.byName("android.min_sdk_version");
+                com.codename1.build.shared.BuildHints.byName("android.targetSDKVersion");
         assertEquals("24", mojo.toSourceLiteral(i, "24", false));
         assertNull(mojo.toSourceLiteral(i, "024", false));
         assertNull(mojo.toSourceLiteral(i, "+24", false));
