@@ -69,12 +69,58 @@ static BOOL cn1MacJavaReady = NO;
 static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
 static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
-static NSMutableArray<NSString *> *cn1MacPendingPushes = nil;
+static NSMutableArray<NSDictionary *> *cn1MacPendingPushes = nil;
 
-static void cn1MacDeliverPush(NSString *body) {
+/// Decodes one APNs payload the way the shared iOS router does and hands each
+/// part to the application.
+///
+/// The four push types the framework defines are distinguished by what the
+/// payload carries, not by a field naming them: an aps.alert dictionary with a
+/// title and a body is type 4, an alert string is type 3 when a `meta` key rides
+/// along and type 1 when it does not, and a payload with `meta` and NO alert at
+/// all is type 2 -- the data-only push.
+///
+/// Reading only aps.alert.body, as this used to, dropped every type 2 on the
+/// floor: a silent notification has no alert by definition, so the whole
+/// category of background pushes never reached the application on this port.
+static void cn1MacDeliverPush(NSDictionary *userInfo) {
+    if (userInfo == nil) {
+        return;
+    }
     struct ThreadLocalData* threadStateData = getThreadLocalData();
-    com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
-        threadStateData, fromNSString(threadStateData, body), JAVA_NULL);
+    NSDictionary *aps = [userInfo objectForKey:@"aps"];
+    id alert = aps != nil ? [aps objectForKey:@"alert"] : nil;
+    id meta = [userInfo objectForKey:@"meta"];
+    BOOL includedBody = NO;
+
+    if ([alert isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *alertDict = (NSDictionary *)alert;
+        NSString *title = [alertDict objectForKey:@"title"];
+        NSString *body = [alertDict objectForKey:@"body"];
+        if (title != nil && body != nil) {
+            includedBody = YES;
+            // "title;body" is the type 4 wire form the Java side parses.
+            NSString *combined = [NSString stringWithFormat:@"%@;%@", title, body];
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+                threadStateData, fromNSString(threadStateData, combined),
+                fromNSString(threadStateData, @"4"));
+        }
+    } else if ([alert isKindOfClass:[NSString class]]) {
+        includedBody = YES;
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+            threadStateData, fromNSString(threadStateData, (NSString *)alert),
+            fromNSString(threadStateData, meta != nil ? @"3" : @"1"));
+    }
+
+    if (meta != nil) {
+        NSString *metaText = [meta isKindOfClass:[NSString class]]
+            ? (NSString *)meta : [meta description];
+        // A null type when the body already went out: the type was reported
+        // with it, and repeating it would count the same push twice.
+        com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+            threadStateData, fromNSString(threadStateData, metaText),
+            includedBody ? JAVA_NULL : fromNSString(threadStateData, @"2"));
+    }
 }
 
 static void cn1MacDeliverURL(NSString *url) {
@@ -113,8 +159,8 @@ void cn1_mac_runtime_markJavaReady(void) {
             cn1MacDeliverURL(url);
         }
         [cn1MacPendingURLs removeAllObjects];
-        for (NSString *body in cn1MacPendingPushes) {
-            cn1MacDeliverPush(body);
+        for (NSDictionary *payload in cn1MacPendingPushes) {
+            cn1MacDeliverPush(payload);
         }
         [cn1MacPendingPushes removeAllObjects];
     });
@@ -251,15 +297,7 @@ extern BOOL isAppSuspended;
 
 - (void)application:(NSApplication *)application
         didReceiveRemoteNotification:(NSDictionary *)userInfo {
-    NSDictionary *aps = [userInfo objectForKey:@"aps"];
-    id alert = aps != nil ? [aps objectForKey:@"alert"] : nil;
-    NSString *body = nil;
-    if ([alert isKindOfClass:[NSString class]]) {
-        body = (NSString *)alert;
-    } else if ([alert isKindOfClass:[NSDictionary class]]) {
-        body = [(NSDictionary *)alert objectForKey:@"body"];
-    }
-    if (body == nil) {
+    if (userInfo == nil) {
         return;
     }
     // Queued like the lifecycle transitions and the launch URL, and for the
@@ -268,14 +306,17 @@ extern BOOL isAppSuspended;
     // is still null, and pushReceived() drops the payload on the floor. The
     // application then never learns about the push that started it -- the one
     // push it most needs.
+    //
+    // The whole payload is held, not a decoded body: the decode decides the push
+    // TYPE, and doing it here would have to be repeated on replay anyway.
     if (!cn1MacJavaReady) {
         if (cn1MacPendingPushes == nil) {
             cn1MacPendingPushes = [[NSMutableArray alloc] init];
         }
-        [cn1MacPendingPushes addObject:body];
+        [cn1MacPendingPushes addObject:userInfo];
         return;
     }
-    cn1MacDeliverPush(body);
+    cn1MacDeliverPush(userInfo);
 }
 
 @end

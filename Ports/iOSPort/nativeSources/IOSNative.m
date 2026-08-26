@@ -6207,9 +6207,43 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___lo
 
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
 void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJECT content){
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
 #if TARGET_OS_OSX
+    // AppKit has no in-process mail composer, so the message goes to the user's
+    // mail application as a mailto: URL through NSWorkspace. sendEmailMessage's
+    // macOS branch calls straight into here, so an empty body meant every
+    // sendMessage on this port opened nothing and failed silently.
+    NSMutableArray *recipientsArray = [NSMutableArray array];
+    if (recipients != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *data = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        int recipientCount = ((JAVA_ARRAY)recipients)->length;
+        for (int iter = 0; iter < recipientCount; iter++) {
+            NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG data[iter]);
+            if (r != nil) {
+                [recipientsArray addObject:r];
+            }
+        }
+    }
+    NSString *nSubject = subject != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
+    NSString *nBody = content != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : @"";
+    // Each part escaped on its own, with the separators added afterwards.
+    // Escaping the assembled string would encode the '?' and '&' that make it a
+    // query, and Mail then reads the whole tail as one address.
+    NSCharacterSet *allowedQuery = [NSCharacterSet URLQueryAllowedCharacterSet];
+    NSString *to = [[recipientsArray componentsJoinedByString:@","]
+        stringByAddingPercentEncodingWithAllowedCharacters:
+            [NSCharacterSet URLPathAllowedCharacterSet]];
+    NSString *email = [NSString stringWithFormat:@"mailto:%@?subject=%@&body=%@",
+        to == nil ? @"" : to,
+        [nSubject stringByAddingPercentEncodingWithAllowedCharacters:allowedQuery],
+        [nBody stringByAddingPercentEncodingWithAllowedCharacters:allowedQuery]];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSURL *url = [NSURL URLWithString:email];
+        if (url != nil) {
+            [[NSWorkspace sharedWorkspace] openURL:url];
+        }
+    });
 #else
     // Recipient.
     NSMutableArray * recipientsArray = [[NSMutableArray alloc] init];
@@ -6571,8 +6605,17 @@ JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_S
     if (m == nil) {
         return 0;
     }
-    [m seekToTime:CMTimeMakeWithSeconds(time / 1000, 1000)];
-    return CMTimeGetSeconds([m currentTime]);
+    // Floating point, and milliseconds out. Both operands were ints, so 1500ms
+    // truncated to 1 second before the seek and sub-second positioning was
+    // impossible; and the result came back in SECONDS from a method whose name,
+    // argument and Java return type are all milliseconds.
+    //
+    // The iOS branch below has the same shape and is deliberately left alone:
+    // it predates this port, it is what every iOS build has shipped, and
+    // changing playback behaviour there belongs in its own change with the iOS
+    // media goldens behind it.
+    [m seekToTime:CMTimeMakeWithSeconds(time / 1000.0, 1000)];
+    return (JAVA_INT)(CMTimeGetSeconds([m currentTime]) * 1000.0);
 #else
     if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
