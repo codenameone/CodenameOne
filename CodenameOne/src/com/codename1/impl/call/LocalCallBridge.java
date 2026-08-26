@@ -81,6 +81,7 @@ public class LocalCallBridge implements CallBridge {
     private boolean javaReady;
     private boolean directoryEnabled = true;
     private boolean audioWithheld;
+    private boolean endFails;
     private int availability;
     private int grantedPermissions = PERMISSION_MANAGE_CALLS | PERMISSION_MICROPHONE;
     private int route = CallAudioRoute.EARPIECE.ordinal();
@@ -150,6 +151,15 @@ public class LocalCallBridge implements CallBridge {
     /// Whether the user has switched caller identification on.
     public void setDirectoryEnabled(boolean value) {
         this.directoryEnabled = value;
+    }
+
+    /// Makes the next end request be refused by the simulated platform.
+    ///
+    /// A real refusal is possible -- CallKit fails a transaction it cannot
+    /// carry out -- and an app that assumed ending always works would leave a
+    /// live call it had already forgotten about.
+    public void primeEndFailure() {
+        this.endFails = true;
     }
 
     /// Stops the audio session ever being activated.
@@ -350,7 +360,7 @@ public class LocalCallBridge implements CallBridge {
         }
         int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
                 | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_GROUPING
-                | CAPABILITY_VIDEO | CAPABILITY_ROUTE_PICKER;
+                | CAPABILITY_VIDEO;
         if (voipSupported) {
             caps |= CAPABILITY_VOIP_PUSH;
         }
@@ -491,6 +501,12 @@ public class LocalCallBridge implements CallBridge {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
             return;
         }
+        if (endFails) {
+            endFails = false;
+            fail(requestId, CallError.BUSY,
+                    "The simulated platform refused to end the call");
+            return;
+        }
         remove(callId);
         later(LATENCY_MILLIS, new AudioDelivery(callId, route, false));
         ok(requestId);
@@ -549,7 +565,11 @@ public class LocalCallBridge implements CallBridge {
 
     @Override
     public void showAudioRoutePicker(int requestId, String callId) {
-        ok(requestId);
+        // Refused, not simulated. No real platform has a system call route
+        // picker, and a simulation that opened one would let an app ship code
+        // that silently does nothing on every device.
+        fail(requestId, CallError.NOT_SUPPORTED,
+                "No platform offers a system call audio route picker");
     }
 
     @Override

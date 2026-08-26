@@ -100,8 +100,11 @@ public interface CallBridge {
     /// blocked.
     int CAPABILITY_SCREENING = 512;
 
-    /// [#getCallCapabilities()] bit: the system can show an audio route
-    /// picker.
+    /// Reserved. **No port sets this.** Neither platform has a system audio
+    /// route picker an app can present for a call -- iOS offers
+    /// `AVRoutePickerView`, a view the app places itself, and Android offers
+    /// nothing -- so [#showAudioRoutePicker] always answers NOT_SUPPORTED.
+    /// The constant is kept so the bit values do not shift if that changes.
     int CAPABILITY_ROUTE_PICKER = 1024;
 
     /// [#requestPermissions] bit: the grant needed to own calls --

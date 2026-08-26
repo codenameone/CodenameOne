@@ -49,10 +49,17 @@ public interface VpnBridge {
     int CAPABILITY_CUSTOM_TUNNEL = 4;
 
     /// [#getVpnCapabilities()] bit: on-demand rules are honoured.
+    ///
+    /// iOS sets this; Android does not, because its managed profile API has
+    /// no equivalent and a bit that promised one would send apps down a path
+    /// that quietly becomes an ordinary manually started tunnel.
     int CAPABILITY_ON_DEMAND = 8;
 
-    /// [#getVpnCapabilities()] bit: the configuration can be marked
-    /// always-on.
+    /// Reserved. **No port sets this**, and there is no `alwaysOn` on
+    /// `VpnProfile` to pair it with: always-on VPN needs a supervised device
+    /// and an MDM payload on iOS, and a Settings toggle or a device-owner API
+    /// on Android. The constant is kept so the bit values below it do not
+    /// shift if either platform ever opens it up.
     int CAPABILITY_ALWAYS_ON = 16;
 
     /// [#getVpnCapabilities()] bit: per-application routing is offered.

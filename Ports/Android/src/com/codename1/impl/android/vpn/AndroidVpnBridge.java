@@ -25,9 +25,14 @@ package com.codename1.impl.android.vpn;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 
 import com.codename1.impl.vpn.VpnWire;
+import com.codename1.io.Preferences;
 import com.codename1.vpn.VpnError;
 import com.codename1.vpn.VpnProtocol;
 import com.codename1.vpn.VpnStatus;
@@ -68,6 +73,7 @@ public class AndroidVpnBridge implements VpnBridge {
     private String installedWire;
     private VpnStatus status = VpnStatus.NOT_CONFIGURED;
     private boolean listening;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     public AndroidVpnBridge(Context context) {
         this.context = context;
@@ -94,10 +100,17 @@ public class AndroidVpnBridge implements VpnBridge {
         if (!available()) {
             return 0;
         }
+        // IKEv2 and nothing else, deliberately.
+        //
         // No CAPABILITY_IPSEC: the managed profile API is IKEv2 only.
         // No CAPABILITY_PER_APP: per-application routing needs a VpnService
-        // this app implements, not a managed profile.
-        return CAPABILITY_IKEV2 | CAPABILITY_ALWAYS_ON | CAPABILITY_ON_DEMAND;
+        // the app implements, not a managed profile.
+        // No CAPABILITY_ON_DEMAND: Ikev2VpnProfile has no on-demand rules,
+        // so an app that checked the bit and set VpnProfile.onDemand would
+        // have got an ordinary manually started tunnel and no way to tell.
+        // No CAPABILITY_ALWAYS_ON: that is a Settings toggle or a
+        // device-owner API here, not something an app may request.
+        return CAPABILITY_IKEV2;
     }
 
     @Override
@@ -170,10 +183,12 @@ public class AndroidVpnBridge implements VpnBridge {
         public void onActivityResult(int requestCode, int resultCode,
                 Intent data) {
             if (resultCode == Activity.RESULT_OK) {
+                Preferences.set(WIRE_PREF, strip(bridge.installedWire));
                 bridge.setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
             } else {
                 bridge.installedWire = null;
+                Preferences.delete(WIRE_PREF);
                 Vpn.deliverAck(requestId, false,
                         VpnError.USER_DECLINED.ordinal(),
                         "The user declined the VPN configuration prompt");
@@ -190,6 +205,7 @@ public class AndroidVpnBridge implements VpnBridge {
         try {
             Reflect.DELETE.invoke(Reflect.manager(context));
             installedWire = null;
+            Preferences.delete(WIRE_PREF);
             setStatus(VpnStatus.NOT_CONFIGURED);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
@@ -202,8 +218,31 @@ public class AndroidVpnBridge implements VpnBridge {
         // The platform keeps the profile and does not hand it back, so the
         // record this port stored is the only description available -- and
         // the secrets were never written into it in the first place.
-        Vpn.deliverProfile(requestId, strip(installedWire));
+        //
+        // Read through storedWire rather than the field, because the field
+        // does not survive the process restart that the provisioned profile
+        // does; without this, load() reported no profile for one Android
+        // still held.
+        Vpn.deliverProfile(requestId, strip(storedWire()));
     }
+
+    /// The description of the installed profile, from this process or the
+    /// one before it.
+    private String storedWire() {
+        if (installedWire != null) {
+            return installedWire;
+        }
+        String saved = Preferences.get(WIRE_PREF, null);
+        installedWire = saved;
+        return saved;
+    }
+
+    /// Where the profile description outlives the process.
+    ///
+    /// Only the description: strip() has already removed the password and the
+    /// shared secret, and the platform keychain is the only thing that ever
+    /// held those.
+    private static final String WIRE_PREF = "cn1.vpn.profile";
 
     /// Removes the password and shared secret from a stored record.
     private static String strip(String wire) {
@@ -226,10 +265,11 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
             return;
         }
-        if (installedWire == null) {
-            fail(requestId, VpnError.NOT_CONFIGURED, null);
-            return;
-        }
+        // Deliberately NOT gated on installedWire. Android keeps the
+        // provisioned profile across a process restart, and the field does
+        // not survive one -- so gating here answered NOT_CONFIGURED for a
+        // profile the platform still holds. The platform's own refusal is
+        // the authority, and it is mapped below.
         try {
             setStatus(VpnStatus.CONNECTING);
             Reflect.START.invoke(Reflect.manager(context));
@@ -240,7 +280,12 @@ public class AndroidVpnBridge implements VpnBridge {
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             setStatus(VpnStatus.DISCONNECTED);
-            fail(requestId, VpnError.CONNECTION_FAILED, describe(e));
+            // A SecurityException here is the platform saying no profile is
+            // provisioned, which is a different answer from a tunnel that
+            // could not be established.
+            fail(requestId, isNotProvisioned(e)
+                    ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
+                    describe(e));
         }
     }
 
@@ -250,19 +295,98 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
             return;
         }
+        // Not gated on installedWire; see startVpn.
         try {
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
             setStatus(VpnStatus.DISCONNECTED);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
-            fail(requestId, VpnError.UNKNOWN, describe(e));
+            fail(requestId, isNotProvisioned(e)
+                    ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
         }
     }
 
     @Override
     public void setStatusListening(boolean value) {
         this.listening = value;
+        if (value) {
+            startWatchingTheTunnel();
+        } else {
+            stopWatchingTheTunnel();
+        }
+    }
+
+    /// Watches the real tunnel rather than this class's own guesses.
+    ///
+    /// Without this the status was whatever the last call to setStatus left
+    /// behind: startVpn set CONNECTING and nothing ever moved it, because
+    /// VpnManager reports no completion. A VPN transport arriving or leaving
+    /// is the only signal Android gives an app that its tunnel came up or
+    /// went away, including when the user disconnects it from Settings.
+    private void startWatchingTheTunnel() {
+        if (networkCallback != null || Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        ConnectivityManager cm = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return;
+        }
+        networkCallback = new TunnelWatcher(this);
+        try {
+            NetworkRequest request = new NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                    // A VPN is not "internet capable" by the default filter's
+                    // reckoning, so the default capabilities would never
+                    // match one.
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build();
+            cm.registerNetworkCallback(request, networkCallback);
+        } catch (RuntimeException e) {
+            // Some devices refuse the registration; the API then reports
+            // whatever setStatus last set, which is what it did before.
+            networkCallback = null;
+        }
+    }
+
+    private void stopWatchingTheTunnel() {
+        if (networkCallback == null) {
+            return;
+        }
+        ConnectivityManager cm = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            try {
+                cm.unregisterNetworkCallback(networkCallback);
+            } catch (RuntimeException ignored) {
+                // Already gone.
+            }
+        }
+        networkCallback = null;
+    }
+
+    /// Turns VPN transport arrival and loss into a status change.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to anything that outlives the registration.
+    private static final class TunnelWatcher
+            extends ConnectivityManager.NetworkCallback {
+        private final AndroidVpnBridge bridge;
+
+        TunnelWatcher(AndroidVpnBridge bridge) {
+            this.bridge = bridge;
+        }
+
+        @Override
+        public void onAvailable(Network network) {
+            bridge.setStatus(VpnStatus.CONNECTED);
+        }
+
+        @Override
+        public void onLost(Network network) {
+            bridge.setStatus(VpnStatus.DISCONNECTED);
+        }
     }
 
     void setStatus(VpnStatus s) {
@@ -286,6 +410,16 @@ public class AndroidVpnBridge implements VpnBridge {
 
     private static void fail(int requestId, VpnError e, String message) {
         Vpn.deliverAck(requestId, false, e.ordinal(), message);
+    }
+
+    /// Whether a platform refusal means "nothing is provisioned".
+    ///
+    /// VpnManager answers a start or stop with no provisioned profile by
+    /// throwing SecurityException, which reaches here wrapped in an
+    /// InvocationTargetException.
+    private static boolean isNotProvisioned(Exception e) {
+        Throwable t = e.getCause() != null ? e.getCause() : e;
+        return t instanceof SecurityException;
     }
 
     /// What went wrong, without letting a reflective wrapper hide it.
@@ -360,12 +494,9 @@ public class AndroidVpnBridge implements VpnBridge {
                         String.class, java.security.cert.X509Certificate.class)
                         .invoke(b, p.getUsername(), p.getPassword(), null);
             }
-            if (p.isAlwaysOn()) {
-                // The platform spells this as "not bypassable": traffic
-                // cannot route around the tunnel.
-                BUILDER.getMethod("setBypassable", boolean.class)
-                        .invoke(b, Boolean.FALSE);
-            }
+            // Nothing here reads VpnProfile.onDemand: Ikev2VpnProfile has no
+            // on-demand rules, which is why getVpnCapabilities does not claim
+            // CAPABILITY_ON_DEMAND.
             return BUILDER.getMethod("build").invoke(b);
         }
 

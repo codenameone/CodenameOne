@@ -28,7 +28,6 @@ import com.codename1.vpn.VpnException;
 import com.codename1.vpn.VpnProtocol;
 import com.codename1.vpn.VpnStatus;
 import com.codename1.vpn.profile.VpnProfile;
-import com.codename1.util.Base64;
 
 /// The encoding `com.codename1.vpn.spi.VpnBridge` speaks.
 ///
@@ -45,15 +44,14 @@ public final class VpnWire {
 
     /// Encodes a profile.
     ///
-    /// The certificate travels base64-encoded because the record is a text
-    /// line; the credentials travel in the clear within the process and are
-    /// handed straight to the platform keychain by the port, which is the
-    /// only place they can go.
+    /// The credentials travel in the clear within the process and are handed
+    /// straight to the platform keychain by the port, which is the only place
+    /// they can go. Fields 7 and 8 are reserved empty slots; see the comment
+    /// at the field list.
     public static String encodeProfile(VpnProfile p) {
         if (p == null) {
             return "";
         }
-        byte[] cert = p.getCertificate();
         return CallWire.join(new String[]{
             p.getServerAddress(),
             String.valueOf(p.getProtocol().ordinal()),
@@ -62,8 +60,14 @@ public final class VpnWire {
             p.getUsername(),
             p.getPassword(),
             p.getSharedSecret(),
-            cert == null ? "" : Base64.encodeNoNewline(cert),
-            CallWire.flagOf(p.isAlwaysOn()),
+            // Field 7 is reserved and always empty: it carried a PKCS#12
+            // certificate that neither port could install without its
+            // passphrase. Kept as a slot rather than removed so the indices
+            // the native parsers use do not shift.
+            "",
+            // Field 8 likewise: it carried an always-on flag that no ordinary
+            // app can ask either platform for.
+            "",
             CallWire.flagOf(p.isOnDemand()),
             p.getDisplayName()
         });
@@ -87,7 +91,6 @@ public final class VpnWire {
                 .protocol(protocol(CallWire.integer(f, 1, 0)))
                 .remoteIdentifier(emptyToNull(CallWire.field(f, 2)))
                 .localIdentifier(emptyToNull(CallWire.field(f, 3)))
-                .alwaysOn(CallWire.flag(f, 8))
                 .onDemand(CallWire.flag(f, 9))
                 .displayName(emptyToNull(CallWire.field(f, 10)));
         String user = CallWire.field(f, 4);
@@ -99,10 +102,7 @@ public final class VpnWire {
         if (secret.length() > 0) {
             p.sharedSecret(secret);
         }
-        String cert = CallWire.field(f, 7);
-        if (cert.length() > 0) {
-            p.certificate(Base64.decode(asciiBytes(cert)));
-        }
+        // Fields 7 and 8 are reserved and ignored; see encodeProfile.
         return p;
     }
 
@@ -141,17 +141,4 @@ public final class VpnWire {
         return v == null || v.length() == 0 ? null : v;
     }
 
-    /// Base64 as bytes, without asking the platform what its default
-    /// encoding is.
-    ///
-    /// `String.getBytes()` would answer differently on two devices, and the
-    /// base64 alphabet is ASCII, so the conversion is spelled out rather than
-    /// left to a default that is only ever right by accident.
-    private static byte[] asciiBytes(String v) {
-        byte[] out = new byte[v.length()];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) v.charAt(i);
-        }
-        return out;
-    }
 }

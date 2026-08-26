@@ -157,8 +157,41 @@ public class CN1CallScreeningService extends CallScreeningService {
     }
 
     /// Whether the user has granted this app the screening role.
+    ///
+    /// Kept for the in-process case; [#isRoleHeld] is what a status query
+    /// should use, because this flag is false in any process that did not
+    /// itself run the request.
     public static boolean isEnabled() {
         return enabled;
+    }
+
+    /// Asks Android whether this app currently holds the screening role.
+    ///
+    /// The authority, rather than the static flag above: the role may have
+    /// been granted in an earlier process or from Settings, and either way
+    /// the flag starts false -- so a status query that trusted it reported
+    /// screening disabled while Android was binding the service.
+    ///
+    /// @param context any context
+    /// @return true when the role is held
+    public static boolean isRoleHeld(Context context) {
+        if (Build.VERSION.SDK_INT < 29 || context == null) {
+            return false;
+        }
+        try {
+            Class<?> rmClass = Class.forName("android.app.role.RoleManager");
+            Object role = rmClass.getField("ROLE_CALL_SCREENING").get(null);
+            Object rm = context.getSystemService(rmClass);
+            if (rm == null || !(role instanceof String)) {
+                return false;
+            }
+            boolean held = isTrue(rmClass.getMethod("isRoleHeld", String.class)
+                    .invoke(rm, role));
+            enabled = held;
+            return held;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /// Asks the user for the call screening role.

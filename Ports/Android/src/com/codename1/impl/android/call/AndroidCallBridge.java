@@ -221,7 +221,7 @@ public class AndroidCallBridge implements CallBridge {
         try {
             telecom().addNewIncomingCall(handle, extras);
         } catch (SecurityException e) {
-            CN1ConnectionService.failParkedReport(
+            CN1ConnectionService.failParkedReport(callId,
                     CallError.UNAUTHORIZED.ordinal(), e.getMessage());
         }
     }
@@ -241,7 +241,7 @@ public class AndroidCallBridge implements CallBridge {
         try {
             telecom().placeCall(uriFor(handleWire), outer);
         } catch (SecurityException e) {
-            CN1ConnectionService.failParkedReport(
+            CN1ConnectionService.failParkedReport(callId,
                     CallError.UNAUTHORIZED.ordinal(), e.getMessage());
         }
     }
@@ -473,23 +473,44 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void setDirectorySource(int requestId, String filePath) {
-        Calls.deliverAck(requestId, isDirectorySupported(),
-                CallError.NOT_SUPPORTED.ordinal(),
-                "Call screening needs Android 10 or newer");
+        if (!isDirectorySupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Call screening needs Android 10 or newer");
+            return;
+        }
+        // The screening service reads the path CallDirectory wrote, so
+        // nothing needs copying here -- but its cache has to be dropped or
+        // the new list is ignored until the process dies.
+        CN1CallScreeningService.invalidate();
+        Calls.deliverAck(requestId, true, 0, null);
     }
 
     @Override
     public void reloadDirectory(int requestId) {
-        Calls.deliverAck(requestId, isDirectorySupported(),
-                CallError.NOT_SUPPORTED.ordinal(),
-                "Call screening needs Android 10 or newer");
+        if (!isDirectorySupported()) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "Call screening needs Android 10 or newer");
+            return;
+        }
+        // The screening service caches the file the first time it screens a
+        // call, and it lives in a process this one does not control. Without
+        // this, setEntries replaced the file and every later call was still
+        // screened against the list loaded at startup.
+        CN1CallScreeningService.invalidate();
+        Calls.deliverAck(requestId, true, 0, null);
     }
 
     @Override
     public void getDirectoryStatus(int requestId) {
+        // Asks the platform rather than trusting the static flag: the role
+        // may have been granted in a previous process, or from Settings, and
+        // the flag defaults to false either way -- so status reported
+        // "disabled" while Android was actively binding the service.
         com.codename1.call.directory.CallDirectory.deliverStatus(requestId,
                 CallWire.join(new String[]{
-                    CallWire.flagOf(CN1CallScreeningService.isEnabled()),
+                    CallWire.flagOf(CN1CallScreeningService.isRoleHeld(context)),
                     "-1", "android"}));
     }
 

@@ -24,6 +24,9 @@ package com.codename1.call.session;
 
 import com.codename1.impl.call.CallRequests;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 /// Something the **system** is asking the app to do to a call: the user
 /// pressed answer on the lock screen, hung up from the car, or tapped the
 /// keypad.
@@ -49,6 +52,9 @@ public final class CallAction {
     private final String callId;
     private boolean deferred;
     private boolean answered;
+    private boolean fulfilled;
+    private Timer safety;
+    private TimerTask safetyTask;
 
     CallAction(long token, String callId) {
         this.token = token;
@@ -64,9 +70,77 @@ public final class CallAction {
     ///
     /// After calling this the listener **must** call [#fulfill()] or
     /// [#fail()], and should do it within about three seconds. A deferred
-    /// action that is never answered is failed automatically.
+    /// action that is never answered is failed automatically, by the timer
+    /// this starts.
     public void defer() {
         deferred = true;
+        // The timer is the whole reason defer() is worth calling rather than
+        // simply not answering. Both platforms time an unanswered action out
+        // on their own, and a timed-out action leaves the system UI and the
+        // app disagreeing about the call with nothing in the log; a FAILED
+        // one puts the UI back into a state the user can act on. Failing
+        // slightly early is the better of the two outcomes.
+        //
+        // java.util.Timer rather than Display.setTimeout, following the same
+        // reasoning as com.codename1.bluetooth's operation queue: this has to
+        // work before Display.init as well as after, and the device Timer has
+        // no daemon constructor -- so the timer is cancelled alongside the
+        // task in answer(), or its thread would keep a desktop JVM alive.
+        synchronized (this) {
+            if (answered) {
+                return;
+            }
+            safety = new Timer();
+            safetyTask = new SafetyNet(this);
+            try {
+                safety.schedule(safetyTask, SAFETY_MILLIS);
+            } catch (IllegalStateException alreadyGone) {
+                safety = null;
+                safetyTask = null;
+            }
+        }
+    }
+
+    /// Stops the safety net, whether or not it has run.
+    private void cancelSafetyNet() {
+        Timer t;
+        TimerTask task;
+        synchronized (this) {
+            t = safety;
+            task = safetyTask;
+            safety = null;
+            safetyTask = null;
+        }
+        if (task != null) {
+            task.cancel();
+        }
+        if (t != null) {
+            // Both, deliberately: cancelling only the task leaves the timer's
+            // non-daemon thread running.
+            t.cancel();
+        }
+    }
+
+    /// How long a deferred action has before it is failed for the app.
+    ///
+    /// Under CallKit's own timeout, so the app gets a definite answer rather
+    /// than the platform's silent one.
+    private static final int SAFETY_MILLIS = 3500;
+
+    /// Fails a deferred action nobody answered.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class SafetyNet extends TimerTask {
+        private final CallAction action;
+
+        SafetyNet(CallAction action) {
+            this.action = action;
+        }
+
+        public void run() {
+            action.answer(false);
+        }
     }
 
     /// Reports that the app did what was asked.
@@ -83,6 +157,13 @@ public final class CallAction {
     /// Whether the listener took responsibility for answering.
     boolean isDeferred() {
         return deferred;
+    }
+
+    /// Whether the answer, if one has been given, was a fulfilment.
+    ///
+    /// Meaningless until [#isAnswered()] is true.
+    synchronized boolean wasFulfilled() {
+        return fulfilled;
     }
 
     /// Whether this has already been answered.
@@ -105,7 +186,9 @@ public final class CallAction {
                 return;
             }
             answered = true;
+            this.fulfilled = fulfilled;
         }
+        cancelSafetyNet();
         com.codename1.call.spi.CallBridge b = CallRequests.bridge();
         if (b != null) {
             b.completeAction(token, fulfilled);

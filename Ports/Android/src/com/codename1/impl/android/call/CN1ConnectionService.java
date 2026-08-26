@@ -74,14 +74,21 @@ public class CN1ConnectionService extends ConnectionService {
 
     private static volatile int route = CallAudioRoute.EARPIECE.ordinal();
 
-    /// The request id of the report that is waiting for Telecom's answer.
+    /// Reports waiting for Telecom's answer, keyed by call id.
     ///
-    /// Telecom does not carry the caller's request id through
-    /// `addNewIncomingCall`, so it is parked here between the call and the
-    /// callback. One at a time is enough: `TelecomManager` serializes them.
-    private static volatile int pendingReportRequest = -1;
+    /// A map rather than a single slot. Telecom does not carry the caller's
+    /// request id through `addNewIncomingCall`, so it is parked here between
+    /// the call and the callback -- but two reports can be in flight at once,
+    /// and a single slot meant the second overwrote the first: one callback
+    /// then acknowledged the wrong request and the other acknowledged
+    /// nothing, leaving an AsyncResource that never settled. The call id is
+    /// already in the request extras, so correlating by it costs nothing.
+    private static final Map<String, Integer> PENDING_REPORTS =
+            new HashMap<String, Integer>();
 
-    private static volatile String pendingReportCallId;
+    /// The call id of the most recent report, for the one case where Telecom
+    /// hands back a request with none of our extras to read.
+    private static volatile String lastReportedCallId;
 
     /// One action the system asked for and the app has not answered.
     private static final class PendingAction {
@@ -109,26 +116,29 @@ public class CN1ConnectionService extends ConnectionService {
     @Override
     public void onCreateIncomingConnectionFailed(PhoneAccountHandle handle,
             ConnectionRequest request) {
-        refuse();
+        refuse(request);
     }
 
     @Override
     public void onCreateOutgoingConnectionFailed(PhoneAccountHandle handle,
             ConnectionRequest request) {
-        refuse();
+        refuse(request);
     }
 
     private Connection adopt(ConnectionRequest request, boolean incoming) {
         String id = request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(EXTRA_CALL_ID);
         if (id == null) {
-            id = pendingReportCallId;
+            // Only reachable when Telecom dropped our extras; with one report
+            // in flight this is still the right answer, and with several
+            // there is nothing better to guess.
+            id = lastReportedCallId;
         }
         if (id == null) {
             // Nothing can be routed to a call with no identifier, so refusing
             // is the honest answer rather than creating an orphan Telecom
             // knows about and this app cannot address.
-            refuse();
+            refuse(request);
             return null;
         }
         CN1Connection c = new CN1Connection(this, id);
@@ -141,35 +151,48 @@ public class CN1ConnectionService extends ConnectionService {
         synchronized (CONNECTIONS) {
             CONNECTIONS.put(id, c);
         }
-        answerReport(true, 0, null);
+        answerReport(id, true, 0, null);
         return c;
     }
 
-    private void refuse() {
-        answerReport(false, CallError.CALL_REFUSED.ordinal(),
+    private void refuse(ConnectionRequest request) {
+        String id = request == null || request.getExtras() == null ? null
+                : request.getExtras().getString(EXTRA_CALL_ID);
+        answerReport(id == null ? lastReportedCallId : id, false,
+                CallError.CALL_REFUSED.ordinal(),
                 "Telecom refused the call: an emergency call is in progress,"
                 + " another application holds a call, or calling is switched"
                 + " off for this app");
     }
 
-    private static void answerReport(boolean ok, int error, String message) {
-        int id = pendingReportRequest;
-        pendingReportRequest = -1;
-        pendingReportCallId = null;
-        if (id >= 0) {
-            Calls.deliverAck(id, ok, error, message);
+    private static void answerReport(String callId, boolean ok, int error,
+            String message) {
+        Integer requestId;
+        synchronized (PENDING_REPORTS) {
+            requestId = callId == null ? null : PENDING_REPORTS.remove(callId);
+            if (requestId == null && PENDING_REPORTS.size() == 1) {
+                // Telecom answered with nothing we could key on and exactly
+                // one report is outstanding, so it is that one.
+                String only = PENDING_REPORTS.keySet().iterator().next();
+                requestId = PENDING_REPORTS.remove(only);
+            }
+        }
+        if (requestId != null) {
+            Calls.deliverAck(requestId.intValue(), ok, error, message);
         }
     }
 
     /// Parks the request id a forthcoming Telecom callback will answer.
     static void expectReport(int requestId, String callId) {
-        pendingReportRequest = requestId;
-        pendingReportCallId = callId;
+        lastReportedCallId = callId;
+        synchronized (PENDING_REPORTS) {
+            PENDING_REPORTS.put(callId, Integer.valueOf(requestId));
+        }
     }
 
     /// Answers a parked report that Telecom never called back about.
-    static void failParkedReport(int error, String message) {
-        answerReport(false, error, message);
+    static void failParkedReport(String callId, int error, String message) {
+        answerReport(callId, false, error, message);
     }
 
     /// The connection for a call id, or null.
@@ -248,6 +271,9 @@ public class CN1ConnectionService extends ConnectionService {
         endAll();
         synchronized (PENDING) {
             PENDING.clear();
+        }
+        synchronized (PENDING_REPORTS) {
+            PENDING_REPORTS.clear();
         }
         route = CallAudioRoute.EARPIECE.ordinal();
     }

@@ -103,8 +103,9 @@ public class LocalVpnBridge implements VpnBridge {
         if (!supported) {
             return 0;
         }
-        int caps = CAPABILITY_IKEV2 | CAPABILITY_IPSEC | CAPABILITY_ON_DEMAND
-                | CAPABILITY_ALWAYS_ON;
+        // No CAPABILITY_ALWAYS_ON: no ordinary app can ask either platform
+        // for it, so the simulation must not be the one place it works.
+        int caps = CAPABILITY_IKEV2 | CAPABILITY_IPSEC | CAPABILITY_ON_DEMAND;
         if (tunnelSupported) {
             caps |= CAPABILITY_CUSTOM_TUNNEL;
         }

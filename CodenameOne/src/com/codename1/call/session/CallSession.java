@@ -143,9 +143,13 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
-        state = CallState.ENDED;
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
+        // The state moves and the session is forgotten only if the system
+        // agreed. Setting ENDED up front left an app whose end request was
+        // refused holding a session that said ended over a call that was
+        // still up.
+        r.onResult(new EndOutcome(this));
         b.endCall(id, callId, reason == null
                 ? CallEndReason.LOCAL_ENDED.ordinal() : reason.ordinal());
         return r;
@@ -157,6 +161,9 @@ public final class CallSession {
     public void reportEndedRemotely(CallEndReason reason) {
         CallBridge b = CallRequests.bridge();
         state = CallState.ENDED;
+        // Unconditional here, unlike end(): this is the app telling the
+        // framework the call is already over, not asking for it to be.
+        Calls.forget(callId);
         if (b != null) {
             b.reportCallEnded(callId, reason == null
                     ? CallEndReason.REMOTE_ENDED.ordinal() : reason.ordinal(),
@@ -217,6 +224,30 @@ public final class CallSession {
         EdtResult<Boolean> r = CallRequests.openAck(id);
         b.setCallGroup(id, callId, other == null ? null : other.getCallId());
         return r;
+    }
+
+    /// Moves the session to ENDED and forgets it, but only once the system
+    /// has accepted the end request.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class EndOutcome
+            implements com.codename1.util.AsyncResult<Boolean> {
+        private final CallSession session;
+
+        EndOutcome(CallSession session) {
+            this.session = session;
+        }
+
+        public void onReady(Boolean value, Throwable error) {
+            if (error != null) {
+                // Still up as far as the system is concerned, so it stays
+                // addressable through Calls.getSession.
+                return;
+            }
+            session.state = CallState.ENDED;
+            Calls.forget(session.getCallId());
+        }
     }
 
     /// Sets the state without telling the system, for events coming the other

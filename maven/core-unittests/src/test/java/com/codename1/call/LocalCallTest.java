@@ -290,6 +290,102 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aSuccessfullyEndedCallIsForgotten() {
+        // getSessions() promises current calls, so an ended one must not sit
+        // there for the life of the process.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        CallAwait.value(s.end(CallEndReason.LOCAL_ENDED));
+        assertNull(Calls.getSession(id), "an ended call must be forgotten");
+        assertEquals(0, Calls.getSessions().length);
+        assertSame(CallState.ENDED, s.getState());
+    }
+
+    @Test
+    public void aRefusedEndKeepsTheSessionAddressable() {
+        // The call is still up as far as the system is concerned, so the app
+        // must still be able to find it and try again.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        bridge.primeEndFailure();
+        CallAwait.errorOf(s.end(CallEndReason.LOCAL_ENDED));
+        assertNotNull(Calls.getSession(id),
+                "a call the system refused to end is still a call");
+        assertFalse(s.getState() == CallState.ENDED,
+                "a refused end must not leave the session claiming ENDED");
+    }
+
+    @Test
+    public void aDeferredEndThatFailsKeepsTheSession() {
+        // The documented behaviour of failing an end action is that the
+        // system UI restores the call. Forgetting the session on dispatch
+        // left the app with a live call it could no longer address.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void endRequested(String callId, CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        waitFor(seen, 1);
+        seen.get(0).fail();
+        assertNotNull(Calls.getSession(id),
+                "a failed end must leave the call addressable");
+    }
+
+    @Test
+    public void anIgnoredEndStillForgetsTheCall() {
+        // The common case must keep working: a listener that does nothing
+        // fulfills the action, so the call really did end.
+        Calls.addActionListener(new CallActionAdapter());
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSession(id) != null && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertNull(Calls.getSession(id));
+    }
+
+    @Test
+    public void aDeferredActionNobodyAnswersIsFailedByTheSafetyTimer() {
+        // defer() promises this in its documentation, and without it the
+        // platform times the action out instead -- which leaves the system UI
+        // and the app disagreeing with nothing in the log.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void answerRequested(String callId, CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateAnswer(id);
+        waitFor(seen, 1);
+        long limit = System.currentTimeMillis() + 9000;
+        while (!isAnswered(seen.get(0)) && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertTrue(isAnswered(seen.get(0)),
+                "a deferred action nobody answered must be failed for them");
+    }
+
+    @Test
+    public void noPlatformClaimsASystemAudioRoutePicker() {
+        // Neither iOS nor Android has one, so the simulation must not be the
+        // single place an app's picker code appears to work.
+        assertEquals(0, Calls.getCapabilities()
+                & com.codename1.call.spi.CallBridge.CAPABILITY_ROUTE_PICKER);
+        CallAwait.assertFailedWith(CallError.NOT_SUPPORTED,
+                Calls.showAudioRoutePicker(CallId.random()));
+    }
+
+    @Test
     public void endingACallThatIsAlreadyGoneIsRefused() {
         String id = CallId.random();
         CallSession s = ring(id);

@@ -553,15 +553,25 @@ public final class Calls {
                     break;
                 }
                 case END: {
-                    if (session != null) {
-                        session.setStateInternal(CallState.ENDED);
-                    }
                     CallAction a = new CallAction(token, callId);
                     for (CallActionListener l : ls) {
                         l.endRequested(callId, a);
                     }
                     settle(a);
-                    forget(callId);
+                    // Deliberately NOT unconditional, and deliberately after
+                    // settle(). A listener that defers and then fails is
+                    // saying it could not end the call, and the system UI
+                    // restores it -- so forgetting the session here left the
+                    // app with a live system call that getSession() could no
+                    // longer address. An action nobody deferred is already
+                    // fulfilled by settle(), so the common case still ends
+                    // here and now.
+                    if (a.isAnswered() && a.wasFulfilled()) {
+                        if (session != null) {
+                            session.setStateInternal(CallState.ENDED);
+                        }
+                        forget(callId);
+                    }
                     break;
                 }
                 case HOLD: {

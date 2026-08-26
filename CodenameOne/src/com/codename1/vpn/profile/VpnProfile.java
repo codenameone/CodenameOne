@@ -33,7 +33,7 @@ import com.codename1.vpn.VpnProtocol;
 ///         .remoteIdentifier("vpn.example.com")
 ///         .localIdentifier("alice")
 ///         .usernamePassword("alice", secret)
-///         .alwaysOn(true);
+///         .onDemand(true);
 /// ```
 ///
 /// #### Credentials are handed over, not held
@@ -50,8 +50,6 @@ public final class VpnProfile {
     private String username;
     private String password;
     private String sharedSecret;
-    private byte[] certificate;
-    private boolean alwaysOn;
     private boolean onDemand;
     private String displayName;
     private boolean passwordKnown;
@@ -99,19 +97,23 @@ public final class VpnProfile {
         return this;
     }
 
-    /// Authenticates with a PKCS#12 certificate.
-    public VpnProfile certificate(byte[] pkcs12) {
-        this.certificate = pkcs12 == null ? null : (byte[]) pkcs12.clone();
-        return this;
-    }
-
-    /// Whether the system should keep this tunnel up at all times. Requires
-    /// the corresponding capability; see
-    /// `com.codename1.vpn.spi.VpnBridge#CAPABILITY_ALWAYS_ON`.
-    public VpnProfile alwaysOn(boolean value) {
-        this.alwaysOn = value;
-        return this;
-    }
+    // There is deliberately no certificate(byte[]) here, and deliberately no
+    // alwaysOn(boolean).
+    //
+    // Certificate authentication cannot be carried by a PKCS#12 blob alone:
+    // importing one needs its passphrase on both platforms -- iOS through
+    // kSecImportExportPassphrase, Android through KeyStore.load -- so a
+    // method taking only the bytes could never install the identity, and a
+    // profile built with it would save cleanly and then fail to authenticate
+    // with nothing to point at. Adding it means adding the passphrase to this
+    // class and identity import to both ports; until that happens, not having
+    // the method is the honest state.
+    //
+    // Always-on is not something an ordinary app can ask for. On iOS it needs
+    // a supervised device and an MDM payload, and on Android it is a Settings
+    // toggle or a device-owner API. The nearest thing either platform offers
+    // an app is [#onDemand], which iOS honours and Android does not -- and
+    // the Android bridge drops CAPABILITY_ON_DEMAND to say so.
 
     /// Whether the system should bring the tunnel up when traffic needs it.
     public VpnProfile onDemand(boolean value) {
@@ -159,16 +161,6 @@ public final class VpnProfile {
     /// The pre-shared key, or null.
     public String getSharedSecret() {
         return sharedSecret;
-    }
-
-    /// The PKCS#12 certificate, or null.
-    public byte[] getCertificate() {
-        return certificate == null ? null : (byte[]) certificate.clone();
-    }
-
-    /// Whether the tunnel is meant to stay up at all times.
-    public boolean isAlwaysOn() {
-        return alwaysOn;
     }
 
     /// Whether the tunnel comes up on demand.
