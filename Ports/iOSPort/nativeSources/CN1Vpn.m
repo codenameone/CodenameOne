@@ -561,6 +561,19 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
     }
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
+        if (loadError != nil) {
+            // Removing against an unloaded or stale manager and then
+            // reporting only the SECOND callback's result turned a transient
+            // read failure into a successful removal -- discarding the
+            // keychain credentials for a configuration never established as
+            // removed.
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
+            }
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNAUTHORIZED,
+                    [loadError localizedDescription]);
+            return;
+        }
         [manager removeFromPreferencesWithCompletionHandler:^(NSError *error) {
             if (error == nil) {
                 // The profile that referenced them is gone, so the items are

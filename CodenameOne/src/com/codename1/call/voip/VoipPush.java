@@ -102,31 +102,37 @@ public final class VoipPush {
     /// Installs the listener and immediately drains any calls that arrived
     /// before the app was listening.
     public static void setListener(VoipPushListener l) {
+        CallBridge b;
+        // The listener, the readiness and the drain decision under ONE
+        // ordering. Split, a call clearing the listener could pause after
+        // removing it, a second could install a replacement and publish
+        // "listening", and the first could then publish "not listening" and
+        // clear the drain -- leaving a registered listener while iOS queued
+        // its pushed calls and CallKit actions until they expired.
         synchronized (LISTENERS) {
             LISTENERS.clear();
             if (l != null) {
                 LISTENERS.add(l);
             }
+            // BEFORE the bridge lookup. Returning early when there is no port
+            // yet -- setListener from an app's init runs before Display.init
+            // -- left this false while a listener was stored, so the
+            // readiness the bridge later published was "not listening".
+            //
+            // Through the shared flag: an action listener registered without
+            // VoipPush counts too, and turning this off here must not silence
+            // a Calls listener that is still installed.
+            CallRequests.setPushesWanted(l != null);
+            drainWanted = l != null;
+            b = CallRequests.bridge();
         }
-        // BEFORE the bridge lookup. Returning early when there is no port
-        // yet -- setListener from an app's init runs before Display.init --
-        // left this false while a listener was stored, so the readiness the
-        // bridge later published was "not listening" and the cold-start calls
-        // it was registered for stayed queued until they expired.
-        //
-        // Through the shared flag: an action listener registered without
-        // VoipPush counts too, and turning this off here must not silence a
-        // Calls listener that is still installed.
-        CallRequests.setPushesWanted(l != null);
-        drainWanted = l != null;
-        CallBridge b = CallRequests.bridge();
-        if (b == null) {
-            return;
+        if (b != null) {
+            drainIfWanted(b);
         }
-        drainIfWanted(b);
     }
 
     /// Whether a listener is waiting for the calls the port already has.
+    /// Guarded by LISTENERS, like the listener it belongs to.
     private static boolean drainWanted;
 
     /// Drains once, when there is somewhere to drain from.
@@ -137,7 +143,9 @@ public final class VoipPush {
     ///
     /// @hidden not part of the public API.
     public static void drainIfWanted(CallBridge b) {
-        synchronized (VoipPush.class) {
+        // The same monitor the flag is written under; the drain itself
+        // happens outside it.
+        synchronized (LISTENERS) {
             if (!drainWanted || b == null) {
                 return;
             }
