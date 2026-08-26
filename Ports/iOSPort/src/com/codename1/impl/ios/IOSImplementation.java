@@ -2031,6 +2031,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         Desktop.getInstance().monitorsChanged();
     }
 
+    /// Records which mouse button produced the pointer event about to be
+    /// dispatched.
+    ///
+    /// Called from the AppKit view immediately before the pointer callback, the
+    /// way the Linux and native Windows ports call setPointerEventMetadata from
+    /// their own input handlers. Without it every click looked primary, so
+    /// PointerEvent.isSecondaryButton() was false for a right click and the
+    /// framework's context-menu and selection logic could not tell the two
+    /// apart.
+    ///
+    /// `button` and `mask` are PointerEvent constants; the type is always a
+    /// mouse here, since a Mac trackpad click arrives as one too.
+    public static void pointerButtonCallback(int button, int mask) {
+        if (instance == null) {
+            return;
+        }
+        instance.setPointerEventMetadata(button, mask,
+                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+    }
+
     /// Invoked when the user moves a native window.
     public static void windowMovedCallback(int windowId) {
         Desktop.getInstance().windowMoved(windowId);

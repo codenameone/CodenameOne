@@ -2436,6 +2436,11 @@ void CN1MacWindowDeliverMonitorsChanged(void) {
     com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+void CN1MacPointerButton(int button, int mask) {
+    com_codename1_impl_ios_IOSImplementation_pointerButtonCallback___int_int(
+        CN1_THREAD_GET_STATE_PASS_ARG button, mask);
+}
+
 void CN1MacWindowDeliverMoved(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowMovedCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }

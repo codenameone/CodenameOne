@@ -505,6 +505,7 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 extern void pointerPressed(int *x, int *y, int length);
 extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
+extern void CN1MacPointerButton(int button, int mask);
 extern void pointerHoverNative(int x, int y);
 extern void pointerHoverPressedNative(int x, int y);
 extern void pointerHoverReleasedNative(int x, int y);
@@ -552,30 +553,52 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
     fn(&x, &y, 1);
 }
 
+// PointerEvent constants, kept here rather than imported because the Java side
+// is what defines them and this file cannot see it.
+#define CN1_PE_BUTTON_PRIMARY   0
+#define CN1_PE_BUTTON_SECONDARY 1
+#define CN1_PE_MASK_PRIMARY     (1 << 0)
+#define CN1_PE_MASK_SECONDARY   (1 << 1)
+
 - (void)mouseDown:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)mouseDragged:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)mouseUp:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
 // Right and middle buttons reach Codename One as ordinary pointer events,
-// because its input model has one pointer. A context menu, if the application
-// wants one, comes from menuForEvent: rather than from a second button here.
+// because its input model has one pointer. What distinguishes them is the
+// metadata recorded first: without it every click read as primary, so
+// PointerEvent.isSecondaryButton() was false for a right click and the
+// framework's context-menu and selection logic could not tell the two apart.
+// The Linux and native Windows ports set the same metadata from their own input
+// handlers. A context menu, if the application wants one, still comes from
+// menuForEvent: rather than from a second button here.
+//
+// Display.isRightMouseButtonDown() is a separate, older API that reads no
+// metadata; the base implementation answers false and only JavaSE overrides it,
+// so it stays false here as it does on Linux and Windows.
 - (void)rightMouseDown:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)rightMouseDragged:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)rightMouseUp:(NSEvent *)event {
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -1153,17 +1176,35 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         [self cn1RememberAnchor:anchor];
         return;
     }
+    // Split from the document selectors below for the same reason the
+    // unmodified line commands further down are: grouped together,
+    // Shift-Home on the third line of a TextArea selected back through every
+    // preceding line instead of stopping where the line starts. The bug was
+    // fixed for the plain movement and left standing for the selecting
+    // variant, which is the same key with Shift held.
     if (selector == @selector(moveToBeginningOfLineAndModifySelection:)
-        || selector == @selector(moveToBeginningOfParagraphAndModifySelection:)
-        || selector == @selector(moveToBeginningOfDocumentAndModifySelection:)) {
+        || selector == @selector(moveToBeginningOfParagraphAndModifySelection:)) {
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        NSUInteger to = [self cn1LineStart:cn1ActiveEdge(sel, anchor) inText:session.text];
+        [self cn1SetSelection:[self cn1Extend:sel to:to anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
+        return;
+    }
+    if (selector == @selector(moveToEndOfLineAndModifySelection:)
+        || selector == @selector(moveToEndOfParagraphAndModifySelection:)) {
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        NSUInteger to = [self cn1LineEnd:cn1ActiveEdge(sel, anchor) inText:session.text];
+        [self cn1SetSelection:[self cn1Extend:sel to:to anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
+        return;
+    }
+    if (selector == @selector(moveToBeginningOfDocumentAndModifySelection:)) {
         NSUInteger anchor = [self cn1SelectionAnchor:sel];
         [self cn1SetSelection:[self cn1Extend:sel to:0 anchor:anchor]];
         [self cn1RememberAnchor:anchor];
         return;
     }
-    if (selector == @selector(moveToEndOfLineAndModifySelection:)
-        || selector == @selector(moveToEndOfParagraphAndModifySelection:)
-        || selector == @selector(moveToEndOfDocumentAndModifySelection:)) {
+    if (selector == @selector(moveToEndOfDocumentAndModifySelection:)) {
         NSUInteger anchor = [self cn1SelectionAnchor:sel];
         [self cn1SetSelection:[self cn1Extend:sel to:len anchor:anchor]];
         [self cn1RememberAnchor:anchor];
