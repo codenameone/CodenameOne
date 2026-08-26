@@ -207,4 +207,18 @@ public class CallManifestFragmentsTest {
         }
         return n;
     }
+
+    @Test
+    public void aVoipConnectionServiceDeclaresItsForegroundType() {
+        // From API 34 startForeground is refused for a type the manifest
+        // never declared, so granting FOREGROUND_SERVICE_PHONE_CALL and
+        // stopping there cannot keep the service alive for a call that
+        // arrived in the background.
+        String voip = CallManifestFragments.services(true, true, false);
+        assertTrue(voip.contains("android:foregroundServiceType=\"phoneCall\""));
+        String session = CallManifestFragments.services(true, false, false);
+        assertFalse(session.contains("foregroundServiceType"),
+                "an app that never rings in the background does not run a"
+                        + " foreground service for calls");
+    }
 }

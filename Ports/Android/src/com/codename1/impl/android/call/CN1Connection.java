@@ -153,6 +153,29 @@ public class CN1Connection extends Connection {
         }
     }
 
+    /// Tears down a call whose answer the app could not carry out.
+    ///
+    /// Telecom has no "this action failed" channel, so the only honest report
+    /// is to end the call -- but onAnswer has already moved Telecom to ACTIVE
+    /// and fired the synthesized audioSessionActivated, as Telecom's own API
+    /// requires. Destroying the connection and stopping there left the app's
+    /// media running against a call that no longer existed and the session in
+    /// Calls.getSessions() for the life of the process, because nothing ever
+    /// told the facade.
+    void failAnswer() {
+        CN1CallNotifications.dismiss(callId);
+        setDisconnected(new DisconnectCause(DisconnectCause.ERROR));
+        if (audioAnnounced) {
+            Calls.deliverAudioDeactivated(callId);
+            audioAnnounced = false;
+        }
+        // Only on this path. Where the app itself asked for the end, the
+        // facade has already moved the session and would fire callEnded a
+        // second time.
+        Calls.deliverCallEnded(callId, CallEndReason.FAILED.ordinal());
+        destroy();
+    }
+
     /// Ends the call and removes it from Telecom.
     void finish(CallEndReason reason) {
         CN1CallNotifications.dismiss(callId);

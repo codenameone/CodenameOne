@@ -269,8 +269,11 @@ public class CN1ConnectionService extends ConnectionService {
         // call rather than leave the system UI showing a state the app is not
         // in.
         if (a.kind == CN1Connection.ACTION_ANSWER) {
-            a.connection.setDisconnected(new DisconnectCause(DisconnectCause.ERROR));
-            a.connection.destroy();
+            // Through the full teardown, not just destroy(): the answer had
+            // already activated the connection and announced the audio
+            // session, so media has to be stopped and the facade has to hear
+            // that the call is over.
+            a.connection.failAnswer();
             forget(a.connection.getCallId());
         } else if (a.kind == CN1Connection.ACTION_HOLD) {
             // onHold() moved Telecom before the app was asked, the way

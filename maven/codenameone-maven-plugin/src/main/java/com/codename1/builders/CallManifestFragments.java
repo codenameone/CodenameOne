@@ -204,8 +204,18 @@ final class CallManifestFragments {
             sb.append("        <service android:name=\"")
                     .append(CONNECTION_SERVICE)
                     .append("\"\n                 android:permission=")
-                    .append("\"android.permission.BIND_TELECOM_CONNECTION_SERVICE\"")
-                    .append("\n                 android:exported=\"true\">\n")
+                    .append("\"android.permission.BIND_TELECOM_CONNECTION_SERVICE\"");
+            if (voip) {
+                // From API 34 startForeground is refused for a type the
+                // manifest never declared, so an app that grants itself
+                // FOREGROUND_SERVICE_PHONE_CALL and stops there cannot keep
+                // this service alive for a call that arrived in the
+                // background. Declared whatever the app targets: the
+                // attribute is ignored below 29, where it did not exist.
+                sb.append("\n                 android:foregroundServiceType=")
+                        .append("\"phoneCall\"");
+            }
+            sb.append("\n                 android:exported=\"true\">\n")
                     .append("            <intent-filter>\n")
                     .append("                <action android:name=")
                     .append("\"android.telecom.ConnectionService\" />\n")

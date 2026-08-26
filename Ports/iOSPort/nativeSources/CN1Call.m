@@ -132,6 +132,16 @@ static CXCallController *cn1clController = nil;
 
 /// Calls this app currently has, keyed by canonical id string.
 static NSMutableDictionary *cn1clCalls = nil;
+/// The calls whose CXStartCallAction this app submitted itself.
+///
+/// reportOutgoing() places an outgoing call by requesting a
+/// CXStartCallAction, and CallKit hands every start action to
+/// performStartCallAction -- including that one. Delivered blindly it looks
+/// exactly like Recents or Siri asking the app to place a call, so an app
+/// that honours the callback's contract calls reportOutgoing() again with the
+/// same id, which submits another action, which arrives again.
+static NSMutableSet *cn1clJavaStarts = nil;
+
 /// The call CallKit last put in charge of the audio session.
 ///
 /// didActivateAudioSession names no call, and with more than one call up --
@@ -181,6 +191,7 @@ static void cn1clEnsureState(void) {
         cn1clUnclaimed = [[NSMutableSet alloc] init];
         cn1clReporting = [[NSMutableSet alloc] init];
         cn1clReportWaiters = [[NSMutableDictionary alloc] init];
+        cn1clJavaStarts = [[NSMutableSet alloc] init];
         cn1clLock = [[NSObject alloc] init];
     });
 }
@@ -264,6 +275,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     @synchronized (cn1clLock) {
         [cn1clCalls removeAllObjects];
         [cn1clActions removeAllObjects];
+        [cn1clJavaStarts removeAllObjects];
         cn1clAudioCall = nil;
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
@@ -312,7 +324,24 @@ static int64_t cn1clTrackAction(CXAction *action) {
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
     // The system asking this app to PLACE a call: Recents, or a voice
     // assistant. No call exists yet; Java reports one with this id.
-    cn1clOwnAudio([action.callUUID UUIDString]);
+    NSString *startedUuid = [action.callUUID UUIDString];
+    cn1clOwnAudio(startedUuid);
+    BOOL ours = NO;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        ours = [cn1clJavaStarts containsObject:startedUuid];
+        if (ours) {
+            [cn1clJavaStarts removeObject:startedUuid];
+        }
+    }
+    if (ours) {
+        // reportOutgoing() submitted this one. The action still has to be
+        // fulfilled or CallKit times it out, but Java already knows about
+        // the call: telling it to place one would have it call
+        // reportOutgoing() again for a call it is already placing.
+        [action fulfill];
+        return;
+    }
     NSString *wire = cn1clJoin([NSArray arrayWithObjects:
             [NSString stringWithFormat:@"%d",
                     action.handle.type == CXHandleTypePhoneNumber
@@ -1049,9 +1078,19 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
         action.contactIdentifier = toNSString(threadStateData, displayName);
     }
     cn1clEnsureProvider();
+    // Marked BEFORE the transaction is requested: CallKit may dispatch the
+    // action to performStartCallAction before this call returns, and the
+    // delegate uses this to tell an app-originated start from a system one.
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clJavaStarts addObject:uuidString];
+    }
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
         if (error != nil) {
+            @synchronized (cn1clLock) {
+                [cn1clJavaStarts removeObject:uuidString];
+            }
             cn1clAck(requestId, NO, CN1_CALL_ERR_CALL_REFUSED,
                     [error localizedDescription]);
             return;
