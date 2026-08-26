@@ -88,6 +88,27 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
         return;
     }
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+    // Managed push carries the canonical typed envelope as a JSON object under
+    // "cn1". It goes out intact, with a null type, BEFORE the historical
+    // aps/meta decoder can split or rewrite it -- which is what the UIKit
+    // delegate does too, and for the same reason: an envelope with no legacy
+    // fields is dropped by that decoder entirely, and one that happens to carry
+    // an alert reaches PushClient as the alert text rather than as JSON and is
+    // rejected as invalid_envelope.
+    id cn1Envelope = [userInfo objectForKey:@"cn1"];
+    if ([cn1Envelope isKindOfClass:[NSDictionary class]]) {
+        NSError *jsonError = nil;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:cn1Envelope options:0 error:&jsonError];
+        if (jsonData != nil && jsonError == nil) {
+            NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+#ifndef CN1_USE_ARC
+            [jsonString autorelease];
+#endif
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+                threadStateData, fromNSString(threadStateData, jsonString), JAVA_NULL);
+            return;
+        }
+    }
     NSDictionary *aps = [userInfo objectForKey:@"aps"];
     id alert = aps != nil ? [aps objectForKey:@"alert"] : nil;
     id meta = [userInfo objectForKey:@"meta"];

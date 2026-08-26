@@ -481,7 +481,13 @@ public final class PushClient {
             return "hms".equals(value) ? "huawei" : value;
         }
         String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform)) {
+        // "mac" alongside "ios": the native macOS port registers with APNs
+        // through UNUserNotificationCenter exactly as iOS does, so a managed
+        // subscription from it has to be routed there. Falling through to
+        // "native" sent provider "native" to the server and no APNs
+        // subscription was ever created. Mac Catalyst is unaffected -- it
+        // reports "ios".
+        if ("ios".equals(platform) || "mac".equals(platform)) {
             return "apns";
         }
         if ("win".equals(platform)) {

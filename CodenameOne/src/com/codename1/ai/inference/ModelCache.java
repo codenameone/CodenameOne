@@ -89,8 +89,9 @@ public final class ModelCache {
         }
         if (sha256 == null && requiresPinnedModelDigest()) {
             throw new IllegalArgumentException(
-                    "iOS model downloads require a SHA-256 digest because "
-                    + "redirects are followed below the portable network layer");
+                    "Model downloads on this platform require a SHA-256 digest "
+                    + "because redirects are followed below the portable "
+                    + "network layer");
         }
 
         final String fileName = safeName(cacheKey) + ".tflite";
@@ -305,7 +306,12 @@ public final class ModelCache {
     }
 
     static boolean requiresPinnedModelDigest() {
-        return "ios".equals(Display.getInstance().getPlatformName());
+        // "mac" as well as "ios": the native macOS port shares the Apple
+        // networking stack, so NSURLSession follows the redirect below the
+        // portable layer there too and the digest is the only thing that can
+        // say what was actually downloaded.
+        String platform = Display.getInstance().getPlatformName();
+        return "ios".equals(platform) || "mac".equals(platform);
     }
 
     static FetchRegistration registerFetch(

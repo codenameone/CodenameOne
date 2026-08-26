@@ -96,6 +96,28 @@ class InferenceApiTest extends UITestBase {
         assertTrue(error.getMessage().contains("SHA-256"));
     }
 
+    /**
+     * The native macOS port shares the Apple networking stack, so the redirect
+     * is followed below the portable layer there for the same reason.
+     */
+    @Test
+    void modelCacheRequiresDigestWhenMacHidesRedirects() {
+        implementation.setPlatformName("mac");
+        assertTrue(ModelCache.requiresPinnedModelDigest());
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModelCache.fetch(
+                        "https://example.com/model.tflite", "mac-model"));
+        assertTrue(error.getMessage().contains("SHA-256"));
+    }
+
+    /** A platform whose networking is the portable stack needs no digest. */
+    @Test
+    void modelCacheNeedsNoDigestWhereRedirectsAreVisible() {
+        implementation.setPlatformName("and");
+        assertFalse(ModelCache.requiresPinnedModelDigest());
+    }
+
     @Test
     void modelCacheRejectsInsecureRedirects() throws Exception {
         FileSystemStorage fs = FileSystemStorage.getInstance();
