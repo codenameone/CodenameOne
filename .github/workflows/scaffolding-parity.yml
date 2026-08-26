@@ -49,7 +49,11 @@ concurrency:
 jobs:
   scaffolding-integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 10 rather than 5, for the reason identity-stack's sample-secrets job
+    # carries: checking out a repository this size can take three minutes on its
+    # own, and a budget sized for the work rather than for the checkout fails
+    # having run none of it.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - name: Validate Initializr embedded Maven coordinates
