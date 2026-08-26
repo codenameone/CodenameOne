@@ -355,6 +355,12 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_T
             return;
         }
         rec.disposed = YES;
+        // Before the window goes: activeRenderingView does not retain what it
+        // points at, and a paint that claimed this window and never reached its
+        // flush -- the window was closed under it -- left the claim standing.
+        // The next frame then drew into a freed view, which is a main-thread
+        // segfault one test after the one that closed the window.
+        [[CN1MacHost sharedHost] forgetRenderingView:rec.view];
         if (rec.modalSession != NULL) {
             [NSApp endModalSession:rec.modalSession];
             rec.modalSession = NULL;
@@ -820,6 +826,9 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowBeginPaint___int(CODENAME_ON
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowFlush___int_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
     CN1MacWindowRecord *rec = cn1WindowAt(slot);
     if (rec == nil) {
+        // The window went away between beginPaint and here. The claim it made
+        // has to be dropped even though there is nothing left to flush.
+        [CN1MacHost sharedHost].activeRenderingView = nil;
         return;
     }
     [CN1MacHost sharedHost].activeRenderingView = rec.view;

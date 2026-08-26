@@ -61,24 +61,6 @@ NSView *CN1MacPeerHostView(void) {
     return [CN1MacHost sharedHost].activeRenderingView;
 }
 
-/**
- * The window being painted right now, or nil when none is.
- *
- * <p>Distinct from CN1MacPeerHostView, which falls back to the main surface: a
- * caller that wants to CORRECT a peer's placement has to be able to tell "the
- * main window is painting" from "no window is painting", because moving a peer
- * on the second reading would drag every secondary window's peer back to the
- * main surface.</p>
- *
- * <p>This is what makes the correction safe. A peer is created during
- * initComponentImpl, before its window has ever painted, so the window is not
- * yet knowable; the first paint that positions it is inside the bracket, and
- * that is when it can be moved to where it belongs.</p>
- */
-NSView *CN1MacPaintingViewOrNil(void) {
-    return [CN1MacHost sharedHost].activeRenderingViewOrNil;
-}
-
 void CN1MacRefreshScaleValue(void) {
     extern float scaleValue;
     NSWindow *w = [CN1MacHost sharedHost].window;
@@ -116,8 +98,10 @@ void CN1MacRefreshScaleValue(void) {
     return _activeRenderingView != nil ? _activeRenderingView : self.renderingView;
 }
 
-- (NSView *)activeRenderingViewOrNil {
-    return _activeRenderingView;
+- (void)forgetRenderingView:(NSView *)view {
+    if (view != nil && _activeRenderingView == view) {
+        _activeRenderingView = nil;
+    }
 }
 
 - (NSView *)renderingView {

@@ -60,9 +60,13 @@
 /// paint and clears it again, and everything else draws into the main window.
 @property (nonatomic, assign) NSView *activeRenderingView;
 
-/// The same value WITHOUT the fall back to the main surface, so a caller can
-/// tell "the main window is painting" from "nothing is painting".
-@property (nonatomic, readonly) NSView *activeRenderingViewOrNil;
+/// Clears activeRenderingView if it is this view, and does nothing otherwise.
+///
+/// The property is unretained -- a rendering view is owned by its window -- so a
+/// window torn down while it is still the claimed one leaves a dangling pointer
+/// that the next frame messages. Anything releasing a rendering view calls this
+/// first.
+- (void)forgetRenderingView:(NSView *)view;
 
 /// Pins the window to one size so a screenshot comparison has something stable
 /// to compare. Only the compliance suite sets this.
