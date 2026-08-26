@@ -555,6 +555,46 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aFailedSystemMuteActionDoesNotMoveTheSessionFlag() {
+        // The other direction from aRefusedMuteDoesNotMoveTheSessionFlag: here
+        // the SYSTEM asked, and a listener that fails the action leaves CallKit holding the
+        // previous mute state, and Java used to report the one the system had
+        // just rejected.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void muteRequested(String callId, boolean muted,
+                    CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        CallSession s = ring(id);
+        bridge.simulateMute(id, true);
+        waitFor(seen, 1);
+        seen.get(0).fail();
+        assertFalse(s.isMuted(),
+                "a failed mute action must not show as muted");
+    }
+
+    @Test
+    public void aPushedCallWithNoHandleDoesNotAbortTheBatch() {
+        // CallHandle rejects an empty value, so the old fallback threw and
+        // took every good call queued behind it with it.
+        bridge.enqueuePushedCall(CallId.random(), null, "No Handle", false,
+                false, null);
+        String good = CallId.random();
+        bridge.enqueuePushedCall(good, CallHandle.phone("+14155551212"),
+                "Ada", false, false, null);
+        final List<PushedCall> got = new ArrayList<PushedCall>();
+        VoipPush.setListener(new Collector(got));
+        waitFor(got, 2);
+        assertEquals(2, got.size(),
+                "a malformed record must not lose the rest of the drain");
+        assertNotNull(Calls.getSession(good));
+    }
+
+    @Test
     public void registeringYieldsAToken() {
         String token = CallAwait.value(VoipPush.register());
         assertNotNull(token);

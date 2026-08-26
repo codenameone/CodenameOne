@@ -484,6 +484,27 @@ public final class Calls {
                 null, false));
     }
 
+    /// Records a mute flag once the action that asked for it is fulfilled.
+    ///
+    /// A named static class rather than an anonymous one so it holds no
+    /// synthetic reference to an enclosing scope.
+    private static final class MuteChange implements Runnable {
+        private final CallSession session;
+        private final boolean muted;
+
+        MuteChange(CallSession session, boolean muted) {
+            this.session = session;
+            this.muted = muted;
+        }
+
+        @Override
+        public void run() {
+            if (session != null) {
+                session.setMutedInternal(muted);
+            }
+        }
+    }
+
     /// Moves a session's state once the action that asked for it is
     /// fulfilled.
     ///
@@ -641,10 +662,12 @@ public final class Calls {
                     break;
                 }
                 case MUTE: {
-                    if (session != null) {
-                        session.setMutedInternal(flag);
-                    }
                     CallAction a = new CallAction(token, callId);
+                    // On fulfilment only, for the reason ANSWER gives: a
+                    // listener that fails this action leaves CallKit holding
+                    // the PREVIOUS mute state, and Java used to report the
+                    // one the system had just rejected.
+                    a.whenFulfilled(new MuteChange(session, flag));
                     try {
                         for (CallActionListener l : ls) {
                             l.muteRequested(callId, flag, a);

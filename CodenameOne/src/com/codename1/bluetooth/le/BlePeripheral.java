@@ -251,23 +251,59 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        out.onResult(new AsyncResult<List<GattService>>() {
+        final AsyncResource<List<GattService>> inner =
+                publishBeforeDone(out, new AsyncResult<List<GattService>>() {
+                    @Override
+                    public void onReady(List<GattService> value,
+                            Throwable err) {
+                        if (err == null && value != null) {
+                            synchronized (stateLock) {
+                                services =
+                                        new ArrayList<GattService>(value);
+                            }
+                        }
+                    }
+                });
+        queue.enqueue(new GattOperationQueue.Op(out) {
             @Override
-            public void onReady(List<GattService> value, Throwable err) {
-                if (err == null && value != null) {
-                    synchronized (stateLock) {
-                        services = new ArrayList<GattService>(value);
+            void start() {
+                doDiscoverServices(inner);
+            }
+        });
+        return out;
+    }
+
+    /// Returns the resource the platform layer should complete, arranging
+    /// for `apply` to run -- and therefore for whatever state it publishes to
+    /// be visible -- strictly before `out` is marked done.
+    ///
+    /// AsyncResource sets its done flag inside the monitor and only then
+    /// notifies observers and callbacks, so state written from an ordinary
+    /// `onResult` listener lands a moment after a waiter has already woken.
+    /// A caller doing the natural `discoverServices().await()` followed by
+    /// `getService(...)` could therefore read the previous operation's cache
+    /// -- which is exactly how a passing test turned intermittent under load.
+    private static <T> AsyncResource<T> publishBeforeDone(
+            final AsyncResource<T> out, final AsyncResult<T> apply) {
+        final AsyncResource<T> inner = new AsyncResource<T>();
+        inner.onResult(new AsyncResult<T>() {
+            @Override
+            public void onReady(T value, Throwable err) {
+                try {
+                    apply.onReady(value, err);
+                } finally {
+                    // already failed by the queue timeout or a dropped link
+                    if (!out.isDone()) {
+                        if (err == null) {
+                            out.complete(value);
+                        } else {
+                            out.error(err);
+                        }
                     }
                 }
             }
         });
-        queue.enqueue(new GattOperationQueue.Op(out) {
-            @Override
-            void start() {
-                doDiscoverServices(out);
-            }
-        });
-        return out;
+        return inner;
     }
 
     /// The cached service list from the last [#discoverServices()] call;
@@ -407,7 +443,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
                 startArm = true;
             }
         }
-        arm.addListener(out);
+        // registered AFTER the bookkeeping listener below, because
+        // AsyncResource runs its callbacks in registration order and
+        // completing `out` first would let the caller observe the
+        // subscription before `armed` records it.
+        final AsyncResource<Boolean> joined = arm;
         if (startArm) {
             final AsyncResource<Boolean> armRes = arm;
             arm.onResult(new AsyncResult<Boolean>() {
@@ -430,6 +470,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
                 }
             });
         }
+        joined.addListener(out);
         return out;
     }
 
@@ -509,18 +550,19 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        out.onResult(new AsyncResult<Integer>() {
-            @Override
-            public void onReady(Integer value, Throwable err) {
-                if (err == null && value != null) {
-                    BlePeripheral.this.mtu = value.intValue();
-                }
-            }
-        });
+        final AsyncResource<Integer> inner =
+                publishBeforeDone(out, new AsyncResult<Integer>() {
+                    @Override
+                    public void onReady(Integer value, Throwable err) {
+                        if (err == null && value != null) {
+                            BlePeripheral.this.mtu = value.intValue();
+                        }
+                    }
+                });
         queue.enqueue(new GattOperationQueue.Op(out) {
             @Override
             void start() {
-                doRequestMtu(mtu, out);
+                doRequestMtu(mtu, inner);
             }
         });
         return out;

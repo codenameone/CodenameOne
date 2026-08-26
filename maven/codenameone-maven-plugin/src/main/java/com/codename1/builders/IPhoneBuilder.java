@@ -4822,6 +4822,15 @@ public class IPhoneBuilder extends Executor {
                 if (usesCallVoip) {
                     enableFeatureDefine(buildinRes, "CN1_CALL_VOIP",
                             "com.codename1.call.voip");
+                    // A VoIP push IS a push, and this copy has no pushV3 --
+                    // it reads ios.includePush directly. Turning the hint on
+                    // is what gets the push entitlement onto an app that
+                    // never touched PushClient; the cloud builder does the
+                    // same thing through pushV3, where it ALSO makes the
+                    // provisioning check demand Push Notifications.
+                    if (request.getArg("ios.includePush", null) == null) {
+                        request.putArgument("ios.includePush", "true");
+                    }
                     // The voip background mode, added only for an app that
                     // referenced the push package. Apple rejects an app that
                     // carries it without a working call implementation, which
@@ -4837,12 +4846,19 @@ public class IPhoneBuilder extends Executor {
                     String injected = request.getArg("ios.plistInject", "");
                     if (injected.contains("UIBackgroundModes")) {
                         if (!injected.contains("voip")) {
-                            log("This app uses com.codename1.call.voip, which"
-                                    + " needs \"voip\" in UIBackgroundModes."
-                                    + " The ios.plistInject build hint declares"
-                                    + " UIBackgroundModes itself, so add it"
-                                    + " there -- the two mechanisms cannot"
-                                    + " both be used.");
+                            // Failed rather than warned. The two mechanisms
+                            // cannot be combined -- plist assembly refuses a
+                            // build that uses both -- so continuing would
+                            // ship an app that registers for VoIP pushes and
+                            // is never woken by one. That is precisely the
+                            // failure nobody can diagnose from a device.
+                            throw new BuildException("This app uses"
+                                    + " com.codename1.call.voip, which needs"
+                                    + " \"voip\" in UIBackgroundModes. The"
+                                    + " ios.plistInject build hint declares"
+                                    + " UIBackgroundModes itself and the two"
+                                    + " cannot be combined, so add <string>voip"
+                                    + "</string> to that array.");
                         }
                     } else {
                         String modes = request.getArg("ios.background_modes", "");

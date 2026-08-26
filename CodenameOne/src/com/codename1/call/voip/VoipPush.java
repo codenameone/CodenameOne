@@ -167,7 +167,15 @@ public final class VoipPush {
         }
         CallHandle handle = CallWire.decodeHandle(handleWire);
         if (handle == null) {
-            handle = CallHandle.generic("");
+            // A blank rather than an empty string, matching what the native
+            // side already showed the user: CN1Call.m substitutes " " for a
+            // handle with no value before reporting to CallKit, so the call
+            // rang with an empty caller and this describes the same thing.
+            //
+            // CallHandle rejects "" outright, so the previous fallback threw
+            // and took the rest of the drained batch with it -- one malformed
+            // push losing every good call queued behind it.
+            handle = CallHandle.generic(" ");
         }
         CallSession existing = Calls.getSession(id);
         CallSession session;

@@ -595,12 +595,16 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         [hex appendFormat:@"%02x", bytes[i]];
     }
     cn1clVoipToken = [hex copy];
-    if (cn1clTokenRequest >= 0) {
-        int req = cn1clTokenRequest;
-        cn1clTokenRequest = -1;
-        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
-                getThreadLocalData(), req, cn1clJString(cn1clVoipToken));
-    }
+    // Delivered EVERY time, not only when a register() is waiting. APNs
+    // rotates a VoIP token while the app stays installed, and the rotation
+    // used to update this variable and stop -- so the app's server kept the
+    // old token and incoming calls quietly stopped arriving. A requestId of
+    // -1 settles nothing and still reaches the tokenChanged listener, which
+    // is what the rotation case needs.
+    int req = cn1clTokenRequest;
+    cn1clTokenRequest = -1;
+    com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+            getThreadLocalData(), req, cn1clJString(cn1clVoipToken));
 }
 
 - (void)pushRegistry:(PKPushRegistry *)registry

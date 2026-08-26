@@ -19,11 +19,11 @@ shared value types.
 |===
 | Capability | iOS | Android | Simulator and desktop | JavaScript
 | System call UI | yes (CallKit) | yes (Android 8 and later) | simulated | --
-| Ring while the app isn't running | yes (PushKit) | yes (high-priority push) | simulated | --
+| Ring while the app isn't running | yes (`com.codename1.call.voip`) | yes, from your own push handler | simulated | --
 | Answer, hold, mute, keypad from the system | yes | yes | simulated | --
 | Audio session handoff | yes | synthesized | simulated | --
 | Conference grouping | yes | -- | simulated | --
-| Caller identification | yes (Call Directory) | yes (Android 10 and later) | simulated | --
+| Caller identification | yes (Call Directory) | -- | simulated | --
 | Call blocking | yes | yes (Android 10 and later) | simulated | --
 |===
 
@@ -138,6 +138,13 @@ ring.
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/CallManagementJava004Snippet.java[tag=call-management-java-004,indent=0]
 ----
 
+`com.codename1.call.voip` is iOS-only, and that isn't a gap. It exists
+because iOS reports a pushed call to the system before any of your code runs
+and kills the app when it doesn't -- a constraint Android doesn't have. On
+Android a high-priority FCM message reaches your ordinary push callback like
+any other, and you call `Calls.reportIncoming` from there.
+`VoipPush.isSupported()` answers false on Android so you can branch on it.
+
 Because the call is reported to the system before any Java runs, *the native
 code parses the push itself* and your server has to honour a fixed shape:
 
@@ -183,12 +190,18 @@ row -- when it isn't, and a string list sorts lexicographically, which puts
 `+1999...` before `+12...`. `CallDirectory` sorts and de-duplicates what you
 give it, so you need not.
 
-Two platform facts to design around. On iOS the numbers are read by a separate
-app extension the system starts on its own schedule, so installing the data and
-asking the system to read it are two steps. And caller identification is *off
-until the user enables your app* in Settings, which nothing you write can do
-for them -- check `DirectoryStatus.isEnabled()` before concluding that a load
-failed.
+Three platform facts to design around. On iOS the numbers are read by a
+separate app extension the system starts on its own schedule, so installing the
+data and asking the system to read it are two steps. Caller identification is
+*off until the user enables your app* in Settings, which nothing you write can
+do for them -- check `DirectoryStatus.isEnabled()` before concluding that a
+load failed.
+
+And *Android blocks but doesn't label*. A `CallScreeningService` may allow,
+reject or silence a call; Android gives a third-party app no way to put a name
+on one. `blocked` entries work there and labels are ignored, which is why
+`Calls.getCapabilities()` reports `CAPABILITY_SCREENING` and not
+`CAPABILITY_DIRECTORY` on Android.
 
 === Developing Without Hardware
 

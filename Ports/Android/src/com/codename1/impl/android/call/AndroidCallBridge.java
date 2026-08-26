@@ -89,10 +89,20 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public boolean isVoipPushSupported() {
-        // The wake-up is an ordinary high-priority FCM message the app's own
-        // push service delivers, so there is nothing extra for this port to
-        // support beyond calls themselves.
-        return isCallSupported();
+        // FALSE, deliberately, and it is not a gap.
+        //
+        // com.codename1.call.voip exists for one reason: iOS reports a pushed
+        // call to the system BEFORE any of the app's code runs, and kills the
+        // app when it does not, so the framework has to own that path.
+        // Android imposes no such deadline -- a high-priority FCM message
+        // arrives in Java like any other -- so the natural Android answer is
+        // for the app to call Calls.reportIncoming from its own push
+        // callback, which works today and needs nothing from this facade.
+        //
+        // Saying true here handed apps a register() that resolved with an
+        // empty token and a listener nothing ever called. Reporting the truth
+        // sends them to the path that works.
+        return false;
     }
 
     @Override
@@ -109,11 +119,17 @@ public class AndroidCallBridge implements CallBridge {
             return 0;
         }
         int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
-                | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_VIDEO
-                | CAPABILITY_VOIP_PUSH;
+                | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_VIDEO;
         if (isDirectorySupported()) {
-            caps |= CAPABILITY_DIRECTORY | CAPABILITY_SCREENING;
+            // SCREENING only, not DIRECTORY. A CallScreeningService may allow,
+            // reject or silence a call; Android offers a third-party app no
+            // way to put a LABEL on an incoming call, which is what
+            // CAPABILITY_DIRECTORY promises. Blocking entries work here and
+            // labels are ignored, so claiming identification meant a
+            // label-only list was accepted and then did nothing at all.
+            caps |= CAPABILITY_SCREENING;
         }
+        // No CAPABILITY_VOIP_PUSH: see isVoipPushSupported.
         // Deliberately no CAPABILITY_GROUPING or CAPABILITY_ROUTE_PICKER:
         // Telecom conferences self-managed calls only through a
         // ConnectionService conference this port does not build, and there is

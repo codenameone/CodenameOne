@@ -333,6 +333,11 @@ public class LocalCallBridge implements CallBridge {
                 ? CallAudioRoute.UNKNOWN.ordinal() : newRoute.ordinal();
     }
 
+    /// Simulates the user muting or unmuting through the system UI.
+    public void simulateMute(String callId, boolean muted) {
+        later(LATENCY_MILLIS, new MuteDelivery(callId, muted, nextToken()));
+    }
+
     /// Simulates the user typing on the system keypad.
     public void simulateDtmf(String callId, String digits) {
         later(LATENCY_MILLIS, new DtmfDelivery(callId, digits, nextToken()));
@@ -829,6 +834,23 @@ public class LocalCallBridge implements CallBridge {
             } else {
                 Calls.deliverAudioDeactivated(callId);
             }
+        }
+    }
+
+    private static final class MuteDelivery implements Runnable {
+        private final String callId;
+        private final boolean muted;
+        private final long token;
+
+        MuteDelivery(String callId, boolean muted, long token) {
+            this.callId = callId;
+            this.muted = muted;
+            this.token = token;
+        }
+
+        @Override
+        public void run() {
+            Calls.deliverMute(callId, muted, token);
         }
     }
 
