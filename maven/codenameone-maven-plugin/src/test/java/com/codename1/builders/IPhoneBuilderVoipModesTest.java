@@ -25,6 +25,8 @@ package com.codename1.builders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -106,8 +108,37 @@ class IPhoneBuilderVoipModesTest {
         // substring test, which suppressed generation entirely -- so the host
         // plist carried neither the group nor the extension identifier.
         String src = builderSource();
-        assertTrue(src.contains("inject.contains(\"<key>\" + key + \"</key>\")"),
+        // The live fragment, and the exact key within it.
+        assertTrue(src.contains("plistWithoutComments(inject)"),
+                "appendCallPlist has to test the fragment without comments");
+        assertTrue(src.contains(".contains(\"<key>\" + key + \"</key>\")"),
                 "appendCallPlist has to test the exact plist key");
+    }
+
+    @Test
+    void aCommentedOutDeclarationIsNotSupplied() {
+        // Every "does the project already supply this?" test used to answer
+        // yes for a declaration the project had COMMENTED OUT. The plist
+        // parser drops the comment, so the builder then stood aside for a key
+        // that was not there -- an app registered for VoIP pushes with no
+        // live background mode to wake it, and a host plist with no app group
+        // for the call directory to read. Both fail only on a device.
+        String commented = "<!-- <key>UIBackgroundModes</key>"
+                + "<array><string>voip</string></array> -->";
+        assertEquals("", IPhoneBuilder.plistWithoutComments(commented).trim());
+        assertFalse(IPhoneBuilder.injectedModesIncludeVoip(
+                IPhoneBuilder.plistWithoutComments(commented)));
+
+        // A live declaration after a comment is still live.
+        String live = "<!-- old -->\n<key>UIBackgroundModes</key>"
+                + "<array><string>voip</string></array>";
+        assertTrue(IPhoneBuilder.injectedModesIncludeVoip(
+                IPhoneBuilder.plistWithoutComments(live)));
+
+        // An unterminated comment swallows the rest, as a parser would.
+        assertEquals("<key>A</key>", IPhoneBuilder.plistWithoutComments(
+                "<key>A</key><!-- <key>B</key>"));
+        assertNull(IPhoneBuilder.plistWithoutComments(null));
     }
 
     private static String builderSource() throws Exception {

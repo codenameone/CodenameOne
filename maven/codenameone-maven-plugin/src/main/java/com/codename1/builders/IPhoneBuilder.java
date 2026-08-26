@@ -245,6 +245,44 @@ public class IPhoneBuilder extends Executor {
     /// @param inject the fragment so far
     /// @param key the Info.plist key
     /// @param value the value, or null to leave the key out
+    /// Returns `plist` with every `<!-- ... -->` span removed.
+    ///
+    /// Every "does the project already supply this?" test asks a text
+    /// question of the `ios.plistInject` fragment, and a plain search answers
+    /// yes for a declaration the project has COMMENTED OUT. The plist parser
+    /// drops the comment, so the builder then stands aside for a key that is
+    /// not there -- leaving an app registered for VoIP pushes with no live
+    /// background mode to wake it, or a host plist with no app group for the
+    /// call directory to read. Both fail only at runtime, on a device.
+    ///
+    /// An unterminated comment swallows the rest of the fragment, which is
+    /// what a parser would do with it too.
+    ///
+    /// @param plist the fragment
+    /// @return the fragment with its comments removed
+    static String plistWithoutComments(String plist) {
+        if (plist == null) {
+            return null;
+        }
+        int open = plist.indexOf("<!--");
+        if (open < 0) {
+            return plist;
+        }
+        StringBuilder sb = new StringBuilder();
+        int from = 0;
+        while (open >= 0) {
+            sb.append(plist, from, open);
+            int close = plist.indexOf("-->", open + 4);
+            if (close < 0) {
+                return sb.toString();
+            }
+            from = close + 3;
+            open = plist.indexOf("<!--", from);
+        }
+        sb.append(plist, from, plist.length());
+        return sb.toString();
+    }
+
     /// @return the fragment, with the entry appended when it was wanted
     private static String appendCallPlist(String inject, String key,
             String value) {
@@ -252,8 +290,13 @@ public class IPhoneBuilder extends Executor {
         // unrelated MyCN1CallAppGroupSetting suppressed generation entirely,
         // and the host plist then carried neither the group nor the extension
         // identifier -- so every directory write and reload failed at runtime.
+        // Tested against the LIVE fragment and appended to the original: a
+        // project that commented an old CN1CallAppGroup out was treated as
+        // supplying it, so neither the comment nor a generated key reached
+        // the host plist.
         if (value == null || value.trim().length() == 0
-                || inject.contains("<key>" + key + "</key>")) {
+                || plistWithoutComments(inject)
+                        .contains("<key>" + key + "</key>")) {
             return inject;
         }
         return inject + "\n<key>" + key + "</key><string>"
@@ -4934,7 +4977,13 @@ public class IPhoneBuilder extends Executor {
                     // broke apps whose injected array already carried voip --
                     // a configuration that worked until the scanner noticed
                     // com.codename1.call.voip.
-                    String injected = request.getArg("ios.plistInject", "");
+                    // COMMENTS STRIPPED: a commented-out UIBackgroundModes
+                    // array still matched both tests below, so the builder
+                    // skipped ios.background_modes for a key the parser had
+                    // already dropped -- an app registered for VoIP pushes
+                    // that nothing wakes.
+                    String injected = plistWithoutComments(
+                            request.getArg("ios.plistInject", ""));
                     // The EXACT key: a fragment carrying MyUIBackgroundModes
                     // matched a bare substring, so the builder treated the
                     // background modes as user supplied, skipped
