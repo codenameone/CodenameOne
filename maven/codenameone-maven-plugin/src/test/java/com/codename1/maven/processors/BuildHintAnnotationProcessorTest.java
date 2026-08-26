@@ -210,6 +210,36 @@ public class BuildHintAnnotationProcessorTest {
                 unset.getProperty("codename1.arg.android.min_sdk_version"));
     }
 
+    /// `@Hint` on an application class does not compile.
+    ///
+    /// It describes a build hint annotation or one of its members, so both of
+    /// its legal placements are annotation declarations. While TYPE was allowed,
+    /// writing `@Hint(name = "ios.pods")` straight onto the main class compiled,
+    /// set nothing and reported nothing -- the processor only reads the group
+    /// annotations -- which is the exact silence these annotations exist to
+    /// remove. javac refuses it now.
+    @Test
+    public void theHintMetaAnnotationCannotBePutOnAClass() throws Exception {
+        try {
+            compile("@com.codename1.annotations.buildhints.Hint(name = \"ios.pods\")");
+            fail("@Hint on an application class must not compile");
+        } catch (java.io.IOException expected) {
+            assertTrue(expected.getMessage(),
+                    expected.getMessage().contains("annotation type not applicable")
+                            || expected.getMessage().contains("not applicable"));
+        }
+    }
+
+    /// ...while both of its real placements still do.
+    @Test
+    public void theHintMetaAnnotationStillWorksWhereItBelongs() throws Exception {
+        // Compiling any annotated main class exercises the group annotations,
+        // which carry @Hint at the type level, and their members, which carry it
+        // on methods. Neither would resolve if the target were too narrow.
+        Properties p = hintsOf("@Ios(pods = {\"Alamofire\"})");
+        assertEquals("Alamofire", p.getProperty("codename1.arg.ios.pods"));
+    }
+
     // ------------------------------------------------------------------
     // determinism and cleanup
     // ------------------------------------------------------------------

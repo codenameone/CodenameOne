@@ -35,13 +35,18 @@ import java.lang.annotation.Target;
 /// developer guide and the Settings editor show, and the handful of facts about
 /// how the builders read the value.
 ///
-/// The annotation's own `default` clause is deliberately NOT the builder's
-/// default. A hint is written only where the developer set it, so the clause has
-/// no meaning at runtime, and encoding the real default there cannot survive a
-/// round trip -- a list collapses to `{}` and an absent enum default to the
-/// first constant. [#def] states it once instead.
+/// The annotation's own `default` clause is deliberately NOT the build server's
+/// default, and nothing here records that either. A hint is written only where
+/// the developer set it, so the clause has no meaning at runtime -- see
+/// [HintUnset] for what the default clause does say.
+///
+/// ANNOTATION_TYPE rather than TYPE. This describes a build hint annotation or
+/// one of its members, and both are annotation declarations. Allowing TYPE let
+/// `@Hint(name = "ios.pods")` be written straight onto an application class,
+/// where it compiles, sets nothing, and reports nothing -- which is the exact
+/// silence these annotations exist to remove.
 @Retention(RetentionPolicy.CLASS)
-@Target({ElementType.METHOD, ElementType.TYPE})
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 public @interface Hint {
 
     /// The key this attribute writes, when it is not the group's prefix
