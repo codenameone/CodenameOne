@@ -4,9 +4,9 @@ An app's documents normally live inside it. The user opens your app to reach the
 
 Codename One generates the platform plumbing for you from build hints. There is no native code in your project on any platform.
 
-=== Do you actually need this?
+=== When you need this
 
-If all you want is for the files your app already writes to be visible in the Files app under "On My iPhone," you need no extension and none of this chapter. Two plist keys do it:
+If all you want is for the files your app already writes to be visible in the Files app under the device's own heading, you need no extension and none of this chapter. Two plist keys do it:
 
 [source,properties]
 ----
@@ -124,7 +124,7 @@ include::../demos/common/src/main/snippets/developer-guide/document-provider.jso
 
 Apple signs an app extension against its *own* App ID. Your app's profile covers your app's bundle id and nothing beneath it, so the generated `CN1Documents` target needs an App ID of its own - `<your package>.CN1Documents` - with the same App Group, and its own provisioning profile.
 
-The <<certificate-wizard,Certificate Wizard>> does all of it: it creates the App Group, enables it on both App IDs, creates the extension's App ID, generates an App Store profile and a development profile for it, downloads them and writes them into your project settings. That's the recommended route.
+The <<certificate-wizard,Certificate Wizard>> does every step: it creates the App Group, enables it on both App IDs, creates the extension's App ID, generates an App Store profile and a development profile for it, downloads them and writes them into your project settings. That's the recommended route.
 
 To do it by hand, create the App ID and profiles in the Apple Developer portal and name them:
 
