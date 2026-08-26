@@ -803,7 +803,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarRequestAccess___int_boolea
 #if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
     __block BOOL granted = NO; dispatch_semaphore_t semaphore = dispatch_semaphore_create(0); EKEventStore *store = cn1CalendarStore();
     void (^completion)(BOOL,NSError*) = ^(BOOL value, NSError *error){ granted = value; dispatch_semaphore_signal(semaphore); };
-    if (@available(iOS 17.0, macCatalyst 17.0, *)) {
+    // macOS 14.0 named explicitly. The `*` means "every platform not listed",
+    // so on native macOS this branch was ALWAYS taken -- and the three
+    // request*Access* selectors arrived in macOS 14, while this target deploys
+    // to 11.0. On a Mac running 11, 12 or 13 that is an unrecognised selector
+    // sent to EKEventStore, which terminates the application rather than falling
+    // back to requestAccessToEntityType: below.
+    if (@available(iOS 17.0, macCatalyst 17.0, macOS 14.0, *)) {
         if (entityType == 1) [store requestFullAccessToRemindersWithCompletion:completion];
         else if (writeOnly) [store requestWriteOnlyAccessToEventsWithCompletion:completion];
         else [store requestFullAccessToEventsWithCompletion:completion];
@@ -5028,7 +5034,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createWKBrowserComponent___java_lang_
         cn1_setBrowserFollowTargetBlank(com_codename1_impl_ios_IOSNative_createWKBrowserComponent, YES);
 
         if (getBooleanClientProperty(CN1_THREAD_GET_STATE_PASS_ARG obj, @"BrowserComponent.ios.debug")) {
-            com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
+            // inspectable arrived in macOS 13.3 and this target deploys to 11.0,
+            // so on an older Mac this is an unrecognised selector and the
+            // application is terminated -- for a debugging flag. The web view
+            // simply is not inspectable there, which is the honest answer.
+            if (@available(macOS 13.3, *)) {
+                com_codename1_impl_ios_IOSNative_createWKBrowserComponent.inspectable = YES;
+            }
         }
 
         com_codename1_impl_ios_IOSNative_createWKBrowserComponent.navigationDelegate = del;
@@ -15559,7 +15571,11 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         }
 #endif // !TARGET_OS_TV
         if (timeSensitive) {
-            if (@available(iOS 15.0, *)) {
+            // macOS 12.0 named as well as iOS 15.0. The `*` reads as "available
+            // on macOS" and the interruption level arrived in 12, while this
+            // target deploys to 11.0 -- so on a Mac running 11 this was an
+            // unrecognised selector rather than a notification.
+            if (@available(iOS 15.0, macOS 12.0, *)) {
                 content.interruptionLevel = UNNotificationInterruptionLevelTimeSensitive;
             }
         }
