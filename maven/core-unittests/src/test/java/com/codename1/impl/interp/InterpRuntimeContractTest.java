@@ -556,6 +556,31 @@ class InterpRuntimeContractTest {
         }
     }
 
+    /**
+     * A pushed class literal handed to a host method's {@code Object}
+     * parameter is passed through as the {@link InterpClass} token itself,
+     * so token identity survives -- a {@code List<Class>} that stores
+     * {@code Pushed.class} and reads it back gets the same reference.
+     * <code>String.valueOf(Pushed.class)</code> and
+     * <code>System.out.println(Pushed.class)</code> would otherwise call
+     * <code>InterpClass.toString()</code> directly (not the interpreter's
+     * class-call handling) and print
+     * <code>com.codename1.impl.interp.InterpClass@1a2b3c</code>. The
+     * <code>toString()</code> override lines the interpreted answer up
+     * with what {@link java.lang.Class#toString} produces on the JVM.
+     */
+    @Test
+    @DisplayName("InterpClass.toString formats like Class.toString for host consumers")
+    void interpClassToStringMatchesClassToString() throws Throwable {
+        InterpClass ordinary = new InterpClass("com/example/Pushed");
+        assertEquals("class com.example.Pushed", ordinary.toString());
+        InterpClass iface = new InterpClass("com/example/Marker");
+        iface.accessFlags = 0x0200;
+        assertEquals("interface com.example.Marker", iface.toString());
+        InterpClass arr = ordinary.arrayType();
+        assertEquals("class [Lcom.example.Pushed;", arr.toString());
+    }
+
 
     /**
      * A pushed program that never returns has to be stoppable, or the Stop

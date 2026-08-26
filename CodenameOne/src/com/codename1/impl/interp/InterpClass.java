@@ -201,6 +201,25 @@ public final class InterpClass {
         return (accessFlags & 0x0200) != 0;
     }
 
+    /// The literal a real `java.lang.Class` prints -- `class foo.Bar`, or
+    /// `interface foo.Bar`, or `class [Lfoo.Bar;` for an array. Interpreted
+    /// class tokens are passed through unchanged when a host method's
+    /// parameter is `Object` (so token identity survives -- a `List<Class>`
+    /// receiving `Pushed.class` and reading it back gets the same reference).
+    /// Without this override, a host `System.out.println(Pushed.class)` or
+    /// `String.valueOf(Pushed.class)` would print `InterpClass@1a2b3c` --
+    /// this format lines the interpreted answer up with the JVM's.
+    @Override
+    public String toString() {
+        if (isArray()) {
+            // JLS: `class [Lfoo.Bar;` for an array. `name` already carries the
+            // descriptor form (`[Lfoo/Bar;`); flipping slashes to dots matches
+            // Class.getName() / Class.toString() output on the JVM.
+            return "class " + name.replace('/', '.');
+        }
+        return (isInterface() ? "interface " : "class ") + name.replace('/', '.');
+    }
+
     /// The source file this class was compiled from, for stack traces and the
     /// on-device source viewer.
     public String getSourceFile() {
