@@ -134,7 +134,15 @@ class WatchNativeBuilder {
     // #if !TARGET_OS_WATCH guarded around each of them -- this list is the link half of the same
     // conditional-system-library arrangement, and it is the half that silently lags.
     static final String WATCH_OPTIONAL_FRAMEWORKS =
-            "OpenGLES.framework;GLKit.framework;Metal.framework;"
+            // CallKit and PushKit are both PRESENT on the watchOS SDK
+            // (verified against WatchOS26.2), so this is the second case the
+            // comment above describes rather than the first: the watch slice
+            // simply never references them. CN1Call.m is #undef'd for
+            // TARGET_OS_WATCH -- a wrist app does not host its own call
+            // provider, it mirrors the phone's -- so linking them would pull
+            // in symbols nothing on the watch calls.
+            "CallKit.framework;PushKit.framework;"
+            + "OpenGLES.framework;GLKit.framework;Metal.framework;"
             + "MapKit.framework;MediaPlayer.framework;MessageUI.framework;"
             + "AddressBookUI.framework;AddressBook.framework;"
             + "WebKit.framework;StoreKit.framework;"

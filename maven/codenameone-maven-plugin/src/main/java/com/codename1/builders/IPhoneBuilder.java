@@ -233,8 +233,48 @@ public class IPhoneBuilder extends Executor {
     ///
     /// - `buildinRes`: the directory holding CodenameOne_GLViewController.h
     /// - `name`: the define to enable
+    /// Appends one `CN1Call*` entry to the Info.plist injection fragment.
+    ///
+    /// A null or empty value is skipped rather than written as an empty
+    /// string, because the native side reads these as "was this configured"
+    /// and an empty entry answers yes. A key the project already injected is
+    /// left alone: a plist with a duplicate key does not reliably keep either
+    /// value.
+    ///
+    /// @param inject the fragment so far
+    /// @param key the Info.plist key
+    /// @param value the value, or null to leave the key out
+    /// @return the fragment, with the entry appended when it was wanted
+    private static String appendCallPlist(String inject, String key,
+            String value) {
+        if (value == null || value.trim().length() == 0
+                || inject.contains(key)) {
+            return inject;
+        }
+        return inject + "\n<key>" + key + "</key><string>"
+                + escapePlistText(value.trim()) + "</string>";
+    }
+
     private void enableNearbyDefine(File buildinRes, String name)
             throws BuildException {
+        enableFeatureDefine(buildinRes, name, "com.codename1.nearby");
+    }
+
+    /// Uncomments a `//#define` in the staged iOS header, failing loudly when
+    /// the marker is not there.
+    ///
+    /// Generalised from the nearby version so the call and VPN natives get
+    /// the same guarantee rather than a second copy of it. The guarantee is
+    /// the point: `replaceInFile` is a `String.replace`, so a marker that is
+    /// absent is a silent no-op, and the build would finish with the native
+    /// compiled out -- the app ships, the API reports the feature
+    /// unsupported, and nothing anywhere says why.
+    ///
+    /// @param buildinRes the staged native sources
+    /// @param name the define to enable
+    /// @param apiName the package that earned it, for the error message
+    private void enableFeatureDefine(File buildinRes, String name,
+            String apiName) throws BuildException {
         File header = new File(buildinRes, "CodenameOne_GLViewController.h");
         try {
             // Checked, because replaceInFile is a String.replace and a
@@ -250,12 +290,12 @@ public class IPhoneBuilder extends Executor {
                     // Already enabled, which is the same outcome.
                     return;
                 }
-                throw new BuildException("This app uses"
-                        + " com.codename1.nearby, which needs " + name
+                throw new BuildException("This app uses "
+                        + apiName + ", which needs " + name
                         + " enabled in CodenameOne_GLViewController.h, and"
                         + " the staged header does not carry that marker."
-                        + " The iOS port in use is older than the nearby"
-                        + " support or has been overridden; build against a"
+                        + " The iOS port in use is older than that support"
+                        + " or has been overridden; build against a"
                         + " port that has it.");
             }
             replaceInFile(header, "//#define " + name, "#define " + name);
@@ -553,7 +593,12 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
-    private static String escapeNearbyPlistText(String value) {
+    /// Escapes text going into a plist `<string>`.
+    ///
+    /// Named for the plist rather than for nearby, because the call provider
+    /// block needs the same escaping and a second copy of three replaces is
+    /// a second place to forget one.
+    private static String escapePlistText(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;");
     }
@@ -611,7 +656,7 @@ public class IPhoneBuilder extends Executor {
             if (v.length() == 0) {
                 continue;
             }
-            b.append("<string>").append(escapeNearbyPlistText(v))
+            b.append("<string>").append(escapePlistText(v))
                     .append("</string>");
         }
         b.append("</array>");
@@ -814,6 +859,20 @@ public class IPhoneBuilder extends Executor {
     private boolean usesNearbyRanging;
     private boolean usesNearbyTransport;
     private boolean usesNearbyCompanion;
+
+    // Tracked separately for the reason the nearby flags are: each buys a
+    // different amount. Owning a call links CallKit; ringing while not
+    // running adds PushKit and the voip background mode, which Apple rejects
+    // an app for carrying without a working call implementation; labelling
+    // somebody else's caller needs neither and gets its own extension.
+    private boolean usesCallSession;
+    private boolean usesCallVoip;
+    private boolean usesCallDirectory;
+    private boolean usesManagedVpn;
+    private boolean usesVpnTunnel;
+
+    /// Whether the Info.plist needs the CN1Call* provider block.
+    private boolean callPlistWanted;
     private boolean usesCn1Vision;
     private boolean usesCn1Language;
     private boolean usesCn1Inference;
@@ -1974,6 +2033,21 @@ public class IPhoneBuilder extends Executor {
                     // Augmented reality (com.codename1.ar.*). Gated on actual
                     // usage so ARKit/SceneKit and the CN1AR natives are only
                     // built for apps that reference the AR API.
+                    if (cls.indexOf("com/codename1/call/session/") == 0) {
+                        usesCallSession = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/voip/") == 0) {
+                        usesCallVoip = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/directory/") == 0) {
+                        usesCallDirectory = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
+                        usesManagedVpn = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesVpnTunnel = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -4679,6 +4753,86 @@ public class IPhoneBuilder extends Executor {
                     addLibs = arLibs;
                 } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
                     addLibs = addLibs + ";" + arLibs;
+                }
+            }
+
+            // System call integration: uncomment CN1_INCLUDE_CALL and
+            // whichever sub-defines the app earned, so CN1Call.m compiles in
+            // only the halves it asked for. The frameworks come from the
+            // PlatformFeatureCatalog entries through the loop below; only the
+            // defines, the background mode and the Info.plist block are
+            // decided here, because none of those is something a declarative
+            // table can express.
+            if (usesCallSession || usesCallVoip || usesCallDirectory) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_CALL",
+                        "com.codename1.call");
+                if (usesCallVoip) {
+                    enableFeatureDefine(buildinRes, "CN1_CALL_VOIP",
+                            "com.codename1.call.voip");
+                    // The voip background mode, added only for an app that
+                    // referenced the push package. Apple rejects an app that
+                    // carries it without a working call implementation, which
+                    // is the entire reason com.codename1.call.voip is a
+                    // separate package from com.codename1.call.session.
+                    String modes = request.getArg("ios.background_modes", "");
+                    if (!modes.contains("voip")) {
+                        request.putArgument("ios.background_modes",
+                                modes.length() == 0 ? "voip" : modes + ",voip");
+                    }
+                }
+                if (usesCallDirectory) {
+                    enableFeatureDefine(buildinRes, "CN1_CALL_DIRECTORY",
+                            "com.codename1.call.directory");
+                }
+                // The call provider's identity is written into Info.plist
+                // further down, in the plist assembly, because native code
+                // needs it BEFORE any Java runs: on a cold start a VoIP push
+                // must be reported to CallKit before this app's own code has
+                // had a chance to configure anything, so the name, icon and
+                // ringtone have to be baked into the bundle.
+                callPlistWanted = true;
+            }
+
+            // VPN configuration management.
+            //
+            // Both entitlements here are single-element arrays, which the
+            // generic ios.entitlements.<key> namespace cannot encode -- it
+            // reads a value with no newline as a <string> -- so they are
+            // written in the array form the namespace does understand.
+            if (usesManagedVpn || usesVpnTunnel) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_VPN",
+                        "com.codename1.vpn");
+                // Personal VPN. Self-serve: any paid account can enable the
+                // capability on the App ID, but it must BE enabled or the app
+                // will not sign.
+                if (request.getArg("ios.entitlements.com.apple.developer"
+                        + ".networking.vpn.api", null) == null) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".networking.vpn.api", "allow-vpn\n");
+                }
+                if (usesVpnTunnel) {
+                    enableFeatureDefine(buildinRes, "CN1_VPN_TUNNEL",
+                            "com.codename1.vpn.tunnel");
+                    // NOT injected automatically. Apple grants
+                    // com.apple.developer.networking.networkextension case by
+                    // case, and an App ID that does not carry it fails
+                    // codesigning with an error naming the entitlement and
+                    // not the reason it appeared -- the same trap the HomeKit
+                    // and nearby-interaction entitlements document. So the
+                    // build asks rather than guesses.
+                    if (request.getArg("ios.entitlements.com.apple.developer"
+                            + ".networking.networkextension", null) == null) {
+                        throw new BuildException("This app uses"
+                                + " com.codename1.vpn.tunnel, which needs the"
+                                + " com.apple.developer.networking"
+                                + ".networkextension entitlement. Apple grants"
+                                + " that one case by case, so it is never"
+                                + " injected automatically: enable the Network"
+                                + " Extensions capability on the App ID, then"
+                                + " set ios.entitlements.com.apple.developer"
+                                + ".networking.networkextension=packet-tunnel-provider"
+                                + " in the build hints.");
+                    }
                 }
             }
 
@@ -12931,6 +13085,29 @@ public class IPhoneBuilder extends Executor {
                 }
             }
             inject += "</array>";
+        }
+
+        // The call provider's identity. Native code reads these during launch,
+        // before any Java has run, because a VoIP push arriving on a cold
+        // start must be reported to CallKit inside the push handler -- and
+        // missing that deadline kills the process and eventually revokes the
+        // app's VoIP push entitlement altogether.
+        if (callPlistWanted) {
+            inject = appendCallPlist(inject, "CN1CallProviderName",
+                    request.getArg("ios.call.providerName",
+                            request.getDisplayName()));
+            inject = appendCallPlist(inject, "CN1CallRingtoneSound",
+                    request.getArg("ios.call.ringtone", null));
+            inject = appendCallPlist(inject, "CN1CallIconTemplateImageName",
+                    request.getArg("ios.call.icon", null));
+            inject = appendCallPlist(inject, "CN1CallDefaultCallerName",
+                    request.getArg("ios.call.unknownCaller", null));
+            inject = appendCallPlist(inject, "CN1CallPendingTTLSeconds",
+                    request.getArg("ios.call.pushTTL", "30"));
+            inject = appendCallPlist(inject, "CN1CallSupportsVideo",
+                    request.getArg("ios.call.video", "false"));
+            inject = appendCallPlist(inject, "CN1CallIncludesCallsInRecents",
+                    request.getArg("ios.call.recents", "true"));
         }
 
         // Receive-shared-content: the host app reads the shared payload from this App Group

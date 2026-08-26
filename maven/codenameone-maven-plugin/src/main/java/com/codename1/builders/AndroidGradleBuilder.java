@@ -173,6 +173,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
             "android.permission.BIND_PRINT_SERVICE",
             "android.permission.BIND_REMOTEVIEWS",
+            "android.permission.BIND_SCREENING_SERVICE",
             "android.permission.BIND_TELECOM_CONNECTION_SERVICE",
             "android.permission.BIND_TEXT_SERVICE",
             "android.permission.BIND_TV_INPUT",
@@ -231,6 +232,7 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.MOUNT_UNMOUNT_FILESYSTEMS",
             "android.permission.NFC",
             "android.permission.PACKAGE_USAGE_STATS",
+            "android.permission.MANAGE_OWN_CALLS",
             "android.permission.PERSISTENT_ACTIVITY",
             "android.permission.PROCESS_OUTGOING_CALLS",
             "android.permission.QUERY_ALL_PACKAGES",
@@ -289,7 +291,8 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.WRITE_SETTINGS",
             "android.permission.WRITE_SYNC_SETTINGS",
             "com.android.voicemail.permission.WRITE_VOICEMAIL",
-            "android.permission.FOREGROUND_SERVICE"
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_PHONE_CALL"
     };
 
 
@@ -739,6 +742,17 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesNearbyTransport;
     private boolean usesNearbyCompanion;
     private boolean usesNearbyPresence;
+
+    // The three call packages are tracked separately for the reason the
+    // nearby ones are: they buy different things and the expensive halves
+    // must not ride along with the cheap one. Owning a call costs
+    // MANAGE_OWN_CALLS and an API 26 floor; ringing while backgrounded adds a
+    // foreground service; labelling somebody else's caller buys neither and
+    // must not, because Play Console flags gratuitous telephony permissions.
+    private boolean usesCallSession;
+    private boolean usesCallVoip;
+    private boolean usesCallDirectory;
+    private boolean usesManagedVpn;
 
     private boolean integrateMoPub = false;
 
@@ -2151,6 +2165,19 @@ public class AndroidGradleBuilder extends Executor {
                             usesHealthWrite = true;
                         }
                     }
+                    if (cls.indexOf("com/codename1/call/session/") == 0) {
+                        usesCallSession = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/voip/") == 0) {
+                        usesCallVoip = true;
+                    }
+                    if (cls.indexOf("com/codename1/call/directory/") == 0) {
+                        usesCallDirectory = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/profile/") == 0
+                            || cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesManagedVpn = true;
+                    }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
                     }
@@ -2747,6 +2774,35 @@ public class AndroidGradleBuilder extends Executor {
                 request.putArgument("android.xapplication",
                         request.getArg("android.xapplication", "")
                                 + presenceService);
+            }
+        }
+
+        // System call integration (com.codename1.call.*).
+        //
+        // The permissions and the <service> elements both come from
+        // CallManifestFragments rather than PlatformFeatureCatalog: the
+        // catalog can name a permission but cannot qualify it and cannot emit
+        // a <service> at all, and a self-managed ConnectionService needs one
+        // carrying its own permission attribute and intent filter.
+        if (usesCallSession || usesCallVoip || usesCallDirectory) {
+            log("Call fragments version "
+                    + CallManifestFragments.FRAGMENT_VERSION
+                    + (usesCallSession ? " session" : "")
+                    + (usesCallVoip ? " voip" : "")
+                    + (usesCallDirectory ? " directory" : ""));
+            xPermissions = CallManifestFragments.injectPermissions(
+                    xPermissions, usesCallSession, usesCallVoip,
+                    usesCallDirectory, targetSDKVersionInt);
+            String callServices = CallManifestFragments.services(
+                    usesCallSession, usesCallVoip, usesCallDirectory);
+            if (callServices.length() > 0
+                    && !request.getArg("android.xapplication", "")
+                            .contains(CallManifestFragments.CONNECTION_SERVICE)
+                    && !request.getArg("android.xapplication", "")
+                            .contains(CallManifestFragments.SCREENING_SERVICE)) {
+                request.putArgument("android.xapplication",
+                        request.getArg("android.xapplication", "")
+                                + callServices);
             }
         }
 
