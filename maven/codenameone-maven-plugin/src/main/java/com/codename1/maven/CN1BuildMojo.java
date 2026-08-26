@@ -2742,6 +2742,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 if (conflict != null) {
                     throw new MojoFailureException(conflict);
                 }
+                if (overriddenOnTheCommandLine(key)) {
+                    // -D wins, and it wins whichever SPELLING it used. The
+                    // overlay below only replaces the same key, so
+                    // -Dcodename1.arg.cn1.androidTheme against an annotated
+                    // and.themeMode left both set -- and the two readers then
+                    // disagreed with each other: JavaSEPort takes the canonical
+                    // and falls back to the alias, so the annotation won in the
+                    // simulator, while AndroidGradleBuilder writes both and the
+                    // alias landed last, so -D won on the device. Same command
+                    // line, opposite results.
+                    getLog().debug("cn1: " + key + " comes from the command line, "
+                            + "so the annotation value is not applied");
+                    continue;
+                }
                 target.setProperty(key, found.getProperty(key));
                 applied++;
             }
@@ -3031,6 +3045,40 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether {@code -D} already sets this hint, under any spelling.
+     *
+     * <p>An alias and its target are ONE effective setting -- the builder reads
+     * {@code android.captureRecord} and then lets {@code and.captureRecord}
+     * override it -- so a command line that names either of them is setting the
+     * hint an annotation would otherwise supply. Comparing the keys literally
+     * missed that, and the documented rule is that {@code -D} overrides both the
+     * annotation and the properties file.</p>
+     */
+    private boolean overriddenOnTheCommandLine(String key) {
+        return overriddenOnTheCommandLine(key,
+                getSession() == null ? null : getSession().getUserProperties());
+    }
+
+    static boolean overriddenOnTheCommandLine(String key, Properties user) {
+        if (user == null) {
+            return false;
+        }
+        String canonical = com.codename1.build.shared.BuildHints.canonicalName(
+                com.codename1.build.shared.BuildHints.strip(key));
+        for (String name : user.stringPropertyNames()) {
+            if (!name.startsWith(com.codename1.build.shared.BuildHints.ARG_PREFIX)) {
+                continue;
+            }
+            String other = com.codename1.build.shared.BuildHints.canonicalName(
+                    com.codename1.build.shared.BuildHints.strip(name));
+            if (canonical.equals(other)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the named class, read from this classpath element, is annotated. */

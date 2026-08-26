@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -363,6 +364,50 @@ public class AnnotationBuildHintMergeTest {
         Field f = findField(target.getClass(), field);
         f.setAccessible(true);
         f.set(target, value);
+    }
+
+    /**
+     * `-D` wins over an annotation whichever spelling it uses.
+     *
+     * <p>An alias and its target are one effective setting, and the overlay that
+     * applies the command line only replaces the SAME key. So
+     * `-Dcodename1.arg.cn1.androidTheme` against an annotated `and.themeMode`
+     * left both set -- and the two readers then disagreed: JavaSEPort takes the
+     * canonical and falls back to the alias, so the annotation won in the
+     * simulator, while AndroidGradleBuilder writes both properties with the
+     * alias last, so `-D` won on the device.</p>
+     */
+    @Test
+    public void aCommandLineAliasBeatsTheAnnotation() {
+        Properties deprecatedSpelling = new Properties();
+        deprecatedSpelling.setProperty("codename1.arg.cn1.androidTheme", "legacy");
+        assertTrue("the deprecated spelling sets the same hint",
+                CN1BuildMojo.overriddenOnTheCommandLine(
+                        "codename1.arg.and.themeMode", deprecatedSpelling));
+
+        // ...and the other way round: the canonical on the command line against
+        // an annotation that happens to write the alias.
+        Properties canonical = new Properties();
+        canonical.setProperty("codename1.arg.and.themeMode", "modern");
+        assertTrue(CN1BuildMojo.overriddenOnTheCommandLine(
+                "codename1.arg.cn1.androidTheme", canonical));
+
+        // The same key is of course still the same key.
+        assertTrue(CN1BuildMojo.overriddenOnTheCommandLine(
+                "codename1.arg.and.themeMode", canonical));
+    }
+
+    /** ...and an unrelated -D leaves the annotation value alone. */
+    @Test
+    public void anUnrelatedCommandLineHintDoesNotSuppressTheAnnotation() {
+        Properties unrelated = new Properties();
+        unrelated.setProperty("codename1.arg.ios.pods", "Alamofire");
+        unrelated.setProperty("maven.test.skip", "true");
+        assertFalse(CN1BuildMojo.overriddenOnTheCommandLine(
+                "codename1.arg.and.themeMode", unrelated));
+        assertFalse(CN1BuildMojo.overriddenOnTheCommandLine(
+                "codename1.arg.and.themeMode", new Properties()));
+        assertFalse(CN1BuildMojo.overriddenOnTheCommandLine("codename1.arg.and.themeMode", null));
     }
 
     /** The main class carrying them is the whole point, so it is not a misplacement. */
