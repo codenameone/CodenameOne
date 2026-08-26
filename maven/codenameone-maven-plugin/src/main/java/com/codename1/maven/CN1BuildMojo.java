@@ -2285,6 +2285,26 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
+        // The icon rides the request rather than the source archive, exactly as
+        // it does for iOS and Windows, and the builder renders the asset catalog
+        // from it. Omitted here, the generated AppIcon.appiconset references ten
+        // PNGs that are never written: a generic icon in the Dock, and an App
+        // Store validation failure for having none.
+        String iconPath = props.getProperty("codename1.icon");
+        if (iconPath != null && iconPath.length() > 0) {
+            File iconFile = new File(iconPath);
+            if (!iconFile.isAbsolute()) {
+                iconFile = new File(getCN1ProjectDir(), iconPath);
+            }
+            try {
+                r.setIcon(iconFile.getAbsolutePath());
+            } catch (IOException ex) {
+                throw new MojoExecutionException("Error reading the icon at "
+                        + iconFile.getAbsolutePath()
+                        + ": it must be a 512x512 pixel PNG, which is scaled to the sizes the "
+                        + "macOS asset catalog asks for.", ex);
+            }
+        }
         r.setType("macos");
         for (Object k : props.keySet()) {
             String key = (String) k;

@@ -22,6 +22,8 @@
  */
 package com.codename1.builders;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -30,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.imageio.ImageIO;
 
 /**
  * Builds a native macOS (AppKit) application.
@@ -573,6 +576,7 @@ public class MacOSNativeBuilder extends Executor {
         }
 
         MacOSXcodeProject.writePlist(plist, new File(srcRoot, appName + "-Info.plist"));
+        writeAppIcon(request, srcRoot);
 
         // Written here rather than only at signing time, so mac-source hands the
         // developer a project that is complete: they open it in Xcode, sign it
@@ -581,6 +585,50 @@ public class MacOSNativeBuilder extends Executor {
         // files rather than writing its own.
         for (String channel : hints.getChannels()) {
             writeEntitlements(hints, srcRoot, appName, channel, channelSuffix(channel));
+        }
+    }
+
+    /**
+     * Renders the application icon into the generated asset catalog.
+     *
+     * <p>The translator emits {@code AppIcon.appiconset/Contents.json} naming ten
+     * PNGs and none of them, because the icon does not travel in the source
+     * archive -- it rides the {@code BuildRequest} separately, which is why the
+     * iOS and Windows builders read it explicitly too. Left unwritten, the
+     * catalog references files that are not there: the bundle shows a generic
+     * icon in the Dock and App Store validation refuses it for having none.</p>
+     *
+     * <p>The sizes are the ten the generated Contents.json asks for. They are
+     * listed here rather than derived from it because the catalog is the
+     * contract: a size the plist names and the build does not produce is the
+     * failure this method exists to prevent, and it should be visible in one
+     * place.</p>
+     */
+    private void writeAppIcon(BuildRequest request, File srcRoot) throws IOException {
+        byte[] iconBytes = request.getIcon();
+        File iconSet = new File(new File(srcRoot, "Images.xcassets"), "AppIcon.appiconset");
+        if (iconBytes == null || iconBytes.length == 0 || !iconSet.isDirectory()) {
+            if (iconSet.isDirectory()) {
+                log("The build request carries no icon, so the generated asset catalog stays "
+                        + "empty and the application ships with the system's generic icon.");
+            }
+            return;
+        }
+        BufferedImage icon = ImageIO.read(new ByteArrayInputStream(iconBytes));
+        if (icon == null) {
+            log("The build request's icon could not be decoded; the application ships with "
+                    + "the system's generic icon.");
+            return;
+        }
+        int[][] sizes = {
+            {16, 1}, {16, 2}, {32, 1}, {32, 2}, {128, 1},
+            {128, 2}, {256, 1}, {256, 2}, {512, 1}, {512, 2},
+        };
+        for (int[] size : sizes) {
+            String name = "mac_" + size[0] + "x" + size[0]
+                    + (size[1] == 2 ? "@2x" : "") + ".png";
+            int px = size[0] * size[1];
+            createIconFile(new File(iconSet, name), icon, px, px);
         }
     }
 
