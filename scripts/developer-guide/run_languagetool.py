@@ -331,6 +331,15 @@ DISABLED_RULES = (
     # SETUP_VERB suggests "set up" instead of "setup" for verb usage.
     # Source uses are mostly noun phrases or compound modifiers.
     "SETUP_VERB",
+    # EN_ELLIPSIS demands whitespace BEFORE an ellipsis (" ..."), which is
+    # one house style among several and the wrong one for a developer
+    # guide: almost every ellipsis here is inside a UI label the reader has
+    # to match on screen exactly -- "File" > "Import...", "Save As...",
+    # "Add Files to...". Verified against LanguageTool 6.6 that the rule
+    # fires on the plain three-dot source as well as on the U+2026 that
+    # asciidoctor substitutes for it, so writing it differently does not
+    # avoid it. Putting a space in front would misquote the menu item.
+    "EN_ELLIPSIS",
     # DASH_RULE is highly stylistic and fires on intentionally short
     # phrases that use em-dashes.
     "DASH_RULE",
@@ -455,6 +464,19 @@ def is_accepted(flagged_text, accept_re, surrounding_after=""):
     return False
 
 
+# The LanguageTool ENGINE version, which is a separate thing from the
+# language_tool_python wrapper the workflow pins with pip. Left to the
+# library's default this is the string "latest", and "latest" does not mean
+# the latest release -- language_tool_python resolves it to
+# LanguageTool-latest-snapshot.zip off the project's snapshot host, i.e. a
+# nightly build. The rule set therefore changed from one CI run to the next
+# with no commit behind it, and a branch that was green went red on prose
+# nobody had edited. Pinned to a real release so this gate answers the same
+# way twice; raise it deliberately, in a commit that also carries whatever
+# new findings the newer rules produce.
+LANGUAGETOOL_VERSION = os.environ.get("LANGUAGETOOL_VERSION", "6.6")
+
+
 def run_languagetool(text, language="en-US", accept_re=None):
     try:
         import language_tool_python
@@ -465,7 +487,19 @@ def run_languagetool(text, language="en-US", accept_re=None):
         )
         return None
 
-    tool = language_tool_python.LanguageTool(language)
+    try:
+        tool = language_tool_python.LanguageTool(
+            language, language_tool_download_version=LANGUAGETOOL_VERSION
+        )
+    except TypeError:
+        # A wrapper too old to accept the pin. Better to run unpinned than
+        # not at all, but say so, because the run is then not reproducible.
+        print(
+            "language_tool_python does not accept a version pin; running against "
+            "whatever engine it downloads.",
+            file=sys.stderr,
+        )
+        tool = language_tool_python.LanguageTool(language)
     try:
         tool.disabled_rules.update(DISABLED_RULES)
     except AttributeError:

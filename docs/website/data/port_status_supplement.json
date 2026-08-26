@@ -313,11 +313,19 @@
           "ports": [
             "ios-gl",
             "ios-metal",
-            "macos", "mac-catalyst"
+            "mac-catalyst"
           ],
           "state": "supported",
           "label": "AVFoundation",
           "detail": "Native AVFoundation backend; signed build, entitlement, permission, and camera hardware required."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "unavailable",
+          "label": "No AppKit capture backend",
+          "detail": "The retained capture path is UIImagePickerController, which AppKit has no peer for, so hasCamera() answers false and the build does not request camera permission."
         },
         {
           "ports": [
@@ -481,12 +489,20 @@
         },
         {
           "ports": [
-            "macos", "mac-catalyst",
+            "mac-catalyst",
             "watchos"
           ],
           "state": "conditional",
           "label": "Apple location",
           "detail": "Available where the target and entitlement expose Core Location behavior."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "unavailable",
+          "label": "No AppKit backend",
+          "detail": "getLocationManager() answers null: the Core Location delegate callbacks live in the UIKit sources the AppKit build excludes, so no entitlement makes foreground, background or geofence callbacks arrive."
         },
         {
           "ports": [
@@ -1162,7 +1178,7 @@
             "android",
             "ios-gl",
             "ios-metal",
-            "macos", "mac-catalyst",
+            "mac-catalyst",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1172,6 +1188,14 @@
           "state": "conditional",
           "label": "OS assistive tech",
           "detail": "Semantic output is consumed by the screen reader or accessibility stack available on that OS."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "conditional",
+          "label": "Announcements only",
+          "detail": "Focus and status announcements reach VoiceOver, but there is no accessibility tree: isAccessibilityTreeSupported() answers false, so a custom-drawn control is announced rather than navigable by rotor or element."
         },
         {
           "ports": [

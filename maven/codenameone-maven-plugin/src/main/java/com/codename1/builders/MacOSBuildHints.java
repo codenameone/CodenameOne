@@ -363,6 +363,16 @@ public class MacOSBuildHints {
         if (perChannel != null && perChannel.trim().length() > 0) {
             return perChannel;
         }
+        // The shared hint answers for a build that ships ONE channel, which is
+        // nearly all of them. It must not answer for both: the App Store takes a
+        // "3rd Party Mac Developer Installer" certificate and Developer ID takes
+        // a "Developer ID Installer" one, so a single value cannot be right for
+        // the two of them -- and signing each package with the same certificate
+        // produces two artifacts of which at least one is rejected, after a
+        // build that reported success.
+        if (getChannels().size() > 1) {
+            return null;
+        }
         return installerIdentity;
     }
 

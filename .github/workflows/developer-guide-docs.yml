@@ -365,11 +365,18 @@ jobs:
         # turning every unrelated PR (e.g. iOS port fixes) red on the
         # final quality-gate check.
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        env:
+          LANGUAGETOOL_VERSION: '6.6'
         run: |
           set -euo pipefail
           REPORT_DIR="build/developer-guide/reports"
           REPORT_FILE="${REPORT_DIR}/languagetool-report.json"
           mkdir -p "$REPORT_DIR"
+          # The pip pin above fixes the WRAPPER; this fixes the engine it
+          # downloads. Unset, the wrapper fetches "latest", which is a
+          # nightly snapshot rather than a release -- so the rule set moved
+          # between runs and turned branches red on prose nobody edited.
+          echo "LanguageTool engine: ${LANGUAGETOOL_VERSION}"
           set +e
           python3 scripts/developer-guide/run_languagetool.py \
             --html build/developer-guide/html/developer-guide.html \

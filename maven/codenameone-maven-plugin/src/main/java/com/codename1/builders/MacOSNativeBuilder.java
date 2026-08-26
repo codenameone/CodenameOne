@@ -1474,14 +1474,23 @@ public class MacOSNativeBuilder extends Executor {
         if (installer != null) {
             cmd.add("--sign");
             cmd.add(installer);
-        } else if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)) {
-            // Fatal, not a warning. productbuild accepts an unsigned package
-            // happily and App Store Connect refuses it a long way downstream, so
-            // warning here hands back an artifact that cannot be submitted.
-            throw new BuildException("macos.signingIdentity.installer is not set, so the App "
-                    + "Store package would be unsigned and App Store Connect would refuse it. "
-                    + "It wants a \"3rd Party Mac Developer Installer\" certificate, which is a "
-                    + "different certificate from the application signing identity.");
+        } else {
+            // Fatal for either channel, not a warning. productbuild accepts an
+            // unsigned package happily and it is unusable at the other end:
+            // App Store Connect refuses it, and Gatekeeper cannot treat an
+            // unsigned installer as Developer ID distribution however well the
+            // app inside it is signed -- signing the app does not sign the
+            // container. Warning meant charging for an artifact nobody can ship.
+            boolean appStore = MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel);
+            throw new BuildException("macos.signingIdentity.installer is not set, so the "
+                    + (appStore ? "App Store" : "Developer ID")
+                    + " package would be unsigned and "
+                    + (appStore ? "App Store Connect would refuse it"
+                                : "Gatekeeper would not accept it as Developer ID distribution")
+                    + ". It wants a \""
+                    + (appStore ? "3rd Party Mac Developer Installer" : "Developer ID Installer")
+                    + "\" certificate, which is a different certificate from the application "
+                    + "signing identity.");
         }
         cmd.add(pkg.getAbsolutePath());
         try {
