@@ -4248,34 +4248,40 @@ public class CodenameOneSettings extends Lifecycle {
         if (active == null) {
             return null;
         }
-        if (element == null || active.indexOf("<" + element + ">") >= 0) {
-            // The child supplies the configuration; the managed declaration may
-            // still be what BINDS the goal. That is the ordinary shape when a
-            // module customizes a plugin its parent set up -- plugin-level
-            // <sourceDirs> here, the <execution> over there -- and returning
-            // this block alone left the goal looking unbound, so the root it
-            // configures was dropped.
-            // Whether the child binds THIS goal, not whether it has any
-            // execution at all. A child that adds an unrelated `test-compile`
-            // was taken as a complete replacement, so the managed execution
-            // binding the production goal was dropped and the root the child
-            // configures went with it.
-            // The module's own <pluginManagement> is the first link of the
-            // chain, so it needs no separate argument -- passing it separately is
-            // what let the nearest block win outright.
-            return bindsGoal(active, goal) ? active
-                    : active + mergedManagedExecutions(
-                            managedFromChain == null ? managementOnly(pomText) : managedFromChain,
-                            artifactId);
-        }
-        String managed = pluginBlock(managementOnly(pomText), artifactId);
-        if (managed == null || managed.indexOf("<" + element + ">") < 0) {
-            String inherited = managedBlockDeclaring(managedFromChain, artifactId, element);
-            if (inherited != null && inherited.indexOf("<" + element + ">") >= 0) {
-                return inherited;
+        // The module's own <pluginManagement> is the first link of the chain, so
+        // it needs no separate argument -- passing it separately is what let the
+        // nearest block win outright.
+        String chain = managedFromChain == null ? managementOnly(pomText) : managedFromChain;
+        String chosen = active;
+        if (element != null && active.indexOf("<" + element + ">") < 0) {
+            // The child activates the plugin but configures nothing, so the
+            // configuration is inherited. Nearest first, then up the chain.
+            String managed = pluginBlock(managementOnly(pomText), artifactId);
+            if (managed != null && managed.indexOf("<" + element + ">") >= 0) {
+                chosen = managed;
+            } else {
+                String inherited = managedBlockDeclaring(chain, artifactId, element);
+                chosen = inherited != null && inherited.indexOf("<" + element + ">") >= 0
+                        ? inherited : (managed == null ? active : managed);
             }
         }
-        return managed == null ? active : managed;
+        // ONE place, for every block this can return. Whichever declaration
+        // supplied the configuration, the thing that BINDS the goal may sit
+        // somewhere else entirely: a module with a bare <plugin>, a nearer
+        // <pluginManagement> holding <sourceDirs>, and the compile execution up
+        // in an ancestor is an ordinary shape, and each of those three pieces
+        // has at some point been read without the others.
+        //
+        // This merge used to hang off the branch where the ACTIVE block carried
+        // the configuration, so the inherited-configuration branch returned a
+        // block with no bound goal and the caller dropped a real source root.
+        // Written as a single exit because that is the third time a rule landed
+        // on one branch of this method and not its sibling.
+        //
+        // bindsGoal first: a block that already binds the goal needs nothing,
+        // and appending would only repeat what it says.
+        return bindsGoal(chosen, goal) ? chosen
+                : chosen + mergedManagedExecutions(chain, artifactId);
     }
 
     /// `xml` with every `<!-- ... -->` removed.

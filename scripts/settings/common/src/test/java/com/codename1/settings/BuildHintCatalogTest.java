@@ -2361,6 +2361,36 @@ public class BuildHintCatalogTest {
                 null));
     }
 
+    /// Configuration from one POM and the binding from another still combine.
+    ///
+    /// A bare `<plugin>` in the module, `<sourceDirs>` in a nearer
+    /// `<pluginManagement>`, and the `compile` execution in an ancestor is an
+    /// ordinary shape, and Maven merges all three. The execution merge used to
+    /// hang off the branch where the ACTIVE block carried the configuration, so
+    /// this path returned a block with no bound goal and the caller dropped a
+    /// real source root.
+    @Test
+    public void inheritedConfigurationAndInheritedBindingCombine() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(pom) + ancestor);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/kt"), "lost the inherited configuration: " + block);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "compile"),
+                "lost the ancestor's binding: " + block);
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
