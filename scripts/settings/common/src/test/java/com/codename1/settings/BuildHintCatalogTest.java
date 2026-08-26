@@ -2352,6 +2352,45 @@ public class BuildHintCatalogTest {
         assertTrue(owned.contains("gen/child-owned"), owned.toString());
     }
 
+    /// Pretty-printed XML binds the goal just as well.
+    ///
+    /// `<goal>\n  add-source\n</goal>` is ordinary formatting and Maven trims it
+    /// before running the goal. Matching the serialized string left the
+    /// execution looking unbound, so the root it configures was dropped and a
+    /// main class living there could not be found.
+    @Test
+    public void aPrettyPrintedGoalStillBinds() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals>\n    <goal>\n      add-source\n    </goal>\n"
+                + "</goals><configuration><sources><source>gen/pretty</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("gen/pretty"), roots.toString());
+
+        // ...and a pretty-printed <phase>none</phase> still switches it off.
+        String disabled = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><phase>\n  none\n</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/off</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(disabled).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(disabled).toString());
+
+        // ...and a pretty-printed <extensions>true</extensions> still binds
+        // Kotlin's compile.
+        String extensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>\n  true\n</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(extensions).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(extensions).toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

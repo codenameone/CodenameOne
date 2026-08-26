@@ -2635,10 +2635,10 @@ public class CodenameOneSettings extends Lifecycle {
             // execution for it, which is the same question runsWithoutExecution
             // answers: build-helper never gets one, so `default-add-source` with
             // no <goal> runs nothing.
-            if (execution.indexOf("<phase>none</phase>") < 0
-                    && (execution.indexOf("<goal>" + goal + "</goal>") >= 0
+            if (!declaresValue(execution, "phase", "none")
+                    && (declaresValue(execution, "goal", goal)
                         || (runsWithoutExecution
-                            && execution.indexOf("<id>default-" + goal + "</id>") >= 0))) {
+                            && declaresValue(execution, "id", "default-" + goal)))) {
                 bound = true;
                 if (execution.indexOf("<" + element + ">") < 0) {
                     if (execution.indexOf("combine.self=\"override\"") < 0) {
@@ -4033,6 +4033,25 @@ public class CodenameOneSettings extends Lifecycle {
         return value.trim();
     }
 
+    /// Whether `xml` declares `<element>value</element>`, comparing the element's
+    /// VALUE rather than its serialization.
+    ///
+    /// `<goal>\n  compile\n</goal>` is ordinary pretty-printed XML and Maven
+    /// trims it before running the goal. Matching the serialized string left
+    /// such an execution looking unbound, so the root it configures was dropped
+    /// and a main class living there could not be found.
+    static boolean declaresValue(String xml, String element, String value) {
+        if (xml == null) {
+            return false;
+        }
+        for (String declared : elementValues(xml, element)) {
+            if (value.equals(declared.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether `pluginBlock` has an enabled execution bound to `goal`.
     ///
     /// A null goal means the caller does not care, and any execution counts.
@@ -4047,9 +4066,8 @@ public class CodenameOneSettings extends Lifecycle {
                 return false;
             }
             String execution = pluginBlock.substring(at, close);
-            if (execution.indexOf("<phase>none</phase>") < 0
-                    && (goal == null
-                        || execution.indexOf("<goal>" + goal + "</goal>") >= 0)) {
+            if (!declaresValue(execution, "phase", "none")
+                    && (goal == null || declaresValue(execution, "goal", goal))) {
                 return true;
             }
             at = pluginBlock.indexOf("<execution>", close);
@@ -4070,7 +4088,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// that still compiles Kotlin.
     static boolean kotlinRunsWithoutExecution(String pluginBlock) {
         if (pluginBlock == null
-                || pluginBlock.indexOf("<extensions>true</extensions>") < 0) {
+                || !declaresValue(pluginBlock, "extensions", "true")) {
             return false;
         }
         int at = pluginBlock.indexOf("<execution>");
@@ -4080,8 +4098,8 @@ public class CodenameOneSettings extends Lifecycle {
                 break;
             }
             String execution = pluginBlock.substring(at, close);
-            if (execution.indexOf("<phase>none</phase>") >= 0
-                    && execution.indexOf("<id>default-compile</id>") >= 0) {
+            if (declaresValue(execution, "phase", "none")
+                    && declaresValue(execution, "id", "default-compile")) {
                 return false;
             }
             at = pluginBlock.indexOf("<execution>", close);
@@ -4101,8 +4119,7 @@ public class CodenameOneSettings extends Lifecycle {
         // name and nothing more -- and treating it as a binding puts
         // src/main/kotlin in the roots for a module that compiles no Kotlin,
         // where a dormant peer shadows the real annotation.
-        boolean lifecycleProvided =
-                pluginBlock.indexOf("<extensions>true</extensions>") >= 0;
+        boolean lifecycleProvided = declaresValue(pluginBlock, "extensions", "true");
         int at = pluginBlock.indexOf("<execution>");
         while (at >= 0) {
             int close = pluginBlock.indexOf("</execution>", at);
@@ -4110,10 +4127,10 @@ public class CodenameOneSettings extends Lifecycle {
                 break;
             }
             String execution = pluginBlock.substring(at, close);
-            if (execution.indexOf("<phase>none</phase>") < 0
-                    && (execution.indexOf("<goal>compile</goal>") >= 0
+            if (!declaresValue(execution, "phase", "none")
+                    && (declaresValue(execution, "goal", "compile")
                         || (lifecycleProvided
-                            && execution.indexOf("<id>default-compile</id>") >= 0))) {
+                            && declaresValue(execution, "id", "default-compile")))) {
                 return true;
             }
             at = pluginBlock.indexOf("<execution>", close);
