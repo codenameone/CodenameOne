@@ -3581,19 +3581,28 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
         POOL_BEGIN();
 
         NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
-        if([ns hasPrefix:@"file:"]) {
-            ns = [NSURL fileURLWithPath:[ns substringFromIndex:5]];
-        }
+        // Kept as an NSURL from here on. The file: branch used to assign the
+        // NSURL back over the NSString variable and both platforms then handed
+        // that to URLWithString:, which reads it as a string -- so asking
+        // whether a local file could be opened called string methods on an
+        // NSURL. It compiled with an incompatible-pointer warning and answered
+        // with whatever that produced.
+        NSURL *target = [ns hasPrefix:@"file:"]
+            ? [NSURL fileURLWithPath:[ns substringFromIndex:5]]
+            : [NSURL URLWithString:ns];
+        if (target == nil) {
+            result = JAVA_FALSE;
+        } else {
 #if TARGET_OS_OSX
         // NSWorkspace answers with the application that would open it, so a nil
         // result is the same "nothing handles this scheme" that canOpenURL:
         // reports -- and unlike iOS it needs no LSApplicationQueriesSchemes
         // declaration to be allowed to ask.
-        result = [[NSWorkspace sharedWorkspace]
-                     URLForApplicationToOpenURL:[NSURL URLWithString:ns]] != nil;
+        result = [[NSWorkspace sharedWorkspace] URLForApplicationToOpenURL:target] != nil;
 #else
-        result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
+        result = [[UIApplication sharedApplication] canOpenURL:target];
 #endif
+        }
         POOL_END();
     });
     return result;

@@ -154,6 +154,28 @@ void CN1MacRefreshScaleValue(void) {
     // Remembers where the user left it between launches. One line, and its
     // absence is the kind of thing that makes an app feel unfinished.
     [_window setFrameAutosaveName:@"CN1MainWindow"];
+    // Minimizing the main window is the application's surface going out of
+    // view, and it has to reach the framework. It does NOT deactivate a Mac
+    // application, so applicationDidHide: never fires for it -- and this window
+    // has no delegate, unlike a secondary one -- so without these two the
+    // framework carried on painting and running timers into a window nobody
+    // could see. Observed rather than delegated because the delegate slot on
+    // this window belongs to nobody and should stay that way.
+    extern void CN1MacDeliverSurfaceHidden(BOOL hidden);
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSWindowDidMiniaturizeNotification
+                    object:_window
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+        CN1MacDeliverSurfaceHidden(YES);
+    }];
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSWindowDidDeminiaturizeNotification
+                    object:_window
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+        CN1MacDeliverSurfaceHidden(NO);
+    }];
     _window.releasedWhenClosed = NO;
     NSString *name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
     if (name == nil) {

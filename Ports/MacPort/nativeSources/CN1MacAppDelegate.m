@@ -337,6 +337,42 @@ BOOL cn1MacRuntimeIsJavaReady(void) {
 /// UIKit flag the shared code reads to decide whether it may paint.
 extern BOOL isAppSuspended;
 
+/// Whether the main surface is currently out of view.
+///
+/// Level state, not an event count. Hiding the application and minimizing its
+/// window are two independent ways to reach the same place, and either can
+/// happen while the other already has -- so the transition is reported once and
+/// the second source is a no-op rather than a duplicate lifecycle callback.
+static BOOL cn1MacSurfaceHidden = NO;
+
+/// Reports the main surface going out of view, or coming back.
+///
+/// Shared by the application's hide/unhide and by the main window's
+/// miniaturize/deminiaturize. Minimizing a window does NOT deactivate a Mac
+/// application, so without the window half the framework kept painting and
+/// running timers into a window nobody could see -- applicationDidHide: never
+/// fires for it.
+void CN1MacDeliverSurfaceHidden(BOOL hidden) {
+    if (cn1MacSurfaceHidden == hidden) {
+        return;
+    }
+    cn1MacSurfaceHidden = hidden;
+    // Set whether or not Java is up: it is C state the shared paint path reads,
+    // and it has to be right from the first frame.
+    isAppSuspended = hidden;
+    if (!cn1MacJavaReady) {
+        cn1MacPendingHidden = hidden ? 1 : 0;
+        return;
+    }
+    if (hidden) {
+        com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    } else {
+        com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    }
+}
+
 @interface CN1MacAppDelegate : NSObject <NSApplicationDelegate, UNUserNotificationCenterDelegate>
 @end
 
@@ -457,21 +493,11 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 }
 
 - (void)applicationDidHide:(NSNotification *)notification {
-    isAppSuspended = YES;
-    if (!cn1MacJavaReady) {
-        cn1MacPendingHidden = 1;
-        return;
-    }
-    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CN1MacDeliverSurfaceHidden(YES);
 }
 
 - (void)applicationWillUnhide:(NSNotification *)notification {
-    isAppSuspended = NO;
-    if (!cn1MacJavaReady) {
-        cn1MacPendingHidden = 0;
-        return;
-    }
-    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    CN1MacDeliverSurfaceHidden(NO);
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
