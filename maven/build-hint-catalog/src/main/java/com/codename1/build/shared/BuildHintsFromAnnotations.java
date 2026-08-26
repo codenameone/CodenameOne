@@ -74,7 +74,7 @@ final class BuildHintsFromAnnotations {
                 .type(HintType.BOOLEAN)
                 .consumedBy("AndroidGradleBuilder")
                 .platform("android")
-                .doc("Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` when `android.release` is on and `\"true\"` when it is off, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531)."));
+                .doc("Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` under `android.release` and `\"true\"` otherwise, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531)."));
         h.add(new BuildHints.Hint("android.disableR8")
                 .annotatedAs(HintGroup.ANDROID, "disableR8")
                 .type(HintType.BOOLEAN)

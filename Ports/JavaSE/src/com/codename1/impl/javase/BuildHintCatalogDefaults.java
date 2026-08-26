@@ -188,7 +188,7 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("android.debug")) {
         set("{{#Android#android.debug}}.label", "Debug");
         set("{{#Android#android.debug}}.type", "Checkbox");
-        set("{{#Android#android.debug}}.description", "Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` when `android.release` is on and `\"true\"` when it is off, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531).");
+        set("{{#Android#android.debug}}.description", "Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` under `android.release` and `\"true\"` otherwise, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531).");
         }
         if (!handWritten.contains("android.disableR8")) {
         set("{{#Android#android.disableR8}}.label", "Disable r8");
