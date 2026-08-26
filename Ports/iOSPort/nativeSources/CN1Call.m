@@ -132,6 +132,14 @@ static CXCallController *cn1clController = nil;
 
 /// Calls this app currently has, keyed by canonical id string.
 static NSMutableDictionary *cn1clCalls = nil;
+/// The call CallKit last put in charge of the audio session.
+///
+/// didActivateAudioSession names no call, and with more than one call up --
+/// a ringing one, a held one, and the active one -- picking allKeys.first
+/// started media for whichever call the dictionary happened to hash first.
+/// Audio follows the answer, the outgoing start, and the resume, so those
+/// three set it and an ending call clears it.
+static NSString *cn1clAudioCall = nil;
 
 /// CXActions delivered to Java and not yet answered, keyed by token.
 static NSMutableDictionary *cn1clActions = nil;
@@ -192,6 +200,40 @@ static void cn1clClaim(NSString *uuidString) {
     }
 }
 
+/// Forgets the audio owner when its call is gone. Caller holds cn1clLock.
+static void cn1clDropAudioLocked(NSString *uuidString) {
+    if (cn1clAudioCall != nil && uuidString != nil
+            && [cn1clAudioCall isEqualToString:uuidString]) {
+        cn1clAudioCall = nil;
+    }
+}
+
+/// Records the call the audio session is about to belong to.
+static void cn1clOwnAudio(NSString *uuidString) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        cn1clAudioCall = [uuidString copy];
+    }
+}
+
+/// The call the audio session belongs to.
+///
+/// Falls back to the only live call, which is both the common case and the
+/// one where the fallback cannot be wrong; with none it answers nil and Java
+/// ignores the callback rather than starting media for a guess.
+static NSString *cn1clAudioOwner(void) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        if (cn1clAudioCall != nil && [cn1clCalls objectForKey:cn1clAudioCall] != nil) {
+            return cn1clAudioCall;
+        }
+        if ([cn1clCalls count] == 1) {
+            return [[cn1clCalls allKeys] firstObject];
+        }
+        return nil;
+    }
+}
+
 /// Allocates a token for a CXAction and remembers it.
 ///
 /// Java answers with completeAction; until it does, the action is neither
@@ -222,11 +264,13 @@ static int64_t cn1clTrackAction(CXAction *action) {
     @synchronized (cn1clLock) {
         [cn1clCalls removeAllObjects];
         [cn1clActions removeAllObjects];
+        cn1clAudioCall = nil;
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
 }
 
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
+    cn1clOwnAudio([action.callUUID UUIDString]);
     com_codename1_impl_ios_IOSCallCallbacks_answerRequested___java_lang_String_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             cn1clTrackAction(action));
@@ -245,6 +289,9 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action {
+    if (!action.onHold) {
+        cn1clOwnAudio([action.callUUID UUIDString]);
+    }
     com_codename1_impl_ios_IOSCallCallbacks_holdRequested___java_lang_String_boolean_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             action.onHold ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
@@ -265,6 +312,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
     // The system asking this app to PLACE a call: Recents, or a voice
     // assistant. No call exists yet; Java reports one with this id.
+    cn1clOwnAudio([action.callUUID UUIDString]);
     NSString *wire = cn1clJoin([NSArray arrayWithObjects:
             [NSString stringWithFormat:@"%d",
                     action.handle.type == CXHandleTypePhoneNumber
@@ -283,18 +331,18 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // THE moment media may start. Reported for whichever call is current;
     // the Java side carries the id so an app with one call needs no
     // bookkeeping.
-    NSString *uuid = nil;
-    @synchronized (cn1clLock) {
-        uuid = [[cn1clCalls allKeys] firstObject];
+    NSString *uuid = cn1clAudioOwner();
+    if (uuid == nil) {
+        return;
     }
     com_codename1_impl_ios_IOSCallCallbacks_audioActivated___java_lang_String_int(
             getThreadLocalData(), cn1clJString(uuid), cn1clRoute);
 }
 
 - (void)provider:(CXProvider *)provider didDeactivateAudioSession:(AVAudioSession *)audioSession {
-    NSString *uuid = nil;
-    @synchronized (cn1clLock) {
-        uuid = [[cn1clCalls allKeys] firstObject];
+    NSString *uuid = cn1clAudioOwner();
+    if (uuid == nil) {
+        return;
     }
     com_codename1_impl_ios_IOSCallCallbacks_audioDeactivated___java_lang_String(
             getThreadLocalData(), cn1clJString(uuid));
@@ -452,6 +500,7 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
         if (error != nil) {
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
+                cn1clDropAudioLocked(uuidString);
                 [cn1clUnclaimed removeObject:uuidString];
             }
             for (NSNumber *waiter in waiters) {
@@ -659,6 +708,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
             [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil reason:r];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
+                cn1clDropAudioLocked(uuidString);
             }
         }
         completion();
@@ -720,6 +770,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                     reason:CXCallEndedReasonUnanswered];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuidString];
+                cn1clDropAudioLocked(uuidString);
                 [cn1clUnclaimed removeObject:uuidString];
             }
         }
@@ -1100,6 +1151,7 @@ void com_codename1_impl_ios_IOSNative_callReportEnded___java_lang_String_int_lon
             reason:reason];
     @synchronized (cn1clLock) {
         [cn1clCalls removeObjectForKey:uuidString];
+        cn1clDropAudioLocked(uuidString);
     }
 #endif
 }
@@ -1133,6 +1185,7 @@ void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
         }
         @synchronized (cn1clLock) {
             [cn1clCalls removeObjectForKey:uuidString];
+            cn1clDropAudioLocked(uuidString);
             [cn1clUnclaimed removeObject:uuidString];
         }
         cn1clAck(requestId, YES, 0, nil);
@@ -1318,6 +1371,7 @@ void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
             NSString *uuid = [[(CXCallAction *)action callUUID] UUIDString];
             @synchronized (cn1clLock) {
                 [cn1clCalls removeObjectForKey:uuid];
+                cn1clDropAudioLocked(uuid);
                 [cn1clUnclaimed removeObject:uuid];
             }
         }

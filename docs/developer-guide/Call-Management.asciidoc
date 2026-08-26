@@ -18,7 +18,7 @@ shared value types.
 [options="header"]
 |===
 | Capability | iOS | Android | Simulator and desktop | JavaScript
-| System call UI | yes (CallKit) | yes (Android 8 and later) | simulated | --
+| System call UI | yes (CallKit) | yes (Android 8 and later, see below) | simulated | --
 | Ring while the app isn't running | yes (`com.codename1.call.voip`) | yes, from your own push handler | simulated | --
 | Answer, hold, mute, keypad from the system | yes | yes | simulated | --
 | Audio session handoff | yes | synthesized | simulated | --
@@ -35,7 +35,7 @@ needs an in-app fallback screen whatever else it does.
 
 Every callback in this family arrives on the EDT.
 
-=== Four Things Worth Knowing Before You Design Around This
+=== Five Things Worth Knowing Before You Design Around This
 
 *Codename One doesn't carry the voice.* There is no codec here, no
 signalling and no WebRTC, and none is planned: those are your app's, and there
@@ -60,6 +60,20 @@ payload, and your listener is told afterward. `PushedCall` therefore hands you
 a `CallSession` you never created, possibly one the user has already answered.
 Your job is to attach media to a call that exists, not to decide whether to
 ring.
+
+*The two platforms draw the ringing screen differently.* On iOS CallKit
+presents the call and there is nothing to build. On Android a self-managed
+calling app gets no system call screen at all: Telecom arbitrates with other
+calls, routes the audio and writes the call log, but presenting the call is
+the application's job. The port does that for you -- a call-category
+notification with a full-screen intent, which the platform turns into a
+full-screen ringing UI on a locked device and a heads-up banner on an unlocked
+one, with Answer and Decline wired to the same listeners as everywhere else.
+Two consequences are yours: the labels come from the
+`android.call.incomingTitle`, `android.call.answerLabel` and
+`android.call.declineLabel` build hints and are English until you set them,
+and the user can silence the *Incoming calls* notification channel, after
+which the call still arrives but doesn't ring.
 
 *Implement `providerReset`.* It means every call your app had is gone,
 because the user switched calling off or the platform recovered from an error.
@@ -239,15 +253,25 @@ Every item is also callable from a test with `CN.execute("call:itemN")`.
 | `ios.call.pushTTL` | `30` | Seconds a pushed call waits for your code before the system ends it as unanswered.
 | `ios.call.video` | `false` | Whether the provider offers video calls.
 | `ios.call.recents` | `true` | Whether calls appear in the system call log.
+| `android.call.incomingTitle` | `Incoming call` | The text on the Android ringing notification.
+| `android.call.answerLabel` | `Answer` | The Android answer button.
+| `android.call.declineLabel` | `Decline` | The Android decline button.
+| `android.call.channelName` | `Incoming calls` | The notification channel the user sees in Settings.
 |===
 
-These are baked into `Info.plist` rather than set from code because native code
-needs them during launch, before any of your code has run. Setting only
+The `ios.call.*` hints are baked into `Info.plist` rather than set from code
+because native code needs them during launch, before any of your code has run.
+The `android.call.*` labels are read when the call rings, and exist because a
+ringing screen is the last place to show an untranslated English string. Setting only
 `CallConfiguration` and expecting a pushed call to ring with the right name is
 the mistake to avoid; `CallConfiguration` refines them once the app is up.
 
 Everything else is automatic. Referencing `com.codename1.call.session` links
-CallKit and registers the Android service; referencing
+CallKit, registers the Android service, and declares the two Android
+permissions the ringing notification needs -- `POST_NOTIFICATIONS` and
+`USE_FULL_SCREEN_INTENT`, the second of which Google restricts to calling and
+alarm apps and which is injected here on the strength of the package you
+referenced; referencing
 `com.codename1.call.voip` adds PushKit and the `voip` background mode;
 referencing `com.codename1.call.directory` generates the iOS Call Directory
 extension and the Android screening service.

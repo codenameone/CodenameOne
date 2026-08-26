@@ -54,7 +54,7 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
-    public void onlyVoipEarnsTheForegroundServiceAndNotificationPermissions() {
+    public void onlyVoipEarnsTheForegroundServicePermission() {
         String session = CallManifestFragments.injectPermissions("", true,
                 false, false, 34);
         assertFalse(session.contains("FOREGROUND_SERVICE_PHONE_CALL"),
@@ -64,7 +64,24 @@ public class CallManifestFragmentsTest {
                 false, 34);
         assertTrue(voip.contains(
                 "\"android.permission.FOREGROUND_SERVICE_PHONE_CALL\""));
-        assertTrue(voip.contains("\"android.permission.POST_NOTIFICATIONS\""));
+    }
+
+    @Test
+    public void everyCallingAppCanRingOnScreen() {
+        // Telecom draws nothing for a self-managed account, so the port rings
+        // with a full-screen-intent notification -- which needs both of these
+        // whether or not the app was woken by a push. Without them a reported
+        // call rang in Telecom's bookkeeping and appeared nowhere.
+        String session = CallManifestFragments.injectPermissions("", true,
+                false, false, 34);
+        assertTrue(session.contains(
+                "\"android.permission.POST_NOTIFICATIONS\""));
+        assertTrue(session.contains(
+                "\"android.permission.USE_FULL_SCREEN_INTENT\""));
+        String directory = CallManifestFragments.injectPermissions("", false,
+                false, true, 34);
+        assertFalse(directory.contains("USE_FULL_SCREEN_INTENT"),
+                "labelling somebody else's caller never rings anything");
     }
 
     @Test

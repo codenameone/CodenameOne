@@ -599,6 +599,93 @@ public class IPhoneBuilder extends Executor {
     /// Named for the plist rather than for nearby, because the call provider
     /// block needs the same escaping and a second copy of three replaces is
     /// a second place to forget one.
+    /// The identifier the Call Directory appex will actually carry.
+    ///
+    /// Resolved in one place because two of them have to agree: the target's
+    /// PRODUCT_BUNDLE_IDENTIFIER, and the CN1CallDirectoryExtensionIdentifier
+    /// the HOST plist carries, which is the string the native reload request
+    /// addresses. Reading the override in only the first left the app asking
+    /// the system to reload an extension identifier nothing had installed,
+    /// and the request fails with nothing to see in the app.
+    private static String callDirectoryBundleId(BuildRequest request) {
+        String override = request.getArg(
+                "ios.call.directory.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                null);
+        if (override != null && override.trim().length() > 0) {
+            return override.trim();
+        }
+        return IOSCallDirectoryExtensionBuilder.bundleId(
+                request.getPackageName());
+    }
+
+    /// The values of a comma or space separated `ios.background_modes`
+    /// hint, so a mode is matched whole. `"remote-notification"` contains
+    /// neither `"voip"` nor any other mode as a substring, but
+    /// `"myvoipmode"` does, and a substring test on the raw hint reads that
+    /// as voip already being present.
+    static java.util.List<String> listedModes(String hint) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        if (hint == null) {
+            return out;
+        }
+        java.util.StringTokenizer tok =
+                new java.util.StringTokenizer(hint, ", \t\r\n");
+        while (tok.hasMoreTokens()) {
+            String t = tok.nextToken().trim();
+            if (t.length() > 0) {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    /// Whether an `ios.plistInject` fragment declares `voip` **inside its
+    /// UIBackgroundModes array**.
+    ///
+    /// Searching the whole fragment was wrong in both directions: a URL
+    /// scheme called `myvoipapp` elsewhere in the plist passed a fragment
+    /// whose background modes were only `remote-notification`, and the app
+    /// then shipped unable to be woken by a call.
+    static boolean injectedModesIncludeVoip(String injected) {
+        if (injected == null) {
+            return false;
+        }
+        int key = injected.indexOf("UIBackgroundModes");
+        while (key >= 0) {
+            int open = injected.indexOf("<array>", key);
+            if (open < 0) {
+                return false;
+            }
+            int close = injected.indexOf("</array>", open);
+            if (close < 0) {
+                return false;
+            }
+            String body = injected.substring(open + "<array>".length(), close);
+            if (arrayHasString(body, "voip")) {
+                return true;
+            }
+            key = injected.indexOf("UIBackgroundModes", close);
+        }
+        return false;
+    }
+
+    /// Whether a plist `<array>` body carries exactly this `<string>` value.
+    private static boolean arrayHasString(String body, String value) {
+        int at = body.indexOf("<string>");
+        while (at >= 0) {
+            int end = body.indexOf("</string>", at);
+            if (end < 0) {
+                return false;
+            }
+            String v = body.substring(at + "<string>".length(), end).trim();
+            if (value.equals(v)) {
+                return true;
+            }
+            at = body.indexOf("<string>", end);
+        }
+        return false;
+    }
+
     private static String escapePlistText(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;");
@@ -4845,7 +4932,7 @@ public class IPhoneBuilder extends Executor {
                     // com.codename1.call.voip.
                     String injected = request.getArg("ios.plistInject", "");
                     if (injected.contains("UIBackgroundModes")) {
-                        if (!injected.contains("voip")) {
+                        if (!injectedModesIncludeVoip(injected)) {
                             // Failed rather than warned. The two mechanisms
                             // cannot be combined -- plist assembly refuses a
                             // build that uses both -- so continuing would
@@ -4862,7 +4949,7 @@ public class IPhoneBuilder extends Executor {
                         }
                     } else {
                         String modes = request.getArg("ios.background_modes", "");
-                        if (!modes.contains("voip")) {
+                        if (!listedModes(modes).contains("voip")) {
                             request.putArgument("ios.background_modes",
                                     modes.length() == 0 ? "voip"
                                             : modes + ",voip");
@@ -10729,9 +10816,14 @@ public class IPhoneBuilder extends Executor {
                 + " (app group " + callDirectoryAppGroup + ")");
 
         Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        // No $(APP_PROVISIONING_PROFILE) rewrite of the MAIN target here,
+        // unlike the cloud builder's copy of this method. That indirection
+        // exists to stop the archive's global signing flags clobbering an
+        // extension, and this copy has no hasExtensionTargets and no such
+        // flags -- it hands the project to a local Xcode. Adding it would
+        // point the main target at a variable nothing sets.
         buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER",
-                IOSCallDirectoryExtensionBuilder.bundleId(
-                        request.getPackageName()));
+                callDirectoryBundleId(request));
         buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
         buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS",
@@ -13333,8 +13425,7 @@ public class IPhoneBuilder extends Executor {
                         callDirectoryAppGroup);
                 inject = appendCallPlist(inject,
                         "CN1CallDirectoryExtensionIdentifier",
-                        IOSCallDirectoryExtensionBuilder.bundleId(
-                                request.getPackageName()));
+                        callDirectoryBundleId(request));
             }
         }
 

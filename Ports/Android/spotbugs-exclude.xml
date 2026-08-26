@@ -535,6 +535,7 @@
             <Class name="com.codename1.impl.android.vpn.AndroidVpnBridge" />
             <Class name="com.codename1.impl.android.vpn.AndroidVpnBridge$Reflect" />
             <Class name="com.codename1.impl.android.call.CN1CallScreeningService" />
+            <Class name="com.codename1.impl.android.call.CN1CallNotifications" />
         </Or>
         <Bug pattern="REC_CATCH_EXCEPTION" />
     </Match>

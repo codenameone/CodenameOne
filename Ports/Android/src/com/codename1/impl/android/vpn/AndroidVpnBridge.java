@@ -118,7 +118,26 @@ public class AndroidVpnBridge implements VpnBridge {
 
     @Override
     public int getVpnStatus() {
-        return status.ordinal();
+        return reconciledStatus().ordinal();
+    }
+
+    /// The status field, corrected for the profile that outlives the field.
+    ///
+    /// A provisioned profile survives a process restart and the field does
+    /// not, so a fresh process reported NOT_CONFIGURED for a VPN Android
+    /// still held -- and registering a listener could not repair it, because
+    /// the transport callback is ignored until this process asks for a
+    /// tunnel. DISCONNECTED is the honest reading: configured, and not
+    /// started by us.
+    ///
+    /// It stops at DISCONNECTED rather than inspecting the live transports,
+    /// because Android gives an app no way to tell its own tunnel from
+    /// another app's -- the reason onTunnelTransport is gated the way it is.
+    private VpnStatus reconciledStatus() {
+        if (status == VpnStatus.NOT_CONFIGURED && storedWire() != null) {
+            status = VpnStatus.DISCONNECTED;
+        }
+        return status;
     }
 
     @Override
@@ -322,6 +341,9 @@ public class AndroidVpnBridge implements VpnBridge {
     public void setStatusListening(boolean value) {
         this.listening = value;
         if (value) {
+            // Before the first callback, so the baseline a new listener sees
+            // is the profile Android actually holds.
+            reconciledStatus();
             startWatchingTheTunnel();
         } else {
             stopWatchingTheTunnel();
@@ -516,7 +538,7 @@ public class AndroidVpnBridge implements VpnBridge {
                                     : p.getRemoteIdentifier());
             if (p.getSharedSecret() != null) {
                 BUILDER.getMethod("setAuthPsk", byte[].class)
-                        .invoke(b, (Object) asciiBytes(p.getSharedSecret()));
+                        .invoke(b, (Object) utf8Bytes(p.getSharedSecret()));
             } else {
                 BUILDER.getMethod("setAuthUsernamePassword", String.class,
                         String.class, java.security.cert.X509Certificate.class)
@@ -528,12 +550,18 @@ public class AndroidVpnBridge implements VpnBridge {
             return BUILDER.getMethod("build").invoke(b);
         }
 
-        private static byte[] asciiBytes(String v) {
-            byte[] out = new byte[v.length()];
-            for (int i = 0; i < out.length; i++) {
-                out[i] = (byte) v.charAt(i);
+        /// UTF-8, matching what CN1Vpn.m stores for the same Java string.
+        /// The previous cast of each UTF-16 unit to a byte truncated any
+        /// non-ASCII character and mangled a surrogate pair outright, so a
+        /// key that authenticated on iOS was rejected on Android with
+        /// nothing to see in either profile.
+        private static byte[] utf8Bytes(String v) {
+            try {
+                return v.getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException never) {
+                // Every JVM is required to support UTF-8.
+                throw new IllegalStateException(never.toString());
             }
-            return out;
         }
 
         private Reflect() {

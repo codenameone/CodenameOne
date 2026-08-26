@@ -107,6 +107,26 @@ final class CallManifestFragments {
             // every reported call without it.
             out = addPermission(out, "android.permission.MANAGE_OWN_CALLS", "");
             out = addPermission(out, "android.permission.RECORD_AUDIO", "");
+            // Every incoming call rings through a notification, because
+            // Telecom draws no UI for a self-managed account -- so these two
+            // belong to calls in general and not only to the pushed ones.
+            // Android 13 needs an explicit grant before anything can appear
+            // in the shade, and a call the user cannot see is a call they
+            // cannot answer; Android 14 additionally demands the full-screen
+            // declaration or the ringing screen degrades to a banner behind
+            // the lock screen.
+            //
+            // USE_FULL_SCREEN_INTENT is restricted to calling and alarm apps,
+            // which is why the LocalNotification path leaves it to the
+            // android.fullScreenIntent hint. An app that referenced
+            // com.codename1.call.session IS a calling app -- the category the
+            // restriction exists to admit -- so here it is injected on the
+            // scanner's evidence, the same discipline as the voip background
+            // mode.
+            out = addPermission(out,
+                    "android.permission.POST_NOTIFICATIONS", "");
+            out = addPermission(out,
+                    "android.permission.USE_FULL_SCREEN_INTENT", "");
             if (video) {
                 // Behind the hint rather than always. Android cannot grant a
                 // runtime permission the manifest does not declare, so
@@ -130,11 +150,6 @@ final class CallManifestFragments {
                     "android.permission.FOREGROUND_SERVICE", "");
             out = addPermission(out,
                     "android.permission.FOREGROUND_SERVICE_PHONE_CALL", "");
-            // Android 13 needs an explicit grant before anything can appear
-            // in the shade, and a call the user cannot see is a call they
-            // cannot answer.
-            out = addPermission(out,
-                    "android.permission.POST_NOTIFICATIONS", "");
         }
 
         if (directory) {

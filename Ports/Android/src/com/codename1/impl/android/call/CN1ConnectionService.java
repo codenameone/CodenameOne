@@ -143,6 +143,9 @@ public class CN1ConnectionService extends ConnectionService {
             return null;
         }
         CN1Connection c = new CN1Connection(this, id);
+        c.setRingingName(request == null || request.getExtras() == null ? null
+                : request.getExtras().getString(
+                        android.telecom.TelecomManager.EXTRA_CALL_SUBJECT));
         c.setInitializing();
         if (incoming) {
             c.setRinging();
@@ -269,6 +272,14 @@ public class CN1ConnectionService extends ConnectionService {
             a.connection.setDisconnected(new DisconnectCause(DisconnectCause.ERROR));
             a.connection.destroy();
             forget(a.connection.getCallId());
+        } else if (a.kind == CN1Connection.ACTION_HOLD) {
+            // onHold() moved Telecom before the app was asked, the way
+            // Telecom's own API requires, so a refusal has to move it back --
+            // otherwise the system holds a call the app still considers
+            // active, and nothing ever resumes it.
+            a.connection.setActive();
+        } else if (a.kind == CN1Connection.ACTION_UNHOLD) {
+            a.connection.setOnHold();
         }
     }
 
@@ -284,6 +295,7 @@ public class CN1ConnectionService extends ConnectionService {
 
     /// Clears every static table, for a provider reset.
     static void reset() {
+        CN1CallNotifications.dismissAll();
         endAll();
         synchronized (PENDING) {
             PENDING.clear();

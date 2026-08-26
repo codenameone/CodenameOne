@@ -51,6 +51,7 @@ public class CN1Connection extends Connection {
     private final String callId;
     private final CN1ConnectionService service;
     private boolean audioAnnounced;
+    private String callerName;
 
     CN1Connection(CN1ConnectionService service, String callId) {
         this.service = service;
@@ -59,13 +60,26 @@ public class CN1Connection extends Connection {
         setAudioModeIsVoip(true);
     }
 
+    /// The name to ring with, from the report that created this call.
+    void setRingingName(String name) {
+        this.callerName = name;
+    }
+
     /// The identifier this call is known by everywhere else.
     public String getCallId() {
         return callId;
     }
 
     @Override
+    public void onShowIncomingCallUi() {
+        // Telecom asking the app to present the call, which for a
+        // self-managed account it never does itself.
+        CN1CallNotifications.showIncoming(callId, callerName);
+    }
+
+    @Override
     public void onAnswer() {
+        CN1CallNotifications.dismiss(callId);
         setActive();
         announceAudio();
         Calls.deliverAnswer(callId, service.nextActionToken(this, ACTION_ANSWER));
@@ -78,12 +92,14 @@ public class CN1Connection extends Connection {
 
     @Override
     public void onReject() {
+        CN1CallNotifications.dismiss(callId);
         Calls.deliverEndRequest(callId,
                 service.nextActionToken(this, ACTION_REJECT));
     }
 
     @Override
     public void onDisconnect() {
+        CN1CallNotifications.dismiss(callId);
         Calls.deliverEndRequest(callId,
                 service.nextActionToken(this, ACTION_DISCONNECT));
     }
@@ -132,6 +148,7 @@ public class CN1Connection extends Connection {
 
     /// Ends the call and removes it from Telecom.
     void finish(CallEndReason reason) {
+        CN1CallNotifications.dismiss(callId);
         setDisconnected(new DisconnectCause(causeOf(reason)));
         if (audioAnnounced) {
             Calls.deliverAudioDeactivated(callId);
