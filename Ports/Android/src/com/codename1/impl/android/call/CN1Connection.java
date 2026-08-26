@@ -26,6 +26,7 @@ import android.os.Build;
 import android.telecom.CallAudioState;
 import android.telecom.Connection;
 import android.telecom.DisconnectCause;
+import android.telecom.VideoProfile;
 
 import com.codename1.call.CallEndReason;
 import com.codename1.call.session.CallAudioRoute;
@@ -52,12 +53,31 @@ public class CN1Connection extends Connection {
     private final CN1ConnectionService service;
     private boolean audioAnnounced;
     private String callerName;
+    private boolean video;
 
     CN1Connection(CN1ConnectionService service, String callId) {
         this.service = service;
         this.callId = callId;
         setConnectionProperties(PROPERTY_SELF_MANAGED);
         setAudioModeIsVoip(true);
+    }
+
+    /// Puts the call into Telecom's video state, if it is a video call.
+    ///
+    /// Both halves are needed and each is silent when it is missing: the
+    /// capabilities say the connection CAN do video, and the video state says
+    /// this call IS doing it. Without them Telecom treated every reported
+    /// call as audio-only while the bridge advertised CAPABILITY_VIDEO, and
+    /// onAnswer(videoState) had nothing to honour.
+    void setVideo(boolean video) {
+        this.video = video;
+        if (!video) {
+            return;
+        }
+        setConnectionCapabilities(getConnectionCapabilities()
+                | CAPABILITY_SUPPORTS_VT_LOCAL_BIDIRECTIONAL
+                | CAPABILITY_SUPPORTS_VT_REMOTE_BIDIRECTIONAL);
+        setVideoState(VideoProfile.STATE_BIDIRECTIONAL);
     }
 
     /// The name to ring with, from the report that created this call.
@@ -87,6 +107,12 @@ public class CN1Connection extends Connection {
 
     @Override
     public void onAnswer(int videoState) {
+        // The state the user answered WITH, which can differ from the one the
+        // call was reported with -- answering a video call with audio only is
+        // an ordinary choice the system offers.
+        if (video) {
+            setVideoState(videoState);
+        }
         onAnswer();
     }
 

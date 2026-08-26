@@ -266,7 +266,7 @@ public class AndroidCallBridge implements CallBridge {
         if (!ready(requestId)) {
             return;
         }
-        Bundle extras = extrasFor(callId, handleWire, displayName);
+        Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
         CN1ConnectionService.expectReport(requestId, callId);
         try {
             telecom().addNewIncomingCall(handle, extras);
@@ -283,7 +283,7 @@ public class AndroidCallBridge implements CallBridge {
         if (!ready(requestId)) {
             return;
         }
-        Bundle extras = extrasFor(callId, handleWire, displayName);
+        Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
         Bundle outer = new Bundle();
         outer.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);
         outer.putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, extras);
@@ -314,7 +314,8 @@ public class AndroidCallBridge implements CallBridge {
         return true;
     }
 
-    private Bundle extrasFor(String callId, String handleWire, String name) {
+    private Bundle extrasFor(String callId, String handleWire, String name,
+            boolean hasVideo) {
         Bundle b = new Bundle();
         b.putString(CN1ConnectionService.EXTRA_CALL_ID, callId);
         b.putParcelable(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS,
@@ -322,6 +323,10 @@ public class AndroidCallBridge implements CallBridge {
         if (name != null) {
             b.putString(TelecomManager.EXTRA_CALL_SUBJECT, name);
         }
+        // Carried to the connection, which is the only place it can be
+        // applied: dropping it here left Telecom treating every call as
+        // audio-only while the bridge advertised CAPABILITY_VIDEO.
+        b.putBoolean(CN1ConnectionService.EXTRA_VIDEO, hasVideo);
         return b;
     }
 
@@ -379,6 +384,9 @@ public class AndroidCallBridge implements CallBridge {
             c.setCallerDisplayName(displayName,
                     TelecomManager.PRESENTATION_ALLOWED);
         }
+        // A call that becomes a video call mid-way is the ordinary upgrade,
+        // and Telecom has to be told or the system's own UI never offers it.
+        c.setVideo(hasVideo);
     }
 
     @Override

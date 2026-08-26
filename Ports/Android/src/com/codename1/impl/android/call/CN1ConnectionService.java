@@ -146,6 +146,8 @@ public class CN1ConnectionService extends ConnectionService {
         c.setRingingName(request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(
                         android.telecom.TelecomManager.EXTRA_CALL_SUBJECT));
+        c.setVideo(request != null && request.getExtras() != null
+                && request.getExtras().getBoolean(EXTRA_VIDEO, false));
         c.setInitializing();
         if (incoming) {
             c.setRinging();
@@ -321,4 +323,7 @@ public class CN1ConnectionService extends ConnectionService {
 
     /// The extras key carrying the portable call id through Telecom.
     static final String EXTRA_CALL_ID = "com.codename1.call.ID";
+
+    /// The extras key carrying the call's initial video state.
+    static final String EXTRA_VIDEO = "com.codename1.call.VIDEO";
 }

@@ -132,14 +132,18 @@ static CXCallController *cn1clController = nil;
 
 /// Calls this app currently has, keyed by canonical id string.
 static NSMutableDictionary *cn1clCalls = nil;
-/// The calls whose CXStartCallAction this app submitted itself.
+/// The actions this app submitted itself, as "<uuid>|<CXAction class>".
 ///
-/// reportOutgoing() places an outgoing call by requesting a
-/// CXStartCallAction, and CallKit hands every start action to
-/// performStartCallAction -- including that one. Delivered blindly it looks
-/// exactly like Recents or Siri asking the app to place a call, so an app
-/// that honours the callback's contract calls reportOutgoing() again with the
-/// same id, which submits another action, which arrives again.
+/// Every transaction an app requests comes back through the provider
+/// delegate, which is the same door the system uses -- so end(), setHeld()
+/// and setMuted() were delivered to the app as endRequested, holdRequested
+/// and muteRequested, callbacks documented for the SYSTEM asking. An app
+/// that honours those contracts signalled the remote end a second time for a
+/// hang-up it had just performed itself.
+///
+/// A submitted action is claimed here and fulfilled natively instead. The
+/// caller already has its own AsyncResource for the outcome, and the session
+/// state moves on that acknowledgement.
 static NSMutableSet *cn1clJavaStarts = nil;
 
 /// The calls whose CXStartCallAction the SYSTEM submitted -- Recents, Siri --
@@ -250,6 +254,44 @@ static void cn1clDropAudioLocked(NSString *uuidString) {
     }
 }
 
+/// The claim key for an action this app submitted.
+static NSString *cn1clOwnKey(NSString *uuidString, Class kind) {
+    return [NSString stringWithFormat:@"%@|%@", uuidString,
+            NSStringFromClass(kind)];
+}
+
+/// Remembers that this app submitted an action, before the transaction is
+/// requested: CallKit can dispatch it before the request call returns.
+static void cn1clClaimOwn(NSString *uuidString, Class kind) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clJavaStarts addObject:cn1clOwnKey(uuidString, kind)];
+    }
+}
+
+/// Whether the delegate is looking at an action this app submitted, clearing
+/// the claim as it answers.
+static BOOL cn1clTakeOwn(CXCallAction *action) {
+    cn1clEnsureState();
+    NSString *key = cn1clOwnKey([action.callUUID UUIDString],
+            [action class]);
+    @synchronized (cn1clLock) {
+        if (![cn1clJavaStarts containsObject:key]) {
+            return NO;
+        }
+        [cn1clJavaStarts removeObject:key];
+        return YES;
+    }
+}
+
+/// Drops a claim whose transaction never reached the delegate.
+static void cn1clReleaseOwn(NSString *uuidString, Class kind) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clJavaStarts removeObject:cn1clOwnKey(uuidString, kind)];
+    }
+}
+
 /// Records the call the audio session is about to belong to.
 static void cn1clOwnAudio(NSString *uuidString) {
     cn1clEnsureState();
@@ -338,6 +380,14 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
+    if (cn1clTakeOwn(action)) {
+        // end() submitted this. The call's bookkeeping is dropped by that
+        // request's own completion block, and the app is already ending the
+        // call -- delivering endRequested would have it signal the remote
+        // end a second time for its own hang-up.
+        [action fulfill];
+        return;
+    }
     // The call is NOT forgotten here. A listener that fails this action --
     // with or without defer() -- is saying it could not end the call, and
     // CallKit then restores it; forgetting the uuid on delivery meant a later
@@ -350,6 +400,15 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action {
+    if (cn1clTakeOwn(action)) {
+        // setHeld() submitted this; the session moves on its own
+        // acknowledgement, and holdRequested is for the system asking.
+        if (!action.onHold) {
+            cn1clOwnAudio([action.callUUID UUIDString]);
+        }
+        [action fulfill];
+        return;
+    }
     if (!action.onHold) {
         cn1clOwnAudio([action.callUUID UUIDString]);
     }
@@ -359,6 +418,11 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performSetMutedCallAction:(CXSetMutedCallAction *)action {
+    if (cn1clTakeOwn(action)) {
+        // setMuted() submitted this; see performSetHeldCallAction.
+        [action fulfill];
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_muteRequested___java_lang_String_boolean_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             action.muted ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
@@ -375,15 +439,8 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // assistant. No call exists yet; Java reports one with this id.
     NSString *startedUuid = [action.callUUID UUIDString];
     cn1clOwnAudio(startedUuid);
-    BOOL ours = NO;
     cn1clEnsureState();
-    @synchronized (cn1clLock) {
-        ours = [cn1clJavaStarts containsObject:startedUuid];
-        if (ours) {
-            [cn1clJavaStarts removeObject:startedUuid];
-        }
-    }
-    if (ours) {
+    if (cn1clTakeOwn(action)) {
         // reportOutgoing() submitted this one. The action still has to be
         // fulfilled or CallKit times it out, but Java already knows about
         // the call: telling it to place one would have it call
@@ -1186,16 +1243,11 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
     // Marked BEFORE the transaction is requested: CallKit may dispatch the
     // action to performStartCallAction before this call returns, and the
     // delegate uses this to tell an app-originated start from a system one.
-    cn1clEnsureState();
-    @synchronized (cn1clLock) {
-        [cn1clJavaStarts addObject:uuidString];
-    }
+    cn1clClaimOwn(uuidString, [CXStartCallAction class]);
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
         if (error != nil) {
-            @synchronized (cn1clLock) {
-                [cn1clJavaStarts removeObject:uuidString];
-            }
+            cn1clReleaseOwn(uuidString, [CXStartCallAction class]);
             cn1clAck(requestId, NO, CN1_CALL_ERR_CALL_REFUSED,
                     [error localizedDescription]);
             return;
@@ -1316,9 +1368,11 @@ void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
         return;
     }
     CXEndCallAction *action = [[CXEndCallAction alloc] initWithCallUUID:uuid];
+    cn1clClaimOwn(uuidString, [CXEndCallAction class]);
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
         if (error != nil) {
+            cn1clReleaseOwn(uuidString, [CXEndCallAction class]);
             // The call is STILL LIVE: CallKit refused the transaction. It
             // used to be forgotten here regardless, so a retry answered
             // INVALID_ID and no later update or remote-end report could reach
@@ -1351,8 +1405,13 @@ void com_codename1_impl_ios_IOSNative_callSetHeld___int_java_lang_String_boolean
     }
     CXSetHeldCallAction *action = [[CXSetHeldCallAction alloc]
             initWithCallUUID:uuid onHold:held != JAVA_FALSE];
+    NSString *heldUuid = [uuid UUIDString];
+    cn1clClaimOwn(heldUuid, [CXSetHeldCallAction class]);
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
+        if (error != nil) {
+            cn1clReleaseOwn(heldUuid, [CXSetHeldCallAction class]);
+        }
         cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
                 error == nil ? nil : [error localizedDescription]);
     }];
@@ -1373,8 +1432,13 @@ void com_codename1_impl_ios_IOSNative_callSetMuted___int_java_lang_String_boolea
     }
     CXSetMutedCallAction *action = [[CXSetMutedCallAction alloc]
             initWithCallUUID:uuid muted:muted != JAVA_FALSE];
+    NSString *mutedUuid = [uuid UUIDString];
+    cn1clClaimOwn(mutedUuid, [CXSetMutedCallAction class]);
     [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
             completion:^(NSError *error) {
+        if (error != nil) {
+            cn1clReleaseOwn(mutedUuid, [CXSetMutedCallAction class]);
+        }
         cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
                 error == nil ? nil : [error localizedDescription]);
     }];
