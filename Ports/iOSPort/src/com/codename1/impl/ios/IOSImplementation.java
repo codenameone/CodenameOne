@@ -2136,11 +2136,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     /// Invoked for an indirect scroll (wheel or trackpad) over a secondary window.
-    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY) {
+    ///
+    /// `precise` and `modifiers` are the event's own, not constants: a notched
+    /// wheel reported as a trackpad scrolls by the wrong unit, and a dropped
+    /// modifier mask is what stops a control-wheel-to-zoom listener from ever
+    /// seeing the held key. A producer that genuinely cannot tell -- the watch
+    /// crown, the UIKit pan recognizer -- passes what it knows and says so at
+    /// the call site.
+    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
         if (dropEvents) {
             return;
         }
-        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, false, 0);
+        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Invoked for a trackpad magnify over a secondary window.
@@ -2330,13 +2338,19 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Invoked from the native trackpad / Magic Mouse / wheel scroll handler. Routes the scroll
     /// through the shared wheel pipeline so that `com.codename1.ui.events.WheelEvent` is a single
-    /// universal scroll-gesture API across desktop, Android and iOS. The deltas come from a high
-    /// resolution device so the event is flagged as precise.
-    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
+    /// universal scroll-gesture API across desktop, Android and iOS.
+    ///
+    /// `precise` and `modifiers` come from the event rather than being assumed.
+    /// Hard-coding precise=true reported every notched mouse wheel as a
+    /// trackpad, and hard-coding modifiers=0 meant a wheel listener could never
+    /// observe Control, Option, Shift or Command -- which is exactly the
+    /// control-wheel-to-zoom gesture the richer overload exists to enable.
+    public static void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
         if (dropEvents || instance == null) {
             return;
         }
-        instance.pointerWheelMoved(x, y, scrollX, scrollY, true, 0);
+        instance.pointerWheelMoved(x, y, scrollX, scrollY, precise, modifiers);
     }
 
     /// Invoked from the native magnify (pinch) gesture recognizer, used by the Mac Catalyst trackpad

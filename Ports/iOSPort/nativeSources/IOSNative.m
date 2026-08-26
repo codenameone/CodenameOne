@@ -2499,8 +2499,9 @@ void CN1MacWindowDeliverHover(int windowId, int type, int x, int y) {
     com_codename1_impl_ios_IOSImplementation_windowHoverCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
 }
 
-void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY) {
-    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY);
+void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY,
+                              int precise, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int_boolean_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY, precise ? JAVA_TRUE : JAVA_FALSE, modifiers);
 }
 
 void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y) {
@@ -2611,8 +2612,9 @@ void pointerHoverReleasedNative(int x, int y) {
     com_codename1_impl_ios_IOSImplementation_pointerHoverReleasedCallback___int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y);
 }
 
-void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY) {
-    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY);
+void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+                               int precise, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_pointerWheelMovedCallback___int_int_int_int_boolean_int(CN1_THREAD_GET_STATE_PASS_ARG x, y, scrollX, scrollY, precise ? JAVA_TRUE : JAVA_FALSE, modifiers);
 }
 
 void pinchMagnifyCallback(float scale, int x, int y) {

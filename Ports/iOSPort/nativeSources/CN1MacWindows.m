@@ -45,7 +45,8 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 extern void CN1MacWindowDeliverHover(int windowId, int type, int x, int y);
-extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY);
+extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY,
+                                     int precise, int modifiers);
 extern void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y);
 extern void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y);
 extern void cn1CapturePointerMetadata(UITouch* touch);
@@ -225,8 +226,11 @@ static void CN1MacWindowApplyDecoration(UIWindowScene* scene, int decorated);
     int dx = (int) (t.x * scale);
     int dy = (int) (t.y * scale);
     if (dx != 0 || dy != 0) {
+        /* Not precise and no modifiers: this is what the Catalyst path has
+           always reported, and UIKit gives the recognizer neither a device
+           class nor a key mask to say otherwise. */
         CN1MacWindowDeliverWheel(self.windowId, (int) (loc.x * scale),
-                (int) (loc.y * scale), dx, dy);
+                (int) (loc.y * scale), dx, dy, 0, 0);
         /* Reset so each callback carries an incremental delta. */
         [recognizer setTranslation:CGPointZero inView:self.view];
     }

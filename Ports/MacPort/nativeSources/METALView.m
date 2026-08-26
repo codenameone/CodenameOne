@@ -516,7 +516,8 @@ extern void pointerHoverPressedNative(int x, int y);
 extern void pointerHoverReleasedNative(int x, int y);
 extern void keyPressedNative(int keyCode);
 extern void keyReleasedNative(int keyCode);
-extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+                                      int precise, int modifiers);
 extern void pinchMagnifyCallback(float scale, int x, int y);
 extern void rotationGestureCallback(float radians, int x, int y);
 
@@ -527,7 +528,8 @@ extern void rotationGestureCallback(float radians, int x, int y);
 // Java path they always did.
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverHover(int windowId, int type, int x, int y);
-extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY);
+extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY,
+                                     int precise, int modifiers);
 extern void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y);
 extern void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
@@ -743,12 +745,22 @@ static int cn1HeldButtonMask(void) {
     // scroll twice as far as every other Mac app.
     CGFloat s = CN1AppKitBackingScale(self);
     CGPoint p = [self cn1PointFromEvent:event];
+    // Forwarded from the event, not assumed. hasPreciseScrollingDeltas is the
+    // same flag the delta scaling above already branches on -- reporting a
+    // notched wheel as a trackpad while multiplying its delta by 16 told the
+    // framework two contradictory things about one event. And the modifier mask
+    // is what a wheel listener needs to implement control-wheel-to-zoom, which
+    // is the gesture the richer overload exists for; dropping it meant no
+    // listener on this port could ever see a held key.
+    int precise = event.hasPreciseScrollingDeltas ? 1 : 0;
+    int modifiers = cn1ModifiersOf(event);
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverWheel(self.cn1WindowId, (int)p.x, (int)p.y,
-                                 (int)(-dx * s), (int)(-dy * s));
+                                 (int)(-dx * s), (int)(-dy * s), precise, modifiers);
         return;
     }
-    pointerWheelMovedCallback((int)p.x, (int)p.y, (int)(-dx * s), (int)(-dy * s));
+    pointerWheelMovedCallback((int)p.x, (int)p.y, (int)(-dx * s), (int)(-dy * s),
+                              precise, modifiers);
 }
 
 - (void)magnifyWithEvent:(NSEvent *)event {

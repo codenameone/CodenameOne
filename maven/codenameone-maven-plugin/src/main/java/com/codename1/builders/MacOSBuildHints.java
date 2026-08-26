@@ -258,6 +258,12 @@ public class MacOSBuildHints {
                     + "requires the sandbox; the package would be rejected at submission. It is "
                     + "honored for the Developer ID channel.");
         }
+        if (packagingExplicit && buildsAppStoreChannel()
+                && !"pkg".equals(packaging) && !"both".equals(packaging)) {
+            warnings.add("macos.packaging=" + packaging + " is ignored for the App Store "
+                    + "channel, which is always packaged as a pkg; a dmg or a zipped .app "
+                    + "cannot be submitted. It is honored for the Developer ID channel.");
+        }
         hardenedRuntime = !"false".equalsIgnoreCase(hint(src, "hardenedRuntime", "true"));
 
         notarize = isTrue(hint(src, "notarize", "false"));
@@ -469,8 +475,19 @@ public class MacOSBuildHints {
      * for the App Store, because productbuild's output is what you upload, and
      * {@code dmg} for Developer ID. So {@code distribution=both} yields a pkg and
      * a dmg rather than one artifact that is neither.
+     *
+     * <p>With one exception, for the same reason the sandbox has one: the App
+     * Store channel is always packaged as a pkg. A dmg or a zipped .app cannot
+     * be submitted at all, so honouring the override there would spend a full
+     * build producing an artifact whose only defect is discovered by hand, at
+     * upload time. The override is reported through {@link #getWarnings()}
+     * rather than applied silently, and it still applies to the Developer ID
+     * channel of the same build.</p>
      */
     public String getPackagingFor(String channel) {
+        if (DISTRIBUTION_APP_STORE.equals(channel)) {
+            return "pkg";
+        }
         return packagingExplicit ? packaging : defaultPackagingFor(channel);
     }
 

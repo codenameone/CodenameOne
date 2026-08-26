@@ -609,11 +609,19 @@
         },
         {
           "ports": [
-            "macos", "mac-catalyst"
+            "mac-catalyst"
           ],
           "state": "conditional",
           "label": "StoreKit",
           "detail": "Requires a signed Mac App Store configuration and matching products."
+        },
+        {
+          "ports": [
+            "macos"
+          ],
+          "state": "unavailable",
+          "label": "No AppKit StoreKit backend",
+          "detail": "Only the iOS builder defines CN1_USE_STOREKIT, and the product and transaction delegate bodies compile out under TARGET_OS_OSX, so canMakePayments() answers false and no amount of signing or product configuration makes a purchase flow run."
         },
         {
           "ports": [

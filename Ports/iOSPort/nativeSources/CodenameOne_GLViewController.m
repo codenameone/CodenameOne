@@ -607,7 +607,8 @@ extern void pointerReleased(int* x, int* y, int length);
 extern void cn1CapturePointerMetadata(UITouch* touch);
 #endif
 #endif
-extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+                                      int precise, int modifiers);
 extern void pinchMagnifyCallback(float scale, int x, int y);
 extern void rotationGestureCallback(float radians, int x, int y);
 extern void screenSizeChanged(int width, int height);
@@ -3770,7 +3771,12 @@ bool lockDrawing;
         if (dx != 0 || dy != 0) {
             // A scroll pan is a drag-like gesture, so the translation maps
             // directly onto the wheel delta (positive dy reveals content above).
-            pointerWheelMovedCallback((int)(loc.x * scaleValue), (int)(loc.y * scaleValue), dx, dy);
+            // Precise: the deltas come off a pan recognizer over a touch or
+            // trackpad surface, never a notched wheel. No modifiers: the
+            // recognizer is not given a key mask, so claiming one would be
+            // inventing it.
+            pointerWheelMovedCallback((int)(loc.x * scaleValue), (int)(loc.y * scaleValue), dx, dy,
+                                      1, 0);
             // Reset so each callback carries an incremental delta.
             [recognizer setTranslation:CGPointZero inView:self.view];
         }

@@ -43,7 +43,8 @@ extern void cn1_watch_paintFrame(void);         // drain the op queue -> render 
 extern void cn1_watch_pointerPressed(int x, int y);
 extern void cn1_watch_pointerDragged(int x, int y);
 extern void cn1_watch_pointerReleased(int x, int y);
-extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
+extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
+                                      int precise, int modifiers);
 extern void cn1_watch_didEnterBackground(void);  // forward the CN1 app lifecycle
 extern void cn1_watch_willEnterForeground(void);
 
@@ -219,7 +220,9 @@ static CGFloat cn1WatchCrownRemainder = 0;
     needsDisplay = YES;
     int cx = _renderingView != nil ? [_renderingView logicalWidth] / 2 : 0;
     int cy = _renderingView != nil ? [_renderingView logicalHeight] / 2 : 0;
-    pointerWheelMovedCallback(cx, cy, 0, whole);
+    // The crown is a high resolution rotary input, and the watch has no
+    // modifier keys to report.
+    pointerWheelMovedCallback(cx, cy, 0, whole, 1, 0);
 }
 
 - (void)tapAtX:(int)x y:(int)y {
