@@ -3244,7 +3244,16 @@ public class CodenameOneSettings extends Lifecycle {
         String path = binding == null ? null : binding.pom();
         String text = pomText();
         for (int depth = 0; depth < 8 && path != null && text != null; depth++) {
-            out.add(text);
+            // Stripped HERE rather than in the seven walks over this list, so a
+            // walk added later cannot be the one that forgets. A plugin or
+            // execution marked <inherited>false</inherited> applies to the POM
+            // that wrote it and not to its children, so an ANCESTOR's copy is
+            // not part of this module's build -- and a root it configures is one
+            // the module never compiles, where a dormant copy of the main class
+            // shadows the live annotated source. depth 0 is this module's own
+            // POM, which applies its declarations whatever it says about
+            // children.
+            out.add(depth == 0 ? text : withoutNonInheritedPlugins(text));
             String parent = parentPomPath(path, text);
             if (parent == null || parent.equals(path)) {
                 break;
@@ -4348,8 +4357,14 @@ public class CodenameOneSettings extends Lifecycle {
         //
         // bindsGoal first: a block that already binds the goal needs nothing,
         // and appending would only repeat what it says.
-        return bindsGoal(chosen, goal) ? chosen
-                : chosen + mergedManagedExecutions(chain, artifactId);
+        // The active block's OWN executions travel with it. Taking the managed
+        // block for its configuration used to drop them: a module that declares
+        // the add-source execution and inherits <sources> from management ended
+        // up with configuration and no binding, so compileGoalConfiguration read
+        // the goal as unbound and omitted a root Maven really compiles.
+        String merged = chosen == active ? chosen : chosen + executionsOnly(active);
+        return bindsGoal(merged, goal) ? merged
+                : merged + mergedManagedExecutions(chain, artifactId);
     }
 
     /// `xml` with every `<!-- ... -->` removed.
@@ -4472,6 +4487,79 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return out;
+    }
+
+    /// The `<executions>` element of `pluginBlock`, or "" when it has none.
+    private static String executionsOnly(String pluginBlock) {
+        String out = between(pluginBlock, "<executions>", "</executions>");
+        return out == null ? "" : out;
+    }
+
+    /// `pomText` with the plugin and execution blocks a child does NOT inherit
+    /// removed.
+    ///
+    /// `<inherited>false</inherited>` means the declaration applies to the POM
+    /// that wrote it and not to its children. Walking the parent chain and
+    /// taking every plugin regardless made a root the child never compiles part
+    /// of the search -- and a dormant copy of the child's main class sitting
+    /// there shadows the live annotated source.
+    ///
+    /// Only meaningful for an ANCESTOR: a POM always applies its own
+    /// declarations, whatever the flag says about its children.
+    static String withoutNonInheritedPlugins(String pomText) {
+        if (pomText == null || pomText.indexOf("<inherited>") < 0) {
+            return pomText;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pomText.indexOf("<plugin>", at);
+            if (open < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            int close = pomText.indexOf("</plugin>", open);
+            if (close < 0) {
+                out.append(pomText.substring(at));
+                return out.toString();
+            }
+            close += "</plugin>".length();
+            out.append(pomText, at, open);
+            String plugin = pomText.substring(open, close);
+            // The plugin's own flag, not one belonging to an execution inside it.
+            if (!declaresValue(withoutElement(plugin, "executions"), "inherited", "false")) {
+                out.append(withoutNonInheritedExecutions(plugin));
+            }
+            at = close;
+        }
+    }
+
+    /// One plugin block with the executions a child does not inherit removed.
+    private static String withoutNonInheritedExecutions(String pluginBlock) {
+        if (pluginBlock.indexOf("<inherited>") < 0) {
+            return pluginBlock;
+        }
+        StringBuilder out = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = pluginBlock.indexOf("<execution>", at);
+            if (open < 0) {
+                out.append(pluginBlock.substring(at));
+                return out.toString();
+            }
+            int close = pluginBlock.indexOf("</execution>", open);
+            if (close < 0) {
+                out.append(pluginBlock.substring(at));
+                return out.toString();
+            }
+            close += "</execution>".length();
+            out.append(pluginBlock, at, open);
+            String execution = pluginBlock.substring(open, close);
+            if (!declaresValue(execution, "inherited", "false")) {
+                out.append(execution);
+            }
+            at = close;
+        }
     }
 
     /// The `<execution>` blocks of one plugin block, in order.

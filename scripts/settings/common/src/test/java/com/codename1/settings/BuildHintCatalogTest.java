@@ -2521,6 +2521,77 @@ public class BuildHintCatalogTest {
         assertNotNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", absent));
     }
 
+    /// An inherited CONFIGURATION does not discard the active BINDING.
+    ///
+    /// A module that declares the add-source execution itself and inherits
+    /// `<sources>` from plugin management ended up with configuration and no
+    /// binding: taking the managed block for its configuration dropped the
+    /// active block's own executions, so the goal read as unbound and the root
+    /// went missing.
+    @Test
+    public void anInheritedConfigurationKeepsTheActiveBinding() {
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/managed</source></sources>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom,
+                "build-helper-maven-plugin", "sources", "add-source", null);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/managed"), "lost the inherited sources: " + block);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "add-source"),
+                "lost the module's own execution: " + block);
+    }
+
+    /// A parent's non-inherited plugin is not part of the child's build.
+    ///
+    /// `<inherited>false</inherited>` says the declaration applies to the POM
+    /// that wrote it and not to its children, so a root it configures is one the
+    /// child never compiles -- and a dormant copy of the child's main class
+    /// there shadows the live annotated source.
+    @Test
+    public void aParentsNonInheritedPluginIsNotTheChildsBuild() {
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<inherited>false</inherited>"
+                + "<executions><execution><id>add</id>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>parent/only</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(parent)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutNonInheritedPlugins(parent)).toString());
+
+        // The same parent WITHOUT the flag does contribute.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(
+                        parent.replace("<inherited>false</inherited>", "")))
+                .contains("parent/only"));
+
+        // And a single non-inherited EXECUTION goes while the plugin stays.
+        String perExecution = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions>"
+                + "<execution><id>skip</id><inherited>false</inherited>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>not/inherited</source></sources>"
+                + "</configuration></execution>"
+                + "<execution><id>keep</id><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>is/inherited</source></sources>"
+                + "</configuration></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(perExecution));
+        assertTrue(roots.contains("is/inherited"), roots.toString());
+        assertFalse(roots.contains("not/inherited"), roots.toString());
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
