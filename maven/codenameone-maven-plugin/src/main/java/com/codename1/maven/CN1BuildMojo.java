@@ -2683,7 +2683,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // is in fact perfectly configured.
         boolean processed = false;
         String stale = null;
-        for (String element : classpathElements) {
+        // The processor writes the manifest into the SAME directory it scanned,
+        // so a manifest stamped for a main class was written beside that class.
+        // An element carrying the stamp without the class is therefore left over
+        // -- the shape is moving the application class from a platform module
+        // into common without cleaning -- and project output comes before
+        // dependencies on the classpath, so the leftover was found first, applied
+        // its old values and returned before the real one was ever read.
+        //
+        // Ordered rather than refused. Refusing assumes the two can never be
+        // packaged apart, and an element that assembles resources from another
+        // module would then lose its hints entirely; putting the colocated ones
+        // first fixes the stale-wins bug and still falls back to a manifest that
+        // is all there is.
+        for (String element : colocatedFirst(classpathElements, expectedMain)) {
             Properties found = readAnnotationHints(new File(element));
             if (found == null) {
                 continue;
@@ -2866,6 +2879,35 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                     + "(-D" + candidateKey + "=... overrides either and is not a conflict.)";
         }
         return null;
+    }
+
+    /**
+     * {@code classpathElements}, with those containing {@code expectedMain}'s
+     * class file first and the relative order otherwise preserved.
+     *
+     * @param classpathElements the compile classpath, in Maven's order
+     * @param expectedMain the binary name of the app's main class, or null
+     * @return the elements to search, colocated ones first
+     */
+    private List<String> colocatedFirst(List<String> classpathElements, String expectedMain) {
+        if (expectedMain == null) {
+            return classpathElements;
+        }
+        List<String> beside = new ArrayList<String>();
+        List<String> rest = new ArrayList<String>();
+        for (String element : classpathElements) {
+            boolean here;
+            try {
+                here = readClass(new File(element), expectedMain) != null;
+            } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+                // Unreadable is not evidence either way; leave it where it was.
+                getLog().debug("cn1: could not look for " + expectedMain + " in " + element, ex);
+                here = false;
+            }
+            (here ? beside : rest).add(element);
+        }
+        beside.addAll(rest);
+        return beside;
     }
 
     /**

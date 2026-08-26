@@ -277,6 +277,50 @@ public class AnnotationBuildHintMergeTest {
     }
 
     // ------------------------------------------------------------------
+    /// A stale manifest on an earlier element does not beat the real one.
+    ///
+    /// Moving the application class from a platform module into common without
+    /// cleaning leaves the platform module's target/classes carrying a manifest
+    /// stamped for that class, with the class itself no longer there. Project
+    /// output precedes dependencies on the classpath, so the leftover was read
+    /// first; its digest check could not fire, because the class it would
+    /// fingerprint is absent -- and the merge applied the old values and
+    /// returned before ever reaching the manifest beside the class.
+    @Test
+    public void aManifestWithoutTheMainClassBesideItDoesNotWin() throws Exception {
+        File stale = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios(teamId = \"OLD\")") + "\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+
+        File live = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        writeAnnotatedClass(live);
+
+        Properties target = new Properties();
+        mergeAll(target, Arrays.asList(stale, live), "MyApp", "com.example");
+        assertEquals("the stale manifest won because it came first",
+                "ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    /// ...and a manifest packaged apart from the class is still used.
+    ///
+    /// Ordering rather than refusing: an element that assembles resources from
+    /// another module carries the manifest without the class, and refusing it
+    /// would lose its hints entirely rather than merely deprioritise them.
+    @Test
+    public void aManifestWithNoColocatedClassAnywhereIsStillApplied() throws Exception {
+        File only = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+
+        Properties target = new Properties();
+        mergeAll(target, Arrays.asList(only), "MyApp", "com.example");
+        assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
     // helpers
     // ------------------------------------------------------------------
 
@@ -480,6 +524,26 @@ public class AnnotationBuildHintMergeTest {
      * Drives the shipped merge rather than a restatement of it, so a change to
      * the rule is a change to what this asserts.
      */
+    /** The same, over several classpath elements in the order given. */
+    private void mergeAll(Properties target, List<File> elements, String mainName, String pkg)
+            throws Exception {
+        CN1BuildMojo mojo = new CN1BuildMojo();
+        Properties settings = new Properties();
+        settings.setProperty("codename1.mainName", mainName);
+        settings.setProperty("codename1.packageName", pkg);
+        Field props = findField(mojo.getClass(), "properties");
+        props.setAccessible(true);
+        props.set(mojo, settings);
+        List<String> cp = new java.util.ArrayList<String>();
+        for (File f : elements) {
+            cp.add(f.getAbsolutePath());
+        }
+        Method m = findMethod(mojo.getClass(), "mergeAnnotationBuildHints",
+                Properties.class, List.class);
+        m.setAccessible(true);
+        m.invoke(mojo, target, cp);
+    }
+
     private void merge(Properties target, File classesDir, String mainName, String pkg)
             throws Exception {
         merge(target, classesDir, mainName, pkg, null);
