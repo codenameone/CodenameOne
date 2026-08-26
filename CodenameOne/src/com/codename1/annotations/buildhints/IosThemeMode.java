@@ -30,12 +30,12 @@ public enum IosThemeMode {
     @HintValue("auto")
     AUTO,
 
-    @HintValue("modern")
+    @HintValue(value = "modern", accepts = {"liquid"})
     MODERN,
 
-    @HintValue("ios7")
+    @HintValue(value = "ios7", accepts = {"flat"})
     IOS7,
 
-    @HintValue("legacy")
+    @HintValue(value = "legacy", accepts = {"iphone"})
     LEGACY;
 }

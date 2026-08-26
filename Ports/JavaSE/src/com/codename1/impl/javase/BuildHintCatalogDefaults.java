@@ -44,85 +44,6 @@ final class BuildHintCatalogDefaults {
     static void register() {
         java.util.Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();
 
-        set("{{@IosPrivacy}}.label", "iOS Privacy Strings");
-        if (!handWritten.contains("ios.NSBluetoothAlwaysUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.label", "Bluetooth always usage description");
-        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.type", "TextField");
-        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.description", "Why the app uses Bluetooth. Supplied automatically when the app references `com.codename1.bluetooth`; set it to say something more specific than the default.");
-        }
-        if (!handWritten.contains("ios.NSBluetoothPeripheralUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.label", "Bluetooth peripheral usage description");
-        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.type", "TextField");
-        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.description", "The pre-iOS 13 spelling of the Bluetooth usage description, supplied and overridable on the same terms.");
-        }
-        if (!handWritten.contains("ios.NSCalendarsFullAccessUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.label", "Calendars full access usage description");
-        set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSCalendarsUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSCalendarsUsageDescription}}.label", "Calendars usage description");
-        set("{{#IosPrivacy#ios.NSCalendarsUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSCalendarsWriteOnlyAccessUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSCalendarsWriteOnlyAccessUsageDescription}}.label", "Calendars write only access usage description");
-        set("{{#IosPrivacy#ios.NSCalendarsWriteOnlyAccessUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSCameraUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSCameraUsageDescription}}.label", "Camera usage description");
-        set("{{#IosPrivacy#ios.NSCameraUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSHealthShareUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSHealthShareUsageDescription}}.label", "Health share usage description");
-        set("{{#IosPrivacy#ios.NSHealthShareUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSHealthUpdateUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSHealthUpdateUsageDescription}}.label", "Health update usage description");
-        set("{{#IosPrivacy#ios.NSHealthUpdateUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSLocalNetworkUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSLocalNetworkUsageDescription}}.label", "Local network usage description");
-        set("{{#IosPrivacy#ios.NSLocalNetworkUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSLocationAlwaysAndWhenInUseUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSLocationAlwaysAndWhenInUseUsageDescription}}.label", "Location always and when in use usage description");
-        set("{{#IosPrivacy#ios.NSLocationAlwaysAndWhenInUseUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSLocationAlwaysUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSLocationAlwaysUsageDescription}}.label", "Location always usage description");
-        set("{{#IosPrivacy#ios.NSLocationAlwaysUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSLocationWhenInUseUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSLocationWhenInUseUsageDescription}}.label", "Location when in use usage description");
-        set("{{#IosPrivacy#ios.NSLocationWhenInUseUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSMicrophoneUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.label", "Microphone usage description");
-        set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSNearbyInteractionAllowOnceUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.label", "Nearby interaction allow once usage description");
-        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.type", "TextField");
-        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.description", "The pre-iOS 16 spelling of the nearby-interaction usage description, supplied automatically when the app references the nearby APIs.");
-        }
-        if (!handWritten.contains("ios.NSNearbyInteractionUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.label", "Nearby interaction usage description");
-        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.type", "TextField");
-        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.description", "Why the app measures distance and direction to nearby devices. Supplied automatically when the app references the nearby APIs; set it to say something more specific than the default.");
-        }
-        if (!handWritten.contains("ios.NSRemindersFullAccessUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.label", "Reminders full access usage description");
-        set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSRemindersUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.label", "Reminders usage description");
-        set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.type", "TextField");
-        }
-        if (!handWritten.contains("ios.NSSpeechRecognitionUsageDescription")) {
-        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.label", "Speech recognition usage description");
-        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.type", "TextField");
-        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.description", "Why the app sends speech for recognition. Supplied automatically when the app references the speech APIs; set it to say something more specific.");
-        }
-
         set("{{@Ios}}.label", "iOS");
         if (!handWritten.contains("ios.add_libs")) {
         set("{{#Ios#ios.add_libs}}.label", "Add libs");
@@ -405,56 +326,6 @@ final class BuildHintCatalogDefaults {
         set("{{#DesktopBuild#desktop.width}}.description", "Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.");
         }
 
-        set("{{@OnDeviceDebug}}.label", "On-Device Debugging");
-        if (!handWritten.contains("android.onDeviceDebug")) {
-        set("{{#OnDeviceDebug#android.onDeviceDebug}}.label", "Android");
-        set("{{#OnDeviceDebug#android.onDeviceDebug}}.type", "Checkbox");
-        set("{{#OnDeviceDebug#android.onDeviceDebug}}.description", "Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable=\"true\"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable=\"true\"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it -- release builds are unaffected. See the On-Device Debugging (Android) chapter for the full flow.");
-        }
-        if (!handWritten.contains("ios.onDeviceDebug")) {
-        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.label", "Ios");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.type", "Checkbox");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.description", "Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the On-Device Debugging (iOS) chapter for the full flow.");
-        }
-        if (!handWritten.contains("ios.onDeviceDebug.proxyHost")) {
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.label", "Ios proxy host");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.type", "TextField");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.description", "Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.");
-        }
-        if (!handWritten.contains("ios.onDeviceDebug.proxyPort")) {
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.label", "Ios proxy port");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.type", "TextField");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.description", "TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.");
-        }
-        if (!handWritten.contains("ios.onDeviceDebug.waitForAttach")) {
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.label", "Ios wait for attach");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.type", "Checkbox");
-        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.description", "Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.");
-        }
-
-        set("{{@Build}}.label", "General");
-        if (!handWritten.contains("facebook.appId")) {
-        set("{{#Build#facebook.appId}}.label", "Facebook app id");
-        set("{{#Build#facebook.appId}}.type", "TextField");
-        set("{{#Build#facebook.appId}}.description", "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app");
-        }
-        if (!handWritten.contains("gcm.sender_id")) {
-        set("{{#Build#gcm.sender_id}}.label", "Gcm sender id");
-        set("{{#Build#gcm.sender_id}}.type", "TextField");
-        set("{{#Build#gcm.sender_id}}.description", "The Android/chrome push identifier, see the push section for more details");
-        }
-        if (!handWritten.contains("nativeTheme")) {
-        set("{{#Build#nativeTheme}}.label", "Native theme");
-        set("{{#Build#nativeTheme}}.type", "Select");
-        set("{{#Build#nativeTheme}}.values", "modern,legacy,custom");
-        set("{{#Build#nativeTheme}}.description", "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.");
-        }
-        if (!handWritten.contains("noExtraResources")) {
-        set("{{#Build#noExtraResources}}.label", "No extra resources");
-        set("{{#Build#noExtraResources}}.type", "Checkbox");
-        set("{{#Build#noExtraResources}}.description", "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.");
-        }
-
         set("{{@Hardening}}.label", "App Hardening");
         if (!handWritten.contains("harden.allowUnhardenedLocalBuild")) {
         set("{{#Hardening#harden.allowUnhardenedLocalBuild}}.label", "Allow unhardened local build");
@@ -488,6 +359,148 @@ final class BuildHintCatalogDefaults {
         set("{{#Hardening#harden.strings}}.type", "Select");
         set("{{#Hardening#harden.strings}}.values", "off,constants,all");
         set("{{#Hardening#harden.strings}}.description", "Overrides string obfuscation independently of harden.level: off, constants or all.");
+        }
+
+        set("{{@OnDeviceDebug}}.label", "On-Device Debugging");
+        if (!handWritten.contains("android.onDeviceDebug")) {
+        set("{{#OnDeviceDebug#android.onDeviceDebug}}.label", "Android");
+        set("{{#OnDeviceDebug#android.onDeviceDebug}}.type", "Checkbox");
+        set("{{#OnDeviceDebug#android.onDeviceDebug}}.description", "Boolean true/false defaults to false. When `true`, the generated `AndroidManifest.xml` is marked `android:debuggable=\"true\"`, R8/proguard is disabled, and the build is pinned to debug-only (`android.release` is forced off and `android.debug` is forced on) so a stray hint can't ship a release-signed APK that's `debuggable=\"true\"`. Pair with the `cn1:android-on-device-debugging` Maven goal (or the bundled IntelliJ run configs) to install, launch, forward JDWP, and stream logcat through adb. Has no effect on builds that don't carry it -- release builds are unaffected. See the On-Device Debugging (Android) chapter for the full flow.");
+        }
+        if (!handWritten.contains("ios.onDeviceDebug")) {
+        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.label", "Ios");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.type", "Checkbox");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug}}.description", "Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the On-Device Debugging (iOS) chapter for the full flow.");
+        }
+        if (!handWritten.contains("ios.onDeviceDebug.proxyHost")) {
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.label", "Ios proxy host");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.type", "TextField");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyHost}}.description", "Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.");
+        }
+        if (!handWritten.contains("ios.onDeviceDebug.proxyPort")) {
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.label", "Ios proxy port");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.type", "TextField");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.proxyPort}}.description", "TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.");
+        }
+        if (!handWritten.contains("ios.onDeviceDebug.waitForAttach")) {
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.label", "Ios wait for attach");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.type", "Checkbox");
+        set("{{#OnDeviceDebug#ios.onDeviceDebug.waitForAttach}}.description", "Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.");
+        }
+
+        set("{{@IosPrivacy}}.label", "iOS Privacy Strings");
+        if (!handWritten.contains("ios.NSBluetoothAlwaysUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.label", "Bluetooth always usage description");
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSBluetoothAlwaysUsageDescription}}.description", "Why the app uses Bluetooth. Supplied automatically when the app references `com.codename1.bluetooth`; set it to say something more specific than the default.");
+        }
+        if (!handWritten.contains("ios.NSBluetoothPeripheralUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.label", "Bluetooth peripheral usage description");
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSBluetoothPeripheralUsageDescription}}.description", "The pre-iOS 13 spelling of the Bluetooth usage description, supplied and overridable on the same terms.");
+        }
+        if (!handWritten.contains("ios.NSCalendarsFullAccessUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.label", "Calendars full access usage description");
+        set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSCalendarsFullAccessUsageDescription}}.description", "The text iOS shows when the app first asks for the calendars full access. It becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSCalendarsUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSCalendarsUsageDescription}}.label", "Calendars usage description");
+        set("{{#IosPrivacy#ios.NSCalendarsUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSCalendarsUsageDescription}}.description", "The text iOS shows when the app first asks for the calendars. It becomes the `NSCalendarsUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSCalendarsWriteOnlyAccessUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSCalendarsWriteOnlyAccessUsageDescription}}.label", "Calendars write only access usage description");
+        set("{{#IosPrivacy#ios.NSCalendarsWriteOnlyAccessUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSCalendarsWriteOnlyAccessUsageDescription}}.description", "The text iOS shows when the app first asks for the calendars write only access. It becomes the `NSCalendarsWriteOnlyAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSCameraUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSCameraUsageDescription}}.label", "Camera usage description");
+        set("{{#IosPrivacy#ios.NSCameraUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSCameraUsageDescription}}.description", "The text iOS shows when the app first asks for the camera. It becomes the `NSCameraUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSHealthShareUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSHealthShareUsageDescription}}.label", "Health share usage description");
+        set("{{#IosPrivacy#ios.NSHealthShareUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSHealthShareUsageDescription}}.description", "The text iOS shows when the app first asks for the health share. It becomes the `NSHealthShareUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSHealthUpdateUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSHealthUpdateUsageDescription}}.label", "Health update usage description");
+        set("{{#IosPrivacy#ios.NSHealthUpdateUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSHealthUpdateUsageDescription}}.description", "The text iOS shows when the app first asks for the health update. It becomes the `NSHealthUpdateUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSLocalNetworkUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSLocalNetworkUsageDescription}}.label", "Local network usage description");
+        set("{{#IosPrivacy#ios.NSLocalNetworkUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSLocalNetworkUsageDescription}}.description", "The text iOS shows when the app first asks for the local network. It becomes the `NSLocalNetworkUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSLocationAlwaysAndWhenInUseUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSLocationAlwaysAndWhenInUseUsageDescription}}.label", "Location always and when in use usage description");
+        set("{{#IosPrivacy#ios.NSLocationAlwaysAndWhenInUseUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSLocationAlwaysAndWhenInUseUsageDescription}}.description", "The text iOS shows when the app first asks for the location always and when in use. It becomes the `NSLocationAlwaysAndWhenInUseUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSLocationAlwaysUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSLocationAlwaysUsageDescription}}.label", "Location always usage description");
+        set("{{#IosPrivacy#ios.NSLocationAlwaysUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSLocationAlwaysUsageDescription}}.description", "The text iOS shows when the app first asks for the location always. It becomes the `NSLocationAlwaysUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSLocationWhenInUseUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSLocationWhenInUseUsageDescription}}.label", "Location when in use usage description");
+        set("{{#IosPrivacy#ios.NSLocationWhenInUseUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSLocationWhenInUseUsageDescription}}.description", "The text iOS shows when the app first asks for the location when in use. It becomes the `NSLocationWhenInUseUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSMicrophoneUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.label", "Microphone usage description");
+        set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSMicrophoneUsageDescription}}.description", "The text iOS shows when the app first asks for the microphone. It becomes the `NSMicrophoneUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSNearbyInteractionAllowOnceUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.label", "Nearby interaction allow once usage description");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionAllowOnceUsageDescription}}.description", "The pre-iOS 16 spelling of the nearby-interaction usage description, supplied automatically when the app references the nearby APIs.");
+        }
+        if (!handWritten.contains("ios.NSNearbyInteractionUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.label", "Nearby interaction usage description");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSNearbyInteractionUsageDescription}}.description", "Why the app measures distance and direction to nearby devices. Supplied automatically when the app references the nearby APIs; set it to say something more specific than the default.");
+        }
+        if (!handWritten.contains("ios.NSRemindersFullAccessUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.label", "Reminders full access usage description");
+        set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSRemindersFullAccessUsageDescription}}.description", "The text iOS shows when the app first asks for the reminders full access. It becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSRemindersUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.label", "Reminders usage description");
+        set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSRemindersUsageDescription}}.description", "The text iOS shows when the app first asks for the reminders. It becomes the `NSRemindersUsageDescription` key in `Info.plist`. The App Store rejects an app that touches this resource without one.");
+        }
+        if (!handWritten.contains("ios.NSSpeechRecognitionUsageDescription")) {
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.label", "Speech recognition usage description");
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.type", "TextField");
+        set("{{#IosPrivacy#ios.NSSpeechRecognitionUsageDescription}}.description", "Why the app sends speech for recognition. Supplied automatically when the app references the speech APIs; set it to say something more specific.");
+        }
+
+        set("{{@Build}}.label", "General");
+        if (!handWritten.contains("facebook.appId")) {
+        set("{{#Build#facebook.appId}}.label", "Facebook app id");
+        set("{{#Build#facebook.appId}}.type", "TextField");
+        set("{{#Build#facebook.appId}}.description", "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app");
+        }
+        if (!handWritten.contains("gcm.sender_id")) {
+        set("{{#Build#gcm.sender_id}}.label", "Gcm sender id");
+        set("{{#Build#gcm.sender_id}}.type", "TextField");
+        set("{{#Build#gcm.sender_id}}.description", "The Android/chrome push identifier, see the push section for more details");
+        }
+        if (!handWritten.contains("nativeTheme")) {
+        set("{{#Build#nativeTheme}}.label", "Native theme");
+        set("{{#Build#nativeTheme}}.type", "Select");
+        set("{{#Build#nativeTheme}}.values", "modern,legacy,custom");
+        set("{{#Build#nativeTheme}}.description", "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.");
+        }
+        if (!handWritten.contains("noExtraResources")) {
+        set("{{#Build#noExtraResources}}.label", "No extra resources");
+        set("{{#Build#noExtraResources}}.type", "Checkbox");
+        set("{{#Build#noExtraResources}}.description", "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.");
         }
     }
 

@@ -106,8 +106,10 @@ public final class BuildHintCodeGenerator {
         // nothing for a hand edit to survive in. This mode writes that one file
         // and nothing else, so a documentation build does not also rewrite source
         // trees it has no business touching.
-        if (args.length == 2 && "--table-only".equals(args[0])) {
-            write(new File(args[1]), asciidocTable());
+        if (args.length == 3 && "--table-only".equals(args[0])) {
+            write(new File(args[2]),
+                    asciidocTable(everything(BuildHintAnnotationReader.readFromSources(
+                            new File(args[1], PKG_PATH)))));
             return;
         }
         if (args.length < 2) {
@@ -117,17 +119,21 @@ public final class BuildHintCodeGenerator {
         }
         File annRoot = new File(args[0], PKG_PATH);
         File catalogRoot = new File(args[1], "com/codename1/build/shared");
-        if (!annRoot.isDirectory() && !annRoot.mkdirs()) {
-            throw new IOException("Could not create " + annRoot);
+        if (!annRoot.isDirectory()) {
+            throw new IOException("No build hint annotations at " + annRoot);
         }
 
+        // The annotations are the source of truth for the hints they expose, so
+        // they are READ here rather than written. Everything below is a view of
+        // them; nothing restates them.
+        List<BuildHints.Hint> annotated = BuildHintAnnotationReader.readFromSources(annRoot);
+
+        // By the enum's own order rather than whichever group a hint name sorts
+        // into first, so the views below do not reshuffle when a hint is added.
         Map<HintGroup, List<BuildHints.Hint>> byGroup =
-                new LinkedHashMap<HintGroup, List<BuildHints.Hint>>();
+                new TreeMap<HintGroup, List<BuildHints.Hint>>();
         Map<String, BuildHints.Hint> enums = new TreeMap<String, BuildHints.Hint>();
-        for (BuildHints.Hint h : BuildHints.entries()) {
-            if (!h.isAnnotated()) {
-                continue;
-            }
+        for (BuildHints.Hint h : annotated) {
             List<BuildHints.Hint> list = byGroup.get(h.group());
             if (list == null) {
                 list = new ArrayList<BuildHints.Hint>();
@@ -161,11 +167,13 @@ public final class BuildHintCodeGenerator {
         // hints they expose -- hand-written, and read back by
         // BuildHintAnnotationReader -- so nothing here writes into
         // CodenameOne/src.
+        write(new File(catalogRoot, "BuildHintsFromAnnotations.java"),
+                catalogViewSource(annotated));
         write(new File(catalogRoot, "BuildHintAnnotationBinding.java"), bindingSource(byGroup, enums));
         for (int i = 2; i < args.length; i++) {
             File target = new File(args[i]);
             if (target.getName().endsWith(".adoc") || target.getName().endsWith(".asciidoc")) {
-                write(target, asciidocTable());
+                write(target, asciidocTable(everything(annotated)));
             } else {
                 write(new File(target, "com/codename1/impl/javase/BuildHintCatalogDefaults.java"),
                         simulatorSchemaSource(byGroup));
@@ -642,8 +650,122 @@ public final class BuildHintCodeGenerator {
      * default the builders actually use, and means a hint added to a builder can
      * no longer be missing from the guide.</p>
      */
-    private static String asciidocTable() {
-        List<BuildHints.Hint> all = new ArrayList<BuildHints.Hint>(BuildHints.entries());
+    /// The annotated hints as catalog entries, for the consumers that cannot run
+    /// ASM.
+    ///
+    /// The Settings editor reads the catalog, and it is a Codename One app: it
+    /// has no bytecode reader and no business gaining one. So the annotations
+    /// are rendered into the catalog the same way the binding table is -- a
+    /// generated VIEW of the source of truth, checked in and drift-gated, not a
+    /// second statement of it.
+    private static String catalogViewSource(List<BuildHints.Hint> annotated) {
+        StringBuilder sb = new StringBuilder(LICENSE);
+        sb.append("package com.codename1.build.shared;\n\n");
+        sb.append("import java.util.List;\n\n");
+        sb.append(doc("The build hints the annotations in "
+                + "`com.codename1.annotations.buildhints` expose.", ""));
+        sb.append("///\n");
+        sb.append(doc("A view, not a source: every fact here is read back out of those "
+                + "annotations, which are where it is stated. Edit the annotation and "
+                + "re-run scripts/gen-build-hint-annotations.sh.", ""));
+        sb.append("final class BuildHintsFromAnnotations {\n\n");
+        sb.append("    private BuildHintsFromAnnotations() {\n    }\n\n");
+        sb.append("    static void register(List<BuildHints.Hint> h) {\n");
+        for (BuildHints.Hint hint : annotated) {
+            sb.append(entrySource(hint));
+        }
+        sb.append("    }\n}\n");
+        return sb.toString();
+    }
+
+    private static String entrySource(BuildHints.Hint h) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("        h.add(new BuildHints.Hint(").append(quote(h.name())).append(")\n");
+        sb.append("                .annotatedAs(HintGroup.").append(h.group().name())
+          .append(", ").append(quote(h.attr())).append(")\n");
+        if (h.type() == HintType.ENUM) {
+            sb.append("                .values(").append(quote(h.enumName()));
+            for (String v : h.values()) {
+                sb.append(", ").append(quote(v));
+            }
+            sb.append(")\n");
+            if (!h.valueAliases().isEmpty()) {
+                sb.append("                .valueAliases(");
+                boolean first = true;
+                for (Map.Entry<String, String> e : h.valueAliases().entrySet()) {
+                    sb.append(first ? "" : ", ").append(quote(e.getKey())).append(", ")
+                      .append(quote(e.getValue()));
+                    first = false;
+                }
+                sb.append(")\n");
+            }
+            if (!h.valueLabels().isEmpty()) {
+                sb.append("                .valueLabels(");
+                for (int i = 0; i < h.valueLabels().size(); i++) {
+                    sb.append(i == 0 ? "" : ", ").append(quote(h.valueLabels().get(i)));
+                }
+                sb.append(")\n");
+            }
+        } else {
+            sb.append("                .type(HintType.").append(h.type().name()).append(")\n");
+        }
+        if (h.def() != null && h.def().length() > 0) {
+            sb.append("                .def(").append(quote(h.def())).append(")\n");
+        }
+        if (h.separator() != null) {
+            sb.append("                .separator(").append(quote(h.separator())).append(")\n");
+        }
+        if (h.aliasOf() != null) {
+            sb.append("                .aliasOf(").append(quote(h.aliasOf())).append(")\n");
+        }
+        if (h.deprecated() != null) {
+            sb.append("                .deprecated(").append(quote(h.deprecated())).append(")\n");
+        }
+        if (h.isExternal()) {
+            sb.append("                .external()\n");
+        }
+        if (h.isEnterpriseOnly()) {
+            sb.append("                .enterpriseOnly()\n");
+        }
+        if (h.link() != null && h.link().length() > 0) {
+            sb.append("                .link(").append(quote(h.link())).append(")\n");
+        }
+        if (!h.consumedBy().isEmpty()) {
+            sb.append("                .consumedBy(");
+            for (int i = 0; i < h.consumedBy().size(); i++) {
+                sb.append(i == 0 ? "" : ", ").append(quote(h.consumedBy().get(i)));
+            }
+            sb.append(")\n");
+        }
+        sb.append("                .platform(").append(quote(h.platform())).append(")\n");
+        sb.append("                .doc(").append(quote(h.doc())).append("));\n");
+        return sb.toString();
+    }
+
+    /// The hints the catalog still describes, plus the annotated ones read from
+    /// source.
+    ///
+    /// Deliberately not BuildHints.entries(): that includes the generated view
+    /// this same run is about to rewrite, so a stale one would render itself
+    /// back into the guide.
+    private static List<BuildHints.Hint> everything(List<BuildHints.Hint> annotated) {
+        List<BuildHints.Hint> all = new ArrayList<BuildHints.Hint>();
+        for (BuildHints.Hint h : BuildHints.entries()) {
+            if (!h.isAnnotated()) {
+                all.add(h);
+            }
+        }
+        all.addAll(annotated);
+        Collections.sort(all, new Comparator<BuildHints.Hint>() {
+            public int compare(BuildHints.Hint a, BuildHints.Hint b) {
+                return a.name().compareTo(b.name());
+            }
+        });
+        return all;
+    }
+
+    private static String asciidocTable(List<BuildHints.Hint> everything) {
+        List<BuildHints.Hint> all = new ArrayList<BuildHints.Hint>(everything);
         Collections.sort(all, new Comparator<BuildHints.Hint>() {
             public int compare(BuildHints.Hint a, BuildHints.Hint b) {
                 int byPlatform = a.platform().compareTo(b.platform());

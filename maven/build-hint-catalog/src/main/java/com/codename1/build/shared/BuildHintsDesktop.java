@@ -44,73 +44,12 @@ final class BuildHintsDesktop {
     }
 
     static void register(List<Hint> h) {
-        h.add(new Hint("desktop.adaptToRetina")
-                .annotatedAs(HintGroup.DESKTOP, "adaptToRetina")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Boolean true/false defaults to true. When set to true some values will ve implicitly "
-                        + "doubled to deal with retina displays and icons etc. Will use higher DPI's"));
-
-        h.add(new Hint("desktop.fullscreen")
-                .annotatedAs(HintGroup.DESKTOP, "fullscreen")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Starts the desktop build in full-screen mode."));
-
-        h.add(new Hint("desktop.height")
-                .annotatedAs(HintGroup.DESKTOP, "height")
-                .type(HintType.INT)
-                .def("600")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Height in pixels for the form in desktop builds, will be doubled for retina grade "
-                        + "displays. Defaults to 600."));
-
-        h.add(new Hint("desktop.interactiveScrollbars")
-                .annotatedAs(HintGroup.DESKTOP, "interactiveScrollbars")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Enables grab-able, click-to-page desktop scrollbars."));
-
-        h.add(new Hint("desktop.resizable")
-                .annotatedAs(HintGroup.DESKTOP, "resizable")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Boolean true/false defaults to true. Indicates whether the UI in the desktop build is "
-                        + "resizable"));
 
         h.add(new Hint("desktop.title")
                 .group(HintGroup.DESKTOP)
                 .type(HintType.STRING)
                 .platform("desktop")
                 .consumedBy("GenerateDesktopAppWrapperMojo"));
-
-        h.add(new Hint("desktop.titleBar")
-                .annotatedAs(HintGroup.DESKTOP, "titleBar")
-                .values("DesktopTitleBar", "native", "custom", "toolbar")
-                .def("native")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("How the desktop window is framed: native for the OS title bar and menu bar, custom for "
-                        + "an undecorated window with a Codename One drawn title bar, or toolbar for the legacy "
-                        + "in-app Toolbar. An unrecognized value falls back to native with a warning."));
-
-        h.add(new Hint("desktop.width")
-                .annotatedAs(HintGroup.DESKTOP, "width")
-                .type(HintType.INT)
-                .def("800")
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo")
-                .doc("Width in pixels for the form in desktop builds, will be doubled for retina grade "
-                        + "displays. Defaults to 800."));
 
         h.add(new Hint("javascript.includeVideoJS")
                 .group(HintGroup.JAVASCRIPT)

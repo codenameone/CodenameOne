@@ -19,6 +19,21 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 CATALOG="$REPO_ROOT/maven/build-hint-catalog"
 CLASSES="$CATALOG/target/classes"
+
+# The generator reads the annotations out of their compiled classes, so ASM has
+# to be on ITS classpath. Provided scope keeps it off the Settings tool's, which
+# is why it is not simply a compile dependency.
+asm_cp() {
+  local out
+  out="$(mktemp)"
+  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog dependency:build-classpath \
+      -Dmdep.includeScope=provided -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
+  if [ -s "$out" ]; then
+    printf '%s' ":$(cat "$out")"
+  fi
+  rm -f "$out"
+}
+
 ANN_ROOT="$REPO_ROOT/CodenameOne/src"
 CATALOG_SRC="$CATALOG/src/main/java"
 
@@ -35,7 +50,7 @@ echo "gen-build-hint-annotations: building the catalog" >&2
 JAVASE_SRC="$REPO_ROOT/Ports/JavaSE/src"
 GUIDE_TABLE="$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc"
 
-java -cp "$CLASSES" com.codename1.build.shared.BuildHintCodeGenerator \
+java -cp "$CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator \
      "$ANN_ROOT" "$CATALOG_SRC" "$JAVASE_SRC" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then

@@ -28,7 +28,10 @@ def catalog():
             continue
         with open(os.path.join(src, fn), encoding="utf-8") as fh:
             text = fh.read()
-        for m in re.finditer(r'new Hint\("((?:[^"\\]|\\.)*)"\)', text):
+        # BuildHintsFromAnnotations is generated and qualifies the type, so both
+        # spellings count -- the hints the annotations expose are catalogued
+        # there rather than in the hand-written files.
+        for m in re.finditer(r'new (?:BuildHints\.)?Hint\("((?:[^"\\]|\\.)*)"\)', text):
             names.add(m.group(1))
         for m in re.finditer(r'\.dynamic\("((?:[^"\\]|\\.)*)"\)', text):
             patterns.add(m.group(1))

@@ -92,6 +92,8 @@ public class BuildHintAnnotationReaderTest {
         check(out, at + "separator", expected.separator(), actual.separator());
         check(out, at + "platform", expected.platform(), actual.platform());
         check(out, at + "values", expected.values(), actual.values());
+        check(out, at + "valueAliases", expected.valueAliases(), actual.valueAliases());
+        check(out, at + "valueLabels", expected.valueLabels(), actual.valueLabels());
         check(out, at + "enum", expected.enumName(), actual.enumName());
         check(out, at + "aliasOf", expected.aliasOf(), actual.aliasOf());
         check(out, at + "deprecated", expected.deprecated(), actual.deprecated());

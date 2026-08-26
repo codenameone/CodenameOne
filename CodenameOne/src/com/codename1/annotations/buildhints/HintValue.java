@@ -42,6 +42,15 @@ public @interface HintValue {
     /// The literal the builder compares against.
     String value();
 
+    /// Other spellings the builder accepts for this same behaviour.
+    ///
+    /// `flat` and `ios7` are one theme, and a properties file may say either.
+    /// They are not separate constants -- one behaviour, one constant, or the
+    /// annotation asks a question with no right answer -- so the alternatives
+    /// live here, and `cn1:migrate-build-hints` uses them to turn whichever
+    /// spelling a project wrote into the constant it means.
+    String[] accepts() default {};
+
     /// How the Settings editor labels this choice, when the wire value is not
     /// presentable on its own.
     String label() default "";

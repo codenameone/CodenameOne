@@ -72,23 +72,6 @@ final class BuildHintsAndroid {
                         + "when set. `IPhoneBuilder` also falls back to it when "
                         + "`ios.facebook_permissions` is unset."));
 
-        h.add(new Hint("and.themeMode")
-                .annotatedAs(HintGroup.ANDROID, "themeMode")
-                .values("AndroidThemeMode", "auto", "modern", "hololight", "legacy")
-                // AndroidImplementation.installNativeTheme compares against these
-                // too; see the note on ios.themeMode about why they are not
-                // constants.
-                .valueAliases("material", "modern", "holo", "hololight")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` "
-                        + "and `modern` / `material` opt in to the CSS-generated Android Material 3 theme from "
-                        + "`native-themes/android-material/theme.css`. `hololight` is Android Holo Light (what the "
-                        + "framework shipped on API 14+ before this refactor). `legacy` loads the pre-Holo Android "
-                        + "theme. The legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true` "
-                        + "still maps to `hololight`. The default stays on `hololight` for existing apps until you "
-                        + "flip in a future release."));
-
         h.add(new Hint("android.NotificationChannel.description")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -162,19 +145,6 @@ final class BuildHintsAndroid {
                 .def("exit")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
-
-        h.add(new Hint("android.activity.launchMode")
-                .annotatedAs(HintGroup.ANDROID, "activityLaunchMode")
-                .type(HintType.STRING)
-                .def("singleTop")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Allows explicitly setting the `android:launchMode` attribute of the main activity in "
-                        + "android. Default is \"singleTop,\" but for some applications you may need to change this "
-                        + "behaviour. In particular, apps that are meant to open a file type will need to set this "
-                        + "to \"singleTask.\" See "
-                        + "https://developer.android.com/guide/topics/manifest/activity-element.html[Android docs "
-                        + "for the activity element] for more information about the `android:launchMode` attribute."));
 
         h.add(new Hint("android.activityClassBody")
                 .group(HintGroup.ANDROID)
@@ -255,14 +225,6 @@ final class BuildHintsAndroid {
                 .def("false")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
-
-        h.add(new Hint("android.appBundle")
-                .annotatedAs(HintGroup.ANDROID, "appBundle")
-                .type(HintType.BOOLEAN)
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Produces an Android App Bundle (.aab) rather than an APK. Required for new Play Store "
-                        + "submissions."));
 
         h.add(new Hint("android.appReview.version")
                 .group(HintGroup.ANDROID)
@@ -355,23 +317,6 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
-        h.add(new Hint("android.buildToolsVersion")
-                .annotatedAs(HintGroup.ANDROID, "buildToolsVersion")
-                .type(HintType.VERSION)
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Android build-tools version. It also selects the compile SDK, so there is no separate "
-                        + "compile-SDK hint."));
-
-        h.add(new Hint("android.captureRecord")
-                .annotatedAs(HintGroup.ANDROID, "captureRecord")
-                .type(HintType.STRING)
-                .def("enabled")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Indicates whether the `RECORD_AUDIO` permission should be requested. Can be `enabled` or "
-                        + "any other value to disable this option"));
-
         h.add(new Hint("android.carAppVersion")
                 .group(HintGroup.ANDROID)
                 .type(HintType.VERSION)
@@ -422,18 +367,6 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
-        h.add(new Hint("android.debug")
-                .annotatedAs(HintGroup.ANDROID, "debug")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("true/false defaults to true - indicates whether to include the debug version in the "
-                        + "build. Defaults conditionally rather than to a fixed value: when android.release is on "
-                        + "it defaults to false, and when release is off it defaults to true, so a build that "
-                        + "selects neither still produces something installable "
-                        + "(AndroidGradleBuilder.java:447-451)."));
-
         h.add(new Hint("android.decouplePlayServiceVersions")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -446,15 +379,6 @@ final class BuildHintsAndroid {
                 .def("false")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
-
-        h.add(new Hint("android.disableR8")
-                .annotatedAs(HintGroup.ANDROID, "disableR8")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Turns off R8, falling back to the older shrinker. Note that hardening requires R8, so "
-                        + "this conflicts with harden.level."));
 
         h.add(new Hint("android.disableR8FullMode")
                 .group(HintGroup.ANDROID)
@@ -480,15 +404,6 @@ final class BuildHintsAndroid {
                         + "Android Gradle builds. When enabled, Codename One generates `mipmap` launcher resources "
                         + "(`ic_launcher`, `ic_launcher_foreground`, and adaptive XML in `mipmap-anydpi-v26`) and "
                         + "uses them in the application manifest (`android:icon` and `android:roundIcon`)."));
-
-        h.add(new Hint("android.enableProguard")
-                .annotatedAs(HintGroup.ANDROID, "enableProguard")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Boolean true/false defaults to true. Allows disabling the proguard obfuscation even on "
-                        + "release builds, notice that this isn't recommended"));
 
         h.add(new Hint("android.excludeBolts")
                 .group(HintGroup.ANDROID)
@@ -626,15 +541,6 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
-        h.add(new Hint("android.gradleDep")
-                .annotatedAs(HintGroup.ANDROID, "gradleDep")
-                .type(HintType.STRING_LIST)
-                .separator(";")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Gradle dependency statements to add to the app module, such as implementation "
-                        + "'com.example:lib:1.0'."));
-
         h.add(new Hint("android.gradlePlugin")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING_LIST)
@@ -737,14 +643,6 @@ final class BuildHintsAndroid {
                         + "API without enabling `android.tapjackingGuard`. A normal install-time permission, so the "
                         + "user sees no prompt."));
 
-        h.add(new Hint("android.hideStatusBar")
-                .annotatedAs(HintGroup.ANDROID, "hideStatusBar")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Hides the Android status bar."));
-
         h.add(new Hint("android.hms.pushVersion")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -778,15 +676,6 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
-        h.add(new Hint("android.installLocation")
-                .annotatedAs(HintGroup.ANDROID, "installLocation")
-                .values("InstallLocation", "auto", "internalOnly", "preferExternal")
-                .def("auto")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Maps to android:installLocation manifest entry defaults to auto. Can also be set to "
-                        + "internalOnly or preferExternal."));
-
         h.add(new Hint("android.java8")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -808,14 +697,6 @@ final class BuildHintsAndroid {
                 .def("true")
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
-
-        h.add(new Hint("android.licenseKey")
-                .annotatedAs(HintGroup.ANDROID, "licenseKey")
-                .type(HintType.STRING)
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("The license key for the Android app, this is required if you use in-app purchase on "
-                        + "Android"));
 
         h.add(new Hint("android.locales")
                 .group(HintGroup.ANDROID)
@@ -854,15 +735,6 @@ final class BuildHintsAndroid {
                 .consumedBy("MapsProviderInjector")
                 .doc("Android's own native map provider, overriding `maps.provider`."));
 
-        h.add(new Hint("android.min_sdk_version")
-                .annotatedAs(HintGroup.ANDROID, "minSdkVersion")
-                .type(HintType.INT)
-                .def("19")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("The least SDK required to run this app, the default value changes based on functionality "
-                        + "but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`."));
-
         h.add(new Hint("android.mockLocation")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -877,16 +749,6 @@ final class BuildHintsAndroid {
                 .type(HintType.STRING)
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
-
-        h.add(new Hint("android.multidex")
-                .annotatedAs(HintGroup.ANDROID, "multidex")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Boolean true/false defaults to false. Multidex allows Android binaries to reference more "
-                        + "than 65536 methods. This slows builds a bit so you have it off by default but if you get "
-                        + "a build error mentioning this limit you should turn this on."));
 
         h.add(new Hint("android.nearby.computerProfile")
                 .group(HintGroup.ANDROID)
@@ -915,15 +777,6 @@ final class BuildHintsAndroid {
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Offers the `watch` device profile in the companion-device chooser, on the "
                         + "same terms as `android.nearby.computerProfile`."));
-
-        h.add(new Hint("android.newFirebaseMessaging")
-                .annotatedAs(HintGroup.ANDROID, "newFirebaseMessaging")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Uses the current Firebase Cloud Messaging integration. Requires AndroidX and Gradle 8.13 "
-                        + "or newer."));
 
         h.add(new Hint("android.nonconsumable")
                 .group(HintGroup.ANDROID)
@@ -1115,15 +968,6 @@ final class BuildHintsAndroid {
                         + "as building against versions other than the server default may introduce "
                         + "incompatibilities with some Codename One APIs."));
 
-        h.add(new Hint("android.proguardKeep")
-                .annotatedAs(HintGroup.ANDROID, "proguardKeep")
-                .type(HintType.STRING_LIST)
-                .separator("\n")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Arguments for the keep option in proguard allowing you to keep a pattern of files for "
-                        + "example, `-keep class com.mypackage.ProblemClass { *; }`"));
-
         h.add(new Hint("android.proguardKeepOverride")
                 .group(HintGroup.ANDROID)
                 .type(HintType.STRING)
@@ -1145,15 +989,6 @@ final class BuildHintsAndroid {
                 .doc("Comma delimited long values to describe the push pattern of vibrate used for the "
                         + "`setVibrate` native method"));
 
-        h.add(new Hint("android.release")
-                .annotatedAs(HintGroup.ANDROID, "release")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("true/false defaults to true - indicates whether to include the release version in the "
-                        + "build"));
-
         h.add(new Hint("android.removeBasePermissions")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -1162,14 +997,6 @@ final class BuildHintsAndroid {
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Boolean true/false defaults to false. Disables the built-in permissions specifically "
                         + "`INTERNET` permission (that is, no networking...)"));
-
-        h.add(new Hint("android.repositories")
-                .annotatedAs(HintGroup.ANDROID, "repositories")
-                .type(HintType.STRING_LIST)
-                .separator("\n")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder", "MapsProviderInjector")
-                .doc("Extra Gradle repositories to resolve dependencies from."));
 
         h.add(new Hint("android.requestReadMediaPermissions")
                 .group(HintGroup.ANDROID)
@@ -1343,16 +1170,6 @@ final class BuildHintsAndroid {
                         + "part of the window is covered (which benign system UI can trigger). Only relevant if "
                         + "`android.tapjackingGuard=true`."));
 
-        h.add(new Hint("android.targetSDKVersion")
-                .annotatedAs(HintGroup.ANDROID, "targetSDKVersion")
-                .type(HintType.INT)
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("The Android SDK the build compiles against. Unset, the build server uses the "
-                        + "highest platform it has installed, so leaving this alone tracks the "
-                        + "server rather than pinning a number. Not every target works: the source "
-                        + "may have limitations, and not all SDK targets are installed."));
-
         h.add(new Hint("android.textureView")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -1370,14 +1187,6 @@ final class BuildHintsAndroid {
                         + "the native widgets sometimes and this indicates whether holo light or holo dark is used. "
                         + "This doesn't affect the Codename One theme but that might change in the future."));
 
-        h.add(new Hint("android.topDependency")
-                .annotatedAs(HintGroup.ANDROID, "topDependency")
-                .type(HintType.STRING_LIST)
-                .separator("\n")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Statements added to the top-level Gradle build file rather than the app module."));
-
         h.add(new Hint("android.tv")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
@@ -1391,14 +1200,6 @@ final class BuildHintsAndroid {
                         + "a 320×180 launcher banner (`@drawable/tv_banner`) from the app icon. The same APK still "
                         + "installs and runs on phones and tablets, and `CN.isTV()` returns true at runtime on a "
                         + "TV."));
-
-        h.add(new Hint("android.useAndroidX")
-                .annotatedAs(HintGroup.ANDROID, "useAndroidX")
-                .type(HintType.BOOLEAN)
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Use Android X instead of support libraries. This will also run a find/replace on all "
-                        + "source files to replace support libraries and artifacts with AndroidX equivalents."));
 
         h.add(new Hint("android.useGradle8")
                 .group(HintGroup.ANDROID)
@@ -1517,15 +1318,6 @@ final class BuildHintsAndroid {
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Allows injecting more attributes into the `activity` tag in the Android XML"));
 
-        h.add(new Hint("android.xapplication")
-                .annotatedAs(HintGroup.ANDROID, "xapplication")
-                .type(HintType.XML)
-                .separator("")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("defaults to an empty string. Allows developers of native Android code to add text within "
-                        + "the application block to define things such as widgets, services etc."));
-
         h.add(new Hint("android.xapplication_attr")
                 .group(HintGroup.ANDROID)
                 .type(HintType.XML)
@@ -1533,14 +1325,6 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder")
                 .doc("Allows injecting more attributes into the `application`` tag in the Android XML"));
-
-        h.add(new Hint("android.xgradle")
-                .annotatedAs(HintGroup.ANDROID, "xgradle")
-                .type(HintType.STRING_LIST)
-                .separator("\n")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("Arbitrary text spliced into the generated app-module Gradle file."));
 
         h.add(new Hint("android.xgradle_default_config")
                 .group(HintGroup.ANDROID)
@@ -1577,12 +1361,5 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .consumedBy("AndroidGradleBuilder"));
 
-        h.add(new Hint("android.xpermissions")
-                .annotatedAs(HintGroup.ANDROID, "xpermissions")
-                .type(HintType.XML)
-                .separator("")
-                .platform("android")
-                .consumedBy("AndroidGradleBuilder")
-                .doc("more permissions for the Android manifest"));
     }
 }

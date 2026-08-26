@@ -223,11 +223,28 @@ setting simply not applied. Our own agent reference shipped
 years; the builders read `android.xpermissions`, `android.min_sdk_version`, and
 nothing at all.
 
-**`maven/build-hint-catalog` is the single source of truth.** Every hint's name,
-type, default, value domain, merge separator and documentation lives there, and
-everything else is generated from it:
+**A hint is described in exactly one place, and which place depends on whether
+it has an annotation.**
 
-- the `com.codename1.annotations.buildhints` annotations in `CodenameOne/src`
+The ~82 hints exposed as annotation attributes are described by the annotation
+itself, in `CodenameOne/src/com/codename1/annotations/buildhints`. Those files
+are HAND-WRITTEN and are the source of truth. The attribute's Java type is the
+hint's type, an enum's constants are its value domain, and `@Hint` carries what
+javac cannot infer -- the wire key where it differs from the attribute name, the
+prose, the builder's default, and how a cn1lib appends. `@HintValue` carries an
+enum constant's wire value and the other spellings the builder accepts.
+`HintKind` names what a `String` really holds, because the editor picks a
+version field, a masked field or a multi-line box and Java says `String` for all
+three.
+
+The remaining ~473 -- the dynamic families, the build-service-only hints and the
+long tail with no annotation -- are described in `maven/build-hint-catalog`.
+
+Everything else is a GENERATED VIEW of those two, and none of it is a place to
+edit:
+
+- `BuildHintsFromAnnotations` in the catalog, so the Settings tool (a Codename
+  One app, with no bytecode reader) sees the annotated hints too
 - `BuildHintAnnotationBinding`, which the annotation processor reads back
 - the developer guide's build hint table, rendered by
   `scripts/gen-build-hint-table.sh` every time the guide is built and **not**
@@ -236,12 +253,15 @@ everything else is generated from it:
 - the simulator's Build Hint editor schema (`BuildHintCatalogDefaults`)
 - the agent reference's annotation table (`skill/references/build-hints.md`)
 
-Adding a hint to a builder means adding it to the catalog in the same change.
-Regenerate with:
+Adding a hint to a builder means describing it in the same change -- as an
+annotation attribute if it should have one, in the catalog otherwise.
+`BuildHintAnnotationReader` reads the annotations out of their COMPILED classes,
+so `@Hint` has CLASS retention and the generator compiles the sources itself
+rather than requiring a core build. Regenerate with:
 
 ```bash
 source tools/env.sh
-scripts/gen-build-hint-annotations.sh          # rewrite the generated files
+scripts/gen-build-hint-annotations.sh          # rewrite the generated views
 scripts/gen-build-hint-annotations.sh --check  # what CI runs
 scripts/check-build-hint-catalog.sh            # every hint the code reads is catalogued
 ```

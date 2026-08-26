@@ -65,6 +65,56 @@ public final class BuildHintAnnotationReader {
     }
 
     /**
+     * Every hint the annotation SOURCES in {@code srcDir} declare.
+     *
+     * <p>Compiles them to a temporary directory first. That keeps this
+     * independent of whether the core has been built: the doc build, the drift
+     * gate and the tests all run it, and none of them should have to build a
+     * framework to render a table. Eighteen small files compile in well under a
+     * second.</p>
+     */
+    public static List<BuildHints.Hint> readFromSources(File srcDir) throws IOException {
+        File[] files = srcDir.listFiles();
+        if (files == null) {
+            throw new IOException("Not a directory: " + srcDir);
+        }
+        List<String> args = new ArrayList<String>();
+        File out = java.nio.file.Files.createTempDirectory("cn1-buildhints").toFile();
+        args.add("-d");
+        args.add(out.getAbsolutePath());
+        for (File f : files) {
+            if (f.getName().endsWith(".java")) {
+                args.add(f.getAbsolutePath());
+            }
+        }
+        javax.tools.JavaCompiler javac = javax.tools.ToolProvider.getSystemJavaCompiler();
+        if (javac == null) {
+            throw new IOException("No Java compiler available; run this on a JDK");
+        }
+        if (javac.run(null, null, null, args.toArray(new String[args.size()])) != 0) {
+            throw new IOException("The build hint annotations under " + srcDir
+                    + " do not compile");
+        }
+        try {
+            return read(new File(out, "com/codename1/annotations/buildhints"));
+        } finally {
+            deleteTree(out);
+        }
+    }
+
+    private static void deleteTree(File f) {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteTree(child);
+            }
+        }
+        if (!f.delete()) {
+            f.deleteOnExit();
+        }
+    }
+
+    /**
      * Every hint the annotations in {@code classesDir} declare.
      *
      * @param classesDir the compiled {@code com/codename1/annotations/buildhints}
@@ -151,6 +201,20 @@ public final class BuildHintAnnotationReader {
                                         scanned.enumDomain.labels.put(constant, String.valueOf(v));
                                     }
                                 }
+
+                                @Override
+                                public AnnotationVisitor visitArray(String member) {
+                                    if (!"accepts".equals(member)) {
+                                        return null;
+                                    }
+                                    return new AnnotationVisitor(API) {
+                                        @Override
+                                        public void visit(String ignored, Object v) {
+                                            scanned.enumDomain.accepts.put(String.valueOf(v),
+                                                    constant);
+                                        }
+                                    };
+                                }
                             };
                         }
                     };
@@ -231,6 +295,8 @@ public final class BuildHintAnnotationReader {
     private static final class EnumDomain {
         private final Map<String, String> wire = new LinkedHashMap<String, String>();
         private final Map<String, String> labels = new LinkedHashMap<String, String>();
+        /// alternative spelling -> the constant it means
+        private final Map<String, String> accepts = new LinkedHashMap<String, String>();
     }
 
     private static final class Attribute {
@@ -316,6 +382,14 @@ public final class BuildHintAnnotationReader {
             }
             List<String> wire = new ArrayList<String>(domain.wire.values());
             hint.values(simple, wire.toArray(new String[wire.size()]));
+            if (!domain.accepts.isEmpty()) {
+                List<String> pairs = new ArrayList<String>();
+                for (Map.Entry<String, String> e : domain.accepts.entrySet()) {
+                    pairs.add(e.getKey());
+                    pairs.add(domain.wire.get(e.getValue()));
+                }
+                hint.valueAliases(pairs.toArray(new String[pairs.size()]));
+            }
             if (!domain.labels.isEmpty()) {
                 List<String> labels = new ArrayList<String>();
                 for (String constant : domain.wire.keySet()) {

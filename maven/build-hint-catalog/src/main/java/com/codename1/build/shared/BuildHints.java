@@ -73,6 +73,10 @@ public final class BuildHints {
         BuildHintsGeneral.register(h);
         BuildHintsDynamic.register(h);
         BuildHintsExternal.register(h);
+        // The hints the annotations expose, rendered back into the catalog for
+        // the consumers that cannot read bytecode -- the Settings editor above
+        // all. A view of the annotations, not a second statement of them.
+        BuildHintsFromAnnotations.register(h);
 
         Map<String, Hint> byName = new LinkedHashMap<String, Hint>();
         for (Hint entry : h) {

@@ -56,129 +56,6 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
-        h.add(new Hint("ios.NSCalendarsFullAccessUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "calendarsFullAccessUsageDescription")
-                .type(HintType.STRING)
-                .def("This app uses your calendars to read and schedule events.")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSCalendarsUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "calendarsUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSCalendarsWriteOnlyAccessUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "calendarsWriteOnlyAccessUsageDescription")
-                .type(HintType.STRING)
-                .def("This app uses your calendar to schedule events.")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSBluetoothAlwaysUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "bluetoothAlwaysUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Why the app uses Bluetooth. Supplied automatically when the app references "
-                        + "`com.codename1.bluetooth`; set it to say something more specific than "
-                        + "the default."));
-
-        h.add(new Hint("ios.NSBluetoothPeripheralUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "bluetoothPeripheralUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("The pre-iOS 13 spelling of the Bluetooth usage description, supplied and "
-                        + "overridable on the same terms."));
-
-        h.add(new Hint("ios.NSCameraUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "cameraUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSNearbyInteractionAllowOnceUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "nearbyInteractionAllowOnceUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("The pre-iOS 16 spelling of the nearby-interaction usage description, "
-                        + "supplied automatically when the app references the nearby APIs."));
-
-        h.add(new Hint("ios.NSNearbyInteractionUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "nearbyInteractionUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Why the app measures distance and direction to nearby devices. Supplied "
-                        + "automatically when the app references the nearby APIs; set it to say "
-                        + "something more specific than the default."));
-
-        h.add(new Hint("ios.NSSpeechRecognitionUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "speechRecognitionUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Why the app sends speech for recognition. Supplied automatically when the "
-                        + "app references the speech APIs; set it to say something more specific."));
-
-        h.add(new Hint("ios.NSHealthShareUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "healthShareUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSHealthUpdateUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "healthUpdateUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSLocalNetworkUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "localNetworkUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSLocationAlwaysAndWhenInUseUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "locationAlwaysAndWhenInUseUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSLocationAlwaysUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "locationAlwaysUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSLocationWhenInUseUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "locationWhenInUseUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.NSMicrophoneUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "microphoneUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSRemindersFullAccessUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "remindersFullAccessUsageDescription")
-                .type(HintType.STRING)
-                .def("This app uses your reminders to read and schedule tasks.")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
-
-        h.add(new Hint("ios.NSRemindersUsageDescription")
-                .annotatedAs(HintGroup.IOS_PRIVACY, "remindersUsageDescription")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder"));
-
         h.add(new Hint("ios.UIRequiredDeviceCapabilities")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -190,14 +67,6 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.add_libs")
-                .annotatedAs(HintGroup.IOS, "addLibs")
-                .type(HintType.STRING_LIST)
-                .separator(";")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("A semicolon separated list of libraries that should be linked to the app to build it"));
 
         h.add(new Hint("ios.afterFinishLaunching")
                 .group(HintGroup.IOS)
@@ -244,19 +113,6 @@ final class BuildHintsIos {
                 .doc("Objective-C code that can be injected into the iOS callback method (message) "
                         + "`applicationDidEnterBackground`."));
 
-        h.add(new Hint("ios.applicationQueriesSchemes")
-                .annotatedAs(HintGroup.IOS, "applicationQueriesSchemes")
-                .type(HintType.STRING_LIST)
-                .separator(",")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Comma separated list of url schemes that `canExecute` will respect on iOS. If the url "
-                        + "scheme isn't mentioned here `canExecute` will return false starting with iOS 9. Notice "
-                        + "that this collides with `ios.plistInject` when used with the "
-                        + "`<key>LSApplicationQueriesSchemes</key>...` value so you should use one or the other. "
-                        + "For example, to enable `canExecute` for a url like `myurl://xys` you can use: "
-                        + "`myurl,myotherurl`"));
-
         h.add(new Hint("ios.associatedDomains")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -278,14 +134,6 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.beforeFinishLaunching")
-                .annotatedAs(HintGroup.IOS, "beforeFinishLaunching")
-                .type(HintType.TEXT_BLOCK)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Objective-C code that can be injected into the iOS app delegate at the top of the body "
-                        + "of the didFinishLaunchingWithOptions callback method"));
 
         h.add(new Hint("ios.bitcode")
                 .group(HintGroup.IOS)
@@ -317,14 +165,6 @@ final class BuildHintsIos {
                 .def("debug")
                 .platform("ios")
                 .consumedBy("IPhoneBuilder", "WatchNativeBuilder"));
-
-        h.add(new Hint("ios.bundleVersion")
-                .annotatedAs(HintGroup.IOS, "bundleVersion")
-                .type(HintType.VERSION)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "WatchNativeBuilder")
-                .doc("Indicates the version number of the bundle, this is useful if you want to create a minor "
-                        + "version number change for the beta testing support"));
 
         h.add(new Hint("ios.carplay.audio")
                 .group(HintGroup.IOS)
@@ -389,24 +229,6 @@ final class BuildHintsIos {
                 .def("false")
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.dependencyManager")
-                .annotatedAs(HintGroup.IOS, "dependencyManager")
-                .values("IosDependencyManager", "auto", "cocoapods", "spm", "both", "none")
-                .def("auto")
-                .platform("ios")
-                .consumedBy("IOSDependencyManager")
-                .doc("Which native dependency manager to use: auto picks one from whichever of ios.pods and "
-                        + "ios.spm.packages is set, and cocoapods, spm or both require the matching hint to be set. "
-                        + "An unrecognized value fails the build."));
-
-        h.add(new Hint("ios.deployment_target")
-                .annotatedAs(HintGroup.IOS, "deploymentTarget")
-                .type(HintType.VERSION)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Minimum iOS version the build targets. Set it to the lowest iOS you actually support; a "
-                        + "higher value excludes older devices from the App Store listing."));
 
         h.add(new Hint("ios.detectJailbreak")
                 .group(HintGroup.IOS)
@@ -585,15 +407,6 @@ final class BuildHintsIos {
                         + "file before the end. This only makes sence for methods that aren't already declared in "
                         + "the class"));
 
-        h.add(new Hint("ios.glAppDelegateHeader")
-                .annotatedAs(HintGroup.IOS, "glAppDelegateHeader")
-                .type(HintType.TEXT_BLOCK)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Objective-C code that can be injected into the iOS app delegate at the top of the file. "
-                        + "For example, if you need to include headers or make special imports for other injected "
-                        + "code"));
-
         h.add(new Hint("ios.googleAdUnitId")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -706,16 +519,6 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
-        h.add(new Hint("ios.includePush")
-                .annotatedAs(HintGroup.IOS, "includePush")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("true/false (defaults to false). Whether to include the push capabilities in the iOS "
-                        + "build. Notice that the IDE plugin has an \"Include Push\" check box you *should* use under "
-                        + "the iOS section."));
-
         h.add(new Hint("ios.intents.appIntents")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
@@ -728,17 +531,6 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.interface_orientation")
-                .annotatedAs(HintGroup.IOS, "interfaceOrientation")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("UIInterfaceOrientationPortrait by default. Indicates the orientation, one or more of "
-                        + "(separated by colon :): `UIInterfaceOrientationPortrait`, "
-                        + "`UIInterfaceOrientationPortraitUpsideDown`, `UIInterfaceOrientationLandscapeLeft`, "
-                        + "`UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an \"Interface "
-                        + "Orientation\" combo box you *should* use under the iOS section."));
 
         h.add(new Hint("ios.keyboardOpen")
                 .group(HintGroup.IOS)
@@ -809,15 +601,6 @@ final class BuildHintsIos {
                         + "Has no effect when `ios.metal=false`. See "
                         + "link:#_choosing_a_color_space_for_the_metal_renderer[Working with iOS / Choosing a color "
                         + "space] for the full table."));
-
-        h.add(new Hint("ios.minDeploymentTarget")
-                .annotatedAs(HintGroup.IOS, "minDeploymentTarget")
-                .type(HintType.VERSION)
-                .def("6.0")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("The null and empty-string reads of this hint are presence checks; 6.0 is the substantive "
-                        + "default (IPhoneBuilder.java:4671)."));
 
         h.add(new Hint("ios.mopubAdSize")
                 .group(HintGroup.IOS)
@@ -890,17 +673,6 @@ final class BuildHintsIos {
                 .doc("Bonjour service type the nearby transport advertises. Derived from the "
                         + "package name when unset."));
 
-        h.add(new Hint("ios.newStorageLocation")
-                .annotatedAs(HintGroup.IOS, "newStorageLocation")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("true/false defaults to false but defined on new projects as true by default. This "
-                        + "changes the storage directory on iOS from using caches to using the documents directory "
-                        + "which is the recommended location but might break compatibility. This is described in "
-                        + "https://github.com/codenameone/CodenameOne/issues/1480[this issue]"));
-
         h.add(new Hint("ios.noUIWebView")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
@@ -931,14 +703,6 @@ final class BuildHintsIos {
                         + "leave it disabled and trigger the prompt explicitly when they're ready to ask for "
                         + "permission."));
 
-        h.add(new Hint("ios.objC")
-                .annotatedAs(HintGroup.IOS, "objC")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Added the `-ObjC` compile flag to the project files which some native libraries require"));
-
         h.add(new Hint("ios.openURLInject")
                 .group(HintGroup.IOS)
                 .type(HintType.XML)
@@ -953,24 +717,6 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
-        h.add(new Hint("ios.plistInject")
-                .annotatedAs(HintGroup.IOS, "plistInject")
-                .type(HintType.XML)
-                .separator("")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "WatchNativeBuilder")
-                .doc("entries to inject into the iOS plist file during build."));
-
-        h.add(new Hint("ios.pods")
-                .annotatedAs(HintGroup.IOS, "pods")
-                .type(HintType.STRING_LIST)
-                .separator(",")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("A comma separated list of https://cocoapods.org/[Cocoa Pods] that should be linked to "
-                        + "the app to build it. For example, `AFNetworking ~> 2.6, ORStackView ~> 3.0, SwiftyJSON "
-                        + "~> 2.3`"));
-
         h.add(new Hint("ios.pods.build.CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)
@@ -983,48 +729,12 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
-        h.add(new Hint("ios.pods.platform")
-                .annotatedAs(HintGroup.IOS, "podsPlatform")
-                .type(HintType.VERSION)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Sets the Cocoapods 'platform' for the Cocoapods. Some Cocoapods require a minimum "
-                        + "platform level. For example, `ios.pods.platform=7.0`."));
-
-        h.add(new Hint("ios.pods.sources")
-                .annotatedAs(HintGroup.IOS, "podsSources")
-                .type(HintType.STRING_LIST)
-                .separator(",")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Extra CocoaPods spec repositories to search, in addition to the default trunk."));
-
         h.add(new Hint("ios.pods.use_frameworks!")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.prerendered_icon")
-                .annotatedAs(HintGroup.IOS, "prerenderedIcon")
-                .type(HintType.BOOLEAN)
-                .def("false")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("true/false defaults to false. The iOS build process adapts the submitted icon for iOS "
-                        + "conventions (adding an overlay) that might not be appropriate on some icons. Setting "
-                        + "this to true leaves the icon unchanged (only scaled)."));
-
-        h.add(new Hint("ios.project_type")
-                .annotatedAs(HintGroup.IOS, "projectType")
-                .values("IosProjectType", "ios", "ipad", "iphone")
-                .def("ios")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder")
-                .doc("one of ios, ipad, iphone (defaults to ios). Indicates whether the resulting binary is "
-                        + "targeted to the iphone only or ipad only. Notice that the IDE plugin has a \"Project "
-                        + "Type\" combo box you *should* use under the iOS section."));
 
         h.add(new Hint("ios.release.teamId")
                 .group(HintGroup.IOS)
@@ -1039,15 +749,6 @@ final class BuildHintsIos {
                 .type(HintType.STRING)
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
-
-        h.add(new Hint("ios.spm.packages")
-                .annotatedAs(HintGroup.IOS, "spmPackages")
-                .type(HintType.STRING_LIST)
-                .separator(";")
-                .platform("ios")
-                .consumedBy("IOSDependencyManager", "IPhoneBuilder")
-                .doc("Swift Package Manager packages to link, one per entry, each written as "
-                        + "identity|url|requirement."));
 
         h.add(new Hint("ios.statusBarFG")
                 .group(HintGroup.IOS)
@@ -1096,32 +797,6 @@ final class BuildHintsIos {
                 .platform("ios")
                 .consumedBy("IPhoneBuilder"));
 
-        h.add(new Hint("ios.teamId")
-                .annotatedAs(HintGroup.IOS, "teamId")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder", "TvNativeBuilder", "WatchNativeBuilder")
-                .doc("Specifies the team ID associated with the iOS provisioning profile and certificate. Use "
-                        + "`ios.debug.teamId` and `ios.release.teamId` to specify different team IDs for debug and "
-                        + "release builds respectively."));
-
-        h.add(new Hint("ios.themeMode")
-                .annotatedAs(HintGroup.IOS, "themeMode")
-                .values("IosThemeMode", "auto", "modern", "ios7", "legacy")
-                // Spellings IOSImplementation.installNativeTheme accepts for the
-                // same two themes. Not enum constants: one behaviour, one
-                // constant, or the annotation asks a question with no right
-                // answer.
-                .valueAliases("flat", "ios7", "liquid", "modern", "iphone", "legacy")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("`auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the existing iOS 7 "
-                        + "flat theme so pre-refactor screenshot goldens and apps see no behavior change. `modern` "
-                        + "/ `liquid` opts in to the CSS-generated iOS Modern (liquid-glass) theme shipped from "
-                        + "`native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto` - pre-liquid "
-                        + "iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7 iPhone theme. The `auto` -> "
-                        + "modern flip is planned for a future release."));
-
         h.add(new Hint("ios.timeSensitiveNotifications")
                 .group(HintGroup.IOS)
                 .type(HintType.BOOLEAN)
@@ -1135,25 +810,6 @@ final class BuildHintsIos {
                 .def("false")
                 .platform("ios")
                 .consumedBy("IPhoneBuilder", "WatchNativeBuilder"));
-
-        h.add(new Hint("ios.uiscene")
-                .annotatedAs(HintGroup.IOS, "uiscene")
-                .type(HintType.BOOLEAN)
-                .def("true")
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("true/false (defaults to true). Enables iOS UIScene lifecycle support. UIScene lets iOS "
-                        + "manage one or more app UI sessions independently, improving lifecycle handling in modern "
-                        + "iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this "
-                        + "is now on by default; set the flag to `false` only if you need to temporarily fall back "
-                        + "to the legacy `UIApplicationDelegate` lifecycle."));
-
-        h.add(new Hint("ios.urlScheme")
-                .annotatedAs(HintGroup.IOS, "urlScheme")
-                .type(HintType.STRING)
-                .platform("ios")
-                .consumedBy("IPhoneBuilder")
-                .doc("Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`"));
 
         h.add(new Hint("ios.urlSchemes")
                 .group(HintGroup.IOS)

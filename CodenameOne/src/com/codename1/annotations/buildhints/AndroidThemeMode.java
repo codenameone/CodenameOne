@@ -30,10 +30,10 @@ public enum AndroidThemeMode {
     @HintValue("auto")
     AUTO,
 
-    @HintValue("modern")
+    @HintValue(value = "modern", accepts = {"material"})
     MODERN,
 
-    @HintValue("hololight")
+    @HintValue(value = "hololight", accepts = {"holo"})
     HOLOLIGHT,
 
     @HintValue("legacy")
