@@ -25,6 +25,8 @@ package com.codename1.vpn;
 import com.codename1.impl.vpn.LocalVpnBridge;
 import com.codename1.impl.vpn.VpnRequests;
 import com.codename1.vpn.profile.Vpn;
+import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnProtocol;
 import com.codename1.vpn.profile.VpnProfile;
 import com.codename1.vpn.profile.VpnStatusListener;
 import org.junit.jupiter.api.AfterEach;
@@ -122,6 +124,42 @@ public class LocalVpnTest {
         assertEquals("vpn.example.com", back.getServerAddress());
         assertEquals("alice", back.getUsername());
         assertNull(back.getPassword(), "the platform does not return secrets");
+    }
+
+    @Test
+    public void aLoadedProfileCannotBeInstalledBackUnchanged() {
+        // Load, change a visible option, install: the obvious thing to try,
+        // and it used to succeed. iOS saved a configuration with a nil
+        // password reference -- or a PSK profile with authenticationMethod
+        // None -- and retired the keychain generation the working profile was
+        // using, so a VPN that had authenticated for months could not any
+        // more, with a successful acknowledgement to say all was well.
+        VpnAwait.value(Vpn.install(profile()));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        back.displayName("Renamed");
+
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
+
+        // Supplying the credentials again makes it installable, which is the
+        // whole point of refusing rather than silently reusing the old one.
+        back.usernamePassword("alice", "hunter2");
+        assertEquals(Boolean.TRUE, VpnAwait.value(Vpn.install(back)));
+    }
+
+    @Test
+    public void aLoadedPskProfileIsRefusedToo() {
+        // The password test alone missed this: a pre-shared-key profile has
+        // no username to notice, so a guard that asked only about the
+        // password let it through.
+        VpnProfile psk = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .sharedSecret("s3cret");
+        VpnAwait.value(Vpn.install(psk));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        back.onDemand(true);
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
     }
 
     @Test

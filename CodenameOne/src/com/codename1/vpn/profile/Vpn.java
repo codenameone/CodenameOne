@@ -109,25 +109,39 @@ public final class Vpn {
             return failed(VpnError.INVALID_CONFIGURATION,
                     "A profile is required");
         }
-        // A profile that came back from load() has its username but NOT its
-        // password: the platform keeps the secret and never hands it over.
+        // A profile that came back from load() has its username but NEITHER
+        // secret: iOS leaves both the password and the shared-secret field
+        // empty, because the platform keeps them in the keychain and never
+        // hands them over.
         // Loading one, changing the display name or the on-demand flag and
         // installing it back is the obvious thing to try, and it used to
-        // succeed -- iOS saved a configuration with a nil password reference
-        // and retired the keychain generation the working profile was using,
-        // so a VPN that had authenticated for months stopped being able to,
-        // with a successful acknowledgement to say it had all gone well.
+        // succeed -- iOS saved a configuration with a nil password reference,
+        // or a pre-shared-key profile with authenticationMethod None, and
+        // retired the keychain generation the working profile was using. A
+        // VPN that had authenticated for months stopped being able to, with a
+        // successful acknowledgement to say it had all gone well.
+        //
+        // Testing the password alone missed the PSK case entirely, which is
+        // why this asks whether the description came from the platform rather
+        // than trying to name every secret it might be missing.
         //
         // Refused rather than papered over. The alternative -- carrying the
         // previous credential references forward -- would silently reinstall
         // a secret the app cannot see and did not ask for, and there is no
         // portable way to know it is still the right one.
+        if (profile.areSecretsWithheld()) {
+            return failed(VpnError.INVALID_CONFIGURATION,
+                    "This profile came from load(), which never carries its"
+                    + " secrets -- the platform keeps them. Call"
+                    + " usernamePassword() or sharedSecret() with the"
+                    + " credentials before installing it back.");
+        }
+        // The password half again, for a profile the app built itself with a
+        // username and a null password. That is not a loaded description, so
+        // the marker above does not cover it, and it is just as unusable.
         if (profile.getUsername() != null && !profile.isPasswordKnown()) {
             return failed(VpnError.INVALID_CONFIGURATION,
-                    "This profile has a username but no password. A profile"
-                    + " from load() never carries its password -- the platform"
-                    + " keeps it -- so set the credentials again before"
-                    + " installing it back.");
+                    "This profile has a username but no password.");
         }
         int id = VpnRequests.nextId();
         EdtResult<Boolean> r = VpnRequests.openAck(id);
@@ -389,7 +403,15 @@ public final class Vpn {
             if (error != null) {
                 out.error(error);
             } else {
-                out.complete(VpnWire.decodeProfile(value));
+                VpnProfile p = VpnWire.decodeProfile(value);
+                if (p != null) {
+                    // Marked at the ONE place that produces a description
+                    // from the platform. decodeProfile itself must not do
+                    // this -- the ports decode an install wire with the same
+                    // method, and that one carries its secrets.
+                    p.markSecretsWithheld();
+                }
+                out.complete(p);
             }
         }
     }

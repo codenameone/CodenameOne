@@ -306,6 +306,26 @@ public class LocalCallTest {
     }
 
     @Test
+    public void anEndedSessionStaysEnded() {
+        // ENDED is terminal in CallState, and signalling is asynchronous: a
+        // media-connected callback already in flight when the call ended used
+        // to move the session back to ACTIVE. The ports drop the report --
+        // the platform call is gone -- so the Java object was left
+        // contradicting both the system and its own contract, and anything
+        // watching it could render or restart media for a call that is over.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        CallAwait.value(s.end(CallEndReason.LOCAL_ENDED));
+        assertSame(CallState.ENDED, s.getState());
+
+        s.reportConnected();
+        assertSame(CallState.ENDED, s.getState(),
+                "a late connected report must not revive an ended call");
+        s.reportStartedConnecting();
+        assertSame(CallState.ENDED, s.getState());
+    }
+
+    @Test
     public void aRefusedEndKeepsTheSessionAddressable() {
         // The call is still up as far as the system is concerned, so the app
         // must still be able to find it and try again.

@@ -54,6 +54,10 @@ public final class VpnProfile {
     private String displayName;
     private boolean passwordKnown;
 
+    /// Whether this description came back from [Vpn#load()], which never
+    /// carries the secrets.
+    private boolean secretsWithheld;
+
     /// Creates a profile for a server.
     ///
     /// @param serverAddress the host name or address, never null or empty
@@ -88,12 +92,16 @@ public final class VpnProfile {
         this.username = user;
         this.password = pass;
         this.passwordKnown = pass != null;
+        // Supplying a credential is what makes a loaded description
+        // installable again; see markSecretsWithheld.
+        this.secretsWithheld = false;
         return this;
     }
 
     /// Authenticates with a pre-shared key.
     public VpnProfile sharedSecret(String value) {
         this.sharedSecret = value;
+        this.secretsWithheld = false;
         return this;
     }
 
@@ -179,5 +187,28 @@ public final class VpnProfile {
     /// platform kept the password", which [#getPassword] alone cannot.
     public boolean isPasswordKnown() {
         return passwordKnown;
+    }
+
+    /// Records that this description came from the platform and carries no
+    /// secrets.
+    ///
+    /// The load path never hands back a password or a pre-shared key -- the
+    /// platform holds them and does not give them out -- so a description
+    /// that came from there is not installable as it stands. Marking it lets
+    /// [Vpn#install] refuse the reinstall instead of quietly replacing a
+    /// working configuration with an unauthenticated one; supplying either
+    /// credential clears the mark.
+    ///
+    /// @hidden not part of the public API.
+    void markSecretsWithheld() {
+        this.secretsWithheld = true;
+    }
+
+    /// Whether this description came from the platform with its secrets
+    /// removed.
+    ///
+    /// @hidden not part of the public API.
+    boolean areSecretsWithheld() {
+        return secretsWithheld;
     }
 }

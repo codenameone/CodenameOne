@@ -95,17 +95,32 @@ public final class CallSession {
     /// is being rung. Ignored for an incoming call.
     public void reportStartedConnecting() {
         CallBridge b = CallRequests.bridge();
+        if (isOver()) {
+            return;
+        }
         if (b != null && direction == CallDirection.OUTGOING) {
             state = CallState.DIALING;
             b.reportOutgoingStartedConnecting(callId, System.currentTimeMillis());
         }
     }
 
+    /// Whether this call has reached its terminal state.
+    ///
+    /// ENDED is terminal in [CallState], and signalling is asynchronous: a
+    /// media-connected callback that was already in flight when the call
+    /// ended used to move the session back to ACTIVE. The ports drop the
+    /// report -- the platform call is gone -- so the Java object was left
+    /// contradicting both the system and its own contract, and anything
+    /// watching it could render or restart media for a call that is over.
+    private boolean isOver() {
+        return state == CallState.ENDED;
+    }
+
     /// Tells the system the call is connected. Call this when media is
     /// actually flowing, because it starts the duration the user sees.
     public void reportConnected() {
         CallBridge b = CallRequests.bridge();
-        if (b == null) {
+        if (b == null || isOver()) {
             return;
         }
         state = CallState.ACTIVE;
@@ -283,7 +298,17 @@ public final class CallSession {
 
         @Override
         public void onReady(Boolean value, Throwable error) {
-            if (error == null) {
+            // Never out of ENDED. Every transition here is an acknowledgement
+            // that was in flight, so a hold or resume the system accepted
+            // just as the call was ending would otherwise move a terminal
+            // session back to HELD or ACTIVE -- the same defect as a late
+            // reportConnected, and reachable by the same route.
+            //
+            // Guarded by inspection rather than by a test: LocalCallBridge
+            // settles an acknowledgement before end() can run, so the
+            // simulation cannot produce the ordering this defends against.
+            // The late-reportConnected half IS covered, in LocalCallTest.
+            if (error == null && !session.isOver()) {
                 session.state = target;
             }
         }

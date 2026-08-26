@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The tab-delimited profile record, and the one thing it must never do:
@@ -114,6 +115,19 @@ public class VpnWireTest {
                     VpnWire.decodeProfile(VpnWire.encodeProfile(p)).getPassword(),
                     "round trip changed " + value);
         }
+    }
+
+    @Test
+    public void aProfileFromTheWireDoesNotClaimToCarrySecrets() {
+        // decodeProfile is used for BOTH directions -- the ports decode an
+        // install wire that carries its secrets, and Vpn.load() decodes a
+        // platform description that carries none -- so the withheld marker
+        // belongs on the load path, not here.
+        VpnProfile p = new VpnProfile("vpn.example.com")
+                .usernamePassword("u", "p");
+        VpnProfile back = VpnWire.decodeProfile(VpnWire.encodeProfile(p));
+        assertEquals("p", back.getPassword());
+        assertTrue(back.isPasswordKnown());
     }
 
     @Test
