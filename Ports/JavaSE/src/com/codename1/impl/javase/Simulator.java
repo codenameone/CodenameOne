@@ -783,6 +783,8 @@ public class Simulator {
         // two obsolete files against each other, finds them consistent, and
         // publishes last week's hints while the real ones sit on the classpath.
         FoundManifest stale = null;
+        // Current, but with no compiled main class beside it: usable, not preferred.
+        FoundManifest apart = null;
         if (classPathStr != null) {
             for (String entry
                     : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
@@ -818,9 +820,13 @@ public class Simulator {
                                 // kept so that finding NO current manifest still
                                 // says why.
                                 if (staleManifestReason(loaded, found) == null) {
-                                    return found;
-                                }
-                                if (stale == null) {
+                                    if (manifestIsColocated(loaded, found)) {
+                                        return found;
+                                    }
+                                    if (apart == null) {
+                                        apart = found;
+                                    }
+                                } else if (stale == null) {
                                     stale = found;
                                 }
                             }
@@ -857,9 +863,13 @@ public class Simulator {
                         FoundManifest found = new FoundManifest(loaded, null, dir,
                                 entryName + " in " + dir.getName());
                         if (staleManifestReason(loaded, found) == null) {
-                            return found;
-                        }
-                        if (stale == null) {
+                            if (manifestIsColocated(loaded, found)) {
+                                return found;
+                            }
+                            if (apart == null) {
+                                apart = found;
+                            }
+                        } else if (stale == null) {
                             stale = found;
                         }
                     }
@@ -875,15 +885,23 @@ public class Simulator {
             FoundManifest found =
                     new FoundManifest(loaded, conventional, null, conventional.toString());
             if (staleManifestReason(loaded, found) == null) {
-                return found;
-            }
-            if (stale == null) {
+                if (manifestIsColocated(loaded, found)) {
+                    return found;
+                }
+                if (apart == null) {
+                    apart = found;
+                }
+            } else if (stale == null) {
                 stale = found;
             }
         }
-        // Nothing current anywhere. The stale one is returned rather than
-        // nothing, so the caller can say which file it is and why it was not
-        // used instead of silently applying no hints at all.
+        // Nothing colocated anywhere. A current manifest that simply is not
+        // beside its class comes next -- it is applied, because refusing it would
+        // lose the hints of a layout that packages resources apart from classes.
+        // Only then the stale one, which the caller refuses but can name.
+        if (apart != null) {
+            return apart;
+        }
         return stale;
     }
 
@@ -982,6 +1000,30 @@ public class Simulator {
     }
 
     /** The compiled main class in the output directory the manifest sits in. */
+    /// Whether the class the manifest was generated FROM sits in the same place.
+    ///
+    /// The processor writes the resource into the very directory it scanned, so a
+    /// manifest and the class it describes are written together. An entry
+    /// carrying the stamp without the class is therefore a leftover -- moving the
+    /// application class between modules without cleaning leaves exactly that --
+    /// and it must not end the search while this application's real manifest sits
+    /// in a later entry.
+    ///
+    /// Not a staleness verdict: a stale manifest has its hints REFUSED, and an
+    /// entry that merely assembles resources from another module would then lose
+    /// its hints entirely. It only loses the tie -- see the `apart` fallback.
+    static boolean manifestIsColocated(java.util.Properties manifest, FoundManifest found) {
+        String main = manifest.getProperty("cn1.buildHints.mainClass");
+        if (main == null || main.trim().length() == 0) {
+            return true;
+        }
+        if (found.jar != null) {
+            return digestOfJarEntry(found.jar,
+                    main.trim().replace('.', '/') + ".class") != null;
+        }
+        return found.file == null || classFileBeside(found.file, main) != null;
+    }
+
     private static File classFileBeside(File manifestFile, String main) {
         if (manifestFile == null) {
             return null;

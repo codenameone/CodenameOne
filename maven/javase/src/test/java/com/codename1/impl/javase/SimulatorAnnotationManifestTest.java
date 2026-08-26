@@ -158,6 +158,62 @@ public class SimulatorAnnotationManifestTest {
     }
 
     /**
+     * A stale directory carrying the stamp but no class does not end the search.
+     *
+     * <p>Moving the application class from a platform module into common without
+     * cleaning leaves the old output directory holding a manifest stamped for
+     * that class with the class itself gone. The staleness check cannot judge it
+     * -- both halves of it need the class file it would compare against, so both
+     * report "not stale" -- and the search stopped there, publishing last build's
+     * hints while the real manifest sat in a later entry.</p>
+     */
+    @Test
+    public void aManifestWithoutTheMainClassBesideItDoesNotEndTheSearch(@TempDir File tmp)
+            throws Exception {
+        File leftover = new File(tmp, "old-classes");
+        File live = new File(tmp, "common-classes");
+        manifestIn(leftover, "com.example.MyApp", "MINIMAL");
+        manifestIn(live, "com.example.MyApp", "NATIVE");
+        // Only the live directory still holds the compiled class.
+        File cls = new File(live, "com/example/MyApp.class");
+        cls.getParentFile().mkdirs();
+        FileOutputStream os = new FileOutputStream(cls);
+        try {
+            os.write(CLASS_BYTES);
+        } finally {
+            os.close();
+        }
+
+        String cp = leftover.getAbsolutePath() + File.pathSeparator + live.getAbsolutePath();
+        Simulator.FoundManifest found =
+                Simulator.findAnnotationManifest(tmp, cp, "com.example.MyApp");
+        assertNotNull(found);
+        assertEquals("NATIVE", found.hints.getProperty("codename1.arg.desktop.titleBar"),
+                "the leftover directory won because it came first");
+    }
+
+    /**
+     * ...and one with no class beside it anywhere is still used.
+     *
+     * <p>It loses the tie, it is not refused: an entry that assembles resources
+     * from another module carries the manifest without the class, and refusing it
+     * would drop its hints rather than merely deprioritise them. A REFUSAL is
+     * what {@code staleManifestReason} means, and this is deliberately not
+     * one.</p>
+     */
+    @Test
+    public void aManifestWithNoClassBesideItAnywhereIsStillUsed(@TempDir File tmp)
+            throws Exception {
+        File only = new File(tmp, "assembled");
+        manifestIn(only, "com.example.MyApp", "NATIVE");
+
+        Simulator.FoundManifest found = Simulator.findAnnotationManifest(
+                tmp, only.getAbsolutePath(), "com.example.MyApp");
+        assertNotNull(found);
+        assertEquals("NATIVE", found.hints.getProperty("codename1.arg.desktop.titleBar"));
+    }
+
+    /**
      * A reactor dependency or a stale output directory earlier on the classpath
      * can carry another application's manifest. Taking the first directory that
      * has one ended the search there, and the caller then saw a main class that
