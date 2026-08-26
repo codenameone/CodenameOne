@@ -2292,6 +2292,30 @@ public class BuildHintCatalogTest {
                         "sourceDir")));
     }
 
+    /// The child supplies the configuration, the parent still supplies the
+    /// binding.
+    ///
+    /// That is the ordinary shape when a module customizes a plugin its parent
+    /// set up: plugin-level `<sources>` in the child, the `<execution>` in the
+    /// managed block. Taking the child's block alone left the goal looking
+    /// unbound and dropped the root it configures.
+    @Test
+    public void aChildsConfigurationKeepsTheManagedBinding() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/from-child</source></sources>"
+                + "</configuration></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("gen/from-child"), roots.toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

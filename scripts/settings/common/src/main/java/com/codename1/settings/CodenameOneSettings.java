@@ -2495,6 +2495,28 @@ public class CodenameOneSettings extends Lifecycle {
     /// read as a production root, so a type kept there shadowed the real
     /// annotation -- and activation depends on properties, files, the JDK and
     /// the OS, none of which this tool has a model for.
+    ///
+    /// An `activeByDefault` profile is INCLUDED even though Maven switches all
+    /// of them off as soon as any other profile in the same POM activates. That
+    /// is a deliberate choice, not an oversight, and it is worth writing down
+    /// because the rule reads like it should go the other way.
+    ///
+    /// Whether the other profile activates depends on a property, a file, the
+    /// JDK or the OS, so this reader cannot tell. Both guesses end in a failed
+    /// build, but not with the same likelihood:
+    ///
+    /// - Include it and the profile was off: a root is scanned that the build
+    ///   does not compile. That only misleads if a dormant copy of the main
+    ///   class happens to sit there.
+    /// - Exclude it and the profile was on: the real root is missed, no main
+    ///   class is found at all, and then EVERY annotation-owned hint looks
+    ///   unowned -- so Add writes a duplicate for any of them.
+    ///
+    /// The second is both likelier and broader, so the default profile stays in.
+    /// None of this applies when `mvn cn1:settings` launched the tool: Maven has
+    /// already resolved the profiles and the roots arrive in the binding, which
+    /// `mainSourceRoots` returns before it ever reads a POM. This path is the
+    /// standalone fallback.
     static java.util.List<String> activeConfiguration(String pomText) {
         java.util.List<String> out = new java.util.ArrayList<>();
         if (pomText == null) {
@@ -4120,7 +4142,15 @@ public class CodenameOneSettings extends Lifecycle {
             return null;
         }
         if (element == null || active.indexOf("<" + element + ">") >= 0) {
-            return active;
+            // The child supplies the configuration; the managed declaration may
+            // still be what BINDS the goal. That is the ordinary shape when a
+            // module customizes a plugin its parent set up -- plugin-level
+            // <sourceDirs> here, the <execution> over there -- and returning
+            // this block alone left the goal looking unbound, so the root it
+            // configures was dropped.
+            return active.indexOf("<execution>") >= 0
+                    ? active : active + executionsOf(pluginBlock(
+                        managementOnly(pomText), artifactId), managedFromChain, artifactId);
         }
         String managed = pluginBlock(managementOnly(pomText), artifactId);
         if (managed == null || managed.indexOf("<" + element + ">") < 0) {
@@ -4157,6 +4187,24 @@ public class CodenameOneSettings extends Lifecycle {
             }
             at = close + 3;
         }
+    }
+
+    /// The `<executions>` of the managed declaration, nearest first, or "".
+    ///
+    /// Only the executions: the managed block's own configuration does NOT come
+    /// along, because the active declaration already supplied the element and an
+    /// active value REPLACES the managed one.
+    private static String executionsOf(String managed, String managedFromChain,
+                                       String artifactId) {
+        String from = managed != null && managed.indexOf("<execution>") >= 0
+                ? managed : pluginBlock(managedFromChain, artifactId);
+        if (from == null) {
+            return "";
+        }
+        int open = from.indexOf("<executions>");
+        int close = from.indexOf("</executions>");
+        return open >= 0 && close > open ? from.substring(open, close + "</executions>".length())
+                : "";
     }
 
     /// The `<pluginManagement>` sections of `pomText`, and nothing else.
