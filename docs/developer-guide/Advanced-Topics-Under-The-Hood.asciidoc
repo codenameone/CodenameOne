@@ -638,7 +638,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macOS builds. `app`, `dmg`, `pkg` or `both`. Unset, each channel takes its own default -- `pkg` for `appStore`, because productbuild's output is what you upload, and `dmg` for `developerID`. Set explicitly, the value applies to every channel. A cloud build always ships a file, so `app` there means the bundle zipped with `ditto` rather than the raw `.app` directory.
 
 |macos.signingIdentity.installer
-|macOS builds. The certificate `productbuild` signs a `.pkg` with -- `3rd Party Mac Developer Installer` for the App Store, `Developer ID Installer` for direct distribution. This is a different certificate from `macos.signingIdentity.appStore`, which signs the application, so it's asked for separately rather than derived. Unset, the package is built unsigned, which the App Store upload refuses.
+|macOS builds. The certificate `productbuild` signs a `.pkg` with -- `3rd Party Mac Developer Installer` for the App Store, `Developer ID Installer` for direct distribution. This is a different certificate from `macos.signingIdentity.appStore`, which signs the application, so it has a hint of its own rather than being derived from that one. Unset, the package is built unsigned, which the App Store upload refuses.
 
 |macos.fixedWindowSize
 |macOS builds. Opt-in. Format `<width>x<height>` — for example `1024x685`. When set, the window's minimum and maximum size are pinned to the requested size so every launch produces a byte-identical window. Default unset, in which case the window is resizable. The CI screenshot pipeline turns this on to keep the strict-pixel golden comparison stable; production apps should leave it off.
