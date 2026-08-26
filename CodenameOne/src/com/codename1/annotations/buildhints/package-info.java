@@ -65,8 +65,14 @@
 /// These annotations are the source of truth for the hints they expose. Add an
 /// attribute here to add a hint: the Java type IS its type, an enum's constants
 /// ARE its value domain, and `@Hint` carries the rest -- the wire key where it
-/// differs from the attribute name, the prose the developer guide shows, the
-/// builder's default, and whether a cn1lib may append to it.
+/// differs from the attribute name, the prose the developer guide shows, and
+/// whether a cn1lib may append to it.
+///
+/// It does NOT carry what the build server does when a hint is not set. That is
+/// the server's to change, and a copy here would be compiled into every app
+/// already built against it with no way to follow. An attribute left alone is
+/// not written into the request at all -- see [HintUnset] -- so the server's
+/// default is in force rather than merely documented.
 ///
 /// Nothing restates any of that. The developer guide's table, the Settings
 /// editor's schema and the processor's binding table are all read back out of
@@ -76,4 +82,17 @@
 /// A hint with no annotation -- a dynamic family such as
 /// `android.permission.<NAME>`, or one only the build service reads -- is
 /// described in maven/build-hint-catalog instead.
+// On the doc comments below and throughout this package: `///` is not a
+// stylistic choice and `/** */` is not an option. Every one of the ~1900 java
+// files under CodenameOne/src uses `///`, and
+// .github/scripts/validate-java25-markdown-docs.sh fails the build on a single
+// `/**` marker anywhere in this tree -- "Use /// markdown comments."
+//
+// The observation behind wanting `/** */` here is accurate as far as it goes:
+// JEP 467 markdown doc comments arrived in Java 23, so a javadoc run on the
+// Java 8 build toolchain does not associate these with their members. That is
+// true of the entire core framework, not of this package, and it is a decision
+// already taken repo-wide and enforced. Changing it for these files alone would
+// break the build immediately and leave twenty files spelled unlike every other
+// file around them.
 package com.codename1.annotations.buildhints;
