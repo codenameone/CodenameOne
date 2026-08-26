@@ -98,6 +98,13 @@ final class LibraryClassPrefixScan {
                     || name.endsWith(".zip")) {
                 scanArchive(child, prefixes, found, depth);
             } else if (name.endsWith(".class")) {
+                // The same skip the archive branch makes: a loose tree can
+                // carry unpacked API definitions, and a definition's own
+                // constant pool names itself. Round 30 fixed only the packed
+                // case.
+                if (isFrameworkClass(child.getPath(), prefixes)) {
+                    continue;
+                }
                 inspect(readAll(child), prefixes, found);
             }
         }
