@@ -313,6 +313,11 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+
+    // Set when the app references com.codename1.documents. Gates the DocumentsProvider
+    // manifest entry, which is the whole of the Android lowering -- unlike Apple there is no
+    // extension and no app group, the provider runs in this app's own process.
+    private boolean usesDocuments;
     /// The kinds declaring a watch complication family, as {id, label, comma-joined families}.
     ///
     /// Collected while the surfaces manifest is parsed and consumed after the module layout is
@@ -2028,6 +2033,13 @@ public class AndroidGradleBuilder extends Executor {
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
                     }
+                    // Document provider: the app's content shown as a source in the storage
+                    // picker. Gated on actual usage so the provider is only declared for apps
+                    // that publish documents -- a declared provider that answers nothing is a
+                    // source the user can open and find empty.
+                    if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
+                        usesDocuments = true;
+                    }
                     if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
                         usesIntents = true;
                     }
@@ -3695,6 +3707,27 @@ public class AndroidGradleBuilder extends Executor {
         watchIntentsActivityMetaData = intentsActivityMetaData;
         watchIntentsManifestEntries = intentsManifestEntries;
 
+        // Document provider (com.codename1.documents): one ContentProvider, declared only when
+        // the app actually publishes documents. android:permission gates the CALLER, not this
+        // app -- MANAGE_DOCUMENTS is a system-signature permission that only the platform
+        // document UI holds, which is what keeps every other app from binding this.
+        String documentsProviderEntry = "";
+        if (usesDocuments) {
+            documentsProviderEntry =
+                    "        <provider\n"
+                    + "            android:name=\"" + xclass("com.codename1.impl.android.documents.CN1DocumentsProvider") + "\"\n"
+                    + "            android:authorities=\"" + request.getPackageName() + ".documents\"\n"
+                    + "            android:exported=\"true\"\n"
+                    + "            android:grantUriPermissions=\"true\"\n"
+                    + "            android:permission=\"android.permission.MANAGE_DOCUMENTS\">\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"android.content.action.DOCUMENTS_PROVIDER\" />\n"
+                    + "            </intent-filter>\n"
+                    + "        </provider>\n";
+            debug("Declaring the CN1Documents provider with authority "
+                    + request.getPackageName() + ".documents");
+        }
+
         String surfacesManifestEntries = "";
         String watchSurfacesManifestEntries = "";
         if (usesSurfaces) {
@@ -5304,6 +5337,7 @@ public class AndroidGradleBuilder extends Executor {
                 + carAppService
                 + wearableListenerService
                 + surfacesManifestEntries
+                + documentsProviderEntry
                 // Only in a STANDALONE build does this manifest belong to the watch. A companion
                 // build's watch services go in the wear module's own manifest, which
                 // generateWearModule writes; putting them here too would declare a complication
