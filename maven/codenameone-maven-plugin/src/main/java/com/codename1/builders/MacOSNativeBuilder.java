@@ -364,7 +364,14 @@ public class MacOSNativeBuilder extends Executor {
         String configuredLibs = request.getArg("macos.add_libs",
                 request.getArg("ios.add_libs", null));
         if (configuredLibs != null) {
-            for (String lib : configuredLibs.split(";")) {
+            // Semicolon, comma OR colon. IPhoneBuilder normalises all three
+            // before it splits, so those are the separators a project has been
+            // free to use -- and a migrated one carries whichever it wrote.
+            // Splitting on semicolons alone handed the translator
+            // "Foo.framework,Bar.framework" as one framework name, which links
+            // neither. An empty token, from a leading or doubled separator, is
+            // dropped by the length check rather than by a special case.
+            for (String lib : configuredLibs.split("[;,:]")) {
                 String trimmed = lib.trim();
                 if (trimmed.length() > 0 && !extraFrameworks.contains(trimmed)) {
                     extraFrameworks.add(trimmed);

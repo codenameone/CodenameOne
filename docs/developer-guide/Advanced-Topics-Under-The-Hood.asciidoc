@@ -629,7 +629,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macOS builds. `true` adds `com.apple.security.files.downloads.read-write`, which is access to the Downloads folder without a panel. Default `false`, and separate from `macos.entitlements.files.userSelected` above because it's a wider grant than picking a file.
 
 |macos.add_libs
-|macOS builds. Semicolon separated frameworks to link in addition to the ones the build detects for itself -- for example `Speech.framework;CoreMIDI.framework`. `ios.add_libs` is read when this is unset, so a project migrated from the Mac Catalyst build keeps linking what its native sources need.
+|macOS builds. Frameworks to link in addition to the ones the build detects for itself, separated by a semicolon, a comma or a colon -- for example `Speech.framework;CoreMIDI.framework`. `ios.add_libs` is read when this is unset, so a project migrated from the Mac Catalyst build keeps linking what its native sources need.
 
 |macos.plistInject
 |macOS builds. Raw XML members added to the generated `Info.plist`, the same form `ios.plistInject` takes -- for example `<key>NSAppTransportSecurity</key><dict/>`. A key that the build also generates is replaced by the injected one, and the build log names it. `ios.plistInject` is read when this is unset, so a project migrated from the Mac Catalyst build keeps its injections.
