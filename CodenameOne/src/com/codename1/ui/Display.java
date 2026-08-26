@@ -269,6 +269,21 @@ public final class Display extends CN1Constants {
     /// so a high/low FPS will have no effect then.
     private int framerateLock = 15;
     private boolean codenameOneRunning = false;
+
+    /// Set the moment the EDT leaves its dispatch loop, BEFORE the teardown
+    /// that follows it.
+    ///
+    /// isAlive() alone cannot answer "will this thread dispatch anything
+    /// again": between the loop exiting and the thread ending there is
+    /// disposeAll() and impl.deinitialize(), and that teardown deliberately
+    /// runs ON the EDT, so the field cannot simply be cleared first. An
+    /// init() landing in that window adopted a thread that was never going to
+    /// dispatch again, and every later operation timed out with the display
+    /// reporting itself uninitialized.
+    ///
+    /// Volatile because it is written by the dying EDT and read by whichever
+    /// thread calls init().
+    private volatile boolean edtRetiring;
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
@@ -516,13 +531,14 @@ public final class Display extends CN1Constants {
             // -- or died some other way -- would otherwise stop a re-init
             // from ever starting a working one.
             //
-            // This does NOT close the whole window: a thread that has left
-            // the dispatch loop but is still inside that teardown is alive,
-            // and an init() adopting it gets no dispatch. Narrowing the
-            // window is worth having on its own; closing it means changing
-            // when the EDT publishes its own death, which is a change to the
-            // display lifecycle rather than to this check.
-            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
+            // edtRetiring closes the rest of it: a thread that has left the
+            // dispatch loop but is still inside that teardown is ALIVE, and
+            // an init() adopting it gets no dispatch at all. The dying EDT
+            // says so itself the moment it leaves the loop, which is the only
+            // point at which the answer is knowable.
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()
+                    || INSTANCE.edtRetiring) {
+                INSTANCE.edtRetiring = false;
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
@@ -1348,6 +1364,12 @@ public final class Display extends CN1Constants {
                 }
             }
         }
+        // PUBLISHED BEFORE the teardown, not after. Everything below still
+        // has to run on this thread -- that is the whole reason the field
+        // cannot just be cleared here -- but from this point the thread will
+        // never dispatch again, and an init() that arrives meanwhile must
+        // start a new EDT rather than adopt this one.
+        INSTANCE.edtRetiring = true;
         // Dispose any window still open, on the EDT, before the implementation goes
         // away. Doing this from the static deinitialize() would run the teardown off
         // the EDT, which is exactly the thread the window's tree expects.
@@ -1355,7 +1377,13 @@ public final class Display extends CN1Constants {
         impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
-        INSTANCE.edt = null;
+        // Only if it is still THIS thread. An init() during the teardown has
+        // already installed a live successor, and clearing the field then
+        // would leave the display with a running EDT it no longer knows
+        // about -- isEdt() answering false on the dispatch thread itself.
+        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+            INSTANCE.edt = null;
+        }
     }
 
     /// Returns the stack trace from the exception on the given

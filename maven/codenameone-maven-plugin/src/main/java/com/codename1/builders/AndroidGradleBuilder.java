@@ -2869,7 +2869,7 @@ public class AndroidGradleBuilder extends Executor {
                     compileSdkInt(maxPlatformVersion, buildToolsVersion,
                             targetNumber, usesNearbyRanging,
                             usesNearbyRanging || usesNearbyTransport
-                                    || usesNearbyCompanion));
+                                    || usesNearbyCompanion, usesCallVoip));
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
@@ -7054,7 +7054,7 @@ public class AndroidGradleBuilder extends Executor {
         compileSdkVersion = String.valueOf(compileSdkInt(maxPlatformVersion,
                 buildToolsVersion, targetNumber, usesNearbyRanging,
                 usesNearbyRanging || usesNearbyTransport
-                        || usesNearbyCompanion));
+                        || usesNearbyCompanion, usesCallVoip));
         String supportLibVersion = maxPlatformVersion;
         String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
             "35", "36"};
@@ -10325,9 +10325,19 @@ public class AndroidGradleBuilder extends Executor {
     /** The compile SDK any nearby cluster demands; see the block below. */
     static final int NEARBY_MIN_COMPILE_SDK = 33;
 
+    /**
+     * The compile SDK {@code android:foregroundServiceType} needs.
+     *
+     * <p>The attribute arrived in API 29 and AAPT rejects an enum value the
+     * compile SDK does not know, so a VoIP app has to compile against at
+     * least this to declare {@code phoneCall} -- which from API 34 Android
+     * requires before it will start the service at all.</p>
+     */
+    static final int FOREGROUND_SERVICE_TYPE_COMPILE_SDK = 29;
+
     static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
             String targetNumber, boolean usesNearbyRanging,
-            boolean usesAnyNearby) {
+            boolean usesAnyNearby, boolean usesCallVoip) {
         String compileSdkVersion = maxPlatformVersion;
         String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
         for (int i = 0; i < ladder.length; i++) {
@@ -10353,6 +10363,14 @@ public class AndroidGradleBuilder extends Executor {
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
         }
+        // NO VoIP raise here, deliberately, and this is where the daemon
+        // twin has one. A VoIP app targeting 29 or later must declare
+        // android:foregroundServiceType="phoneCall", which needs a compile
+        // SDK of at least 29 -- but this copy has already raised the compile
+        // SDK to the target above, unconditionally, so any target that
+        // requires the attribute has already made it writable. The daemon
+        // copy raises to the target only inside its container path, which is
+        // why it needs the rule stated separately.
         try {
             return Integer.parseInt(compileSdkVersion.trim());
         } catch (NumberFormatException notANumber) {

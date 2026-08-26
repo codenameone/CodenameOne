@@ -98,6 +98,18 @@ public class CN1ConnectionService extends ConnectionService {
     /// hands back a request with none of our extras to read.
     private static volatile String lastReportedCallId;
 
+    /// Calls the SYSTEM asked this app to place and that Java has not
+    /// reported back yet.
+    ///
+    /// The listener contract says the app answers startCallRequested by
+    /// calling Calls.reportOutgoing with the id it was handed. On this
+    /// platform that reaches placeCall, which would create a SECOND
+    /// connection for a call Telecom already has -- the new one replacing
+    /// this one in CONNECTIONS while the original stayed alive in Telecom.
+    /// The report adopts the connection recorded here instead.
+    private static final Map<String, CN1Connection> SYSTEM_STARTED =
+            new HashMap<String, CN1Connection>();
+
     /// One action the system asked for and the app has not answered.
     private static final class PendingAction {
         private final CN1Connection connection;
@@ -187,6 +199,9 @@ public class CN1ConnectionService extends ConnectionService {
             // app is TOLD about it instead, with an id it has never seen and
             // the address the system supplied. This is the Android half of
             // what performStartCallAction delivers on iOS.
+            synchronized (SYSTEM_STARTED) {
+                SYSTEM_STARTED.put(id, c);
+            }
             Calls.deliverStartCallRequest(id, externalHandleWire(request),
                     c.isVideo(), nextActionToken(c, CN1Connection.ACTION_START));
             return c;
@@ -246,6 +261,34 @@ public class CN1ConnectionService extends ConnectionService {
         }
     }
 
+    /// Adopts the connection for a call the system asked this app to place.
+    ///
+    /// Answers true when this id names such a call, in which case the report
+    /// is complete: Telecom already has the call and placing it again would
+    /// duplicate it.
+    static boolean adoptSystemStarted(int requestId, String callId) {
+        CN1Connection c;
+        synchronized (SYSTEM_STARTED) {
+            c = callId == null ? null : SYSTEM_STARTED.remove(callId);
+        }
+        if (c == null) {
+            return false;
+        }
+        // Already dialing from adopt(); the report is the app saying it has
+        // taken the call on, which is exactly what the acknowledgement means.
+        Calls.deliverAck(requestId, true, 0, null);
+        return true;
+    }
+
+    /// Forgets a system-started call that was never reported back.
+    static void forgetSystemStarted(String callId) {
+        synchronized (SYSTEM_STARTED) {
+            if (callId != null) {
+                SYSTEM_STARTED.remove(callId);
+            }
+        }
+    }
+
     /// Parks the request id a forthcoming Telecom callback will answer.
     static void expectReport(int requestId, String callId) {
         lastReportedCallId = callId;
@@ -271,6 +314,10 @@ public class CN1ConnectionService extends ConnectionService {
         synchronized (CONNECTIONS) {
             CONNECTIONS.remove(callId);
         }
+        // A system-started call the app never reported back is gone too;
+        // leaving its id here would have a later report with the same id
+        // adopt a connection that no longer exists.
+        forgetSystemStarted(callId);
     }
 
     /// Ends every call, for a provider that has gone away.

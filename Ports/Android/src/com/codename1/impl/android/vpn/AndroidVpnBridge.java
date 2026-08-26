@@ -443,6 +443,20 @@ public class AndroidVpnBridge implements VpnBridge {
         // not survive one -- so gating here answered NOT_CONFIGURED for a
         // profile the platform still holds. The platform's own refusal is
         // the authority, and it is mapped below.
+        // The SAME reservation install and removal take. Without it a start
+        // could bring up the OLD profile while an install was building or
+        // waiting on the consent prompt -- after which the replacement is
+        // provisioned and the caller is left with a running tunnel that is
+        // not the one it asked for, both requests having reported success --
+        // or be accepted a moment before a removal deleted the profile.
+        synchronized (this) {
+            if (operationPending) {
+                fail(requestId, VpnError.UNKNOWN,
+                        "A VPN profile operation is in progress; wait for it"
+                        + " to finish before starting the tunnel");
+                return;
+            }
+        }
         try {
             startRequested = true;
             setStatus(VpnStatus.CONNECTING);
@@ -502,6 +516,17 @@ public class AndroidVpnBridge implements VpnBridge {
             return;
         }
         // Not gated on installedWire; see startVpn.
+        // The same reservation, for the same reason as startVpn: stopping
+        // a tunnel whose profile is being replaced acts on the one the
+        // install is about to remove.
+        synchronized (this) {
+            if (operationPending) {
+                fail(requestId, VpnError.UNKNOWN,
+                        "A VPN profile operation is in progress; wait for it"
+                        + " to finish before stopping the tunnel");
+                return;
+            }
+        }
         VpnStatus before = reconciledStatus();
         boolean wasRequested = startRequested;
         try {

@@ -206,16 +206,39 @@ public class CallManifestFragmentsTest {
         // Ranging alone reaches 36 even when the ladder and the target are
         // far below it.
         assertEquals(36, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                true, true));
+                true, true, false));
         // Transport or companion without ranging still reaches 33.
         assertEquals(33, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, true));
+                false, true, false));
         // No nearby at all: the ladder and the target decide.
         assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, false));
+                false, false, false));
         assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "34",
-                false, false),
+                false, false, false),
                 "the compile SDK is never below the target");
+    }
+
+    @Test
+    public void aVoipAppTargeting29OrLaterCanDeclareItsServiceType() {
+        // The attribute is required from 34 and unwritable below a compile
+        // SDK of 29, so leaving a target-34 VoIP build at 28 shipped an app
+        // whose foreground service could not start at all. Raised only when
+        // the TARGET asks for it: an app really targeting 28 keeps its
+        // legacy compile SDK, needing neither the attribute nor the raise.
+        // In THIS copy the compile SDK is raised to the target
+        // unconditionally, so a target that requires the attribute has
+        // already made it writable and no separate VoIP rule is needed. The
+        // daemon twin raises to the target only inside its container path,
+        // which is why it states the rule on its own.
+        assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "34",
+                false, false, true),
+                "a target-34 VoIP build must be able to name phoneCall");
+        assertTrue(AndroidGradleBuilder.compileSdkInt("28", "28", "34",
+                false, false, true)
+                >= AndroidGradleBuilder.FOREGROUND_SERVICE_TYPE_COMPILE_SDK);
+        assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false, true),
+                "a target-28 app neither needs the attribute nor a raise");
     }
 
     @Test

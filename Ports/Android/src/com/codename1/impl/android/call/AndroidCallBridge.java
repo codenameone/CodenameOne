@@ -345,6 +345,15 @@ public class AndroidCallBridge implements CallBridge {
         if (!ready(requestId)) {
             return;
         }
+        // A call the SYSTEM asked this app to place is already in Telecom.
+        // The listener contract has the app answer startCallRequested with
+        // reportOutgoing, and placing it again would create a SECOND
+        // connection for the same id -- the new one replacing the original in
+        // CONNECTIONS while the original stayed alive in Telecom, so the user
+        // would see two calls and the app could address only one.
+        if (CN1ConnectionService.adoptSystemStarted(requestId, callId)) {
+            return;
+        }
         Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
         Bundle outer = new Bundle();
         outer.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);

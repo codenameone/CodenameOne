@@ -663,7 +663,14 @@ public final class Calls {
 
         @Override
         public void run() {
-            if (session != null) {
+            // Never out of ENDED. An answer or hold the app DEFERRED runs
+            // this whenever the listener finally fulfils it, which can be
+            // after the call ended or after a provider reset discarded the
+            // native action entirely -- and the session is no longer even
+            // registered by then. The third place this had to be said, after
+            // the acknowledgement hook and reportConnected: ENDED is terminal
+            // and every path that writes state has to respect that.
+            if (session != null && session.getState() != CallState.ENDED) {
                 session.setStateInternal(target);
             }
         }

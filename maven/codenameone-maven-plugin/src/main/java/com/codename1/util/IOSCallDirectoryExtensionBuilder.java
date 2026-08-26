@@ -338,7 +338,13 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("    <string>").append(escape(displayName))
                 .append("</string>\n");
         sb.append("    <key>CFBundleExecutable</key>\n");
-        sb.append("    <string>").append(EXTENSION_NAME).append("</string>\n");
+        // The BUILD SETTING, as every other generated extension plist uses.
+        // Hard-coding the default name meant an
+        // ios.call.directory.buildSettings.PRODUCT_NAME override renamed the
+        // executable Xcode produced while this kept naming the old one, so
+        // the embedded extension pointed at a file that does not exist and
+        // could not be loaded.
+        sb.append("    <string>$(EXECUTABLE_NAME)</string>\n");
         sb.append("    <key>CFBundleIdentifier</key>\n");
         sb.append("    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n");
         sb.append("    <key>CFBundleInfoDictionaryVersion</key>\n");
