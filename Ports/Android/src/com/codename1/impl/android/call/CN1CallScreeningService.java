@@ -241,6 +241,20 @@ public class CN1CallScreeningService extends CallScreeningService {
                 unsupported(requestId);
                 return;
             }
+            // One dialog at a time. CodenameOneActivity keeps a SINGLE
+            // result listener and setIntentResultListener ignores a
+            // replacement while it is waiting, so a second request started
+            // over the first left one of them in CallRequests for ever with
+            // no error anywhere.
+            synchronized (CN1CallScreeningService.class) {
+                if (rolePending) {
+                    Calls.deliverAck(requestId, false,
+                            com.codename1.call.CallError.BUSY.ordinal(),
+                            "The screening role prompt is already on screen");
+                    return;
+                }
+                rolePending = true;
+            }
             com.codename1.impl.android.AndroidNativeUtil.startActivityForResult(
                     intent, new RoleResult(requestId));
         } catch (Exception e) {
@@ -284,6 +298,9 @@ public class CN1CallScreeningService extends CallScreeningService {
     ///
     /// A named class rather than an anonymous one so it carries no synthetic
     /// reference to the activity, which outlives the dialog.
+    /// Whether a role dialog owns the activity's single result channel.
+    private static boolean rolePending;
+
     private static final class RoleResult
             implements com.codename1.impl.android.IntentResultListener {
         private final int requestId;
@@ -295,6 +312,12 @@ public class CN1CallScreeningService extends CallScreeningService {
         @Override
         public void onActivityResult(int requestCode, int resultCode,
                 Intent data) {
+            // First, and whatever the outcome: a declined prompt that never
+            // cleared this would block every later request for the life of
+            // the process.
+            synchronized (CN1CallScreeningService.class) {
+                rolePending = false;
+            }
             enabled = resultCode == Activity.RESULT_OK;
             Calls.deliverAck(requestId, enabled,
                     com.codename1.call.CallError.UNAUTHORIZED.ordinal(),

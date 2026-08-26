@@ -142,6 +142,23 @@ static NSMutableDictionary *cn1clCalls = nil;
 /// same id, which submits another action, which arrives again.
 static NSMutableSet *cn1clJavaStarts = nil;
 
+/// The calls whose CXStartCallAction the SYSTEM submitted -- Recents, Siri --
+/// and that Java has not adopted yet.
+///
+/// startCallRequested tells the app to report the call with that id, and
+/// reportOutgoing() answered by submitting a SECOND start action for a uuid
+/// whose first one was still pending. CallKit can refuse that transaction,
+/// which failed reportOutgoing() and took the Java session with it while the
+/// original action went on to be fulfilled.
+static NSMutableSet *cn1clSystemStarts = nil;
+
+/// Every registration waiting for the first credentials callback.
+///
+/// A scalar slot lost all but the last: two register() calls before PushKit
+/// answered left the first AsyncResource pending for ever and retained in
+/// CallRequests. Guarded by cn1clLock like the rest of the state.
+static NSMutableArray *cn1clTokenRequests = nil;
+
 /// The call CallKit last put in charge of the audio session.
 ///
 /// didActivateAudioSession names no call, and with more than one call up --
@@ -192,6 +209,8 @@ static void cn1clEnsureState(void) {
         cn1clReporting = [[NSMutableSet alloc] init];
         cn1clReportWaiters = [[NSMutableDictionary alloc] init];
         cn1clJavaStarts = [[NSMutableSet alloc] init];
+        cn1clSystemStarts = [[NSMutableSet alloc] init];
+        cn1clTokenRequests = [[NSMutableArray alloc] init];
         cn1clLock = [[NSObject alloc] init];
     });
 }
@@ -276,6 +295,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [cn1clCalls removeAllObjects];
         [cn1clActions removeAllObjects];
         [cn1clJavaStarts removeAllObjects];
+        [cn1clSystemStarts removeAllObjects];
         cn1clAudioCall = nil;
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
@@ -341,6 +361,12 @@ static int64_t cn1clTrackAction(CXAction *action) {
         // reportOutgoing() again for a call it is already placing.
         [action fulfill];
         return;
+    }
+    // The system asked. Remembered so the reportOutgoing() this callback is
+    // about to provoke ADOPTS this action instead of submitting a second one
+    // for the same uuid.
+    @synchronized (cn1clLock) {
+        [cn1clSystemStarts addObject:startedUuid];
     }
     NSString *wire = cn1clJoin([NSArray arrayWithObjects:
             [NSString stringWithFormat:@"%d",
@@ -641,7 +667,6 @@ static void cn1clDrain(int requestId) {
 
 static PKPushRegistry *cn1clRegistry = nil;
 static NSString *cn1clVoipToken = nil;
-static int cn1clTokenRequest = -1;
 
 /// The uuid a payload names, or a fresh one when it names none.
 ///
@@ -679,10 +704,28 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     // old token and incoming calls quietly stopped arriving. A requestId of
     // -1 settles nothing and still reaches the tokenChanged listener, which
     // is what the rotation case needs.
-    int req = cn1clTokenRequest;
-    cn1clTokenRequest = -1;
-    com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
-            getThreadLocalData(), req, cn1clJString(cn1clVoipToken));
+    NSArray *waiting = nil;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        waiting = [NSArray arrayWithArray:cn1clTokenRequests];
+        [cn1clTokenRequests removeAllObjects];
+    }
+    if ([waiting count] == 0) {
+        // A rotation with nobody waiting. A requestId of -1 settles nothing
+        // and still reaches the tokenChanged listener, which is what this
+        // case needs.
+        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                getThreadLocalData(), -1, cn1clJString(cn1clVoipToken));
+        return;
+    }
+    // One settlement per waiting registration. deliverToken tells the
+    // listener only when the value actually changed, so several of these
+    // announce one rotation.
+    for (NSNumber *req in waiting) {
+        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                getThreadLocalData(), [req intValue],
+                cn1clJString(cn1clVoipToken));
+    }
 }
 
 - (void)pushRegistry:(PKPushRegistry *)registry
@@ -1085,6 +1128,24 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
                 @"Not a canonical call id");
         return;
     }
+    // A call the system asked this app to place is already a CallKit
+    // transaction in flight. Submitting a second start action for the same
+    // uuid is what CallKit refuses, and that refusal failed reportOutgoing()
+    // and took the Java session with it while the original action went on to
+    // be fulfilled. Adopt it instead: register the call and answer yes.
+    cn1clEnsureState();
+    BOOL adopting = NO;
+    @synchronized (cn1clLock) {
+        adopting = [cn1clSystemStarts containsObject:uuidString];
+        if (adopting) {
+            [cn1clSystemStarts removeObject:uuidString];
+            [cn1clCalls setObject:uuidString forKey:uuidString];
+        }
+    }
+    if (adopting) {
+        cn1clAck(requestId, YES, 0, nil);
+        return;
+    }
     CXStartCallAction *action = [[CXStartCallAction alloc]
             initWithCallUUID:uuid
             handle:cn1clHandleFromWire(toNSString(threadStateData, handleWire))];
@@ -1413,6 +1474,16 @@ void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
     if (action == nil) {
         return;
     }
+    if ([action isKindOfClass:[CXStartCallAction class]]) {
+        // The adopt window is over either way: the app has answered the
+        // action, so it either reported the call (which removed this) or
+        // never will. Left behind, an unreported start would sit in the set
+        // for the life of the process.
+        NSString *startUuid = [[(CXCallAction *)action callUUID] UUIDString];
+        @synchronized (cn1clLock) {
+            [cn1clSystemStarts removeObject:startUuid];
+        }
+    }
     if (fulfilled != JAVA_FALSE) {
         // A fulfilled end is the only point at which the call is really over,
         // so it is where the native bookkeeping drops it.
@@ -1451,7 +1522,10 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
         return;
     }
     // The token arrives asynchronously; park the request for the delegate.
-    cn1clTokenRequest = requestId;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clTokenRequests addObject:[NSNumber numberWithInt:requestId]];
+    }
 #else
     com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
             threadStateData, requestId, CN1_CALL_ERR_NOT_SUPPORTED,

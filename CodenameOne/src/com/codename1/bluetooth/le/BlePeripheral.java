@@ -264,7 +264,14 @@ public abstract class BlePeripheral extends BluetoothDevice {
                         }
                     }
                 });
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        // The queue watches INNER, not out. Its timeout and its failAll both
+        // complete whatever they are given, and with two writers the timer
+        // could fail `out` between publishBeforeDone's isDone() check and its
+        // completion -- overwriting the timeout and notifying observers again
+        // after the queue had moved on. One writer removes the race instead
+        // of narrowing it: a timeout fails `inner`, and the same listener
+        // that would have published the result turns it into out.error.
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
                 doDiscoverServices(inner);
@@ -290,11 +297,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
             @Override
             public void onReady(T value, Throwable err) {
                 if (out.isDone()) {
-                    // The queue timeout or a dropped link already failed this
-                    // operation, and the platform answered afterwards anyway.
-                    // Publishing now would overwrite the service cache or the
-                    // MTU that a LATER operation has since established, so a
-                    // late answer is dropped rather than applied.
+                    // Belt and braces now that the queue watches `inner`:
+                    // nothing else completes `out`, but a platform that
+                    // answers a timed-out request twice would otherwise
+                    // publish the service cache or the MTU that a LATER
+                    // operation has since established.
                     return;
                 }
                 try {
@@ -566,7 +573,8 @@ public abstract class BlePeripheral extends BluetoothDevice {
                         }
                     }
                 });
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        // The queue watches INNER; see discoverServices for why.
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
                 doRequestMtu(mtu, inner);

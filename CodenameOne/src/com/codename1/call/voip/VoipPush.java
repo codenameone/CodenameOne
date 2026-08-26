@@ -211,14 +211,22 @@ public final class VoipPush {
     ///
     /// @hidden not part of the public API.
     public static void deliverToken(int requestId, String value) {
+        boolean changed;
         synchronized (VoipPush.class) {
+            changed = value == null ? token != null : !value.equals(token);
             token = value;
         }
         EdtResult<String> r = CallRequests.takeString(requestId);
         if (r != null) {
             r.complete(value);
         }
-        post(new Delivery(null, value));
+        if (changed) {
+            // Only on a real change. A port with several registrations
+            // waiting settles them one at a time through here, and a
+            // rotation that produces the same token is not a rotation --
+            // neither is a reason to tell the app its token changed.
+            post(new Delivery(null, value));
+        }
     }
 
     /// Fails a registration.

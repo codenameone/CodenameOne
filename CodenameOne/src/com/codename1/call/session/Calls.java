@@ -26,6 +26,7 @@ import com.codename1.call.CallAvailability;
 import com.codename1.call.CallDirection;
 import com.codename1.call.CallEndReason;
 import com.codename1.call.CallError;
+import com.codename1.io.Log;
 import com.codename1.call.CallException;
 import com.codename1.call.CallHandle;
 import com.codename1.call.CallId;
@@ -210,20 +211,23 @@ public final class Calls {
         // duplicate report used to take the ORIGINAL live call out of
         // getSessions() with it, leaving a call the system is still showing
         // that nothing in Java can address.
-        //
-        // Only live calls are in the map; forget() removes an ended one, so
-        // presence is the whole test.
+        // ONE critical section for the test and the reservation. Split, two
+        // threads reporting the same id -- socket signalling racing a pushed
+        // call is the ordinary way -- both passed the test and both inserted,
+        // so two CallSession objects existed for one call with only the
+        // second reachable, and the port's request parked under that id was
+        // overwritten with one AsyncResource left unanswered.
+        CallSession session = new CallSession(id, direction, handle, displayName,
+                direction == CallDirection.INCOMING
+                        ? CallState.RINGING : CallState.DIALING);
         synchronized (SESSIONS) {
+            // Only live calls are in the map; forget() removes an ended one,
+            // so presence is the whole test.
             if (SESSIONS.containsKey(id)) {
                 out.error(new CallException(CallError.DUPLICATE_CALL,
                         "A call with this id is already live: " + id));
                 return out;
             }
-        }
-        CallSession session = new CallSession(id, direction, handle, displayName,
-                direction == CallDirection.INCOMING
-                        ? CallState.RINGING : CallState.DIALING);
-        synchronized (SESSIONS) {
             SESSIONS.put(id, session);
         }
         int reqId = CallRequests.nextId();
@@ -238,6 +242,47 @@ public final class Calls {
             b.reportOutgoingCall(reqId, id, wire, displayName, -1, video);
         }
         return out;
+    }
+
+    /// Tells one listener a call ended, without letting it stop the others.
+    ///
+    /// The action arms deliberately let a listener's exception propagate:
+    /// there is a request behind them, the caller is entitled to see the
+    /// failure, and the token is settled in a `finally` either way. This is a
+    /// notification -- nobody is waiting on an answer, every listener is
+    /// entitled to hear it, and on a port the thread carrying it is a native
+    /// callback thread that must not be taken down by application code.
+    private static void tell(CallActionListener l, String callId,
+            CallEndReason reason) {
+        try {
+            l.callEnded(callId, reason);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the provider reset. See [#tell] for why this one
+    /// swallows.
+    private static void tellReset(CallActionListener l) {
+        try {
+            l.providerReset();
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Records a listener's exception without depending on a Display.
+    ///
+    /// Log.e goes through the platform implementation, which is null before
+    /// Display.init -- so logging a throw from a listener registered that
+    /// early replaced it with an NPE from the logger. There is no log to
+    /// write to at that point; the stack trace is all there is.
+    private static void report(Throwable t) {
+        if (Display.isInitialized()) {
+            Log.e(t);
+        } else {
+            t.printStackTrace(); //NOPMD AvoidPrintStackTrace
+        }
     }
 
     /// Completes the caller's resource once the system has accepted or
@@ -779,10 +824,17 @@ public final class Calls {
                         session.setStateInternal(CallState.ENDED);
                     }
                     CallEndReason reason = CallWire.endReason(ordinal);
-                    for (CallActionListener l : ls) {
-                        l.callEnded(callId, reason);
+                    try {
+                        for (CallActionListener l : ls) {
+                            tell(l, callId, reason);
+                        }
+                    } finally {
+                        // Mandatory, so a listener that throws cannot leave an
+                        // ended session in getSessions() addressing a native
+                        // call that no longer exists. The action arms settle
+                        // their tokens in a finally for the same reason.
+                        forget(callId);
                     }
-                    forget(callId);
                     break;
                 }
                 case RESET:
@@ -804,7 +856,7 @@ public final class Calls {
                             CallError.PROVIDER_RESET,
                             "The system's call provider was reset"));
                     for (CallActionListener l : ls) {
-                        l.providerReset();
+                        tellReset(l);
                     }
                     break;
                 default:

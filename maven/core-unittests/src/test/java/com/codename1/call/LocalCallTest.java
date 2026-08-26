@@ -671,6 +671,27 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aThrowingEndListenerStillLetsTheCallGo() {
+        // The cleanup is mandatory: without it an ended session stayed in
+        // getSessions() addressing a native call that no longer exists, and
+        // one badly written listener was enough to do it.
+        final List<CallEndReason> seen = new ArrayList<CallEndReason>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void callEnded(String callId, CallEndReason reason) {
+                seen.add(reason);
+                throw new IllegalStateException("a listener that throws");
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateRemoteEnd(id, CallEndReason.REMOTE_ENDED);
+        waitFor(seen, 1);
+        assertNull(Calls.getSession(id),
+                "an ended call must be forgotten even when a listener threw");
+        assertEquals(0, Calls.getSessions().length);
+    }
+
+    @Test
     public void registeringYieldsAToken() {
         String token = CallAwait.value(VoipPush.register());
         assertNotNull(token);
