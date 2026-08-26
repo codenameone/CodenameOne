@@ -2820,6 +2820,54 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.lastIdentifier("\"DEFAULT\"", false));
     }
 
+    /// A leaf can turn an inherited execution back ON.
+    ///
+    /// Maven takes the NEAREST declaration that names a phase, so a leaf that
+    /// redeclares the id its parent disabled re-enables it -- keeping the
+    /// inherited goal and configuration. Unioning every level that says
+    /// `<phase>none</phase>` kept the parent's veto and dropped a root the build
+    /// really compiles.
+    @Test
+    public void aLeafCanReEnableAnInheritedExecution() {
+        String grandparent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>grandparent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String parentDisables = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String leafReEnables = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        // Nearest first: leaf, then the parent that disabled it.
+        java.util.List<String> nearer = java.util.Arrays.asList(leafReEnables, parentDisables);
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                .contains("grandparent/gen"),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                        .toString());
+
+        // A leaf that says nothing about the phase decides nothing, so the
+        // parent's veto still stands.
+        String leafSilent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>leaf/gen</source></sources>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                        java.util.Arrays.asList(leafSilent, parentDisables))).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                                java.util.Arrays.asList(leafSilent, parentDisables))).toString());
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

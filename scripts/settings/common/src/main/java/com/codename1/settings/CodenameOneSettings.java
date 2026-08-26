@@ -4611,6 +4611,40 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// The execution ids that are switched off for `artifactId`, resolved
+    /// NEAREST first.
+    ///
+    /// Not the union of every level that says `<phase>none</phase>`. Maven takes
+    /// the nearest declaration that names a phase, so a leaf that redeclares an
+    /// id its parent disabled turns it back ON -- keeping the parent's `none` as
+    /// well dropped a root the build really compiles. A level that says nothing
+    /// about the phase decides nothing and the question passes further up.
+    private static java.util.Set<String> disabledNearestFirst(java.util.List<String> nearer,
+                                                              String artifactId) {
+        java.util.Set<String> off = new java.util.HashSet<>();
+        java.util.Set<String> decided = new java.util.HashSet<>();
+        for (String child : nearer) {
+            for (String block : pluginBlocks(withoutElement(child, "pluginManagement"),
+                    artifactId)) {
+                for (String execution : executionBlocks(block)) {
+                    java.util.List<String> phases = elementValues(execution, "phase");
+                    if (phases.isEmpty()) {
+                        continue;
+                    }
+                    java.util.List<String> ids = elementValues(execution, "id");
+                    String id = ids.isEmpty() ? "default" : ids.get(0).trim();
+                    if (!decided.add(id)) {
+                        continue;
+                    }
+                    if ("none".equals(phases.get(0).trim())) {
+                        off.add(id);
+                    }
+                }
+            }
+        }
+        return off;
+    }
+
     /// The execution ids `pluginBlock` switches off with `<phase>none</phase>`.
     private static java.util.Set<String> disabledExecutionIds(String pluginBlock) {
         java.util.Set<String> out = new java.util.HashSet<>();
@@ -4699,17 +4733,9 @@ public class CodenameOneSettings extends Lifecycle {
             out.append(pomText, at, open);
             String plugin = pomText.substring(open, close);
             String artifactId = elementValue(plugin, "artifactId");
-            // Every nearer level, and every block each declares for this plugin:
-            // the union of what they switch off is what the ancestor inherits.
-            java.util.Set<String> off = new java.util.HashSet<>();
-            if (artifactId != null) {
-                for (String child : nearer) {
-                    for (String block : pluginBlocks(withoutElement(child, "pluginManagement"),
-                            artifactId.trim())) {
-                        off.addAll(disabledExecutionIds(block));
-                    }
-                }
-            }
+            java.util.Set<String> off = artifactId == null
+                    ? new java.util.HashSet<String>()
+                    : disabledNearestFirst(nearer, artifactId.trim());
             out.append(off.isEmpty() ? plugin : withoutExecutionIds(plugin, off));
             at = close;
         }
