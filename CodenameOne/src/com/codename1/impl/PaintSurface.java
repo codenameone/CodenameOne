@@ -187,7 +187,7 @@ public final class PaintSurface {
             // time over the pixels it had just produced. Anything translucent in it -- antialiased
             // glyphs, a shadow -- composites twice and comes out darker. The parent's paint already
             // covers the child, so drop it, matching what the loop above does when the order is
-            // reversed. Null slots are what cancelRepaint leaves too, and paintDirty skips them.
+            // reversed.
             //
             // Only when the parent repaints in full: paintDirty clips a component to its dirty
             // region, so a parent holding one does not necessarily cover the child, and dropping it
@@ -198,21 +198,34 @@ public final class PaintSurface {
             // latched pending flag, and that pair is exactly what makes repaint(x, y, w, h) return
             // without queueing, so every later partial repaint of that child would be lost.
             if (cmp instanceof Container && ((Component) cmp).getDirtyRegion() == null) {
+                int write = 0;
                 for (int iter = 0; iter < paintQueueFill; iter++) {
                     Animation ani = paintQueue[iter];
-                    if (!(ani instanceof Component)) {
-                        continue;
-                    }
-                    Component parent = ((Component) ani).getParent();
-                    while (parent != null) {
-                        if (parent == cmp) { //NOPMD CompareObjectsWithEquals
-                            paintQueue[iter] = null;
-                            ((Component) ani).consumePendingRepaint();
-                            break;
+                    boolean covered = false;
+                    if (ani instanceof Component) {
+                        Component parent = ((Component) ani).getParent();
+                        while (parent != null) {
+                            if (parent == cmp) { //NOPMD CompareObjectsWithEquals
+                                covered = true;
+                                break;
+                            }
+                            parent = parent.getParent();
                         }
-                        parent = parent.getParent();
+                    }
+                    if (covered) {
+                        ((Component) ani).consumePendingRepaint();
+                    } else if (ani != null) {
+                        paintQueue[write++] = ani;
                     }
                 }
+                // Survivors are compacted rather than left as holes, so the slots the drop freed are
+                // usable again. paintQueueFill counts holes too -- leaving them would let a queue
+                // holding a single live entry report itself full and reject every repaint requested
+                // before the next flush. Order is what paintDirty reads, and compaction preserves it.
+                for (int iter = write; iter < paintQueueFill; iter++) {
+                    paintQueue[iter] = null;
+                }
+                paintQueueFill = write;
             }
 
             paintQueue[paintQueueFill] = cmp;

@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,6 +54,13 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         }
     }
 
+    /** Paints until nothing is queued, so a scenario below starts from a known-empty queue. */
+    private static void drain() {
+        for (int iter = 0; iter < 50 && Display.impl.hasPendingPaints(); iter++) {
+            Display.impl.paintDirty();
+        }
+    }
+
     private static CountingContainer showChild(Form form) {
         CountingContainer child = new CountingContainer();
         child.add(new Label("hello"));
@@ -60,7 +68,7 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         form.show();
         form.revalidate();
         // drain whatever showing the form queued, so each scenario below starts from an empty queue
-        Display.impl.paintDirty();
+        drain();
         child.paints = 0;
         return child;
     }
@@ -155,6 +163,46 @@ class PaintQueueAncestorDedupTest extends UITestBase {
         Display.impl.paintDirty();
 
         assertEquals(1, first.paints, "a refused parent must not take the queued children with it");
+    }
+
+    /**
+     * Dropping entries has to reclaim their slots. {@code paintQueueFill} counts holes, so leaving
+     * them behind lets a queue holding one live entry report itself full and reject everything
+     * requested before the next flush.
+     */
+    @FormTest
+    void droppedSlotsAreReclaimed() {
+        Form form = new Form("paint queue", new BorderLayout());
+        Container holder = new Container(BoxLayout.y());
+        // scrollable so every child is laid out at its preferred size: a child measuring zero is
+        // dropped by Component.repaint(Component) and would never reach the queue
+        holder.setScrollableY(true);
+        // outside `holder`, so dropping holder's descendants cannot cover it, and on screen so its
+        // paint is not clipped away
+        CountingContainer outsider = new CountingContainer();
+        outsider.add(new Label("outsider"));
+        form.add(BorderLayout.NORTH, outsider);
+        form.add(BorderLayout.CENTER, holder);
+        CountingContainer[] children = new CountingContainer[PAINT_QUEUE_CAPACITY - 1];
+        for (int i = 0; i < children.length; i++) {
+            children[i] = new CountingContainer();
+            children[i].add(new Label("c" + i));
+            holder.add(children[i]);
+        }
+        form.show();
+        form.revalidate();
+        drain();
+
+        // fill the queue to one short of capacity, then collapse it all into the one parent
+        for (CountingContainer child : children) {
+            child.repaint();
+        }
+        holder.repaint();
+        outsider.paints = 0;
+        outsider.repaint();
+        Display.impl.paintDirty();
+
+        assertEquals(1, outsider.paints, "the dropped slots must be usable by an unrelated repaint");
     }
 
     @FormTest
