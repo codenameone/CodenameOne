@@ -64,8 +64,15 @@ public final class VpnRequests {
     ///
     /// @hidden not part of the public API; test-only.
     public static void resetForTest(VpnBridge bridge) {
+        VpnBridge previous;
         synchronized (VpnRequests.class) {
+            previous = testBridge;
             testBridge = bridge;
+        }
+        // See CallRequests.resetForTest: a simulation left behind by a
+        // finished test goes on delivering into the next one otherwise.
+        if (previous instanceof LocalVpnBridge) {
+            ((LocalVpnBridge) previous).retire();
         }
         ACKS.failAll(new IllegalStateException("reset"));
         STRINGS.failAll(new IllegalStateException("reset"));

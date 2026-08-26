@@ -74,6 +74,11 @@ public class LocalCallBridge implements CallBridge {
 
     private List<Runnable> deferred;
 
+    /// Set when the bridge is discarded; see [#retire()]. Guarded by the
+    /// bridge itself rather than volatile, which this project's analysers
+    /// reject in core.
+    private boolean retired;
+
     private boolean supported = true;
     private boolean voipSupported = true;
     private boolean directorySupported = true;
@@ -733,11 +738,57 @@ public class LocalCallBridge implements CallBridge {
             return;
         }
         if (Display.isInitialized()) {
-            Display.getInstance().setTimeout(millis, delivery);
+            // Wrapped so a delivery scheduled by a finished test cannot fire
+            // into the next one. Display.setTimeout hands back nothing to
+            // cancel, and a stale answer arriving while another test is
+            // starting its Display is not a failure anyone can read: the
+            // symptom is that test timing out with the EDT not yet up.
+            Display.getInstance().setTimeout(millis,
+                    new Retired(this, delivery));
             return;
         }
         // No Display, so this is a unit test driving the bridge directly.
         delivery.run();
+    }
+
+    /// Drops every delivery this bridge has scheduled and refuses more.
+    ///
+    /// Called when the facade is reset -- which is what a test's teardown
+    /// does -- because Display.setTimeout cannot be cancelled and the
+    /// simulation is deliberately slow enough that answers outlive a short
+    /// test.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public void retire() {
+        synchronized (this) {
+            retired = true;
+        }
+    }
+
+    /// Whether this bridge has been discarded.
+    boolean isRetired() {
+        synchronized (this) {
+            return retired;
+        }
+    }
+
+    /// A scheduled delivery that checks its bridge is still in use.
+    private static final class Retired implements Runnable {
+        private final LocalCallBridge bridge;
+        private final Runnable delivery;
+
+        Retired(LocalCallBridge bridge, Runnable delivery) {
+            this.bridge = bridge;
+            this.delivery = delivery;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.isRetired()) {
+                return;
+            }
+            delivery.run();
+        }
     }
 
     // ------------------------------------------------------------------

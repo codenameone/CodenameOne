@@ -216,6 +216,21 @@ static void cn1vpDiscardSecrets(void) {
             setInteger:0 forKey:@"cn1vpn.secretGeneration"];
 }
 
+/// Deletes the items an installation staged but never saved.
+///
+/// The secrets go into the keychain while the configuration is built, which
+/// is before saveToPreferences is even called -- so a declined prompt or an
+/// invalid configuration left a password and a pre-shared key that NOTHING
+/// references, and that a later remove() would not find either, because
+/// remove only knows about the live generation.
+static void cn1vpDiscardStagedSecrets(void) {
+    int staged = cn1vpLoadSecretGeneration() + 1;
+    SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+            [NSString stringWithFormat:@"cn1vpn.psk.%d", staged]));
+    SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+            [NSString stringWithFormat:@"cn1vpn.password.%d", staged]));
+}
+
 /// Retires the generations older than the one that just saved.
 ///
 /// Only after a successful save: until then the installed profile still
@@ -429,6 +444,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
                 cn1vpAck(requestId, YES, 0, nil);
                 return;
             }
+            cn1vpDiscardStagedSecrets();
             // A user who declines the system prompt lands here, and it is an
             // ordinary outcome rather than a failure to report twice.
             int code = saveError.code == NEVPNErrorConfigurationReadWriteFailed
@@ -449,6 +465,17 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
 #ifdef CN1_VPN_HAS_NE
+    // Both mutate the one shared NEVPNManager, so running a removal across an
+    // installation lets the two callbacks interleave: the removal can
+    // acknowledge success before the pending save puts the profile back, or
+    // delete the profile the installation has just acknowledged. Whichever
+    // way round, one of the two answered success for a state that is not the
+    // one on the device.
+    if (cn1vpInstalling) {
+        cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                @"A VPN profile installation is in progress");
+        return;
+    }
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
         [manager removeFromPreferencesWithCompletionHandler:^(NSError *error) {

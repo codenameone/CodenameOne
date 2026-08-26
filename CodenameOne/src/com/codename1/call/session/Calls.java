@@ -251,11 +251,34 @@ public final class Calls {
     /// failure, and the token is settled in a `finally` either way. This is a
     /// notification -- nobody is waiting on an answer, every listener is
     /// entitled to hear it, and on a port the thread carrying it is a native
-    /// callback thread that must not be taken down by application code.
+    /// callback thread that must not be taken down by application code. All
+    /// FOUR notification arms are handled this way: ended, providerReset and
+    /// both halves of the audio session.
     private static void tell(CallActionListener l, String callId,
             CallEndReason reason) {
         try {
             l.callEnded(callId, reason);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the audio session is live. See [#tell]: this is the
+    /// notification an app starts its media from, so a listener that throws
+    /// must not leave the ones after it with a silent call.
+    private static void tellAudioOn(CallActionListener l, CallAudioSession s) {
+        try {
+            l.audioSessionActivated(s);
+        } catch (Throwable t) {
+            report(t);
+        }
+    }
+
+    /// Tells one listener the audio session is gone. See [#tellAudioOn]:
+    /// stopping early here leaves a media engine running.
+    private static void tellAudioOff(CallActionListener l, String callId) {
+        try {
+            l.audioSessionDeactivated(callId);
         } catch (Throwable t) {
             report(t);
         }
@@ -827,13 +850,13 @@ public final class Calls {
                 case AUDIO_ON: {
                     CallAudioSession s = new CallAudioSession(callId, route(ordinal));
                     for (CallActionListener l : ls) {
-                        l.audioSessionActivated(s);
+                        tellAudioOn(l, s);
                     }
                     break;
                 }
                 case AUDIO_OFF:
                     for (CallActionListener l : ls) {
-                        l.audioSessionDeactivated(callId);
+                        tellAudioOff(l, callId);
                     }
                     break;
                 case ENDED: {

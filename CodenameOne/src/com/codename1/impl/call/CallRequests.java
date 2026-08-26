@@ -110,8 +110,18 @@ public final class CallRequests {
     ///
     /// - `bridge`: the bridge to install, or null for none
     public static void resetForTest(CallBridge bridge) {
+        CallBridge previous;
         synchronized (CallRequests.class) {
+            previous = testBridge;
             testBridge = bridge;
+        }
+        // The simulation schedules its answers through Display.setTimeout,
+        // which hands back nothing to cancel -- so a bridge left behind by a
+        // finished test goes on delivering into the next one. Told to stop
+        // instead. Tested with instanceof rather than cast for the reason
+        // check-cast-semantics.sh gives.
+        if (previous instanceof LocalCallBridge) {
+            ((LocalCallBridge) previous).retire();
         }
         ACKS.failAll(new IllegalStateException("reset"));
         PERMISSIONS.failAll(new IllegalStateException("reset"));

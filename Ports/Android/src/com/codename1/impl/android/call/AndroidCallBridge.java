@@ -200,26 +200,42 @@ public class AndroidCallBridge implements CallBridge {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             @Override
             public void run() {
-                if ((permissionBits & PERMISSION_MICROPHONE) != 0) {
-                    com.codename1.impl.android.AndroidImplementation
-                            .checkForPermission(Manifest.permission.RECORD_AUDIO,
-                                    "This is required to carry the audio of a call");
+                // One sequence at a time. checkForPermission blocks on a
+                // dialog behind an activity-wide flag and request code, so two
+                // workers running at once share them: the first result clears
+                // the flag for both, and the second returned the mask as it
+                // stood with its OWN dialog still on screen -- reporting a
+                // denial the user was in the middle of granting.
+                synchronized (PERMISSION_LOCK) {
+                    requestPermissionsLocked(permissionBits, requestId);
                 }
-                if ((permissionBits & PERMISSION_CAMERA) != 0) {
-                    com.codename1.impl.android.AndroidImplementation
-                            .checkForPermission(Manifest.permission.CAMERA,
-                                    "This is required for video calls");
-                }
-                if ((permissionBits & PERMISSION_NOTIFICATIONS) != 0
-                        && Build.VERSION.SDK_INT >= 33) {
-                    com.codename1.impl.android.AndroidImplementation
-                            .checkForPermission("android.permission.POST_NOTIFICATIONS",
-                                    "This is required to show an incoming call");
-                }
-                Calls.deliverPermissionResult(requestId, getGrantedPermissions());
             }
         });
     }
+
+    /// The permission sequence itself; the caller holds PERMISSION_LOCK.
+    private void requestPermissionsLocked(int permissionBits, int requestId) {
+        if ((permissionBits & PERMISSION_MICROPHONE) != 0) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission(Manifest.permission.RECORD_AUDIO,
+                            "This is required to carry the audio of a call");
+        }
+        if ((permissionBits & PERMISSION_CAMERA) != 0) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission(Manifest.permission.CAMERA,
+                            "This is required for video calls");
+        }
+        if ((permissionBits & PERMISSION_NOTIFICATIONS) != 0
+                && Build.VERSION.SDK_INT >= 33) {
+            com.codename1.impl.android.AndroidImplementation
+                    .checkForPermission("android.permission.POST_NOTIFICATIONS",
+                            "This is required to show an incoming call");
+        }
+        Calls.deliverPermissionResult(requestId, getGrantedPermissions());
+    }
+
+    /// Serialises the permission sequence; see requestPermissions.
+    private static final Object PERMISSION_LOCK = new Object();
 
     @Override
     public void configureProvider(int requestId, String configWire) {

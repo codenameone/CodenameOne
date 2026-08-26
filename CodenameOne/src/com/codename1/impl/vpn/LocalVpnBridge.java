@@ -48,6 +48,9 @@ public class LocalVpnBridge implements VpnBridge {
 
     private List<Runnable> deferred;
 
+    /// Set when the bridge is discarded; see [#retire()].
+    private boolean retired;
+
     private boolean supported = true;
     private boolean userAccepts = true;
     private boolean authenticates = true;
@@ -243,10 +246,48 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         if (Display.isInitialized()) {
-            Display.getInstance().setTimeout(millis, delivery);
+            // Wrapped for the reason LocalCallBridge gives: setTimeout hands
+            // back nothing to cancel, so an answer scheduled by a finished
+            // test would otherwise fire into the next one.
+            Display.getInstance().setTimeout(millis, new Retired(this, delivery));
             return;
         }
         delivery.run();
+    }
+
+    /// Drops every delivery this bridge has scheduled and refuses more.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public void retire() {
+        synchronized (this) {
+            retired = true;
+        }
+    }
+
+    /// Whether this bridge has been discarded.
+    boolean isRetired() {
+        synchronized (this) {
+            return retired;
+        }
+    }
+
+    /// A scheduled delivery that checks its bridge is still in use.
+    private static final class Retired implements Runnable {
+        private final LocalVpnBridge bridge;
+        private final Runnable delivery;
+
+        Retired(LocalVpnBridge bridge, Runnable delivery) {
+            this.bridge = bridge;
+            this.delivery = delivery;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.isRetired()) {
+                return;
+            }
+            delivery.run();
+        }
     }
 
     private static final class AckDelivery implements Runnable {
