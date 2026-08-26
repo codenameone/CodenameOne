@@ -547,7 +547,8 @@ public class MacOSNativeBuilder extends Executor {
         // cannot ship without its sentence. macOS kills a process that touches a
         // TCC-gated API with no usage description -- no prompt, no catchable
         // error -- so a camera app built without this crashes on first use.
-        plist.putAll(MacOSXcodeProject.privacyUsageDescriptions(caps,
+        plist.putAll(MacOSXcodeProject.privacyUsageDescriptions(
+                effectiveCapabilities(hints, caps),
                 new MacOSXcodeProject.UsageDescriptionResolver() {
                     @Override
                     public String get(String key) {
@@ -581,6 +582,38 @@ public class MacOSNativeBuilder extends Executor {
         for (String channel : hints.getChannels()) {
             writeEntitlements(hints, srcRoot, appName, channel, channelSuffix(channel));
         }
+    }
+
+    /**
+     * The capabilities the bundle has to describe: what the scan found, plus
+     * anything a {@code macos.entitlements.device.*} override turned on.
+     *
+     * <p>The union rather than the scan, because the two have to agree. An
+     * override exists precisely for access the scanner cannot see -- through a
+     * cn1lib, or native code -- and granting the entitlement while omitting the
+     * usage description is the worst of both: the app is allowed to ask, and
+     * macOS kills it the moment it does.</p>
+     *
+     * <p>Across every channel, since the plist is one file and a capability
+     * enabled for either channel ships in it.</p>
+     */
+    private MacOSXcodeProject.MacOSCapabilities effectiveCapabilities(MacOSBuildHints hints,
+            MacOSXcodeProject.MacOSCapabilities scanned) {
+        MacOSXcodeProject.MacOSCapabilities out = new MacOSXcodeProject.MacOSCapabilities();
+        out.usesCamera = scanned.usesCamera;
+        out.usesMicrophone = scanned.usesMicrophone;
+        out.usesBluetooth = scanned.usesBluetooth;
+        out.usesLocation = scanned.usesLocation;
+        out.usesServerSockets = scanned.usesServerSockets;
+        for (String channel : hints.getChannels()) {
+            MacOSBuildHints.EntitlementOverrides o = hints.entitlementsFor(channel);
+            out.usesCamera |= o.camera(scanned.usesCamera);
+            out.usesMicrophone |= o.microphone(scanned.usesMicrophone);
+            out.usesBluetooth |= o.bluetooth(scanned.usesBluetooth);
+            out.usesLocation |= o.location(scanned.usesLocation);
+            out.usesServerSockets |= o.networkServer(scanned.usesServerSockets);
+        }
+        return out;
     }
 
     /// The file-name suffix for one signing channel. One place, because the
@@ -729,8 +762,16 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add(appName);
         cmd.add("-configuration");
         cmd.add(request.getArg("macos.configuration", "Release"));
-        cmd.add("-derivedDataPath");
-        cmd.add(derived.getAbsolutePath());
+        // SYMROOT/OBJROOT rather than -derivedDataPath. xcodebuild refuses
+        // -derivedDataPath unless it is also given -scheme ("The flag -scheme,
+        // -testProductsPath, or -xctestrun is required when specifying
+        // -derivedDataPath"), and the generated project has no shared scheme --
+        // the screenshot script writes one itself precisely because the
+        // translator emits none. These two settings are target-compatible and
+        // put the products in the same place under `derived`, which is where
+        // findAppBundle looks.
+        cmd.add("SYMROOT=" + new File(derived, "Build/Products").getAbsolutePath());
+        cmd.add("OBJROOT=" + new File(derived, "Build/Intermediates.noindex").getAbsolutePath());
         // Universal by default. A Mac application is expected to run on both
         // architectures, and a single-architecture build is the kind of thing
         // nobody notices until an Intel user reports it.
@@ -803,7 +844,15 @@ public class MacOSNativeBuilder extends Executor {
         // Notarization needs a signed bundle, so an unsigned build says so
         // rather than running a notarization that would be rejected.
         if (hints.isNotarize()) {
-            if (signingIdentity == null) {
+            if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)) {
+                // Notarization requires Developer ID signing, so submitting the
+                // store-signed artifact is rejected -- and with distribution=both
+                // that rejection would fail the whole build after BOTH artifacts
+                // were successfully produced. The store notarizes its own uploads.
+                log("Skipping notarization of the App Store package: notarization applies to "
+                        + "Developer ID distribution, and App Store submissions are notarized by "
+                        + "the store.");
+            } else if (signingIdentity == null) {
                 log("macos.notarize is set but the " + channel + " build is unsigned, so there is "
                         + "nothing to notarize. Configure a Developer ID signing identity.");
             } else if (containers.isEmpty()) {

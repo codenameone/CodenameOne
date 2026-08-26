@@ -160,6 +160,14 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 /// non-Retina display changes the answer while the app is running.
 - (void)viewDidChangeBackingProperties {
     [super viewDidChangeBackingProperties];
+    // The shared point<->pixel global as well as this view's framebuffer. The
+    // two are read by different code -- the renderer re-asks the view, while the
+    // peer layout and the native pickers read the global -- so refreshing only
+    // one leaves them disagreeing after the window moves to a display with a
+    // different backing scale. The host resolves it against the MAIN window, so
+    // a secondary view calling this cannot claim the value.
+    extern void CN1MacRefreshScaleValue(void);
+    CN1MacRefreshScaleValue();
     [self updateBackingSize];
 }
 

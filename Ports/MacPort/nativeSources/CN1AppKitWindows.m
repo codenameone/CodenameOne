@@ -580,9 +580,21 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         NSRect content = [old contentRectForFrameRect:old.frame];
         NSString *title = old.title;
         METALView *view = rec.view;
+        // Everything else the window had been told, carried across. The
+        // replacement is a different NSWindow, so anything not copied here is
+        // silently lost -- and the framework does not re-apply it, because from
+        // its side nothing changed. Window.show() sets always-on-top before
+        // converting to a utility window, so dropping the level left a window
+        // whose isAlwaysOnTop() is true and which does not float.
+        NSWindowLevel level = old.level;
+        NSSize minSize = old.contentMinSize;
+        NSWindow *owner = old.parentWindow;
 
         [view removeFromSuperview];
         old.delegate = nil;
+        if (owner != nil) {
+            [owner removeChildWindow:old];
+        }
         [old orderOut:nil];
         [old close];
 
@@ -591,8 +603,16 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         [fresh setFrame:[fresh frameRectForContentRect:content] display:NO];
         fresh.contentView = view;
         fresh.delegate = rec;
+        fresh.level = level;
+        fresh.contentMinSize = minSize;
         rec.window = fresh;
         rec.utility = utility != 0;
+        if (owner != nil) {
+            // Re-attached only if it was already attached; a window still
+            // waiting for its first show keeps its pendingOwner instead, so the
+            // conversion does not order it in early.
+            [owner addChildWindow:fresh ordered:NSWindowAbove];
+        }
         if (wasVisible) {
             [fresh makeKeyAndOrderFront:nil];
         }

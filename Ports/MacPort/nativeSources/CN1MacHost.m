@@ -33,6 +33,30 @@
 static const CGFloat CN1_MAC_DEFAULT_WIDTH = 1024;
 static const CGFloat CN1_MAC_DEFAULT_HEIGHT = 685;
 
+/**
+ * Republishes the main window's backing scale to the shared global.
+ *
+ * <p>Re-read rather than captured once: moving the window between a Retina and
+ * a non-Retina display changes the answer while the app runs. The framebuffer
+ * path already re-asks, so a stale global left the two disagreeing -- shared
+ * rendering and CN1MacPickers divide anchor coordinates by this, so a popover
+ * opened after the move landed at the wrong place and at the wrong size.</p>
+ *
+ * <p>Always the MAIN window, whoever calls: this is one process-wide value, and
+ * a secondary window on another display must not claim it.</p>
+ */
+void CN1MacRefreshScaleValue(void) {
+    extern float scaleValue;
+    NSWindow *w = [CN1MacHost sharedHost].window;
+    if (w == nil) {
+        return;
+    }
+    CGFloat s = w.backingScaleFactor;
+    if (s > 0) {
+        scaleValue = (float)s;
+    }
+}
+
 @implementation CN1MacHost {
     NSWindow *_window;
     METALView *_renderingView;
@@ -106,8 +130,7 @@ static const CGFloat CN1_MAC_DEFAULT_HEIGHT = 685;
     // iOS from the screen scale; without setting it here every peer component
     // would be laid out at pixel coordinates read as points, so on a Retina
     // display each one lands at twice its size in the wrong place.
-    extern float scaleValue;
-    scaleValue = (float)_window.backingScaleFactor;
+    CN1MacRefreshScaleValue();
     [_window center];
     [_window makeKeyAndOrderFront:nil];
     [_window makeFirstResponder:_renderingView];
