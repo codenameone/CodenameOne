@@ -33,6 +33,7 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -63,8 +64,14 @@ import java.util.Set;
 ///   2. ParparVM's iOS class scan and the JavaSE simulator both see them.
 ///   3. The project's `target/classes` takes precedence over any cn1-core
 ///      JAR stub of the same internal name on the classpath at runtime.
+/// COMPILE resolution is required, not optional. A processor discovers which
+/// annotations are build hint annotations by reading the annotation package off
+/// this classpath, and without a declared scope Maven does not resolve it:
+/// getCompileClasspathElements() throws, the package is not found, and every
+/// annotated hint is silently skipped.
 @Mojo(name = "process-annotations",
       defaultPhase = LifecyclePhase.PROCESS_CLASSES,
+      requiresDependencyResolution = ResolutionScope.COMPILE,
       threadSafe = true)
 public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
 
@@ -347,7 +354,14 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         try {
             return module.getCompileClasspathElements();
         } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
-            getLog().debug("cn1: compile classpath unresolved for " + module.getArtifactId(), ex);
+            // Loud. An unresolved classpath means the annotation package cannot
+            // be found, and a processor that reads it then finds nothing to do
+            // -- so every annotated hint would be skipped with no other sign. The
+            // mojo declares COMPILE resolution precisely so this cannot happen;
+            // reaching it means that declaration was lost.
+            getLog().warn("cn1: the compile classpath for " + module.getArtifactId()
+                    + " is unresolved, so build hint annotations cannot be read: "
+                    + ex.getMessage());
             return java.util.Collections.emptyList();
         }
     }

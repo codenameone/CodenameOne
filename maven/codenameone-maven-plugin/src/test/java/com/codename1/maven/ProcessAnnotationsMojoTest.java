@@ -262,4 +262,53 @@ public class ProcessAnnotationsMojoTest {
                 .getCodeSource().getLocation();
         return new File(url.toURI());
     }
+
+    /// The goal must ask Maven to resolve the compile classpath.
+    ///
+    /// The processor finds out which annotations are build hint annotations by
+    /// reading the annotation package off that classpath. Without a declared
+    /// scope Maven does not resolve it, getCompileClasspathElements() throws,
+    /// the package is not found, and every annotated hint is skipped -- a green
+    /// build with the hints silently absent, which is what this whole feature
+    /// exists to prevent. It shipped that way for exactly one commit.
+    ///
+    /// Read from the BYTECODE, because @Mojo has CLASS retention and
+    /// getAnnotation() returns null for it -- the same fact that makes the build
+    /// hint annotations themselves unreadable by reflection.
+    @Test
+    public void theGoalResolvesTheCompileClasspath() throws Exception {
+        File classFile = new File(new File(ProcessAnnotationsMojo.class.getProtectionDomain()
+                .getCodeSource().getLocation().toURI()),
+                "com/codename1/maven/ProcessAnnotationsMojo.class");
+        assertTrue(classFile.getAbsolutePath(), classFile.isFile());
+        final String[] scope = new String[1];
+        java.io.InputStream in = new java.io.FileInputStream(classFile);
+        try {
+            new org.objectweb.asm.ClassReader(in).accept(
+                    new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                        @Override
+                        public org.objectweb.asm.AnnotationVisitor visitAnnotation(
+                                String descriptor, boolean visible) {
+                            if (!"Lorg/apache/maven/plugins/annotations/Mojo;"
+                                    .equals(descriptor)) {
+                                return null;
+                            }
+                            return new org.objectweb.asm.AnnotationVisitor(
+                                    org.objectweb.asm.Opcodes.ASM9) {
+                                @Override
+                                public void visitEnum(String name, String desc, String value) {
+                                    if ("requiresDependencyResolution".equals(name)) {
+                                        scope[0] = value;
+                                    }
+                                }
+                            };
+                        }
+                    }, org.objectweb.asm.ClassReader.SKIP_CODE);
+        } finally {
+            in.close();
+        }
+        assertTrue("process-annotations must resolve the compile classpath, got " + scope[0],
+                "COMPILE".equals(scope[0]) || "COMPILE_PLUS_RUNTIME".equals(scope[0])
+                        || "TEST".equals(scope[0]));
+    }
 }
