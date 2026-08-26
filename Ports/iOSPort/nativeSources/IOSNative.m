@@ -4131,12 +4131,31 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 
 extern float scaleValue;
 
+#if TARGET_OS_OSX
+/// The scale a peer's own window uses, falling back to the process-wide one.
+///
+/// scaleValue tracks the MAIN window, and a peer in a secondary window on a
+/// display of a different density is laid out in ITS window's pixels -- so
+/// dividing by the main window's scale sized and placed it wrongly, at half or
+/// double, while the pointer coordinates and the drawable for that same window
+/// used the right one.
+static CGFloat cn1MacPeerScale(NSView *peerView) {
+    extern float scaleValue;
+    CGFloat scale = (peerView != nil && peerView.window != nil)
+        ? peerView.window.backingScaleFactor : 0;
+    if (scale <= 0) {
+        scale = scaleValue > 0 ? scaleValue : 1;
+    }
+    return scale;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #if TARGET_OS_OSX
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
-        float scale = scaleValue;
+        CGFloat scale = cn1MacPeerScale(v);
         [v setFrame:CGRectMake(x / scale, y / scale, w / scale, h / scale)];
         [v setNeedsDisplay:YES];
         POOL_END();
@@ -4297,7 +4316,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
                     addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
-            float scale = scaleValue;
+            CGFloat scale = cn1MacPeerScale(v);
             [v setFrame:CGRectMake(x / scale, y / scale, w / scale, h / scale)];
             [v setNeedsDisplay:YES];
         } else {
@@ -15380,29 +15399,29 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
     JAVA_OBJECT me, JAVA_OBJECT notificationId, JAVA_OBJECT alertTitle, JAVA_OBJECT alertBody, JAVA_OBJECT alertSound, JAVA_INT badgeNumber, JAVA_LONG fireDate, JAVA_INT repeatType, JAVA_BOOLEAN foreground
                                                                                                                                                                      ) {
 #ifdef CN1_INCLUDE_NOTIFICATIONS2
+    // Every string here is autoreleased -- [NSString string] and both of the
+    // stringBy... results -- so nothing in this function owns one and the three
+    // releases that used to sit between these lines were over-releases.
+    //
+    // They survived because of what they happened to be released: the empty
+    // string is a shared instance whose release does nothing, and a short ASCII
+    // result is a tagged pointer, where release is also a no-op. A body long
+    // enough to be heap-backed is neither, and that one crashed when the pool
+    // drained -- after the notification had been scheduled, so nowhere near the
+    // call that caused it.
     NSString * title = [NSString string];
     NSString * body = [NSString string];
     NSString *tmpStr;
     if (alertTitle != NULL) {
         tmpStr = [title stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertTitle)];
-                    
-#ifndef CN1_USE_ARC
-        [title release];
-#endif
         title = tmpStr;
     }
-    
+
     if (alertBody != NULL) {
-        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];     
-#ifndef CN1_USE_ARC
-        [body release];
-#endif
+        tmpStr = [body stringByAppendingString:toNSString(CN1_THREAD_STATE_PASS_ARG alertBody)];
         body = tmpStr;
     }
     tmpStr = [body stringByReplacingOccurrencesOfString:@"%" withString:@"%%"];
-#ifndef CN1_USE_ARC
-    [body release];
-#endif
     body = tmpStr;
     
     NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
