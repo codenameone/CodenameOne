@@ -2207,6 +2207,15 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.indexOf("com/codename1/call/directory/") == 0) {
                         usesCallDirectory = true;
                     }
+                    // Only .profile. There is no com.codename1.vpn.tunnel
+                    // to scan for: a tunnel needs a bound VpnService and a
+                    // packet API this framework does not have, and on iOS its
+                    // body would run in an extension with no Java virtual
+                    // machine in it. So no <service> guarded by
+                    // BIND_VPN_SERVICE is emitted anywhere, deliberately --
+                    // declaring one for a package nobody can import would
+                    // put a VPN permission on the manifest of an app that
+                    // cannot tunnel anything.
                     if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
                     }
