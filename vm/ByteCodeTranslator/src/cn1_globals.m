@@ -684,6 +684,79 @@ _Atomic long long cn1ConsResolved = 0;   // ...that resolved to a heap object
 // in the same cycle would have marked it anyway), so it is an UPPER BOUND on conservative
 // resurrection -- which is what makes it able to refute cheaply and not to confirm.
 _Atomic long long cn1ConsFirstMarks = 0;
+
+// ---- mutator stall accounting (issue 5537, the "death by GC" half) -------------------
+// The five merged fixes for 5537 all measured the FOOTPRINT and the collector's own wall
+// time. Neither can express what the reporter is left with: "no long term memory buildup,
+// and no crashes, but the pauses for GC become very frequent and very long". Nothing in
+// the runtime measured a pause. [GCPROBE]'s phases are the COLLECTOR's time; waitMs is
+// the exact inverse of what is wanted (the collector waiting on a mutator); [PACING] and
+// [LOWMEM] count parks and record no duration at all. So a build could stall every worker
+// thread for 90% of the run and every gate would stay green.
+//
+// This measures the other side: for each site where a mutator can be stopped, how long it
+// was stopped and why. Cost is two clock_gettime calls per PARK -- never per allocation --
+// against a park that is at minimum a 50us sleep, so it cannot distort what it measures.
+#define CN1_STALL_PACING_VOLUME 0   // regime-A run-ahead cap (cn1PacingPark, no budget)
+#define CN1_STALL_PACING_BUDGET 1   // regime-B admission wait (cn1PacingPark, under a ceiling)
+#define CN1_STALL_LOWMEM        2   // the low-memory allocation throttle
+#define CN1_STALL_HANDSHAKE     3   // threadBlockedByGC: this thread's own share of the mark
+#define CN1_STALL_PENDING_FULL  4   // per-thread pending table full: waits out a WHOLE cycle
+#define CN1_STALL_NATIVE_RESUME 5   // returning from a native call into a running mark
+#define CN1_STALL_SIGNAL_STOP   6   // parked inside the GC's stop signal handler
+#define CN1_STALL_CAUSES        7
+static const char* cn1StallCauseNames[CN1_STALL_CAUSES] = {
+    "pacingVolume", "pacingBudget", "lowMemory", "handshake",
+    "pendingFull", "nativeResume", "signalStop"
+};
+// Log2-microsecond buckets. A stall distribution spans microseconds (a handshake that
+// found the thread already parked) to seconds (waiting out a cycle), so a linear
+// histogram either loses the short tail or needs thousands of buckets; bucket k holds
+// [2^k, 2^(k+1)) us and 32 of them reach past an hour.
+#define CN1_STALL_BUCKETS 32
+_Atomic long long cn1StallNs[CN1_STALL_CAUSES];
+_Atomic long cn1StallCount[CN1_STALL_CAUSES];
+_Atomic long long cn1StallMaxNs[CN1_STALL_CAUSES];
+_Atomic long cn1StallBuckets[CN1_STALL_CAUSES][CN1_STALL_BUCKETS];
+// How the collector decided to start each cycle. Under sustained churn a healthy
+// collector answers a pending request and starts the next cycle at once; the defect this
+// pair exists to gate is the collector idling while every mutator is parked waiting for
+// it. Counting the decision is machine-independent in a way no pause threshold is -- a
+// slow runner makes cycles longer, it does not make the collector idle through demand.
+_Atomic long cn1GcCyclesOnDemand = 0;   // started immediately: a collection was owed
+_Atomic long cn1GcCyclesAfterIdle = 0;  // started after an idle wait expired or was woken
+
+long long cn1StallNowNs(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long long)t.tv_sec * 1000000000LL + (long long)t.tv_nsec;
+}
+
+// ts may be null: the signal-stop handler has no usable thread state to charge, and the
+// duty-cycle line below is a sum over live threads, so an uncharged stall is simply not
+// counted there while still appearing in the per-cause table.
+void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts) {
+    if(ns <= 0 || cause < 0 || cause >= CN1_STALL_CAUSES) {
+        return;
+    }
+    atomic_fetch_add_explicit(&cn1StallNs[cause], ns, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1StallCount[cause], 1, memory_order_relaxed);
+    long long prev = atomic_load_explicit(&cn1StallMaxNs[cause], memory_order_relaxed);
+    while(ns > prev && !atomic_compare_exchange_weak_explicit(&cn1StallMaxNs[cause], &prev, ns,
+                                                              memory_order_relaxed,
+                                                              memory_order_relaxed)) {
+    }
+    long long us = ns / 1000;
+    int b = 0;
+    while(us > 1 && b < CN1_STALL_BUCKETS - 1) {
+        us >>= 1;
+        b++;
+    }
+    atomic_fetch_add_explicit(&cn1StallBuckets[cause][b], 1, memory_order_relaxed);
+    if(ts != 0) {
+        atomic_fetch_add_explicit(&ts->gcStallNs, ns, memory_order_relaxed);
+    }
+}
 #endif
 
 static void cn1ReportLowMemoryParks(void) {
@@ -2892,6 +2965,9 @@ static _Atomic long long cn1LegacyBytesSinceGc = 0;
 // scheduled at most once per cycle window, not on every allocation after the
 // crossing. Cleared in cn1BibopBeginGcCycle after the counter reset.
 static _Atomic int cn1LegacyGcScheduled = 0;
+// Same latch for the BiBOP trigger. Cleared in cn1BibopBeginGcCycle after the counter
+// reset, for the reason spelled out there.
+static _Atomic int cn1BibopGcScheduled = 0;
 #endif
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
@@ -2912,6 +2988,76 @@ JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_
     }
 #endif
     return alloc > threshold && totalAllocations > CN1_HIGH_FREQUENCY_ALLOCATION_ACTIVATED_THRESHOLD;
+}
+
+// How long the collector should idle between cycles, or 0 to start the next one at once.
+//
+// This used to be inline in System.startGCThread's loop as
+//
+//     if(forceGc || isHighFrequencyGC()) { forceGc = false; LOCK.wait(200); }
+//     else                               { LOCK.wait(30000); }
+//
+// which THREW AWAY every collection request that arrived while the collector was inside
+// a cycle: System.gc() sets forceGc and notifies, the notify is lost because nobody is
+// waiting yet, and the loop then clears the flag and sleeps 200ms anyway. Under sustained
+// churn every trigger crossing lands mid-cycle, so that was the normal case, and the cost
+// is not the collector's -- it is the mutator's. A thread parked on the run-ahead cap in
+// cn1PacingPark is waiting for the NEXT CYCLE TO BEGIN, so it waits out that idle too: on
+// the GcSteadyState churn workload the mark was 40ms and the measured park was 212ms, and
+// four worker threads spent 80 of 120 thread-seconds stopped (issue 5537, the "pauses
+// become very frequent and very long" the reporter is left with after the footprint work).
+//
+// forceGc means "a collection is owed", so it is answered rather than discarded. The
+// 200ms/30s idles are unchanged for the cases that actually are idle.
+//
+// isHighFrequencyGC() is called unconditionally and exactly once because it RESETS
+// allocationsSinceLastGC as part of answering; short-circuiting it would let that counter
+// accumulate across the whole busy period and then misreport the first quiet one.
+JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
+    // isHighFrequencyGC() is called unconditionally and exactly once: it RESETS
+    // allocationsSinceLastGC as part of answering, so short-circuiting it would let that
+    // counter accumulate across a whole busy period and then misreport the first quiet one.
+    JAVA_BOOLEAN highFrequency = java_lang_System_isHighFrequencyGC___R_boolean(threadStateData);
+    JAVA_BOOLEAN forced = get_static_java_lang_System_forceGc();
+    if(forced) {
+        set_static_java_lang_System_forceGc(JAVA_FALSE);
+        // Ablation arm: -DCN1_GC_NO_DEMAND_SIGNAL restores BOTH halves of the old
+        // behaviour -- the request discarded here and the request suppressed in
+        // cn1BibopMaybeGc -- so the pair can be A/B'd in one session. They are one defect:
+        // a demand signal that is never raised and, if raised, never answered.
+#if !defined(CN1_GC_NO_DEMAND_SIGNAL) && !defined(CN1_DISABLE_BIBOP)
+        // Answer the request only while it STILL STANDS. Both counters are zeroed at cycle
+        // start, so what they hold here is what the mutator produced DURING the cycle that
+        // just ended: at or above the trigger means it is outrunning the collector and the
+        // next cycle is already owed; below it means the collector is keeping up and the
+        // ordinary idle is the right answer. Answering every request the instant it can --
+        // including from an application that was never blocked -- measured 8-9% on the two
+        // allocation-heavy microbenchmarks, which is a real cost paid for nothing. In the
+        // case this whole change is about the test is never close: the mutator has run all
+        // the way to the run-ahead cap, which is a multiple of the trigger.
+        //
+        // Read the two atomics directly rather than through cn1PacingUncollectedBytes(),
+        // which is compiled out under -DCN1_PACING_NO_RESERVE -- an arm this decision has
+        // nothing to do with, and one the gate builds.
+        {
+            long long uncollected =
+                    (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed)
+                  + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
+                                                                memory_order_relaxed);
+            if(uncollected >= trigger) {
+#ifdef CN1_GC_CONFORM
+                atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
+#endif
+                return 0;
+            }
+        }
+#endif
+    }
+#ifdef CN1_GC_CONFORM
+    atomic_fetch_add_explicit(&cn1GcCyclesAfterIdle, 1, memory_order_relaxed);
+#endif
+    return highFrequency ? 200 : 30000;
 }
 
 JAVA_INT java_lang_System_identityHashCode___java_lang_Object_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
@@ -3203,6 +3349,7 @@ void cn1BibopBeginGcCycle(void) {
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
     (void)atomic_exchange_explicit(&cn1LegacyGcScheduled, 0, memory_order_acq_rel);
+    (void)atomic_exchange_explicit(&cn1BibopGcScheduled, 0, memory_order_acq_rel);
 #ifdef CN1_GRACE_AUDIT
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
@@ -4263,6 +4410,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             atomic_fetch_add_explicit(&cn1PacingParksBibop, 1, memory_order_relaxed);
         }
         CN1_GC_PARK_CAPTURE(threadStateData);
+        CN1_STALL_T0(__stallVol);
         threadStateData->threadActive = JAVA_FALSE;
         int spins = 0;
         while(cn1PacingVolume(which) > (long long)cap &&
@@ -4274,6 +4422,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             usleep((JAVA_INT)(500));
         }
         threadStateData->threadActive = JAVA_TRUE;
+        CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
 
@@ -4345,6 +4494,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         }
     }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
+    CN1_STALL_T0(__stallBudget);
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
     int lastEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
@@ -4415,6 +4565,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         usleep((JAVA_INT)(500));
     }
     threadStateData->threadActive = JAVA_TRUE;
+    CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
@@ -4445,21 +4596,52 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // stack for the cooperative conservative scan, mark inactive, wait out the GC.
     if(threadStateData->threadBlockedByGC) {
         CN1_GC_PARK_CAPTURE(threadStateData);
+        CN1_STALL_T0(__stallHs);
         threadStateData->threadActive = JAVA_FALSE;
         while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(500));
         }
         threadStateData->threadActive = JAVA_TRUE;
+        CN1_STALL_ADD(__stallHs, CN1_STALL_HANDSHAKE, threadStateData);
     }
     long __gcTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
+    // LATCHED to one request per cycle window, exactly as the legacy trigger in
+    // codenameOneGcMalloc already is -- and, like it, deliberately NOT suppressed while a
+    // cycle is running.
+    //
+    // The !gcCurrentlyRunning suppression this replaces was silently starving the
+    // collector under sustained churn (issue 5537). bibopBytesSinceGc is zeroed at cycle
+    // START, so a mutator spends the whole cycle re-crossing the trigger -- and every one
+    // of those crossings was discarded because a cycle was running. By the time the cycle
+    // ended and the suppression lifted, every mutator was already parked on the run-ahead
+    // cap in cn1PacingPark and therefore allocating nothing, so no crossing was left to
+    // make the request. forceGc was false, the collector took its 200ms idle wait, and the
+    // whole application sat blocked on a collector that had decided it was not needed:
+    // measured mark 40ms, measured mutator park 212ms.
+    //
+    // Recording the demand while the cycle runs is what makes the answer in
+    // java_lang_System_gcIdleWaitMillis___R_int reachable. The latch supplies what the
+    // suppression was actually buying -- no System.gc() (a lock + notify) on every page
+    // acquire after the crossing.
+#ifdef CN1_GC_NO_DEMAND_SIGNAL
     if(!gcCurrentlyRunning &&
        atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __gcTrigger) {
-        // save/restore: we may already be INSIDE a caller's native-allocation
-        // bracket (reachable here under CN1_CONSERVATIVE_GC_ROOTS)
-        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
-        threadStateData->nativeAllocationMode = JAVA_TRUE;
-        java_lang_System_gc__(threadStateData);
-        threadStateData->nativeAllocationMode = wasNam;
+        {
+#else
+    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __gcTrigger
+       && atomic_load_explicit(&cn1BibopGcScheduled, memory_order_relaxed) == 0) {
+        int expectedLatch = 0;
+        if(atomic_compare_exchange_strong_explicit(&cn1BibopGcScheduled, &expectedLatch, 1,
+                                                   memory_order_acq_rel,
+                                                   memory_order_relaxed)) {
+#endif
+            // save/restore: we may already be INSIDE a caller's native-allocation
+            // bracket (reachable here under CN1_CONSERVATIVE_GC_ROOTS)
+            JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+            threadStateData->nativeAllocationMode = JAVA_TRUE;
+            java_lang_System_gc__(threadStateData);
+            threadStateData->nativeAllocationMode = wasNam;
+        }
     }
 #ifndef CN1_BIBOP_NO_PACING
     // 0 pending: a BiBOP thread dirties at most one CN1_BIBOP_PAGE_SIZE page before its
@@ -6985,7 +7167,12 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
     t->gcSigStackPointer = sp;
     __atomic_thread_fence(__ATOMIC_RELEASE);
     t->gcSigStopped = (sig_atomic_t)gen;
+    // clock_gettime and a relaxed atomic add are both async-signal-safe, so the stall
+    // this spin costs is charged like every other park rather than being the one
+    // uninstrumented way to stop a mutator.
+    CN1_STALL_T0(__stallSig);
     while((int)t->gcSigRelease < gen) { /* async-signal-safe spin */ }
+    CN1_STALL_ADD(__stallSig, CN1_STALL_SIGNAL_STOP, t);
     // Only clear our own park marker -- a late-exiting older handler must not
     // wipe a newer generation's park the GC is currently waiting on.
     if((int)t->gcSigStopped == gen) t->gcSigStopped = 0;
@@ -7266,6 +7453,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         }
         if(blockedByGc || throttle) {
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            CN1_STALL_T0(__stallLow);
             threadStateData->threadActive = JAVA_FALSE;
             if(throttle) {
                 usleep((JAVA_INT)(1000));
@@ -7274,6 +7462,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 usleep((JAVA_INT)(1000));
             }
             threadStateData->threadActive = JAVA_TRUE;
+            CN1_STALL_ADD(__stallLow, CN1_STALL_LOWMEM, threadStateData);
         }
     }
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
@@ -7321,11 +7510,13 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
         if(threadStateData->threadBlockedByGC && !threadStateData->nativeAllocationMode) {
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            CN1_STALL_T0(__stallLegHs);
             threadStateData->threadActive = JAVA_FALSE;
             while(threadStateData->threadBlockedByGC) {
                 usleep(1000);
             }
             threadStateData->threadActive = JAVA_TRUE;
+            CN1_STALL_ADD(__stallLegHs, CN1_STALL_HANDSHAKE, threadStateData);
         }
         long maxHeapSize = CN1_MAX_HEAP_SIZE;
         if (isEdt(threadStateData->threadId) && !lowMemoryMode) {
@@ -7336,6 +7527,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         
         if(threadStateData->heapAllocationSize > maxHeapSize && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            CN1_STALL_T0(__stallPending);
             threadStateData->threadActive=JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
@@ -7362,6 +7554,7 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 invokedGC = NO;
                 threadStateData->threadActive = JAVA_TRUE;
             }
+            CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
         } else {
             if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
                 
@@ -9534,6 +9727,89 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
     cn1GcProbeResetPhases();
 }
 
+// Sum the per-thread stall clocks and count the mutators they belong to. Under the
+// critical section: collectThreadResources frees a dying thread's TLD under that same
+// lock, so reading the slots without it is a use-after-free, not merely a stale number.
+// It is 1024 pointer reads once a second against a lock the mutators hold for microseconds.
+static long long cn1StallLastNs = 0;   // previous second's summed thread stall clock
+static long long cn1StallLastMs = 0;   // ...and the wall stamp it was read at
+// Peak concurrent mutator count, sampled by the 1Hz thread. The whole-run duty figure
+// has to divide by SOMETHING, and by exit the workers have exited and taken their stall
+// clocks with them -- summing live threads there reports one thread and 100% duty on a
+// run that was stalled throughout. Per-cause totals survive thread death (they are
+// process-wide), so the honest denominator is the peak thread count that produced them.
+static _Atomic int cn1StallPeakThreads = 0;
+
+static void cn1StallSumThreads(long long* outNs, int* outThreads) {
+    long long total = 0;
+    int threads = 0;
+    lockCriticalSection();
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        struct ThreadLocalData* t = allThreads[iter];
+        if(t != 0 && t->lightweightThread) {
+            total += atomic_load_explicit(&t->gcStallNs, memory_order_relaxed);
+            threads++;
+        }
+    }
+    unlockCriticalSection();
+    *outNs = total;
+    *outThreads = threads;
+}
+
+// Estimate a percentile from the log2-microsecond histogram. Returns the LOWER edge of
+// the bucket the rank falls in, i.e. it never overstates a stall -- which is the honest
+// direction for a number being used to argue a latency defect exists.
+static long long cn1StallPercentileUs(int cause, double q) {
+    long total = 0;
+    for(int b = 0 ; b < CN1_STALL_BUCKETS ; b++) {
+        total += atomic_load_explicit(&cn1StallBuckets[cause][b], memory_order_relaxed);
+    }
+    if(total == 0) {
+        return 0;
+    }
+    long want = (long)(q * (double)total);
+    long seen = 0;
+    for(int b = 0 ; b < CN1_STALL_BUCKETS ; b++) {
+        seen += atomic_load_explicit(&cn1StallBuckets[cause][b], memory_order_relaxed);
+        if(seen > want) {
+            return b == 0 ? 0 : (1LL << b);
+        }
+    }
+    return 1LL << (CN1_STALL_BUCKETS - 1);
+}
+
+// The whole-run table. Printed at exit so a run that ends in a kill still leaves the
+// 1Hz series behind, and a run that ends cleanly leaves the distribution too.
+static void cn1ReportStalls(void) {
+    long long wallMs = cn1GcProbeElapsedMs();
+    long long totalNs = 0;
+    for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
+        totalNs += atomic_load_explicit(&cn1StallNs[c], memory_order_relaxed);
+    }
+    int threads = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
+    fprintf(stderr, "[GCSTALL] wallMs=%lld threads=%d threadStallMs=%lld dutyPct=%.1f"
+                    " cyclesOnDemand=%ld cyclesAfterIdle=%ld\n",
+            wallMs, threads, totalNs / 1000000LL,
+            (wallMs > 0 && threads > 0)
+                ? 100.0 * (1.0 - ((double)totalNs / 1000000.0) / ((double)wallMs * threads))
+                : -1.0,
+            atomic_load_explicit(&cn1GcCyclesOnDemand, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcCyclesAfterIdle, memory_order_relaxed));
+    for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
+        long count = atomic_load_explicit(&cn1StallCount[c], memory_order_relaxed);
+        if(count == 0) {
+            continue;
+        }
+        long long ns = atomic_load_explicit(&cn1StallNs[c], memory_order_relaxed);
+        fprintf(stderr, "[GCSTALL] cause=%s count=%ld totalMs=%lld meanUs=%lld"
+                        " p50Us=%lld p99Us=%lld maxUs=%lld\n",
+                cn1StallCauseNames[c], count, ns / 1000000LL, (ns / count) / 1000LL,
+                cn1StallPercentileUs(c, 0.5), cn1StallPercentileUs(c, 0.99),
+                atomic_load_explicit(&cn1StallMaxNs[c], memory_order_relaxed) / 1000LL);
+    }
+    fflush(stderr);
+}
+
 // 1Hz wall-clock series. ATOMICS ONLY -- it must never walk bibopAllPages. This is the
 // series that survives a collector which has stopped finishing cycles, which is the state
 // the reporter describes and the one in which the per-cycle emitter above goes silent.
@@ -9574,6 +9850,41 @@ static void* cn1GcProbeThread(void* ignored) {
             (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed),
 #endif
             atomic_load_explicit(&cn1GcStaleSkips, memory_order_relaxed));
+        // The mutator's side of the same second. dutyPct is the fraction of wall time the
+        // mutator threads were RUNNING: the reported symptom is that it collapses while
+        // the footprint stays flat, which no other line in this runtime can show.
+        {
+            long long nowNs = 0;
+            int threads = 0;
+            cn1StallSumThreads(&nowNs, &threads);
+            {
+                int peak = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
+                while(threads > peak &&
+                      !atomic_compare_exchange_weak_explicit(&cn1StallPeakThreads, &peak, threads,
+                                                             memory_order_relaxed,
+                                                             memory_order_relaxed)) {
+                }
+            }
+            long long deltaNs = nowNs - cn1StallLastNs;
+            long long nowMs = cn1GcProbeElapsedMs();
+            long long deltaMs = nowMs - cn1StallLastMs;
+            if(deltaNs < 0) {
+                deltaNs = 0;    // a thread died and took its clock with it
+            }
+            fprintf(stderr, "[GCSTALL-T] v=1 tMs=%lld threads=%d stallMs=%lld dutyPct=%.1f"
+                            " volume=%ld budget=%ld lowMem=%ld handshake=%ld pending=%ld\n",
+                    nowMs, threads, deltaNs / 1000000LL,
+                    (deltaMs > 0 && threads > 0)
+                        ? 100.0 * (1.0 - ((double)deltaNs / 1000000.0) / ((double)deltaMs * threads))
+                        : -1.0,
+                    atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_VOLUME], memory_order_relaxed),
+                    atomic_load_explicit(&cn1StallCount[CN1_STALL_PACING_BUDGET], memory_order_relaxed),
+                    atomic_load_explicit(&cn1StallCount[CN1_STALL_LOWMEM], memory_order_relaxed),
+                    atomic_load_explicit(&cn1StallCount[CN1_STALL_HANDSHAKE], memory_order_relaxed),
+                    atomic_load_explicit(&cn1StallCount[CN1_STALL_PENDING_FULL], memory_order_relaxed));
+            cn1StallLastNs = nowNs;
+            cn1StallLastMs = nowMs;
+        }
         fflush(stderr);
     }
     return ignored;
@@ -9590,9 +9901,10 @@ static void* cn1GcProbeThread(void* ignored) {
 static int cn1ConformCfg(int which) {
     static const char* names[] = {
         "CN1_WL_SECONDS", "CN1_WL_THREADS", "CN1_WL_DEPTH", "CN1_WL_BRANCH",
-        "CN1_WL_SLEEP_MS", "CN1_WL_MOVES", "CN1_WL_LEGACY", "CN1_WL_SCRUB"
+        "CN1_WL_SLEEP_MS", "CN1_WL_MOVES", "CN1_WL_LEGACY", "CN1_WL_SCRUB",
+        "CN1_WL_BIGARRAY"
     };
-    static const int defs[] = { 60, 4, 14, 3, 0, 4, 256, 0 };
+    static const int defs[] = { 60, 4, 14, 3, 0, 4, 256, 0, 0 };
     int n = (int)(sizeof(defs) / sizeof(defs[0]));
     if(which < 0 || which >= n) {
         return 0;
@@ -9686,6 +9998,7 @@ void initConstantPool() {
     atexit(cn1ReportGcOverflow);
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
+    atexit(cn1ReportStalls);
     cn1GcProbeInit();
 #endif
 

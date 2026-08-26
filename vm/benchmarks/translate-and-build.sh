@@ -39,12 +39,22 @@ for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h; do
     cp "$REPO/vm/ByteCodeTranslator/src/$f" "$TRANSLATOR/$f"
 done
 
-# 3. JavaAPI classes (built once, then cached)
+# 3. JavaAPI classes (cached, but INVALIDATED when a source is newer than the cache).
+# The presence check alone is not enough and fails in a way that looks like a VM bug: when
+# Thread.sleep(long) stopped being a native and became Java calling sleepImpl, a cache from
+# before that change still declared it native, so the translator emitted a call to
+# java_lang_Thread_sleep___long and nothing defined it -- an undefined-symbol link error in
+# generated code, with no hint that the cause was a stale directory.
 JAVAAPI="$REPO/vm/benchmarks/target/javaapi-classes"
-if [ ! -f "$JAVAAPI/java/lang/Object.class" ]; then
+JAVAAPI_STAMP="$REPO/vm/benchmarks/target/javaapi-classes.stamp"
+if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || \
+   [ -n "$(find "$REPO/vm/JavaAPI/src" -name '*.java' -newer "$JAVAAPI_STAMP" -print -quit 2>/dev/null)" ] || \
+   [ ! -f "$JAVAAPI_STAMP" ]; then
+    rm -rf "$JAVAAPI"
     mkdir -p "$JAVAAPI"
     "$J8/bin/javac" -nowarn -source 1.8 -target 1.8 -d "$JAVAAPI" \
         $(find "$REPO/vm/JavaAPI/src" -name '*.java')
+    touch "$JAVAAPI_STAMP"
 fi
 
 # 4. compile the benchmark class against JavaAPI only. Bench is shared with

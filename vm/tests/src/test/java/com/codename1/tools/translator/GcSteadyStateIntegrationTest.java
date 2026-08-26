@@ -155,6 +155,110 @@ class GcSteadyStateIntegrationTest {
      */
     private static final long HEADROOM_THRESHOLD_MB = 128;
 
+    /**
+     * Share of collection cycles the collector started because one was owed, below which
+     * it is idling through demand. Deliberately loose: the fixed build measures 0.99 on a
+     * developer machine and the faulted one measures 0.00, so anything in between is a
+     * regression and nothing legitimate lands near the line.
+     */
+    private static final double MIN_ON_DEMAND_SHARE = 0.5;
+
+    /**
+     * How much longer the faulted build's mutator stalls must be before scenario 6 counts
+     * as having re-injected the defect. Measured 8x (25ms against 209ms); 2x is the floor
+     * that keeps the check meaningful on a runner where the cycle itself dominates the
+     * park and compresses the ratio.
+     */
+    private static final double MIN_PARK_RATIO = 2.0;
+
+    /**
+     * The [GCSTALL] report: how long the MUTATOR threads were stopped, by cause, and how
+     * the collector decided to start each cycle.
+     *
+     * <p>Separate from {@link Series} because it answers the opposite question. Series
+     * reads [GCPROBE], which is the collector's own time and its partition of the
+     * footprint. This reads the mutator's: the pair of numbers that says whether an
+     * application using this VM can actually run.</p>
+     */
+    private static final class Stalls {
+        boolean reported;
+        long cyclesOnDemand;
+        long cyclesAfterIdle;
+        double dutyPct = -1;
+        long volumeParks;
+        long meanVolumeParkUs;
+        long maxVolumeParkUs;
+
+        static Stalls parse(String output) {
+            Stalls s = new Stalls();
+            for (String line : output.split("\\R")) {
+                if (!line.startsWith("[GCSTALL]")) {
+                    continue;
+                }
+                if (line.contains("cyclesOnDemand=")) {
+                    s.reported = true;
+                    s.cyclesOnDemand = field(line, "cyclesOnDemand=");
+                    s.cyclesAfterIdle = field(line, "cyclesAfterIdle=");
+                    s.dutyPct = doubleField(line, "dutyPct=");
+                } else if (line.contains("cause=pacingVolume")) {
+                    s.volumeParks = field(line, "count=");
+                    s.meanVolumeParkUs = field(line, "meanUs=");
+                    s.maxVolumeParkUs = field(line, "maxUs=");
+                }
+            }
+            return s;
+        }
+
+        /** 1.0 means every cycle answered a pending request; 0.0 means none did. */
+        double onDemandShare() {
+            long total = cyclesOnDemand + cyclesAfterIdle;
+            return total == 0 ? 0 : (double) cyclesOnDemand / total;
+        }
+
+        @Override
+        public String toString() {
+            return "cyclesOnDemand=" + cyclesOnDemand + " cyclesAfterIdle=" + cyclesAfterIdle
+                    + " onDemandShare=" + String.format("%.2f", onDemandShare())
+                    + " dutyPct=" + String.format("%.1f", dutyPct)
+                    + " volumeParks=" + volumeParks
+                    + " meanParkUs=" + meanVolumeParkUs
+                    + " maxParkUs=" + maxVolumeParkUs;
+        }
+
+        private static long field(String line, String key) {
+            int at = line.indexOf(key);
+            if (at < 0) {
+                return -1;
+            }
+            String rest = line.substring(at + key.length());
+            int end = 0;
+            if (end < rest.length() && rest.charAt(end) == '-') {
+                end++;
+            }
+            while (end < rest.length() && Character.isDigit(rest.charAt(end))) {
+                end++;
+            }
+            return end > 0 ? Long.parseLong(rest.substring(0, end)) : -1;
+        }
+
+        private static double doubleField(String line, String key) {
+            int at = line.indexOf(key);
+            if (at < 0) {
+                return -1;
+            }
+            String rest = line.substring(at + key.length());
+            int end = 0;
+            if (end < rest.length() && rest.charAt(end) == '-') {
+                end++;
+            }
+            while (end < rest.length()
+                    && (Character.isDigit(rest.charAt(end)) || rest.charAt(end) == '.')) {
+                end++;
+            }
+            return end > 0 ? Double.parseDouble(rest.substring(0, end)) : -1;
+        }
+    }
+
     @Test
     void aChurningWorkloadReachesAWorkingSetAndStaysThere() throws Exception {
         Parser.cleanup();
@@ -341,6 +445,73 @@ class GcSteadyStateIntegrationTest {
                         + evidence(unbounded));
         System.err.println("[GcSteadyState] ceiling/no-reserve: smallestHeadroom="
                 + unboundedHeadroomMb + "MB");
+
+        // ---- 5. the mutator must be RUNNING, not waiting on the collector -------
+        // The four scenarios above all measure memory, and the reporter's build passed
+        // every one of them and was still unusable: "no long term memory buildup, and no
+        // crashes, but the pauses for GC become very frequent and very long". Nothing in
+        // this runtime measured a pause -- [GCPROBE] times the COLLECTOR, and [PACING]
+        // counts parks without recording how long any of them lasted -- so a build could
+        // stall every worker for most of the run and this gate would stay green.
+        //
+        // What it was: bibopBytesSinceGc is zeroed at cycle START, so under sustained
+        // churn a mutator re-crosses the collection trigger throughout every cycle, and
+        // cn1BibopMaybeGc discarded all of those crossings because a cycle was running.
+        // By the time one ended, every mutator was parked on the run-ahead cap and
+        // therefore allocating nothing, so no crossing was left to raise the request --
+        // and the GC thread, seeing no demand, took its 200ms idle wait with the whole
+        // application blocked on it. Measured mark 40ms, measured mutator park 212ms.
+        //
+        // ASSERT THE MECHANISM, REPORT THE OUTCOME, exactly as scenario 3 does. The
+        // outcome (duty cycle, park duration) is a function of how many cores the runner
+        // gives the collector; the mechanism is not. cyclesOnDemand counts cycles the
+        // collector started because a collection was owed, cyclesAfterIdle counts cycles
+        // it started after idling first. A collector keeping up with a workload that
+        // parks its mutators must be answering demand, on any machine.
+        Stalls goodStalls = Stalls.parse(clean.output);
+        assertTrue(goodStalls.reported,
+                "No [GCSTALL] report from the fixed build, so the stall instrument did not"
+                        + " run and scenarios 5 and 6 measure nothing. Output: " + tail(clean.output));
+        assertTrue(goodStalls.volumeParks > 0,
+                "The workload never parked on the run-ahead cap, so it never depended on the"
+                        + " collector's responsiveness and this scenario proves nothing. "
+                        + goodStalls);
+        assertTrue(goodStalls.cyclesOnDemand + goodStalls.cyclesAfterIdle >= MIN_CYCLES,
+                "Too few collection cycles to judge how they were scheduled. " + goodStalls);
+        assertTrue(goodStalls.onDemandShare() >= MIN_ON_DEMAND_SHARE,
+                "The collector idled before " + String.format("%.0f%%", 100 * (1 - goodStalls.onDemandShare()))
+                        + " of its cycles while mutators were parked waiting for it. " + goodStalls);
+        System.err.println("[GcSteadyState] stalls/fixed: " + goodStalls);
+
+        // ---- 6. proof that scenario 5 can fail ---------------------------------
+        // CN1_GC_NO_DEMAND_SIGNAL restores both halves of the defect: the suppressed
+        // request in cn1BibopMaybeGc and the discarded one in gcIdleWaitMillis. They are
+        // one defect -- a demand signal that is never raised and, if raised, never
+        // answered -- so one macro re-injects both.
+        Path noDemand = build(distDir, tempDirs, "nodemand",
+                "-DCN1_GC_CONFORM -DCN1_GC_NO_DEMAND_SIGNAL");
+        Run starved = run(noDemand, distDir);
+        assertHealthy(starved, "the -DCN1_GC_NO_DEMAND_SIGNAL build", javaResult);
+        Stalls badStalls = Stalls.parse(starved.output);
+        assertTrue(badStalls.reported,
+                "No [GCSTALL] report from the faulted build. Output: " + tail(starved.output));
+        assertEquals(0, badStalls.cyclesOnDemand,
+                "The demand signal was compiled out, so no cycle may have started on demand."
+                        + " This arm is not actually faulted and scenario 5 proved nothing. "
+                        + badStalls);
+        // The outcome, asserted RELATIVE to the same machine in the same session: the
+        // faulted build must stall its mutators materially longer. An absolute pause
+        // threshold would be testing the runner -- a two-core machine legitimately runs
+        // cycles several times longer than a developer's, and a park cannot be shorter
+        // than the cycle it is waiting for.
+        assertTrue(badStalls.volumeParks > 0,
+                "The faulted build never parked either, so there is nothing to compare. "
+                        + badStalls);
+        assertTrue(badStalls.meanVolumeParkUs >= goodStalls.meanVolumeParkUs * MIN_PARK_RATIO,
+                "Re-injecting the starved demand signal did NOT lengthen the mutator's"
+                        + " stalls, so scenario 5 is inert. fixed=" + goodStalls
+                        + " faulted=" + badStalls);
+        System.err.println("[GcSteadyState] stalls/faulted: " + badStalls);
     }
 
     /**

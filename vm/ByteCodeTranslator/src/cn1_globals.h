@@ -1230,6 +1230,14 @@ struct ThreadLocalData {
     char         gcSigRegs[4096];            // raw copy of the interrupted ucontext (GPRs)
     volatile sig_atomic_t gcSigRegsLen;      // valid bytes in gcSigRegs
 #endif
+#ifdef CN1_GC_CONFORM
+    // Cumulative nanoseconds this thread has spent stopped at any of the park sites
+    // enumerated by CN1_STALL_* in cn1_globals.m. Written by the owning thread, summed
+    // once a second by the probe thread, hence atomic rather than plain -- see the
+    // [GCSTALL-T] duty-cycle line. Present only in a CN1_GC_CONFORM build, so the
+    // struct a shipping build compiles is unchanged.
+    _Atomic long long gcStallNs;
+#endif
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
@@ -1786,7 +1794,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
  * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
  * roots are off. */
 #define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
-#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; __cn1rts->gcParkCaptured = JAVA_FALSE; } while(0)
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); CN1_STALL_T0(__cn1rt0); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; __cn1rts->gcParkCaptured = JAVA_FALSE; CN1_STALL_ADD(__cn1rt0, CN1_STALL_NATIVE_RESUME, __cn1rts); } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
@@ -2659,6 +2667,20 @@ extern __thread struct ThreadLocalData* cn1TlsSelf;
     } while(0)
 #else
 #define CN1_GC_PARK_CAPTURE(ts) do {} while(0)
+#endif
+
+// Bracket one mutator park so its duration is charged to a cause. Both halves compile to
+// nothing without -DCN1_GC_CONFORM -- including the timestamp variable, which is why the
+// name is a macro argument rather than a fixed identifier: several park sites sit in one
+// scope in codenameOneGcMalloc and a fixed name would not survive there.
+#ifdef CN1_GC_CONFORM
+extern long long cn1StallNowNs(void);
+extern void cn1StallRecord(int cause, long long ns, struct ThreadLocalData* ts);
+#define CN1_STALL_T0(v) long long v = cn1StallNowNs()
+#define CN1_STALL_ADD(v, cause, ts) cn1StallRecord((cause), cn1StallNowNs() - (v), (ts))
+#else
+#define CN1_STALL_T0(v) ((void)0)
+#define CN1_STALL_ADD(v, cause, ts) ((void)0)
 #endif
 
 typedef JAVA_OBJECT (*newInstanceFunctionPointer)(CODENAME_ONE_THREAD_STATE);
