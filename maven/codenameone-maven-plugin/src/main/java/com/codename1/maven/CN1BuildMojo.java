@@ -3051,6 +3051,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private String liveAnnotatedClass(File element, java.util.Collection<String> descriptors,
                                       String exclude) {
         List<String> roots;
+        String encoding;
         try {
             // The module that PRODUCED this element, not the one running. In the
             // generated layout the application's classes come from `common`
@@ -3064,7 +3065,17 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // Kotlin plugin compiles its own sourceDirs without adding them
             // back, and this list is used to decide that a source is ABSENT.
             org.apache.maven.project.MavenProject owner = moduleProducing(element);
-            roots = compileSourceRoots(owner == null ? project : owner, userProperties());
+            org.apache.maven.project.MavenProject module = owner == null ? project : owner;
+            roots = compileSourceRoots(module, userProperties());
+            // The charset that module compiles with, for the same reason
+            // ProcessAnnotationsMojo is given it: the scan below decides a source
+            // is ABSENT by reading it, and the single-byte encodings all decode
+            // every byte into DIFFERENT characters. Without it a name outside
+            // ASCII is unjudgeable and the class is kept -- which is the safe
+            // direction, but it keeps a genuinely deleted class forever and fails
+            // its placement check on every incremental build. This caller knows
+            // the module, so there is no reason for it to be the one guessing.
+            encoding = sourceEncodingOf(module, userProperties());
         } catch (RuntimeException ex) {
             return null;
         }
@@ -3084,7 +3095,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             try {
                 com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, hit);
                 if (cls != null && com.codename1.maven.processors.BuildHintAnnotationProcessor
-                        .hasBackingSource(cls, roots)) {
+                        .hasBackingSource(cls, roots, encoding)) {
                     return hit;
                 }
             } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
