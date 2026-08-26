@@ -1338,20 +1338,6 @@ public class Component implements Animation, StyleListener, Editable {
 
     }
 
-    /// Retires a pending repaint request that something other than this component's own root paint
-    /// has satisfied -- an ancestor queued for a full repaint covers everything under it, so the
-    /// paint queue drops the entry rather than painting the subtree a second time.
-    ///
-    /// The bookkeeping has to match what a root paint would have done. `#paintComponent(Graphics)`
-    /// clears the pending flag and the flush clears the dirty region; leaving the flag latched
-    /// instead would make every later `#repaint(int, int, int, int)` on this component return
-    /// without queueing anything, because that method reads the flag as "a full repaint is already
-    /// coming".
-    public final void consumePendingRepaint() {
-        repaintPending = false;
-        setDirtyRegion(null);
-    }
-
     /// Checks whether the component's background should be painted.
     ///
     /// #### Returns

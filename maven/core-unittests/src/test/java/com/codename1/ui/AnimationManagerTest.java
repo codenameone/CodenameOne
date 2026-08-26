@@ -1,25 +1,3 @@
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -68,15 +46,8 @@ class AnimationManagerTest extends UITestBase {
         assertEquals(1, completionCalls.get(), "Completion callback should not run a second time");
     }
 
-    /**
-     * An animation that reports {@code isInProgress() == false} from the moment it is queued has never
-     * been stepped, so its whole effect is still pending - the deferred add/remove a {@link Container}
-     * queues while another animation runs, and a theme refresh, are all shaped that way. Completing it
-     * without that one {@code updateState()} call dropped the mutation on the floor (issue #5600), so
-     * the manager owes it exactly one update, and no more.
-     */
     @Test
-    void testAlreadyFinishedAnimationAppliesItsStateOnceThenCompletes() {
+    void testAlreadyFinishedAnimationRunsCompletionWithoutUpdateState() {
         Form form = new Form();
         AnimationManager manager = form.getAnimationManager();
         AtomicInteger updateStateCalls = new AtomicInteger();
@@ -99,12 +70,7 @@ class AnimationManagerTest extends UITestBase {
 
         manager.updateAnimations();
 
-        assertEquals(1, updateStateCalls.get(), "Never-stepped animation must still apply its state once");
+        assertEquals(0, updateStateCalls.get(), "Already-finished animation must not mutate state");
         assertEquals(1, completionCalls.get(), "Completion callback should still run once");
-
-        manager.updateAnimations();
-
-        assertEquals(1, updateStateCalls.get(), "The one update must not be repeated after completion");
-        assertEquals(1, completionCalls.get(), "Completion callback should not run a second time");
     }
 }

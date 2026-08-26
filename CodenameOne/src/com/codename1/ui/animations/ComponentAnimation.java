@@ -38,7 +38,6 @@ public abstract class ComponentAnimation {
     private int step = -1;
     private ArrayList<Runnable> post;
     private boolean completed = false;
-    private boolean stateUpdated = false;
 
     /// Allows us to create an animation that compounds several separate animations so they appear as a
     /// single animation to the system and process in parallel
@@ -125,7 +124,6 @@ public abstract class ComponentAnimation {
 
     /// Invoked by the animation manager internally
     public final void updateAnimationState() {
-        stateUpdated = true;
         updateState();
         if (!isInProgress()) {
             completeIfNeeded();
@@ -135,28 +133,10 @@ public abstract class ComponentAnimation {
     }
     
     /// Completes the animation if needed, without forcing an additional updateState() call.
-    ///
-    /// An animation that was never stepped is the exception: it still has to apply its effect once.
-    /// A `ComponentAnimation` whose `#isInProgress()` is false from the moment it is queued -- the
-    /// deferred add/remove that `com.codename1.ui.Container` queues while another animation runs, or
-    /// a theme refresh -- carries its entire payload in `#updateState()`, so completing it without
-    /// that call drops the mutation. That is how a `com.codename1.ui.TextComponent` losing focus
-    /// behind a queued animation kept its floating hint label in the hierarchy and painted it on top
-    /// of the field's own hint.
     public final void completeAnimation() {
         if (!isInProgress()) {
-            if (!stateUpdated) {
-                stateUpdated = true;
-                applyNeverStartedState();
-            }
             completeIfNeeded();
         }
-    }
-
-    /// Applies the pending effect of an animation the manager completed without ever stepping.
-    /// The default is the single `#updateState()` call that stepping would have made.
-    void applyNeverStartedState() {
-        updateState();
     }
     
     private void completeIfNeeded() {
@@ -252,18 +232,6 @@ public abstract class ComponentAnimation {
             }
             for (ComponentAnimation a : anims) {
                 a.updateAnimationState();
-            }
-        }
-
-        /// Every child is pending, not just the one `sequence` points at. A sequential compound
-        /// that was never stepped has already had `#isInProgress()` walk `sequence` to the end of
-        /// the array, so the single update `#updateState()` would make lands on the last child and
-        /// drops the rest. Each child completes itself instead, which is a no-op for any that the
-        /// aggregate did step.
-        @Override
-        void applyNeverStartedState() {
-            for (ComponentAnimation a : anims) {
-                a.completeAnimation();
             }
         }
 

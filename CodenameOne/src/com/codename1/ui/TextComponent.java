@@ -152,8 +152,8 @@ public class TextComponent extends InputComponent {
             @Override
             public void run() {
                 Component.setSameSize(field);
-                text.remove();
-                placeholder.remove();
+                removeAnimationLabel(text);
+                removeAnimationLabel(placeholder);
                 getLabel().setVisible(true);
             }
         };
@@ -187,8 +187,8 @@ public class TextComponent extends InputComponent {
                 field.setHint(getLabel().getText());
                 getLabel().setVisible(false);
                 Component.setSameSize(getLabel());
-                text.remove();
-                placeholder.remove();
+                removeAnimationLabel(text);
+                removeAnimationLabel(placeholder);
             }
         };
         ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
@@ -199,6 +199,26 @@ public class TextComponent extends InputComponent {
                 syncHintPosition();
             }
         });
+    }
+
+    /// Takes one of the transition's temporary labels back out of the animation layer.
+    ///
+    /// `com.codename1.ui.Component#remove()` is not usable here. The cleanup runs from an animation
+    /// completion, and selecting the next field before typing anything leaves that field's own
+    /// transition queued behind this one -- so the animation manager is still animating, and
+    /// `com.codename1.ui.Container#removeComponent(Component)` takes its deferred path, which
+    /// queues the removal as an animation that reports `isInProgress()` false and is therefore
+    /// completed without ever being stepped. The removal is dropped and the label stays in the
+    /// hierarchy, painting on top of the field's own hint (issue #5600).
+    ///
+    /// Removing directly is safe precisely here: the animation over this layer is the one that just
+    /// finished, and the transitions queued behind it belong to other components' layers.
+    private void removeAnimationLabel(Label label) {
+        if (label.getParent() == animationLayer) { //NOPMD CompareObjectsWithEquals
+            animationLayer.removeComponentImplNoAnimationSafety(label);
+        } else {
+            label.remove();
+        }
     }
 
     /// Puts the transition in its end state exactly once, whether it got there by completing or by
