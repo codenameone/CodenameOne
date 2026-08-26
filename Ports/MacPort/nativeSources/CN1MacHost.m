@@ -161,20 +161,20 @@ void CN1MacRefreshScaleValue(void) {
     // framework carried on painting and running timers into a window nobody
     // could see. Observed rather than delegated because the delegate slot on
     // this window belongs to nobody and should stay that way.
-    extern void CN1MacDeliverSurfaceHidden(BOOL hidden);
+    extern void CN1MacDeliverWindowMiniaturized(BOOL miniaturized);
     [[NSNotificationCenter defaultCenter]
         addObserverForName:NSWindowDidMiniaturizeNotification
                     object:_window
                      queue:[NSOperationQueue mainQueue]
                 usingBlock:^(NSNotification *note) {
-        CN1MacDeliverSurfaceHidden(YES);
+        CN1MacDeliverWindowMiniaturized(YES);
     }];
     [[NSNotificationCenter defaultCenter]
         addObserverForName:NSWindowDidDeminiaturizeNotification
                     object:_window
                      queue:[NSOperationQueue mainQueue]
                 usingBlock:^(NSNotification *note) {
-        CN1MacDeliverSurfaceHidden(NO);
+        CN1MacDeliverWindowMiniaturized(NO);
     }];
     _window.releasedWhenClosed = NO;
     NSString *name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];

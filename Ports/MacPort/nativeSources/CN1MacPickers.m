@@ -78,6 +78,10 @@ static void cn1PickerFinish(JAVA_LONG result) {
 /// Minutes the application allows between selectable values, or 1 for every
 /// minute. NSDatePicker has no step of its own, so this is enforced on commit.
 @property (nonatomic, assign) int minuteStep;
+/// The duration fields, when this is a duration picker. NSDatePicker cannot
+/// express a duration at all -- see cn1BuildDurationView.
+@property (nonatomic, retain) NSTextField *durationHoursField;
+@property (nonatomic, retain) NSTextField *durationMinutesField;
 @end
 
 @implementation CN1MacPickerController
@@ -90,6 +94,21 @@ static void cn1PickerFinish(JAVA_LONG result) {
     if (self.listView != nil) {
         NSInteger row = self.listView.selectedRow;
         cn1PickerFinish(row < 0 ? -1 : (JAVA_LONG)row);
+        return;
+    }
+    if (self.durationHoursField != nil || self.durationMinutesField != nil) {
+        // Read straight out of the fields. A duration is a count, not an
+        // instant, so there is no date here to convert.
+        long long hours = self.durationHoursField != nil
+            ? (long long)self.durationHoursField.integerValue : 0;
+        long long minutes = self.durationMinutesField != nil
+            ? (long long)self.durationMinutesField.integerValue : 0;
+        long long total = hours * 3600000LL + minutes * 60000LL;
+        if (self.minuteStep > 1) {
+            long long stepMs = (long long)self.minuteStep * 60000LL;
+            total = ((total + stepMs / 2) / stepMs) * stepMs;
+        }
+        cn1PickerFinish((JAVA_LONG)total);
         return;
     }
     NSDate *date = self.datePicker.dateValue;
@@ -158,6 +177,84 @@ static void cn1PickerFinish(JAVA_LONG result) {
 @end
 
 /// Builds the popover's content: the chooser, a Cancel and a Done.
+/// One labelled number field with a stepper beside it.
+static CGFloat cn1AddDurationField(NSView *parent, CGFloat x, NSTextField **outField,
+                                   NSString *label, NSInteger value,
+                                   NSInteger maximum, NSInteger step) {
+    NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(x, 26, 54, 22)];
+    NSNumberFormatter *fmt = [[NSNumberFormatter alloc] init];
+    fmt.numberStyle = NSNumberFormatterNoStyle;
+    fmt.minimum = @0;
+    fmt.maximum = @(maximum);
+    fmt.allowsFloats = NO;
+    field.formatter = fmt;
+    field.alignment = NSTextAlignmentRight;
+    field.integerValue = value;
+    [parent addSubview:field];
+
+    NSStepper *stepper = [[NSStepper alloc] initWithFrame:NSMakeRect(x + 56, 26, 15, 22)];
+    stepper.minValue = 0;
+    stepper.maxValue = (double)maximum;
+    stepper.increment = (double)(step < 1 ? 1 : step);
+    stepper.integerValue = value;
+    stepper.valueWraps = NO;
+    // Bound rather than wired through an action: the two stay in step in both
+    // directions with no target, which is what a Mac stepper beside a field is.
+    [field bind:NSValueBinding toObject:stepper withKeyPath:@"objectValue" options:nil];
+    [parent addSubview:stepper];
+
+    NSTextField *caption = [NSTextField labelWithString:label];
+    caption.frame = NSMakeRect(x + 74, 29, 46, 17);
+    [parent addSubview:caption];
+
+    if (outField != NULL) {
+        *outField = field;
+    }
+#ifndef CN1_USE_ARC
+    [fmt release];
+    [field release];
+    [stepper release];
+#endif
+    return x + 124;
+}
+
+/// The duration chooser.
+///
+/// NSDatePicker has no duration mode, and the hour/minute elements it does have
+/// are a CLOCK: they run 0..23 and wrap. A duration is a count -- the portable
+/// spinner allows up to 999 hours -- so a 30 hour value displayed there showed
+/// 6 and committed 6. Number fields with steppers are what a duration is.
+static NSView *cn1BuildDurationView(CN1MacPickerController *controller, int type,
+                                    long long millis, int minuteStep) {
+    NSView *view = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 10, 56)];
+    long long totalMinutes = millis / 60000LL;
+    CGFloat x = 8;
+    NSTextField *hoursField = nil;
+    NSTextField *minutesField = nil;
+    // 6 is hours only and 7 is minutes only; 5 carries both. The ranges are the
+    // portable spinner's: whichever field stands alone counts up to 999, and
+    // minutes beside hours are the 0..59 of an hour.
+    if (type == 5 || type == 6) {
+        long long hours = type == 6 ? (totalMinutes + 30) / 60 : totalMinutes / 60;
+        x = cn1AddDurationField(view, x, &hoursField, @"hours",
+                                (NSInteger)MIN(hours, 999LL), 999, 1);
+    }
+    if (type == 5 || type == 7) {
+        long long minutes = type == 7 ? totalMinutes : totalMinutes % 60;
+        NSInteger maximum = type == 7 ? 999 : 59;
+        x = cn1AddDurationField(view, x, &minutesField, @"min",
+                                (NSInteger)MIN(minutes, (long long)maximum),
+                                maximum, minuteStep < 1 ? 1 : minuteStep);
+    }
+    controller.durationHoursField = hoursField;
+    controller.durationMinutesField = minutesField;
+    view.frame = NSMakeRect(0, 0, x, 56);
+#ifndef CN1_USE_ARC
+    [view autorelease];
+#endif
+    return view;
+}
+
 static NSView *cn1PickerContentView(CN1MacPickerController *controller, NSView *chooser,
                                     CGFloat width, CGFloat height) {
     CGFloat buttonRow = 32;
@@ -218,6 +315,21 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
         CN1MacPickerController *controller = [[CN1MacPickerController alloc] init];
         controller.pickerType = type;
         controller.minuteStep = minuteStep > 0 ? minuteStep : 1;
+
+        if (type == 5 || type == 6 || type == 7) {
+            // A duration gets its own control. NSDatePicker's hour field is a
+            // clock -- 0..23, wrapping -- and a duration is a count that the
+            // portable spinner allows up to 999 hours, so anything past a day
+            // could not be shown or chosen at all.
+            NSView *duration = cn1BuildDurationView(controller, type, time,
+                                                    controller.minuteStep);
+            NSView *durationContent = cn1PickerContentView(controller, duration,
+                                                           MAX(duration.frame.size.width + 16, 220),
+                                                           duration.frame.size.height + 8);
+            cn1PickerPresent(controller, durationContent, x, y, w, h);
+            POOL_END();
+            return;
+        }
 
         NSDatePicker *picker = [[NSDatePicker alloc] initWithFrame:NSMakeRect(0, 0, 260, 154)];
         picker.datePickerStyle = NSDatePickerStyleTextFieldAndStepper;

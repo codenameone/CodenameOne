@@ -337,26 +337,25 @@ BOOL cn1MacRuntimeIsJavaReady(void) {
 /// UIKit flag the shared code reads to decide whether it may paint.
 extern BOOL isAppSuspended;
 
-/// Whether the main surface is currently out of view.
+/// The two independent reasons the main surface can be out of view, and what
+/// was last reported for their combination.
 ///
-/// Level state, not an event count. Hiding the application and minimizing its
-/// window are two independent ways to reach the same place, and either can
-/// happen while the other already has -- so the transition is reported once and
-/// the second source is a no-op rather than a duplicate lifecycle callback.
-static BOOL cn1MacSurfaceHidden = NO;
+/// Separate on purpose. Collapsing them into one flag looks equivalent and is
+/// not: minimize the window, then hide the application and unhide it, and the
+/// unhide reports the surface visible again while the window is still
+/// miniaturized -- so painting and timers resume for something nobody can see.
+/// They are ORed, and only a change in the result is reported.
+static BOOL cn1MacAppHidden = NO;
+static BOOL cn1MacWindowMiniaturized = NO;
+static BOOL cn1MacSurfaceReportedHidden = NO;
 
-/// Reports the main surface going out of view, or coming back.
-///
-/// Shared by the application's hide/unhide and by the main window's
-/// miniaturize/deminiaturize. Minimizing a window does NOT deactivate a Mac
-/// application, so without the window half the framework kept painting and
-/// running timers into a window nobody could see -- applicationDidHide: never
-/// fires for it.
-void CN1MacDeliverSurfaceHidden(BOOL hidden) {
-    if (cn1MacSurfaceHidden == hidden) {
+/// Reports the combined visibility, if it changed.
+static void cn1MacRefreshSurfaceHidden(void) {
+    BOOL hidden = cn1MacAppHidden || cn1MacWindowMiniaturized;
+    if (cn1MacSurfaceReportedHidden == hidden) {
         return;
     }
-    cn1MacSurfaceHidden = hidden;
+    cn1MacSurfaceReportedHidden = hidden;
     // Set whether or not Java is up: it is C state the shared paint path reads,
     // and it has to be right from the first frame.
     isAppSuspended = hidden;
@@ -371,6 +370,22 @@ void CN1MacDeliverSurfaceHidden(BOOL hidden) {
         com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+}
+
+/// The application was hidden or unhidden -- Cmd-H, or Hide Others elsewhere.
+void CN1MacDeliverAppHidden(BOOL hidden) {
+    cn1MacAppHidden = hidden;
+    cn1MacRefreshSurfaceHidden();
+}
+
+/// The main window was minimized or restored.
+///
+/// Minimizing does NOT deactivate a Mac application, so applicationDidHide:
+/// never fires for it and without this half the framework kept painting and
+/// running timers into a window nobody could see.
+void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
+    cn1MacWindowMiniaturized = miniaturized;
+    cn1MacRefreshSurfaceHidden();
 }
 
 @interface CN1MacAppDelegate : NSObject <NSApplicationDelegate, UNUserNotificationCenterDelegate>
@@ -493,11 +508,11 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 }
 
 - (void)applicationDidHide:(NSNotification *)notification {
-    CN1MacDeliverSurfaceHidden(YES);
+    CN1MacDeliverAppHidden(YES);
 }
 
 - (void)applicationWillUnhide:(NSNotification *)notification {
-    CN1MacDeliverSurfaceHidden(NO);
+    CN1MacDeliverAppHidden(NO);
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
