@@ -1054,7 +1054,7 @@ public class MacOSNativeBuilder extends Executor {
                 }
                 submission = zip;
             }
-            int passwordIndex = -1;
+            String notarizePassword = null;
             List<String> submit = new ArrayList<String>();
             submit.add("xcrun");
             submit.add("notarytool");
@@ -1074,12 +1074,17 @@ public class MacOSNativeBuilder extends Executor {
                 // macNative.notarize.password spelling is still supported and
                 // only the hint parser knows about it. Reading the modern key
                 // directly submits an empty password for a migrated project.
-                passwordIndex = submit.size();
-                submit.add(hints.getNotarizePassword() == null
-                        ? "" : hints.getNotarizePassword());
+                notarizePassword = hints.getNotarizePassword() == null
+                        ? "" : hints.getNotarizePassword();
+                submit.add(notarizePassword);
             }
             submit.add("--wait");
-            if (!exec(resultDir, 3600000, submit.toArray(new String[0]))) {
+            // The app-specific password must not reach the build log: exec
+            // appends every argument to the message this builder prints. Redacted
+            // by value rather than by position, because a miscounted index
+            // redacts the flag and prints the secret next to it.
+            if (!execRedacted(resultDir, 3600000, new String[]{notarizePassword},
+                    submit.toArray(new String[0]))) {
                 throw new BuildException("Notarization was rejected");
             }
             // Stapling the ticket is what makes the application launch without a

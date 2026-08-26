@@ -3011,14 +3011,19 @@ public abstract class Executor {
 
 
     /**
-     * Argument positions the next {@link #exec} must not print, or null.
+     * Argument VALUES the next {@link #exec} must not print, or null.
+     *
+     * <p>By value rather than by position, deliberately. The first version of
+     * this took indices and the caller counted them wrong by one -- it redacted
+     * the {@code -P} flag and printed the password beside it, so the leak was
+     * "fixed" and still leaking, which is the worst state for a credential to be
+     * in. A value cannot be miscounted.</p>
      *
      * <p>An instance field rather than a parameter because the logging happens
-     * in one place at the bottom of five overloads, and threading a set through
-     * all of them to serve two call sites would be worse than this. Always set
-     * and cleared around a single call -- see {@link #execRedacted}.</p>
+     * in one place at the bottom of five overloads. Always set and cleared
+     * around a single call -- see {@link #execRedacted}.</p>
      */
-    private java.util.Set<Integer> redactedArgIndices;
+    private java.util.Set<String> redactedArgValues;
 
     /**
      * Runs a command whose arguments at {@code secretIndices} are credentials.
@@ -3035,20 +3040,51 @@ public abstract class Executor {
      * while it runs, which is a smaller and much shorter-lived exposure than a
      * log file, and neither tool accepts the secret any other way.</p>
      */
-    public boolean execRedacted(File dir, int timeout, int[] secretIndices, String... varArgs)
+    public boolean execRedacted(File dir, int timeout, String[] secrets, String... varArgs)
             throws Exception {
-        java.util.Set<Integer> secrets = new java.util.HashSet<Integer>();
-        if (secretIndices != null) {
-            for (int i : secretIndices) {
-                secrets.add(Integer.valueOf(i));
-            }
-        }
-        redactedArgIndices = secrets;
+        redactedArgValues = redactionSet(secrets);
         try {
             return exec(dir, timeout, varArgs);
         } finally {
-            redactedArgIndices = null;
+            redactedArgValues = null;
         }
+    }
+
+    /**
+     * The secrets worth redacting, dropping null and empty ones.
+     *
+     * <p>An empty secret would match every argument that happens to be empty and
+     * turn an ordinary command line into noise, which teaches whoever reads the
+     * log to stop trusting it.</p>
+     */
+    static java.util.Set<String> redactionSet(String[] secrets) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        if (secrets != null) {
+            for (String s : secrets) {
+                if (s != null && s.length() > 0) {
+                    out.add(s);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** What {@link #exec} prints for one argument. Package-visible so it is testable. */
+    static String redactArg(java.util.Set<String> secrets, String arg) {
+        if (secrets == null || arg == null) {
+            return arg;
+        }
+        if (secrets.contains(arg)) {
+            return "***";
+        }
+        // Also the attached form: `security import` takes -P<password> in some
+        // invocations, and a secret glued to its flag is still a secret.
+        for (String secret : secrets) {
+            if (arg.length() > secret.length() && arg.endsWith(secret)) {
+                return arg.substring(0, arg.length() - secret.length()) + "***";
+            }
+        }
+        return arg;
     }
 
     public boolean exec(File dir, File javaHome, int timeout, Map<String, String> env, String... varArgs) throws Exception {
@@ -3061,8 +3097,7 @@ public abstract class Executor {
             // to the customer in the build log, and log() goes to the daemon's
             // own stdout, so a credential printed here outlives the build in
             // operational logging as well.
-            String s = redactedArgIndices != null && redactedArgIndices.contains(Integer.valueOf(argIdx))
-                    ? "***" : varArgs[argIdx];
+            String s = redactArg(redactedArgValues, varArgs[argIdx]);
             logSb.append(s + " ");
             message.append(s);
             message.append(" ");
