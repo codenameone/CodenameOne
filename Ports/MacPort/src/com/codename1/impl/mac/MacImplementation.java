@@ -125,6 +125,68 @@ public class MacImplementation extends IOSImplementation {
         return null;
     }
 
+    /// @inheritDoc
+    ///
+    /// False. This port delivers mouse and trackpad events, not touch, and the
+    /// inherited answer is an unconditional true because every other consumer of
+    /// IOSImplementation is a touch device.
+    ///
+    /// Display caches it once, so a Mac build came up with every touch-only
+    /// behaviour selected -- command, spinner, map, focus and scrollbar paths
+    /// all pick their variant from this.
+    @Override
+    public boolean isTouchDevice() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
+    /// A Mac has no SMS. sendSMS() is a no-op on this port, and the inherited
+    /// answer said SMS_INTERACTIVE -- so an application offered a compose path
+    /// that silently did nothing. The macOS chapter promises Display reports it
+    /// unsupported, which is now true.
+    @Override
+    public int getSMSSupport() {
+        return com.codename1.ui.Display.SMS_NOT_SUPPORTED;
+    }
+
+    /// @inheritDoc
+    ///
+    /// False: a desktop window has no orientation to lock, lockOrientation is a
+    /// no-op here, and the macOS chapter promises this reads as unsupported.
+    /// The inherited answer excludes only the watch and the TV.
+    @Override
+    public boolean canForceOrientation() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
+    /// False until there is an AppKit accessibility tree. The projection native
+    /// does nothing on this port, so a true answer both discarded every update
+    /// AND suppressed Component.focusGainedInternal's announcement fallback --
+    /// leaving a custom-drawn control with neither semantics nor focus
+    /// announcements. Saying no gets the fallback back.
+    ///
+    /// Exposing a custom-drawn interface to VoiceOver is a real project, and the
+    /// macOS chapter says so rather than implying it comes free.
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
+    /// False. The inherited check reads the OS version and says yes on macOS 11
+    /// and later, but the native behind it is compiled out unless the build
+    /// defines CN1_USE_APPREVIEW and links StoreKit, which this builder does
+    /// not -- so requestNativeInAppReview did nothing while its wrapper reported
+    /// success, and AppReview never showed its portable fallback.
+    @Override
+    public boolean isNativeInAppReviewSupported() {
+        return false;
+    }
+
     private AppKitWindowManager windowManager;
 
     /// @inheritDoc
