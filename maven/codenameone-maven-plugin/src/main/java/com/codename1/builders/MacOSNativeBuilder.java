@@ -844,9 +844,20 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null) {
                 return;
             }
-            // The same test IPhoneBuilder uses, so a project that gets local
-            // notifications on iOS gets them here.
-            if (cls.startsWith("com/codename1/notifications/LocalNotification")) {
+            // The whole com.codename1.notifications package, not just
+            // LocalNotification. That package exists for nothing else, and the
+            // define gates one thing -- whether the notification code is
+            // compiled at all -- so anything in it is evidence enough.
+            //
+            // Narrower than this leaves a real hole: an application that only
+            // calls Display.requestNotificationPermission() references
+            // NotificationPermissionRequest and NotificationPermissionCallback
+            // and never names LocalNotification, so the define stayed off and
+            // requestNotificationPermission() returned a synthetic grant
+            // without ever asking macOS. IPhoneBuilder matches only
+            // LocalNotification and has the same hole; it is left alone here
+            // because widening it changes what an existing iOS build compiles.
+            if (cls.startsWith("com/codename1/notifications/")) {
                 usesLocalNotifications[0] = true;
             }
             if (!cls.startsWith("com/codename1/security/")) {

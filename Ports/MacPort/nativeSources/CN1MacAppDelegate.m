@@ -72,6 +72,14 @@ static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
 static NSMutableArray<NSDictionary *> *cn1MacPendingPushes = nil;
 
+/// Local notifications that arrived before the Java side existed.
+///
+/// Held as the whole delivery -- the id plus whatever the user did with it --
+/// because the action and the reply text are as much a part of the callback as
+/// the id is, and re-deriving them on replay is not possible once the
+/// UNNotificationResponse has gone.
+static NSMutableArray<NSDictionary *> *cn1MacPendingLocalNotifications = nil;
+
 /// Decodes one APNs payload the way the shared iOS router does and hands each
 /// part to the application.
 ///
@@ -198,6 +206,65 @@ static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
     cn1MacDeliverPush(userInfo);
 }
 
+/// Reports a local notification, filling in what the user did with it.
+///
+/// actionId and textResponse reach the application through PushContent, which
+/// is what LocalNotification.addAction and addInputAction document. The UIKit
+/// delegate forwards only the id and has the same gap; it is not changed here
+/// because this port does not compile that file.
+static void cn1MacDeliverLocalNotification(NSDictionary *delivery) {
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    NSString *localId = [delivery objectForKey:@"id"];
+    if (localId == nil) {
+        return;
+    }
+    com_codename1_push_PushContent_reset__(threadStateData);
+    NSString *title = [delivery objectForKey:@"title"];
+    if (title != nil) {
+        com_codename1_push_PushContent_setTitle___java_lang_String(
+            threadStateData, fromNSString(threadStateData, title));
+    }
+    NSString *body = [delivery objectForKey:@"body"];
+    if (body != nil) {
+        com_codename1_push_PushContent_setBody___java_lang_String(
+            threadStateData, fromNSString(threadStateData, body));
+    }
+    NSString *actionId = [delivery objectForKey:@"actionId"];
+    if (actionId != nil) {
+        com_codename1_push_PushContent_setActionId___java_lang_String(
+            threadStateData, fromNSString(threadStateData, actionId));
+    }
+    NSString *textResponse = [delivery objectForKey:@"textResponse"];
+    if (textResponse != nil) {
+        com_codename1_push_PushContent_setTextResponse___java_lang_String(
+            threadStateData, fromNSString(threadStateData, textResponse));
+    }
+    com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
+        threadStateData, fromNSString(threadStateData, localId));
+}
+
+/// Reports a local notification, or holds it until the Java side exists.
+///
+/// The same rule pushes follow, and it has to apply here too: opening a
+/// notification COLD-LAUNCHES the app, so this delegate runs before the
+/// asynchronously dispatched bootstrap has installed LocalNotificationCallback.
+/// localNotificationReceived() only schedules a retry when pushCallback is
+/// non-null, so an application implementing only LocalNotificationCallback lost
+/// the notification that launched it outright.
+static void cn1MacQueueOrDeliverLocalNotification(NSDictionary *delivery) {
+    if (delivery == nil) {
+        return;
+    }
+    if (!cn1MacJavaReady) {
+        if (cn1MacPendingLocalNotifications == nil) {
+            cn1MacPendingLocalNotifications = [[NSMutableArray alloc] init];
+        }
+        [cn1MacPendingLocalNotifications addObject:delivery];
+        return;
+    }
+    cn1MacDeliverLocalNotification(delivery);
+}
+
 static void cn1MacDeliverURL(NSString *url) {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
     JAVA_OBJECT str = fromNSString(threadStateData, url);
@@ -238,6 +305,10 @@ void cn1_mac_runtime_markJavaReady(void) {
             cn1MacDeliverPush(payload);
         }
         [cn1MacPendingPushes removeAllObjects];
+        for (NSDictionary *delivery in cn1MacPendingLocalNotifications) {
+            cn1MacDeliverLocalNotification(delivery);
+        }
+        [cn1MacPendingLocalNotifications removeAllObjects];
     });
 }
 
@@ -291,9 +362,15 @@ extern BOOL isAppSuspended;
     NSDictionary *info = notification.request.content.userInfo;
     id localId = [info objectForKey:@"__ios_id__"];
     if ([localId isKindOfClass:[NSString class]]) {
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
-            threadStateData, fromNSString(threadStateData, (NSString *)localId));
+        NSMutableDictionary *delivery = [NSMutableDictionary dictionary];
+        [delivery setObject:localId forKey:@"id"];
+        if (notification.request.content.title != nil) {
+            [delivery setObject:notification.request.content.title forKey:@"title"];
+        }
+        if (notification.request.content.body != nil) {
+            [delivery setObject:notification.request.content.body forKey:@"body"];
+        }
+        cn1MacQueueOrDeliverLocalNotification(delivery);
         if (completionHandler != nil) {
             completionHandler([info objectForKey:@"foreground"] != nil
                 ? UNNotificationPresentationOptionAlert
@@ -314,9 +391,31 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
     NSDictionary *info = response.notification.request.content.userInfo;
     id localId = [info objectForKey:@"__ios_id__"];
     if ([localId isKindOfClass:[NSString class]]) {
-        struct ThreadLocalData* threadStateData = getThreadLocalData();
-        com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(
-            threadStateData, fromNSString(threadStateData, (NSString *)localId));
+        NSMutableDictionary *delivery = [NSMutableDictionary dictionary];
+        [delivery setObject:localId forKey:@"id"];
+        if (response.notification.request.content.title != nil) {
+            [delivery setObject:response.notification.request.content.title forKey:@"title"];
+        }
+        if (response.notification.request.content.body != nil) {
+            [delivery setObject:response.notification.request.content.body forKey:@"body"];
+        }
+        // The default and dismiss identifiers mean "opened" and "swiped away",
+        // not an action the application declared, so they are not reported as
+        // one -- getActionId() would otherwise answer a UN* constant no
+        // LocalNotification.addAction ever used.
+        NSString *actionId = response.actionIdentifier;
+        if (actionId != nil
+                && ![actionId isEqualToString:UNNotificationDefaultActionIdentifier]
+                && ![actionId isEqualToString:UNNotificationDismissActionIdentifier]) {
+            [delivery setObject:actionId forKey:@"actionId"];
+        }
+        if ([response isKindOfClass:[UNTextInputNotificationResponse class]]) {
+            NSString *userText = ((UNTextInputNotificationResponse *)response).userText;
+            if (userText != nil) {
+                [delivery setObject:userText forKey:@"textResponse"];
+            }
+        }
+        cn1MacQueueOrDeliverLocalNotification(delivery);
     } else {
         cn1MacQueueOrDeliverPush(info);
     }
