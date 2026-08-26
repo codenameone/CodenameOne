@@ -32,8 +32,10 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  * device builds.
  *
  * <p>Distinct from {@link BuildMacDesktopMojo}, which bundles the JVM/JavaSE app
- * ({@code mac-os-x-desktop}), and from {@link BuildMacCatalystMojo}, which builds
- * the legacy Mac Catalyst slice ({@code mac-catalyst}).</p>
+ * ({@code mac-os-x-desktop}). There is deliberately no wrapper for Mac Catalyst:
+ * Catalyst IS an iOS build, turned on with the {@code macNative.enabled} hint, so
+ * it is reached through the iOS wrappers and giving it one of its own would be a
+ * second spelling for what the hint already says.</p>
  *
  * <p>Filled a uniformity gap: {@code windows-device} had a wrapper mojo + IDE entry
  * but the equivalent native-Mac target was reachable only by hand.</p>

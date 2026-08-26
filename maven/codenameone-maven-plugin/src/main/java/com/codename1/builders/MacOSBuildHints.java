@@ -177,7 +177,8 @@ public class MacOSBuildHints {
         if (staleIosTarget != null && staleIosTarget.length() > 0) {
             warnings.add("macNative.iosMinDeploymentTarget is ignored by the native macOS build; "
                     + "it described the iOS half of a Mac Catalyst slice, and this target has none. "
-                    + "Remove it, or build mac-catalyst if you need that behavior.");
+                    + "Remove it, or set macNative.enabled and build the iOS target if you "
+                    + "still need Mac Catalyst.");
         }
     }
 
