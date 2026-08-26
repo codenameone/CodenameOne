@@ -158,6 +158,20 @@ public class MacOSNativeBuilder extends Executor {
         File classesDir = new File(tmpFile, "classes");
         File resDir = new File(tmpFile, "res");
         File buildinRes = new File(tmpFile, "btres");
+        // Emptied, not merely created. These paths are stable across builds and
+        // unzip() only overwrites the entries the archive carries, so on a
+        // rebuild without `mvn clean` a class or resource deleted since the last
+        // build stays here -- and is then scanned for permissions and crypto
+        // usage, and translated into the app. Removed code that keeps shipping,
+        // and an entitlement the application no longer justifies, are both worse
+        // than a slower build.
+        try {
+            deleteRecursively(classesDir);
+            deleteRecursively(resDir);
+            deleteRecursively(buildinRes);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to clear the staged build inputs", ex);
+        }
         classesDir.mkdirs();
         resDir.mkdirs();
         buildinRes.mkdirs();
@@ -1128,9 +1142,14 @@ public class MacOSNativeBuilder extends Executor {
         }
     }
 
+    /// Removes a tree, tolerating one that is not there.
+    ///
+    /// No symlink following: descending through a link would delete outside the
+    /// tree being removed, and a signed bundle is full of them.
     private static void deleteRecursively(File f) throws IOException {
-        // No symlink following on the way out either: deleting through a link
-        // would reach outside the result directory.
+        if (!f.exists()) {
+            return;
+        }
         if (f.isDirectory() && !isSymlink(f)) {
             File[] children = f.listFiles();
             if (children != null) {

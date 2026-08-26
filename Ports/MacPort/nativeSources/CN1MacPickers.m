@@ -75,6 +75,9 @@ static void cn1PickerFinish(JAVA_LONG result) {
 @property (nonatomic, retain) NSArray<NSString *> *choices;
 @property (nonatomic, assign) NSInteger initialSelection;
 @property (nonatomic, assign) BOOL answered;
+/// Minutes the application allows between selectable values, or 1 for every
+/// minute. NSDatePicker has no step of its own, so this is enforced on commit.
+@property (nonatomic, assign) int minuteStep;
 @end
 
 @implementation CN1MacPickerController
@@ -101,7 +104,19 @@ static void cn1PickerFinish(JAVA_LONG result) {
     // minute back through the current time zone shifted it by the UTC offset,
     // which also meant the value shown when the popover opened was not the value
     // that went in.
-    cn1PickerFinish((JAVA_LONG)llround([date timeIntervalSince1970] * 1000.0));
+    JAVA_LONG millis = (JAVA_LONG)llround([date timeIntervalSince1970] * 1000.0);
+    if (self.minuteStep > 1
+            && (self.pickerType == 2 || self.pickerType == 5
+                || self.pickerType == 6 || self.pickerType == 7)) {
+        // Snapped rather than configured: NSDatePicker has no minute-step
+        // property, so the control lets the user land anywhere and the value is
+        // rounded to the nearest allowed one on commit. Without this the
+        // application's configured step was simply not enforced -- a picker set
+        // to quarter hours committed 07 minutes quite happily.
+        JAVA_LONG stepMs = (JAVA_LONG)self.minuteStep * 60000;
+        millis = ((millis + stepMs / 2) / stepMs) * stepMs;
+    }
+    cn1PickerFinish(millis);
 }
 
 - (void)cancel:(id)sender {
@@ -197,6 +212,7 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
         POOL_BEGIN();
         CN1MacPickerController *controller = [[CN1MacPickerController alloc] init];
         controller.pickerType = type;
+        controller.minuteStep = minuteStep > 0 ? minuteStep : 1;
 
         NSDatePicker *picker = [[NSDatePicker alloc] initWithFrame:NSMakeRect(0, 0, 260, 154)];
         picker.datePickerStyle = NSDatePickerStyleTextFieldAndStepper;
@@ -228,7 +244,14 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
             picker.timeZone = gmt;
             picker.calendar = cal;
         }
-        picker.dateValue = [NSDate dateWithTimeIntervalSince1970:time / 1000.0];
+        // Opened on an allowed value too, so the picker does not start on a
+        // minute it will refuse to commit.
+        long long seeded = time;
+        if (controller.minuteStep > 1) {
+            long long stepMs = (long long)controller.minuteStep * 60000;
+            seeded = ((seeded + stepMs / 2) / stepMs) * stepMs;
+        }
+        picker.dateValue = [NSDate dateWithTimeIntervalSince1970:seeded / 1000.0];
         controller.datePicker = picker;
 
         NSView *content = cn1PickerContentView(controller, picker,

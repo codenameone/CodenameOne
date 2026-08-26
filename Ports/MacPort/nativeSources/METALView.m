@@ -264,9 +264,16 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // changed from and the framework has not been told a size at all yet -- and
     // skipped until Java exists, since this runs from AppKit before the app's
     // main thread has constructed anything.
+    // The MAIN view only. screenSizeChanged() sets the framework's one display
+    // size, so a secondary window running through here would resize the main
+    // Form to the auxiliary window's dimensions. Those windows have their own
+    // channel: CN1MacWindowRecord.windowDidResize: already sends
+    // CN1MacWindowDeliverResize for them, which is per window by construction.
+    // cn1WindowId is -1 for the host's view and >= 0 for every created window,
+    // the same test the pointer and key paths use.
     extern void screenSizeChanged(int width, int height);
     extern BOOL cn1MacRuntimeIsJavaReady(void);
-    if (sizeWasKnown && cn1MacRuntimeIsJavaReady()) {
+    if (sizeWasKnown && self.cn1WindowId < 0 && cn1MacRuntimeIsJavaReady()) {
         screenSizeChanged(pw, ph);
     }
 }
