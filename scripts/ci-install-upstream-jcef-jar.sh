@@ -39,7 +39,14 @@ install_artifact() {
         enc="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$version")"
         url="https://repo1.maven.org/maven2/$group_path/$artifact/$enc/$artifact-$enc.jar"
         echo "[install-upstream-jcef] downloading $url"
-        curl -fsSL -o "$tmp" "$url"
+        # Retried by curl itself, not only by the caller. repo1.maven.org answers
+        # 429 under load with a Retry-After header, and --retry honours it --
+        # which a wrapper loop guessing its own backoff cannot. The workflow
+        # wrappers around this script waited 15s then 30s and were still inside
+        # Central's rate-limit window every time, so all three attempts failed
+        # and took the run with them.
+        curl -fsSL --retry 6 --retry-delay 10 --retry-max-time 420 --retry-all-errors \
+            -o "$tmp" "$url"
     fi
 
     # dest may be a symlink into a shared tree (e.g. /opt/cn1-binaries); remove
