@@ -33,14 +33,21 @@ import UniformTypeIdentifiers
 final class CN1DocumentItem: NSObject, NSFileProviderItem {
     private let node: CN1DocumentNode
     private let parentId: NSFileProviderItemIdentifier
+    private let identifier: NSFileProviderItemIdentifier
 
-    init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier) {
+    /// The identifier is passed in rather than taken from the node because the tree's root has
+    /// two names: whatever id the app gave it, and `.rootContainer`, which is the only one the
+    /// system accepts back when it asked for the root. Answering with the app's id there is a
+    /// mismatch the browser reads as "that is not the item I asked for".
+    init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier,
+         identifier: NSFileProviderItemIdentifier? = nil) {
         self.node = node
         self.parentId = parentId
+        self.identifier = identifier ?? NSFileProviderItemIdentifier(node.id)
     }
 
     var itemIdentifier: NSFileProviderItemIdentifier {
-        NSFileProviderItemIdentifier(node.id)
+        identifier
     }
 
     var parentItemIdentifier: NSFileProviderItemIdentifier {

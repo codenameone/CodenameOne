@@ -65,7 +65,11 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         } else {
             parent = .rootContainer
         }
-        completionHandler(CN1DocumentItem(node: node, parentId: parent), nil)
+        // The root answers to .rootContainer, never to the app's own id for it.
+        let identifier: NSFileProviderItemIdentifier? =
+            resolved == index.rootId ? .rootContainer : nil
+        completionHandler(CN1DocumentItem(node: node, parentId: parent, identifier: identifier),
+                          nil)
         progress.completedUnitCount = 1
         return progress
     }

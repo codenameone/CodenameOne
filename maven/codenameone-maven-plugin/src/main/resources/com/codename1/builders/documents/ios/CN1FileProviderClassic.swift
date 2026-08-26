@@ -55,7 +55,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
             : NSFileProviderItemIdentifier(parentId!)
-        return CN1DocumentItem(node: node, parentId: parent)
+        // The root answers to .rootContainer, never to the app's own id for it.
+        let identifier: NSFileProviderItemIdentifier? =
+            resolved == index.rootId ? .rootContainer : nil
+        return CN1DocumentItem(node: node, parentId: parent, identifier: identifier)
     }
 
     override func urlForItem(withPersistentIdentifier identifier: NSFileProviderItemIdentifier)
