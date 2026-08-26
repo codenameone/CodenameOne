@@ -206,6 +206,20 @@ static NSMutableDictionary *cn1clReportWaiters = nil;
 /// Whether application code has installed a VoIP listener.
 static BOOL cn1clJavaReady = NO;
 
+/// CXActions that arrived before the app had a listener.
+///
+/// A pushed call rings before any of this app's code has run, and the user
+/// can answer it there and then. Delivered into a facade with no listeners,
+/// the action was auto-fulfilled by the facade's own safety net and
+/// cn1clTrackAction had already claimed the call -- so the watchdog left it
+/// alone, the drain handed Java a session still marked RINGING, and
+/// answerRequested was never delivered at all: the call was connected on
+/// screen and the app never started its media.
+///
+/// Held here instead and replayed once Java says it is listening, which is
+/// the same handshake the pending-call drain uses.
+static NSMutableArray *cn1clQueuedActions = nil;
+
 static int cn1clRoute = CN1_CALL_ROUTE_EARPIECE;
 static BOOL cn1clConfigured = NO;
 static NSString *cn1clDirectoryPath = nil;
@@ -224,6 +238,7 @@ static void cn1clEnsureState(void) {
         cn1clJavaStarts = [[NSMutableSet alloc] init];
         cn1clSystemStarts = [[NSMutableSet alloc] init];
         cn1clTokenRequests = [[NSMutableArray alloc] init];
+        cn1clQueuedActions = [[NSMutableArray alloc] init];
         cn1clLock = [[NSObject alloc] init];
     });
 }
@@ -251,6 +266,35 @@ static void cn1clDropAudioLocked(NSString *uuidString) {
         // after the call is gone, and that callback still has to name it.
         cn1clAudioRetiring = cn1clAudioCall;
         cn1clAudioCall = nil;
+    }
+}
+
+/// Holds an action until Java is listening, answering whether it did.
+///
+/// The block is what will run at replay time; nothing is fulfilled or failed
+/// here, because CallKit's own timeout is the only honest deadline and the
+/// app is expected to be listening within a fraction of it.
+static BOOL cn1clHoldUntilReady(void (^deliver)(void)) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        if (cn1clJavaReady) {
+            return NO;
+        }
+        [cn1clQueuedActions addObject:[deliver copy]];
+        return YES;
+    }
+}
+
+/// Replays everything held while the app was not listening.
+static void cn1clReplayQueuedActions(void) {
+    NSArray *held = nil;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        held = [NSArray arrayWithArray:cn1clQueuedActions];
+        [cn1clQueuedActions removeAllObjects];
+    }
+    for (void (^deliver)(void) in held) {
+        deliver();
     }
 }
 
@@ -374,6 +418,15 @@ static int64_t cn1clTrackAction(CXAction *action) {
 
 - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
     cn1clOwnAudio([action.callUUID UUIDString]);
+    // Held when the app has no listener yet: a pushed call rings before any
+    // of its code runs, and the user can answer it there and then.
+    if (cn1clHoldUntilReady(^{
+        com_codename1_impl_ios_IOSCallCallbacks_answerRequested___java_lang_String_long(
+                getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+                cn1clTrackAction(action));
+    })) {
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_answerRequested___java_lang_String_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             cn1clTrackAction(action));
@@ -394,6 +447,13 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // CallSession.end() answered INVALID_ID for a call the system was still
     // showing, and availability checks misread it as somebody else's.
     // cn1clCompleteAction drops it once the action is fulfilled.
+    if (cn1clHoldUntilReady(^{
+        com_codename1_impl_ios_IOSCallCallbacks_endRequested___java_lang_String_long(
+                getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+                cn1clTrackAction(action));
+    })) {
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_endRequested___java_lang_String_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             cn1clTrackAction(action));
@@ -412,6 +472,13 @@ static int64_t cn1clTrackAction(CXAction *action) {
     if (!action.onHold) {
         cn1clOwnAudio([action.callUUID UUIDString]);
     }
+    if (cn1clHoldUntilReady(^{
+        com_codename1_impl_ios_IOSCallCallbacks_holdRequested___java_lang_String_boolean_long(
+                getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+                action.onHold ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
+    })) {
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_holdRequested___java_lang_String_boolean_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             action.onHold ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
@@ -423,12 +490,26 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [action fulfill];
         return;
     }
+    if (cn1clHoldUntilReady(^{
+        com_codename1_impl_ios_IOSCallCallbacks_muteRequested___java_lang_String_boolean_long(
+                getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+                action.muted ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
+    })) {
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_muteRequested___java_lang_String_boolean_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             action.muted ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
 }
 
 - (void)provider:(CXProvider *)provider performPlayDTMFCallAction:(CXPlayDTMFCallAction *)action {
+    if (cn1clHoldUntilReady(^{
+        com_codename1_impl_ios_IOSCallCallbacks_dtmfRequested___java_lang_String_java_lang_String_long(
+                getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+                cn1clJString(action.digits), cn1clTrackAction(action));
+    })) {
+        return;
+    }
     com_codename1_impl_ios_IOSCallCallbacks_dtmfRequested___java_lang_String_java_lang_String_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             cn1clJString(action.digits), cn1clTrackAction(action));
@@ -1698,6 +1779,11 @@ void com_codename1_impl_ios_IOSNative_callDrainPendingCalls___int(
         JAVA_INT requestId) {
 #ifdef CN1_CALL_HAS_CALLKIT
     cn1clDrain(requestId);
+    // AFTER the drain, not on setJavaReady: an action held from the cold
+    // start names a call the app has only just been handed, and delivering
+    // answerRequested for a session Java has not adopted yet would arrive
+    // for a call it does not know about.
+    cn1clReplayQueuedActions();
 #else
     com_codename1_impl_ios_IOSCallCallbacks_pendingCallsDrained___int_int(
             threadStateData, requestId, 0);
@@ -1726,11 +1812,38 @@ void com_codename1_impl_ios_IOSNative_callSetDirectorySource___int_java_lang_Str
         return;
     }
     NSURL *dest = [container URLByAppendingPathComponent:@"cn1calldirectory.tsv"];
+    // Staged, then swapped. The READER is the Call Directory extension in
+    // its own process, and iOS starts it on its own schedule -- so deleting
+    // the live file first gave it a window in which the file was missing,
+    // which it reports as a successful load of ZERO entries and iOS then
+    // drops every caller-ID and blocking record. A failed copy did the same
+    // thing permanently, while setEntries answered that it had failed.
+    NSURL *staging = [container URLByAppendingPathComponent:
+            @"cn1calldirectory.tsv.new"];
+    NSFileManager *files = [NSFileManager defaultManager];
     NSError *error = nil;
-    [[NSFileManager defaultManager] removeItemAtURL:dest error:nil];
-    [[NSFileManager defaultManager] copyItemAtURL:[NSURL fileURLWithPath:src]
-                                            toURL:dest error:&error];
+    [files removeItemAtURL:staging error:nil];
+    [files copyItemAtURL:[NSURL fileURLWithPath:src] toURL:staging
+                   error:&error];
     if (error != nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
+                [error localizedDescription]);
+        return;
+    }
+    // replaceItemAtURL is the atomic swap; with no file to replace it fails,
+    // and a plain move is right because nothing can be reading what is not
+    // there yet.
+    if ([files fileExistsAtPath:[dest path]]) {
+        error = nil;
+        [files replaceItemAtURL:dest withItemAtURL:staging
+                 backupItemName:nil options:0 resultingItemURL:nil
+                          error:&error];
+    } else {
+        error = nil;
+        [files moveItemAtURL:staging toURL:dest error:&error];
+    }
+    if (error != nil) {
+        [files removeItemAtURL:staging error:nil];
         cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
                 [error localizedDescription]);
         return;
