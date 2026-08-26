@@ -264,8 +264,21 @@ public class CN1CallScreeningService extends CallScreeningService {
                 }
                 rolePending = true;
             }
-            com.codename1.impl.android.AndroidNativeUtil.startActivityForResult(
-                    intent, new RoleResult(requestId));
+            try {
+                com.codename1.impl.android.AndroidNativeUtil
+                        .startActivityForResult(intent,
+                                new RoleResult(requestId));
+            } catch (RuntimeException launchFailed) {
+                // The current activity can be gone by now, and
+                // startActivityForResult throws when it is. Without this the
+                // prompt never opened and nothing cleared the flag, so every
+                // later request was refused as BUSY for the life of the
+                // process -- the same shape the VPN consent path had.
+                synchronized (CN1CallScreeningService.class) {
+                    rolePending = false;
+                }
+                throw launchFailed;
+            }
         } catch (Exception e) {
             unsupported(requestId);
         }

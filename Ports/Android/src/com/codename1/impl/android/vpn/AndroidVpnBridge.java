@@ -374,11 +374,16 @@ public class AndroidVpnBridge implements VpnBridge {
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             startRequested = false;
-            setStatus(VpnStatus.DISCONNECTED);
             // A SecurityException here is the platform saying no profile is
             // provisioned, which is a different answer from a tunnel that
-            // could not be established.
-            fail(requestId, isNotProvisioned(e)
+            // could not be established -- and the STATUS has to say the same
+            // thing as the failure. Reporting DISCONNECTED for a refusal that
+            // said NOT_CONFIGURED had getStatus() contradict the error the
+            // caller had just been handed.
+            boolean absent = isNotProvisioned(e);
+            setStatus(absent ? VpnStatus.NOT_CONFIGURED
+                    : VpnStatus.DISCONNECTED);
+            fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
                     describe(e));
         }
@@ -391,6 +396,7 @@ public class AndroidVpnBridge implements VpnBridge {
             return;
         }
         // Not gated on installedWire; see startVpn.
+        VpnStatus before = reconciledStatus();
         try {
             startRequested = false;
             setStatus(VpnStatus.DISCONNECTING);
@@ -398,7 +404,15 @@ public class AndroidVpnBridge implements VpnBridge {
             setStatus(VpnStatus.DISCONNECTED);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
-            fail(requestId, isNotProvisioned(e)
+            // DISCONNECTING was set before the platform was asked, so a
+            // refusal left the bridge saying a tunnel was going down for ever
+            // -- with no tunnel and, in the SecurityException case, no
+            // profile either. The state goes back to what it was, or to
+            // NOT_CONFIGURED when the platform has just said there is
+            // nothing provisioned.
+            boolean absent = isNotProvisioned(e);
+            setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
+            fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
         }
     }
