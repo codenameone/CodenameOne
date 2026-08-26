@@ -2607,8 +2607,8 @@ public class CodenameOneSettings extends Lifecycle {
         collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"), properties, out);
         String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
                 "compile", managedFromChain);
-        collectRoots(compileGoalConfiguration(kotlin, "compile", "sourceDir",
-                kotlinRunsWithoutExecution(kotlin)), "sourceDir", properties, out);
+        collectContainerRoots(compileGoalConfiguration(kotlin, "compile", "sourceDirs",
+                kotlinRunsWithoutExecution(kotlin)), "sourceDirs", properties, out);
         String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source",
                 "add-source", managedFromChain);
         if (helper != null) {
@@ -2616,8 +2616,8 @@ public class CodenameOneSettings extends Lifecycle {
             // TEST sources is passed over -- the same distinction the Kotlin
             // plugin's compile and test-compile executions need.
             // add-source runs only where an execution says so.
-            collectRoots(compileGoalConfiguration(helper, "add-source", "source", false), "source",
-                    properties, out);
+            collectContainerRoots(compileGoalConfiguration(helper, "add-source", "sources",
+                    false), "sources", properties, out);
         }
     }
 
@@ -2696,7 +2696,10 @@ public class CodenameOneSettings extends Lifecycle {
                         || (runsWithoutExecution
                             && declaresValue(execution, "id", "default-" + goal)))) {
                 bound = true;
-                if (execution.indexOf("<" + element + ">") < 0) {
+                // Attribute-tolerant: `<sourceDirs combine.children="append">`
+                // is the element, and matching `<sourceDirs>` literally missed
+                // exactly the execution that asks for both lists.
+                if (containerValues(execution, element).isEmpty()) {
                     if (execution.indexOf("combine.self=\"override\"") < 0) {
                         out.add(pluginLevel);
                     }
@@ -2727,6 +2730,102 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
+    /// The values of every direct child of `container`, whatever they are named.
+    ///
+    /// Maven maps a collection parameter by POSITION, not by child tag: the
+    /// Kotlin plugin reads `<sourceDirs><source>gen/kt</source></sourceDirs>`
+    /// exactly as it reads `<sourceDir>`, and AbstractCN1Mojo iterates the
+    /// children for that reason. Requiring one spelling here dropped a root
+    /// Maven really compiles -- and it is the SAME question the Maven side
+    /// already answered the other way.
+    private static void collectContainerRoots(java.util.List<String> blocks, String container,
+                                              java.util.Map<String, String> properties,
+                                              java.util.List<String> out) {
+        for (String block : blocks) {
+            // The container may carry attributes -- `<sourceDirs
+            // combine.children="append">` is how a POM asks for both lists --
+            // so it cannot be found by matching `<sourceDirs>` literally.
+            for (String dirs : containerValues(block, container)) {
+                collectRoots(childValues(dirs), properties, out);
+            }
+        }
+    }
+
+    /// The contents of every `<name>` or `<name ...>` element in `xml`.
+    private static java.util.List<String> containerValues(String xml, String name) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
+        String open = "<" + name;
+        String shut = "</" + name + ">";
+        int at = xml.indexOf(open);
+        while (at >= 0) {
+            int nameEnd = at + open.length();
+            char after = nameEnd < xml.length() ? xml.charAt(nameEnd) : ' ';
+            if (after != '>' && after != ' ' && after != '\t' && after != '\n'
+                    && after != '\r' && after != '/') {
+                // <sourceDirsSomethingElse>, not this element.
+                at = xml.indexOf(open, nameEnd);
+                continue;
+            }
+            int tagEnd = xml.indexOf('>', nameEnd);
+            if (tagEnd < 0) {
+                return out;
+            }
+            if (xml.charAt(tagEnd - 1) == '/') {
+                at = xml.indexOf(open, tagEnd);
+                continue;
+            }
+            int close = xml.indexOf(shut, tagEnd);
+            if (close < 0) {
+                return out;
+            }
+            out.add(xml.substring(tagEnd + 1, close));
+            at = xml.indexOf(open, close + shut.length());
+        }
+        return out;
+    }
+
+    /// The text of every direct child element of `xml`.
+    private static java.util.List<String> childValues(String xml) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (xml == null) {
+            return out;
+        }
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf('<', at);
+            if (open < 0 || open + 1 >= xml.length()) {
+                return out;
+            }
+            if (xml.charAt(open + 1) == '/') {
+                at = open + 2;
+                continue;
+            }
+            int nameEnd = xml.indexOf('>', open);
+            if (nameEnd < 0) {
+                return out;
+            }
+            String name = xml.substring(open + 1, nameEnd).trim();
+            if (name.endsWith("/")) {
+                at = nameEnd + 1;
+                continue;
+            }
+            int space = name.indexOf(' ');
+            if (space > 0) {
+                name = name.substring(0, space);
+            }
+            String shut = "</" + name + ">";
+            int close = xml.indexOf(shut, nameEnd);
+            if (close < 0) {
+                return out;
+            }
+            out.add(xml.substring(nameEnd + 1, close));
+            at = close + shut.length();
+        }
+    }
+
     private static void collectRoots(java.util.List<String> values,
                                      java.util.Map<String, String> properties,
                                      java.util.List<String> out) {
@@ -2734,8 +2833,16 @@ public class CodenameOneSettings extends Lifecycle {
             String path = value.trim().replace('\\', '/');
             // A `${project.basedir}` prefix is deterministic and common; only
             // an expression this reader cannot resolve makes the path unusable.
-            if (path.isEmpty() || expandProjectPaths(path, "/probe", null, properties) == null
-                    || looksLikeATestRoot(path)) {
+            // No name test. Every root that reaches here was declared through a
+            // MAIN-code element -- <sourceDirectory>, build-helper add-source,
+            // the Kotlin compile goal -- and the test spellings of each
+            // (<testSourceDirectory>, add-test-source, test-compile) are filtered
+            // by element and goal before this. Maven compiles
+            // src/integrationTest/java as main code when a POM says so, and
+            // guessing from the path dropped exactly that root -- taking the
+            // annotated main class in it, which is the failure this list exists
+            // to prevent.
+            if (path.isEmpty() || expandProjectPaths(path, "/probe", null, properties) == null) {
                 continue;
             }
             if (!out.contains(path)) {
@@ -2914,21 +3021,6 @@ public class CodenameOneSettings extends Lifecycle {
             out.append(text, at, hit).append(with);
             at = hit + find.length();
         }
-    }
-
-    /// Whether a declared path is a test tree, by the same convention the source
-    /// sets follow: a `test` segment, or one that says test the way
-    /// `testFixtures` and `integrationTest` do.
-    private static boolean looksLikeATestRoot(String path) {
-        for (String segment : com.codename1.util.StringUtil.tokenize(path, "/")) {
-            if ("test".equals(segment)
-                    || (segment.length() > 4 && segment.startsWith("test")
-                        && Character.isUpperCase(segment.charAt(4)))
-                    || segment.endsWith("Test") || segment.endsWith("Tests")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static java.util.List<String> elementValues(String xml, String name) {

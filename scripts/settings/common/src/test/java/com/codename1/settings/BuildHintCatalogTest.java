@@ -1717,9 +1717,11 @@ public class BuildHintCatalogTest {
         assertTrue(roots.contains("src/generated/java"), roots.toString());
         assertTrue(roots.contains("src/main/kt"), roots.toString());
 
-        // A declared TEST root is dropped: those are configured through the same
-        // elements, and one shadowing a production type is the failure the root
-        // list exists to avoid.
+        // A declared TEST root is dropped -- by the ELEMENT and the GOAL that
+        // declare it, never by how the path is spelled. Maven compiles
+        // src/integrationTest/java as main code when an add-source execution
+        // says so, and guessing from the name dropped that root along with the
+        // annotated main class in it.
         java.util.List<String> withTests = CodenameOneSettings.declaredSourceRoots(
                 "<project><build>"
                         + "<sourceDirectory>appsrc</sourceDirectory>"
@@ -1731,8 +1733,10 @@ public class BuildHintCatalogTest {
                         + "</sources></configuration></execution></executions></plugin>"
                         + "</plugins></build></project>");
         assertTrue(withTests.contains("appsrc"), withTests.toString());
+        // <testSourceDirectory> is not read at all.
         assertFalse(withTests.contains("src/test/java"), withTests.toString());
-        assertFalse(withTests.contains("src/integrationTest/java"), withTests.toString());
+        // ...but add-source means main code, whatever the directory is called.
+        assertTrue(withTests.contains("src/integrationTest/java"), withTests.toString());
 
         // `<source>` and `<sourceDir>` are ordinary words: another plugin naming
         // a directory in one is not saying it is compiled.
@@ -2866,6 +2870,65 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(
                         CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
                                 java.util.Arrays.asList(leafSilent, parentDisables))).toString());
+    }
+
+    /// A collection is read by POSITION, not by the child's tag name.
+    ///
+    /// Maven maps `<sourceDirs>` to a list and ignores what the children are
+    /// called, which is why AbstractCN1Mojo iterates them. Requiring the one
+    /// spelling `<sourceDir>` dropped a root Maven really compiles -- and the
+    /// same is true of build-helper's `<sources>`.
+    @Test
+    public void aCollectionIsReadByPositionNotByChildName() {
+        String kotlin = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>compile</goal></goals>"
+                + "<configuration><sourceDirs>"
+                + "<source>gen/kt-a</source>"
+                + "<sourceDir>gen/kt-b</sourceDir>"
+                + "<dir>gen/kt-c</dir>"
+                + "</sourceDirs></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(kotlin);
+        for (String expected : new String[]{"gen/kt-a", "gen/kt-b", "gen/kt-c"}) {
+            assertTrue(roots.contains(expected), expected + " missing from " + roots);
+        }
+
+        String helper = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources>"
+                + "<path>gen/helper-a</path><source>gen/helper-b</source>"
+                + "</sources></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> helperRoots = CodenameOneSettings.declaredSourceRoots(helper);
+        assertTrue(helperRoots.contains("gen/helper-a"), helperRoots.toString());
+        assertTrue(helperRoots.contains("gen/helper-b"), helperRoots.toString());
+    }
+
+    /// A production root keeps its meaning however it is spelled.
+    ///
+    /// Maven compiles `src/integrationTest/java` as MAIN code when an
+    /// add-source execution says so. Guessing test scope from a path segment
+    /// dropped that root, and the annotated main class in it went with it --
+    /// which is the failure the root list exists to prevent. Test roots are
+    /// excluded by the element and the goal that declare them.
+    @Test
+    public void aProductionRootIsNotJudgedByItsName() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>src/integrationTest/java</source>"
+                + "</sources></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom)
+                .contains("src/integrationTest/java"),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+
+        // add-test-source with the same directory is still excluded, by GOAL.
+        String tests = pom.replace("add-source", "add-test-source");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(tests).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(tests).toString());
     }
 
     /// Plugin-level configuration with no execution is dormant here too.
