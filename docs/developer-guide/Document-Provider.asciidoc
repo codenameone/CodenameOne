@@ -144,10 +144,12 @@ match the bundle ID "com.example.myapp.CN1Documents"
 
 Codename One refuses that build before sending it, naming the extension and the bundle id its App ID has to match. A wildcard App ID (`com.example.*`) is the one case that needs no extra profile - it already covers the extension - and the build lets it through.
 
-Local "ios-source" builds need none of this: you sign the generated Xcode project in Xcode as usual.
+macOS hosts the same extension rather than shipping without it, so a Mac build embeds a `CN1Documents` bundle too and needs signing assets for it in the same way. The App Group is written into the Mac entitlements automatically; the extension's own Mac profile isn't, so a cloud Mac build needs one just as an iOS build does.
+
+Local "ios-source" and "mac-source" builds need none of this: you sign the generated Xcode project in Xcode as usual.
 
 === Testing
 
 `isSupported()` answers `false` in the simulator, and every publish call is a safe no-op there, so your code needs no guards beyond the one shown above. The simulator still writes everything a device would, under `cn1documents` in the app's home directory, so you can read back exactly what a device would have been handed.
 
-On a device, publish a tree and open the Files app: the location appears under "Browse" alongside iCloud Drive. On Android it appears in the storage picker. A local "ios-source" build produces the `CN1Documents` target in the generated Xcode project, so you can confirm the extension compiles and is embedded before signing anything.
+On a device, publish a tree and open the Files app: the location appears under "Browse" alongside iCloud Drive. On macOS it appears in Finder's sidebar. On Android it appears in the storage picker. A local "ios-source" build produces the `CN1Documents` target in the generated Xcode project, so you can confirm the extension compiles and is embedded before signing anything.

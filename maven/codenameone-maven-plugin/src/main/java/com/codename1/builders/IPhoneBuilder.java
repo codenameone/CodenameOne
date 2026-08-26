@@ -6479,6 +6479,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (macNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    // Told before the entitlements are written, so the Mac slice declares the
+                    // same App Group the iOS one does. Without it the Mac app publishes into a
+                    // container its own extension cannot open.
+                    macNativeBuilder.setDocumentProviderAppGroup(
+                            documentProviderEnabled ? documentsAppGroup : null);
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
                     macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
@@ -11356,15 +11361,18 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
                 + "embed_file = embed_phase.add_file_reference(fileref)\n");
         if (macNativeBuilder.isEnabled()) {
-            // Mac Catalyst guard, matching the widget extension: this iOS build also produces a
-            // Catalyst slice, whose Mac entitlements carry no app group, so building and
-            // embedding the extension for the Mac destination would fail the archive. The
-            // AppKit macOS port gets its own target instead, in the project the Mac builder
-            // generates. Platform-filter the dependency and the embed step to the iOS slice.
-            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
-                    + "dep.platform_filter = 'ios' if dep\n"
-                    + "embed_file.platform_filter = 'ios'\n");
-            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+            // Unlike the widget extension, this one travels to the Catalyst slice. The reason the
+            // widget extension is filtered out is that the Mac entitlements carry no app group --
+            // and for this feature they now do, because setDocumentProviderAppGroup told the Mac
+            // builder to write it. FileProvider is available to Catalyst, so the Mac app hosts
+            // the same extension the iOS app does rather than shipping without the feature.
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "YES");
+            // Must match the app target, which MacNativeBuilder sets to YES. On the Catalyst
+            // destination that turns the app's bundle id into "maccatalyst.<id>"; an embedded
+            // extension has to stay nested under whatever the host actually resolves to, so
+            // leaving this NO would ship an appex whose id is no longer prefixed by the app's
+            // and fail the archive.
+            buildSettingsMap.put("DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER", "YES");
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
