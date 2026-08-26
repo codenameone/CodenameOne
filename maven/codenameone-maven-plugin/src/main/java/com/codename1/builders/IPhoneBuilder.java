@@ -248,8 +248,12 @@ public class IPhoneBuilder extends Executor {
     /// @return the fragment, with the entry appended when it was wanted
     private static String appendCallPlist(String inject, String key,
             String value) {
+        // The EXACT key, not a substring of the fragment: a project with an
+        // unrelated MyCN1CallAppGroupSetting suppressed generation entirely,
+        // and the host plist then carried neither the group nor the extension
+        // identifier -- so every directory write and reload failed at runtime.
         if (value == null || value.trim().length() == 0
-                || inject.contains(key)) {
+                || inject.contains("<key>" + key + "</key>")) {
             return inject;
         }
         return inject + "\n<key>" + key + "</key><string>"
@@ -10866,6 +10870,15 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
         for (String key : request.getArgs()) {
             if (key.startsWith("ios.call.directory.buildSettings.")) {
+                String overrideValue = request.getArg(key, "");
+                if (overrideValue.trim().length() == 0) {
+                    // A present-but-empty override is not an override. Left
+                    // in, it replaced the resolved bundle identifier with
+                    // nothing: a simulator target with no identifier, a
+                    // signed build reporting an empty App ID, and a host
+                    // plist still naming the default.
+                    continue;
+                }
                 buildSettingsMap.put(
                         key.substring("ios.call.directory.buildSettings.".length()),
                         request.getArg(key, ""));

@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class IPhoneBuilderVoipModesTest {
 
+    private static final String BUILDER_SOURCE =
+            "src/main/java/com/codename1/builders/IPhoneBuilder.java";
+
     private static final String MODES_HEAD =
             "<key>UIBackgroundModes</key>\n<array>\n";
 
@@ -80,5 +83,38 @@ class IPhoneBuilderVoipModesTest {
                 .contains("voip"));
         assertFalse(IPhoneBuilder.listedModes("myvoipmode").contains("voip"),
                 "a mode whose name contains voip is not voip");
+    }
+
+    @Test
+    void anEmptyBundleIdOverrideKeepsTheDefault() throws Exception {
+        // A present-but-empty override is not an override. Left in, it
+        // replaced the resolved identifier with nothing: a simulator target
+        // with no bundle id and a host plist still naming the default.
+        String src = builderSource();
+        int loop = src.indexOf(
+                "key.startsWith(\"ios.call.directory.buildSettings.\")");
+        assertTrue(loop > 0, "the override loop has to exist");
+        String after = src.substring(loop, Math.min(src.length(), loop + 700));
+        assertTrue(after.contains("trim().length() == 0"),
+                "an empty override has to be skipped: " + after);
+        assertTrue(after.contains("continue;"), after);
+    }
+
+    @Test
+    void theInjectedKeyIsMatchedExactly() throws Exception {
+        // A project with an unrelated MyCN1CallAppGroupSetting matched a bare
+        // substring test, which suppressed generation entirely -- so the host
+        // plist carried neither the group nor the extension identifier.
+        String src = builderSource();
+        assertTrue(src.contains("inject.contains(\"<key>\" + key + \"</key>\")"),
+                "appendCallPlist has to test the exact plist key");
+    }
+
+    private static String builderSource() throws Exception {
+        java.io.File f = new java.io.File(BUILDER_SOURCE);
+        assertTrue(f.exists(), "builder source must be readable: "
+                + f.getAbsolutePath());
+        return new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8);
     }
 }
