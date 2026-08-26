@@ -172,23 +172,29 @@ public final class CallRequests {
     /// stopped listening while the other listener was still installed -- and
     /// on iOS that means every CallKit action is held until it times out.
     private static void updateReadiness(boolean isActions, boolean wanted) {
-        boolean before;
-        boolean after;
+        // The DELIVERY is inside the lock too, not just the computation.
+        // Released in between, two transitions could be computed in one order
+        // and delivered in the other: a push listener leaving computes false
+        // and pauses, an action listener arriving computes and delivers true,
+        // and the stale false lands last -- leaving the port holding CallKit
+        // actions until they time out while a live action listener waits for
+        // them. The bridge implementations are setters, so there is nothing
+        // here to deadlock against.
         synchronized (CallRequests.class) {
-            before = actionsWanted || pushesWanted;
+            boolean before = actionsWanted || pushesWanted;
             if (isActions) {
                 actionsWanted = wanted;
             } else {
                 pushesWanted = wanted;
             }
-            after = actionsWanted || pushesWanted;
-        }
-        if (before == after) {
-            return;
-        }
-        CallBridge b = bridge();
-        if (b != null) {
-            b.setJavaReady(after);
+            boolean after = actionsWanted || pushesWanted;
+            if (before == after) {
+                return;
+            }
+            CallBridge b = bridge();
+            if (b != null) {
+                b.setJavaReady(after);
+            }
         }
     }
 

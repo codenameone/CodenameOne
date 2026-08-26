@@ -122,6 +122,17 @@ final class LibraryClassPrefixScan {
                 }
                 String lower = entry.getName().toLowerCase(Locale.ROOT);
                 if (lower.endsWith(".class")) {
+                    if (isFrameworkClass(entry.getName(), prefixes)) {
+                        // The API definition itself, bundled into a fat jar.
+                        // Its own constant pool necessarily names its own
+                        // class, so inspecting it reports usage that nothing
+                        // in the app or the library actually has -- and on
+                        // iOS that false hit generates the directory
+                        // extension and then demands a provisioning profile
+                        // for it, failing an otherwise valid build. The
+                        // nearby scanner skips these for the same reason.
+                        continue;
+                    }
                     try {
                         inspect(readAll(zip.getInputStream(entry)), prefixes,
                                 found);
@@ -199,6 +210,28 @@ final class LibraryClassPrefixScan {
                 found.add(prefixes[i]);
             }
         }
+    }
+
+    /// Whether this entry IS one of the classes being looked for, rather
+    /// than something that references one.
+    ///
+    /// A fat jar that bundles the Codename One API carries
+    /// com/codename1/call/directory/CallDirectory.class, whose constant pool
+    /// contains its own name; counting that as usage turns every such jar
+    /// into a directory-enabled build.
+    static boolean isFrameworkClass(String entryName, String[] prefixes) {
+        String path = entryName.replace('\\', '/');
+        int at = path.indexOf("com/codename1/");
+        if (at < 0) {
+            return false;
+        }
+        String fromRoot = path.substring(at);
+        for (String prefix : prefixes) {
+            if (fromRoot.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static byte[] readAll(File file) {

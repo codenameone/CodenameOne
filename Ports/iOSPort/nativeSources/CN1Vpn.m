@@ -472,19 +472,27 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             manager.onDemandRules = [NSArray arrayWithObject:rule];
         }
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
-            @synchronized (cn1vpInstallLock) {
-                cn1vpInstalling = NO;
-            }
             if (saveError == nil) {
                 // The new profile is installed and owns the new generation,
                 // so the previous one's items can go. A failed save falls
                 // through and leaves them exactly where the still-installed
                 // profile expects them.
                 cn1vpRetireOldSecrets();
+                // Released only now. Cleared before the cleanup, a second
+                // install could reserve the SAME next generation and stage
+                // its secrets into it while this one was still retiring --
+                // and in the failure case below, delete what the second had
+                // just staged.
+                @synchronized (cn1vpInstallLock) {
+                    cn1vpInstalling = NO;
+                }
                 cn1vpAck(requestId, YES, 0, nil);
                 return;
             }
             cn1vpDiscardStagedSecrets();
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
+            }
             // A user who declines the system prompt lands here, and it is an
             // ordinary outcome rather than a failure to report twice.
             int code = saveError.code == NEVPNErrorConfigurationReadWriteFailed
@@ -511,12 +519,22 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
     // delete the profile the installation has just acknowledged. Whichever
     // way round, one of the two answered success for a state that is not the
     // one on the device.
+    // The removal RESERVES the manager for its whole asynchronous run, not
+    // just for the instant it looks. Checking and letting go, an install
+    // could start while the load and the remove were still in flight, and the
+    // two callbacks interleaved on the one shared manager: both answered
+    // success while the later one either put the profile back or deleted the
+    // one just installed, and the secret cleanup no longer matched what was
+    // on the device.
     cn1vpEnsureInstallLock();
-    BOOL installing = NO;
+    BOOL busy = NO;
     @synchronized (cn1vpInstallLock) {
-        installing = cn1vpInstalling;
+        busy = cn1vpInstalling;
+        if (!busy) {
+            cn1vpInstalling = YES;
+        }
     }
-    if (installing) {
+    if (busy) {
         cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
                 @"A VPN profile installation is in progress");
         return;
@@ -532,6 +550,9 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
                 // generation. Only after a SUCCESSFUL removal: a failed one
                 // leaves the profile installed and still needing them.
                 cn1vpDiscardSecrets();
+            }
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
             }
             cn1vpAck(requestId, error == nil, CN1_VPN_ERR_UNKNOWN,
                     error == nil ? nil : [error localizedDescription]);
