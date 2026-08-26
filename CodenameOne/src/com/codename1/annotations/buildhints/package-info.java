@@ -62,7 +62,18 @@
 /// </execution>
 /// ```
 ///
-/// Generated from com.codename1.build.shared.BuildHints by
-/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and
-/// re-run scripts/gen-build-hint-annotations.sh.
+/// These annotations are the source of truth for the hints they expose. Add an
+/// attribute here to add a hint: the Java type IS its type, an enum's constants
+/// ARE its value domain, and `@Hint` carries the rest -- the wire key where it
+/// differs from the attribute name, the prose the developer guide shows, the
+/// builder's default, and whether a cn1lib may append to it.
+///
+/// Nothing restates any of that. The developer guide's table, the Settings
+/// editor's schema and the processor's binding table are all read back out of
+/// these classes by BuildHintAnnotationReader; run
+/// scripts/gen-build-hint-annotations.sh after editing to refresh them.
+///
+/// A hint with no annotation -- a dynamic family such as
+/// `android.permission.<NAME>`, or one only the build service reads -- is
+/// described in maven/build-hint-catalog instead.
 package com.codename1.annotations.buildhints;
