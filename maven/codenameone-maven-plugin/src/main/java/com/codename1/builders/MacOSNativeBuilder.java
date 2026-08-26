@@ -240,17 +240,20 @@ public class MacOSNativeBuilder extends Executor {
         // silently returns a constant is the worst possible failure, and it is
         // what an unconfigured build ships.
         final boolean[] usesCrypto = {false};
+        final boolean[] usesLocalNotifications = {false};
         try {
-            scanClassesForPermissions(classesDir, new CryptoScanner(usesCrypto));
+            scanClassesForPermissions(classesDir,
+                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
             // CN1_INCLUDE_CRYPTO off, and the stub bridge then returns the caller's
             // buffer untouched -- commonly all zeroes. A random source that silently
             // returns a constant is the worst failure in this file.
-            scanClassesForPermissions(buildinRes, new CryptoScanner(usesCrypto));
+            scanClassesForPermissions(buildinRes,
+                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications));
         } catch (IOException ex) {
-            throw new BuildException("Failed to scan the application for crypto usage", ex);
+            throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
         if (usesCrypto[0]) {
             // In the staged native tree, not in the resources: that tree is what
@@ -279,6 +282,31 @@ public class MacOSNativeBuilder extends Executor {
             }
         }
         log("Crypto API " + (usesCrypto[0] ? "enabled" : "disabled"));
+
+        // UserNotifications is the same framework on macOS, so the only thing
+        // standing between an app and a working LocalNotification is this
+        // define -- and with it off every sendLocalNotification body compiles
+        // away while requestNotificationPermission still reports granted. The
+        // app schedules notifications that never arrive and has no way to tell.
+        //
+        // The app delegate's CN1_INCLUDE_NOTIFICATIONS is deliberately NOT set:
+        // that one lives in CodenameOne_GLAppDelegate.h, which this port
+        // excludes. CN1MacAppDelegate handles delivery instead.
+        if (usesLocalNotifications[0]) {
+            File iosNative = new File(nativeSources, "IOSNative.m");
+            if (!iosNative.exists()) {
+                throw new BuildException("The application uses com.codename1.notifications but "
+                        + "IOSNative.m is missing from the staged native sources at "
+                        + iosNative.getAbsolutePath());
+            }
+            try {
+                replaceInFile(iosNative, "//#define CN1_INCLUDE_NOTIFICATIONS2",
+                        "#define CN1_INCLUDE_NOTIFICATIONS2");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable local notifications in IOSNative.m", ex);
+            }
+        }
+        log("Local Notifications " + (usesLocalNotifications[0] ? "enabled" : "disabled"));
 
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
@@ -792,11 +820,19 @@ public class MacOSNativeBuilder extends Executor {
      * deliberately not counted: they need LocalAuthentication rather than the
      * cipher implementations, and this port links the former unconditionally.</p>
      */
-    private static final class CryptoScanner implements Executor.ClassScanner {
-        private final boolean[] flag;
+    /// The compile-time toggles the staged native sources have to be told about
+    /// before translation, gathered in one pass.
+    ///
+    /// Both fail the same silent way if they are missed: the code they guard is
+    /// compiled to empty bodies, so the feature is simply absent from an
+    /// otherwise green build.
+    private static final class NativeFeatureScanner implements Executor.ClassScanner {
+        private final boolean[] usesCrypto;
+        private final boolean[] usesLocalNotifications;
 
-        CryptoScanner(boolean[] flag) {
-            this.flag = flag;
+        NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications) {
+            this.usesCrypto = usesCrypto;
+            this.usesLocalNotifications = usesLocalNotifications;
         }
 
         @Override
@@ -805,15 +841,26 @@ public class MacOSNativeBuilder extends Executor {
 
         @Override
         public void usesClass(String cls) {
-            if (cls == null || !cls.startsWith("com/codename1/security/")) {
+            if (cls == null) {
                 return;
             }
+            // The same test IPhoneBuilder uses, so a project that gets local
+            // notifications on iOS gets them here.
+            if (cls.startsWith("com/codename1/notifications/LocalNotification")) {
+                usesLocalNotifications[0] = true;
+            }
+            if (!cls.startsWith("com/codename1/security/")) {
+                return;
+            }
+            // Biometrics and secure storage live in the same package and are
+            // LocalAuthentication and Keychain rather than CommonCrypto, so they
+            // must not drag the cipher suite in.
             String shortName = cls.substring("com/codename1/security/".length());
             boolean isBiometric = shortName.startsWith("Biometric")
                     || shortName.equals("SecureStorage")
                     || shortName.equals("AuthenticationOptions");
             if (!isBiometric) {
-                flag[0] = true;
+                usesCrypto[0] = true;
             }
         }
 

@@ -8113,14 +8113,84 @@ void openGalleryMultiple(JAVA_INT type) {
 #endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isMultiGallerySelectSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#ifdef ENABLE_GALLERY_MULTISELECT
+#if TARGET_OS_OSX
+    // An open panel selects as many files as it is asked to, so there is no
+    // multiselect build flag to gate on here.
+    return JAVA_TRUE;
+#elif defined(ENABLE_GALLERY_MULTISELECT)
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
 #endif
 }
 
+#if TARGET_OS_OSX
+/// The file types an open panel offers for a gallery type.
+///
+/// Nil means everything, which is what GALLERY_ALL asks for.
+static NSArray *cn1MacGalleryFileTypes(int type) {
+    // GALLERY_IMAGE / GALLERY_IMAGE_MULTI, then GALLERY_VIDEO / GALLERY_VIDEO_MULTI.
+    if (type == 0 || type == 3) {
+        return @[@"png", @"jpg", @"jpeg", @"gif", @"bmp", @"tiff", @"tif", @"heic", @"heif", @"webp"];
+    }
+    if (type == 1 || type == 4) {
+        return @[@"mov", @"mp4", @"m4v", @"avi", @"mpg", @"mpeg", @"mkv", @"webm"];
+    }
+    return nil;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type) {
+#if TARGET_OS_OSX
+    // An open panel IS the gallery on a Mac. There is no photo-library picker
+    // and no library permission to ask for: under the App Sandbox the user
+    // choosing a file is itself the grant, which is what the powerbox does.
+    //
+    // Deliberately outside the INCLUDE_PHOTOLIBRARY_USAGE guard below. That
+    // define is set from an iOS usage-description build hint that a macOS build
+    // has no reason to carry, and gating on it left openGallery inert.
+    // -9998 is grouped with the MULTI types by IOSImplementation, so it is one
+    // here too; -9999 is a single unfiltered pick.
+    BOOL multiple = (type == 3 || type == 4 || type == 5 || type == -9998);
+    NSArray *fileTypes = cn1MacGalleryFileTypes((int)type);
+#ifndef CN1_USE_ARC
+    [fileTypes retain];
+#endif
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSOpenPanel *panel = [NSOpenPanel openPanel];
+        panel.allowsMultipleSelection = multiple;
+        panel.canChooseDirectories = NO;
+        panel.canChooseFiles = YES;
+        if (fileTypes != nil) {
+            panel.allowedFileTypes = fileTypes;
+        }
+        NSInteger response = [panel runModal];
+        NSString *result = nil;
+        if (response == NSModalResponseOK) {
+            NSMutableArray *paths = [NSMutableArray array];
+            for (NSURL *url in panel.URLs) {
+                if (url.path != nil) {
+                    [paths addObject:url.path];
+                }
+            }
+            if ([paths count] > 0) {
+                // Newline separated for a multiple selection, which is the
+                // shape capturePictureResult already splits on.
+                result = [paths componentsJoinedByString:@"\n"];
+            }
+        }
+        struct ThreadLocalData* threadStateData = getThreadLocalData();
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(
+            threadStateData,
+            result == nil ? JAVA_NULL : fromNSString(threadStateData, result));
+        POOL_END();
+#ifndef CN1_USE_ARC
+        [fileTypes release];
+#endif
+    });
+    return;
+#endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
     BOOL multiple = false;
     if (type == 3 || type == 4 || type == 5) {  // GALLERY_TYPE_IMAGE_MULTI, GALLERY_TYPE_VIDEO_MULTI, GALLERY_TYPE_ALL_MULTI
@@ -9766,7 +9836,12 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryAddUsage___R_bool
 }
 //native boolean checkPhotoLibraryUsage();
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_checkPhotoLibraryUsage___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-#ifdef INCLUDE_PHOTOLIBRARY_USAGE
+#if TARGET_OS_OSX
+    // There is no photo library to hold a usage description for. openGallery
+    // presents an open panel, and under the App Sandbox the user's choice in
+    // that panel is the access grant.
+    return JAVA_TRUE;
+#elif defined(INCLUDE_PHOTOLIBRARY_USAGE)
     return JAVA_TRUE;
 #else
     return JAVA_FALSE;
@@ -15467,10 +15542,23 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_cancelBackgroundTask___java_lang_Stri
 #endif // !TARGET_OS_WATCH (BackgroundTasks)
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+// The two slices whose register/submit/cancel above are empty bodies. They have
+// to say so here, because @available's `*` wildcard means "true on every other
+// platform" -- so without this the answer was yes on both, and an application
+// took the supported path, persisted its work requests and scheduled tasks that
+// could never run.
+//
+// macOS: BGTaskScheduler exists on the desktop, so this is a port that has not
+// been written rather than a platform that cannot. watchOS: WKRefreshBackground
+// Task is a different API entirely.
+#if TARGET_OS_OSX || TARGET_OS_WATCH
+    return JAVA_FALSE;
+#else
     if (@available(iOS 13.0, *)) {
         return JAVA_TRUE;
     }
     return JAVA_FALSE;
+#endif
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundProcessingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
