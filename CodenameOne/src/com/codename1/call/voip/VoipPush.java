@@ -112,7 +112,10 @@ public final class VoipPush {
         if (b == null) {
             return;
         }
-        b.setJavaReady(l != null);
+        // Through the shared flag: an action listener registered without
+        // VoipPush counts too, and turning this off here must not silence a
+        // Calls listener that is still installed.
+        CallRequests.setPushesWanted(l != null);
         if (l != null) {
             b.drainPendingCalls(CallRequests.nextId());
         }

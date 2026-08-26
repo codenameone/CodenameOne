@@ -526,6 +526,19 @@ public class AndroidCallBridge implements CallBridge {
         Calls.deliverAck(requestId, true, 0, null);
     }
 
+    /// The activity a prompt can be shown from, or null when there is none.
+    ///
+    /// The cached context is for system work and may be a Service; only the
+    /// prompt paths need an activity, and only at the moment they show one.
+    private Activity currentActivity() {
+        Activity current = com.codename1.impl.android.AndroidImplementation
+                .getActivity();
+        if (current != null) {
+            return current;
+        }
+        return context instanceof Activity ? (Activity) context : null;
+    }
+
     private static int androidRouteOf(int ordinal) {
         CallAudioRoute[] values = CallAudioRoute.values();
         CallAudioRoute r = ordinal < 0 || ordinal >= values.length
@@ -623,7 +636,12 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void requestScreeningRole(int requestId) {
-        Activity a = context instanceof Activity ? (Activity) context : null;
+        // Asked for NOW rather than taken from the cached context. That
+        // context is deliberately allowed to be a Service -- a push can wake
+        // this process with no activity at all -- and testing it here meant a
+        // bridge first obtained from that service could never prompt again,
+        // even once the app was in the foreground.
+        Activity a = currentActivity();
         if (a == null || !isDirectorySupported()) {
             Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
                     "Call screening needs Android 10 or newer and a foreground"

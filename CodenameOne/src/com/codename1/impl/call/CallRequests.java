@@ -127,9 +127,58 @@ public final class CallRequests {
         PERMISSIONS.failAll(new IllegalStateException("reset"));
         STRINGS.failAll(new IllegalStateException("reset"));
         COUNTS.failAll(new IllegalStateException("reset"));
+        synchronized (CallRequests.class) {
+            actionsWanted = false;
+            pushesWanted = false;
+        }
         com.codename1.call.session.Calls.resetForTest();
         com.codename1.call.voip.VoipPush.resetForTest();
         com.codename1.call.directory.CallDirectory.resetForTest();
+    }
+
+    /// Whether a call action listener is registered.
+    private static boolean actionsWanted;
+
+    /// Whether a VoIP push listener is registered.
+    private static boolean pushesWanted;
+
+    /// Tells the port whether Java can receive callbacks at all.
+    ///
+    /// The port holds system-originated actions until this is true, so it has
+    /// to mean "somebody is listening", not "somebody is listening for
+    /// PUSHES". Driven only by VoipPush, an app that used Calls without ever
+    /// touching VoipPush -- a foreground signalling call, or an outgoing
+    /// request from Recents -- had every action held until CallKit timed it
+    /// out, with a CallActionListener registered the whole time.
+    ///
+    /// @hidden not part of the public API.
+    public static void setActionsWanted(boolean wanted) {
+        updateReadiness(wanted, pushesWanted);
+    }
+
+    /// Records that a VoIP push listener is or is not registered.
+    ///
+    /// @hidden not part of the public API.
+    public static void setPushesWanted(boolean wanted) {
+        updateReadiness(actionsWanted, wanted);
+    }
+
+    private static void updateReadiness(boolean actions, boolean pushes) {
+        boolean before;
+        boolean after;
+        synchronized (CallRequests.class) {
+            before = actionsWanted || pushesWanted;
+            actionsWanted = actions;
+            pushesWanted = pushes;
+            after = actionsWanted || pushesWanted;
+        }
+        if (before == after) {
+            return;
+        }
+        CallBridge b = bridge();
+        if (b != null) {
+            b.setJavaReady(after);
+        }
     }
 
     /// The next request id.

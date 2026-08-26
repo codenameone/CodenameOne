@@ -628,6 +628,16 @@ public class LocalCallBridge implements CallBridge {
         this.javaReady = ready;
     }
 
+    /// Whether the facade has told this bridge that Java is listening.
+    ///
+    /// The iOS port holds system-originated actions until this is true, so a
+    /// test can assert that an ordinary Calls listener is enough to turn it
+    /// on -- without VoipPush, which an app that never receives pushes has no
+    /// reason to touch.
+    public boolean isJavaReady() {
+        return javaReady;
+    }
+
     @Override
     public void drainPendingCalls(int requestId) {
         List<PendingPush> batch;

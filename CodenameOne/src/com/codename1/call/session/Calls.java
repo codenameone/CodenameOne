@@ -403,12 +403,21 @@ public final class Calls {
                 LISTENERS.add(l);
             }
         }
+        // The port holds system-originated actions until Java says it is
+        // listening, and THIS is what listening means for an app that never
+        // uses VoipPush.
+        CallRequests.setActionsWanted(true);
     }
 
     /// Removes a listener.
     public static void removeActionListener(CallActionListener l) {
+        boolean empty;
         synchronized (LISTENERS) {
             LISTENERS.remove(l);
+            empty = LISTENERS.isEmpty();
+        }
+        if (empty) {
+            CallRequests.setActionsWanted(false);
         }
     }
 

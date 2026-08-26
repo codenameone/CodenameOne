@@ -24,6 +24,7 @@ package com.codename1.call;
 
 import com.codename1.call.session.CallAction;
 import com.codename1.call.session.CallActionAdapter;
+import com.codename1.call.session.CallActionListener;
 import com.codename1.call.session.CallAudioRoute;
 import com.codename1.call.session.CallAudioSession;
 import com.codename1.call.session.CallConfiguration;
@@ -710,6 +711,26 @@ public class LocalCallTest {
         waitFor(played, 1);
         assertEquals("42#", played.get(0),
                 "the digits the app sent must reach its own listener");
+    }
+
+    @Test
+    public void anActionListenerAloneMakesJavaReady() {
+        // The iOS port holds every system-originated action until the facade
+        // says Java is listening. Driven only by VoipPush.setListener, an app
+        // that used Calls without ever touching pushes -- a foreground
+        // signalling call, or an outgoing request from Recents -- had its
+        // actions held until CallKit timed them out, with a listener
+        // registered the whole time.
+        assertFalse(bridge.isJavaReady(),
+                "nothing is listening yet");
+        CallActionListener l = new CallActionAdapter() { };
+        Calls.addActionListener(l);
+        assertTrue(bridge.isJavaReady(),
+                "an action listener is what listening means for an app that"
+                        + " never receives a push");
+        Calls.removeActionListener(l);
+        assertFalse(bridge.isJavaReady(),
+                "and the last one leaving turns it back off");
     }
 
     @Test

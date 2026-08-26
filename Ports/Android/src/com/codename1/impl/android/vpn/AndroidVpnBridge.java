@@ -185,7 +185,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;
             }
-            if (!(context instanceof Activity) || consent == null) {
+            // Resolved now, not from the cached context: see
+            // AndroidCallBridge.currentActivity. A bridge first obtained from
+            // a service could otherwise never show a consent prompt again.
+            if (currentActivity() == null || consent == null) {
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "Installing a VPN needs a foreground activity to show"
                         + " the consent prompt");
@@ -530,6 +533,16 @@ public class AndroidVpnBridge implements VpnBridge {
         if (listening) {
             Vpn.deliverStatusChanged(s.ordinal());
         }
+    }
+
+    /// The activity a prompt can be shown from, or null when there is none.
+    private Activity currentActivity() {
+        Activity current = com.codename1.impl.android.AndroidImplementation
+                .getActivity();
+        if (current != null) {
+            return current;
+        }
+        return context instanceof Activity ? (Activity) context : null;
     }
 
     /// A reflective answer as an `Intent`, or null when it is not one.

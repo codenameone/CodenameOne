@@ -198,16 +198,21 @@ public final class CallDirectory {
         } finally {
             os.close();
         }
-        // The move. rename() takes a NAME rather than a path -- it refuses
-        // one containing a separator -- and will not replace an existing
-        // file, so the old list is removed first. That window is a missing
-        // file rather than a truncated one, which the reader treats as an
-        // empty directory: the same answer it gives before any list is
-        // installed, and nothing like a half-parsed one.
-        if (fs.exists(path)) {
-            fs.delete(path);
-        }
+        // The move, WITHOUT deleting first. rename() takes a name rather than
+        // a path, and on the platform where this matters it is File.renameTo,
+        // which replaces the destination in one step -- so a screening that
+        // lands mid-replacement sees either the whole old list or the whole
+        // new one. Removing the old file first reintroduced the very window
+        // the staging was added to close, a moment in which a number the
+        // replacement blocks is allowed through.
         fs.rename(staging, "cn1calldirectory.tsv");
+        if (fs.exists(staging)) {
+            // A platform whose rename cannot replace. Nothing else is
+            // available there, and no such platform runs the reader in
+            // another process.
+            fs.delete(path);
+            fs.rename(staging, "cn1calldirectory.tsv");
+        }
         return path;
     }
 

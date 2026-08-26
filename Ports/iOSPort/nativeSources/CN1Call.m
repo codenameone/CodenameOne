@@ -1792,7 +1792,23 @@ void com_codename1_impl_ios_IOSNative_callSetJavaReady___boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_BOOLEAN ready) {
 #ifdef CN1_CALL_HAS_CALLKIT
+    BOOL wasReady = cn1clJavaReady;
     cn1clJavaReady = ready != JAVA_FALSE;
+    if (cn1clJavaReady && !wasReady) {
+        // Replayed here as well as after the drain, because readiness no
+        // longer implies a drain: an app that registers a Calls action
+        // listener without ever touching VoipPush has nothing to drain, and
+        // its held actions would otherwise wait until CallKit timed them out.
+        //
+        // Asynchronously, so the VoipPush path -- which calls this and then
+        // drainPendingCalls on the same thread -- still replays AFTER the
+        // drain has handed Java its sessions. The replay empties the queue
+        // under the lock, so whichever runs first, nothing is delivered
+        // twice.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            cn1clReplayQueuedActions();
+        });
+    }
 #endif
 }
 
