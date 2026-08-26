@@ -698,6 +698,15 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             return null;
         }
         String v = value;
+        // A value the hint's own pattern rejects is refused HERE, the way an
+        // enum outside its domain and a non-canonical int already are. Rendering
+        // it produces an annotation the processor then refuses, and this goal
+        // reacts to that by rolling the WHOLE migration back -- so one misspelled
+        // ios.interface_orientation would cost a project every other hint's
+        // migration, instead of being left in the properties file where it is.
+        if (violatesPattern(hint, v)) {
+            return null;
+        }
         switch (hint.type()) {
             case BOOLEAN:
                 // Exactly, not ignoring case. AndroidGradleBuilder compares
@@ -1276,6 +1285,23 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             i = end;
         }
         return out.toString();
+    }
+
+    /// Whether `value` fails the hint's declared value pattern.
+    ///
+    /// A pattern the catalog cannot compile is not a reason to refuse a
+    /// migration: the catalog's own tests are where a bad pattern belongs.
+    private static boolean violatesPattern(com.codename1.build.shared.BuildHints.Hint hint,
+                                           String value) {
+        String pattern = hint.valuePattern();
+        if (pattern == null || pattern.length() == 0) {
+            return false;
+        }
+        try {
+            return !java.util.regex.Pattern.compile(pattern).matcher(value).matches();
+        } catch (java.util.regex.PatternSyntaxException badPattern) {
+            return false;
+        }
     }
 
     /// Every enum type the catalog can render a value as.

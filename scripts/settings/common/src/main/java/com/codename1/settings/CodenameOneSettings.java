@@ -4456,9 +4456,16 @@ public class CodenameOneSettings extends Lifecycle {
                 java.util.List<String> phases = elementValues(execution, "phase");
                 String phase = phases.isEmpty() ? null : phases.get(0).trim();
                 String goals = between(execution, "<goals>", "</goals>");
+                // The execution's own configuration travels with it. build-helper
+                // and Kotlin put <sources>/<sourceDirs> HERE rather than at
+                // plugin level, so a merge that kept only the binding left the
+                // goal on one execution and the root it configures on another --
+                // and compileGoalConfiguration, which looks for the source ON the
+                // bound execution, found none.
+                String configuration = between(execution, "<configuration>", "</configuration>");
                 String[] merged = byId.get(id);
                 if (merged == null) {
-                    byId.put(id, new String[]{phase, goals});
+                    byId.put(id, new String[]{phase, goals, configuration});
                     continue;
                 }
                 if (merged[0] == null) {
@@ -4466,6 +4473,9 @@ public class CodenameOneSettings extends Lifecycle {
                 }
                 if (merged[1] == null) {
                     merged[1] = goals;
+                }
+                if (merged[2] == null) {
+                    merged[2] = configuration;
                 }
             }
         }
@@ -4480,6 +4490,9 @@ public class CodenameOneSettings extends Lifecycle {
             }
             if (e.getValue()[1] != null) {
                 out.append(e.getValue()[1]);
+            }
+            if (e.getValue()[2] != null) {
+                out.append(e.getValue()[2]);
             }
             out.append("</execution>");
         }

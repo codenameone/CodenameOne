@@ -2638,6 +2638,34 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(otherId, null, ancestor).toString());
     }
 
+    /// A merged execution keeps the configuration as well as the binding.
+    ///
+    /// Redeclaring an inherited id with only `<configuration><sources>` is how
+    /// Maven says "same execution, different directory". Merging phase and goals
+    /// alone left the goal on one execution and the root on another, and
+    /// `compileGoalConfiguration` looks for the source ON the bound execution --
+    /// so it found none and dropped a directory Maven really compiles.
+    @Test
+    public void aMergedExecutionKeepsItsConfiguration() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id>"
+                + "<configuration><sources><source>gen/merged</source></sources>"
+                + "</configuration></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, ancestor);
+        assertTrue(roots.contains("gen/merged"), roots.toString());
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

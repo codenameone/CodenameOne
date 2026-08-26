@@ -32,6 +32,7 @@ import org.junit.rules.TemporaryFolder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 /// Covers the properties parsing in `MigrateBuildHintsMojo`.
@@ -195,6 +196,24 @@ public class MigrateBuildHintsPropertyParsingTest {
         assertEquals("AndroidMinSdk.API_23", mojo.toSourceLiteral(min, "23", false));
         // A level the enum does not carry is refused rather than invented.
         assertNull(mojo.toSourceLiteral(min, "7", false));
+    }
+
+    /// A value its own pattern rejects is refused, not migrated.
+    ///
+    /// Rendering it produces an annotation the processor then refuses, and this
+    /// goal reacts to that by rolling the WHOLE migration back -- so one
+    /// misspelled orientation would cost a project every other hint's migration
+    /// instead of staying in the properties file where it already is.
+    @Test
+    public void aValueItsPatternRejectsIsNotMigrated() {
+        MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
+        com.codename1.build.shared.BuildHints.Hint orientation =
+                com.codename1.build.shared.BuildHints.byName("ios.interface_orientation");
+        assertNotNull(orientation.valuePattern());
+        assertEquals("\"UIInterfaceOrientationPortrait\"",
+                mojo.toSourceLiteral(orientation, "UIInterfaceOrientationPortrait", false));
+        assertNull(mojo.toSourceLiteral(orientation, "UIInterfaceOrientationPortraitt", false));
+        assertNull(mojo.toSourceLiteral(orientation, "Portrait", false));
     }
 
     /// A value that is not already canonical is refused, not normalised.
