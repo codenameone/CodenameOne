@@ -83,6 +83,36 @@ public class GcSteadyStateApp {
      * cost something. Reference-carrying on purpose -- the rescan skips objects with no
      * mark function, so a population of primitive arrays would be free and prove nothing. */
     private static final int LEGACY_BLOCKS = 256;
+
+    /**
+     * Ints in the throwaway array allocated at every node, sized so it lands on the LEGACY
+     * allocation path.
+     *
+     * <p>Small objects AND small arrays are served from the BiBOP page heap, so the
+     * search's own {@code int[64]} board copy is 280 bytes and never reaches
+     * allObjectsInHeap. Only allocations over CN1_BIBOP_MAX_OBJECT (512 bytes) do -- and a
+     * real game-tree search crosses that line constantly, since a 15x15 board of ints is
+     * 900. Without this the fixture cannot exercise the per-thread pending table at all,
+     * and the stall it can produce is exactly what scenarios 10 and 11 measure.</p>
+     *
+     * <p>ZERO here, and the test rewrites this line to 160 (640 bytes -- over the line)
+     * for the scenarios that need the legacy path. It has to be off by default: the
+     * throwaway arrays sit in allObjectsInHeap until the next sweep, which multiplies the
+     * legacy population by twenty, and scenario 2's SATB budget is expressed per live
+     * object with exactly that population as its denominator. Turning it on for everyone
+     * would not have found a defect, it would have silently made that gate unfalsifiable.
+     *
+     * <p>javac folds the guarded block away entirely at 0, so scenarios 1-9 translate and
+     * run the same program they always did.</p>
+     */
+    private static final int BIG_ARRAY_INTS = 0;
+
+    /**
+     * Sink for the throwaway arrays. A static field write the translator cannot fold away,
+     * and deliberately NOT part of RESULT: the host-JVM parity check must keep comparing
+     * the same number it always did.
+     */
+    static long bigArraySink;
     private static final int LEGACY_BLOCK_REFS = 128;
 
     static Object[][] legacyLiveSet;
@@ -166,6 +196,16 @@ public class GcSteadyStateApp {
         }
         int best = -1;
         for (int b = 0; b < BRANCH; b++) {
+            // Legacy-path churn: over CN1_BIBOP_MAX_OBJECT, so this one goes through
+            // calloc + allObjectsInHeap + the per-thread pending table rather than the
+            // page heap. Touched at both ends so neither javac nor the translator's
+            // scalar replacement can delete the allocation being measured.
+            if (BIG_ARRAY_INTS > 0) {
+                int[] scratch = new int[BIG_ARRAY_INTS];
+                scratch[0] = seed + b;
+                scratch[BIG_ARRAY_INTS - 1] = depth;
+                bigArraySink += scratch[0] ^ scratch[BIG_ARRAY_INTS - 1];
+            }
             int[] child = new int[BOARD_CELLS];
             for (int i = 0; i < BOARD_CELLS; i++) {
                 child[i] = board[i] + ((seed + b + i) & 7);

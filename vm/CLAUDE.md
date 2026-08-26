@@ -135,3 +135,57 @@ Two things worth knowing before reading a number from this workload:
   driver is time-bounded, so its `RESULT=` legitimately differs run to run and cannot be
   used to compare two builds. `vm/tests`' `GcSteadyStateApp` is fixed-round precisely so it
   can be.
+
+### The rest of the mark, and three traps
+
+Fixing the demand signal exposed what the collector actually spends a cycle on. Under the
+legacy-heavy shape (`CN1_WL_BIGARRAY=256`, arrays over `CN1_BIBOP_MAX_OBJECT`) a 159ms mark
+was 39% grace pass, 36% conservative-root snapshot and 19% per-thread drain, against a
+**1.5MB live set** with a 1.9M-slot legacy table.
+
+- **The legacy-table rescan was the per-thread drain.** `gcMarkDrain` ends every call with a
+  linear walk of `allObjectsInHeap` that re-pushes each already-marked object so its mark
+  function runs again. That is an OVERFLOW recovery -- `gcMarkObject` pushes every object it
+  marks, and a push is dropped only when the worklist overflows -- but it ran on all
+  `(threads + 3 + SATB rounds)` calls a cycle makes. Measured before the gate: 8.9 passes per
+  cycle, **16.5 million slot visits and 290,000 mark functions re-run per cycle**, and across
+  883 passes it found something new exactly **zero** times. Gating it on
+  `gcMarkOverflowSeen` -- the gate the BiBOP half of the same loop always had -- is worth
+  **+27% throughput and -21% footprint** on that shape. `-DCN1_GC_ALWAYS_RESCAN_LEGACY`
+  restores it.
+- **The extent sort and the search in front of it.** `cn1ConsExt` is rebuilt and re-sorted
+  every cycle; the qsort alone was 34ms of a 57ms snapshot build. It is now an inlined
+  introsort (1.28x libc qsort on the same data, validated element-for-element against qsort
+  by `CN1_CONS_EXT_SORT_TEST`), and a Bloom filter over the 64KB address block answers the
+  binary search outright -- **1.5M searches with 0 hits became 66k searches**. Neither shows
+  up in end-to-end throughput; both remove work whose cost grows with the heap, which is
+  what #5585 was about. `-DCN1_CONS_EXT_LIBC_SORT`, `-DCN1_CONS_EXT_NO_BLOOM`.
+- **A mutator could wait a whole collection for pending-table space.** Legacy allocations go
+  into a per-thread table only the collector empties, and when it filled the thread waited
+  for any running cycle to FINISH, then requested another and waited for that too -- when a
+  running cycle is precisely what migrates the table. Both thresholds involved come from one
+  free-RAM reading taken at the first collection, so they are unreachable on any machine CI
+  runs on. `CN1_SIMULATE_FREE_MEMORY` now pins that reading too (one knob, one meaning), and
+  with it pinned to a device-like 16MB the fix takes the **worst** stall from 1579ms to
+  136ms. `-DCN1_GC_PENDING_WAIT_FULL_CYCLE`.
+
+Three things that cost real time here, all of them measurement rather than code:
+
+- **Never call `System.gc()` from inside a parked wait.** It enters a Java monitor, and
+  `monitorEnter` is a GC safepoint -- so the request takes the thread back OUT of the parked
+  state the collector is spinning on in its own `while(threadActive)` loop, and the cycle
+  that was about to migrate its table gets longer instead. Asking every 200ms from inside
+  the wait turned a 55ms mean stall into 400ms. Ask once, before parking.
+- **A blocked mutator is not always demand the collector can answer.** Returning 0 from
+  `gcIdleWaitMillis` whenever a mutator was parked looked obviously right and was not: a
+  thread parked because the process BUDGET is exhausted is waiting for memory collecting
+  will not produce, and treating it as demand ran the collector back-to-back at 100% and
+  starved the threads it was serving -- the `-DCN1_PACING_NO_RESERVE` arm under a ceiling
+  stopped finishing at all. `cn1GcBlockedMutators` is kept for the duty-cycle figure and the
+  idle decision deliberately does not read it.
+- **This host cannot resolve a 5% throughput difference.** `objectAllocation` measured 1.201
+  and 0.892 against the same baseline in two sessions an hour apart, and at a 3GB footprint
+  the runs push the machine into swap and stop measuring the collector at all. Assert on the
+  COUNTERS (`rescanSlots`, `extSearches`, `cyclesOnDemand`, stall histograms), which are
+  stable, and treat any per-benchmark ratio under ~5% as noise; the whole-suite geomean over
+  13 interleaved reps is 0.999.

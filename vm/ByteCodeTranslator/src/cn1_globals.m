@@ -224,6 +224,33 @@ static JAVA_BOOLEAN isEdt(long threadId) {
 #endif
  }
 
+// TEST HOOK. CN1_SIMULATE_FREE_MEMORY=<bytes> substitutes a fixed reading for the host's
+// available memory. The dynamic pacing cap is a FRACTION of that reading, so how far a
+// mutator may run ahead of the collector -- and therefore, off a per-process ceiling,
+// how large the process gets -- depends on how much RAM the machine happened to have
+// free. That makes the issue-5537 growth shape reproduce on an idle developer machine
+// and vanish on a busy one, in both directions, which is no basis for a guard: without
+// this hook the same test passes for opposite reasons on the same host an hour apart.
+// Off unless set. -1 = env not probed yet. long long for the LLP64 target.
+static _Atomic long long cn1SimulatedFreeMem = -1;
+static long long cn1SimulatedFreeMemBytes(void) {
+    long long v = atomic_load_explicit(&cn1SimulatedFreeMem, memory_order_relaxed);
+    if(v < 0) {
+        const char* e = getenv("CN1_SIMULATE_FREE_MEMORY");
+        v = e ? atoll(e) : 0;
+        if(v < 0) {
+            v = 0;
+        }
+        atomic_store_explicit(&cn1SimulatedFreeMem, v, memory_order_relaxed);
+    }
+    return v;
+}
+
+// NOTE: defined HERE rather than beside the pacing macros because init_gc_thresholds --
+// which is not BiBOP-specific and runs in every build -- reads it. Left inside the page
+// heap's #ifndef CN1_DISABLE_BIBOP block it linked in the default build and produced an
+// undefined symbol in the ablation arm.
+
 // AVAILABLE memory (not just free_count) -- the HOST-WIDE headroom reading, used by
 // the dynamic GC pacing cap on platforms that impose no per-process memory limit.
 // Where there IS such a limit, cn1ProcessHeadroom below supersedes this; see the
@@ -652,6 +679,21 @@ static void cn1ReportGcOverflow(void) {
 // only the second is a defect.
 long long cn1GcSnapNs = 0;    // rebuilding the conservative-root snapshots (incl. the qsort)
 long long cn1GcGraceNs = 0;   // both grace passes: O(all pages) + O(legacy table), every cycle
+long long cn1GcGraceLegNs = 0;// ...of which the LEGACY half alone (O(legacy table), every cycle)
+// CUMULATIVE across the run: time in the extent sort, and the extents sorted. Not reset
+// per cycle -- a per-cycle counter read at exit reports the LAST cycle, which at end of a
+// run is winding down and unrepresentative. ATOMIC because cn1GcBuildRootSnapshots is
+// reachable from the per-thread scan paths as well as from the collector, and a plain
+// -=/+= pair from two threads produced a NEGATIVE total.
+_Atomic long long cn1GcSnapSortNs = 0;
+_Atomic long long cn1ConsExtSorted = 0;
+// How often the SORTED array is actually consulted -- the binary search is the last resort
+// for interior pointers, reached only after the page index and the exact-base hash have
+// both missed. If this is ~0 the per-cycle sort is being paid for nothing.
+_Atomic long long cn1ConsExtSearches = 0;
+_Atomic long long cn1ConsExtHits = 0;
+_Atomic long long cn1ConsExtBloomRejects = 0;  // words the O(1) filter answered outright
+                               // A/B arms can be compared per element rather than per run.
 long long cn1GcDrainNs = 0;   // the root drain
 long long cn1GcWaitNs = 0;    // waiting for mutators to reach a safepoint
 long long cn1GcStackNs = 0;   // scanning one thread's stacks (precise + conservative)
@@ -725,6 +767,14 @@ _Atomic long cn1StallBuckets[CN1_STALL_CAUSES][CN1_STALL_BUCKETS];
 // slow runner makes cycles longer, it does not make the collector idle through demand.
 _Atomic long cn1GcCyclesOnDemand = 0;   // started immediately: a collection was owed
 _Atomic long cn1GcCyclesAfterIdle = 0;  // started after an idle wait expired or was woken
+// What gcMarkDrain's linear rescan of allObjectsInHeap actually costs and actually buys.
+// The rescan exists for the worklist-OVERFLOW case, but it runs unconditionally on every
+// call, and gcMarkWorklistPush does not dedupe -- so every already-marked legacy object is
+// pushed again and has its mark function re-run. These say how often that pays.
+_Atomic long long cn1GcRescanSlots = 0;    // table slots visited by the linear rescan
+_Atomic long long cn1GcRescanPushes = 0;   // already-marked objects re-pushed by it
+_Atomic long cn1GcRescanPasses = 0;        // full passes over the table
+_Atomic long cn1GcRescanUseful = 0;        // ...that marked something new (needed a repeat)
 
 long long cn1StallNowNs(void) {
     struct timespec t;
@@ -777,7 +827,16 @@ static void init_gc_thresholds() {
         GC_THRESHOLDS_INITIALIZED = JAVA_TRUE;
         
         // On iPhone X, this generally starts with a figure like 388317184 (i.e. ~380 MB)
-        long freemem = get_free_memory();
+        // CN1_SIMULATE_FREE_MEMORY pins this too. Everything below is derived from a
+        // single free-RAM reading taken at the FIRST collection, and on a developer
+        // machine it evaluates to tens of millions of slots -- so the two thresholds that
+        // stop a mutator for a WHOLE collection cycle (CN1_MAX_HEAP_SIZE below and the
+        // aggressive-allocator hold in codenameOneGCMark) are unreachable here and
+        // reachable on a device: the same "testable nowhere CI can run" shape that let the
+        // rest of issue 5537 survive five fixes. One knob, one meaning -- the hook that
+        // pins the pacing cap's reading pins this one.
+        long long simFree = cn1SimulatedFreeMemBytes();
+        long freemem = simFree > 0 ? (long)simFree : get_free_memory();
         
         // com.codename1.ui.Container is approx 900 bytes
         // Most allocations are 32 bytes though... so we're making an estimate
@@ -1958,11 +2017,13 @@ void codenameOneGCMark() {
                 
                 JAVA_INT allocSize = t->heapAllocationSize;
                 JAVA_BOOLEAN agressiveAllocator = JAVA_FALSE;
+#ifndef CN1_NO_AGGRESSIVE_HOLD
                 if (isEdt(t->threadId) && !lowMemoryMode) {
                     agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD_EDT;
                 } else {
                     agressiveAllocator = allocSize > CN1_AGRESSIVE_ALLOCATOR_THREAD_HEAP_ALLOCATIONS_THRESHOLD;
                 }
+#endif
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
                     long freeMemory = get_free_memory();
                     #if defined(__OBJC__)
@@ -2294,7 +2355,7 @@ void codenameOneGCMark() {
 #endif
         cn1GcInGracePass = 1;   // see cn1GcGraceFullDrains
 #ifdef CN1_GC_CONFORM
-        { long long __g0 = cn1GcNowNs(); cn1GcGraceNs -= __g0; }
+        { long long __g0 = cn1GcNowNs(); cn1GcGraceNs -= __g0; cn1GcGraceLegNs -= __g0; }
 #endif
         int gt = currentSizeOfAllObjectsInHeap;
         for(int gi = 0 ; gi < gt ; gi++) {
@@ -2331,7 +2392,7 @@ void codenameOneGCMark() {
         CN1_GC_TRUSTED_END();
         gcMarkDrain(d);
 #ifdef CN1_GC_CONFORM
-        cn1GcGraceNs += cn1GcNowNs();
+        { long long __g1 = cn1GcNowNs(); cn1GcGraceNs += __g1; cn1GcGraceLegNs += __g1; }
 #endif
         cn1GcInGracePass = 0;
     }
@@ -2970,6 +3031,25 @@ static _Atomic int cn1LegacyGcScheduled = 0;
 static _Atomic int cn1BibopGcScheduled = 0;
 #endif
 
+// Mutators currently stopped WAITING FOR THE COLLECTOR (the pacing park's run-ahead and
+// budget waits, and the pending-table wait in codenameOneGcMalloc). This is demand the
+// allocation counters cannot express: a thread parked on the collector allocates nothing,
+// so "bytes allocated since the cycle started" reads as quiet at exactly the moment the
+// application is most blocked. gcIdleWaitMillis must never idle while this is non-zero.
+_Atomic int cn1GcBlockedMutators = 0;
+
+// Upper bound on the pending-table wait in codenameOneGcMalloc, in milliseconds of
+// 1ms sleeps. Its own constant rather than the pacing park's: this is a legacy-path
+// mechanism and must still compile with the page heap disabled, where every
+// CN1_PACING_* macro is compiled out. Ten seconds, matching the pacing park's backstop --
+// long enough that reaching it means something is wrong, short enough that a wedged
+// collector cannot hang a mutator forever. On expiry the caller grows its table instead.
+#ifndef CN1_PENDING_WAIT_MAX_SPINS
+#define CN1_PENDING_WAIT_MAX_SPINS 10000
+#endif
+
+// NOT under CN1_GC_CONFORM: this one is policy, not diagnostics -- gcIdleWaitMillis reads
+// it to decide whether to idle, so a build without the probe must still maintain it.
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
     long long alloc = allocationsSinceLastGC;
     allocationsSinceLastGC = 0;
@@ -3045,6 +3125,16 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
                   + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
             long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
                                                                 memory_order_relaxed);
+            // TRIED AND REJECTED: also returning 0 whenever cn1GcBlockedMutators > 0, on
+            // the theory that a parked mutator is demand the byte counters cannot express.
+            // It is, but it is not demand the COLLECTOR can always answer -- a thread
+            // parked because the process budget is exhausted is waiting for memory that
+            // collecting will not produce, and treating it as demand made the collector
+            // run cycles back to back at 100% instead of idling, starving the very threads
+            // it was trying to serve: the -DCN1_PACING_NO_RESERVE arm under a simulated
+            // ceiling stopped finishing its fixed round count at all. The counter is kept
+            // because it is what the [GCSTALL] duty figure is built from; the idle
+            // decision deliberately does not read it.
             if(uncollected >= trigger) {
 #ifdef CN1_GC_CONFORM
                 atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
@@ -4053,27 +4143,6 @@ _Atomic long cn1CachedFreeMem = 0;
 // the pacing cap to decide whether the growth bound above applies; 0 where the platform
 // has no probe, which reads as "not large" and leaves the cap alone.
 static _Atomic long long cn1CachedProcFootprint = 0;
-// TEST HOOK. CN1_SIMULATE_FREE_MEMORY=<bytes> substitutes a fixed reading for the host's
-// available memory. The dynamic pacing cap is a FRACTION of that reading, so how far a
-// mutator may run ahead of the collector -- and therefore, off a per-process ceiling,
-// how large the process gets -- depends on how much RAM the machine happened to have
-// free. That makes the issue-5537 growth shape reproduce on an idle developer machine
-// and vanish on a busy one, in both directions, which is no basis for a guard: without
-// this hook the same test passes for opposite reasons on the same host an hour apart.
-// Off unless set. -1 = env not probed yet. long long for the LLP64 target.
-static _Atomic long long cn1SimulatedFreeMem = -1;
-static long long cn1SimulatedFreeMemBytes(void) {
-    long long v = atomic_load_explicit(&cn1SimulatedFreeMem, memory_order_relaxed);
-    if(v < 0) {
-        const char* e = getenv("CN1_SIMULATE_FREE_MEMORY");
-        v = e ? atoll(e) : 0;
-        if(v < 0) {
-            v = 0;
-        }
-        atomic_store_explicit(&cn1SimulatedFreeMem, v, memory_order_relaxed);
-    }
-    return v;
-}
 void cn1RefreshFreeMemCache(void) {
     long long simFree = cn1SimulatedFreeMemBytes();
     atomic_store_explicit(&cn1CachedFreeMem,
@@ -4411,6 +4480,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         }
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallVol);
+        atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
         threadStateData->threadActive = JAVA_FALSE;
         int spins = 0;
         while(cn1PacingVolume(which) > (long long)cap &&
@@ -4422,6 +4492,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             usleep((JAVA_INT)(500));
         }
         threadStateData->threadActive = JAVA_TRUE;
+        atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -4495,6 +4566,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
     }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     CN1_STALL_T0(__stallBudget);
+    atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
     int lastEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
@@ -4565,6 +4637,7 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         usleep((JAVA_INT)(500));
     }
     threadStateData->threadActive = JAVA_TRUE;
+    atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
@@ -5944,6 +6017,54 @@ static inline unsigned cn1PtrMix(uintptr_t v) {
 static char** cn1ConsExtHash = 0;
 static int cn1ConsExtHashMask = -1;   // capacity-1, or -1 when unallocated
 
+// ---- O(1) rejection in front of the extent binary search ----------------------------
+// The sorted extent array is the LAST resort in cn1ConservativeResolve: it is reached only
+// after the page index and the exact-base hash have both missed, i.e. for a word that is
+// not a BiBOP address and not a legacy object base. Almost every such word is not a heap
+// pointer at all -- an integer, a return address, a stale frame word -- and each one was
+// paying a full binary search over the whole extent array. Measured on the array-heavy
+// churn shape: 2,298,610 searches over 748,000 extents in 12 seconds, with ZERO hits.
+//
+// A Bloom filter over the 64KB address block fixes that in one load. It may say "maybe"
+// for a block it does not hold (harmless: the search then runs exactly as before), but it
+// can never say "no" for a block it does hold, which is the only direction that would be a
+// correctness bug -- a rejected word is a root that is never marked, i.e. a use-after-free.
+// Every 64KB block an extent touches is inserted, so a multi-block array is fully covered.
+//
+// 2^17 bits = 16KB, fixed, allocated once in .bss. -DCN1_CONS_EXT_NO_BLOOM removes it.
+#define CN1_CONS_EXT_BLOOM_BITS 17
+#define CN1_CONS_EXT_BLOOM_MASK ((1u << CN1_CONS_EXT_BLOOM_BITS) - 1)
+#define CN1_CONS_EXT_BLOCK_SHIFT 16
+static unsigned long long cn1ConsExtBloom[(1u << CN1_CONS_EXT_BLOOM_BITS) / 64];
+
+static inline unsigned cn1ConsExtBloomSlot(uintptr_t addr) {
+    return cn1PtrMix(addr >> CN1_CONS_EXT_BLOCK_SHIFT) & CN1_CONS_EXT_BLOOM_MASK;
+}
+
+static inline JAVA_BOOLEAN cn1ConsExtBloomMayContain(uintptr_t addr) {
+    unsigned slot = cn1ConsExtBloomSlot(addr);
+    return (cn1ConsExtBloom[slot >> 6] & (1ULL << (slot & 63))) != 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+// Rebuilt with the extent array itself, in the same place and under the same lock, so it
+// can never describe a different generation of extents than the array it guards.
+static void cn1ConsExtBloomRebuild(void) {
+    memset(cn1ConsExtBloom, 0, sizeof(cn1ConsExtBloom));
+    for(int i = 0 ; i < cn1ConsExtN ; i++) {
+        uintptr_t lo = (uintptr_t)cn1ConsExt[i].lo;
+        uintptr_t hi = (uintptr_t)cn1ConsExt[i].hi;
+        if(hi <= lo) {
+            hi = lo + 1;
+        }
+        uintptr_t firstBlock = lo >> CN1_CONS_EXT_BLOCK_SHIFT;
+        uintptr_t lastBlock = (hi - 1) >> CN1_CONS_EXT_BLOCK_SHIFT;
+        for(uintptr_t b = firstBlock ; b <= lastBlock ; b++) {
+            unsigned slot = cn1PtrMix(b) & CN1_CONS_EXT_BLOOM_MASK;
+            cn1ConsExtBloom[slot >> 6] |= (1ULL << (slot & 63));
+        }
+    }
+}
+
 #ifndef CN1_DISABLE_BIBOP
 // ---- BiBOP page snapshot: open-addressed on page base ----
 // Entry holds the geometry INLINE so a hit costs one cache line, and the registry
@@ -6131,6 +6252,244 @@ static int cn1ConsExtCmp(const void* a, const void* b) {
     return (la > lb) - (la < lb);
 }
 
+// ---- extent sort -------------------------------------------------------------------
+// The comment above names replacing "the libc qsort (a function-pointer comparator call
+// per compare) with an inlined/radix sort" as one of three directions for this cost. This
+// is that one, and it is the only one of the three that cannot change WHAT the resolver
+// sees: same array, same order, just sorted without an indirect call per comparison.
+//
+// Measured on the array-heavy churn shape (CN1_WL_BIGARRAY=256, 748k extents): the qsort
+// alone was 34.2ms of a 57.5ms snapshot build and 28% of the whole mark.
+//
+// A radix sort would be O(n) but needs a scratch buffer the size of the array (18MB at
+// that extent count), and footprint is the other half of this issue -- so this is an
+// in-place introsort: median-of-3 quicksort, insertion sort for short runs, and a
+// heapsort fallback once the recursion depth exceeds 2*log2(n), which is what makes the
+// worst case O(n log n) rather than O(n^2). Recursion is on the SMALLER side only, so
+// stack depth is bounded by log2(n) even in the worst case.
+//
+// Keys are object base addresses of distinct live objects, so they are unique; the
+// partition below does not rely on that, but it is why no three-way split is needed.
+// -DCN1_CONS_EXT_LIBC_SORT restores qsort for A/B.
+#define CN1_CONS_EXT_SWAP(x, y) do { \
+        CN1ConsExtent __t = (x); (x) = (y); (y) = __t; \
+    } while(0)
+
+static void cn1ConsExtInsertionSort(CN1ConsExtent* a, int n) {
+    for(int i = 1 ; i < n ; i++) {
+        CN1ConsExtent v = a[i];
+        int j = i - 1;
+        while(j >= 0 && a[j].lo > v.lo) {
+            a[j + 1] = a[j];
+            j--;
+        }
+        a[j + 1] = v;
+    }
+}
+
+static void cn1ConsExtSiftDown(CN1ConsExtent* a, int root, int n) {
+    for(;;) {
+        int child = 2 * root + 1;
+        if(child >= n) {
+            return;
+        }
+        if(child + 1 < n && a[child].lo < a[child + 1].lo) {
+            child++;
+        }
+        if(!(a[root].lo < a[child].lo)) {
+            return;
+        }
+        CN1_CONS_EXT_SWAP(a[root], a[child]);
+        root = child;
+    }
+}
+
+static void cn1ConsExtHeapSort(CN1ConsExtent* a, int n) {
+    for(int start = (n - 2) / 2 ; start >= 0 ; start--) {
+        cn1ConsExtSiftDown(a, start, n);
+    }
+    for(int end = n - 1 ; end > 0 ; end--) {
+        CN1_CONS_EXT_SWAP(a[0], a[end]);
+        cn1ConsExtSiftDown(a, 0, end);
+    }
+}
+
+static void cn1ConsExtSortRange(CN1ConsExtent* a, int lo, int hi, int depth) {
+    while(hi - lo > 16) {
+        if(depth <= 0) {
+            cn1ConsExtHeapSort(a + lo, hi - lo + 1);
+            return;
+        }
+        depth--;
+        // Median of three, left in the middle. This also places a[lo] <= pivot <= a[hi],
+        // which is what bounds the two scans below without an explicit index test.
+        int m = lo + ((hi - lo) >> 1);
+        if(a[m].lo < a[lo].lo) {
+            CN1_CONS_EXT_SWAP(a[m], a[lo]);
+        }
+        if(a[hi].lo < a[lo].lo) {
+            CN1_CONS_EXT_SWAP(a[hi], a[lo]);
+        }
+        if(a[hi].lo < a[m].lo) {
+            CN1_CONS_EXT_SWAP(a[hi], a[m]);
+        }
+        char* pivot = a[m].lo;
+        int i = lo - 1;
+        int j = hi + 1;
+        for(;;) {
+            do {
+                i++;
+            } while(a[i].lo < pivot);
+            do {
+                j--;
+            } while(a[j].lo > pivot);
+            if(i >= j) {
+                break;
+            }
+            CN1_CONS_EXT_SWAP(a[i], a[j]);
+        }
+        // Recurse into the smaller partition and iterate on the larger one, so the
+        // recursion depth is bounded by log2(n) regardless of how the pivots fall.
+        if(j - lo < hi - j) {
+            cn1ConsExtSortRange(a, lo, j, depth);
+            lo = j + 1;
+        } else {
+            cn1ConsExtSortRange(a, j + 1, hi, depth);
+            hi = j;
+        }
+    }
+    cn1ConsExtInsertionSort(a + lo, hi - lo + 1);
+}
+
+static void cn1ConsExtSort(CN1ConsExtent* a, int n) {
+    if(n < 2) {
+        return;
+    }
+#ifdef CN1_CONS_EXT_LIBC_SORT
+    qsort(a, n, sizeof(CN1ConsExtent), cn1ConsExtCmp);
+#else
+    int depth = 0;
+    for(int t = n ; t > 1 ; t >>= 1) {
+        depth += 2;
+    }
+    cn1ConsExtSortRange(a, 0, n - 1, depth);
+#endif
+#ifdef CN1_GC_VERIFY
+    // A resolver miss is a use-after-free, and every lookup of an INTERIOR pointer binary
+    // searches this array, so an ordering bug here is silent until it corrupts the heap.
+    // The verifier build (run-gc-verify.sh) pays an O(n) check to make it loud instead.
+    for(int v = 1 ; v < n ; v++) {
+        if(a[v].lo < a[v - 1].lo) {
+            fprintf(stderr, "CN1 GC VERIFY: extent array is not sorted at %d of %d\n", v, n);
+            fflush(stderr);
+            abort();
+        }
+    }
+#endif
+}
+
+// Randomised self-test for the extent sort, run at startup when CN1_CONS_EXT_SORT_TEST is
+// set. It exists because a sort bug here is SILENT: the array feeds a binary search that
+// resolves interior pointers during the conservative scan, so a mis-ordered array does not
+// crash -- it returns the wrong object, or none, and the collector frees something that is
+// live. Nothing else in the suite would catch that deterministically.
+//
+// It compares against libc qsort with the same comparator, element for element, across the
+// input shapes that break naive quicksorts (already sorted, reverse sorted, all equal, few
+// distinct values), and reports the time for both so the replacement's claim is measured on
+// the same data rather than inferred from a workload whose footprint moves the host.
+#ifdef CN1_GC_CONFORM
+static JAVA_BOOLEAN cn1ConsExtSortTestOne(const char* pattern, int n, int seed,
+                                          long long* introNs, long long* libcNs) {
+    CN1ConsExtent* mine = (CN1ConsExtent*)malloc(sizeof(CN1ConsExtent) * (size_t)n);
+    CN1ConsExtent* ref = (CN1ConsExtent*)malloc(sizeof(CN1ConsExtent) * (size_t)n);
+    if(mine == 0 || ref == 0) {
+        free(mine);
+        free(ref);
+        fprintf(stderr, "[SORTTEST] pattern=%s n=%d SKIPPED (out of memory)\n", pattern, n);
+        return JAVA_TRUE;
+    }
+    // xorshift64: deterministic on every platform, unlike rand(), so a failure reproduces.
+    unsigned long long r = (unsigned long long)seed | 1ULL;
+    for(int i = 0 ; i < n ; i++) {
+        r ^= r << 13;
+        r ^= r >> 7;
+        r ^= r << 17;
+        unsigned long long key;
+        if(strcmp(pattern, "sorted") == 0) {
+            key = (unsigned long long)i * 64ULL;
+        } else if(strcmp(pattern, "reverse") == 0) {
+            key = (unsigned long long)(n - i) * 64ULL;
+        } else if(strcmp(pattern, "equal") == 0) {
+            key = 4096ULL;
+        } else if(strcmp(pattern, "fewdistinct") == 0) {
+            key = (r % 8ULL) * 64ULL;
+        } else if(strcmp(pattern, "clustered") == 0) {
+            // What malloc actually produces: runs of nearby addresses, a few arenas apart.
+            key = ((r % 4ULL) << 32) + ((unsigned long long)i * 48ULL);
+        } else {
+            key = r;
+        }
+        mine[i].lo = (char*)(size_t)key;
+        mine[i].hi = (char*)(size_t)(key + 32ULL);
+        mine[i].base = JAVA_NULL;
+        ref[i] = mine[i];
+    }
+    long long t0 = cn1GcNowNs();
+    cn1ConsExtSortRange(mine, 0, n - 1, 64);
+    *introNs += cn1GcNowNs() - t0;
+    t0 = cn1GcNowNs();
+    qsort(ref, (size_t)n, sizeof(CN1ConsExtent), cn1ConsExtCmp);
+    *libcNs += cn1GcNowNs() - t0;
+    JAVA_BOOLEAN ok = JAVA_TRUE;
+    for(int i = 0 ; i < n ; i++) {
+        if(mine[i].lo != ref[i].lo) {
+            fprintf(stderr, "[SORTTEST] pattern=%s n=%d MISMATCH at %d: %p vs %p\n",
+                    pattern, n, i, (void*)mine[i].lo, (void*)ref[i].lo);
+            ok = JAVA_FALSE;
+            break;
+        }
+    }
+    free(mine);
+    free(ref);
+    return ok;
+}
+
+void cn1ConsExtSortSelfTest(void) {
+    const char* e = getenv("CN1_CONS_EXT_SORT_TEST");
+    if(e == 0 || *e == 0 || e[0] == '0') {
+        return;
+    }
+    static const char* patterns[] = {
+        "random", "sorted", "reverse", "equal", "fewdistinct", "clustered"
+    };
+    static const int sizes[] = { 0, 1, 2, 3, 16, 17, 64, 1000, 100000 };
+    JAVA_BOOLEAN allOk = JAVA_TRUE;
+    long long introNs = 0, libcNs = 0;
+    long long elements = 0;
+    for(int p = 0 ; p < (int)(sizeof(patterns) / sizeof(patterns[0])) ; p++) {
+        for(int z = 0 ; z < (int)(sizeof(sizes) / sizeof(sizes[0])) ; z++) {
+            int n = sizes[z];
+            if(n < 2) {
+                continue;   // cn1ConsExtSort returns early; the range sort is not called
+            }
+            if(!cn1ConsExtSortTestOne(patterns[p], n, 12345 + p * 31 + z, &introNs, &libcNs)) {
+                allOk = JAVA_FALSE;
+            }
+            elements += n;
+        }
+    }
+    fprintf(stderr, "[SORTTEST] elements=%lld introMs=%.2f libcMs=%.2f speedup=%.2f result=%s\n",
+            elements, introNs / 1e6, libcNs / 1e6,
+            introNs > 0 ? (double)libcNs / (double)introNs : 0.0,
+            allOk ? "PASS" : "FAIL");
+    fflush(stderr);
+    if(!allOk) {
+        abort();
+    }
+}
+#endif /* CN1_GC_CONFORM */
+
 // Rebuild the resolver index. MUST be called while no thread we are about to scan is
 // signal-stopped (it reallocs -> would deadlock against a thread frozen mid-malloc).
 // O(allObjectsInHeap + pending + bibop pages) -- bounded by the heap the sweep already
@@ -6192,7 +6551,17 @@ void cn1GcBuildRootSnapshots(void) {
         }
     }
     unlockThreadHeapMutex();
-    qsort(cn1ConsExt, cn1ConsExtN, sizeof(CN1ConsExtent), cn1ConsExtCmp);
+#ifdef CN1_GC_CONFORM
+    long long __sortT0 = cn1GcNowNs();
+#endif
+    cn1ConsExtSort(cn1ConsExt, cn1ConsExtN);
+#ifdef CN1_GC_CONFORM
+    atomic_fetch_add_explicit(&cn1GcSnapSortNs, cn1GcNowNs() - __sortT0, memory_order_relaxed);
+    atomic_fetch_add_explicit(&cn1ConsExtSorted, (long long)cn1ConsExtN, memory_order_relaxed);
+#endif
+#ifndef CN1_CONS_EXT_NO_BLOOM
+    cn1ConsExtBloomRebuild();
+#endif
     // Index the extents by exact base for the resolver's dominant caller. Built AFTER
     // the sort only because it must not be left describing a stale array; the table
     // stores the base pointers themselves, so the sort order is irrelevant to it.
@@ -6402,6 +6771,36 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
     }
 
     if(cn1ConsExtN > 0) {
+#ifndef CN1_CONS_EXT_NO_BLOOM
+        if(!cn1ConsExtBloomMayContain(v)) {
+#ifdef CN1_GC_VERIFY
+            // Self-check: a false NEGATIVE here is a missed root, i.e. a use-after-free
+            // that would surface far away and much later. The verifier build pays the
+            // search it just skipped and aborts if the filter was wrong.
+            {
+                int vlo = 0, vhi = cn1ConsExtN - 1, vfound = -1;
+                while(vlo <= vhi) {
+                    int vmid = (vlo + vhi) >> 1;
+                    if(cn1ConsExt[vmid].lo <= (char*)w) { vfound = vmid; vlo = vmid + 1; }
+                    else vhi = vmid - 1;
+                }
+                if(vfound >= 0 && (char*)w < cn1ConsExt[vfound].hi) {
+                    fprintf(stderr, "CN1 GC VERIFY: extent bloom rejected %p which resolves"
+                                    " to %p\n", w, (void*)cn1ConsExt[vfound].base);
+                    fflush(stderr);
+                    abort();
+                }
+            }
+#endif
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1ConsExtBloomRejects, 1, memory_order_relaxed);
+#endif
+            return JAVA_NULL;
+        }
+#endif
+#ifdef CN1_GC_CONFORM
+        atomic_fetch_add_explicit(&cn1ConsExtSearches, 1, memory_order_relaxed);
+#endif
         int lo = 0, hi = cn1ConsExtN - 1, found = -1;
         while(lo <= hi) {
             int mid = (lo + hi) >> 1;
@@ -6409,6 +6808,9 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
             else hi = mid - 1;
         }
         if(found >= 0 && (char*)w < cn1ConsExt[found].hi) {
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1ConsExtHits, 1, memory_order_relaxed);
+#endif
             return cn1ConsExt[found].base;                       // base or array interior
         }
     }
@@ -7526,36 +7928,93 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         
         
         if(threadStateData->heapAllocationSize > maxHeapSize && constantPoolObjects != 0 && !threadStateData->nativeAllocationMode) {
-            CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            // This thread's pending table is over its bound and only the collector empties
+            // it (it migrates each thread's table into allObjectsInHeap at mark start), so
+            // the thread has to wait for a migration. It does NOT have to wait for a whole
+            // collection, which is what this did:
+            //
+            //     while(gcCurrentlyRunning) usleep(1000);   // wait the cycle OUT
+            //     java_lang_System_gc__();                  // then ask for another
+            //     while(... || heapAllocationSize > 0) ...  // and wait for THAT one
+            //
+            // A cycle that is already running is precisely the thing that is about to
+            // migrate this table. Waiting for it to finish and then requesting a second
+            // one costs a whole extra cycle, every time, and both of this function's
+            // thresholds come from one free-RAM reading taken at the first GC -- tens of
+            // millions of slots on a developer machine, small enough on a memory-tight
+            // device for a churning thread to land here constantly. Measured with the
+            // reading pinned to a device-like 16MB: 100 stalls, 83ms mean, 198ms max,
+            // 8.3 of 12 seconds.
+            //
+            // So: ask once, then wait only for the migration itself, re-asking on the
+            // same cadence the pacing park uses (a parked thread allocates nothing, so
+            // nothing else will raise the request for it). The wait is BOUNDED, and on
+            // expiry control falls through to the growth below rather than proceeding
+            // with a full table -- which is what makes bounding it safe.
             CN1_STALL_T0(__stallPending);
-            threadStateData->threadActive=JAVA_FALSE;
+            invokedGC = YES;
+#ifdef CN1_GC_PENDING_WAIT_FULL_CYCLE
+            // Ablation arm: the pre-fix shape -- wait the running cycle OUT, then ask for
+            // another and wait for that one too.
+            atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
+            CN1_GC_PARK_CAPTURE(threadStateData);
+            threadStateData->threadActive = JAVA_FALSE;
             while(gcCurrentlyRunning) {
                 usleep((JAVA_INT)(1000));
             }
-            threadStateData->threadActive=JAVA_TRUE;
-            
-            if(threadStateData->heapAllocationSize > 0 ) {
-                invokedGC = YES;
+            threadStateData->threadActive = JAVA_TRUE;
+            if(threadStateData->heapAllocationSize > 0) {
                 threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
                 threadStateData->nativeAllocationMode = JAVA_FALSE;
-                CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+                CN1_GC_PARK_CAPTURE(threadStateData);
                 threadStateData->threadActive = JAVA_FALSE;
-                while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
-                    if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
-                        // For some reason the gcThread is dead
-                        threadStateData->nativeAllocationMode = JAVA_TRUE;
-                        java_lang_System_gc__(threadStateData);
-                        threadStateData->nativeAllocationMode = JAVA_FALSE;
-                        threadStateData->threadActive = JAVA_FALSE;
-                    }
+                while(threadStateData->threadBlockedByGC
+                      || threadStateData->heapAllocationSize > 0) {
                     usleep((JAVA_INT)(1000));
                 }
-                invokedGC = NO;
-                threadStateData->threadActive = JAVA_TRUE;
             }
+            // The common tail below clears threadActive, invokedGC and the blocked count
+            // for BOTH arms, so this one must not do it a second time.
+#else
+            // Ask ONCE, and ask before parking. java_lang_System_gc__ enters a Java
+            // monitor, and monitorEnter is itself a GC safepoint -- issuing it from inside
+            // the parked wait takes this thread back out of the parked state the collector
+            // is waiting on in its own while(threadActive) spin, so the cycle that was
+            // about to migrate this table gets longer instead of shorter. Measured: asking
+            // every 200ms from inside the wait turned a 55ms mean stall into 400ms.
+            {
+                JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+                threadStateData->nativeAllocationMode = JAVA_TRUE;
+                java_lang_System_gc__(threadStateData);
+                threadStateData->nativeAllocationMode = wasNam;
+            }
+            CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
+            atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
+            threadStateData->threadActive = JAVA_FALSE;
+            {
+                // Wait only for the migration, and stay parked for all of it: a cycle that
+                // is ALREADY running is the thing that empties this table, and it can only
+                // do so while this thread is parked. Bounded, and on expiry control falls
+                // through to the growth below rather than proceeding with a full table.
+                int pendingSpins = 0;
+                while((threadStateData->heapAllocationSize > 0
+                       || threadStateData->threadBlockedByGC)
+                      && pendingSpins < CN1_PENDING_WAIT_MAX_SPINS) {
+                    usleep((JAVA_INT)(1000));
+                    pendingSpins++;
+                }
+            }
+#endif
+            invokedGC = NO;
+            threadStateData->threadActive = JAVA_TRUE;
+            atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
-        } else {
+        }
+        {
+            // Reached on BOTH paths now: normally the table is not full here (the wait
+            // above emptied it), but if that wait expired it still is, and growing is the
+            // only thing that keeps the append below in bounds.
             if(threadStateData->heapAllocationSize == threadStateData->threadHeapTotalSize) {
                 
                 // Let's trigger a GC here.
@@ -8849,7 +9308,36 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             cn1BibopRescanStart();
         }
 #endif
+        // The linear rescan of allObjectsInHeap is an OVERFLOW recovery, so it runs only
+        // when pushes were actually dropped -- the same gate the BiBOP half of this loop
+        // has always had two lines below ("First time we observe an overflow, start also
+        // rescanning page slots"). The legacy half simply never got it.
+        //
+        // It is sound because gcMarkObject pushes EVERY object it marks that has a mark
+        // function, and gcMarkWorklistPush drops a push only on overflow -- which sets
+        // gcMarkOverflowSeen, sticky for the cycle. With no overflow, draining the
+        // worklist to empty IS the fixed point, and the table walk can only re-find
+        // objects whose mark functions have already run.
+        //
+        // gcMarkObject is the ONLY writer of the current epoch during a mark. The two
+        // other stores of currentGcMarkValue in this file are not counter-examples: the
+        // one in codenameOneGCSweep is the grace rule promoting a mark==-1 survivor, and
+        // it runs AFTER the mark, when nothing drains again; the one in gcMarkArrayObject
+        // is under CN1_NURSERY (not built here) and its own comment says the concurrent
+        // drain must not take that path. If a third writer is ever added, this gate and
+        // the belt below both depend on it pushing too.
+        //
+        // Unconditionally it was the dominant cost of a mark and bought nothing. Measured
+        // on the churn workload: 8.9 passes per cycle over a 1.9M-slot table, 16.5 MILLION
+        // slot visits and 290,000 mark functions RE-run per cycle -- and across 883 passes
+        // it found something new exactly 0 times. -DCN1_GC_ALWAYS_RESCAN_LEGACY restores
+        // the unconditional walk for A/B and is what the gate re-injects.
+#ifdef CN1_GC_ALWAYS_RESCAN_LEGACY
         int total = currentSizeOfAllObjectsInHeap;
+#else
+        int total = atomic_load_explicit(&gcMarkOverflowSeen, memory_order_acquire)
+                ? currentSizeOfAllObjectsInHeap : 0;
+#endif
 #ifndef CN1_DISABLE_BIBOP
         JAVA_BOOLEAN scanDone = (rescanCursor >= total) && bibopDone;
 #else
@@ -8864,6 +9352,11 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
         }
         gcMarkWorklistOverflow = JAVA_FALSE;
         if(scanDone) {
+#ifdef CN1_GC_CONFORM
+            if(gcMarkFoundUnmarkedChildInPass) {
+                atomic_fetch_add_explicit(&cn1GcRescanUseful, 1, memory_order_relaxed);
+            }
+#endif
             if(!gcMarkFoundUnmarkedChildInPass) {
                 // We finished a full heap sweep, drained the resulting pushes, and the
                 // drain marked nothing new. Fixed point.
@@ -8881,15 +9374,33 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             }
 #endif
         }
+#ifdef CN1_GC_CONFORM
+        {
+            long long __slots0 = 0, __pushes0 = 0;
+#endif
         while(rescanCursor < total && gcMarkWorklistTop < CN1_GC_MARK_WORKLIST_SIZE) {
             JAVA_OBJECT o = allObjectsInHeap[rescanCursor];
             rescanCursor++;
+#ifdef CN1_GC_CONFORM
+            __slots0++;
+#endif
             if(o != JAVA_NULL && o->__codenameOneGcMark == currentGcMarkValue) {
                 if(o->__codenameOneParentClsReference->markFunction != 0) {
                     gcMarkWorklistPush(o, JAVA_FALSE);
+#ifdef CN1_GC_CONFORM
+                    __pushes0++;
+#endif
                 }
             }
         }
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GcRescanSlots, __slots0, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GcRescanPushes, __pushes0, memory_order_relaxed);
+            if(__slots0 > 0) {
+                atomic_fetch_add_explicit(&cn1GcRescanPasses, 1, memory_order_relaxed);
+            }
+        }
+#endif
 #ifndef CN1_DISABLE_BIBOP
         // Once the table is exhausted, continue the single linear rescan space into
         // the page registry (resumes its own cursor when the worklist refills).
@@ -9565,6 +10076,7 @@ static long long cn1GcProbeSideBytes(void) {
 static void cn1GcProbeResetPhases(void) {
     cn1GcSnapNs = 0;
     cn1GcGraceNs = 0;
+    cn1GcGraceLegNs = 0;
     cn1GcDrainNs = 0;
     cn1GcWaitNs = 0;
     cn1GcStackNs = 0;
@@ -9795,6 +10307,25 @@ static void cn1ReportStalls(void) {
                 : -1.0,
             atomic_load_explicit(&cn1GcCyclesOnDemand, memory_order_relaxed),
             atomic_load_explicit(&cn1GcCyclesAfterIdle, memory_order_relaxed));
+    fprintf(stderr, "[GCSTALL] graceLegMs=%.1f sortTotalMs=%.1f sortedTotal=%lld"
+                    " nsPerExtent=%.1f\n",
+            cn1GcGraceLegNs / 1e6,
+            atomic_load_explicit(&cn1GcSnapSortNs, memory_order_relaxed) / 1e6,
+            atomic_load_explicit(&cn1ConsExtSorted, memory_order_relaxed),
+            atomic_load_explicit(&cn1ConsExtSorted, memory_order_relaxed) > 0
+                ? (double)atomic_load_explicit(&cn1GcSnapSortNs, memory_order_relaxed)
+                    / (double)atomic_load_explicit(&cn1ConsExtSorted, memory_order_relaxed)
+                : 0.0);
+    fprintf(stderr, "[GCSTALL] extSearches=%lld extHits=%lld bloomRejects=%lld\n",
+            atomic_load_explicit(&cn1ConsExtSearches, memory_order_relaxed),
+            atomic_load_explicit(&cn1ConsExtHits, memory_order_relaxed),
+            atomic_load_explicit(&cn1ConsExtBloomRejects, memory_order_relaxed));
+    fprintf(stderr, "[GCSTALL] rescanPasses=%ld rescanUseful=%ld rescanSlots=%lld"
+                    " rescanPushes=%lld\n",
+            atomic_load_explicit(&cn1GcRescanPasses, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcRescanUseful, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcRescanSlots, memory_order_relaxed),
+            atomic_load_explicit(&cn1GcRescanPushes, memory_order_relaxed));
     for(int c = 0 ; c < CN1_STALL_CAUSES ; c++) {
         long count = atomic_load_explicit(&cn1StallCount[c], memory_order_relaxed);
         if(count == 0) {
@@ -9999,6 +10530,7 @@ void initConstantPool() {
     cn1StartSimulatedMemoryWarnings();
 #ifdef CN1_GC_CONFORM
     atexit(cn1ReportStalls);
+    cn1ConsExtSortSelfTest();
     cn1GcProbeInit();
 #endif
 
