@@ -3712,7 +3712,10 @@ public class AndroidGradleBuilder extends Executor {
         // app -- MANAGE_DOCUMENTS is a system-signature permission that only the platform
         // document UI holds, which is what keeps every other app from binding this.
         String documentsProviderEntry = "";
-        if (usesDocuments) {
+        // The explicit hint counts here too, so a project configured by the Certificate Wizard
+        // declares the same thing to both builders rather than only to the iOS one.
+        if (usesDocuments || "true".equals(request.getArg("android.documentProvider.enabled",
+                request.getArg("ios.documentProvider.enabled", "false")))) {
             documentsProviderEntry =
                     "        <provider\n"
                     + "            android:name=\"" + xclass("com.codename1.impl.android.documents.CN1DocumentsProvider") + "\"\n"

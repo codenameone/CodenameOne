@@ -11234,12 +11234,20 @@ public class IPhoneBuilder extends Executor {
      * browser and the extension's deployment target.
      */
     private void parseDocumentProviderHints(BuildRequest request) throws BuildException {
-        documentProviderEnabled = usesDocuments
+        // Two ways in, because two things need to agree. The classpath scan is the automatic
+        // one and matches how surfaces decides. The explicit hint exists because the tools that
+        // cannot read bytecode -- the Certificate Wizard, which creates the extension's App ID
+        // and profile, and the signing preflight, which refuses a build that lacks them -- have
+        // no other way to know this project wants the extension. Honouring it here is what keeps
+        // those two from acting on an extension this builder would never have generated.
+        documentProviderEnabled = (usesDocuments
+                        || "true".equals(request.getArg("ios.documentProvider.enabled", "false")))
                 && !"false".equals(request.getArg("ios.documentProvider.extension", "true"));
         if (!documentProviderEnabled) {
-            // Either the app never touches com.codename1.documents, or the developer opted out
-            // with ios.documentProvider.extension=false. In both cases the iOS lowering is
-            // skipped entirely and the API stays an inert no-op at runtime.
+            // Either the app never touches com.codename1.documents and never asked for the
+            // extension, or the developer opted out with ios.documentProvider.extension=false.
+            // In both cases the iOS lowering is skipped entirely and the API stays an inert
+            // no-op at runtime.
             return;
         }
         String hintAppGroup = request.getArg("ios.documentProvider.appGroup", null);
