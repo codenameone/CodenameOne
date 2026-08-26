@@ -58,7 +58,8 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // The root answers to .rootContainer, never to the app's own id for it.
         let identifier: NSFileProviderItemIdentifier? =
             resolved == index.rootId ? .rootContainer : nil
-        return CN1DocumentItem(node: node, parentId: parent, identifier: identifier)
+        return CN1DocumentItem(node: node, parentId: parent, identifier: identifier,
+                               revision: index.revision)
     }
 
     override func urlForItem(withPersistentIdentifier identifier: NSFileProviderItemIdentifier)
@@ -68,13 +69,38 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         }
         // One directory per identifier, because two published items may legitimately share a
         // filename in different folders and this API keys purely on the URL.
-        return storageURL.appendingPathComponent(identifier.rawValue, isDirectory: true)
+        //
+        // The identifier is encoded first. Node ids are the app's own record keys and
+        // DocumentNode puts no restriction on them, so an id like "account/42" would otherwise
+        // become two path components -- and persistentIdentifierForItem, which reads back a
+        // single component, would return "42" and then resolve to no such item.
+        return storageURL
+            .appendingPathComponent(CN1FileProviderClassic.encode(identifier.rawValue),
+                                    isDirectory: true)
             .appendingPathComponent(item.filename)
     }
 
     override func persistentIdentifierForItem(at url: URL) -> NSFileProviderItemIdentifier? {
         let dir = url.deletingLastPathComponent().lastPathComponent
-        return dir.isEmpty ? nil : NSFileProviderItemIdentifier(dir)
+        guard !dir.isEmpty, let decoded = CN1FileProviderClassic.decode(dir) else {
+            return nil
+        }
+        return NSFileProviderItemIdentifier(decoded)
+    }
+
+    /// Encodes an arbitrary node id into exactly one path component, and back.
+    ///
+    /// Percent-encoding with a deliberately narrow allowed set: the separator has to go, and so
+    /// does "%" itself or decoding would be ambiguous. Case is preserved, which a case-insensitive
+    /// filesystem would not do for a raw id.
+    static func encode(_ identifier: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-_")
+        return identifier.addingPercentEncoding(withAllowedCharacters: allowed) ?? identifier
+    }
+
+    static func decode(_ component: String) -> String? {
+        component.removingPercentEncoding
     }
 
     override func providePlaceholder(at url: URL,

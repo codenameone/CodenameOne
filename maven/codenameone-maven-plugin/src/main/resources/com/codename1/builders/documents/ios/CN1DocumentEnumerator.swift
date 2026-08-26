@@ -55,7 +55,7 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
             : NSFileProviderItemIdentifier(resolved)
         let items = children.compactMap { id -> CN1DocumentItem? in
             guard let node = index.nodes[id] else { return nil }
-            return CN1DocumentItem(node: node, parentId: parent)
+            return CN1DocumentItem(node: node, parentId: parent, revision: index.revision)
         }
         observer.didEnumerate(items)
         observer.finishEnumerating(upTo: nil)

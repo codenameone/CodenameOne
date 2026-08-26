@@ -137,8 +137,7 @@ public class DocumentProviderPublishTest extends BaseTest {
                 .setLastModified(1735689600000L));
         folder.add(DocumentNode.file("cn1ss_remote", "remote.pdf")
                 .setContentType("application/pdf")
-                .setRemoteId("cn1ss/remote-1")
-                .setReadOnly(true));
+                .setRemoteId("cn1ss/remote-1"));
         root.add(folder);
         // Neither size nor date: the readers have to treat both as unknown rather than as zero.
         root.add(DocumentNode.file("cn1ss_bare", "bare.bin"));

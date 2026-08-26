@@ -68,7 +68,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // The root answers to .rootContainer, never to the app's own id for it.
         let identifier: NSFileProviderItemIdentifier? =
             resolved == index.rootId ? .rootContainer : nil
-        completionHandler(CN1DocumentItem(node: node, parentId: parent, identifier: identifier),
+        completionHandler(CN1DocumentItem(node: node, parentId: parent, identifier: identifier,
+                               revision: index.revision),
                           nil)
         progress.completedUnitCount = 1
         return progress
@@ -95,7 +96,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
             : NSFileProviderItemIdentifier(parentId!)
-        let item = CN1DocumentItem(node: node, parentId: parent)
+        let item = CN1DocumentItem(node: node, parentId: parent, revision: index.revision)
 
         // A local copy always wins, which is what makes a cached remote document open without a
         // round trip.

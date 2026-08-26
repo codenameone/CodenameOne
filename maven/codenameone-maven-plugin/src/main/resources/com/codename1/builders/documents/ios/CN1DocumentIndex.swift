@@ -33,7 +33,6 @@ struct CN1DocumentNode: Decodable {
     let remoteId: String?
     let size: Int64?
     let lastModified: Int64?
-    let readOnly: Bool?
     let children: [CN1DocumentNode]?
 }
 
@@ -51,8 +50,16 @@ final class CN1DocumentIndex {
     private(set) var childIds: [String: [String]] = [:]
     let rootId: String
 
-    init(root: CN1DocumentNode) {
+    /// Changes whenever the app republishes. The index file is rewritten on every publish, so
+    /// its modification time is a revision counter the format did not have to grow a field for.
+    /// `CN1DocumentItem` folds it into the item version of any node that declares neither a size
+    /// nor a modification date, which is the only case where the node itself carries no signal
+    /// that its bytes changed.
+    let revision: String
+
+    init(root: CN1DocumentNode, revision: String) {
         rootId = root.id
+        self.revision = revision
         index(root, parent: nil)
     }
 
@@ -77,6 +84,9 @@ final class CN1DocumentIndex {
         guard let doc = try? JSONDecoder().decode(CN1DocumentIndexDocument.self, from: data) else {
             return nil
         }
-        return CN1DocumentIndex(root: doc.root)
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate])
+                .flatMap { $0 as? Date }
+                .map { String($0.timeIntervalSince1970) } ?? ""
+        return CN1DocumentIndex(root: doc.root, revision: stamp)
     }
 }

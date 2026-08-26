@@ -339,7 +339,7 @@ public class IOSDocumentProviderExtensionBuilder {
      * generate the classic provider for a modern deployment target and leave the extension inert
      * on every device that could have run the good one.</p>
      */
-    static int compareVersions(String a, String b) {
+    public static int compareVersions(String a, String b) {
         String[] left = split(a);
         String[] right = split(b);
         int n = Math.max(left.length, right.length);

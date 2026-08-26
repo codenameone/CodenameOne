@@ -113,9 +113,6 @@ public final class DocumentIndexSerializer {
         if (node.getLastModified() >= 0) {
             m.put("lastModified", Long.valueOf(node.getLastModified()));
         }
-        if (node.isReadOnly()) {
-            m.put("readOnly", Boolean.TRUE);
-        }
         if (node.isFolder()) {
             List<DocumentNode> kids = node.getChildren();
             List<Object> out = new ArrayList<Object>(kids.size());
@@ -139,7 +136,6 @@ public final class DocumentIndexSerializer {
         node.setRemoteId(str(m.get("remoteId")));
         node.setSize(num(m.get("size")));
         node.setLastModified(num(m.get("lastModified")));
-        node.setReadOnly(bool(m.get("readOnly")));
         Object children = m.get("children");
         if (children instanceof List) {
             for (Object child : (List) children) {

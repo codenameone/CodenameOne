@@ -49,8 +49,7 @@ class DocumentIndexSerializerTest {
                 .setLastModified(1735689600000L));
         year.add(DocumentNode.file("inv-2", "February.pdf")
                 .setContentType("application/pdf")
-                .setRemoteId("s3://bucket/feb")
-                .setReadOnly(true));
+                .setRemoteId("s3://bucket/feb"));
         root.add(year);
 
         DocumentNode back = DocumentIndexSerializer.deserialize(
@@ -73,12 +72,10 @@ class DocumentIndexSerializerTest {
         assertEquals("invoices/january.pdf", jan.getPath());
         assertEquals(4096L, jan.getSize());
         assertEquals(1735689600000L, jan.getLastModified());
-        assertFalse(jan.isReadOnly());
 
         DocumentNode feb = backYear.getChildren().get(1);
         assertEquals("s3://bucket/feb", feb.getRemoteId());
         assertNull(feb.getPath());
-        assertTrue(feb.isReadOnly());
     }
 
     @Test
@@ -105,7 +102,6 @@ class DocumentIndexSerializerTest {
         // unset field look like a deliberate erasure.
         assertFalse(json.contains("null"), json);
         assertFalse(json.contains("remoteId"), json);
-        assertFalse(json.contains("readOnly"), json);
         assertFalse(json.contains("\"size\""), json);
     }
 

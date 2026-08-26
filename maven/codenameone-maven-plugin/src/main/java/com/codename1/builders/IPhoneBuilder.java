@@ -855,6 +855,10 @@ public class IPhoneBuilder extends Executor {
 
     private String documentsAppGroup;
     private String documentsDisplayName;
+
+    // Whether the generated extension is the replicated (iOS 16 / macOS 13) provider.
+    // Read by injectToPlist so the app-side natives know which one they are talking to.
+    private boolean documentsUsesReplicatedApi = true;
     /// True when a watch target exists and at least one kind declares a complication family, so
     /// the watch app gets a CN1WatchWidgets extension of its own.
     ///
@@ -11264,6 +11268,13 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("ios.documentProvider.appGroup must start with 'group.' "
                     + "(an Apple requirement); found '" + documentsAppGroup + "'");
         }
+        // Decided here rather than when the target is generated, so the plist key below cannot
+        // depend on which of the two runs first. It is the same comparison
+        // IOSDocumentProviderExtensionBuilder makes when it picks which provider to emit.
+        documentsUsesReplicatedApi = IOSDocumentProviderExtensionBuilder.compareVersions(
+                request.getArg("ios.documentProvider.deploymentTarget",
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS),
+                IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS) >= 0;
         documentsDisplayName = request.getArg("ios.documentProvider.displayName",
                 request.getDisplayName());
         if (documentsDisplayName == null || documentsDisplayName.length() == 0) {
@@ -13204,6 +13215,15 @@ public class IPhoneBuilder extends Executor {
             if (!inject.contains("CN1DocumentsDisplayName")) {
                 inject += "\n<key>CN1DocumentsDisplayName</key><string>"
                         + plistEscape(documentsDisplayName) + "</string>";
+            }
+            // Which provider was generated, which the app-side natives cannot infer. Below the
+            // replicated API's floor the extension is the classic NSFileProviderExtension, which
+            // registers no domain and is signalled through the default manager instead. Deciding
+            // that from @available at runtime would strand a classic build on the very systems it
+            // was generated for.
+            if (!inject.contains("CN1DocumentsReplicated")) {
+                inject += "\n<key>CN1DocumentsReplicated</key><string>"
+                        + (documentsUsesReplicatedApi ? "true" : "false") + "</string>";
             }
         }
 

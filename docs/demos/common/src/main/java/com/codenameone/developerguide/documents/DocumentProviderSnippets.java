@@ -85,8 +85,7 @@ public class DocumentProviderSnippets {
         DocumentNode year = DocumentNode.folder("y2031", "2031");
         year.add(DocumentNode.file("inv-1", "January.pdf")
                 .setContentType("application/pdf")
-                .setPath("2031/january.pdf")
-                .setReadOnly(true));
+                .setPath("2031/january.pdf"));
         root.add(year);
         DocumentProvider.publish(root);
         // end::nestFolders[]

@@ -61,7 +61,6 @@ public class DocumentNode {
     private String remoteId;
     private long size = -1;
     private long lastModified = -1;
-    private boolean readOnly;
     private final List<DocumentNode> children = new ArrayList<DocumentNode>();
 
     /// Creates a node.
@@ -236,27 +235,6 @@ public class DocumentNode {
         return this;
     }
 
-    /// Returns true when the file browser should refuse edits to this item.
-    public boolean isReadOnly() {
-        return readOnly;
-    }
-
-    /// Marks this item read-only, so the browser offers no rename, move or delete for it.
-    ///
-    /// This is presentation, not enforcement: it removes the affordances rather than protecting
-    /// the underlying bytes, which are still whatever the app wrote into the shared container.
-    ///
-    /// #### Parameters
-    ///
-    /// - `readOnly`: true to present the item as read-only
-    ///
-    /// #### Returns
-    ///
-    /// this node, for chaining
-    public DocumentNode setReadOnly(boolean readOnly) {
-        this.readOnly = readOnly;
-        return this;
-    }
 
     /// Adds a child to this folder.
     ///

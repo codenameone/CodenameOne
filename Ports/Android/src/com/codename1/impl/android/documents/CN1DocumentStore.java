@@ -85,7 +85,6 @@ public final class CN1DocumentStore {
         public String remoteId;
         public long size = -1;
         public long lastModified = -1;
-        public boolean readOnly;
         public final List<String> childIds = new ArrayList<String>();
     }
 
@@ -130,7 +129,6 @@ public final class CN1DocumentStore {
         node.remoteId = json.optString("remoteId", null);
         node.size = json.optLong("size", -1);
         node.lastModified = json.optLong("lastModified", -1);
-        node.readOnly = json.optBoolean("readOnly", false);
         index.nodes.put(node.id, node);
         JSONArray children = json.optJSONArray("children");
         if (children != null) {

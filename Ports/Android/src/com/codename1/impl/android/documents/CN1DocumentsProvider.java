@@ -207,10 +207,19 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
                 throw new IOException("Could not create " + cacheDir);
             }
-            File target = new File(cacheDir, sanitize(node.id));
+            File target = new File(cacheDir, cacheName(node.id));
+            // Downloaded into a file nobody else can be holding, then moved into place. Two
+            // clients opening the same document arrive here on separate binder threads; writing
+            // straight to the shared path let one truncate the bytes the other had already
+            // handed back a descriptor for, which the reader saw as a corrupt document.
+            //
+            // The rename is what makes it safe rather than merely rarer: a descriptor already
+            // opened on the old file keeps that inode, and any open after the rename sees a file
+            // that was complete before it was ever linked to this name.
+            File partial = File.createTempFile("fetch", ".part", cacheDir);
             InputStream in = connection.getInputStream();
             try {
-                FileOutputStream out = new FileOutputStream(target);
+                FileOutputStream out = new FileOutputStream(partial);
                 try {
                     byte[] buffer = new byte[8192];
                     int len;
@@ -223,8 +232,19 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 } finally {
                     out.close();
                 }
+            } catch (Throwable t) {
+                if (!partial.delete()) {
+                    Log.w(TAG, "Could not delete the partial download " + partial);
+                }
+                throw t instanceof IOException ? (IOException) t : new IOException(t);
             } finally {
                 in.close();
+            }
+            if (!partial.renameTo(target)) {
+                // A rename onto an existing name fails on some filesystems; the existing file is
+                // a complete copy of the same content, so serve the partial's own path instead of
+                // failing the open.
+                return partial;
             }
             return target;
         } catch (IOException err) {
@@ -238,14 +258,20 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         }
     }
 
-    /// Node ids are the app's own keys and may contain anything, including separators. This is a
-    /// cache file name, so it has to be a single path component.
-    private static String sanitize(String id) {
-        StringBuilder sb = new StringBuilder(id.length());
+    /// The cache file name for a node id.
+    ///
+    /// Node ids are the app's own record keys and may contain anything, including separators, so
+    /// this has to collapse to a single path component. Replacing the awkward characters is not
+    /// enough on its own -- "a/b" and "a_b" collapse to the same name, and two different
+    /// documents would then share one cache file. The id's hash is appended so distinct ids stay
+    /// distinct while the readable part is kept for anyone looking at the cache directory.
+    private static String cacheName(String id) {
+        StringBuilder sb = new StringBuilder(id.length() + 12);
         for (int i = 0; i < id.length(); i++) {
             char c = id.charAt(i);
-            sb.append(Character.isLetterOrDigit(c) || c == '.' || c == '-' || c == '_' ? c : '_');
+            sb.append(Character.isLetterOrDigit(c) || c == '.' || c == '-' ? c : '_');
         }
+        sb.append('-').append(Integer.toHexString(id.hashCode()));
         return sb.toString();
     }
 

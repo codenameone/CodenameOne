@@ -16436,6 +16436,24 @@ static NSFileProviderDomain *cn1DocumentsDomain(void) {
                                                 displayName:cn1DocumentsDisplayName()] autorelease];
 }
 
+// Which provider the BUILD generated, not what this OS could run. Below the replicated API's
+// floor the builder emits the classic NSFileProviderExtension instead, and that one is not
+// domain-based: it is reached through the default manager and registers no domain at all.
+// Deciding this from @available alone would strand the classic extension -- every publish would
+// register nothing and signal nothing, so the browser would keep serving the tree it first read.
+static BOOL cn1DocumentsReplicated(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsReplicated"];
+    if ([v isKindOfClass:[NSString class]]) {
+        return [(NSString *)v boolValue];
+    }
+    if ([v isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)v boolValue];
+    }
+    // Absent means a build that predates the key, which only ever generated the replicated
+    // provider.
+    return YES;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSString *path = cn1DocumentsContainerPath();
@@ -16445,6 +16463,11 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THR
 }
 
 void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // The classic provider has no domain to register: the system finds it through the extension
+    // point alone, so this is correctly a no-op there rather than a missing step.
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
     if (@available(iOS 16.0, macOS 13.0, *)) {
         POOL_BEGIN();
         if (cn1DocumentsGroupId() != nil) {
@@ -16463,6 +16486,9 @@ void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE
 }
 
 void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
     if (@available(iOS 16.0, macOS 13.0, *)) {
         POOL_BEGIN();
         [NSFileProviderManager removeDomain:cn1DocumentsDomain() completionHandler:^(NSError *error) {
@@ -16475,6 +16501,28 @@ void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_M
 }
 
 void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        // The classic provider is reached through the default manager rather than a domain.
+        // Without this a pre-iOS-16 build would publish a new tree and never tell the browser,
+        // leaving an open or cached folder showing the previous publish indefinitely.
+        //
+        // TARGET_OS_OSX rather than @available: +defaultManager is API_UNAVAILABLE(macos), so on
+        // the AppKit slice this does not compile at all rather than merely failing at runtime.
+        // Nothing is lost there -- the generator refuses to emit the classic provider for macOS,
+        // whose floor is already past the replicated API, so this branch is unreachable on it.
+#if !TARGET_OS_OSX
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager defaultManager];
+        [mgr signalEnumeratorForContainerItemIdentifier:NSFileProviderRootContainerItemIdentifier
+                                      completionHandler:^(NSError *error) {
+            if (error != nil) {
+                NSLog(@"Codename One: could not signal the document provider: %@", error);
+            }
+        }];
+        POOL_END();
+#endif
+        return;
+    }
     if (@available(iOS 16.0, macOS 13.0, *)) {
         POOL_BEGIN();
         NSFileProviderManager *mgr = [NSFileProviderManager managerForDomain:cn1DocumentsDomain()];
@@ -16492,13 +16540,23 @@ void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_M
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    // The container is load-bearing either way: without the group there is nowhere for the two
+    // processes to meet and the extension would enumerate an empty tree forever.
+    BOOL ok = cn1DocumentsContainerPath() != nil;
+    POOL_END();
+    if (!ok) {
+        return JAVA_FALSE;
+    }
+    if (!cn1DocumentsReplicated()) {
+        // A classic build is supported on exactly the systems it was generated for. Gating this
+        // on the replicated API would answer false on every device below iOS 16 -- which is the
+        // whole population ios.documentProvider.deploymentTarget < 16 exists to serve -- and an
+        // app following the documented isSupported() guard would hide the feature there.
+        return JAVA_TRUE;
+    }
     if (@available(iOS 16.0, macOS 13.0, *)) {
-        POOL_BEGIN();
-        // Both halves are load-bearing: without the group there is no container for the two
-        // processes to meet in, and the extension would enumerate an empty tree forever.
-        BOOL ok = cn1DocumentsContainerPath() != nil;
-        POOL_END();
-        return ok ? JAVA_TRUE : JAVA_FALSE;
+        return JAVA_TRUE;
     }
     return JAVA_FALSE;
 }

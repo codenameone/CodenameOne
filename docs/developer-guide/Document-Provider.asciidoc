@@ -48,7 +48,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/documents/
 
 A node may carry both. The local copy always wins, which is how a cached document opens without a round trip.
 
-Folders nest as you would expect, and a node can be marked read-only so the browser offers no rename, move or delete for it:
+The location is read-only. Your app is the only writer, so the browser offers no editing, renaming or deleting and never presents a save that would fail. To change what people see, publish again.
+
+Folders nest as you would expect:
 
 [source,java]
 ----

@@ -34,16 +34,18 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     private let node: CN1DocumentNode
     private let parentId: NSFileProviderItemIdentifier
     private let identifier: NSFileProviderItemIdentifier
+    private let revision: String
 
     /// The identifier is passed in rather than taken from the node because the tree's root has
     /// two names: whatever id the app gave it, and `.rootContainer`, which is the only one the
     /// system accepts back when it asked for the root. Answering with the app's id there is a
     /// mismatch the browser reads as "that is not the item I asked for".
     init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier,
-         identifier: NSFileProviderItemIdentifier? = nil) {
+         identifier: NSFileProviderItemIdentifier? = nil, revision: String = "") {
         self.node = node
         self.parentId = parentId
         self.identifier = identifier ?? NSFileProviderItemIdentifier(node.id)
+        self.revision = revision
     }
 
     var itemIdentifier: NSFileProviderItemIdentifier {
@@ -95,10 +97,14 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     var capabilities: NSFileProviderItemCapabilities {
+        // Reading only, for every item. The published tree is a view of content the app owns and
+        // the app is its only writer -- createItem/modifyItem/deleteItem all refuse, and the
+        // Android provider rejects a write-mode open. Advertising .allowsWriting here would make
+        // the browser offer an edit-and-save flow that then fails on every save.
         if node.folder {
             return [.allowsReading, .allowsContentEnumerating]
         }
-        return node.readOnly == true ? [.allowsReading] : [.allowsReading, .allowsWriting]
+        return [.allowsReading]
     }
 
     var documentSize: NSNumber? {
@@ -114,9 +120,16 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     @available(iOS 16.0, macOS 13.0, *)
     var itemVersion: NSFileProviderItemVersion {
         // The browser caches content per version, so the version has to move whenever the bytes
-        // could have. Modification time and size are the only signals the index carries; when the
-        // app omits both, republishing the same id serves the cached copy.
-        let stamp = "\(node.lastModified ?? -1)-\(node.size ?? -1)"
+        // could have. Modification time and size are the node's own signals and are preferred,
+        // because they only change when that item changes. A node that declares neither carries
+        // no signal at all, and would otherwise keep the constant stamp "-1--1" across every
+        // republish -- the browser would go on serving cached bytes for content that changed.
+        // Those nodes fall back to the index revision, which moves on every publish: coarser
+        // (it re-fetches that item whenever anything is published) but never stale.
+        let known = node.lastModified != nil || node.size != nil
+        let stamp = known
+            ? "\(node.lastModified ?? -1)-\(node.size ?? -1)"
+            : "rev-\(revision)"
         let data = Data(stamp.utf8)
         return NSFileProviderItemVersion(contentVersion: data, metadataVersion: data)
     }
