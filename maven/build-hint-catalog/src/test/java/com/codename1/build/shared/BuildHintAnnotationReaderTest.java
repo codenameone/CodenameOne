@@ -51,9 +51,12 @@ public class BuildHintAnnotationReaderTest {
 
     @Test
     public void theAnnotationsCarryEverythingTheCatalogDoes() throws Exception {
-        File classes = compileTheAnnotations();
+        // Through readFromSources, which is what the generator calls: the
+        // prose lives in the attribute's `///` documentation so an IDE shows it,
+        // and that is not in the class file at all. Reading the bytecode alone
+        // would test a path nothing uses and report every doc as missing.
         Map<String, BuildHints.Hint> fromAnnotations = byName(
-                BuildHintAnnotationReader.read(classes));
+                BuildHintAnnotationReader.readFromSources(annotationSources()));
 
         List<BuildHints.Hint> annotatedInCatalog = new ArrayList<BuildHints.Hint>();
         for (BuildHints.Hint h : BuildHints.entries()) {
@@ -137,25 +140,12 @@ public class BuildHintAnnotationReaderTest {
         return out;
     }
 
-    /// Compiles the real annotation sources, so this tests the tree that ships
-    /// rather than a fixture that resembles it.
-    private static File compileTheAnnotations() throws Exception {
+    /// The real annotation sources, so this tests the tree that ships rather
+    /// than a fixture that resembles it.
+    private static File annotationSources() {
         File src = new File("../../CodenameOne/src/com/codename1/annotations/buildhints");
         assertTrue(src.isDirectory(), "annotation sources not found at " + src.getAbsolutePath());
-        List<String> args = new ArrayList<String>();
-        File out = Files.createTempDirectory("buildhint-annotations").toFile();
-        out.deleteOnExit();
-        args.add("-d");
-        args.add(out.getAbsolutePath());
-        File[] files = src.listFiles();
-        for (File f : files) {
-            if (f.getName().endsWith(".java")) {
-                args.add(f.getAbsolutePath());
-            }
-        }
-        JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
-        assertEquals(0, javac.run(null, null, null, args.toArray(new String[args.size()])),
-                "the annotation sources must compile");
-        return new File(out, "com/codename1/annotations/buildhints");
+        return src;
     }
+
 }

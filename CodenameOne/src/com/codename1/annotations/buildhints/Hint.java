@@ -51,10 +51,6 @@ public @interface Hint {
     /// the authority on the spelling.
     String name() default "";
 
-    /// What this hint does, as the developer guide and the Settings editor show
-    /// it.
-    String doc() default "";
-
     /// What the builder does when nobody sets the hint.
     ///
     /// Documentation, not behaviour: an attribute the developer leaves alone is

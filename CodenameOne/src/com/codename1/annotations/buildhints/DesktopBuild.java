@@ -44,31 +44,39 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface DesktopBuild {
 
-    @Hint(def = "true",
-            doc = "Boolean true/false defaults to true. When set to true some values will ve implicitly doubled to deal with retina displays and icons etc. Will use higher DPI's")
+    /// Boolean true/false defaults to true. When set to true some values will ve
+    /// implicitly doubled to deal with retina displays and icons etc. Will use
+    /// higher DPI's
+    @Hint(def = "true")
     boolean adaptToRetina() default false;
 
-    @Hint(def = "false",
-            doc = "Starts the desktop build in full-screen mode.")
+    /// Starts the desktop build in full-screen mode.
+    @Hint(def = "false")
     boolean fullscreen() default false;
 
-    @Hint(def = "600",
-            doc = "Height in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 600.")
+    /// Height in pixels for the form in desktop builds, will be doubled for retina
+    /// grade displays. Defaults to 600.
+    @Hint(def = "600")
     int height() default 0;
 
-    @Hint(def = "true",
-            doc = "Enables grab-able, click-to-page desktop scrollbars.")
+    /// Enables grab-able, click-to-page desktop scrollbars.
+    @Hint(def = "true")
     boolean interactiveScrollbars() default false;
 
-    @Hint(def = "true",
-            doc = "Boolean true/false defaults to true. Indicates whether the UI in the desktop build is resizable")
+    /// Boolean true/false defaults to true. Indicates whether the UI in the
+    /// desktop build is resizable
+    @Hint(def = "true")
     boolean resizable() default false;
 
-    @Hint(def = "native",
-            doc = "How the desktop window is framed: native for the OS title bar and menu bar, custom for an undecorated window with a Codename One drawn title bar, or toolbar for the legacy in-app Toolbar. An unrecognized value falls back to native with a warning.")
+    /// How the desktop window is framed: native for the OS title bar and menu bar,
+    /// custom for an undecorated window with a Codename One drawn title bar, or
+    /// toolbar for the legacy in-app Toolbar. An unrecognized value falls back to
+    /// native with a warning.
+    @Hint(def = "native")
     DesktopTitleBar titleBar() default DesktopTitleBar.NATIVE;
 
-    @Hint(def = "800",
-            doc = "Width in pixels for the form in desktop builds, will be doubled for retina grade displays. Defaults to 800.")
+    /// Width in pixels for the form in desktop builds, will be doubled for retina
+    /// grade displays. Defaults to 800.
+    @Hint(def = "800")
     int width() default 0;
 }

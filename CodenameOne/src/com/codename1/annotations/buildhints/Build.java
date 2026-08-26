@@ -39,19 +39,28 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Build {
 
-    @Hint(name = "facebook.appId",
-            doc = "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app")
+    /// The application ID for an app that requires native Facebook login
+    /// integration, this defaults to null which means native Facebook support
+    /// shouldn't be in the app
+    @Hint(name = "facebook.appId")
     String facebookAppId() default "";
 
+    /// The Android/chrome push identifier, see the push section for more details
     @Hint(name = "gcm.sender_id",
-            doc = "The Android/chrome push identifier, see the push section for more details",
             consumedBy = {"AndroidGradleBuilder"})
     String gcmSenderId() default "";
 
-    @Hint(doc = "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.")
+    /// `modern`, `legacy`, `custom` (default unset). Cross-platform override that
+    /// sets both `ios.themeMode` and `and.themeMode` together when those aren't
+    /// set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat
+    /// + Holo Light, `custom` disables the framework native theme entirely. The
+    /// legacy alias `cn1.nativeTheme` is still accepted.
     NativeThemeMode nativeTheme() default NativeThemeMode.MODERN;
 
-    @Hint(def = "false",
-            doc = "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.")
+    /// true/false (defaults to false). Blocks codename one from injecting its own
+    /// resources when set to true, the only effect this has is in slightly
+    /// reducing archive size. This might have adverse effects on some features of
+    /// Codename One so it isn't recommended.
+    @Hint(def = "false")
     boolean noExtraResources() default false;
 }

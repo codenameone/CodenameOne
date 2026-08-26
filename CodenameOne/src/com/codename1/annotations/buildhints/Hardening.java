@@ -39,26 +39,34 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Hardening {
 
-    @Hint(def = "false",
-            doc = "Permits a local or source build to run with hardening requested but not applied. Without it such a build is refused, so a hardened app is never shipped from a target that can't actually harden it.")
+    /// Permits a local or source build to run with hardening requested but not
+    /// applied. Without it such a build is refused, so a hardened app is never
+    /// shipped from a target that can't actually harden it.
+    @Hint(def = "false")
     boolean allowUnhardenedLocalBuild() default false;
 
-    @Hint(doc = "Overrides control-flow obfuscation independently of harden.level.")
+    /// Overrides control-flow obfuscation independently of harden.level.
     HardenControlFlow controlFlow() default HardenControlFlow.OFF;
 
+    /// Keep rules in ProGuard syntax, one per line, for classes that are resolved
+    /// by name at runtime and so can't be found by the automatic analysis. Same
+    /// syntax as android.proguardKeep, so existing rules port directly. Rules are
+    /// separated by newlines only, because a semicolon is legal inside a rule body
+    /// such as { *; }.
     @Hint(kind = HintKind.TEXT_BLOCK,
-            doc = "Keep rules in ProGuard syntax, one per line, for classes that are resolved by name at runtime and so can't be found by the automatic analysis. Same syntax as android.proguardKeep, so existing rules port directly. Rules are separated by newlines only, because a semicolon is legal inside a rule body such as { *; }.",
             consumedBy = {"AndroidGradleBuilder"})
     String keep() default "";
 
+    /// Master switch for app hardening: off, standard, aggressive or paranoid. An
+    /// unrecognized value fails the build rather than being treated as off.
     @Hint(def = "off",
-            doc = "Master switch for app hardening: off, standard, aggressive or paranoid. An unrecognized value fails the build rather than being treated as off.",
             consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo", "Executor"})
     HardenLevel level() default HardenLevel.OFF;
 
-    @Hint(doc = "Overrides symbol renaming independently of harden.level.")
+    /// Overrides symbol renaming independently of harden.level.
     boolean rename() default false;
 
-    @Hint(doc = "Overrides string obfuscation independently of harden.level: off, constants or all.")
+    /// Overrides string obfuscation independently of harden.level: off, constants
+    /// or all.
     HardenStrings strings() default HardenStrings.OFF;
 }

@@ -44,105 +44,146 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Android {
 
+    /// Allows explicitly setting the `android:launchMode` attribute of the main
+    /// activity in android. Default is "singleTop," but for some applications you
+    /// may need to change this behaviour. In particular, apps that are meant to
+    /// open a file type will need to set this to "singleTask." See
+    /// https://developer.android.com/guide/topics/manifest/activity-element.html[Android
+    /// docs for the activity element] for more information about the
+    /// `android:launchMode` attribute.
     @Hint(name = "android.activity.launchMode",
-            def = "singleTop",
-            doc = "Allows explicitly setting the `android:launchMode` attribute of the main activity in android. Default is \"singleTop,\" but for some applications you may need to change this behaviour. In particular, apps that are meant to open a file type will need to set this to \"singleTask.\" See https://developer.android.com/guide/topics/manifest/activity-element.html[Android docs for the activity element] for more information about the `android:launchMode` attribute.")
+            def = "singleTop")
     String activityLaunchMode() default "";
 
-    @Hint(doc = "Produces an Android App Bundle (.aab) rather than an APK. Required for new Play Store submissions.")
+    /// Produces an Android App Bundle (.aab) rather than an APK. Required for new
+    /// Play Store submissions.
     boolean appBundle() default false;
 
-    @Hint(kind = HintKind.VERSION,
-            doc = "Android build-tools version. It also selects the compile SDK, so there is no separate compile-SDK hint.")
+    /// Android build-tools version. It also selects the compile SDK, so there is
+    /// no separate compile-SDK hint.
+    @Hint(kind = HintKind.VERSION)
     String buildToolsVersion() default "";
 
-    @Hint(def = "enabled",
-            doc = "Indicates whether the `RECORD_AUDIO` permission should be requested. Can be `enabled` or any other value to disable this option")
+    /// Indicates whether the `RECORD_AUDIO` permission should be requested. Can be
+    /// `enabled` or any other value to disable this option
+    @Hint(def = "enabled")
     String captureRecord() default "";
 
-    @Hint(def = "false",
-            doc = "true/false defaults to true - indicates whether to include the debug version in the build. Defaults conditionally rather than to a fixed value: when android.release is on it defaults to false, and when release is off it defaults to true, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451).")
+    /// true/false defaults to true - indicates whether to include the debug
+    /// version in the build. Defaults conditionally rather than to a fixed value:
+    /// when android.release is on it defaults to false, and when release is off it
+    /// defaults to true, so a build that selects neither still produces something
+    /// installable (AndroidGradleBuilder.java:447-451).
+    @Hint(def = "false")
     boolean debug() default false;
 
-    @Hint(def = "false",
-            doc = "Turns off R8, falling back to the older shrinker. Note that hardening requires R8, so this conflicts with harden.level.")
+    /// Turns off R8, falling back to the older shrinker. Note that hardening
+    /// requires R8, so this conflicts with harden.level.
+    @Hint(def = "false")
     boolean disableR8() default false;
 
-    @Hint(def = "true",
-            doc = "Boolean true/false defaults to true. Allows disabling the proguard obfuscation even on release builds, notice that this isn't recommended")
+    /// Boolean true/false defaults to true. Allows disabling the proguard
+    /// obfuscation even on release builds, notice that this isn't recommended
+    @Hint(def = "true")
     boolean enableProguard() default false;
 
+    /// Gradle dependency statements to add to the app module, such as
+    /// implementation 'com.example:lib:1.0'.
     @Hint(appendable = true,
-            separator = ";",
-            doc = "Gradle dependency statements to add to the app module, such as implementation 'com.example:lib:1.0'.")
+            separator = ";")
     String[] gradleDep() default {};
 
-    @Hint(def = "false",
-            doc = "Hides the Android status bar.")
+    /// Hides the Android status bar.
+    @Hint(def = "false")
     boolean hideStatusBar() default false;
 
-    @Hint(def = "auto",
-            doc = "Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.")
+    /// Maps to android:installLocation manifest entry defaults to auto. Can also
+    /// be set to internalOnly or preferExternal.
+    @Hint(def = "auto")
     InstallLocation installLocation() default InstallLocation.AUTO;
 
-    @Hint(doc = "The license key for the Android app, this is required if you use in-app purchase on Android")
+    /// The license key for the Android app, this is required if you use in-app
+    /// purchase on Android
     String licenseKey() default "";
 
+    /// The least SDK required to run this app, the default value changes based on
+    /// functionality but can be as low as 7. This corresponds to the XML attribute
+    /// `android:minSdkVersion`.
     @Hint(name = "android.min_sdk_version",
-            def = "19",
-            doc = "The least SDK required to run this app, the default value changes based on functionality but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`.")
+            def = "19")
     int minSdkVersion() default 0;
 
-    @Hint(def = "true",
-            doc = "Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on.")
+    /// Boolean true/false defaults to false. Multidex allows Android binaries to
+    /// reference more than 65536 methods. This slows builds a bit so you have it
+    /// off by default but if you get a build error mentioning this limit you
+    /// should turn this on.
+    @Hint(def = "true")
     boolean multidex() default false;
 
-    @Hint(def = "true",
-            doc = "Uses the current Firebase Cloud Messaging integration. Requires AndroidX and Gradle 8.13 or newer.")
+    /// Uses the current Firebase Cloud Messaging integration. Requires AndroidX
+    /// and Gradle 8.13 or newer.
+    @Hint(def = "true")
     boolean newFirebaseMessaging() default false;
 
+    /// Arguments for the keep option in proguard allowing you to keep a pattern of
+    /// files for example, `-keep class com.mypackage.ProblemClass { *; }`
     @Hint(appendable = true,
-            separator = "\n",
-            doc = "Arguments for the keep option in proguard allowing you to keep a pattern of files for example, `-keep class com.mypackage.ProblemClass { *; }`")
+            separator = "\n")
     String[] proguardKeep() default {};
 
-    @Hint(def = "true",
-            doc = "true/false defaults to true - indicates whether to include the release version in the build")
+    /// true/false defaults to true - indicates whether to include the release
+    /// version in the build
+    @Hint(def = "true")
     boolean release() default false;
 
+    /// Extra Gradle repositories to resolve dependencies from.
     @Hint(appendable = true,
             separator = "\n",
-            doc = "Extra Gradle repositories to resolve dependencies from.",
             consumedBy = {"AndroidGradleBuilder", "MapsProviderInjector"})
     String[] repositories() default {};
 
-    @Hint(doc = "The Android SDK the build compiles against. Unset, the build server uses the highest platform it has installed, so leaving this alone tracks the server rather than pinning a number. Not every target works: the source may have limitations, and not all SDK targets are installed.")
+    /// The Android SDK the build compiles against. Unset, the build server uses
+    /// the highest platform it has installed, so leaving this alone tracks the
+    /// server rather than pinning a number. Not every target works: the source may
+    /// have limitations, and not all SDK targets are installed.
     int targetSDKVersion() default 0;
 
-    @Hint(name = "and.themeMode",
-            doc = "`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated Android Material 3 theme from `native-themes/android-material/theme.css`. `hololight` is Android Holo Light (what the framework shipped on API 14+ before this refactor). `legacy` loads the pre-Holo Android theme. The legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true` still maps to `hololight`. The default stays on `hololight` for existing apps until you flip in a future release.")
+    /// `auto`, `modern` / `material`, `hololight` (default for existing apps),
+    /// `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated
+    /// Android Material 3 theme from `native-themes/android-material/theme.css`.
+    /// `hololight` is Android Holo Light (what the framework shipped on API 14+
+    /// before this refactor). `legacy` loads the pre-Holo Android theme. The
+    /// legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true`
+    /// still maps to `hololight`. The default stays on `hololight` for existing
+    /// apps until you flip in a future release.
+    @Hint(name = "and.themeMode")
     AndroidThemeMode themeMode() default AndroidThemeMode.AUTO;
 
+    /// Statements added to the top-level Gradle build file rather than the app
+    /// module.
     @Hint(appendable = true,
-            separator = "\n",
-            doc = "Statements added to the top-level Gradle build file rather than the app module.")
+            separator = "\n")
     String[] topDependency() default {};
 
-    @Hint(doc = "Use Android X instead of support libraries. This will also run a find/replace on all source files to replace support libraries and artifacts with AndroidX equivalents.")
+    /// Use Android X instead of support libraries. This will also run a
+    /// find/replace on all source files to replace support libraries and artifacts
+    /// with AndroidX equivalents.
     boolean useAndroidX() default false;
 
+    /// defaults to an empty string. Allows developers of native Android code to
+    /// add text within the application block to define things such as widgets,
+    /// services etc.
     @Hint(appendable = true,
-            kind = HintKind.XML,
-            doc = "defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.")
+            kind = HintKind.XML)
     String xapplication() default "";
 
+    /// Arbitrary text spliced into the generated app-module Gradle file.
     @Hint(appendable = true,
-            separator = "\n",
-            doc = "Arbitrary text spliced into the generated app-module Gradle file.")
+            separator = "\n")
     String[] xgradle() default {};
 
+    /// more permissions for the Android manifest
     @Hint(appendable = true,
-            kind = HintKind.XML,
-            doc = "more permissions for the Android manifest")
+            kind = HintKind.XML)
     String xpermissions() default "";
 }

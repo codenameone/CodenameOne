@@ -96,10 +96,132 @@ public final class BuildHintAnnotationReader {
                     + " do not compile");
         }
         try {
-            return read(new File(out, "com/codename1/annotations/buildhints"));
+            List<BuildHints.Hint> hints =
+                    read(new File(out, "com/codename1/annotations/buildhints"));
+            Map<String, String> docs = docComments(files);
+            for (BuildHints.Hint h : hints) {
+                String doc = docs.get(h.group().annotationSimpleName() + "#" + h.attr());
+                if (doc != null) {
+                    h.doc(doc);
+                }
+            }
+            return hints;
         } finally {
             deleteTree(out);
         }
+    }
+
+    /**
+     * The `///` documentation above each attribute, keyed `Annotation#attribute`.
+     *
+     * <p>Read from the source text rather than through
+     * {@code Elements.getDocComment}, which would be the obvious route and does
+     * not work here: these are JEP 467 markdown doc comments, and to the JDK 8
+     * javac that builds the core they are ordinary line comments carrying no
+     * documentation at all.</p>
+     *
+     * <p>The prose lives in the javadoc and nowhere else, so an IDE shows it on
+     * completion -- which is the whole point of a checked annotation. Reading it
+     * back for the guide's table is this method's job. Nothing here parses Java:
+     * it collects the run of `///` lines that precedes a declaration, and the
+     * round trip test fails if any attribute comes back without one.</p>
+     */
+    private static Map<String, String> docComments(File[] files) throws IOException {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        for (File f : files) {
+            if (!f.getName().endsWith(".java")) {
+                continue;
+            }
+            String simple = f.getName().substring(0, f.getName().length() - ".java".length());
+            List<String> pending = new ArrayList<String>();
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new FileInputStream(f), "UTF-8"));
+            try {
+                String line;
+                int insideAnnotation = 0;
+                while ((line = r.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (insideAnnotation > 0) {
+                        insideAnnotation += balance(trimmed);
+                        continue;
+                    }
+                    if (trimmed.startsWith("///")) {
+                        pending.add(trimmed.length() > 3 ? trimmed.substring(3).trim() : "");
+                        continue;
+                    }
+                    if (trimmed.startsWith("@")) {
+                        insideAnnotation = balance(trimmed);
+                        continue;
+                    }
+                    String attribute = attributeDeclaredBy(trimmed);
+                    if (attribute != null) {
+                        if (!pending.isEmpty()) {
+                            out.put(simple + "#" + attribute, join(pending));
+                        }
+                        pending.clear();
+                    } else if (trimmed.length() > 0) {
+                        // Anything else -- `public @interface Android {` above
+                        // all -- means the comment was documenting that, not an
+                        // attribute. Letting it through attached the type's own
+                        // javadoc to whichever attribute came first.
+                        pending.clear();
+                    }
+                }
+            } finally {
+                r.close();
+            }
+        }
+        return out;
+    }
+
+    /// The attribute an annotation-member declaration declares, or null.
+    private static String attributeDeclaredBy(String trimmed) {
+        int parens = trimmed.indexOf("()");
+        if (parens <= 0 || !trimmed.endsWith(";")) {
+            return null;
+        }
+        String head = trimmed.substring(0, parens);
+        int space = head.lastIndexOf(' ');
+        if (space < 0) {
+            return null;
+        }
+        String name = head.substring(space + 1);
+        return name.length() > 0 && Character.isJavaIdentifierStart(name.charAt(0))
+                ? name : null;
+    }
+
+    /// How far this line opens or closes a parenthesised annotation.
+    private static int balance(String trimmed) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (inString) {
+                if (c == '\\') {
+                    i++;
+                } else if (c == '"') {
+                    inString = false;
+                }
+            } else if (c == '"') {
+                inString = true;
+            } else if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            }
+        }
+        return depth;
+    }
+
+    private static String join(List<String> lines) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            if (sb.length() > 0) {
+                sb.append(line.length() == 0 ? "\n" : " ");
+            }
+            sb.append(line);
+        }
+        return sb.toString().trim();
     }
 
     private static void deleteTree(File f) {

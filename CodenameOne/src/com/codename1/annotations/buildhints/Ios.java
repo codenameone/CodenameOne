@@ -44,112 +44,163 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Ios {
 
+    /// A semicolon separated list of libraries that should be linked to the app to
+    /// build it
     @Hint(appendable = true,
             name = "ios.add_libs",
-            separator = ";",
-            doc = "A semicolon separated list of libraries that should be linked to the app to build it")
+            separator = ";")
     String[] addLibs() default {};
 
+    /// Comma separated list of url schemes that `canExecute` will respect on iOS.
+    /// If the url scheme isn't mentioned here `canExecute` will return false
+    /// starting with iOS 9. Notice that this collides with `ios.plistInject` when
+    /// used with the `<key>LSApplicationQueriesSchemes</key>...` value so you
+    /// should use one or the other. For example, to enable `canExecute` for a url
+    /// like `myurl://xys` you can use: `myurl,myotherurl`
     @Hint(appendable = true,
-            separator = ",",
-            doc = "Comma separated list of url schemes that `canExecute` will respect on iOS. If the url scheme isn't mentioned here `canExecute` will return false starting with iOS 9. Notice that this collides with `ios.plistInject` when used with the `<key>LSApplicationQueriesSchemes</key>...` value so you should use one or the other. For example, to enable `canExecute` for a url like `myurl://xys` you can use: `myurl,myotherurl`")
+            separator = ",")
     String[] applicationQueriesSchemes() default {};
 
-    @Hint(kind = HintKind.TEXT_BLOCK,
-            doc = "Objective-C code that can be injected into the iOS app delegate at the top of the body of the didFinishLaunchingWithOptions callback method")
+    /// Objective-C code that can be injected into the iOS app delegate at the top
+    /// of the body of the didFinishLaunchingWithOptions callback method
+    @Hint(kind = HintKind.TEXT_BLOCK)
     String beforeFinishLaunching() default "";
 
+    /// Indicates the version number of the bundle, this is useful if you want to
+    /// create a minor version number change for the beta testing support
     @Hint(kind = HintKind.VERSION,
-            doc = "Indicates the version number of the bundle, this is useful if you want to create a minor version number change for the beta testing support",
             consumedBy = {"IPhoneBuilder", "WatchNativeBuilder"})
     String bundleVersion() default "";
 
+    /// Which native dependency manager to use: auto picks one from whichever of
+    /// ios.pods and ios.spm.packages is set, and cocoapods, spm or both require
+    /// the matching hint to be set. An unrecognized value fails the build.
     @Hint(def = "auto",
-            doc = "Which native dependency manager to use: auto picks one from whichever of ios.pods and ios.spm.packages is set, and cocoapods, spm or both require the matching hint to be set. An unrecognized value fails the build.",
             consumedBy = {"IOSDependencyManager"})
     IosDependencyManager dependencyManager() default IosDependencyManager.AUTO;
 
+    /// Minimum iOS version the build targets. Set it to the lowest iOS you
+    /// actually support; a higher value excludes older devices from the App Store
+    /// listing.
     @Hint(name = "ios.deployment_target",
-            kind = HintKind.VERSION,
-            doc = "Minimum iOS version the build targets. Set it to the lowest iOS you actually support; a higher value excludes older devices from the App Store listing.")
+            kind = HintKind.VERSION)
     String deploymentTarget() default "";
 
-    @Hint(kind = HintKind.TEXT_BLOCK,
-            doc = "Objective-C code that can be injected into the iOS app delegate at the top of the file. For example, if you need to include headers or make special imports for other injected code")
+    /// Objective-C code that can be injected into the iOS app delegate at the top
+    /// of the file. For example, if you need to include headers or make special
+    /// imports for other injected code
+    @Hint(kind = HintKind.TEXT_BLOCK)
     String glAppDelegateHeader() default "";
 
-    @Hint(def = "false",
-            doc = "true/false (defaults to false). Whether to include the push capabilities in the iOS build. Notice that the IDE plugin has an \"Include Push\" check box you *should* use under the iOS section.")
+    /// true/false (defaults to false). Whether to include the push capabilities in
+    /// the iOS build. Notice that the IDE plugin has an "Include Push" check box
+    /// you *should* use under the iOS section.
+    @Hint(def = "false")
     boolean includePush() default false;
 
-    @Hint(name = "ios.interface_orientation",
-            doc = "UIInterfaceOrientationPortrait by default. Indicates the orientation, one or more of (separated by colon :): `UIInterfaceOrientationPortrait`, `UIInterfaceOrientationPortraitUpsideDown`, `UIInterfaceOrientationLandscapeLeft`, `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an \"Interface Orientation\" combo box you *should* use under the iOS section.")
+    /// UIInterfaceOrientationPortrait by default. Indicates the orientation, one
+    /// or more of (separated by colon :): `UIInterfaceOrientationPortrait`,
+    /// `UIInterfaceOrientationPortraitUpsideDown`,
+    /// `UIInterfaceOrientationLandscapeLeft`,
+    /// `UIInterfaceOrientationLandscapeRight`. Notice that the IDE plugin has an
+    /// "Interface Orientation" combo box you *should* use under the iOS section.
+    @Hint(name = "ios.interface_orientation")
     String interfaceOrientation() default "";
 
+    /// The null and empty-string reads of this hint are presence checks; 6.0 is
+    /// the substantive default (IPhoneBuilder.java:4671).
     @Hint(kind = HintKind.VERSION,
-            def = "6.0",
-            doc = "The null and empty-string reads of this hint are presence checks; 6.0 is the substantive default (IPhoneBuilder.java:4671).")
+            def = "6.0")
     String minDeploymentTarget() default "";
 
-    @Hint(def = "true",
-            doc = "true/false defaults to false but defined on new projects as true by default. This changes the storage directory on iOS from using caches to using the documents directory which is the recommended location but might break compatibility. This is described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]")
+    /// true/false defaults to false but defined on new projects as true by
+    /// default. This changes the storage directory on iOS from using caches to
+    /// using the documents directory which is the recommended location but might
+    /// break compatibility. This is described in
+    /// https://github.com/codenameone/CodenameOne/issues/1480[this issue]
+    @Hint(def = "true")
     boolean newStorageLocation() default false;
 
-    @Hint(def = "false",
-            doc = "Added the `-ObjC` compile flag to the project files which some native libraries require")
+    /// Added the `-ObjC` compile flag to the project files which some native
+    /// libraries require
+    @Hint(def = "false")
     boolean objC() default false;
 
+    /// entries to inject into the iOS plist file during build.
     @Hint(appendable = true,
             kind = HintKind.XML,
-            doc = "entries to inject into the iOS plist file during build.",
             consumedBy = {"IPhoneBuilder", "WatchNativeBuilder"})
     String plistInject() default "";
 
+    /// A comma separated list of https://cocoapods.org/[Cocoa Pods] that should be
+    /// linked to the app to build it. For example, `AFNetworking ~> 2.6,
+    /// ORStackView ~> 3.0, SwiftyJSON ~> 2.3`
     @Hint(appendable = true,
-            separator = ",",
-            doc = "A comma separated list of https://cocoapods.org/[Cocoa Pods] that should be linked to the app to build it. For example, `AFNetworking ~> 2.6, ORStackView ~> 3.0, SwiftyJSON ~> 2.3`")
+            separator = ",")
     String[] pods() default {};
 
+    /// Sets the Cocoapods 'platform' for the Cocoapods. Some Cocoapods require a
+    /// minimum platform level. For example, `ios.pods.platform=7.0`.
     @Hint(name = "ios.pods.platform",
-            kind = HintKind.VERSION,
-            doc = "Sets the Cocoapods 'platform' for the Cocoapods. Some Cocoapods require a minimum platform level. For example, `ios.pods.platform=7.0`.")
+            kind = HintKind.VERSION)
     String podsPlatform() default "";
 
+    /// Extra CocoaPods spec repositories to search, in addition to the default
+    /// trunk.
     @Hint(appendable = true,
             name = "ios.pods.sources",
-            separator = ",",
-            doc = "Extra CocoaPods spec repositories to search, in addition to the default trunk.")
+            separator = ",")
     String[] podsSources() default {};
 
+    /// true/false defaults to false. The iOS build process adapts the submitted
+    /// icon for iOS conventions (adding an overlay) that might not be appropriate
+    /// on some icons. Setting this to true leaves the icon unchanged (only
+    /// scaled).
     @Hint(name = "ios.prerendered_icon",
-            def = "false",
-            doc = "true/false defaults to false. The iOS build process adapts the submitted icon for iOS conventions (adding an overlay) that might not be appropriate on some icons. Setting this to true leaves the icon unchanged (only scaled).")
+            def = "false")
     boolean prerenderedIcon() default false;
 
+    /// one of ios, ipad, iphone (defaults to ios). Indicates whether the resulting
+    /// binary is targeted to the iphone only or ipad only. Notice that the IDE
+    /// plugin has a "Project Type" combo box you *should* use under the iOS
+    /// section.
     @Hint(name = "ios.project_type",
             def = "ios",
-            doc = "one of ios, ipad, iphone (defaults to ios). Indicates whether the resulting binary is targeted to the iphone only or ipad only. Notice that the IDE plugin has a \"Project Type\" combo box you *should* use under the iOS section.",
             consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     IosProjectType projectType() default IosProjectType.IOS;
 
+    /// Swift Package Manager packages to link, one per entry, each written as
+    /// identity|url|requirement.
     @Hint(appendable = true,
             name = "ios.spm.packages",
             separator = ";",
-            doc = "Swift Package Manager packages to link, one per entry, each written as identity|url|requirement.",
             consumedBy = {"IOSDependencyManager", "IPhoneBuilder"})
     String[] spmPackages() default {};
 
-    @Hint(doc = "Specifies the team ID associated with the iOS provisioning profile and certificate. Use `ios.debug.teamId` and `ios.release.teamId` to specify different team IDs for debug and release builds respectively.",
-            consumedBy = {"IPhoneBuilder", "MacNativeBuilder", "TvNativeBuilder", "WatchNativeBuilder"})
+    /// Specifies the team ID associated with the iOS provisioning profile and
+    /// certificate. Use `ios.debug.teamId` and `ios.release.teamId` to specify
+    /// different team IDs for debug and release builds respectively.
+    @Hint(consumedBy = {"IPhoneBuilder", "MacNativeBuilder", "TvNativeBuilder", "WatchNativeBuilder"})
     String teamId() default "";
 
-    @Hint(doc = "`auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS Modern (liquid-glass) theme shipped from `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto` - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7 iPhone theme. The `auto` -> modern flip is planned for a future release.")
+    /// `auto` (default), `modern`, `ios7`, `legacy`. `auto` (unset) keeps the
+    /// existing iOS 7 flat theme so pre-refactor screenshot goldens and apps see
+    /// no behavior change. `modern` / `liquid` opts in to the CSS-generated iOS
+    /// Modern (liquid-glass) theme shipped from
+    /// `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto`
+    /// - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7
+    /// iPhone theme. The `auto` -> modern flip is planned for a future release.
     IosThemeMode themeMode() default IosThemeMode.AUTO;
 
-    @Hint(def = "true",
-            doc = "true/false (defaults to true). Enables iOS UIScene lifecycle support. UIScene lets iOS manage one or more app UI sessions independently, improving lifecycle handling in modern iOS versions. Apple has indicated UIScene will be required starting with iOS 27, so this is now on by default; set the flag to `false` only if you need to temporarily fall back to the legacy `UIApplicationDelegate` lifecycle.")
+    /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
+    /// UIScene lets iOS manage one or more app UI sessions independently,
+    /// improving lifecycle handling in modern iOS versions. Apple has indicated
+    /// UIScene will be required starting with iOS 27, so this is now on by
+    /// default; set the flag to `false` only if you need to temporarily fall back
+    /// to the legacy `UIApplicationDelegate` lifecycle.
+    @Hint(def = "true")
     boolean uiscene() default false;
 
-    @Hint(doc = "Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`")
+    /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
     String urlScheme() default "";
 }
