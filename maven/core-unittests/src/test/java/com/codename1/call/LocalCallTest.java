@@ -33,6 +33,7 @@ import com.codename1.call.voip.PushedCall;
 import com.codename1.call.voip.VoipPush;
 import com.codename1.call.voip.VoipPushListener;
 import com.codename1.impl.call.CallRequests;
+import com.codename1.call.spi.CallBridge;
 import com.codename1.impl.call.LocalCallBridge;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -592,6 +593,20 @@ public class LocalCallTest {
         assertEquals(2, got.size(),
                 "a malformed record must not lose the rest of the drain");
         assertNotNull(Calls.getSession(good));
+    }
+
+    @Test
+    public void groupingIsRefusedRatherThanSimulated() {
+        // No platform lets an app conference two of its own calls, so a
+        // simulation that answered success would have apps ship a conference
+        // button that works on the desktop and does nothing on a device.
+        String a = CallId.random();
+        CallSession first = ring(a);
+        CallSession second = ring(CallId.random());
+        CallAwait.assertFailedWith(CallError.NOT_SUPPORTED,
+                first.groupWith(second));
+        assertEquals(0, Calls.getCapabilities() & CallBridge.CAPABILITY_GROUPING,
+                "and the capability must not be advertised either");
     }
 
     @Test

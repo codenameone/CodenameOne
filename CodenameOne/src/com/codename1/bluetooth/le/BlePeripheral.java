@@ -289,10 +289,17 @@ public abstract class BlePeripheral extends BluetoothDevice {
         inner.onResult(new AsyncResult<T>() {
             @Override
             public void onReady(T value, Throwable err) {
+                if (out.isDone()) {
+                    // The queue timeout or a dropped link already failed this
+                    // operation, and the platform answered afterwards anyway.
+                    // Publishing now would overwrite the service cache or the
+                    // MTU that a LATER operation has since established, so a
+                    // late answer is dropped rather than applied.
+                    return;
+                }
                 try {
                     apply.onReady(value, err);
                 } finally {
-                    // already failed by the queue timeout or a dropped link
                     if (!out.isDone()) {
                         if (err == null) {
                             out.complete(value);

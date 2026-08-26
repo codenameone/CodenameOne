@@ -1266,20 +1266,15 @@ void com_codename1_impl_ios_IOSNative_callSendDtmf___int_java_lang_String_java_l
 void com_codename1_impl_ios_IOSNative_callSetGroup___int_java_lang_String_java_lang_String(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT otherCallId) {
-#ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
-    if (uuid == nil) {
-        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
-        return;
-    }
-    CXCallUpdate *update = [[CXCallUpdate alloc] init];
-    update.supportsGrouping = otherCallId != JAVA_NULL;
-    [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
-    cn1clAck(requestId, YES, 0, nil);
-#else
+    // NOT_SUPPORTED whether or not CallKit is compiled in, because CallKit
+    // offers no app-initiated group action: CXSetGroupCallAction travels
+    // system to app, and CXCallUpdate.supportsGrouping only says the system
+    // MAY offer grouping in its own UI. Setting that flag and acknowledging
+    // success meant groupWith() reported that it had conferenced two calls
+    // and had done nothing of the kind -- and callCapabilities has never
+    // claimed CN1_CALL_CAP_GROUPING, so this was the one entry point
+    // disagreeing with the mask beside it.
     cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
-#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(

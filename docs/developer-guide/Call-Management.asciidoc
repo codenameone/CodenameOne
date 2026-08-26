@@ -22,7 +22,7 @@ shared value types.
 | Ring while the app isn't running | yes (`com.codename1.call.voip`) | yes, from your own push handler | simulated | --
 | Answer, hold, mute, keypad from the system | yes | yes | simulated | --
 | Audio session handoff | yes | synthesized | simulated | --
-| Conference grouping | yes | -- | simulated | --
+| Conference grouping | -- | -- | -- | --
 | Caller identification | yes (Call Directory) | -- | simulated | --
 | Call blocking | yes | yes (Android 10 and later) | simulated | --
 |===
@@ -118,12 +118,22 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 `CallSession` carries the rest: `end`, `setHeld`, `setMuted`, `sendDigits`,
-`update` and `groupWith`. Two are worth reading twice. `setMuted` tells the
+`update` and `groupWith`. Three are worth reading twice. `setMuted` tells the
 operating system what the mute button should look like and does *not* stop your
-app sending audio -- nothing in this package touches media. And
+app sending audio -- nothing in this package touches media.
 `reportEndedRemotely` rather than `end` is what you call when the hang-up came
 down your own signalling, so the system call log says the far end hung up
 instead of blaming the user.
+
+And `groupWith` answers `NOT_SUPPORTED` everywhere, which is why the matrix
+above shows conference grouping as absent on both platforms. Neither lets an
+app conference two of its own calls: CallKit's group action travels from the
+system to your app with no counterpart in the other direction, and Telecom
+conferences self-managed calls only through a `ConnectionService` conference
+Codename One doesn't build. Nothing stops you mixing several streams into one
+call yourself and reporting that as a single call -- that needs no permission
+from either platform, and it's what apps that offer conferencing actually
+do.
 
 === Actions, And Why They Have To Be Answered
 

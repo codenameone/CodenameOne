@@ -221,6 +221,15 @@ public final class CallSession {
 
     /// Puts this call in a conference with `other`, or takes it out of one
     /// when `other` is null.
+    ///
+    /// **Answers NOT_SUPPORTED on every platform today**, which is why
+    /// [com.codename1.call.spi.CallBridge#CAPABILITY_GROUPING] is set by no
+    /// port: CallKit's group action travels system to app with no
+    /// app-initiated counterpart, and Telecom conferences self-managed calls
+    /// only through a `ConnectionService` conference this framework does not
+    /// build. It stays here because the system may still ask an app to group
+    /// calls, and because a conference an app mixes itself needs no
+    /// permission from either platform.
     public AsyncResource<Boolean> groupWith(CallSession other) {
         CallBridge b = CallRequests.bridge();
         if (b == null) {

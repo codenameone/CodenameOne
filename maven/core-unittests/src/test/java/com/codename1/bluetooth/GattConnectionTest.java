@@ -319,4 +319,32 @@ class GattConnectionTest extends UITestBase {
                 "getMtu() still answered the old value for a caller that "
                         + "saw requestMtu() finish");
     }
+
+    @Test
+    void aDiscoveryThatTimedOutDoesNotOverwriteTheCacheLater()
+            throws Exception {
+        // The queue fails the operation on timeout, but the platform still
+        // owns its own resource and can answer afterwards. Publishing then
+        // would overwrite a cache a LATER discovery has since established.
+        p.connectNow();
+        AsyncResource<List<GattService>> first = p.discoverServices();
+        p.completeNext(Arrays.asList(p.buildService(SVC)));
+        assertNotNull(p.getService(SVC));
+
+        p.setOpTimeout(50);
+        AsyncResource<List<GattService>> late = p.discoverServices();
+        final java.util.concurrent.CountDownLatch failed =
+                new java.util.concurrent.CountDownLatch(1);
+        late.except(t -> failed.countDown());
+        assertTrue(failed.await(20, java.util.concurrent.TimeUnit.SECONDS),
+                "the operation should have timed out");
+        p.setOpTimeout(0);
+
+        // the platform answers the timed-out request, with nothing in it
+        p.completeNext(new ArrayList<GattService>());
+        assertNotNull(p.getService(SVC),
+                "a late answer to a timed-out discovery must not replace the"
+                        + " cache");
+        assertNotNull(first.get(null));
+    }
 }

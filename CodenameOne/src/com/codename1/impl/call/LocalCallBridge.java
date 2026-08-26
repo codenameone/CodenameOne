@@ -375,7 +375,7 @@ public class LocalCallBridge implements CallBridge {
             return 0;
         }
         int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
-                | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_GROUPING
+                | CAPABILITY_MUTE | CAPABILITY_DTMF
                 | CAPABILITY_VIDEO;
         if (voipSupported) {
             caps |= CAPABILITY_VOIP_PUSH;
@@ -565,7 +565,12 @@ public class LocalCallBridge implements CallBridge {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
             return;
         }
-        ok(requestId);
+        // Refused rather than simulated, because no device does it. A
+        // simulation that answered success here would have apps build a
+        // conference button that works on the desktop and silently does
+        // nothing on both platforms -- which is worse than not offering it.
+        fail(requestId, CallError.NOT_SUPPORTED,
+                "No platform lets an app conference its own calls");
     }
 
     @Override

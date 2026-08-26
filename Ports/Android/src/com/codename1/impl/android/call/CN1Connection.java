@@ -92,14 +92,21 @@ public class CN1Connection extends Connection {
 
     @Override
     public void onReject() {
-        CN1CallNotifications.dismiss(callId);
+        // The notification is NOT dismissed here. A listener that fails this
+        // action is saying it could not reject the call, and Telecom then
+        // leaves it ringing -- with the only answer surface already gone.
+        // finish() takes it down once the rejection is actually carried out,
+        // which is the same "apply on acknowledgement" rule the session state
+        // follows.
         Calls.deliverEndRequest(callId,
                 service.nextActionToken(this, ACTION_REJECT));
     }
 
     @Override
     public void onDisconnect() {
-        CN1CallNotifications.dismiss(callId);
+        // Same reasoning as onReject: a refused hang-up leaves the call up,
+        // and finish() clears the notification when the end is carried out.
+        // A call the user answered has none anyway.
         Calls.deliverEndRequest(callId,
                 service.nextActionToken(this, ACTION_DISCONNECT));
     }
