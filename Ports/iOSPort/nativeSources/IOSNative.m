@@ -10510,7 +10510,26 @@ void com_codename1_impl_ios_IOSNative_nsDataToByteArray___long_byte_1ARRAY(CN1_T
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioUnit___java_lang_String_int_float_float_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
     JAVA_OBJECT path, JAVA_INT audioChannels, JAVA_FLOAT sampleRate, JAVA_OBJECT sampleBuffer) {
-#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
+#if defined(INCLUDE_MICROPHONE_USAGE) && TARGET_OS_OSX
+        // No AVAudioSession on a Mac: there is no shared session category to
+        // set and no per-session permission to request. Microphone access is
+        // granted per application by TCC the first time one is opened, from the
+        // NSMicrophoneUsageDescription the builder writes into the bundle.
+        //
+        // The recorder itself is the same AVFoundation object as on iOS; only
+        // the session ceremony around it is iOS-only, and referencing it here at
+        // all makes the file uncompilable for the macOS SDK.
+        __block CN1AudioUnit* recorder = nil;
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            POOL_BEGIN();
+            recorder = [[CN1AudioUnit alloc] initWithPath:toNSString(CN1_THREAD_STATE_PASS_ARG path)
+                                                 channels:audioChannels
+                                               sampleRate:sampleRate
+                                             sampleBuffer:(JAVA_ARRAY)sampleBuffer];
+            POOL_END();
+        });
+        return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+#elif defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV && !TARGET_OS_WATCH
         __block CN1AudioUnit* recorder = nil;
          
         __block NSString *exStr = nil;
@@ -10607,7 +10626,50 @@ void com_codename1_impl_ios_IOSNative_destroyAudioUnit___long(CN1_THREAD_STATE_M
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_String_java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                   JAVA_OBJECT  destinationFile, JAVA_OBJECT mimeType, JAVA_INT sampleRate, JAVA_INT bitRate, JAVA_INT channels, JAVA_INT maxDuration) {
-#if defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
+#if defined(INCLUDE_MICROPHONE_USAGE) && TARGET_OS_OSX
+    // As in createAudioUnit above: a Mac has no audio session, and the recorder
+    // is the same AVFoundation object once that ceremony is removed.
+    __block AVAudioRecorder* recorder = nil;
+    __block NSString *exStr = nil;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        NSString *filePath = toNSString(CN1_THREAD_GET_STATE_PASS_ARG destinationFile);
+        NSFileManager *fm = [[NSFileManager alloc] init];
+        NSString *ns = fixFilePath(filePath);
+        if ([fm fileExistsAtPath:ns]) {
+            [fm removeItemAtPath:ns error:nil];
+        }
+#ifndef CN1_USE_ARC
+        [fm release];
+#endif
+        NSDictionary *recordSettings = [NSDictionary dictionaryWithObjectsAndKeys:
+                                        [NSNumber numberWithFloat:(JAVA_FLOAT)sampleRate], AVSampleRateKey,
+                                        [NSNumber numberWithInt:kAudioFormatMPEG4AAC], AVFormatIDKey,
+                                        [NSNumber numberWithInt:channels], AVNumberOfChannelsKey,
+                                        nil];
+        NSError *error = nil;
+        recorder = [[AVAudioRecorder alloc] initWithURL:[NSURL fileURLWithPath:ns]
+                                               settings:recordSettings
+                                                  error:&error];
+        if (error != nil) {
+            CN1Log(@"Error in recording: %@", [error localizedDescription]);
+            exStr = [error localizedDescription];
+            POOL_END();
+            return;
+        }
+        com_codename1_impl_ios_IOSImplementation_finishedCreatingAudioRecorder___java_io_IOException(
+            CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL);
+        POOL_END();
+    });
+    if (exStr != nil) {
+        JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex,
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG exStr));
+        throwException(threadStateData, ex);
+        return (JAVA_LONG)0;
+    }
+    return (JAVA_LONG)((BRIDGE_CAST void*)recorder);
+#elif defined(INCLUDE_MICROPHONE_USAGE) && !TARGET_OS_TV
     __block AVAudioRecorder* recorder = nil;
      
     __block NSString *exStr = nil;

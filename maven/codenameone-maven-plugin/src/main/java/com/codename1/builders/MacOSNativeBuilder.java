@@ -242,17 +242,19 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesCrypto = {false};
         final boolean[] usesLocalNotifications = {false};
         final boolean[] usesMicrophone = {false};
+        final boolean[] usesBluetooth = {false};
+        final boolean[] usesCalendar = {false};
         try {
-            scanClassesForPermissions(classesDir,
-                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications, usesMicrophone));
+            scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
             // CN1_INCLUDE_CRYPTO off, and the stub bridge then returns the caller's
             // buffer untouched -- commonly all zeroes. A random source that silently
             // returns a constant is the worst failure in this file.
-            scanClassesForPermissions(buildinRes,
-                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications, usesMicrophone));
+            scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -341,6 +343,48 @@ public class MacOSNativeBuilder extends Executor {
         }
         log("Microphone " + (usesMicrophone[0] ? "enabled" : "disabled"));
 
+        // CoreBluetooth and EventKit are the same frameworks on macOS, and their
+        // natives carry no UIKit -- but each is behind a define AND a framework,
+        // and neither was being set. CN1Bluetooth.m compiled its stub branch, so
+        // every capability check answered false and every operation was inert;
+        // calendarSupported() answered false the same way. Both features were
+        // documented as working and were not present in any build.
+        //
+        // The frameworks travel in the translator's addLibs argument, which this
+        // target was passing as "none".
+        List<String> extraFrameworks = new ArrayList<String>();
+        if (usesBluetooth[0]) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application uses com.codename1.bluetooth but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define CN1_INCLUDE_BLUETOOTH",
+                        "#define CN1_INCLUDE_BLUETOOTH");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the Bluetooth backend", ex);
+            }
+            extraFrameworks.add("CoreBluetooth.framework");
+        }
+        log("Bluetooth " + (usesBluetooth[0] ? "enabled" : "disabled"));
+        if (usesCalendar[0]) {
+            File iosNative = new File(nativeSources, "IOSNative.m");
+            if (!iosNative.exists()) {
+                throw new BuildException("The application uses com.codename1.calendar but "
+                        + "IOSNative.m is missing from the staged native sources at "
+                        + iosNative.getAbsolutePath());
+            }
+            try {
+                replaceInFile(iosNative, "//#define CN1_USE_CALENDAR", "#define CN1_USE_CALENDAR");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the calendar backend", ex);
+            }
+            extraFrameworks.add("EventKit.framework");
+        }
+        log("Calendar " + (usesCalendar[0] ? "enabled" : "disabled"));
+
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
         // a class set with no main at all -- so the stub is what makes the
@@ -408,7 +452,10 @@ public class MacOSNativeBuilder extends Executor {
         parparCmd.add(request.getDisplayName());
         parparCmd.add(version);
         parparCmd.add("mac");
-        parparCmd.add("none");
+        // The addLibs slot. "none" when nothing extra is needed, which is what
+        // this target always passed -- so a detected framework had no way to
+        // reach the generated project.
+        parparCmd.add(extraFrameworks.isEmpty() ? "none" : join(";", extraFrameworks));
         try {
             int outputMark = message.length();
             if (!exec(tmpFile, 900000, parparCmd.toArray(new String[0]))) {
@@ -912,12 +959,16 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesLocalNotifications;
 
         private final boolean[] usesMicrophone;
+        private final boolean[] usesBluetooth;
+        private final boolean[] usesCalendar;
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
-                boolean[] usesMicrophone) {
+                boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
+            this.usesBluetooth = usesBluetooth;
+            this.usesCalendar = usesCalendar;
         }
 
         @Override
@@ -945,6 +996,12 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/notifications/")) {
                 usesLocalNotifications[0] = true;
             }
+            if (cls.startsWith("com/codename1/bluetooth/")) {
+                usesBluetooth[0] = true;
+            }
+            if (cls.startsWith("com/codename1/calendar/LocalCalendarSource")) {
+                usesCalendar[0] = true;
+            }
             if (!cls.startsWith("com/codename1/security/")) {
                 return;
             }
@@ -968,6 +1025,9 @@ public class MacOSNativeBuilder extends Executor {
             if (usesNotifications(cls, method)) {
                 usesLocalNotifications[0] = true;
             }
+            if (usesLocalCalendar(cls, method)) {
+                usesCalendar[0] = true;
+            }
         }
     }
 
@@ -987,6 +1047,26 @@ public class MacOSNativeBuilder extends Executor {
         }
         return cls.equals("com/codename1/ui/Display")
                 && method.indexOf("requestNotificationPermission") > -1;
+    }
+
+    /**
+     * Whether an invoked method reaches the local calendar.
+     *
+     * <p>The same entry points IPhoneBuilder matches, so a project that gets
+     * EventKit on iOS gets it here. EventKit is the same framework on macOS.</p>
+     */
+    static boolean usesLocalCalendar(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        if (cls.startsWith("com/codename1/calendar/LocalCalendarSource")) {
+            return true;
+        }
+        if (cls.startsWith("com/codename1/calendar/CalendarManager")) {
+            return method.indexOf("getLocalSource") >= 0 || method.indexOf("getSources") >= 0;
+        }
+        return cls.equals("com/codename1/ui/Display")
+                && method.indexOf("getLocalCalendarSource") >= 0;
     }
 
     /**
@@ -1534,6 +1614,17 @@ public class MacOSNativeBuilder extends Executor {
         } finally {
             zis.close();
         }
+    }
+
+    private static String join(String sep, List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (String v : values) {
+            if (sb.length() > 0) {
+                sb.append(sep);
+            }
+            sb.append(v);
+        }
+        return sb.toString();
     }
 
     private static String join(String sep, File... files) {
