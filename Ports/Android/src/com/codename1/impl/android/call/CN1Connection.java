@@ -80,6 +80,20 @@ public class CN1Connection extends Connection {
         setVideoState(VideoProfile.STATE_BIDIRECTIONAL);
     }
 
+    /// Whether Telecom currently offers this route for the call.
+    ///
+    /// setAudioRoute reports nothing back, so this is the only way to tell a
+    /// route that will be taken from one that will be ignored.
+    boolean routeIsAvailable(int androidRoute) {
+        CallAudioState state = getCallAudioState();
+        if (state == null) {
+            // No audio state yet, so nothing is known; the request is allowed
+            // through rather than refused on a guess.
+            return true;
+        }
+        return (state.getSupportedRouteMask() & androidRoute) != 0;
+    }
+
     /// The name to ring with, from the report that created this call.
     void setRingingName(String name) {
         this.callerName = name;

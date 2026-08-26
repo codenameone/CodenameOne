@@ -507,8 +507,22 @@ public class AndroidCallBridge implements CallBridge {
                     "There is no call to route audio for");
             return;
         }
-        c.setAudioRoute(androidRouteOf(routeOrdinal));
-        CN1ConnectionService.setRoute(routeOrdinal);
+        // Asked whether Telecom will take it. setAudioRoute answers nothing,
+        // so caching the REQUESTED ordinal and acknowledging meant asking for
+        // BLUETOOTH with no device paired reported success -- and
+        // getAudioRoute() then claimed Bluetooth while audio stayed on the
+        // earpiece. This is the same correction the iOS route setter needed.
+        int androidRoute = androidRouteOf(routeOrdinal);
+        if (!c.routeIsAvailable(androidRoute)) {
+            Calls.deliverAck(requestId, false,
+                    CallError.NOT_SUPPORTED.ordinal(),
+                    "That audio route is not available for this call");
+            return;
+        }
+        c.setAudioRoute(androidRoute);
+        // The route itself is recorded by onCallAudioStateChanged when
+        // Telecom actually moves it, which is the only report that means it
+        // happened.
         Calls.deliverAck(requestId, true, 0, null);
     }
 

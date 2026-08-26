@@ -367,6 +367,12 @@ public class AndroidVpnBridge implements VpnBridge {
             startRequested = true;
             setStatus(VpnStatus.CONNECTING);
             Reflect.START.invoke(Reflect.manager(context));
+            // Watching starts HERE as well as in setStatusListening. The
+            // transport callback is the only signal Android gives that a
+            // tunnel came up, so an app that starts a VPN without registering
+            // a listener first sat at CONNECTING for ever and getStatus()
+            // could never report otherwise.
+            startWatchingTheTunnel();
             // The platform reports no completion, so the tunnel is CONNECTING
             // until the network callback says otherwise. Answering the request
             // now is the honest thing: "the platform accepted the request" is

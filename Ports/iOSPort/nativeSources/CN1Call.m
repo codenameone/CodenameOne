@@ -535,6 +535,14 @@ static int64_t cn1clTrackAction(CXAction *action) {
     @synchronized (cn1clLock) {
         [cn1clSystemStarts addObject:startedUuid];
     }
+    // Held like the other five while the app has no listener. A start that
+    // reached an empty facade was auto-fulfilled, so the call Recents or Siri
+    // asked for was never placed and no session was ever created.
+    if (cn1clHoldUntilReady(^{
+        [self provider:provider performStartCallAction:action];
+    })) {
+        return;
+    }
     NSString *wire = cn1clJoin([NSArray arrayWithObjects:
             [NSString stringWithFormat:@"%d",
                     action.handle.type == CXHandleTypePhoneNumber

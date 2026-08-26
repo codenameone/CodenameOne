@@ -13541,9 +13541,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public synchronized com.codename1.call.spi.CallBridge getCallBridge() {
         if (callBridge == null) {
             callBridge = new com.codename1.impl.android.call.AndroidCallBridge(
-                    getActivity());
+                    callServiceContext());
         }
         return callBridge;
+    }
+
+    /// The context the call and VPN bridges do their system work through.
+    ///
+    /// NOT getActivity(): Codename One can be initialised from a Service --
+    /// which is what happens when a push wakes the app to report an incoming
+    /// call -- and getActivity() is null there. The bridge cached that null
+    /// for the life of the process, so even isSupported() threw on the
+    /// TelecomManager lookup, and foregrounding later did not repair it.
+    ///
+    /// An activity is only needed to SHOW something, and the two places that
+    /// need one look for it when they get there.
+    private Context callServiceContext() {
+        Context activity = getActivity();
+        return activity != null ? activity : getContext();
     }
 
     /// The VPN bridge, on the platform's managed IKEv2 client.
@@ -13553,7 +13568,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public synchronized com.codename1.vpn.spi.VpnBridge getVpnBridge() {
         if (vpnBridge == null) {
             vpnBridge = new com.codename1.impl.android.vpn.AndroidVpnBridge(
-                    getActivity());
+                    callServiceContext());
         }
         return vpnBridge;
     }
