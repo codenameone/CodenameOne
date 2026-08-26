@@ -223,7 +223,7 @@ public class InterpIOSLinker implements InterpLinker {
         // receiver's own class, worked. There is no vtable to consult from
         // here, so the walk up from the real class is the dispatch.
         return invokeInstance(receiverClass(target, owner), name, descriptor, target, args,
-                kindOf(InterpValuesAccess.returnType(descriptor)));
+                kindOf(InterpValuesAccess.returnType(descriptor)), false);
     }
 
     /// The receiver's actual class name, falling back to the declared owner.
@@ -238,8 +238,10 @@ public class InterpIOSLinker implements InterpLinker {
 
     public Object invokeSpecial(Object target, String owner, String name, String descriptor,
                                 Object[] args) throws Throwable {
+        // invokespecial's whole role -- super, init, nestmate -- is to reach
+        // methods invokevirtual cannot, so `allowPrivate` is true here.
         return invokeInstance(owner, name, descriptor, target, args,
-                kindOf(InterpValuesAccess.returnType(descriptor)));
+                kindOf(InterpValuesAccess.returnType(descriptor)), true);
     }
 
     public Object invokeStatic(String owner, String name, String descriptor, Object[] args)
@@ -260,9 +262,12 @@ public class InterpIOSLinker implements InterpLinker {
     // compile and the installed framework must not bind here: the native
     // dispatcher would ignore the receiver and run it as a static, silently
     // executing a different API shape. The JVM raises
-    // IncompatibleClassChangeError; mirror that.
+    // IncompatibleClassChangeError; mirror that. `allowPrivate` is false for
+    // invokevirtual (a private declaration is IllegalAccessError there;
+    // nestmate access requires invokespecial) and true for invokespecial.
     private Object invokeInstance(String owner, String name, String descriptor, Object target,
-                                  Object[] args, int returnKind) throws Throwable {
+                                  Object[] args, int returnKind, boolean allowPrivate)
+            throws Throwable {
         int id = methodId(owner, name, descriptor);
         if (id < 0) {
             throw new NoSuchMethodError(owner + "." + name + descriptor
@@ -270,6 +275,9 @@ public class InterpIOSLinker implements InterpLinker {
         }
         if (symbols.isStaticMethod(id)) {
             throw new IncompatibleClassChangeError(owner + "." + name + " is static");
+        }
+        if (!allowPrivate && symbols.isPrivateMethod(id)) {
+            throw new IllegalAccessError(owner + "." + name + " is private");
         }
         return invokeWithId(id, descriptor, target, args, returnKind);
     }

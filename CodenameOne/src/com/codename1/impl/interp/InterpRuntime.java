@@ -1508,7 +1508,16 @@ public final class InterpRuntime {
                 f.pushDouble(Double.longBitsToDouble(Long.parseLong(bundle.string(operand))));
                 break;
             case InterpOpcodes.LDC_STRING:
-                f.pushRef(bundle.string(operand));
+                // JVMS 5.4.3.1: a resolved `ldc` on a String constant is the
+                // canonical interned instance of that literal. Pushing the
+                // bundle's own copy would leave `"hi" == "hi"` false when
+                // one side comes from a pushed literal and the other from
+                // host code -- the failure that identity-sensitive code
+                // (a legacy switch on `intern()`, a comparison against
+                // Character.toString(), a String.equals fast path built
+                // on ==) reads as spurious. bundle.string only deduplicates
+                // within the bundle; the intern pool is the whole VM's.
+                f.pushRef(bundle.string(operand).intern());
                 break;
             case InterpOpcodes.LDC_CLASS: {
                 // `Color.class` where Color is in this bundle names something

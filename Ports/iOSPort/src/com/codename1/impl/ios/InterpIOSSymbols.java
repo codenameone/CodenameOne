@@ -68,6 +68,19 @@ class InterpIOSSymbols {
      */
     private final Hashtable staticMethods = new Hashtable();
 
+    /**
+     * Method ids the sidecar marked as private.
+     *
+     * <p>Private methods are not inherited: the class-chain walk in
+     * {@link #methodId} refuses a match found on a superclass so
+     * {@code B extends A implements I} with {@code A.private m()} and
+     * {@code I.m()} does not dispatch to {@code A.m}. invokevirtual against
+     * a directly-declared private is also a JVM IllegalAccessError, so
+     * {@link InterpIOSLinker} consults the same flag at the invocation
+     * site (nestmate access requires invokespecial).</p>
+     */
+    private final Hashtable privateMethods = new Hashtable();
+
     /** "owner#name" -> instance field id. */
     private final Hashtable fieldIds = new Hashtable();
 
@@ -203,6 +216,9 @@ class InterpIOSSymbols {
                     if (staticFlag) {
                         staticMethods.put(methodId, Boolean.TRUE);
                     }
+                    if (privateFlag) {
+                        privateMethods.put(methodId, Boolean.TRUE);
+                    }
                 }
             }
         } else if (table.charAt(start) == 'f' && table.startsWith("field\t", start)) {
@@ -312,7 +328,17 @@ class InterpIOSSymbols {
             classSeen.put(currentOwner, Boolean.TRUE);
             Integer id = (Integer)methodIds.get(currentOwner + "." + name + descriptor);
             if (id != null) {
-                return id.intValue();
+                // Private methods are not inherited: an invokevirtual on
+                // `B extends A implements I` where `A.m` is private and `I.m`
+                // is declared should not dispatch to `A.m`; JVM would raise
+                // IllegalAccessError, then interface resolution (below) picks
+                // up `I.m`. Skip a match found on a superclass -- keep the
+                // one directly declared on the requested owner though, since
+                // invokespecial (super, init, nestmate) has to be able to
+                // reach it and the invocation site there validates access.
+                if (currentOwner.equals(owner) || privateMethods.get(id) == null) {
+                    return id.intValue();
+                }
             }
             currentOwner = superName(currentOwner);
         }
@@ -501,6 +527,11 @@ class InterpIOSSymbols {
     /** True when the sidecar marked this id as a static method. */
     boolean isStaticMethod(int id) {
         return staticMethods.get(Integer.valueOf(id)) != null;
+    }
+
+    /** True when the sidecar marked this id as a private method. */
+    boolean isPrivateMethod(int id) {
+        return privateMethods.get(Integer.valueOf(id)) != null;
     }
 
     /**
