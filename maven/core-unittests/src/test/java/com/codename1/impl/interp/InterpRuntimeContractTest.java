@@ -427,6 +427,7 @@ class InterpRuntimeContractTest {
         }
     }
 
+
     /**
      * A pushed program that never returns has to be stoppable, or the Stop
      * button is decoration and the only recovery is killing the app. The

@@ -1366,7 +1366,14 @@ public final class InterpRuntime {
                     throw hostThrown;
                 }
                 f.sp = 0;
-                f.pushRef(hostThrown);
+                // fromHost: when a pushed exception subclass crossed a shim
+                // and the host rethrew it, hostThrown is the host peer
+                // implementing InterpBacked. findHandler already unwrapped it
+                // to test the catch type; the catch variable has to receive
+                // the InterpObject wrapper too, or a subsequent interpreted
+                // `e.field` / `e.method()` would resolve against the peer's
+                // host class and fail to link.
+                f.pushRef(fromHost(hostThrown));
                 insn = handler;
                 continue;
             }
