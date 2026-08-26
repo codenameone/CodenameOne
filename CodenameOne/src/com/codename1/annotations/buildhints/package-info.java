@@ -33,7 +33,7 @@
 /// Put the annotations on your application's main class:
 ///
 /// ```java
-/// @Ios(newStorageLocation = true, themeMode = IosThemeMode.MODERN)
+/// @Ios(newStorageLocation = Toggle.ON, themeMode = IosThemeMode.MODERN)
 /// @Android(themeMode = AndroidThemeMode.MODERN)
 /// @DesktopBuild(titleBar = DesktopTitleBar.NATIVE)
 /// public class MyApplication {

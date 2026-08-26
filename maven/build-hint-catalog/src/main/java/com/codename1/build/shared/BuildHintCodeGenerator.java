@@ -323,55 +323,6 @@ public final class BuildHintCodeGenerator {
         }
     }
 
-    private static String packageInfoSource(Map<HintGroup, List<BuildHints.Hint>> byGroup) {
-        StringBuilder sb = new StringBuilder(LICENSE);
-        sb.append(doc("Build hints expressed as annotations, so the compiler checks them.", ""));
-        sb.append("///\n");
-        sb.append(doc("A build hint used to be a `codename1.arg.<name>=<value>` line in "
-                + "`codenameone_settings.properties`. Nothing validated it, so a misspelled "
-                + "name was copied into the build request, never read, and silently dropped: "
-                + "the build stayed green and the setting simply did nothing. Written as an "
-                + "annotation the same mistake is an unknown symbol, a wrong value type is a "
-                + "type error, and a value outside a hint's supported set is an unknown enum "
-                + "constant.", ""));
-        sb.append("///\n");
-        sb.append(doc("Put the annotations on your application's main class:", ""));
-        sb.append("///\n");
-        sb.append("/// ```java\n");
-        sb.append("/// @Ios(newStorageLocation = Toggle.ON, themeMode = IosThemeMode.MODERN)\n");
-        sb.append("/// @Android(themeMode = AndroidThemeMode.MODERN)\n");
-        sb.append("/// @DesktopBuild(titleBar = DesktopTitleBar.NATIVE)\n");
-        sb.append("/// public class MyApplication {\n");
-        sb.append("/// }\n");
-        sb.append("/// ```\n");
-        sb.append("///\n");
-        sb.append(doc("These annotations cover the hints most applications set. The rest, and "
-                + "the open-ended families such as `android.permission.<NAME>` that an "
-                + "annotation cannot express, are still set in "
-                + "`codenameone_settings.properties`, which continues to work exactly as "
-                + "before. Setting the same hint in both places is a build error.", ""));
-        sb.append("///\n");
-        sb.append(doc("A project generated recently already runs the goal that turns these into "
-                + "build hints. An older one may not: a goal's default phase does not add an "
-                + "execution to a project, so the annotations would compile and then be ignored. "
-                + "The build refuses rather than shipping without them, and the module that "
-                + "compiles the main class needs:", ""));
-        sb.append("///\n");
-        sb.append("/// ```xml\n");
-        sb.append("/// <execution>\n");
-        sb.append("///   <id>cn1-process-classes</id>\n");
-        sb.append("///   <phase>process-classes</phase>\n");
-        sb.append("///   <goals>\n");
-        sb.append("///     <goal>process-annotations</goal>\n");
-        sb.append("///   </goals>\n");
-        sb.append("/// </execution>\n");
-        sb.append("/// ```\n");
-        sb.append("///\n");
-        sb.append(GENERATED_NOTE);
-        sb.append("package ").append(PKG).append(";\n");
-        return sb.toString();
-    }
-
     private static String bindingSource(Map<HintGroup, List<BuildHints.Hint>> byGroup,
                                         Map<String, BuildHints.Hint> enums) {
         StringBuilder sb = new StringBuilder(LICENSE);
