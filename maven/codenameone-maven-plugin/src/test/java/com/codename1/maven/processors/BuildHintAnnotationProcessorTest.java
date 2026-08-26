@@ -786,6 +786,106 @@ public class BuildHintAnnotationProcessorTest {
         }
     }
 
+    /// A non-ASCII NESTED name is not judged without the compiler's encoding.
+    ///
+    /// The package and the simple name both treated a name outside ASCII as
+    /// unjudgeable; the nesting path did not. A Windows-1251 source decodes
+    /// through ISO-8859-1 without error and into DIFFERENT -- equally valid --
+    /// identifier characters, so the nested name was not found, the file was
+    /// read as declaring some other type, and the live class was dropped as an
+    /// orphan. `processClass` then skipped the misplaced-annotation error it
+    /// exists to raise: a green build with the hints quietly ignored.
+    @Test
+    public void aNonAsciiNestedNameIsNotJudgedWithoutTheEncoding() throws Exception {
+        String cyr = "\u041a\u043b\u044e\u0447";
+        File src = tmp.newFolder();
+        File dir = new File(src, "com/ex");
+        assertTrue(dir.mkdirs());
+        String text = "package com.ex;\npublic class Main {\n  static class " + cyr
+                + " {}\n}\n";
+        writeAs(new File(dir, "Main.java"), text, "windows-1251");
+
+        AnnotatedClass cls = compiledClass("com.ex.Main", text, "com/ex/Main$" + cyr);
+        assertTrue("kept when the encoding is unknown",
+                BuildHintAnnotationProcessor.hasBackingSource(cls,
+                        java.util.Collections.singletonList(src.getAbsolutePath())));
+    }
+
+    /// With the module's encoding, the same name is judged EXACTLY.
+    ///
+    /// "Cannot tell" is the right answer only while the encoding is unknown. Left
+    /// there it is its own bug in the other direction: a genuinely deleted class
+    /// with a non-ASCII name would be kept on every incremental build and fail
+    /// its placement check forever. So a module that declares its encoding gets
+    /// a real answer -- the live nested name matches, and a stale one does not.
+    @Test
+    public void theModulesEncodingJudgesANonAsciiNameExactly() throws Exception {
+        String cyr = "\u041a\u043b\u044e\u0447";
+        String other = "\u0414\u0440\u0443\u0433\u043e\u0439";
+        File src = tmp.newFolder();
+        File dir = new File(src, "com/ex");
+        assertTrue(dir.mkdirs());
+        String text = "package com.ex;\npublic class Main {\n  static class " + cyr
+                + " {}\n}\n";
+        writeAs(new File(dir, "Main.java"), text, "windows-1251");
+        java.util.List<String> roots = java.util.Collections.singletonList(src.getAbsolutePath());
+
+        assertTrue("the live nested class is matched",
+                BuildHintAnnotationProcessor.hasBackingSource(
+                        compiledClass("com.ex.Main", text, "com/ex/Main$" + cyr),
+                        roots, "windows-1251"));
+
+        // The same source, asked about a nested name it does not declare.
+        String stale = "package com.ex;\npublic class Main {\n  static class " + other
+                + " {}\n}\n";
+        assertFalse("a stale nested class is not vouched for",
+                BuildHintAnnotationProcessor.hasBackingSource(
+                        compiledClass("com.ex.Main", stale, "com/ex/Main$" + other),
+                        roots, "windows-1251"));
+    }
+
+    /// A declared encoding the file does not actually decode through is ignored.
+    ///
+    /// A module that says UTF-8 and has one source that is not gains nothing from
+    /// being read as UTF-8: the bytes are malformed, every one of them comes back
+    /// as a replacement character, and a name spelled with one never matches. The
+    /// byte sniffing reads that file correctly, so it stays the better answer --
+    /// and the declaration is not taken on faith.
+    @Test
+    public void aDeclaredEncodingTheFileDoesNotDecodeThroughIsIgnored() throws Exception {
+        String cafe = "Caf\u00e9";
+        File src = tmp.newFolder();
+        File dir = new File(src, "com/ex");
+        assertTrue(dir.mkdirs());
+        String text = "package com.ex;\npublic class " + cafe + " {\n}\n";
+        writeAs(new File(dir, cafe + ".java"), text, "ISO-8859-1");
+
+        assertTrue(BuildHintAnnotationProcessor.hasBackingSource(
+                compiledClass("com.ex." + cafe, text, "com/ex/" + cafe),
+                java.util.Collections.singletonList(src.getAbsolutePath()), "UTF-8"));
+    }
+
+    /// Writes `text` to `f` in `charset`.
+    private static void writeAs(File f, String text, String charset) throws Exception {
+        java.io.OutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(text.getBytes(charset));
+        } finally {
+            os.close();
+        }
+    }
+
+    /// Compiles `text` and returns the scanned class at `internalName`.
+    private AnnotatedClass compiledClass(String binaryName, String text, String internalName)
+            throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource(binaryName, text),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        AnnotatedClass cls = ClassScanner.scan(classes).get(internalName);
+        assertTrue("the class under test must have been compiled: " + internalName, cls != null);
+        return cls;
+    }
+
     /// A UTF-16 source is read as UTF-16, even though it decodes as UTF-8.
     ///
     /// An ASCII-named class compiled as UTF-16LE is `p\0a\0c\0k\0...` on

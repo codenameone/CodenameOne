@@ -110,7 +110,12 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                 // The roots Maven is actually compiling, so a processor asking
                 // whether a class still has a source is not guessing at the
                 // layout.
-                compileSourceRoots(project, userProperties()));
+                compileSourceRoots(project, userProperties()),
+                // The charset javac is given, so a processor reading a source
+                // back decodes the text that was actually compiled rather than
+                // one of the single-byte encodings that all decode without
+                // error and disagree about every non-ASCII character.
+                sourceEncodingOf(project, userProperties()));
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {

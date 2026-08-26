@@ -240,11 +240,29 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// differ from the class it declares, so a package-path lookup would call a
     /// perfectly live class orphaned.
     private static boolean hasBackingSource(AnnotatedClass cls, ProcessorContext ctx) {
-        return hasBackingSource(cls, ctx.getCompileSourceRoots());
+        return hasBackingSource(cls, ctx.getCompileSourceRoots(), ctx.getSourceEncoding());
     }
 
     /// As above, for a caller that has the roots but no ProcessorContext.
+    ///
+    /// The encoding is unknown on this path, so a name outside ASCII stays
+    /// unjudgeable and the class is kept.
     public static boolean hasBackingSource(AnnotatedClass cls, List<String> compileSourceRoots) {
+        return hasBackingSource(cls, compileSourceRoots, null);
+    }
+
+    /// As above, decoding the sources with the charset the module compiles them
+    /// with.
+    ///
+    /// Null encoding means the module did not say. That is the case the byte
+    /// sniffing below exists for, and it settles UTF-16 and UTF-8 but cannot
+    /// separate one single-byte encoding from another -- every byte decodes, and
+    /// the non-ASCII ones decode DIFFERENTLY. So with no encoding a non-ASCII
+    /// name is left inconclusive rather than guessed at; with one it is compared
+    /// exactly, which is what keeps a genuinely stale class from being kept
+    /// forever and failing its placement check on every incremental build.
+    public static boolean hasBackingSource(AnnotatedClass cls, List<String> compileSourceRoots,
+                                           String sourceEncoding) {
         List<String> roots = compileSourceRoots;
         if (roots == null || roots.isEmpty()) {
             return true;
@@ -272,7 +290,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 continue;
             }
             sawARoot = true;
-            if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, wholeName, 0)) {
+            if (declaresPackage(dir, sourceFile, pkg, simpleName, nestedName, wholeName, 0,
+                    sourceEncoding)) {
                 return true;
             }
         }
@@ -319,7 +338,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// because Kotlin does not require the two to agree. Depth-limited: this runs
     /// per annotated class and a source tree is not a search index.
     private static boolean declaresPackage(File dir, String name, String pkg, String simple,
-                                           String[] nested, String whole, int depth) {
+                                           String[] nested, String whole, int depth,
+                                           String encoding) {
         if (depth > MAX_SOURCE_TREE_DEPTH) {
             // Out of budget is "cannot tell", not "no such source". Answering no
             // here dropped a live annotated class -- silently, and with its
@@ -335,11 +355,13 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         for (File f : children) {
             if (f.isFile()) {
-                if (f.getName().equals(name) && matches(f, pkg, simple, nested, whole)) {
+                if (f.getName().equals(name)
+                        && matches(f, pkg, simple, nested, whole, encoding)) {
                     return true;
                 }
             } else if (f.isDirectory()
-                    && declaresPackage(f, name, pkg, simple, nested, whole, depth + 1)) {
+                    && declaresPackage(f, name, pkg, simple, nested, whole, depth + 1,
+                            encoding)) {
                 return true;
             }
         }
@@ -355,8 +377,17 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// failing the placement check on every incremental build, which is the very
     /// thing this guard was added to stop.
     private static boolean matches(File f, String pkg, String simple, String[] nested,
-                                   String whole) {
-        String text = readHead(f);
+                                   String whole, String encoding) {
+        String text = readHead(f, encoding);
+        // Whether the text above is the one the compiler sees, rather than a
+        // guess that happens to decode. Every branch below turns on it: a name
+        // outside ASCII is unjudgeable only while this is false, because the
+        // single-byte encodings all decode every byte and disagree about which
+        // character it is. Once the module has named its encoding the comparison
+        // is exact, which matters in BOTH directions -- an inconclusive answer
+        // keeps a genuinely deleted class forever, and it then fails its
+        // placement check on every incremental build.
+        boolean exact = decodedWith(f, encoding);
         if (text == null) {
             // Unreadable: answer yes, as everywhere else here, because the only
             // thing this decides is whether to IGNORE an annotated class.
@@ -378,7 +409,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             // involving one is "cannot tell", not "somewhere else". Concluding
             // otherwise dropped a live annotated class and lost its placement
             // error, which is the failure this whole guard exists to prevent.
-            return !isAscii(pkg) || !isAscii(declaredPkg);
+            return !exact && (!isAscii(pkg) || !isAscii(declaredPkg));
         }
         // The name as spelled, before it is read as a nesting path: `$` is legal
         // in a Java type name, so a top-level `class Wrong$Type` really is
@@ -388,14 +419,44 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         }
         if (!declaresType(text, simple, kotlin)) {
             // Same reasoning as the package: an unreadable name is unjudgeable.
-            return !isAscii(simple) || !isAscii(text);
+            return !exact && (!isAscii(simple) || !isAscii(text));
         }
         // The whole nesting PATH has to be there, in order. Checking only the
         // innermost name let an unrelated Main.B.Wrong vouch for a deleted
         // Main.A.Wrong, so the orphan stayed and failed the placement check on
         // every incremental build. Checking only the outer class was the same bug
         // one level out.
-        return nested == null || declaresNestedPath(text, nested, kotlin);
+        if (nested == null || declaresNestedPath(text, nested, kotlin)) {
+            return true;
+        }
+        // Same reasoning as the package and the simple name, which both had this
+        // guard while the nesting path did not: without the compiler's encoding a
+        // name outside ASCII cannot be judged, because every single-byte encoding
+        // decodes every byte and they disagree about which character it is. An
+        // absent nested name was therefore read as "declared somewhere else", the
+        // live class was dropped as an orphan, and the misplaced-annotation error
+        // it exists to raise was never reported -- a green build with the hints
+        // quietly ignored.
+        return !exact && (!isAscii(nestedPathOf(nested)) || !isAscii(text));
+    }
+
+    /// Whether `f` was decoded with the encoding the module named.
+    ///
+    /// False when it named none, and false when it named one the file does not
+    /// decode through -- in which case `readHead` fell back to sniffing the
+    /// bytes and the text is a guess again.
+    private static boolean decodedWith(File f, String encoding) {
+        java.nio.charset.Charset declared = charsetNamed(encoding);
+        return declared != null && decodesAs(f, declared);
+    }
+
+    /// The nesting path joined, for the ASCII test above.
+    private static String nestedPathOf(String[] nested) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < nested.length; i++) {
+            sb.append(nested[i]);
+        }
+        return sb.toString();
     }
 
     /// Whether every character of `s` is ASCII, which is where this scan can
@@ -1251,7 +1312,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     /// and no type declaration was then found, so a live annotated class read as
     /// an orphan, and `processClass` skipped the misplaced-annotation error it
     /// exists to raise: a green build with the hint quietly ignored.
-    private static java.nio.charset.Charset decoderFor(File f) {
+    /// `configured` is the encoding the module compiles its sources with, and
+    /// it wins when the file really decodes through it. It is not taken on faith:
+    /// a module that declares UTF-8 and has one file that is not gains nothing
+    /// from being read as UTF-8 with replacement characters in it, and the
+    /// sniffing below is a better answer for that file than the declaration is.
+    private static java.nio.charset.Charset decoderFor(File f, String configured) {
+        java.nio.charset.Charset declared = charsetNamed(configured);
+        if (declared != null && decodesAs(f, declared)) {
+            return declared;
+        }
         try {
             byte[] bytes = new byte[(int) Math.min(f.length(), 64L * 1024)];
             InputStream in = new FileInputStream(f);
@@ -1281,6 +1351,52 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             return java.nio.charset.Charset.forName("ISO-8859-1");
         } catch (IOException ex) {
             return java.nio.charset.Charset.forName("UTF-8");
+        }
+    }
+
+    /// The named charset, or null when the name is absent or unsupported.
+    ///
+    /// An unsupported name is not an error to raise here: the compiler will
+    /// raise its own, and this scan only decides whether to look harder before
+    /// ignoring an annotation.
+    private static java.nio.charset.Charset charsetNamed(String name) {
+        if (name == null || name.trim().length() == 0) {
+            return null;
+        }
+        try {
+            return java.nio.charset.Charset.forName(name.trim());
+        } catch (RuntimeException unsupported) {
+            return null;
+        }
+    }
+
+    /// Whether the head of `f` decodes through `charset` without a malformed or
+    /// unmappable byte.
+    private static boolean decodesAs(File f, java.nio.charset.Charset charset) {
+        try {
+            byte[] bytes = new byte[(int) Math.min(f.length(), 64L * 1024)];
+            InputStream in = new FileInputStream(f);
+            int read = 0;
+            try {
+                while (read < bytes.length) {
+                    int n = in.read(bytes, read, bytes.length - read);
+                    if (n < 0) {
+                        break;
+                    }
+                    read += n;
+                }
+            } finally {
+                in.close();
+            }
+            java.nio.charset.CharsetDecoder decoder = charset.newDecoder();
+            decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT);
+            decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+            decoder.decode(java.nio.ByteBuffer.wrap(bytes, 0, read));
+            return true;
+        } catch (java.nio.charset.CharacterCodingException notThisOne) {
+            return false;
+        } catch (IOException ex) {
+            return false;
         }
     }
 
@@ -1330,6 +1446,11 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
     }
 
     static String readHead(File f) {
+        return readHead(f, null);
+    }
+
+    /// The same, decoding with `encoding` when the module named one.
+    static String readHead(File f, String encoding) {
         if (f.length() > 4L * 1024 * 1024) {
             return null;
         }
@@ -1342,7 +1463,8 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             // into replacement characters. What neither reading can settle -- a
             // non-ASCII name in some third encoding -- is left inconclusive by
             // the caller rather than called an orphan.
-            r = new BufferedReader(new InputStreamReader(new FileInputStream(f), decoderFor(f)));
+            r = new BufferedReader(new InputStreamReader(new FileInputStream(f),
+                    decoderFor(f, encoding)));
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = r.readLine()) != null) {
