@@ -2681,7 +2681,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // a manifest carrying only the main-class stamp for it. Judging by the hint
         // count alone would read that as "never processed" and refuse a build that
         // is in fact perfectly configured.
-        boolean processed = false;
         String stale = null;
         // The processor writes the manifest into the SAME directory it scanned,
         // so a manifest stamped for a main class was written beside that class.
@@ -2736,7 +2735,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 stale = mismatch;
                 continue;
             }
-            processed = true;
             int applied = 0;
             for (String key : found.stringPropertyNames()) {
                 if (!key.startsWith("codename1.arg.")) {
@@ -2772,14 +2770,21 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 target.setProperty(key, found.getProperty(key));
                 applied++;
             }
+            // The FIRST accepted manifest is the answer, whether or not it set
+            // anything. Continuing when it happened to apply nothing let a later
+            // element decide instead: `@Ios()` with no members -- legal Java, and
+            // what is left after the last attribute is deleted -- produces a
+            // current manifest with no hint keys, and an older copy of the same
+            // main class further down the classpath carries a manifest that
+            // passes its own digest check, because it is fingerprinted against
+            // the stale class sitting beside it. Its obsolete hints were then
+            // applied over the authoritative empty one. The same is true of a
+            // manifest whose every key is overridden on the command line.
             if (applied > 0) {
                 getLog().info("cn1: applied " + applied + " build hint(s) from annotations");
-                failOnMisplacedAnnotations(classpathElements, expectedMain);
-                return;
+            } else {
+                getLog().debug("cn1: annotations were processed and set no build hint");
             }
-        }
-        if (processed) {
-            getLog().debug("cn1: annotations were processed and set no build hint");
             failOnMisplacedAnnotations(classpathElements, expectedMain);
             return;
         }

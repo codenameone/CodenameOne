@@ -2453,8 +2453,21 @@ public class CodenameOneSettings extends Lifecycle {
         if (!hasSrcMain) {
             out.add(projectDir + "/src");
         }
-        out.add(projectDir + "/target/generated-sources");
-        out.add(projectDir + "/build/generated-sources");
+        if (javaCompiled) {
+            // Java trees, so the same gate as src/main/java: nothing under them
+            // is compiled when javac is not running, and a `.java` candidate is
+            // searched before every `.kt` one -- which is how a disabled
+            // generator's leftover copy of the main class was selected ahead of
+            // the Kotlin source the build actually compiles.
+            //
+            // A guess of last resort either way: a generator registers a CHILD
+            // of these (target/generated-sources/annotations), not the container,
+            // and a root Maven really compiles has already come from the POM
+            // above. They stay only because an older project layout may have
+            // nothing else to offer.
+            out.add(projectDir + "/target/generated-sources");
+            out.add(projectDir + "/build/generated-sources");
+        }
         return out;
     }
 

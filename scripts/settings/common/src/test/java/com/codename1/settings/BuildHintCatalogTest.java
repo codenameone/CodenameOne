@@ -2161,6 +2161,17 @@ public class BuildHintCatalogTest {
         // The Kotlin root is not conditional on it.
         assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
                 .contains("/p/common/src/main/kotlin"));
+
+        // The generated trees are Java trees, so the same gate applies. A
+        // disabled generator's leftover copy of the main class under one of them
+        // was otherwise searched -- and searched BEFORE every .kt candidate --
+        // in a module whose application is compiled from Kotlin.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false, true)
+                .contains("/p/common/target/generated-sources"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/target/generated-sources"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/build/generated-sources"));
     }
 
     /// Only `default-compile` switched off with `<phase>none</phase>` counts.

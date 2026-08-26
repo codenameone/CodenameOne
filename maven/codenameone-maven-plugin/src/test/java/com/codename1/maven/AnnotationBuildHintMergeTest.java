@@ -321,6 +321,42 @@ public class AnnotationBuildHintMergeTest {
         assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
     }
 
+    /// An authoritative manifest that sets nothing still ends the search.
+    ///
+    /// `@Ios()` with no members is legal Java -- it is what is left after the
+    /// last attribute is deleted -- and the processor emits a current manifest
+    /// carrying only the stamp. Continuing past it because it applied nothing
+    /// let an OLDER copy of the same main class further down the classpath
+    /// decide instead: that copy's manifest passes its own digest check, because
+    /// it is fingerprinted against the stale class sitting beside it.
+    @Test
+    public void anAcceptedManifestThatSetsNothingStillEndsTheSearch() throws Exception {
+        File live = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios()") + "\n");
+        compileInto(live, "com.example.MyApp",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.buildhints.Ios;\n"
+                        + "@Ios()\n"
+                        + "public class MyApp {\n}\n");
+
+        // An older module still holding its own copy of the class AND the
+        // manifest generated from it, so the pair agree with each other.
+        File old = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"OLD\")") + "\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+        compileInto(old, "com.example.MyApp",
+                "package com.example;\n"
+                        + "import com.codename1.annotations.buildhints.Ios;\n"
+                        + "@Ios(teamId = \"OLD\")\n"
+                        + "public class MyApp {\n}\n");
+
+        Properties target = new Properties();
+        mergeAll(target, Arrays.asList(live, old), "MyApp", "com.example");
+        assertNull("a stale manifest set a hint the current one deliberately does not",
+                target.getProperty("codename1.arg.ios.teamId"));
+    }
+
     // helpers
     // ------------------------------------------------------------------
 
