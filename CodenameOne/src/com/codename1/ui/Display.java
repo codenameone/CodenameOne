@@ -509,7 +509,20 @@ public final class Display extends CN1Constants {
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            if (INSTANCE.edt == null) {
+            // A recorded thread that is no longer alive is not a dispatch
+            // thread. The EDT clears this field itself at the END of its
+            // shutdown, after disposing windows and deinitialising the
+            // implementation, so a thread that died without getting that far
+            // -- or died some other way -- would otherwise stop a re-init
+            // from ever starting a working one.
+            //
+            // This does NOT close the whole window: a thread that has left
+            // the dispatch loop but is still inside that teardown is alive,
+            // and an init() adopting it gets no dispatch. Narrowing the
+            // window is worth having on its own; closing it means changing
+            // when the EDT publishes its own death, which is a change to the
+            // display lifecycle rather than to this check.
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.

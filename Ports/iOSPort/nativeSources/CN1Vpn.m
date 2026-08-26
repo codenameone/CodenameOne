@@ -144,6 +144,9 @@ static int cn1vpSecretGeneration = -1;
 /// Whether an installation owns the shared manager and the next generation.
 static BOOL cn1vpInstalling = NO;
 
+/// Whether the shared manager's saved configuration has been read.
+static BOOL cn1vpLoaded = NO;
+
 /// Reads the generation once per process.
 static int cn1vpLoadSecretGeneration(void) {
     if (cn1vpSecretGeneration < 0) {
@@ -320,6 +323,7 @@ static void cn1vpEnsureLoaded(void) {
     dispatch_once(&once, ^{
         [[NEVPNManager sharedManager] loadFromPreferencesWithCompletionHandler:
                 ^(NSError *error) {
+            cn1vpLoaded = YES;
             if (cn1vpListening) {
                 com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
                         getThreadLocalData(), cn1vpStatusOrdinal(
@@ -335,6 +339,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_vpnStatus___R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
 #ifdef CN1_VPN_HAS_NE
     cn1vpEnsureLoaded();
+    if (!cn1vpLoaded) {
+        // The load is asynchronous and this is not. Until it lands the shared
+        // manager reports NEVPNStatusInvalid, which reads as NOT_CONFIGURED
+        // -- an ACTIVE claim that no VPN exists, for a device that may have a
+        // connected one. UNKNOWN is the truth: nothing is known yet, and an
+        // app is told to wait rather than to draw an install button.
+        return CN1_VPN_STATUS_UNKNOWN;
+    }
     return cn1vpStatusOrdinal([[NEVPNManager sharedManager] connection].status);
 #else
     return CN1_VPN_STATUS_NOT_CONFIGURED;

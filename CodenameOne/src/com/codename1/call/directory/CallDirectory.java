@@ -159,8 +159,21 @@ public final class CallDirectory {
         return r;
     }
 
+    /// Serialises writers. Two concurrent setEntries calls opened the same
+    /// staging path, so the second truncated the first's file and either
+    /// could rename it into place half-written -- which is what the staging
+    /// was added to make impossible.
+    private static final Object WRITE_LOCK = new Object();
+
     /// Sorts, de-duplicates and writes the entries, answering with the path.
     private static String write(DirectoryEntry[] entries) throws IOException {
+        synchronized (WRITE_LOCK) {
+            return writeLocked(entries);
+        }
+    }
+
+    private static String writeLocked(DirectoryEntry[] entries)
+            throws IOException {
         DirectoryEntry[] sorted = new DirectoryEntry[entries.length];
         System.arraycopy(entries, 0, sorted, 0, entries.length);
         Arrays.sort(sorted, new ByNumber());

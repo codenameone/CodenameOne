@@ -176,6 +176,13 @@ public class AndroidCallBridge implements CallBridge {
                 || granted("android.permission.POST_NOTIFICATIONS")) {
             mask |= PERMISSION_NOTIFICATIONS;
         }
+        // The role is not an Android permission, but it IS one of this SPI's
+        // permission bits -- and reporting it absent while the user held it
+        // made requestPermissions look like it had been refused something
+        // the app already had.
+        if (CN1CallScreeningService.isRoleHeld(context)) {
+            mask |= PERMISSION_SCREENING_ROLE;
+        }
         return mask;
     }
 
@@ -214,7 +221,8 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     /// The permission sequence itself; the caller holds PERMISSION_LOCK.
-    private void requestPermissionsLocked(int permissionBits, int requestId) {
+    private void requestPermissionsLocked(int permissionBits,
+            final int requestId) {
         if ((permissionBits & PERMISSION_MICROPHONE) != 0) {
             com.codename1.impl.android.AndroidImplementation
                     .checkForPermission(Manifest.permission.RECORD_AUDIO,
@@ -230,6 +238,24 @@ public class AndroidCallBridge implements CallBridge {
             com.codename1.impl.android.AndroidImplementation
                     .checkForPermission("android.permission.POST_NOTIFICATIONS",
                             "This is required to show an incoming call");
+        }
+        if ((permissionBits & PERMISSION_SCREENING_ROLE) != 0
+                && (getGrantedPermissions() & PERMISSION_SCREENING_ROLE) == 0) {
+            // The role has its own prompt rather than a permission dialog, so
+            // the mask cannot be answered until the user has decided.
+            // Ignoring the bit reported an immediate denial for something the
+            // user was never asked about.
+            Activity a = currentActivity();
+            if (a != null) {
+                CN1CallScreeningService.requestRole(a, new Runnable() {
+                    @Override
+                    public void run() {
+                        Calls.deliverPermissionResult(requestId,
+                                getGrantedPermissions());
+                    }
+                });
+                return;
+            }
         }
         Calls.deliverPermissionResult(requestId, getGrantedPermissions());
     }

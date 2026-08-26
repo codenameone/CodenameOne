@@ -210,11 +210,30 @@ public class CN1CallScreeningService extends CallScreeningService {
     /// `AndroidVpnBridge` reaches `VpnManager` that way: naming it directly
     /// would mean raising the SDK the whole port builds against, to buy a
     /// capability that degrades perfectly well.
+    /// Requests the role and runs `whenDone` once the user has decided.
+    ///
+    /// The permission API needs the OUTCOME rather than an acknowledgement,
+    /// because Calls.requestPermissions answers with a mask that has to
+    /// include the role by the time it is delivered.
+    public static void requestRole(Activity activity, Runnable whenDone) {
+        requestRole(activity, -1, whenDone);
+    }
+
     public static void requestRole(Activity activity, final int requestId) {
+        requestRole(activity, requestId, null);
+    }
+
+    private static void requestRole(Activity activity, final int requestId,
+            final Runnable whenDone) {
         if (Build.VERSION.SDK_INT < 29) {
-            Calls.deliverAck(requestId, false,
-                    com.codename1.call.CallError.NOT_SUPPORTED.ordinal(),
-                    "The call screening role needs Android 10 or newer");
+            if (requestId >= 0) {
+                Calls.deliverAck(requestId, false,
+                        com.codename1.call.CallError.NOT_SUPPORTED.ordinal(),
+                        "The call screening role needs Android 10 or newer");
+            }
+            if (whenDone != null) {
+                whenDone.run();
+            }
             return;
         }
         try {
@@ -229,25 +248,30 @@ public class CN1CallScreeningService extends CallScreeningService {
                     rmClass.getField("ROLE_CALL_SCREENING").get(null));
             Object rm = activity.getSystemService(rmClass);
             if (rm == null || role == null) {
-                unsupported(requestId);
+                finish(requestId, whenDone, false);
                 return;
             }
             if (!isTrue(rmClass.getMethod("isRoleAvailable", String.class)
                     .invoke(rm, role))) {
-                unsupported(requestId);
+                finish(requestId, whenDone, false);
                 return;
             }
             if (isTrue(rmClass.getMethod("isRoleHeld", String.class)
                     .invoke(rm, role))) {
                 enabled = true;
-                Calls.deliverAck(requestId, true, 0, null);
+                if (requestId >= 0) {
+                    Calls.deliverAck(requestId, true, 0, null);
+                }
+                if (whenDone != null) {
+                    whenDone.run();
+                }
                 return;
             }
             Intent intent = asIntent(rmClass
                     .getMethod("createRequestRoleIntent", String.class)
                     .invoke(rm, role));
             if (intent == null) {
-                unsupported(requestId);
+                finish(requestId, whenDone, false);
                 return;
             }
             // One dialog at a time. CodenameOneActivity keeps a SINGLE
@@ -257,9 +281,15 @@ public class CN1CallScreeningService extends CallScreeningService {
             // no error anywhere.
             synchronized (CN1CallScreeningService.class) {
                 if (rolePending) {
-                    Calls.deliverAck(requestId, false,
-                            com.codename1.call.CallError.BUSY.ordinal(),
-                            "The screening role prompt is already on screen");
+                    if (requestId >= 0) {
+                        Calls.deliverAck(requestId, false,
+                                com.codename1.call.CallError.BUSY.ordinal(),
+                                "The screening role prompt is already on"
+                                + " screen");
+                    }
+                    if (whenDone != null) {
+                        whenDone.run();
+                    }
                     return;
                 }
                 rolePending = true;
@@ -267,7 +297,7 @@ public class CN1CallScreeningService extends CallScreeningService {
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(intent,
-                                new RoleResult(requestId));
+                                new RoleResult(requestId, whenDone));
             } catch (RuntimeException launchFailed) {
                 // The current activity can be gone by now, and
                 // startActivityForResult throws when it is. Without this the
@@ -280,7 +310,21 @@ public class CN1CallScreeningService extends CallScreeningService {
                 throw launchFailed;
             }
         } catch (Exception e) {
-            unsupported(requestId);
+            finish(requestId, whenDone, false);
+        }
+    }
+
+    /// Answers a role request that ended without a prompt.
+    private static void finish(int requestId, Runnable whenDone, boolean ok) {
+        if (requestId >= 0) {
+            if (ok) {
+                Calls.deliverAck(requestId, true, 0, null);
+            } else {
+                unsupported(requestId);
+            }
+        }
+        if (whenDone != null) {
+            whenDone.run();
         }
     }
 
@@ -327,8 +371,11 @@ public class CN1CallScreeningService extends CallScreeningService {
             implements com.codename1.impl.android.IntentResultListener {
         private final int requestId;
 
-        RoleResult(int requestId) {
+        private final Runnable whenDone;
+
+        RoleResult(int requestId, Runnable whenDone) {
             this.requestId = requestId;
+            this.whenDone = whenDone;
         }
 
         @Override
@@ -341,9 +388,14 @@ public class CN1CallScreeningService extends CallScreeningService {
                 rolePending = false;
             }
             enabled = resultCode == Activity.RESULT_OK;
-            Calls.deliverAck(requestId, enabled,
-                    com.codename1.call.CallError.UNAUTHORIZED.ordinal(),
-                    "The user declined the call screening role");
+            if (requestId >= 0) {
+                Calls.deliverAck(requestId, enabled,
+                        com.codename1.call.CallError.UNAUTHORIZED.ordinal(),
+                        "The user declined the call screening role");
+            }
+            if (whenDone != null) {
+                whenDone.run();
+            }
         }
     }
 }

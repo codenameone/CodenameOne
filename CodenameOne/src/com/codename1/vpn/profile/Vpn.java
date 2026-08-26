@@ -25,6 +25,7 @@ package com.codename1.vpn.profile;
 import com.codename1.impl.async.EdtResult;
 import com.codename1.impl.vpn.VpnRequests;
 import com.codename1.impl.vpn.VpnWire;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import com.codename1.vpn.VpnError;
@@ -280,7 +281,27 @@ public final class Vpn {
         public void run() {
             VpnStatusListener[] ls = listeners();
             for (VpnStatusListener l : ls) {
-                l.vpnStatusChanged(status);
+                tell(l, status);
+            }
+        }
+
+        /// Tells one listener, without letting it stop the others.
+        ///
+        /// A status change is a notification: nobody is waiting on an answer
+        /// and every listener is entitled to hear it, so one that throws must
+        /// not leave the rest showing the previous state. The call facade's
+        /// notification arms are handled the same way.
+        private void tell(VpnStatusListener l, VpnStatus s) {
+            try {
+                l.vpnStatusChanged(s);
+            } catch (Throwable t) {
+                if (Display.isInitialized()) {
+                    Log.e(t);
+                } else {
+                    // Log.e goes through the platform implementation, which
+                    // is null before Display.init.
+                    t.printStackTrace(); //NOPMD AvoidPrintStackTrace
+                }
             }
         }
     }
