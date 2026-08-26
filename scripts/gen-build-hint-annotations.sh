@@ -63,6 +63,7 @@ if [ "$check" -eq 1 ]; then
   # back rather than any file restating them. Policing them here would report a
   # deliberate edit as drift.
   targets=("maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintAnnotationBinding.java"
+           "maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintsFromAnnotations.java"
            "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
