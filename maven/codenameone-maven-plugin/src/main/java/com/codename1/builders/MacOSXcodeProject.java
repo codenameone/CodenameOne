@@ -327,7 +327,7 @@ public class MacOSXcodeProject {
             if (overrides.location(c.usesLocation)) {
                 ent.put(ENT_LOCATION, Boolean.TRUE);
             }
-            if (overrides.calendars(false)) {
+            if (overrides.calendars(c.usesCalendar)) {
                 ent.put(ENT_CALENDARS, Boolean.TRUE);
             }
         }
@@ -444,6 +444,11 @@ public class MacOSXcodeProject {
         public boolean usesBluetooth;
         public boolean usesLocation;
         public boolean usesServerSockets;
+        /// Set when the class scan finds a local-calendar entry point. The scan
+        /// is what enables EventKit, so the entitlement and the usage strings
+        /// have to follow it -- otherwise a sandboxed build links the framework
+        /// and is refused access to it.
+        public boolean usesCalendar;
     }
 
     /** The ExportOptions plist for one channel. */

@@ -65,6 +65,10 @@ public class MacOSNativeBuilder extends Executor {
     private final List<File> artifacts = new ArrayList<File>();
     /// The scan result and the dlopen flag, kept because the entitlements are
     /// written once per signing channel while the scan is worth doing once.
+    /// Whether the class scan found a local-calendar entry point, carried from
+    /// the native-feature scan to the permission generation that runs later.
+    private boolean calendarDetected;
+
     private MacOSXcodeProject.MacOSCapabilities capabilities;
     private boolean loadsExternalCode;
 
@@ -384,6 +388,11 @@ public class MacOSNativeBuilder extends Executor {
             extraFrameworks.add("EventKit.framework");
         }
         log("Calendar " + (usesCalendar[0] ? "enabled" : "disabled"));
+        // The same answer that enabled EventKit above has to reach the
+        // entitlement and the usage strings, or a sandboxed build links the
+        // framework and is refused access to it at first use, and an unsandboxed
+        // one is terminated for a missing privacy string.
+        calendarDetected = usesCalendar[0];
 
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
@@ -680,6 +689,10 @@ public class MacOSNativeBuilder extends Executor {
             // shows up as a permission denial at runtime with no explanation.
             throw new IOException("Failed to scan the application for macOS capabilities", ex);
         }
+        // The calendar answer comes from the native-feature scan rather than
+        // this one, because it is the same answer that decides whether EventKit
+        // is linked at all -- one detection, one result.
+        caps.usesCalendar = calendarDetected;
         capabilities = caps;
         // loadsExternalCode: a hardened-runtime bundle that dlopens anything --
         // which a Codename One application does not, but a cn1lib shipping a
@@ -710,7 +723,7 @@ public class MacOSNativeBuilder extends Executor {
         // something the class scan detects, it is inherited from the iOS
         // usage-description hints -- and whichever channel grants the
         // entitlement needs the descriptions in the one shared plist.
-        boolean calendarsGranted = false;
+        boolean calendarsGranted = calendarDetected;
         for (String channel : hints.getChannels()) {
             calendarsGranted |= hints.entitlementsFor(channel).calendars(false);
         }

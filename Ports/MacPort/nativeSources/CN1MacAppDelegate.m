@@ -491,7 +491,12 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
-    isAppSuspended = NO;
+    // isAppSuspended is NOT cleared here. Active and visible are different
+    // things on a Mac: Cmd-Tab back to an application whose window is still
+    // minimized sends this and no deminiaturize, so clearing the flag resumed
+    // painting and the active-state behaviour for a window nobody could see.
+    // The surface tracker owns that flag, and the two events that actually
+    // change visibility -- unhide and deminiaturize -- are what clear it.
     if (!cn1MacJavaReady) {
         cn1MacPendingActive = 1;
         return;

@@ -756,9 +756,11 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRestore___int(CODENAME_ONE_T
         if (rec.window.isMiniaturized) {
             [rec.window deminiaturize:nil];
         }
-        if (rec.window.isZoomed) {
-            [rec.window zoom:nil];
-        }
+        // Deliberately NOT un-maximized. restore() undoes minimize and nothing
+        // else -- toggleMaximize() owns that independently -- and deminiaturize:
+        // already brings a window back to whatever size it had. Zooming after it
+        // took a window that was maximized when the user minimized it and
+        // un-maximized it on the way back.
     });
 }
 

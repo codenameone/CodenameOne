@@ -327,6 +327,14 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
                                                            MAX(duration.frame.size.width + 16, 220),
                                                            duration.frame.size.height + 8);
             cn1PickerPresent(controller, durationContent, x, y, w, h);
+            // Released like the date path below. The popover retains what it
+            // presents, so these are the creator's own references -- and this
+            // early return used to skip them, leaking a controller and a whole
+            // view graph every time a duration picker was opened.
+#ifndef CN1_USE_ARC
+            [durationContent release];
+            [controller release];
+#endif
             POOL_END();
             return;
         }
