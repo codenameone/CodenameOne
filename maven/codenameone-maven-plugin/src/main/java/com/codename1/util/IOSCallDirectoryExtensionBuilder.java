@@ -129,7 +129,14 @@ public final class IOSCallDirectoryExtensionBuilder {
         return "#import <CallKit/CallKit.h>\n"
                 + "\n"
                 + "@interface CN1CallDirectoryHandler"
-                + " : CXCallDirectoryProvider\n"
+                + " : CXCallDirectoryProvider"
+                // Declared, not implied. CallKit sends the failure to the
+                // context's delegate through this protocol, and its one
+                // method is required -- a delegate that does not conform can
+                // be sent a selector it does not recognise, which terminates
+                // the extension instead of logging the error it was told
+                // about.
+                + " <CXCallDirectoryExtensionContextDelegate>\n"
                 + "@end\n";
     }
 
@@ -279,9 +286,14 @@ public final class IOSCallDirectoryExtensionBuilder {
         sb.append("    }\n");
         sb.append("    [context completeRequestWithCompletionHandler:nil];\n");
         sb.append("}\n\n");
-        sb.append("- (void)requestFailed:(CXCallDirectoryExtensionContext *)"
-                + "context\n");
-        sb.append("                error:(NSError *)error {\n");
+        // requestFailedForExtensionContext:withError:, which is the whole
+        // selector CXCallDirectoryExtensionContextDelegate declares. The
+        // shorter requestFailed:error: is not a CallKit selector at all, so
+        // the delegate assignment above pointed at a method nothing calls and
+        // the reload error went nowhere.
+        sb.append("- (void)requestFailedForExtensionContext:"
+                + "(CXCallDirectoryExtensionContext *)context\n");
+        sb.append("                                withError:(NSError *)error {\n");
         sb.append("    // Logged and swallowed. There is nothing to retry"
                 + " against and no\n");
         sb.append("    // user to tell; iOS reports the failure through"

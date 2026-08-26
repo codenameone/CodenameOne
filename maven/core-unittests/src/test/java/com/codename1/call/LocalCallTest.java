@@ -654,6 +654,23 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aDuplicateReportLeavesTheLiveCallAlone() {
+        // The registration replaces whatever is under the id, and the
+        // handover forgets the id when the platform answers DUPLICATE_CALL --
+        // so a duplicate used to take the ORIGINAL live call out of
+        // getSessions() with it, leaving a call the system is still showing
+        // that nothing in Java can address.
+        String id = CallId.random();
+        CallSession first = ring(id);
+        CallAwait.assertFailedWith(CallError.DUPLICATE_CALL,
+                Calls.reportIncoming(id, CallHandle.phone("+14155550000"),
+                        "Somebody Else", false));
+        assertSame(first, Calls.getSession(id),
+                "the live call must survive a duplicate report, unchanged");
+        assertEquals(1, Calls.getSessions().length);
+    }
+
+    @Test
     public void registeringYieldsAToken() {
         String token = CallAwait.value(VoipPush.register());
         assertNotNull(token);

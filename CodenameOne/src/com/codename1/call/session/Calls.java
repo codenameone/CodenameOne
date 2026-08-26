@@ -204,6 +204,22 @@ public final class Calls {
                     "A call handle is required"));
             return out;
         }
+        // Refused here rather than by the platform. The registration below
+        // replaces whatever is registered under this id, and the handover
+        // forgets the id when the platform answers DUPLICATE_CALL -- so a
+        // duplicate report used to take the ORIGINAL live call out of
+        // getSessions() with it, leaving a call the system is still showing
+        // that nothing in Java can address.
+        //
+        // Only live calls are in the map; forget() removes an ended one, so
+        // presence is the whole test.
+        synchronized (SESSIONS) {
+            if (SESSIONS.containsKey(id)) {
+                out.error(new CallException(CallError.DUPLICATE_CALL,
+                        "A call with this id is already live: " + id));
+                return out;
+            }
+        }
         CallSession session = new CallSession(id, direction, handle, displayName,
                 direction == CallDirection.INCOMING
                         ? CallState.RINGING : CallState.DIALING);

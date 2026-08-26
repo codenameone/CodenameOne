@@ -72,6 +72,24 @@ class TvNativeBuilderNearbyTest {
         assertFalse(list.contains("MultipeerConnectivity.framework"), list);
     }
 
+    @Test
+    void theCallFrameworksTvosLacksAreWeakLinked() throws Exception {
+        // Measured against AppleTVOS26.2: neither .framework directory
+        // exists, so a tvOS slice of an app that references
+        // com.codename1.call fails while resolving them.
+        String list = optionalFrameworks();
+        assertTrue(list.contains("CallKit.framework"), list);
+        assertTrue(list.contains("PushKit.framework"), list);
+    }
+
+    @Test
+    void theVpnFrameworkTvosShipsIsNotWeakLinked() throws Exception {
+        // Same SDK, opposite answer: NetworkExtension IS present, so
+        // weak-linking it would only obscure that it links normally.
+        String list = optionalFrameworks();
+        assertFalse(list.contains("NetworkExtension.framework"), list);
+    }
+
     /**
      * The tvOS plist carries the local-network keys the transport needs.
      *

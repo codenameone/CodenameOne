@@ -739,6 +739,21 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                 [cn1clCalls removeObjectForKey:uuidString];
                 cn1clDropAudioLocked(uuidString);
             }
+            completion();
+            // AFTER the completion, so PushKit's deadline is satisfied first
+            // whatever Java does with this.
+            //
+            // Sent unconditionally. A retraction that beats the drain names a
+            // call Java has never heard of and the facade ignores it; one
+            // that arrives after the drain names a session Java has adopted,
+            // which without this stayed RINGING for the life of the process
+            // with every later operation on it answering INVALID_ID.
+            com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
+                    getThreadLocalData(), cn1clJString(uuidString),
+                    r == CXCallEndedReasonUnanswered
+                            ? CN1_CALL_END_UNANSWERED
+                            : CN1_CALL_END_REMOTE);
+            return;
         }
         completion();
         return;
@@ -1421,6 +1436,15 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
         JAVA_INT requestId) {
 #if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
     cn1CallInstallPushRegistry();
+    // Asked for on EVERY registration, not only the first. The installer is
+    // dispatch_once-guarded, so after an unregister() emptied desiredPushTypes
+    // a later register() went through here, found the registry already built,
+    // and parked a request that no credentials could ever answer -- VoIP
+    // delivery stayed off until the process restarted. Re-asserting the type
+    // is what makes PushKit hand the token over again.
+    if (cn1clRegistry != nil) {
+        cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+    }
     if (cn1clVoipToken != nil) {
         com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
                 threadStateData, requestId, cn1clJString(cn1clVoipToken));
