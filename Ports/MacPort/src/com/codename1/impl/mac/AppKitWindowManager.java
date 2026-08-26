@@ -43,6 +43,31 @@ import com.codename1.ui.Image;
 /// @author Shai Almog
 class AppKitWindowManager extends WindowManager {
 
+    // setCommands is deliberately still the SPI's no-op, and this is the note
+    // saying so rather than an oversight.
+    //
+    // macOS has ONE menu bar and its contents follow the key window, so honoring
+    // per-window commands means swapping the whole bar as focus moves -- not
+    // merely rendering a second menu somewhere. Three pieces are missing for
+    // that, and none of them is local to this class:
+    //
+    //   1. The manager is never told which window is key. The native side knows
+    //      (CN1MacWindowRecord's windowDidBecomeKey:) and delivers it to
+    //      Desktop.setFocusedWindow, which does not route back down to the port.
+    //   2. IOSImplementation.setNativeCommands publishes ONE global list, and
+    //      fireMacMenuCommand(int) resolves a click through the single static
+    //      macNativeCommands. Per-window menus need the published list and the
+    //      resolution list to change together, or a click on the newly shown
+    //      menu invokes the previous window's command by index.
+    //   3. The menu bar is what the macOS screenshot goldens capture, so a swap
+    //      that fires at the wrong moment is a suite-wide diff.
+    //
+    // Until those exist the commands are still reachable: TopLevelContainer
+    // records them and Window.dispatchCommand activates them, which is exactly
+    // the fallback WindowManager.setCommands documents for a port with nowhere
+    // to put them. Implementing it is worth doing; doing it by adding a fourth
+    // way to publish a menu is not.
+
     /// The owner recorded for a window owned by the application's main window,
     /// which has no peer of its own to point at.
     private static final Object MAIN_WINDOW = new Object();
