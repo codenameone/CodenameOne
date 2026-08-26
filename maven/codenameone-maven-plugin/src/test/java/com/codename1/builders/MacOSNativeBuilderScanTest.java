@@ -65,4 +65,25 @@ public class MacOSNativeBuilderScanTest {
         assertFalse(MacOSNativeBuilder.opensMicrophone(null, "captureAudio"));
         assertFalse(MacOSNativeBuilder.opensMicrophone("com/codename1/capture/Capture", null));
     }
+
+    /**
+     * The package test in usesClass covers an application that names a
+     * notification type. This covers the one that does not: a lambda passed to
+     * requestNotificationPermission compiles to an invokedynamic whose reported
+     * owner is the app class holding the lambda body, so the functional
+     * interface is never seen and the permission call is the only evidence.
+     */
+    @Test
+    public void theNotificationRuleCatchesThePermissionEntryPoint() {
+        assertTrue(MacOSNativeBuilder.usesNotifications(
+                "com/codename1/ui/Display", "requestNotificationPermission"));
+
+        assertFalse("a different Display method says nothing about notifications",
+                MacOSNativeBuilder.usesNotifications("com/codename1/ui/Display", "getDisplayWidth"));
+        assertFalse("the name alone is not enough -- it has to be Display's",
+                MacOSNativeBuilder.usesNotifications(
+                        "com/example/MyHelper", "requestNotificationPermission"));
+        assertFalse(MacOSNativeBuilder.usesNotifications(null, "requestNotificationPermission"));
+        assertFalse(MacOSNativeBuilder.usesNotifications("com/codename1/ui/Display", null));
+    }
 }

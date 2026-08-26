@@ -917,7 +917,28 @@ public class MacOSNativeBuilder extends Executor {
             if (opensMicrophone(cls, method)) {
                 usesMicrophone[0] = true;
             }
+            if (usesNotifications(cls, method)) {
+                usesLocalNotifications[0] = true;
+            }
         }
+    }
+
+    /**
+     * Whether an invoked method means the application uses notifications.
+     *
+     * <p>The package test in {@code usesClass} catches an application that
+     * names any of these types, which is most of them. It does not catch a
+     * lambda: {@code requestNotificationPermission(r -> ...)} compiles to an
+     * invokedynamic whose reported owner is the app class holding the lambda
+     * body, and the functional interface appears only in a descriptor the scan
+     * does not read. So the entry point is matched by name as well.</p>
+     */
+    static boolean usesNotifications(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        return cls.equals("com/codename1/ui/Display")
+                && method.indexOf("requestNotificationPermission") > -1;
     }
 
     /**
