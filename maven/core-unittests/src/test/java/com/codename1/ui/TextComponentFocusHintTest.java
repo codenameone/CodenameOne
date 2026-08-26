@@ -180,4 +180,48 @@ class TextComponentFocusHintTest extends UITestBase {
 
         assertBlurred(first, "Firstname");
     }
+
+    @FormTest
+    void contentArrivingWhileTheReverseTransitionIsQueuedKeepsTheFloatingLabel() {
+        Form form = new Form("TextComponent Test", BoxLayout.y());
+        TextComponent first = floatingHintComponent("Firstname");
+        TextComponent last = floatingHintComponent("Lastname");
+        form.addAll(first, last);
+        form.show();
+        form.revalidate();
+
+        first.getField().requestFocus();
+        pump(form);
+        assertFocused(first, "Firstname");
+
+        // the label-to-hint transition is queued while the field is empty, then content arrives
+        last.getField().requestFocus();
+        first.text("value");
+        pump(form);
+
+        assertTrue(first.getLabel().isVisible(),
+                "a blurred field holding content keeps its floating label");
+        assertEquals(1, countLabelsWithText(first, "Firstname"));
+    }
+
+    @FormTest
+    void contentArrivingBeforeTheFormIsHiddenKeepsTheFloatingLabel() {
+        Form form = new Form("TextComponent Test", BoxLayout.y());
+        TextComponent first = floatingHintComponent("Firstname");
+        TextComponent last = floatingHintComponent("Lastname");
+        form.addAll(first, last);
+        form.show();
+        form.revalidate();
+
+        first.getField().requestFocus();
+        pump(form);
+
+        last.getField().requestFocus();
+        first.text("value");
+        Form other = new Form("Elsewhere", BoxLayout.y());
+        other.show();
+
+        assertTrue(first.getLabel().isVisible(),
+                "a blurred field holding content keeps its floating label");
+    }
 }

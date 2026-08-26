@@ -130,10 +130,16 @@ public class TextComponent extends InputComponent {
             if (!getLabel().isVisible()) {
                 animateHintToLabel();
             }
-        } else {
-            if (getLabel().isVisible() && getText().length() == 0 && isOnTopMode()) {
-                animateLabelToHint();
+        } else if (getText().length() > 0) {
+            // Content arrived while the reverse transition was queued, so the transition hid a label
+            // that a field with text has to keep -- the hint is not painted once there is text, which
+            // would leave nothing naming the field. Nothing to animate, only a state to correct.
+            if (!getLabel().isVisible()) {
+                field.setHint("");
+                getLabel().setVisible(true);
             }
+        } else if (getLabel().isVisible() && isOnTopMode()) {
+            animateLabelToHint();
         }
     }
 
@@ -244,10 +250,11 @@ public class TextComponent extends InputComponent {
         if (animationLayer == null || !isFocusAnimation()) {
             return;
         }
-        if (field.hasFocus()) {
+        if (field.hasFocus() || getText().length() > 0) {
+            // focused, or holding content: either way the label belongs above the field
             field.setHint("");
             getLabel().setVisible(true);
-        } else if (getText().length() == 0 && isOnTopMode()) {
+        } else if (isOnTopMode()) {
             field.setHint(getLabel().getText());
             getLabel().setVisible(false);
         }
