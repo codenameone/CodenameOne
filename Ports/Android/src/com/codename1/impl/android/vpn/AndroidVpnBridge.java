@@ -179,8 +179,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 // BOTH: the field is what storedWire() answers from for the
                 // rest of this process, so persisting only to Preferences
                 // left load() describing the profile this one replaced.
-                installedWire = wire;
-                Preferences.set(WIRE_PREF, strip(wire));
+                synchronized (this) {
+                    installedWire = wire;
+                    Preferences.set(WIRE_PREF, strip(wire));
+                }
                 setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;
@@ -224,7 +226,7 @@ public class AndroidVpnBridge implements VpnBridge {
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(consent,
-                                new Consent(this, requestId, previous));
+                                new Consent(this, requestId, previous, wire));
             } catch (RuntimeException launchFailed) {
                 // The cached context can still LOOK like an Activity after
                 // the app is backgrounded, while the current activity that
@@ -256,38 +258,56 @@ public class AndroidVpnBridge implements VpnBridge {
         private final int requestId;
         /// The record describing what was installed BEFORE this attempt.
         private final String previous;
+        /// The profile this prompt is about, so the result does not have to
+        /// re-read a field another install may have replaced.
+        private final String attempted;
 
-        Consent(AndroidVpnBridge bridge, int requestId, String previous) {
+        Consent(AndroidVpnBridge bridge, int requestId, String previous,
+                String attempted) {
             this.bridge = bridge;
             this.requestId = requestId;
             this.previous = previous;
+            this.attempted = attempted;
         }
 
         @Override
         public void onActivityResult(int requestCode, int resultCode,
                 Intent data) {
-            // First, and whatever the outcome: the channel is free again and
-            // a refused install that never cleared this would block every
-            // later one for the life of the process.
+            boolean approved = resultCode == Activity.RESULT_OK;
+            // The reservation is held THROUGH this, and the wire this prompt
+            // was about is carried rather than re-read. Clearing the flag
+            // first let a new install overwrite installedWire while this
+            // callback was still running, so the first consent persisted the
+            // second profile and acknowledged itself as successful.
             synchronized (bridge) {
+                if (approved) {
+                    bridge.installedWire = attempted;
+                    Preferences.set(WIRE_PREF, strip(attempted));
+                } else {
+                    // The PREVIOUS profile is untouched: Android installs
+                    // nothing when the prompt is declined, so a replacement
+                    // the user refused leaves whatever was already
+                    // provisioned in place. Clearing the record made load()
+                    // answer null and getStatus() NOT_CONFIGURED for a VPN
+                    // Android was still holding.
+                    bridge.installedWire = previous;
+                    if (previous == null) {
+                        Preferences.delete(WIRE_PREF);
+                    } else {
+                        // STRIPPED, like every other path that writes here.
+                        // installedWire carries the whole profile while an
+                        // install is in flight, so a restored `previous` can
+                        // still hold the password or the pre-shared key --
+                        // and this is ordinary preference storage.
+                        Preferences.set(WIRE_PREF, strip(previous));
+                    }
+                }
                 bridge.consentPending = false;
             }
-            if (resultCode == Activity.RESULT_OK) {
-                Preferences.set(WIRE_PREF, strip(bridge.installedWire));
+            if (approved) {
                 bridge.setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
             } else {
-                // The PREVIOUS profile is untouched: Android installs nothing
-                // when the prompt is declined, so a replacement that the user
-                // refused leaves whatever was already provisioned in place.
-                // Clearing the record made load() answer null and getStatus()
-                // NOT_CONFIGURED for a VPN Android was still holding.
-                bridge.installedWire = previous;
-                if (previous == null) {
-                    Preferences.delete(WIRE_PREF);
-                } else {
-                    Preferences.set(WIRE_PREF, previous);
-                }
                 Vpn.deliverAck(requestId, false,
                         VpnError.USER_DECLINED.ordinal(),
                         "The user declined the VPN configuration prompt");
@@ -301,25 +321,24 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
             return;
         }
-        boolean prompting;
-        synchronized (this) {
-            prompting = consentPending;
-        }
-        if (prompting) {
-            // A prompt for a profile this would delete is on screen. Removing
-            // underneath it answered success, and then the user's approval
-            // answered success too -- persisting the wire this method had
-            // just cleared and leaving Android provisioned after a removal
-            // the app was told had worked.
-            fail(requestId, VpnError.UNKNOWN,
-                    "A VPN consent prompt is on screen; wait for it to be"
-                    + " answered before removing the profile");
-            return;
-        }
         try {
-            Reflect.DELETE.invoke(Reflect.manager(context));
-            installedWire = null;
-            Preferences.delete(WIRE_PREF);
+            // The check AND the deletion under one monitor, the same one the
+            // install reservation takes. Released in between, an install
+            // could reserve consent after this method looked and then be
+            // approved after it reported success -- so both answered success
+            // and the approved install put the profile back.
+            synchronized (this) {
+                if (consentPending) {
+                    // A prompt for a profile this would delete is on screen.
+                    fail(requestId, VpnError.UNKNOWN,
+                            "A VPN consent prompt is on screen; wait for it to"
+                            + " be answered before removing the profile");
+                    return;
+                }
+                Reflect.DELETE.invoke(Reflect.manager(context));
+                installedWire = null;
+                Preferences.delete(WIRE_PREF);
+            }
             setStatus(VpnStatus.NOT_CONFIGURED);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
@@ -343,12 +362,17 @@ public class AndroidVpnBridge implements VpnBridge {
     /// The description of the installed profile, from this process or the
     /// one before it.
     private String storedWire() {
-        if (installedWire != null) {
-            return installedWire;
+        // Under the same monitor as every other access. SpotBugs caught this
+        // one as inconsistent synchronisation, and it is the read the consent
+        // result and the removal both depend on.
+        synchronized (this) {
+            if (installedWire != null) {
+                return installedWire;
+            }
+            String saved = Preferences.get(WIRE_PREF, null);
+            installedWire = saved;
+            return saved;
         }
-        String saved = Preferences.get(WIRE_PREF, null);
-        installedWire = saved;
-        return saved;
     }
 
     /// Where the profile description outlives the process.
@@ -452,7 +476,12 @@ public class AndroidVpnBridge implements VpnBridge {
             // is the profile Android actually holds.
             reconciledStatus();
             startWatchingTheTunnel();
-        } else {
+        } else if (!startRequested) {
+            // Only when this app has no tunnel of its own up. The transport
+            // callback is the sole signal Android gives that a tunnel went
+            // away, so unregistering it because the last LISTENER left meant
+            // a disconnect from Settings was never seen and getStatus() said
+            // CONNECTED for ever. Delivery stops; observation does not.
             stopWatchingTheTunnel();
         }
     }

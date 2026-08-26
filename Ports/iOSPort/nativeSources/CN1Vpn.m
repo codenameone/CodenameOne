@@ -144,6 +144,18 @@ static int cn1vpSecretGeneration = -1;
 /// Whether an installation owns the shared manager and the next generation.
 static BOOL cn1vpInstalling = NO;
 
+/// Guards cn1vpInstalling; every read and write takes it.
+static NSObject *cn1vpInstallLock = nil;
+
+/// Creates the install lock once. @synchronized on nil is a no-op, which
+/// would leave the reservation unguarded rather than fail visibly.
+static void cn1vpEnsureInstallLock(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1vpInstallLock = [[NSObject alloc] init];
+    });
+}
+
 /// Whether the shared manager's saved configuration has been read.
 static BOOL cn1vpLoaded = NO;
 
@@ -382,16 +394,30 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
     // that had been deleted. Rejecting is better than queueing: the second
     // caller learns immediately rather than waiting on a prompt for
     // somebody else's profile.
-    if (cn1vpInstalling) {
+    // Test AND set together. Two installs could otherwise both read this as
+    // free and both go on to mutate the one shared NEVPNManager and the same
+    // next-generation keychain accounts -- which is precisely the credential
+    // replacement and wrong-profile acknowledgement this guard exists to
+    // prevent.
+    cn1vpEnsureInstallLock();
+    BOOL busy = NO;
+    @synchronized (cn1vpInstallLock) {
+        busy = cn1vpInstalling;
+        if (!busy) {
+            cn1vpInstalling = YES;
+        }
+    }
+    if (busy) {
         cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
                 @"A VPN profile installation is already in progress");
         return;
     }
-    cn1vpInstalling = YES;
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
         if (loadError != nil) {
-            cn1vpInstalling = NO;
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
+            }
             cn1vpAck(requestId, NO, CN1_VPN_ERR_UNAUTHORIZED,
                     [loadError localizedDescription]);
             return;
@@ -446,7 +472,9 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             manager.onDemandRules = [NSArray arrayWithObject:rule];
         }
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
-            cn1vpInstalling = NO;
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
+            }
             if (saveError == nil) {
                 // The new profile is installed and owns the new generation,
                 // so the previous one's items can go. A failed save falls
@@ -483,7 +511,12 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
     // delete the profile the installation has just acknowledged. Whichever
     // way round, one of the two answered success for a state that is not the
     // one on the device.
-    if (cn1vpInstalling) {
+    cn1vpEnsureInstallLock();
+    BOOL installing = NO;
+    @synchronized (cn1vpInstallLock) {
+        installing = cn1vpInstalling;
+    }
+    if (installing) {
         cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
                 @"A VPN profile installation is in progress");
         return;

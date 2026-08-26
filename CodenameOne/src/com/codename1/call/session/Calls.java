@@ -398,26 +398,31 @@ public final class Calls {
         if (l == null) {
             return;
         }
+        // The readiness update happens with the mutation that justifies it.
+        // Told afterwards, an add overlapping the removal of the last
+        // listener could see readiness already true and emit nothing, and
+        // the remover would then set it false -- leaving a registered
+        // listener while the port considers Java unready, which on iOS means
+        // every CallKit action is held until it times out.
         synchronized (LISTENERS) {
             if (!LISTENERS.contains(l)) {
                 LISTENERS.add(l);
             }
+            // The port holds system-originated actions until Java says it is
+            // listening, and THIS is what listening means for an app that
+            // never uses VoipPush.
+            CallRequests.setActionsWanted(true);
         }
-        // The port holds system-originated actions until Java says it is
-        // listening, and THIS is what listening means for an app that never
-        // uses VoipPush.
-        CallRequests.setActionsWanted(true);
     }
 
     /// Removes a listener.
     public static void removeActionListener(CallActionListener l) {
-        boolean empty;
         synchronized (LISTENERS) {
             LISTENERS.remove(l);
-            empty = LISTENERS.isEmpty();
-        }
-        if (empty) {
-            CallRequests.setActionsWanted(false);
+            // Inside the lock; see addActionListener.
+            if (LISTENERS.isEmpty()) {
+                CallRequests.setActionsWanted(false);
+            }
         }
     }
 
