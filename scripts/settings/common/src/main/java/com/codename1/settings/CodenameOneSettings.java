@@ -4260,9 +4260,13 @@ public class CodenameOneSettings extends Lifecycle {
             // was taken as a complete replacement, so the managed execution
             // binding the production goal was dropped and the root the child
             // configures went with it.
-            return bindsGoal(active, goal)
-                    ? active : active + executionsOf(pluginBlock(
-                        managementOnly(pomText), artifactId), managedFromChain, artifactId);
+            // The module's own <pluginManagement> is the first link of the
+            // chain, so it needs no separate argument -- passing it separately is
+            // what let the nearest block win outright.
+            return bindsGoal(active, goal) ? active
+                    : active + mergedManagedExecutions(
+                            managedFromChain == null ? managementOnly(pomText) : managedFromChain,
+                            artifactId);
         }
         String managed = pluginBlock(managementOnly(pomText), artifactId);
         if (managed == null || managed.indexOf("<" + element + ">") < 0) {
@@ -4301,22 +4305,131 @@ public class CodenameOneSettings extends Lifecycle {
         }
     }
 
-    /// The `<executions>` of the managed declaration, nearest first, or "".
+    /// The managed `<executions>` for `artifactId`, merged across the whole
+    /// chain, or "".
+    ///
+    /// Every managed declaration in the chain, not the nearest one that happens
+    /// to have an execution. Maven MERGES `pluginManagement` down the chain, so a
+    /// parent that binds `compile` and a child that manages only the version --
+    /// or only an unrelated execution -- still leaves the parent's binding in
+    /// force. Stopping at the nearest block dropped it, the goal read as unbound,
+    /// and the source root it configures disappeared from the scan; a dormant
+    /// copy of the main class could then answer for the compiled one and its
+    /// annotation-owned hints looked editable, which is how Add writes the
+    /// duplicate the next build refuses.
+    ///
+    /// Merged BY ID, because that is how Maven merges them and because a union
+    /// would be wrong in the direction that matters: a child re-declaring the
+    /// parent's execution id with `<phase>none</phase>` switches it off, and a
+    /// union would still see the parent's binding and call it bound. Within an id
+    /// the nearest declaration that says something wins, and one that says
+    /// nothing about a field leaves the ancestor's showing -- so a child that
+    /// overrides only the phase keeps the goals it inherits.
     ///
     /// Only the executions: the managed block's own configuration does NOT come
     /// along, because the active declaration already supplied the element and an
     /// active value REPLACES the managed one.
-    private static String executionsOf(String managed, String managedFromChain,
-                                       String artifactId) {
-        String from = managed != null && managed.indexOf("<execution>") >= 0
-                ? managed : pluginBlock(managedFromChain, artifactId);
-        if (from == null) {
+    private static String mergedManagedExecutions(String managedFromChain, String artifactId) {
+        java.util.List<String> blocks = pluginBlocks(managedFromChain, artifactId);
+        if (blocks.isEmpty()) {
             return "";
         }
-        int open = from.indexOf("<executions>");
-        int close = from.indexOf("</executions>");
-        return open >= 0 && close > open ? from.substring(open, close + "</executions>".length())
-                : "";
+        // Insertion-ordered so the emitted text is stable, and so an execution
+        // only an ancestor declares still comes out.
+        java.util.Map<String, String[]> byId = new java.util.LinkedHashMap<>();
+        for (String block : blocks) {
+            for (String execution : executionBlocks(block)) {
+                java.util.List<String> ids = elementValues(execution, "id");
+                // Maven's own name for an execution that does not give one.
+                String id = ids.isEmpty() ? "default" : ids.get(0).trim();
+                java.util.List<String> phases = elementValues(execution, "phase");
+                String phase = phases.isEmpty() ? null : phases.get(0).trim();
+                String goals = between(execution, "<goals>", "</goals>");
+                String[] merged = byId.get(id);
+                if (merged == null) {
+                    byId.put(id, new String[]{phase, goals});
+                    continue;
+                }
+                if (merged[0] == null) {
+                    merged[0] = phase;
+                }
+                if (merged[1] == null) {
+                    merged[1] = goals;
+                }
+            }
+        }
+        if (byId.isEmpty()) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder("<executions>");
+        for (java.util.Map.Entry<String, String[]> e : byId.entrySet()) {
+            out.append("<execution><id>").append(e.getKey()).append("</id>");
+            if (e.getValue()[0] != null) {
+                out.append("<phase>").append(e.getValue()[0]).append("</phase>");
+            }
+            if (e.getValue()[1] != null) {
+                out.append(e.getValue()[1]);
+            }
+            out.append("</execution>");
+        }
+        return out.append("</executions>").toString();
+    }
+
+    /// Every `<plugin>` block for `artifactId` in `pomText`, in document order.
+    ///
+    /// `pluginBlock` returns the first and nothing else, which is the right
+    /// answer for one POM and the wrong one for the concatenated management
+    /// chain, where each POM in it contributes its own block.
+    static java.util.List<String> pluginBlocks(String pomText, String artifactId) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pomText == null) {
+            return out;
+        }
+        String text = withoutComments(pomText);
+        String marker = "<artifactId>" + artifactId + "</artifactId>";
+        int at = text.indexOf(marker);
+        while (at >= 0) {
+            int open = text.lastIndexOf("<plugin>", at);
+            int close = text.indexOf("</plugin>", at);
+            if (open >= 0 && close > open) {
+                out.add(text.substring(open, close));
+                at = text.indexOf(marker, close);
+            } else {
+                at = text.indexOf(marker, at + marker.length());
+            }
+        }
+        return out;
+    }
+
+    /// The `<execution>` blocks of one plugin block, in order.
+    private static java.util.List<String> executionBlocks(String pluginBlock) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (pluginBlock == null) {
+            return out;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return out;
+            }
+            out.add(pluginBlock.substring(at, close));
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return out;
+    }
+
+    /// The text from `open` through the following `close`, or null.
+    private static String between(String xml, String open, String close) {
+        if (xml == null) {
+            return null;
+        }
+        int from = xml.indexOf(open);
+        if (from < 0) {
+            return null;
+        }
+        int to = xml.indexOf(close, from);
+        return to < 0 ? null : xml.substring(from, to + close.length());
     }
 
     /// The `<pluginManagement>` sections of `pomText`, and nothing else.

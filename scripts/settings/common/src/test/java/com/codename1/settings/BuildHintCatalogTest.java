@@ -2186,6 +2186,116 @@ public class BuildHintCatalogTest {
                 "<plugin><artifactId>maven-compiler-plugin</artifactId></plugin>"));
     }
 
+    /// An ancestor's managed binding survives a nearer managed declaration.
+    ///
+    /// Maven MERGES `pluginManagement` down the chain, so a parent that binds
+    /// `compile` and a child that manages only the version -- or only an
+    /// unrelated execution -- still leaves the parent's binding in force. Taking
+    /// the nearest managed block that has any execution at all dropped it, the
+    /// goal read as unbound, and the source root it configures vanished from the
+    /// scan; a dormant copy of the main class could then answer for the compiled
+    /// one, and its annotation-owned hints looked editable.
+    @Test
+    public void anAncestorsManagedBindingSurvivesANearerManagedDeclaration() {
+        String parent = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+
+        // The nearer POM manages the same plugin, with only a version.
+        String versionOnly = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(versionOnly, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(versionOnly) + parent);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "compile"),
+                "version-only managed block hid the ancestor binding");
+
+        // ...and with only an execution that binds something else.
+        String otherExecution = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>test-compile</id><phase>test-compile</phase>"
+                + "<goals><goal>test-compile</goal></goals></execution>"
+                + "</executions></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String second = CodenameOneSettings.activePluginBlock(otherExecution,
+                "kotlin-maven-plugin", "sourceDirs", "compile",
+                managementOf(otherExecution) + parent);
+        assertTrue(CodenameOneSettings.bindsGoal(second, "compile"),
+                "an unrelated managed execution hid the ancestor binding");
+    }
+
+    /// A nearer managed declaration still SWITCHES OFF the ancestor's execution.
+    ///
+    /// The merge is by execution id, not a union. A child that re-declares the
+    /// parent's id with `<phase>none</phase>` turns it off, and a union would
+    /// still see the parent's goal and call the plugin bound -- which is the
+    /// mirror-image bug, and the one that keeps a root the build does not
+    /// compile.
+    @Test
+    public void aNearerPhaseNoneStillDisablesTheAncestorsExecution() {
+        String parent = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String child = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>none</phase></execution>"
+                + "</executions></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(child, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(child) + parent);
+        assertFalse(CodenameOneSettings.bindsGoal(block, "compile"),
+                "a disabled execution still read as a binding");
+    }
+
+    /// Every managed block for the plugin is returned, not just the first.
+    ///
+    /// The management chain is the POMs' `<pluginManagement>` sections
+    /// concatenated, so each one contributes its own block. Reading only the
+    /// first is what made an ancestor's binding invisible.
+    @Test
+    public void everyManagedBlockForThePluginIsRead() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><goals><goal>compile</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        assertEquals(2, CodenameOneSettings.pluginBlocks(chain, "kotlin-maven-plugin").size());
+        assertTrue(CodenameOneSettings.pluginBlocks(chain, "maven-compiler-plugin").isEmpty());
+    }
+
+    /// The `<pluginManagement>` sections of `pom`, as the chain reader sees them.
+    private static String managementOf(String pom) {
+        StringBuilder out = new StringBuilder();
+        int at = pom.indexOf("<pluginManagement>");
+        while (at >= 0) {
+            int close = pom.indexOf("</pluginManagement>", at);
+            if (close < 0) {
+                break;
+            }
+            out.append(pom, at, close + "</pluginManagement>".length());
+            at = pom.indexOf("<pluginManagement>", close);
+        }
+        return out.toString();
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

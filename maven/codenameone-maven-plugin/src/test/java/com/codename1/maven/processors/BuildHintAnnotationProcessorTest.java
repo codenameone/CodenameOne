@@ -847,21 +847,28 @@ public class BuildHintAnnotationProcessorTest {
     /// A declared encoding the file does not actually decode through is ignored.
     ///
     /// A module that says UTF-8 and has one source that is not gains nothing from
-    /// being read as UTF-8: the bytes are malformed, every one of them comes back
-    /// as a replacement character, and a name spelled with one never matches. The
+    /// being read as UTF-8: the bytes are malformed, they come back as
+    /// replacement characters, and a name spelled with one never matches. The
     /// byte sniffing reads that file correctly, so it stays the better answer --
     /// and the declaration is not taken on faith.
+    ///
+    /// The non-ASCII name is a NESTED one, so every path this test touches stays
+    /// ASCII. Putting it in the file name instead passed here and failed on CI:
+    /// a runner whose `sun.jnu.encoding` is ASCII cannot represent the name, so
+    /// the file was written under a mangled one and the scan never found it --
+    /// the test measuring the runner's locale rather than the decoder.
     @Test
     public void aDeclaredEncodingTheFileDoesNotDecodeThroughIsIgnored() throws Exception {
         String cafe = "Caf\u00e9";
         File src = tmp.newFolder();
         File dir = new File(src, "com/ex");
         assertTrue(dir.mkdirs());
-        String text = "package com.ex;\npublic class " + cafe + " {\n}\n";
-        writeAs(new File(dir, cafe + ".java"), text, "ISO-8859-1");
+        String text = "package com.ex;\npublic class Main {\n  static class " + cafe
+                + " {}\n}\n";
+        writeAs(new File(dir, "Main.java"), text, "ISO-8859-1");
 
         assertTrue(BuildHintAnnotationProcessor.hasBackingSource(
-                compiledClass("com.ex." + cafe, text, "com/ex/" + cafe),
+                compiledClass("com.ex.Main", text, "com/ex/Main$" + cafe),
                 java.util.Collections.singletonList(src.getAbsolutePath()), "UTF-8"));
     }
 
