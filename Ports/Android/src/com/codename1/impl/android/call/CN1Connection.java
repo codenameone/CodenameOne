@@ -54,6 +54,8 @@ public class CN1Connection extends Connection {
     private boolean audioAnnounced;
     private String callerName;
     private boolean video;
+    /// Set between onAnswer and the action being fulfilled.
+    private boolean awaitingAnswer;
 
     CN1Connection(CN1ConnectionService service, String callId) {
         this.service = service;
@@ -114,8 +116,16 @@ public class CN1Connection extends Connection {
     @Override
     public void onAnswer() {
         CN1CallNotifications.dismiss(callId);
+        // Telecom is moved first because its API requires it, but the AUDIO
+        // is not announced here. Both deliveries reach the app through the
+        // EDT in call order, so announcing before the answer told an app its
+        // media could start before it had been told the call was answered --
+        // and an app that defers the answer while it negotiates signalling
+        // would start media for a call it has not accepted. The simulation
+        // delivers them the other way round, which is the order that is
+        // right.
+        awaitingAnswer = true;
         setActive();
-        announceAudio();
         Calls.deliverAnswer(callId, service.nextActionToken(this, ACTION_ANSWER));
     }
 
@@ -193,9 +203,21 @@ public class CN1Connection extends Connection {
 
     @Override
     public void onStateChanged(int state) {
-        if (state == STATE_ACTIVE) {
+        // Not while an answer is in flight: that path announces when the
+        // action is fulfilled, and setActive() above gets here first.
+        if (state == STATE_ACTIVE && !awaitingAnswer) {
             announceAudio();
         }
+    }
+
+    /// Announces the audio session once the answer has been carried out.
+    ///
+    /// Called from CN1ConnectionService when the action is fulfilled, so an
+    /// app that deferred the answer starts its media only after it has
+    /// accepted the call.
+    void answerFulfilled() {
+        awaitingAnswer = false;
+        announceAudio();
     }
 
     /// Tears down a call whose answer the app could not carry out.

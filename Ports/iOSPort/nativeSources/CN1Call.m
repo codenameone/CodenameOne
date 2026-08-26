@@ -132,7 +132,9 @@ static CXCallController *cn1clController = nil;
 
 /// Calls this app currently has, keyed by canonical id string.
 static NSMutableDictionary *cn1clCalls = nil;
-/// The actions this app submitted itself, as "<uuid>|<CXAction class>".
+/// The actions this app submitted itself, as "<uuid>|<CXAction class>",
+/// counted so that two overlapping requests of the same kind for one call
+/// are both recognised as this app's.
 ///
 /// Every transaction an app requests comes back through the provider
 /// delegate, which is the same door the system uses -- so end(), setHeld()
@@ -144,7 +146,7 @@ static NSMutableDictionary *cn1clCalls = nil;
 /// A submitted action is claimed here and fulfilled natively instead. The
 /// caller already has its own AsyncResource for the outcome, and the session
 /// state moves on that acknowledgement.
-static NSMutableSet *cn1clJavaStarts = nil;
+static NSCountedSet *cn1clJavaStarts = nil;
 
 /// The calls whose CXStartCallAction the SYSTEM submitted -- Recents, Siri --
 /// and that Java has not adopted yet.
@@ -235,7 +237,7 @@ static void cn1clEnsureState(void) {
         cn1clUnclaimed = [[NSMutableSet alloc] init];
         cn1clReporting = [[NSMutableSet alloc] init];
         cn1clReportWaiters = [[NSMutableDictionary alloc] init];
-        cn1clJavaStarts = [[NSMutableSet alloc] init];
+        cn1clJavaStarts = [[NSCountedSet alloc] init];
         cn1clSystemStarts = [[NSMutableSet alloc] init];
         cn1clTokenRequests = [[NSMutableArray alloc] init];
         cn1clQueuedActions = [[NSMutableArray alloc] init];
@@ -320,7 +322,12 @@ static BOOL cn1clTakeOwn(CXCallAction *action) {
     NSString *key = cn1clOwnKey([action.callUUID UUIDString],
             [action class]);
     @synchronized (cn1clLock) {
-        if (![cn1clJavaStarts containsObject:key]) {
+        // COUNTED, not a set. Two setHeld() or two setMuted() calls for one
+        // call produce the same key, and a plain set kept one entry -- so the
+        // first callback consumed it and the second was misread as the system
+        // asking, which handed the app a hold or mute request it had made
+        // itself and had it signal the change twice.
+        if ([cn1clJavaStarts countForObject:key] == 0) {
             return NO;
         }
         [cn1clJavaStarts removeObject:key];

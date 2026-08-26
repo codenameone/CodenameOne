@@ -423,6 +423,9 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             return;
         }
         NEVPNProtocol *cfg;
+        // Set when a keychain write hands back nil; checked before the save.
+        BOOL ipsecSecretMissing = NO;
+        BOOL passwordMissing = NO;
         if (proto == CN1_VPN_PROTO_IPSEC) {
             NEVPNProtocolIPSec *ipsec = [[NEVPNProtocolIPSec alloc] init];
             ipsec.authenticationMethod = [psk length] > 0
@@ -431,6 +434,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             if ([psk length] > 0) {
                 ipsec.sharedSecretReference =
                         cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.psk"), psk);
+                ipsecSecretMissing = ipsec.sharedSecretReference == nil;
             }
             ipsec.localIdentifier = [localId length] > 0 ? localId : nil;
             ipsec.remoteIdentifier = [remoteId length] > 0 ? remoteId : server;
@@ -446,6 +450,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
                     : NEVPNIKEAuthenticationMethodNone;
             if ([psk length] > 0) {
                 ike.sharedSecretReference = cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.psk"), psk);
+                ipsecSecretMissing = ike.sharedSecretReference == nil;
             }
             ike.localIdentifier = [localId length] > 0 ? localId : nil;
             ike.remoteIdentifier = [remoteId length] > 0 ? remoteId : server;
@@ -459,6 +464,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             // reference, which is why a loaded profile can never hand the
             // secret back to the app.
             cfg.passwordReference = cn1vpStoreSecret(cn1vpSecretAccount(@"cn1vpn.password"), pass);
+            passwordMissing = cfg.passwordReference == nil;
         }
         cfg.disconnectOnSleep = NO;
 
@@ -470,6 +476,20 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         if (onDemand) {
             NEOnDemandRuleConnect *rule = [[NEOnDemandRuleConnect alloc] init];
             manager.onDemandRules = [NSArray arrayWithObject:rule];
+        }
+        // A keychain write that failed hands back nil, and assigning that as
+        // the reference saved a profile with no credential in it: the install
+        // reported success and the next connection could not authenticate --
+        // having already replaced a profile that worked.
+        if (([psk length] > 0 && ipsecSecretMissing)
+                || ([pass length] > 0 && passwordMissing)) {
+            cn1vpDiscardStagedSecrets();
+            @synchronized (cn1vpInstallLock) {
+                cn1vpInstalling = NO;
+            }
+            cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                    @"The VPN credentials could not be stored in the keychain");
+            return;
         }
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
             if (saveError == nil) {

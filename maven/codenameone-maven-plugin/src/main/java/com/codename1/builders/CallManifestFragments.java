@@ -152,12 +152,15 @@ final class CallManifestFragments {
                     "android.permission.FOREGROUND_SERVICE_PHONE_CALL", "");
         }
 
-        if (directory) {
-            // Deliberately NOT MANAGE_OWN_CALLS. An app that only labels or
-            // blocks somebody else's caller never owns a call, and Play
-            // Console flags gratuitous telephony permissions.
-            out = addPermission(out, "android.permission.READ_CALL_LOG", "");
-        }
+        // Nothing for `directory`. Deliberately NOT MANAGE_OWN_CALLS -- an app
+        // that only labels or blocks somebody else's caller never owns a call
+        // -- and deliberately not READ_CALL_LOG either: CN1CallScreeningService
+        // takes the number from Call.Details, which the system hands it, and
+        // never reads the log. Declaring it put a screening-only build under
+        // call-log policy and store review for an access it does not make,
+        // against a package documented as carrying no telephony permissions.
+        // The role and the BIND_SCREENING_SERVICE declaration are the whole
+        // requirement.
 
         return out;
     }

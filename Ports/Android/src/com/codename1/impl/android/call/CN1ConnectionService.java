@@ -252,6 +252,13 @@ public class CN1ConnectionService extends ConnectionService {
             return;
         }
         if (fulfilled) {
+            if (a.kind == CN1Connection.ACTION_ANSWER) {
+                // The audio session is announced HERE, not in onAnswer: an
+                // app that defers the answer while it negotiates signalling
+                // must not be told its media can start before it has accepted
+                // the call.
+                a.connection.answerFulfilled();
+            }
             // A reject or a hang-up the app agreed to still has to be carried
             // out. Telecom asked; delivering the request to Java and letting
             // the facade fulfil it is not the same as ending the call, and

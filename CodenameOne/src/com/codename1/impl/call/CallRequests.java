@@ -83,6 +83,25 @@ public final class CallRequests {
     ///
     /// the bridge, or null
     public static synchronized CallBridge bridge() {
+        CallBridge b = resolveBridge();
+        if (b != null) {
+            // The first moment there is anywhere to send it. A listener
+            // registered before Display.init moved the flags with no port to
+            // tell, and every later registration then saw no transition and
+            // said nothing either -- so iOS held every CallKit action until
+            // it timed out while a listener sat registered.
+            boolean wanted = actionsWanted || pushesWanted;
+            if (deliveredReady == null
+                    || deliveredReady.booleanValue() != wanted) {
+                deliveredReady = Boolean.valueOf(wanted);
+                b.setJavaReady(wanted);
+            }
+        }
+        return b;
+    }
+
+    /// The port's bridge, with no side effects.
+    private static CallBridge resolveBridge() {
         if (testBridge != null) {
             return testBridge;
         }
@@ -130,6 +149,7 @@ public final class CallRequests {
         synchronized (CallRequests.class) {
             actionsWanted = false;
             pushesWanted = false;
+            deliveredReady = null;
         }
         com.codename1.call.session.Calls.resetForTest();
         com.codename1.call.voip.VoipPush.resetForTest();
@@ -188,15 +208,32 @@ public final class CallRequests {
                 pushesWanted = wanted;
             }
             boolean after = actionsWanted || pushesWanted;
-            if (before == after) {
+            CallBridge b = resolveBridge();
+            if (b == null) {
+                // No port yet -- a listener registered before Display.init.
+                // The flags still moved, so the state is remembered and
+                // delivered by whoever next finds a bridge; without that, iOS
+                // held every CallKit action until it timed out because
+                // nothing ever told it Java was listening.
+                deliveredReady = null;
                 return;
             }
-            CallBridge b = bridge();
-            if (b != null) {
-                b.setJavaReady(after);
+            if (before == after && deliveredReady != null
+                    && deliveredReady.booleanValue() == after) {
+                return;
             }
+            deliveredReady = Boolean.valueOf(after);
+            b.setJavaReady(after);
         }
     }
+
+    /// What the port was last told, or null when it has not been told.
+    ///
+    /// Comparing only the computed transition was not enough: a listener
+    /// installed before the port existed changed the flags without reaching
+    /// anyone, and every later registration then saw no transition and said
+    /// nothing either.
+    private static Boolean deliveredReady;
 
     /// The next request id.
     ///

@@ -339,6 +339,16 @@ public class AndroidVpnBridge implements VpnBridge {
                 installedWire = null;
                 Preferences.delete(WIRE_PREF);
             }
+            // This app no longer has a tunnel to own. Left set, the transport
+            // callback stayed attributed to us and the onLost that deleting a
+            // provisioned profile produces moved the status from
+            // NOT_CONFIGURED to DISCONNECTED -- so getStatus() claimed a
+            // configuration still existed after the removal it had just
+            // reported as successful.
+            startRequested = false;
+            if (!listening) {
+                stopWatchingTheTunnel();
+            }
             setStatus(VpnStatus.NOT_CONFIGURED);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
