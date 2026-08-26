@@ -56,7 +56,7 @@ piece of advice is correct everywhere.
 *A pushed call is already ringing.* When a call arrives as a VoIP push, iOS
 requires it to be reported to the system _before any of your code runs_ and
 kills the app when it isn't -- so native code does the reporting from a fixed
-payload, and your listener is told afterwards. `PushedCall` therefore hands you
+payload, and your listener is told afterward. `PushedCall` therefore hands you
 a `CallSession` you never created, possibly one the user has already answered.
 Your job is to attach media to a call that exists, not to decide whether to
 ring.
@@ -168,7 +168,7 @@ package from `com.codename1.call.session`.
 === Naming And Blocking Other People's Callers
 
 This is caller ID and spam blocking: an ordinary cellular call arrives, and the
-system asks the installed directories whether any of them recognises the
+system asks the installed directories whether any of them recognizes the
 number. It has nothing to do with calls your app carries, which is why it's a
 package of its own and carries no telephony permissions.
 
