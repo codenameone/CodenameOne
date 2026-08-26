@@ -60,6 +60,10 @@
 /// paint and clears it again, and everything else draws into the main window.
 @property (nonatomic, assign) NSView *activeRenderingView;
 
+/// The same value WITHOUT the fall back to the main surface, so a caller can
+/// tell "the main window is painting" from "nothing is painting".
+@property (nonatomic, readonly) NSView *activeRenderingViewOrNil;
+
 /// Pins the window to one size so a screenshot comparison has something stable
 /// to compare. Only the compliance suite sets this.
 - (void)setFixedContentSize:(NSSize)size;

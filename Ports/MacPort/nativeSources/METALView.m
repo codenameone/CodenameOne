@@ -51,6 +51,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 @implementation METALView {
     NSTrackingArea *cn1TrackingArea;
     NSMutableIndexSet *consumedKeys;
+    NSUInteger selectionAnchor;
+    BOOL selectionAnchorValid;
 }
 
 @synthesize commandQueue;
@@ -726,6 +728,10 @@ static int CN1MacKeyCode(NSEvent *event) {
     }
     session.text = [session.text stringByReplacingCharactersInRange:range
                                                          withString:string];
+    // Reported as the operation it is. The pure editor owns its own document and
+    // cannot take a whole-text replacement; the legacy path ignores this and
+    // sends the document at commit instead.
+    CN1MacTextInputNotifyReplace(range, string);
     return YES;
 }
 
@@ -747,6 +753,7 @@ static int CN1MacKeyCode(NSEvent *event) {
     if (!session.active) {
         return;
     }
+    [self cn1ForgetAnchor];
     NSString *inserted = [string isKindOfClass:[NSAttributedString class]]
         ? [(NSAttributedString *)string string]
         : (NSString *)string;
@@ -796,10 +803,15 @@ static int CN1MacKeyCode(NSEvent *event) {
         : NSMakeRange(NSNotFound, 0);
     session.selectedRange = NSMakeRange(range.location + selectedRange.location,
                                         selectedRange.length);
+    // The composing run, so the pure editor can render it as uncommitted. The
+    // replacement above already told it what changed; this says the change is
+    // still being composed.
+    CN1MacTextInputNotifyComposing(marked, (NSInteger)selectedRange.location);
     [session commitFinished:NO];
 }
 
 - (void)unmarkText {
+    CN1MacTextInputNotifyFinishComposing();
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     session.markedRange = NSMakeRange(NSNotFound, 0);
     [[NSTextInputContext currentInputContext] discardMarkedText];
@@ -861,10 +873,36 @@ static int CN1MacKeyCode(NSEvent *event) {
     return NSNotFound;
 }
 
-/// The edge a shift-arrow moves. Growing leftwards moves the start, rightwards
-/// the end -- and with no selection both are the caret.
-static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
-    return leftwards ? sel.location : NSMaxRange(sel);
+/// The end of the selection the keyboard is moving, given where the anchor is.
+///
+/// Not "the left edge when going left": that loses which end is fixed, so
+/// reversing direction grew the selection from the other side instead of
+/// contracting it. From caret 5, Shift-Left gives [4,5); Shift-Right then has to
+/// come back to 5, not run on to [4,6).
+static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
+    return anchor == sel.location ? NSMaxRange(sel) : sel.location;
+}
+
+/// The fixed end of the selection the keyboard is building.
+///
+/// Remembered across keystrokes, because the range alone cannot say which end is
+/// anchored: [4,5) is the same range whether the user shift-lefted from 5 or
+/// shift-righted from 4, and the next keystroke has to grow from the other end
+/// in each case. Forgotten whenever the selection stops matching what was
+/// recorded, which is how an ordinary click or an insertion starts a fresh one.
+- (NSUInteger)cn1SelectionAnchor:(NSRange)sel {
+    if (selectionAnchorValid
+            && (selectionAnchor == sel.location || selectionAnchor == NSMaxRange(sel))) {
+        return selectionAnchor;
+    }
+    // No usable memory: a collapsed caret anchors on itself, and a selection made
+    // some other way anchors at its start, which is what AppKit does.
+    return sel.location;
+}
+
+- (void)cn1RememberAnchor:(NSUInteger)anchor {
+    selectionAnchor = anchor;
+    selectionAnchorValid = YES;
 }
 
 /// The index one composed character before `at`.
@@ -892,11 +930,25 @@ static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
 }
 
 /// Grows or shrinks a selection towards `to`, keeping the far edge anchored.
-- (NSRange)cn1Extend:(NSRange)sel to:(NSUInteger)to anchoredAtStart:(BOOL)atStart {
-    NSUInteger anchor = atStart ? sel.location : NSMaxRange(sel);
+- (NSRange)cn1Extend:(NSRange)sel to:(NSUInteger)to anchor:(NSUInteger)anchor {
     NSUInteger lo = MIN(anchor, to);
     NSUInteger hi = MAX(anchor, to);
     return NSMakeRange(lo, hi - lo);
+}
+
+/// Anything that is not a shift-arrow ends the selection gesture, so the next
+/// one starts from wherever the caret ended up rather than from a stale anchor.
+- (void)cn1ForgetAnchor {
+    selectionAnchorValid = NO;
+}
+
+/// Moves the caret or selection and tells the pure editor. A caret move is not
+/// an edit, so it never reaches cn1ReplaceRange -- without this the editor's own
+/// caret stayed where it was while the shadow moved, and the next insertion
+/// landed at the wrong offset.
+- (void)cn1SetSelection:(NSRange)sel {
+    [CN1MacTextInputSession sharedSession].selectedRange = sel;
+    CN1MacTextInputNotifySelection(sel);
 }
 
 - (void)doCommandBySelector:(SEL)selector {
@@ -929,13 +981,13 @@ static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
     if (selector == @selector(deleteBackward:)) {
         if (sel.length > 0) {
             [self cn1ReplaceRange:sel withString:@""];
-            session.selectedRange = NSMakeRange(sel.location, 0);
+            [self cn1SetSelection:NSMakeRange(sel.location, 0)];
         } else if (sel.location > 0) {
             // Steps by composed character so deleting an emoji or an accented
             // letter removes the whole thing rather than half of it.
             NSRange back = [session.text rangeOfComposedCharacterSequenceAtIndex:sel.location - 1];
             [self cn1ReplaceRange:back withString:@""];
-            session.selectedRange = NSMakeRange(back.location, 0);
+            [self cn1SetSelection:NSMakeRange(back.location, 0)];
         }
         [session commitFinished:NO];
         return;
@@ -943,25 +995,27 @@ static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
     if (selector == @selector(deleteForward:)) {
         if (sel.length > 0) {
             [self cn1ReplaceRange:sel withString:@""];
-            session.selectedRange = NSMakeRange(sel.location, 0);
+            [self cn1SetSelection:NSMakeRange(sel.location, 0)];
         } else if (sel.location < len) {
             NSRange fwd = [session.text rangeOfComposedCharacterSequenceAtIndex:sel.location];
             [self cn1ReplaceRange:fwd withString:@""];
-            session.selectedRange = NSMakeRange(fwd.location, 0);
+            [self cn1SetSelection:NSMakeRange(fwd.location, 0)];
         }
         [session commitFinished:NO];
         return;
     }
+    [self cn1ForgetAnchor];
     if (selector == @selector(moveLeft:)) {
         NSUInteger at = sel.length > 0 ? sel.location
             : [self cn1IndexBefore:sel.location inText:session.text];
-        session.selectedRange = NSMakeRange(at, 0);
+        [self cn1SetSelection:NSMakeRange(at, 0)];
         return;
     }
+    [self cn1ForgetAnchor];
     if (selector == @selector(moveRight:)) {
         NSUInteger at = sel.length > 0 ? NSMaxRange(sel)
             : [self cn1IndexAfter:sel.location inText:session.text];
-        session.selectedRange = NSMakeRange(at, 0);
+        [self cn1SetSelection:NSMakeRange(at, 0)];
         return;
     }
     // Shift-arrow and its line/document variants. AppKit turns them into these
@@ -970,52 +1024,56 @@ static NSUInteger cn1SelectionEdge(NSRange sel, BOOL leftwards) {
     // TextField or TextArea on the port.
     if (selector == @selector(moveLeftAndModifySelection:)
         || selector == @selector(moveBackwardAndModifySelection:)) {
-        session.selectedRange = [self cn1Extend:sel
-                                             to:[self cn1IndexBefore:cn1SelectionEdge(sel, YES)
-                                                              inText:session.text]
-                                       anchoredAtStart:NO];
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        NSUInteger to = [self cn1IndexBefore:cn1ActiveEdge(sel, anchor) inText:session.text];
+        [self cn1SetSelection:[self cn1Extend:sel to:to anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
         return;
     }
     if (selector == @selector(moveRightAndModifySelection:)
         || selector == @selector(moveForwardAndModifySelection:)) {
-        session.selectedRange = [self cn1Extend:sel
-                                             to:[self cn1IndexAfter:cn1SelectionEdge(sel, NO)
-                                                             inText:session.text]
-                                       anchoredAtStart:YES];
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        NSUInteger to = [self cn1IndexAfter:cn1ActiveEdge(sel, anchor) inText:session.text];
+        [self cn1SetSelection:[self cn1Extend:sel to:to anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
         return;
     }
     if (selector == @selector(moveToBeginningOfLineAndModifySelection:)
         || selector == @selector(moveToBeginningOfParagraphAndModifySelection:)
         || selector == @selector(moveToBeginningOfDocumentAndModifySelection:)) {
-        session.selectedRange = NSMakeRange(0, NSMaxRange(sel));
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        [self cn1SetSelection:[self cn1Extend:sel to:0 anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
         return;
     }
     if (selector == @selector(moveToEndOfLineAndModifySelection:)
         || selector == @selector(moveToEndOfParagraphAndModifySelection:)
         || selector == @selector(moveToEndOfDocumentAndModifySelection:)) {
-        session.selectedRange = NSMakeRange(sel.location, len - sel.location);
+        NSUInteger anchor = [self cn1SelectionAnchor:sel];
+        [self cn1SetSelection:[self cn1Extend:sel to:len anchor:anchor]];
+        [self cn1RememberAnchor:anchor];
         return;
     }
     if (selector == @selector(moveToBeginningOfLine:)
         || selector == @selector(moveToBeginningOfParagraph:)
         || selector == @selector(moveToBeginningOfDocument:)) {
-        session.selectedRange = NSMakeRange(0, 0);
+        [self cn1SetSelection:NSMakeRange(0, 0)];
         return;
     }
     if (selector == @selector(moveToEndOfLine:)
         || selector == @selector(moveToEndOfParagraph:)
         || selector == @selector(moveToEndOfDocument:)) {
-        session.selectedRange = NSMakeRange(len, 0);
+        [self cn1SetSelection:NSMakeRange(len, 0)];
         return;
     }
     if (selector == @selector(selectAll:)) {
-        session.selectedRange = NSMakeRange(0, len);
+        [self cn1SetSelection:NSMakeRange(0, len)];
         return;
     }
     if (selector == @selector(deleteToEndOfLine:) || selector == @selector(deleteToEndOfParagraph:)) {
         NSRange tail = NSMakeRange(sel.location, len - sel.location);
         [self cn1ReplaceRange:tail withString:@""];
-        session.selectedRange = NSMakeRange(sel.location, 0);
+        [self cn1SetSelection:NSMakeRange(sel.location, 0)];
         [session commitFinished:NO];
         return;
     }

@@ -30,7 +30,79 @@
 // round trip lands.
 extern void stringEdit(int finished, int cursorPos, NSString *text);
 
-@implementation CN1MacTextInputSession
+/*
+ * The pure-editor callbacks. Declared here rather than pulled from a header
+ * because ParparVM names them by their full Java signature and there is no
+ * header for generated symbols; IOSImplementation.tiKeepNativeCallbacksAlive
+ * already holds a reachable reference to every one of them, which is what stops
+ * the dead-code pass dropping a method only C calls.
+ */
+extern void com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT start, JAVA_INT end, JAVA_OBJECT text, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT start, JAVA_INT end, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiSetComposing___java_lang_String_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT text, JAVA_INT rel, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT action);
+
+/// Reports one replacement to the pure editor. No-op for the legacy path, whose
+/// edits travel as a whole-document stringEdit instead.
+void CN1MacTextInputNotifyReplace(NSRange range, NSString *text) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.pureEditor) {
+        return;
+    }
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String_int(
+            threadStateData, (JAVA_INT)range.location, (JAVA_INT)NSMaxRange(range),
+            fromNSString(threadStateData, text != nil ? text : @""),
+            (JAVA_INT)[session nextEditSeq]);
+}
+
+void CN1MacTextInputNotifySelection(NSRange sel) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.pureEditor) {
+        return;
+    }
+    com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(
+            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)sel.location, (JAVA_INT)NSMaxRange(sel),
+            (JAVA_INT)[session nextEditSeq]);
+}
+
+void CN1MacTextInputNotifyComposing(NSString *text, NSInteger rel) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.pureEditor) {
+        return;
+    }
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_tiSetComposing___java_lang_String_int_int(
+            threadStateData, fromNSString(threadStateData, text != nil ? text : @""),
+            (JAVA_INT)rel, (JAVA_INT)[session nextEditSeq]);
+}
+
+void CN1MacTextInputNotifyFinishComposing(void) {
+    CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (!session.pureEditor) {
+        return;
+    }
+    com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(
+            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)[session nextEditSeq]);
+}
+
+/// The Return / action key, which is how a single-line pure editor learns the
+/// user is done. tiEditorAction rather than tiKeyCommand: the former is the
+/// editor-action channel, the latter is for caret and editing key commands.
+void CN1MacTextInputNotifyEditorAction(void) {
+    com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(
+            CN1_THREAD_GET_STATE_PASS_ARG 0);
+}
+
+@implementation CN1MacTextInputSession {
+    int editSeq;
+}
 
 + (instancetype)sharedSession {
     static CN1MacTextInputSession *shared = nil;
@@ -102,7 +174,25 @@ extern void stringEdit(int finished, int cursorPos, NSString *text);
     });
 }
 
+- (int)nextEditSeq {
+    return ++editSeq;
+}
+
 - (void)commitFinished:(BOOL)finished {
+    if (self.pureEditor) {
+        // The pure editor has already been told about the edit itself, operation
+        // by operation, through the ti* callbacks. stringEdit would reach
+        // editingUpdate, which only ever touches currentEditing -- null on this
+        // path -- so it is not merely redundant here, it is the whole reason a
+        // pure editor typed nothing.
+        //
+        // "finished" still has to travel: it is how a single-line editor learns
+        // the user pressed Return.
+        if (finished) {
+            CN1MacTextInputNotifyEditorAction();
+        }
+        return;
+    }
     stringEdit(finished ? 1 : 0, (int)NSMaxRange(self.selectedRange), self.text);
 }
 
@@ -122,6 +212,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_
     NSString *initial = initialText != JAVA_NULL
         ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG initialText)
         : @"";
+    // The pure editor engine's entry point. editStringAt, below, is the legacy
+    // TextField/TextArea one, and the two report to different Java callbacks.
+    [CN1MacTextInputSession sharedSession].pureEditor = YES;
     [[CN1MacTextInputSession sharedSession] startWithText:initial
                                                 selStart:selStart
                                                   selEnd:selEnd
@@ -182,6 +275,7 @@ void CN1MacTextInputSetText(NSString *text) {
 void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     NSString *initial = text != nil ? text : @"";
+    session.pureEditor = NO;
     session.editorBounds = bounds;
     // A caret rectangle is needed before the first updateTextInputState arrives,
     // or an input method opened on the first keystroke has nowhere to put its

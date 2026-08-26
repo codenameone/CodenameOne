@@ -242,6 +242,13 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesCrypto = {false};
         try {
             scanClassesForPermissions(classesDir, new CryptoScanner(usesCrypto));
+            // btres too, for the reason the capability scan reads it: unzip routes a
+            // submitted cn1lib's jar there rather than unpacking it beside the loose
+            // classes. A library that is the only thing calling SecureRandom left
+            // CN1_INCLUDE_CRYPTO off, and the stub bridge then returns the caller's
+            // buffer untouched -- commonly all zeroes. A random source that silently
+            // returns a constant is the worst failure in this file.
+            scanClassesForPermissions(buildinRes, new CryptoScanner(usesCrypto));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for crypto usage", ex);
         }

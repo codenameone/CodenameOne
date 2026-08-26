@@ -4224,12 +4224,26 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
     // port, so without this a peer belonging to a secondary Window was added to
     // the main one and drawn there at coordinates meant for its own.
     extern NSView *CN1MacPeerHostView(void);
+    extern NSView *CN1MacPaintingViewOrNil(void);
     CN1View *peerHost = (CN1View *)CN1MacPeerHostView();
+    // Strictly nil when nothing is painting, unlike peerHost. A peer is created
+    // during initComponentImpl, BEFORE its window has ever painted, so at that
+    // moment there is no way to know which window it belongs to. This call runs
+    // again on every positioning pass, and those DO happen inside the window's
+    // paint bracket -- so the peer migrates to its own window the first time
+    // that window lays it out. The fallback variant cannot be used for the move:
+    // it reads "the main window" whenever nothing is painting, which would drag
+    // every secondary window's peer back to the main surface.
+    CN1View *paintingHost = (CN1View *)CN1MacPaintingViewOrNil();
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
+        if (paintingHost != nil && [v superview] != nil && [v superview] != paintingHost) {
+            [v removeFromSuperview];
+        }
         if([v superview] == nil) {
-            [(peerHost != nil ? peerHost
+            CN1View *target = paintingHost != nil ? paintingHost : peerHost;
+            [(target != nil ? target
                  : (CN1View *)[[CodenameOne_GLViewController instance] eaglView])
                     addPeerComponent:v];
         }
