@@ -6256,14 +6256,32 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
     // Each part escaped on its own, with the separators added afterwards.
     // Escaping the assembled string would encode the '?' and '&' that make it a
     // query, and Mail then reads the whole tail as one address.
-    NSCharacterSet *allowedQuery = [NSCharacterSet URLQueryAllowedCharacterSet];
-    NSString *to = [[recipientsArray componentsJoinedByString:@","]
-        stringByAddingPercentEncodingWithAllowedCharacters:
-            [NSCharacterSet URLPathAllowedCharacterSet]];
+    //
+    // NOT URLQueryAllowedCharacterSet: that is the set legal in a whole query,
+    // so it leaves '&', '=' and '+' alone -- and these are individual parameter
+    // VALUES, where an '&' in the body starts a parameter and everything after
+    // it is lost, and a '+' is read back as a space. The sub-delimiters are
+    // removed so only the unreserved characters survive unescaped.
+    NSMutableCharacterSet *allowedValue =
+        [[NSCharacterSet URLQueryAllowedCharacterSet] mutableCopy];
+    [allowedValue removeCharactersInString:@"&=+?#/;,:$@!*'()[]"];
+#ifndef CN1_USE_ARC
+    [allowedValue autorelease];
+#endif
+    // The recipients are escaped one at a time and joined afterwards, because
+    // the comma between them is a separator rather than part of an address.
+    NSMutableArray *escapedRecipients = [NSMutableArray array];
+    for (NSString *r in recipientsArray) {
+        NSString *e = [r stringByAddingPercentEncodingWithAllowedCharacters:allowedValue];
+        if (e != nil) {
+            [escapedRecipients addObject:e];
+        }
+    }
+    NSString *to = [escapedRecipients componentsJoinedByString:@","];
     NSString *email = [NSString stringWithFormat:@"mailto:%@?subject=%@&body=%@",
         to == nil ? @"" : to,
-        [nSubject stringByAddingPercentEncodingWithAllowedCharacters:allowedQuery],
-        [nBody stringByAddingPercentEncodingWithAllowedCharacters:allowedQuery]];
+        [nSubject stringByAddingPercentEncodingWithAllowedCharacters:allowedValue],
+        [nBody stringByAddingPercentEncodingWithAllowedCharacters:allowedValue]];
     dispatch_async(dispatch_get_main_queue(), ^{
         NSURL *url = [NSURL URLWithString:email];
         if (url != nil) {
@@ -6301,10 +6319,65 @@ void launchMailAppOnDevice(JAVA_OBJECT recipients, JAVA_OBJECT subject, JAVA_OBJ
 void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY_java_lang_String_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
                                                                                                                                                                            JAVA_OBJECT  recipients, JAVA_OBJECT  subject, JAVA_OBJECT content, JAVA_OBJECT attachment, JAVA_OBJECT attachmentMimeType, JAVA_BOOLEAN htmlMail) {
 #if TARGET_OS_OSX
-    // No compose controller: AppKit has no in-process mail composer, so the
-    // message is handed to the user's mail application the same way the iOS
-    // path does when MFMailComposeViewController says it cannot send.
-    launchMailAppOnDevice(recipients, subject, content);
+    // AppKit has no in-process mail composer, so the message is handed to the
+    // user's mail application. Through the sharing service rather than a mailto
+    // URL, because a mailto cannot carry a file: attachments were being dropped
+    // silently, and Message.getAttachments() documents that they are sent.
+    NSMutableArray *items = [NSMutableArray array];
+    NSString *nBody = content != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG content) : @"";
+    [items addObject:nBody];
+    if (attachment != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *attData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)attachment)->data;
+        int attCount = ((JAVA_ARRAY)attachment)->length;
+        for (int iter = 0; iter < attCount; iter++) {
+            NSString *path = toNSString(CN1_THREAD_GET_STATE_PASS_ARG attData[iter]);
+            if (path == nil || path.length == 0) {
+                continue;
+            }
+            // The framework hands these over as file: URLs on this port, and a
+            // plain path is accepted too rather than assuming one shape.
+            NSURL *fileURL = [path hasPrefix:@"file:"]
+                ? [NSURL URLWithString:path]
+                : [NSURL fileURLWithPath:path];
+            if (fileURL != nil) {
+                [items addObject:fileURL];
+            }
+        }
+    }
+    NSMutableArray *toList = [NSMutableArray array];
+    if (recipients != JAVA_NULL) {
+        JAVA_ARRAY_OBJECT *recData = (JAVA_ARRAY_OBJECT *)((JAVA_ARRAY)recipients)->data;
+        int recCount = ((JAVA_ARRAY)recipients)->length;
+        for (int iter = 0; iter < recCount; iter++) {
+            NSString *r = toNSString(CN1_THREAD_GET_STATE_PASS_ARG recData[iter]);
+            if (r != nil) {
+                [toList addObject:r];
+            }
+        }
+    }
+    NSString *nSubject = subject != JAVA_NULL
+        ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG subject) : @"";
+    BOOL hasAttachments = items.count > 1;
+    NSSharingService *mail =
+        [NSSharingService sharingServiceNamed:NSSharingServiceNameComposeEmail];
+    if (mail != nil && [mail canPerformWithItems:items]) {
+        mail.recipients = toList;
+        mail.subject = nSubject;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [mail performWithItems:items];
+        });
+    } else {
+        // No mail service configured. A mailto still opens whatever handles it,
+        // which is better than nothing -- but it cannot carry a file, so say so
+        // rather than let the attachments disappear without a trace.
+        if (hasAttachments) {
+            CN1Log(@"No mail service is available to compose with attachments; opening a "
+                   @"plain mailto and the %d attachment(s) are NOT included.",
+                   (int)(items.count - 1));
+        }
+        launchMailAppOnDevice(recipients, subject, content);
+    }
 #else
 #if TARGET_OS_WATCH || TARGET_OS_TV
     // No MessageUI on watchOS/tvOS; email composition is a no-op.

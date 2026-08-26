@@ -158,6 +158,21 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
             com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
                 threadStateData, fromNSString(threadStateData, combined),
                 fromNSString(threadStateData, @"4"));
+        } else if (body != nil) {
+            // A body with no title is the common APNs dictionary form and means
+            // exactly what the string form means, so it is reported as that
+            // rather than skipped. Skipped, a push with no meta reached the
+            // application not at all, and one with meta arrived as a data-only
+            // type 2 -- the body silently gone in both.
+            //
+            // Type 4 stays reserved for title AND body, because that is the
+            // "title;body" wire form and half of it is not that.
+            includedBody = YES;
+            com_codename1_push_PushContent_setBody___java_lang_String(
+                threadStateData, fromNSString(threadStateData, body));
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+                threadStateData, fromNSString(threadStateData, body),
+                fromNSString(threadStateData, meta != nil ? @"3" : @"1"));
         }
     } else if ([alert isKindOfClass:[NSString class]]) {
         includedBody = YES;
