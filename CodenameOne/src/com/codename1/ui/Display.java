@@ -5724,6 +5724,29 @@ public final class Display extends CN1Constants {
         return impl.getNearbyBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.call` API to reach the system call
+    /// stack -- CallKit and PushKit on iOS, `ConnectionService` and `TelecomManager` on Android --
+    /// or null when unsupported on this port. Internal -- application code uses the
+    /// `com.codename1.call` packages rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the call bridge, or null
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        return impl.getCallBridge();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.vpn` API to manage VPN
+    /// configurations, or null when unsupported on this port. Internal -- application code uses
+    /// the `com.codename1.vpn` packages rather than this bridge directly.
+    ///
+    /// #### Returns
+    ///
+    /// the VPN bridge, or null
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        return impl.getVpnBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
     /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge
