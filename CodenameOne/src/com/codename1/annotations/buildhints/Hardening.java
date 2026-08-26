@@ -34,17 +34,16 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
+@Hint(consumedBy = {"CN1BuildMojo"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Hardening {
 
     @Hint(def = "false",
-            doc = "Permits a local or source build to run with hardening requested but not applied. Without it such a build is refused, so a hardened app is never shipped from a target that can't actually harden it.",
-            consumedBy = {"CN1BuildMojo"})
+            doc = "Permits a local or source build to run with hardening requested but not applied. Without it such a build is refused, so a hardened app is never shipped from a target that can't actually harden it.")
     boolean allowUnhardenedLocalBuild() default false;
 
-    @Hint(doc = "Overrides control-flow obfuscation independently of harden.level.",
-            consumedBy = {"CN1BuildMojo"})
+    @Hint(doc = "Overrides control-flow obfuscation independently of harden.level.")
     HardenControlFlow controlFlow() default HardenControlFlow.OFF;
 
     @Hint(kind = HintKind.TEXT_BLOCK,
@@ -57,11 +56,9 @@ public @interface Hardening {
             consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo", "Executor"})
     HardenLevel level() default HardenLevel.OFF;
 
-    @Hint(doc = "Overrides symbol renaming independently of harden.level.",
-            consumedBy = {"CN1BuildMojo"})
+    @Hint(doc = "Overrides symbol renaming independently of harden.level.")
     boolean rename() default false;
 
-    @Hint(doc = "Overrides string obfuscation independently of harden.level: off, constants or all.",
-            consumedBy = {"CN1BuildMojo"})
+    @Hint(doc = "Overrides string obfuscation independently of harden.level: off, constants or all.")
     HardenStrings strings() default HardenStrings.OFF;
 }

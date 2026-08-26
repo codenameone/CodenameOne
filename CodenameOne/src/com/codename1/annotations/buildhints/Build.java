@@ -34,13 +34,13 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
+@Hint(consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Build {
 
     @Hint(name = "facebook.appId",
-            doc = "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app",
-            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
+            doc = "The application ID for an app that requires native Facebook login integration, this defaults to null which means native Facebook support shouldn't be in the app")
     String facebookAppId() default "";
 
     @Hint(name = "gcm.sender_id",
@@ -48,12 +48,10 @@ public @interface Build {
             consumedBy = {"AndroidGradleBuilder"})
     String gcmSenderId() default "";
 
-    @Hint(doc = "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.",
-            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
+    @Hint(doc = "`modern`, `legacy`, `custom` (default unset). Cross-platform override that sets both `ios.themeMode` and `and.themeMode` together when those aren't set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat + Holo Light, `custom` disables the framework native theme entirely. The legacy alias `cn1.nativeTheme` is still accepted.")
     NativeThemeMode nativeTheme() default NativeThemeMode.MODERN;
 
     @Hint(def = "false",
-            doc = "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.",
-            consumedBy = {"AndroidGradleBuilder", "IPhoneBuilder"})
+            doc = "true/false (defaults to false). Blocks codename one from injecting its own resources when set to true, the only effect this has is in slightly reducing archive size. This might have adverse effects on some features of Codename One so it isn't recommended.")
     boolean noExtraResources() default false;
 }

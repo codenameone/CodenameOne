@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
 /// round trip -- a list collapses to `{}` and an absent enum default to the
 /// first constant. [#def] states it once instead.
 @Retention(RetentionPolicy.CLASS)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 public @interface Hint {
 
     /// The key this attribute writes, when it is not the group's prefix
@@ -84,9 +84,20 @@ public @interface Hint {
     String separator() default "";
 
     /// The platform this hint applies to, for the guide's table.
+    ///
+    /// On the annotation TYPE this is the default for every attribute in it,
+    /// which is where it belongs: every hint in `@Android` is an Android hint,
+    /// and saying so on each of the twenty-four was noise that could also be got
+    /// wrong. An attribute states it only to disagree -- `@OnDeviceDebug` spans
+    /// two platforms and each of its attributes says which.
     String platform() default "";
 
     /// The builders that read it, for the guide's table.
+    ///
+    /// On the annotation TYPE this is the default for every attribute in it. An
+    /// attribute states its own only when it differs -- an Android hint that
+    /// `MapsProviderInjector` also reads, or an iOS one the watch builder wants
+    /// too.
     String[] consumedBy() default {};
 
     /// The hint this one is a deprecated second spelling of.

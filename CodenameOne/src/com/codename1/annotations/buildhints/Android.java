@@ -31,159 +31,118 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies. Each attribute's `@Hint(def)` records
-/// what that default is; the `default` clause below it is a neutral placeholder
-/// with no meaning at runtime.
+/// the builder's own default applies. Each attribute's `@Hint(def)` records what
+/// that default is; the `default` clause below it is a neutral placeholder with
+/// no meaning at runtime.
+///
+/// The platform and the builders that read these hints are stated once on the
+/// annotation, not on every attribute. An attribute repeats one only to
+/// disagree with it.
+@Hint(platform = "android",
+        consumedBy = {"AndroidGradleBuilder"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface Android {
 
     @Hint(name = "android.activity.launchMode",
             def = "singleTop",
-            platform = "android",
-            doc = "Allows explicitly setting the `android:launchMode` attribute of the main activity in android. Default is \"singleTop,\" but for some applications you may need to change this behaviour. In particular, apps that are meant to open a file type will need to set this to \"singleTask.\" See https://developer.android.com/guide/topics/manifest/activity-element.html[Android docs for the activity element] for more information about the `android:launchMode` attribute.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Allows explicitly setting the `android:launchMode` attribute of the main activity in android. Default is \"singleTop,\" but for some applications you may need to change this behaviour. In particular, apps that are meant to open a file type will need to set this to \"singleTask.\" See https://developer.android.com/guide/topics/manifest/activity-element.html[Android docs for the activity element] for more information about the `android:launchMode` attribute.")
     String activityLaunchMode() default "";
 
-    @Hint(platform = "android",
-            doc = "Produces an Android App Bundle (.aab) rather than an APK. Required for new Play Store submissions.",
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(doc = "Produces an Android App Bundle (.aab) rather than an APK. Required for new Play Store submissions.")
     boolean appBundle() default false;
 
     @Hint(kind = HintKind.VERSION,
-            platform = "android",
-            doc = "Android build-tools version. It also selects the compile SDK, so there is no separate compile-SDK hint.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Android build-tools version. It also selects the compile SDK, so there is no separate compile-SDK hint.")
     String buildToolsVersion() default "";
 
     @Hint(def = "enabled",
-            platform = "android",
-            doc = "Indicates whether the `RECORD_AUDIO` permission should be requested. Can be `enabled` or any other value to disable this option",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Indicates whether the `RECORD_AUDIO` permission should be requested. Can be `enabled` or any other value to disable this option")
     String captureRecord() default "";
 
     @Hint(def = "false",
-            platform = "android",
-            doc = "true/false defaults to true - indicates whether to include the debug version in the build. Defaults conditionally rather than to a fixed value: when android.release is on it defaults to false, and when release is off it defaults to true, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451).",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "true/false defaults to true - indicates whether to include the debug version in the build. Defaults conditionally rather than to a fixed value: when android.release is on it defaults to false, and when release is off it defaults to true, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451).")
     boolean debug() default false;
 
     @Hint(def = "false",
-            platform = "android",
-            doc = "Turns off R8, falling back to the older shrinker. Note that hardening requires R8, so this conflicts with harden.level.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Turns off R8, falling back to the older shrinker. Note that hardening requires R8, so this conflicts with harden.level.")
     boolean disableR8() default false;
 
     @Hint(def = "true",
-            platform = "android",
-            doc = "Boolean true/false defaults to true. Allows disabling the proguard obfuscation even on release builds, notice that this isn't recommended",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Boolean true/false defaults to true. Allows disabling the proguard obfuscation even on release builds, notice that this isn't recommended")
     boolean enableProguard() default false;
 
     @Hint(appendable = true,
             separator = ";",
-            platform = "android",
-            doc = "Gradle dependency statements to add to the app module, such as implementation 'com.example:lib:1.0'.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Gradle dependency statements to add to the app module, such as implementation 'com.example:lib:1.0'.")
     String[] gradleDep() default {};
 
     @Hint(def = "false",
-            platform = "android",
-            doc = "Hides the Android status bar.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Hides the Android status bar.")
     boolean hideStatusBar() default false;
 
     @Hint(def = "auto",
-            platform = "android",
-            doc = "Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Maps to android:installLocation manifest entry defaults to auto. Can also be set to internalOnly or preferExternal.")
     InstallLocation installLocation() default InstallLocation.AUTO;
 
-    @Hint(platform = "android",
-            doc = "The license key for the Android app, this is required if you use in-app purchase on Android",
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(doc = "The license key for the Android app, this is required if you use in-app purchase on Android")
     String licenseKey() default "";
 
     @Hint(name = "android.min_sdk_version",
             def = "19",
-            platform = "android",
-            doc = "The least SDK required to run this app, the default value changes based on functionality but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "The least SDK required to run this app, the default value changes based on functionality but can be as low as 7. This corresponds to the XML attribute `android:minSdkVersion`.")
     int minSdkVersion() default 0;
 
     @Hint(def = "true",
-            platform = "android",
-            doc = "Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on.")
     boolean multidex() default false;
 
     @Hint(def = "true",
-            platform = "android",
-            doc = "Uses the current Firebase Cloud Messaging integration. Requires AndroidX and Gradle 8.13 or newer.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Uses the current Firebase Cloud Messaging integration. Requires AndroidX and Gradle 8.13 or newer.")
     boolean newFirebaseMessaging() default false;
 
     @Hint(appendable = true,
             separator = "\n",
-            platform = "android",
-            doc = "Arguments for the keep option in proguard allowing you to keep a pattern of files for example, `-keep class com.mypackage.ProblemClass { *; }`",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Arguments for the keep option in proguard allowing you to keep a pattern of files for example, `-keep class com.mypackage.ProblemClass { *; }`")
     String[] proguardKeep() default {};
 
     @Hint(def = "true",
-            platform = "android",
-            doc = "true/false defaults to true - indicates whether to include the release version in the build",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "true/false defaults to true - indicates whether to include the release version in the build")
     boolean release() default false;
 
     @Hint(appendable = true,
             separator = "\n",
-            platform = "android",
             doc = "Extra Gradle repositories to resolve dependencies from.",
             consumedBy = {"AndroidGradleBuilder", "MapsProviderInjector"})
     String[] repositories() default {};
 
-    @Hint(platform = "android",
-            doc = "The Android SDK the build compiles against. Unset, the build server uses the highest platform it has installed, so leaving this alone tracks the server rather than pinning a number. Not every target works: the source may have limitations, and not all SDK targets are installed.",
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(doc = "The Android SDK the build compiles against. Unset, the build server uses the highest platform it has installed, so leaving this alone tracks the server rather than pinning a number. Not every target works: the source may have limitations, and not all SDK targets are installed.")
     int targetSDKVersion() default 0;
 
     @Hint(name = "and.themeMode",
-            platform = "android",
-            doc = "`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated Android Material 3 theme from `native-themes/android-material/theme.css`. `hololight` is Android Holo Light (what the framework shipped on API 14+ before this refactor). `legacy` loads the pre-Holo Android theme. The legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true` still maps to `hololight`. The default stays on `hololight` for existing apps until you flip in a future release.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "`auto`, `modern` / `material`, `hololight` (default for existing apps), `legacy`. `auto` and `modern` / `material` opt in to the CSS-generated Android Material 3 theme from `native-themes/android-material/theme.css`. `hololight` is Android Holo Light (what the framework shipped on API 14+ before this refactor). `legacy` loads the pre-Holo Android theme. The legacy alias `cn1.androidTheme` is still accepted, and `and.hololight=true` still maps to `hololight`. The default stays on `hololight` for existing apps until you flip in a future release.")
     AndroidThemeMode themeMode() default AndroidThemeMode.AUTO;
 
     @Hint(appendable = true,
             separator = "\n",
-            platform = "android",
-            doc = "Statements added to the top-level Gradle build file rather than the app module.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Statements added to the top-level Gradle build file rather than the app module.")
     String[] topDependency() default {};
 
-    @Hint(platform = "android",
-            doc = "Use Android X instead of support libraries. This will also run a find/replace on all source files to replace support libraries and artifacts with AndroidX equivalents.",
-            consumedBy = {"AndroidGradleBuilder"})
+    @Hint(doc = "Use Android X instead of support libraries. This will also run a find/replace on all source files to replace support libraries and artifacts with AndroidX equivalents.")
     boolean useAndroidX() default false;
 
     @Hint(appendable = true,
             kind = HintKind.XML,
-            platform = "android",
-            doc = "defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "defaults to an empty string. Allows developers of native Android code to add text within the application block to define things such as widgets, services etc.")
     String xapplication() default "";
 
     @Hint(appendable = true,
             separator = "\n",
-            platform = "android",
-            doc = "Arbitrary text spliced into the generated app-module Gradle file.",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "Arbitrary text spliced into the generated app-module Gradle file.")
     String[] xgradle() default {};
 
     @Hint(appendable = true,
             kind = HintKind.XML,
-            platform = "android",
-            doc = "more permissions for the Android manifest",
-            consumedBy = {"AndroidGradleBuilder"})
+            doc = "more permissions for the Android manifest")
     String xpermissions() default "";
 }

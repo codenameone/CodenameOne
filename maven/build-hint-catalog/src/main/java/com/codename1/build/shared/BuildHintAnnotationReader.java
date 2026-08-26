@@ -141,7 +141,7 @@ public final class BuildHintAnnotationReader {
         List<BuildHints.Hint> out = new ArrayList<BuildHints.Hint>();
         for (Annotation group : groups) {
             for (Attribute a : group.attributes) {
-                out.add(a.toHint(group.simpleName, enums));
+                out.add(a.toHint(group.simpleName, group.defaults, enums));
             }
         }
         Collections.sort(out, new Comparator<BuildHints.Hint>() {
@@ -177,6 +177,36 @@ public final class BuildHintAnnotationReader {
                     } else {
                         isAnnotation = false;
                     }
+                }
+
+                @Override
+                public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+                    // The @Hint on the TYPE supplies the defaults for every
+                    // attribute in it. Every hint in @Android is an Android hint
+                    // read by AndroidGradleBuilder, and saying so on each of the
+                    // twenty-four was noise that could also be got wrong.
+                    if (!isAnnotation || !HINT.equals(desc) || scanned.annotation == null) {
+                        return null;
+                    }
+                    final Attribute defaults = scanned.annotation.defaults;
+                    return new AnnotationVisitor(API) {
+                        @Override
+                        public void visit(String member, Object v) {
+                            defaults.values.put(member, String.valueOf(v));
+                        }
+
+                        @Override
+                        public AnnotationVisitor visitArray(final String member) {
+                            final List<String> items = new ArrayList<String>();
+                            defaults.arrays.put(member, items);
+                            return new AnnotationVisitor(API) {
+                                @Override
+                                public void visit(String ignored, Object v) {
+                                    items.add(String.valueOf(v));
+                                }
+                            };
+                        }
+                    };
                 }
 
                 @Override
@@ -286,6 +316,9 @@ public final class BuildHintAnnotationReader {
     private static final class Annotation {
         private final String simpleName;
         private final List<Attribute> attributes = new ArrayList<Attribute>();
+        /// The type-level @Hint, whose members are the defaults for every
+        /// attribute that does not state its own.
+        private final Attribute defaults = new Attribute("", Type.VOID_TYPE);
 
         Annotation(String simpleName) {
             this.simpleName = simpleName;
@@ -316,7 +349,8 @@ public final class BuildHintAnnotationReader {
             return v == null ? fallback : v;
         }
 
-        BuildHints.Hint toHint(String groupSimpleName, Map<String, EnumDomain> enums) {
+        BuildHints.Hint toHint(String groupSimpleName, Attribute groupDefaults,
+                               Map<String, EnumDomain> enums) {
             HintGroup group = groupOf(groupSimpleName);
             String prefix = group.keyPrefix() == null ? "" : group.keyPrefix();
             String hintName = value("name", prefix + name);
@@ -330,7 +364,7 @@ public final class BuildHintAnnotationReader {
             if (def.length() > 0) {
                 hint.def(def);
             }
-            hint.platform(value("platform", "general"));
+            hint.platform(value("platform", groupDefaults.value("platform", "general")));
             if (values.containsKey("aliasOf")) {
                 hint.aliasOf(values.get("aliasOf"));
             }
@@ -348,6 +382,9 @@ public final class BuildHintAnnotationReader {
                 hint.link(link);
             }
             List<String> by = arrays.get("consumedBy");
+            if (by == null || by.isEmpty()) {
+                by = groupDefaults.arrays.get("consumedBy");
+            }
             if (by != null && !by.isEmpty()) {
                 hint.consumedBy(by.toArray(new String[by.size()]));
             }

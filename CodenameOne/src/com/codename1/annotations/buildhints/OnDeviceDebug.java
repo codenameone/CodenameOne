@@ -34,6 +34,7 @@ import java.lang.annotation.Target;
 /// the builder's own default applies. Each attribute's `@Hint(def)` records
 /// what that default is; the `default` clause below it is a neutral placeholder
 /// with no meaning at runtime.
+@Hint(consumedBy = {"IPhoneBuilder"})
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
 public @interface OnDeviceDebug {
@@ -48,28 +49,24 @@ public @interface OnDeviceDebug {
     @Hint(name = "ios.onDeviceDebug",
             def = "false",
             platform = "ios",
-            doc = "Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the On-Device Debugging (iOS) chapter for the full flow.",
-            consumedBy = {"IPhoneBuilder"})
+            doc = "Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the On-Device Debugging (iOS) chapter for the full flow.")
     boolean ios() default false;
 
     @Hint(name = "ios.onDeviceDebug.proxyHost",
             def = "127.0.0.1",
             platform = "ios",
-            doc = "Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.",
-            consumedBy = {"IPhoneBuilder"})
+            doc = "Hostname or IP address the device-side listener dials to reach the desktop proxy. Default `127.0.0.1` (correct for the native iOS simulator). For a physical device, set this to the developer laptop's LAN IP. Has no effect unless `ios.onDeviceDebug=true`.")
     String iosProxyHost() default "";
 
     @Hint(name = "ios.onDeviceDebug.proxyPort",
             def = "55333",
             platform = "ios",
-            doc = "TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.",
-            consumedBy = {"IPhoneBuilder"})
+            doc = "TCP port on `ios.onDeviceDebug.proxyHost` where the proxy is listening for the device. Default `55333`. Has no effect unless `ios.onDeviceDebug=true`.")
     int iosProxyPort() default 0;
 
     @Hint(name = "ios.onDeviceDebug.waitForAttach",
             def = "false",
             platform = "ios",
-            doc = "Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.",
-            consumedBy = {"IPhoneBuilder"})
+            doc = "Boolean true/false defaults to false. When `true`, the app blocks at startup until the proxy connects and the IDE tells the VM to continue. Useful when the breakpoint to investigate fires during app boot. Has no effect unless `ios.onDeviceDebug=true`.")
     boolean iosWaitForAttach() default false;
 }
