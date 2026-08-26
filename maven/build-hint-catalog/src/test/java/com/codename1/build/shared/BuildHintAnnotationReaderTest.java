@@ -148,4 +148,66 @@ public class BuildHintAnnotationReaderTest {
         return src;
     }
 
+
+    /// No hint attribute may declare a default that carries a VALUE.
+    ///
+    /// The build server owns what happens when a hint is not set, and it may
+    /// change that. A copy of that answer in an annotation cannot follow: it is
+    /// compiled into every app already built against it, and it is what IDE
+    /// completion and the javadoc show. `boolean appBundle() default false` read
+    /// as "off unless you turn it on" while AndroidGradleBuilder defaults
+    /// android.appBundle to true.
+    ///
+    /// So every default here must be a marker for "nothing was said" -- `""`,
+    /// `{}`, `0`, or an enum's @HintUnset constant. A boolean cannot express
+    /// that, which is why there are no boolean hint attributes left.
+    @Test
+    public void noHintAttributeDeclaresAValueBearingDefault() throws Exception {
+        File dir = new File("../../CodenameOne/src/com/codename1/annotations/buildhints");
+        assertTrue(dir.isDirectory(), dir.getAbsolutePath());
+        java.util.regex.Pattern decl = java.util.regex.Pattern.compile(
+                "^\\s+([A-Za-z0-9_\\[\\]]+) ([A-Za-z0-9_]+)\\(\\) default ([^;]+);",
+                java.util.regex.Pattern.MULTILINE);
+        java.util.List<String> bad = new java.util.ArrayList<String>();
+        for (String group : new String[]{"Android", "Ios", "IosPrivacy", "DesktopBuild",
+                                         "Build", "Hardening", "OnDeviceDebug"}) {
+            File f = new File(dir, group + ".java");
+            assertTrue(f.isFile(), f.getAbsolutePath());
+            String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8");
+            java.util.regex.Matcher m = decl.matcher(text);
+            while (m.find()) {
+                String value = m.group(3).trim();
+                boolean unset = "\"\"".equals(value) || "{}".equals(value)
+                        || "0".equals(value) || value.endsWith(".DEFAULT");
+                if (!unset) {
+                    bad.add(group + "." + m.group(2) + " defaults to " + value);
+                }
+            }
+        }
+        assertTrue(bad.isEmpty(), "these restate a value the build server owns: " + bad);
+    }
+
+    /// ...and every enum a hint uses declares exactly one @HintUnset constant.
+    ///
+    /// Without it the attribute's default would have to name a real value, which
+    /// is the same claim in another shape. Two would make "not set" ambiguous.
+    @Test
+    public void everyHintEnumDeclaresOneUnsetConstant() throws Exception {
+        File dir = new File("../../CodenameOne/src/com/codename1/annotations/buildhints");
+        for (String e : new String[]{"Toggle", "AndroidThemeMode", "IosThemeMode",
+                                     "IosProjectType", "IosDependencyManager", "InstallLocation",
+                                     "HardenStrings", "HardenLevel", "HardenControlFlow",
+                                     "DesktopTitleBar", "NativeThemeMode"}) {
+            File f = new File(dir, e + ".java");
+            assertTrue(f.isFile(), f.getAbsolutePath());
+            String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8");
+            int count = 0;
+            int at = text.indexOf("@HintUnset");
+            while (at >= 0) {
+                count++;
+                at = text.indexOf("@HintUnset", at + 1);
+            }
+            assertEquals(1, count, e + " must mark exactly one constant @HintUnset");
+        }
+    }
 }
