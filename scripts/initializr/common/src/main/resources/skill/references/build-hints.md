@@ -41,6 +41,7 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `codename1.arg.ios.beforeFinishLaunching=...` | Native code inserted before iOS's `application:didFinishLaunchingWithOptions:` returns. |
 | `codename1.arg.ios.newStorageLocation=true` | Use modern iOS storage paths (recommended for new apps). |
 | `codename1.arg.ios.wallet.extension=true` | Generate an Apple Wallet issuer-provisioning extension (iOS 14+). See *Apple Wallet issuer provisioning* below. |
+| `codename1.arg.ios.documentProvider.enabled=true` | Publish the app's content as a location in the system file browser (Files on iOS, Finder on macOS, the storage picker on Android). See *Document provider* below. |
 
 ## Android
 
@@ -102,6 +103,26 @@ Card issuers can surface their cards inside the iOS Wallet app via a *non-UI iss
 | `ios.wallet.*Inject=...raw ObjC...` | Inject custom Objective-C at marker points (`generateRequestInject`, `generateResponseInject`, `statusInject`, `uiViewDidLoadInject`, etc.) in the generated extension code. |
 
 This is an advanced, issuer-only feature — most apps never need it. The compiled native code is gated behind a build define, so leaving the hints unset is a no-op.
+
+## Document provider
+
+Publishes app content as a browsable location in the system file browser: the Files app on iOS, Finder's sidebar on macOS, the storage picker on Android. Referencing `com.codename1.documents` is what makes the build generate the native plumbing -- an app-extension target plus App Group on Apple platforms, a `DocumentsProvider` in the manifest on Android.
+
+Publish a tree of `DocumentNode`s through `com.codename1.documents.DocumentProvider`. Content comes either from bytes written under `DocumentProvider.getSharedDirectory()` (a node's `path`) or on demand from an HTTPS endpoint you host (a node's `remoteId` plus `setRemoteEndpoint`).
+
+| Hint (`codename1.arg.` prefix) | Effect |
+| --- | --- |
+| `ios.documentProvider.enabled=true` | Declares the feature. Redundant for the build, which detects the API reference itself, but it is how the Certificate Wizard and the signing preflight know the extension will be generated. |
+| `ios.documentProvider.appGroup=group.com.example.app` | Shared App Group (must start with `group.`), defaulting to `group.` plus the package name. It is the entire transport between the app and the extension. |
+| `ios.documentProvider.displayName=...` | Name the location carries in the browser; defaults to the app's display name. |
+| `ios.documentProvider.deploymentTarget=16.0` | Minimum OS version. At or above 16.0 the extension uses `NSFileProviderReplicatedExtension`; below it, the deprecated `NSFileProviderExtension`. |
+| `ios.documentProvider.extension=false` | Skip the iOS lowering entirely, leaving the API an inert no-op. |
+
+Two things to get right. Node ids must be stable for the life of the item -- the platform remembers them for favourites and recents, so ids derived from list position point the browser at the wrong file later. And the reader is a *separate process* that runs while the app is dead and cannot call Java, so publish whenever your data changes rather than in response to being browsed.
+
+If all you want is the app's own documents folder visible in Files, you need none of this -- set `ios.plistInject` with `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` instead.
+
+The extension needs its own App ID and provisioning profile; `mvn cn1:certificatewizard` creates both, along with the App Group.
 
 ## JavaScript / web
 
