@@ -2243,6 +2243,19 @@ public class BuildHintCatalogTest {
         assertEquals("<project>", CodenameOneSettings.withoutComments("<project><!-- oops"));
     }
 
+    /// `default-add-source` is not a binding here either.
+    @Test
+    public void anIdAloneDoesNotBindAnUninjectedGoal() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-add-source</id><configuration>"
+                + "<sources><source>gen/not-really-bound</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets

@@ -2609,9 +2609,14 @@ public class CodenameOneSettings extends Lifecycle {
             // <phase>none</phase> is the conventional way to switch off an
             // execution inherited from a parent while leaving its goal in place,
             // so the goal alone does not mean the build runs it.
+            // The id alone binds the goal only where the LIFECYCLE provides an
+            // execution for it, which is the same question runsWithoutExecution
+            // answers: build-helper never gets one, so `default-add-source` with
+            // no <goal> runs nothing.
             if (execution.indexOf("<phase>none</phase>") < 0
                     && (execution.indexOf("<goal>" + goal + "</goal>") >= 0
-                        || execution.indexOf("<id>default-" + goal + "</id>") >= 0)) {
+                        || (runsWithoutExecution
+                            && execution.indexOf("<id>default-" + goal + "</id>") >= 0))) {
                 bound = true;
                 if (execution.indexOf("<" + element + ">") < 0) {
                     if (execution.indexOf("combine.self=\"override\"") < 0) {

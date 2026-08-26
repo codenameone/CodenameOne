@@ -1344,7 +1344,15 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
                 boolean thisOne = execution.getGoals() != null
                         && execution.getGoals().contains(goal);
-                if (!thisOne && ("default-" + goal).equals(execution.getId())) {
+                // The id alone binds the goal only where the LIFECYCLE provides
+                // an execution for it -- maven-compiler-plugin, and a Kotlin
+                // plugin with <extensions>true</extensions>. build-helper never
+                // gets one, so `default-add-source` with no <goal> is an
+                // execution with an odd name that runs nothing, and counting it
+                // pulled in sources Maven does not compile. That is the same
+                // question runsWithoutExecution answers.
+                if (!thisOne && runsWithoutExecution
+                        && ("default-" + goal).equals(execution.getId())) {
                     thisOne = true;
                 }
                 if (!thisOne || isDisabled(execution)) {
@@ -1680,7 +1688,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             }
             {
                 for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
-                    if (bindsCompile(execution) && !isDisabled(execution)) {
+                    if (bindsCompile(execution, plugin.isExtensions()) && !isDisabled(execution)) {
                         return true;
                     }
                 }
@@ -1723,9 +1731,17 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /// Whether `execution` binds the `compile` goal, disabled or not.
-    private static boolean bindsCompile(org.apache.maven.model.PluginExecution execution) {
-        return (execution.getGoals() != null && execution.getGoals().contains("compile"))
-                || "default-compile".equals(execution.getId());
+    ///
+    /// `lifecycleProvided` says whether the plugin has a lifecycle-injected
+    /// execution at all: without `<extensions>true</extensions>` the Kotlin
+    /// plugin has none, so `default-compile` with no `<goal>` is a name and
+    /// nothing more.
+    private static boolean bindsCompile(org.apache.maven.model.PluginExecution execution,
+                                        boolean lifecycleProvided) {
+        if (execution.getGoals() != null && execution.getGoals().contains("compile")) {
+            return true;
+        }
+        return lifecycleProvided && "default-compile".equals(execution.getId());
     }
 
     /** Whether the Kotlin plugin says where its main sources are. */

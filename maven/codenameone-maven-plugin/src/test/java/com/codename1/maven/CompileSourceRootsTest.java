@@ -136,28 +136,6 @@ public class CompileSourceRootsTest {
     }
 
     /**
-     * A POM that overrides Maven's own injected execution binds the goal through
-     * its ID rather than naming it, and that still compiles the root.
-     */
-    @Test
-    public void theDefaultCompileExecutionIdBindsTheGoalToo() throws Exception {
-        File basedir = tmp.newFolder();
-        new File(basedir, "src/main/kotlin").mkdirs();
-        MavenProject project = projectAt(basedir);
-
-        Plugin kotlin = new Plugin();
-        kotlin.setArtifactId("kotlin-maven-plugin");
-        PluginExecution execution = new PluginExecution();
-        execution.setId("default-compile");
-        kotlin.addExecution(execution);
-        project.getBuild().addPlugin(kotlin);
-
-        assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
-                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
-                        "src/main/kotlin"));
-    }
-
-    /**
      * `<extensions>true</extensions>` compiles Kotlin with no execution written.
      *
      * <p>It is the documented way to let the plugin contribute its own
@@ -402,6 +380,64 @@ public class CompileSourceRootsTest {
 
         assertTrue(AbstractCN1Mojo.compileSourceRoots(project).toString(),
                 contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "src/main/kotlin"));
+    }
+
+    /**
+     * `default-add-source` is not a binding.
+     *
+     * <p>`default-<goal>` is Maven's name for a LIFECYCLE-injected execution,
+     * and build-helper never gets one -- it is not part of any packaging
+     * lifecycle. So an execution with that id and no `<goal>` runs nothing, and
+     * counting it pulled in a directory Maven does not compile, where a stale
+     * annotated class keeps a source and fails the placement check.</p>
+     */
+    @Test
+    public void anIdAloneDoesNotBindAGoalTheLifecycleNeverInjects() throws Exception {
+        File basedir = tmp.newFolder();
+        MavenProject project = projectAt(basedir);
+
+        Plugin helper = new Plugin();
+        helper.setArtifactId("build-helper-maven-plugin");
+        PluginExecution named = new PluginExecution();
+        named.setId("default-add-source");
+        named.setConfiguration(config("<sources><a>gen/not-really-bound</a></sources>"));
+        helper.addExecution(named);
+        project.getBuild().addPlugin(helper);
+
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(project).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(project), basedir,
+                        "gen/not-really-bound"));
+    }
+
+    /**
+     * ...and neither for a Kotlin plugin that never asked for the lifecycle.
+     * With `<extensions>true</extensions>` the same execution IS the binding.
+     */
+    @Test
+    public void theDefaultCompileIdNeedsTheExtensionLifecycle() throws Exception {
+        File basedir = tmp.newFolder();
+        new File(basedir, "src/main/kotlin").mkdirs();
+        MavenProject plain = projectAt(basedir);
+        Plugin kotlin = new Plugin();
+        kotlin.setArtifactId("kotlin-maven-plugin");
+        PluginExecution byId = new PluginExecution();
+        byId.setId("default-compile");
+        kotlin.addExecution(byId);
+        plain.getBuild().addPlugin(kotlin);
+        assertFalse(AbstractCN1Mojo.compileSourceRoots(plain).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(plain), basedir, "src/main/kotlin"));
+
+        MavenProject withExtensions = projectAt(basedir);
+        Plugin extended = new Plugin();
+        extended.setArtifactId("kotlin-maven-plugin");
+        extended.setExtensions(true);
+        PluginExecution sameId = new PluginExecution();
+        sameId.setId("default-compile");
+        extended.addExecution(sameId);
+        withExtensions.getBuild().addPlugin(extended);
+        assertTrue(AbstractCN1Mojo.compileSourceRoots(withExtensions).toString(),
+                contains(AbstractCN1Mojo.compileSourceRoots(withExtensions), basedir,
                         "src/main/kotlin"));
     }
 
