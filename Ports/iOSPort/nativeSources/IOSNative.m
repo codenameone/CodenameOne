@@ -4883,6 +4883,21 @@ void com_codename1_impl_ios_IOSNative_retainPeer___long(CN1_THREAD_STATE_MULTI_A
 #ifndef NO_UIWEBVIEW
 UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 #endif
+#if TARGET_OS_WATCH || TARGET_OS_TV
+/// The watch and TV slices get their own key.
+///
+/// UIWebViewEventDelegate.h -- which declares the shared one -- is wrapped in
+/// `#if !TARGET_OS_WATCH && !TARGET_OS_TV`, and UIWebViewEventDelegate.m is not
+/// compiled here either, so on these slices the shared key is neither declared
+/// nor linked. The helpers below need nothing from it but a unique address, and
+/// there is no web view on either slice for a value to travel between, so a
+/// local key is exactly equivalent.
+///
+/// The helpers themselves stay outside the NO_UIWEBVIEW guard because the
+/// WKWebView paths call them too, and those compile on every slice.
+static const void *CN1FollowTargetBlankKey = &CN1FollowTargetBlankKey;
+#endif
+
 static void cn1_setBrowserFollowTargetBlank(id webView, BOOL follow) {
     objc_setAssociatedObject(webView, CN1FollowTargetBlankKey, [NSNumber numberWithBool:follow], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
