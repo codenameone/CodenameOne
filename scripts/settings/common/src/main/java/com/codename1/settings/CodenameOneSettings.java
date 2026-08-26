@@ -2579,12 +2579,7 @@ public class CodenameOneSettings extends Lifecycle {
         if (pomText == null) {
             return null;
         }
-        String out = pomText;
-        for (String section : new String[]{"pluginManagement", "plugins", "reporting",
-                                           "resources", "testResources"}) {
-            out = withoutElement(out, section);
-        }
-        return out;
+        return withoutNonCompileSections(pomText);
     }
 
     private static void collectDeclaredRoots(String pomText,
@@ -2837,6 +2832,32 @@ public class CodenameOneSettings extends Lifecycle {
         return out;
     }
 
+    /// The sections of a POM that configure something OTHER than which files
+    /// get compiled.
+    ///
+    /// Shared by the two readers that search by element name, because they were
+    /// written from the same rule and then drifted: `<directory>` was already
+    /// taken as a direct child with these stripped, while `<sourceDirectory>`
+    /// was read across the whole POM and picked up Checkstyle's analysis-only
+    /// one. One list, so the next element added to either cannot be scoped by
+    /// only one of them.
+    private static final String[] NON_COMPILE_SECTIONS = {
+        "resources", "testResources", "plugins", "pluginManagement", "filters", "extensions",
+        "reporting"
+    };
+
+    /// `xml` with every [#NON_COMPILE_SECTIONS] section removed.
+    private static String withoutNonCompileSections(String xml) {
+        if (xml == null) {
+            return null;
+        }
+        String out = xml;
+        for (String section : NON_COMPILE_SECTIONS) {
+            out = withoutElement(out, section);
+        }
+        return out;
+    }
+
     /// The `<directory>` the POM's `<build>` element configures, or null.
     ///
     /// A DIRECT child: `<resources>` and the plugin sections carry
@@ -2852,11 +2873,7 @@ public class CodenameOneSettings extends Lifecycle {
         }
         int close = pomText.indexOf("</build>", at);
         String build = close < 0 ? pomText.substring(at) : pomText.substring(at, close);
-        for (String nested : new String[] {"resources", "testResources", "plugins",
-                "pluginManagement", "filters", "extensions"}) {
-            build = withoutElement(build, nested);
-        }
-        return elementValue(build, "directory");
+        return elementValue(withoutNonCompileSections(build), "directory");
     }
 
     private static String withoutElement(String xml, String name) {

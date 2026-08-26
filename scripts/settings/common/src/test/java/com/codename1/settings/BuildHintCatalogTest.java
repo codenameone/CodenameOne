@@ -2436,6 +2436,37 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(pom).toString());
     }
 
+    /// Both element-name readers exclude the same sections.
+    ///
+    /// They were written from one rule and drifted: `<directory>` was taken as a
+    /// direct child with the plugin and resource sections stripped, while
+    /// `<sourceDirectory>` was read across the whole POM. They share the list
+    /// now, and this is what says so -- an element added to one reader's
+    /// exclusions cannot silently miss the other.
+    @Test
+    public void bothElementNameReadersExcludeTheSameSections() {
+        String pom = "<project><build>"
+                + "<sourceDirectory>src/main/java</sourceDirectory>"
+                + "<directory>target</directory>"
+                + "<resources><resource><directory>res/only</directory>"
+                + "<sourceDirectory>res/only</sourceDirectory></resource></resources>"
+                + "<filters><filter><sourceDirectory>filter/only</sourceDirectory></filter>"
+                + "</filters>"
+                + "<extensions><extension><sourceDirectory>ext/only</sourceDirectory>"
+                + "</extension></extensions>"
+                + "<plugins><plugin><configuration>"
+                + "<sourceDirectory>plugin/only</sourceDirectory>"
+                + "<directory>plugin/dir</directory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertEquals("target", CodenameOneSettings.configuredBuildDirectory(pom));
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("src/main/java"), roots.toString());
+        for (String leaked : new String[]{"res/only", "filter/only", "ext/only", "plugin/only"}) {
+            assertFalse(roots.contains(leaked), leaked + " became a compile root: " + roots);
+        }
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
