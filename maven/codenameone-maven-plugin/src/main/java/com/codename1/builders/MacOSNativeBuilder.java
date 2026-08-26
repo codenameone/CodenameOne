@@ -241,9 +241,10 @@ public class MacOSNativeBuilder extends Executor {
         // what an unconfigured build ships.
         final boolean[] usesCrypto = {false};
         final boolean[] usesLocalNotifications = {false};
+        final boolean[] usesMicrophone = {false};
         try {
             scanClassesForPermissions(classesDir,
-                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications));
+                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications, usesMicrophone));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -251,7 +252,7 @@ public class MacOSNativeBuilder extends Executor {
             // buffer untouched -- commonly all zeroes. A random source that silently
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes,
-                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications));
+                    new NativeFeatureScanner(usesCrypto, usesLocalNotifications, usesMicrophone));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -307,6 +308,38 @@ public class MacOSNativeBuilder extends Executor {
             }
         }
         log("Local Notifications " + (usesLocalNotifications[0] ? "enabled" : "disabled"));
+
+        // AVAudioRecorder is the same API on macOS and the recorder natives carry
+        // no UIKit, so the only thing between an application and a working
+        // recording is this define. With it off, checkMicrophoneUsage() answers
+        // false and the inherited implementation throws the iOS build-hint
+        // exception before recording starts, while the recorder bodies are
+        // compiled away -- so the entitlement and the usage description were
+        // written for a feature that could not run.
+        //
+        // Camera and location are deliberately NOT wired up the same way.
+        // INCLUDE_CAMERA_USAGE would compile a UIImagePickerController path that
+        // macOS does not have, and INCLUDE_LOCATION_USAGE would create a manager
+        // whose delegate callbacks live in the !TARGET_OS_OSX half of
+        // CodenameOne_GLViewController.m and are never compiled here -- an
+        // application would get a location manager that reports nothing at all.
+        // Both report unsupported from MacImplementation instead.
+        if (usesMicrophone[0]) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application records audio but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define INCLUDE_MICROPHONE_USAGE",
+                        "#define INCLUDE_MICROPHONE_USAGE");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the microphone backend in "
+                        + "CodenameOne_GLViewController.h", ex);
+            }
+        }
+        log("Microphone " + (usesMicrophone[0] ? "enabled" : "disabled"));
 
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
@@ -830,9 +863,13 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesCrypto;
         private final boolean[] usesLocalNotifications;
 
-        NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications) {
+        private final boolean[] usesMicrophone;
+
+        NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
+                boolean[] usesMicrophone) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
+            this.usesMicrophone = usesMicrophone;
         }
 
         @Override
@@ -877,7 +914,36 @@ public class MacOSNativeBuilder extends Executor {
 
         @Override
         public void usesClassMethod(String cls, String method) {
+            if (opensMicrophone(cls, method)) {
+                usesMicrophone[0] = true;
+            }
         }
+    }
+
+    /**
+     * Whether an invoked method opens the microphone.
+     *
+     * <p>One rule, two callers: the entitlement scan decides what the signature
+     * asks for, and the feature scan decides whether the recorder is compiled at
+     * all. Written twice they would drift, and the failure of the drift is an
+     * application that holds the entitlement and has no recorder behind it.</p>
+     */
+    static boolean opensMicrophone(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        // The recorder is the one thing in com.codename1.media that opens a
+        // microphone; createMedia and the player APIs only read a file or a
+        // stream. Matched by method for the same reason the Android builder
+        // matches createMediaRecorder before adding RECORD_AUDIO.
+        if (cls.startsWith("com/codename1/media/")) {
+            return method.indexOf("createMediaRecorder") > -1;
+        }
+        // Audio capture, and video capture, which records sound with the picture.
+        if (cls.startsWith("com/codename1/capture/")) {
+            return method.indexOf("captureAudio") > -1 || method.indexOf("captureVideo") > -1;
+        }
+        return false;
     }
 
     /** Maps class references onto the entitlements they require. */
@@ -922,33 +988,19 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null || method == null) {
                 return;
             }
-            // The recorder is the one thing in com.codename1.media that opens a
-            // microphone; createMedia and the player APIs only read a file or a
-            // stream. Matched by method for the same reason the Android builder
-            // matches createMediaRecorder before adding RECORD_AUDIO.
-            if (cls.startsWith("com/codename1/media/")
-                    && method.indexOf("createMediaRecorder") > -1) {
+            if (opensMicrophone(cls, method)) {
                 caps.usesMicrophone = true;
             }
-            // Capture is matched by method for the same reason, one step finer:
-            // the package is entirely capture, but each entry point opens a
-            // different device. Granting both for any reference to the package
-            // declared the camera for an audio-only recorder, and the microphone
-            // for a photo app -- and merely naming VideoCaptureConstraints, or
-            // asking hasCamera(), declared both while opening nothing.
-            if (cls.startsWith("com/codename1/capture/")) {
-                if (method.indexOf("capturePhoto") > -1) {
-                    caps.usesCamera = true;
-                }
-                if (method.indexOf("captureAudio") > -1) {
-                    caps.usesMicrophone = true;
-                }
-                // Video records sound with the picture, so it is the one entry
-                // point that genuinely needs both.
-                if (method.indexOf("captureVideo") > -1) {
-                    caps.usesCamera = true;
-                    caps.usesMicrophone = true;
-                }
+            // Capture is matched by method one step finer than by package: the
+            // package is entirely capture, but each entry point opens a
+            // different device. Granting both for any reference to it declared
+            // the camera for an audio-only recorder and the microphone for a
+            // photo app -- and merely naming VideoCaptureConstraints, or asking
+            // hasCamera(), declared both while opening nothing.
+            if (cls.startsWith("com/codename1/capture/")
+                    && (method.indexOf("capturePhoto") > -1
+                        || method.indexOf("captureVideo") > -1)) {
+                caps.usesCamera = true;
             }
         }
     }
@@ -966,6 +1018,26 @@ public class MacOSNativeBuilder extends Executor {
             String appName) throws BuildException {
         File srcRoot = new File(distDir, appName + "-src");
         List<String> channels = hints.getChannels();
+        // An unsigned App Store package is never a valid one. signingIdentity
+        // "none" turns application signing off, but packaging still signs the
+        // outer .pkg with the installer identity and reports a successful
+        // artifact -- so the build looks fine and App Store Connect rejects it
+        // for an app with no signature and none of the sandbox entitlements it
+        // is required to carry. Refused here, where the customer is told which
+        // hint to change, rather than by Apple hours later.
+        //
+        // Only the store channel: "none" is a real escape hatch for a Developer
+        // ID or local build a developer wants unsigned.
+        for (String channel : channels) {
+            if (MacOSBuildHints.DISTRIBUTION_APP_STORE.equals(channel)
+                    && hints.getSigningIdentityFor(channel) == null) {
+                throw new BuildException("macos.signingIdentity.appStore=none cannot be "
+                        + "combined with an App Store build: the package would carry an "
+                        + "unsigned application with no entitlements and App Store Connect "
+                        + "rejects it. Name a signing identity, or build only the "
+                        + "developerID channel.");
+            }
+        }
         for (String channel : channels) {
             if (!buildChannel(request, hints, distDir, srcRoot, appName, channel,
                     channels.size() > 1)) {

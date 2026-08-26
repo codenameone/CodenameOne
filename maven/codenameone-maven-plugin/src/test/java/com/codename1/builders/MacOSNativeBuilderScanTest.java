@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.builders;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * The class-scan rules that decide what the macOS build compiles and what its
+ * signature asks for.
+ */
+public class MacOSNativeBuilderScanTest {
+
+    /**
+     * One rule serves two decisions -- the microphone entitlement and whether
+     * the recorder is compiled at all -- so it is worth pinning on its own.
+     * Written twice they would drift, and the drift ships an application
+     * holding an entitlement with no recorder behind it.
+     */
+    @Test
+    public void theMicrophoneRuleFollowsTheEntryPointThatOpensOne() {
+        assertTrue("the recorder is what opens a microphone in com.codename1.media",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/media/MediaManager", "createMediaRecorder"));
+        assertTrue(MacOSNativeBuilder.opensMicrophone(
+                "com/codename1/capture/Capture", "captureAudio"));
+        assertTrue("video capture records sound with the picture",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/capture/Capture", "captureVideo"));
+
+        assertFalse("a photo opens no microphone",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/capture/Capture", "capturePhoto"));
+        assertFalse("playback is not recording",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/media/MediaManager", "createMedia"));
+        // The near miss that makes the package prefix load-bearing:
+        // CameraSessionOptions.captureAudio(boolean) is a session flag on a
+        // different class, and the screenshot sample calls it with false.
+        assertFalse("captureAudio on a camera session is a flag, not a capture",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/camera/CameraSessionOptions", "captureAudio"));
+        assertFalse(MacOSNativeBuilder.opensMicrophone(null, "captureAudio"));
+        assertFalse(MacOSNativeBuilder.opensMicrophone("com/codename1/capture/Capture", null));
+    }
+}

@@ -506,6 +506,8 @@ extern void pointerPressed(int *x, int *y, int length);
 extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
 extern void pointerHoverNative(int x, int y);
+extern void pointerHoverPressedNative(int x, int y);
+extern void pointerHoverReleasedNative(int x, int y);
 extern void keyPressedNative(int keyCode);
 extern void keyReleasedNative(int keyCode);
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
@@ -587,6 +589,34 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
         return;
     }
     pointerHoverNative((int)p.x, (int)p.y);
+}
+
+/// The pointer entered the view. The tracking area below asks for this, and
+/// without a handler an application overriding pointerHoverPressed() never heard
+/// about a pointer arriving -- on the main form or in a secondary window.
+- (void)mouseEntered:(NSEvent *)event {
+    if (!self.cn1InputEnabled) {
+        return;
+    }
+    CGPoint p = [self cn1PointFromEvent:event];
+    if (self.cn1WindowId >= 0) {
+        CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_PRESSED, (int)p.x, (int)p.y);
+        return;
+    }
+    pointerHoverPressedNative((int)p.x, (int)p.y);
+}
+
+/// The pointer left the view, which is the other half of the hover lifecycle.
+- (void)mouseExited:(NSEvent *)event {
+    if (!self.cn1InputEnabled) {
+        return;
+    }
+    CGPoint p = [self cn1PointFromEvent:event];
+    if (self.cn1WindowId >= 0) {
+        CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_RELEASED, (int)p.x, (int)p.y);
+        return;
+    }
+    pointerHoverReleasedNative((int)p.x, (int)p.y);
 }
 
 /// mouseMoved: is not delivered without a tracking area, and the area has to be

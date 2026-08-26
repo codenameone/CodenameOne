@@ -103,6 +103,28 @@ public class MacImplementation extends IOSImplementation {
         return null;
     }
 
+    /// @inheritDoc
+    ///
+    /// Null, which is the base class's answer for a platform without location.
+    ///
+    /// Not simply a matter of enabling INCLUDE_LOCATION_USAGE: CoreLocation is
+    /// on macOS and the natives compile, but the delegate that receives
+    /// didUpdateLocations, didEnterRegion and didExitRegion is the
+    /// `@implementation` in the `!TARGET_OS_OSX` half of
+    /// CodenameOne_GLViewController.m, and this port compiles the AppKit
+    /// controller instead. Turning the define on would hand back a working-
+    /// looking LocationManager that never reports a position -- which is worse
+    /// than saying no, because nothing downstream can tell the difference.
+    ///
+    /// Making it work means the AppKit controller adopting
+    /// CLLocationManagerDelegate and carrying those callbacks, which is its own
+    /// piece of work rather than a build flag. `IOSNative.isGeofencingSupported()`
+    /// reports false for the same reason.
+    @Override
+    public com.codename1.location.LocationManager getLocationManager() {
+        return null;
+    }
+
     private AppKitWindowManager windowManager;
 
     /// @inheritDoc
