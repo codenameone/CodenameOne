@@ -141,8 +141,13 @@ public class CN1Connection extends Connection {
         if (state == null) {
             return;
         }
-        Calls.deliverMute(callId, state.isMuted(),
-                service.nextActionToken(this, ACTION_MUTE));
+        // deliverMuteChanged, not deliverMute: Telecom is REPORTING a mute it
+        // has already applied and takes no instruction about it from a
+        // self-managed app, so there is nothing here for a listener to
+        // refuse. Delivered as a refusable action, a fail() left the system
+        // showing muted, the app still transmitting and isMuted() answering
+        // for neither.
+        Calls.deliverMuteChanged(callId, state.isMuted());
         CN1ConnectionService.setRoute(routeOf(state.getRoute()));
     }
 
@@ -242,5 +247,8 @@ public class CN1Connection extends Connection {
     static final int ACTION_HOLD = 4;
     static final int ACTION_UNHOLD = 5;
     static final int ACTION_DTMF = 6;
+    /// Unused since the mute state became a fact rather than a request --
+    /// see onCallAudioStateChanged. Kept so the neighbouring values, which
+    /// index nothing but are read in logs, do not shift.
     static final int ACTION_MUTE = 7;
 }

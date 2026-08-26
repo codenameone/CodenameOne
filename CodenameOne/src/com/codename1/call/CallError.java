@@ -98,5 +98,15 @@ public enum CallError {
 
     /// Nothing more specific is known. Ports use this only when the platform
     /// itself gave no usable reason.
-    UNKNOWN
+    UNKNOWN,
+
+    /// The system's call provider was reset while the operation was in
+    /// flight, so it can never be answered. See
+    /// [com.codename1.call.session.CallActionListener#providerReset()].
+    ///
+    /// Last deliberately, and **never sent by a port**: it is raised by the
+    /// facade itself. Every other value crosses the SPI as an ordinal, so a
+    /// new one has to be appended or every port's error mapping shifts by
+    /// one.
+    PROVIDER_RESET
 }

@@ -33,7 +33,9 @@ import com.codename1.call.voip.PushedCall;
 import com.codename1.call.voip.VoipPush;
 import com.codename1.call.voip.VoipPushListener;
 import com.codename1.impl.call.CallRequests;
+import com.codename1.util.AsyncResource;
 import com.codename1.call.spi.CallBridge;
+import com.codename1.impl.call.CallRequests;
 import com.codename1.impl.call.LocalCallBridge;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -607,6 +609,48 @@ public class LocalCallTest {
                 first.groupWith(second));
         assertEquals(0, Calls.getCapabilities() & CallBridge.CAPABILITY_GROUPING,
                 "and the capability must not be advertised either");
+    }
+
+    @Test
+    public void aProviderResetFailsWhatWasInFlight() {
+        // The provider is gone and the port has dropped the request ids with
+        // it, so a report that raced the reset can never be answered -- and
+        // this SPI calls an operation that never answers worse than one that
+        // fails.
+        // Opened directly rather than by racing a simulated report against
+        // the reset: what is being asserted is that a request outstanding
+        // when the reset arrives is failed, and a race would test the
+        // simulation's timing instead.
+        int requestId = CallRequests.nextId();
+        AsyncResource<Boolean> racing = CallRequests.openAck(requestId);
+        Calls.deliverProviderReset();
+        Throwable err = CallAwait.errorOf(racing);
+        assertNotNull(err, "an in-flight report must not hang after a reset");
+        assertTrue(err instanceof CallException, "got " + err);
+        assertSame(CallError.PROVIDER_RESET,
+                ((CallException) err).getError());
+    }
+
+    @Test
+    public void aSystemMuteThatCannotBeRefusedStillMoves() {
+        // Telecom reports a mute it has already applied. A listener that
+        // fails that cannot un-apply it, so the session has to agree with the
+        // system rather than with the listener.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void muteRequested(String callId, boolean muted,
+                    CallAction action) {
+                seen.add(action);
+                action.fail();
+            }
+        });
+        String id = CallId.random();
+        CallSession s = ring(id);
+        Calls.deliverMuteChanged(id, true);
+        waitFor(seen, 1);
+        assertTrue(s.isMuted(),
+                "a mute the platform already applied must show as muted even"
+                        + " when the listener failed the action");
     }
 
     @Test

@@ -435,6 +435,23 @@ public final class Calls {
                 null, null, false));
     }
 
+    /// The system CHANGED the mute state, rather than asking whether it may.
+    ///
+    /// Telecom's `onCallAudioStateChanged` reports a mute the platform has
+    /// already applied, and a self-managed app cannot refuse it -- the port's
+    /// own `setMuted` says as much. Delivered as a refusable action it let a
+    /// listener "fail" a fact: the system went on showing muted, the app went
+    /// on transmitting, and `isMuted()` answered for neither. This applies
+    /// the state first and hands listeners an action that is already
+    /// fulfilled, so the same `muteRequested` callback serves both platforms
+    /// and only the one that can be refused ever is.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverMuteChanged(String callId, boolean muted) {
+        dispatch(new ActionEvent(ActionEvent.MUTE_CHANGED, callId, CallAction.NONE, muted,
+                null, null, false));
+    }
+
     /// The user typed on the system keypad.
     ///
     /// @hidden not part of the public API.
@@ -573,6 +590,7 @@ public final class Calls {
         static final int AUDIO_OFF = 7;
         static final int ENDED = 8;
         static final int RESET = 9;
+        static final int MUTE_CHANGED = 10;
 
         private final int kind;
         private final String callId;
@@ -661,6 +679,26 @@ public final class Calls {
                     }
                     break;
                 }
+                case MUTE_CHANGED: {
+                    // Applied before anyone is told, because it already
+                    // happened. The action is handed over fulfilled so a
+                    // listener written against the iOS shape still compiles
+                    // and still runs -- fail() on it changes nothing, which
+                    // is exactly the truth on this platform.
+                    if (session != null) {
+                        session.setMutedInternal(flag);
+                    }
+                    CallAction done = new CallAction(CallAction.NONE, callId);
+                    done.fulfill();
+                    try {
+                        for (CallActionListener l : ls) {
+                            l.muteRequested(callId, flag, done);
+                        }
+                    } finally {
+                        settle(done);
+                    }
+                    break;
+                }
                 case MUTE: {
                     CallAction a = new CallAction(token, callId);
                     // On fulfilment only, for the reason ANSWER gives: a
@@ -738,6 +776,17 @@ public final class Calls {
                     synchronized (SESSIONS) {
                         SESSIONS.clear();
                     }
+                    // Then everything in flight. The provider is gone and the
+                    // native side has dropped the request ids with it, so a
+                    // report, end, configure or permission request that raced
+                    // the reset would never be answered -- and this SPI calls
+                    // an operation that never answers worse than one that
+                    // fails. A late acknowledgement is ignored after this,
+                    // which is the point: it would otherwise hand back a
+                    // session RESET has already removed.
+                    CallRequests.failAll(new CallException(
+                            CallError.PROVIDER_RESET,
+                            "The system's call provider was reset"));
                     for (CallActionListener l : ls) {
                         l.providerReset();
                     }

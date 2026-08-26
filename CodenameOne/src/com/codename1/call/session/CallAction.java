@@ -48,6 +48,9 @@ import java.util.TimerTask;
 /// rather than left to time out, because a failed action puts the system UI
 /// back in a state the user can act on, and a timed-out one does not.
 public final class CallAction {
+    /// The token of an action that was never issued -- see [#answer].
+    static final long NONE = -1L;
+
     private final long token;
     private final String callId;
     private boolean deferred;
@@ -219,6 +222,12 @@ public final class CallAction {
         if (hook != null) {
             // Outside the lock: the hook ends up in Calls, which takes its own.
             hook.run();
+        }
+        if (token == NONE) {
+            // Nothing to answer: the platform told the app what it had
+            // already done rather than asking permission, so there is no
+            // pending action to fulfil or fail.
+            return;
         }
         com.codename1.call.spi.CallBridge b = CallRequests.bridge();
         if (b != null) {

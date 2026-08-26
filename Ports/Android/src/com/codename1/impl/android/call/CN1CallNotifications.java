@@ -228,12 +228,18 @@ final class CN1CallNotifications {
                         dismiss(callId);
                         return;
                     }
+                    // Neither branch dismisses. onAnswer() takes the
+                    // notification down itself, and a rejection must keep it
+                    // up until it is actually carried out: a listener that
+                    // fails endRequested is saying it could not reject the
+                    // call, Telecom then leaves it ringing, and taking the
+                    // notification away here left that restored call with no
+                    // answer surface. finish() clears it on the way out.
                     if (ACTION_ANSWER.equals(intent.getAction())) {
                         c.onAnswer();
                     } else {
                         c.onReject();
                     }
-                    dismiss(callId);
                 }
             };
         }

@@ -55,7 +55,25 @@ public final class IOSCallDirectoryExtensionBuilder {
     /** The generated target's name. */
     public static final String EXTENSION_NAME = "CN1CallDirectory";
 
-    /** What tells iOS this is a call directory rather than some other kind. */
+    /**
+     * What tells iOS this is a call directory rather than some other kind.
+     *
+     * <p><b>Not {@code com.apple.callkit.call-directory}</b>, which does not
+     * exist. The confusion is natural -- the class this target implements is
+     * {@code CXCallDirectoryProvider} and {@code CX} is CallKit -- but the
+     * extension POINT belongs to the IdentityLookup family, beside
+     * {@code com.apple.identitylookup.message-filter}. Xcode's own "Call
+     * Directory Extension" template writes exactly the value below into
+     * {@code NSExtensionPointIdentifier}, and Apple's
+     * {@code CXCallDirectoryProvider} documentation names it as the point to
+     * declare.</p>
+     *
+     * <p>Getting it wrong is silent in the way this whole feature is silent:
+     * the extension builds, signs and embeds, and iOS never launches it, so
+     * caller identification is simply absent with nothing to read anywhere.
+     * Change it only against Apple's documentation, never against a
+     * plausible-looking name.</p>
+     */
     public static final String EXTENSION_POINT =
             "com.apple.identitylookup.call-directory";
 

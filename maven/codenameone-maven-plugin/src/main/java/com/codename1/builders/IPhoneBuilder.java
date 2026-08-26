@@ -4992,6 +4992,18 @@ public class IPhoneBuilder extends Executor {
                 // had a chance to configure anything, so the name, icon and
                 // ringtone have to be baked into the bundle.
                 callPlistWanted = true;
+                // The MICROPHONE prompt is not optional the way the camera
+                // one is: a call carries voice, Calls.requestPermissions
+                // reaches AVAudioSession's record prompt, and iOS TERMINATES
+                // an app that asks for a protected resource with no purpose
+                // string in Info.plist. Injected for every calling app rather
+                // than behind a hint, because there is no calling app that
+                // does not need it.
+                if (request.getArg("ios.NSMicrophoneUsageDescription",
+                        null) == null) {
+                    request.putArgument("ios.NSMicrophoneUsageDescription",
+                            "Carries your voice during a call.");
+                }
                 // iOS refuses the camera prompt outright without a purpose
                 // string, so a video app that asked for CAMERA got a denial
                 // it could not clear. Behind the project's own statement that
