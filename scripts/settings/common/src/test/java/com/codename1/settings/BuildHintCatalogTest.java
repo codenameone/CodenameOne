@@ -2764,6 +2764,62 @@ public class BuildHintCatalogTest {
                         "teamId", false));
     }
 
+    /// An intermediate parent's override reaches the grandparent.
+    ///
+    /// Inheritance is applied one level at a time: a parent that disables the
+    /// grandparent's execution disables it for the leaf too, and the leaf never
+    /// mentions it. Filtering every ancestor against the leaf alone let the
+    /// grandparent's enabled copy through with its root.
+    @Test
+    public void anIntermediateParentsOverrideReachesTheGrandparent() {
+        String grandparent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>grandparent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String leaf = "<project><build></build></project>";
+
+        // The leaf says nothing about it; the parent is what switched it off.
+        java.util.List<String> nearer = java.util.Arrays.asList(leaf, parent);
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                        .toString());
+
+        // With the leaf alone -- which is what was compared before -- it stands.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                        java.util.Arrays.asList(leaf))).contains("grandparent/gen"));
+    }
+
+    /// The unset constant is matched as a TOKEN, not as text after a dot.
+    ///
+    /// `Toggle./* default */DEFAULT` is an ordinary way to write it and the
+    /// processor emits nothing for it, so a properties line stays legal -- while
+    /// a raw suffix comparison saw `/* default */DEFAULT` and claimed ownership.
+    @Test
+    public void theUnsetConstantIsMatchedAsAToken() {
+        com.codename1.build.shared.BuildHints.Hint appBundle =
+                com.codename1.build.shared.BuildHints.byName("android.appBundle");
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle,
+                "Toggle./* default */DEFAULT", false));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle . DEFAULT", false));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.DEFAULT // keep", false));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.ON", false));
+        // A string that merely CONTAINS the word is not the constant.
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "\"DEFAULT\"", false));
+
+        assertEquals("DEFAULT", CodenameOneSettings.lastIdentifier("Toggle./*x*/DEFAULT", false));
+        assertNull(CodenameOneSettings.lastIdentifier("\"DEFAULT\"", false));
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution

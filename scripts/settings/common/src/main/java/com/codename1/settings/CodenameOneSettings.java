@@ -3244,9 +3244,11 @@ public class CodenameOneSettings extends Lifecycle {
         java.util.List<String> out = new java.util.ArrayList<>();
         String path = binding == null ? null : binding.pom();
         String text = pomText();
-        // The module's own POM: what it switches off, it switches off for the
-        // declarations it inherits.
-        String own = text;
+        // Every POM nearer than the one being read. Inheritance is applied one
+        // level at a time, so an intermediate parent that disables the
+        // grandparent's execution disables it for this module too -- and this
+        // module never mentions it.
+        java.util.List<String> nearer = new java.util.ArrayList<>();
         for (int depth = 0; depth < 8 && path != null && text != null; depth++) {
             // Stripped HERE rather than in the seven walks over this list, so a
             // walk added later cannot be the one that forgets. A plugin or
@@ -3266,7 +3268,8 @@ public class CodenameOneSettings extends Lifecycle {
             // enabled copy, and a root the build does not compile went into the
             // scan.
             out.add(depth == 0 ? text
-                    : withoutExecutionsDisabledBy(withoutNonInheritedPlugins(text), own));
+                    : withoutExecutionsDisabledBy(withoutNonInheritedPlugins(text), nearer));
+            nearer.add(text);
             String parent = parentPomPath(path, text);
             if (parent == null || parent.equals(path)) {
                 break;
@@ -4575,8 +4578,13 @@ public class CodenameOneSettings extends Lifecycle {
     /// overriding. Filtering only what gets appended left the ancestor's enabled
     /// copy sitting inside the chosen block, where bindsGoal found it.
     private static String withoutDisabledExecutions(String block, String disabledBy) {
-        java.util.Set<String> off = disabledExecutionIds(disabledBy);
-        if (block == null || off.isEmpty() || block.indexOf("<execution>") < 0) {
+        return withoutExecutionIds(block, disabledExecutionIds(disabledBy));
+    }
+
+    /// `block` without the executions named by `off`.
+    private static String withoutExecutionIds(String block, java.util.Set<String> off) {
+        if (block == null || off == null || off.isEmpty()
+                || block.indexOf("<execution>") < 0) {
             return block;
         }
         StringBuilder out = new StringBuilder();
@@ -4658,7 +4666,20 @@ public class CodenameOneSettings extends Lifecycle {
     /// plugins may both declare `default` and disabling one says nothing about
     /// the other.
     static String withoutExecutionsDisabledBy(String pomText, String childPom) {
-        if (pomText == null || childPom == null || childPom.indexOf("<phase>") < 0) {
+        return withoutExecutionsDisabledBy(pomText,
+                childPom == null ? java.util.Collections.<String>emptyList()
+                        : java.util.Collections.singletonList(childPom));
+    }
+
+    /// The same, against EVERY nearer POM rather than only the leaf.
+    ///
+    /// Inheritance is applied one level at a time, so an intermediate parent
+    /// that disables the grandparent's execution disables it for the leaf too --
+    /// and the leaf never mentions it. Comparing every ancestor with the leaf
+    /// alone let the grandparent's enabled copy through, and its root went into
+    /// the scan.
+    static String withoutExecutionsDisabledBy(String pomText, java.util.List<String> nearer) {
+        if (pomText == null || nearer == null || nearer.isEmpty()) {
             return pomText;
         }
         StringBuilder out = new StringBuilder();
@@ -4678,11 +4699,18 @@ public class CodenameOneSettings extends Lifecycle {
             out.append(pomText, at, open);
             String plugin = pomText.substring(open, close);
             String artifactId = elementValue(plugin, "artifactId");
-            String childsCopy = artifactId == null ? null
-                    : pluginBlock(withoutElement(childPom, "pluginManagement"),
-                            artifactId.trim());
-            out.append(childsCopy == null ? plugin
-                    : withoutDisabledExecutions(plugin, childsCopy));
+            // Every nearer level, and every block each declares for this plugin:
+            // the union of what they switch off is what the ancestor inherits.
+            java.util.Set<String> off = new java.util.HashSet<>();
+            if (artifactId != null) {
+                for (String child : nearer) {
+                    for (String block : pluginBlocks(withoutElement(child, "pluginManagement"),
+                            artifactId.trim())) {
+                        off.addAll(disabledExecutionIds(block));
+                    }
+                }
+            }
+            out.append(off.isEmpty() ? plugin : withoutExecutionIds(plugin, off));
             at = close;
         }
     }
@@ -5452,7 +5480,7 @@ public class CodenameOneSettings extends Lifecycle {
                             // emits no hint for the unset constant, so the
                             // properties file may legally declare it and this
                             // must not claim ownership.
-                            if (isUnsetValue(h, attributeValue(args, h.attr(), kotlin))) {
+                            if (isUnsetValue(h, attributeValue(args, h.attr(), kotlin), kotlin)) {
                                 break;
                             }
                             out.put(com.codename1.build.shared.BuildHints.canonicalName(h.name()),
@@ -5565,13 +5593,60 @@ public class CodenameOneSettings extends Lifecycle {
     /// `DEFAULT`: every unset constant is spelled that way today and none of
     /// this should depend on it staying that way.
     static boolean isUnsetValue(com.codename1.build.shared.BuildHints.Hint hint, String value) {
+        return isUnsetValue(hint, value, false);
+    }
+
+    /// The same, reading `value` as source in the language it was written in.
+    ///
+    /// The last identifier TOKEN, not the text after the last dot.
+    /// `Toggle./* default */DEFAULT` is a perfectly ordinary way to write the
+    /// constant, and the processor sees Toggle.DEFAULT and emits nothing -- while
+    /// a raw suffix comparison saw `/* default */DEFAULT`, called the hint owned,
+    /// and hid a properties value the build accepts.
+    static boolean isUnsetValue(com.codename1.build.shared.BuildHints.Hint hint, String value,
+                                boolean kotlin) {
         String unset = hint == null ? null : hint.unsetConstant();
         if (unset == null || value == null) {
             return false;
         }
-        String written = value.trim();
-        int dot = written.lastIndexOf('.');
-        return unset.equals(dot < 0 ? written : written.substring(dot + 1).trim());
+        return unset.equals(lastIdentifier(value, kotlin));
+    }
+
+    /// The last identifier in `value`, ignoring comments and whitespace, or null.
+    static String lastIdentifier(String value, boolean kotlin) {
+        StringBuilder code = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            int skipped = skipNonCode(value, i, kotlin);
+            if (skipped > i) {
+                // A comment contributes nothing; a string literal is not an
+                // identifier either, and keeping it would let its CONTENTS be
+                // read as one.
+                i = skipped - 1;
+                code.append(' ');
+                continue;
+            }
+            code.append(value.charAt(i));
+        }
+        String text = code.toString();
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) {
+            end--;
+        }
+        int start = end;
+        while (start > 0 && isIdentifierChar(text.charAt(start - 1))) {
+            start--;
+        }
+        return start == end ? null : text.substring(start, end);
+    }
+
+    /// Whether `c` can appear in a Java or Kotlin identifier.
+    ///
+    /// Spelled out rather than through Character.isLetterOrDigit, which is not
+    /// in the Codename One runtime API this tool compiles against. Sources in
+    /// this repository are ASCII, so the constants being matched are too.
+    private static boolean isIdentifierChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '$';
     }
 
     private static boolean declaresAttribute(String args, String attr, boolean kotlin) {
