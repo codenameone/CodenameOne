@@ -141,6 +141,9 @@ static int cn1vpStatusOrdinal(NEVPNStatus status) {
 /// means nothing this port installed is on the device yet.
 static int cn1vpSecretGeneration = -1;
 
+/// Whether an installation owns the shared manager and the next generation.
+static BOOL cn1vpInstalling = NO;
+
 /// Reads the generation once per process.
 static int cn1vpLoadSecretGeneration(void) {
     if (cn1vpSecretGeneration < 0) {
@@ -327,9 +330,24 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
     BOOL onDemand = [cn1vpField(f, 9) isEqualToString:@"1"];
     NSString *name = cn1vpField(f, 10);
 
+    // One installation at a time. Two overlapping calls share the single
+    // NEVPNManager AND the same next-generation keychain accounts, so the
+    // second's SecItemAdd replaced the first's not-yet-saved item and either
+    // save could retire the generation both were using -- acknowledging the
+    // wrong profile, or leaving the installed one pointing at credentials
+    // that had been deleted. Rejecting is better than queueing: the second
+    // caller learns immediately rather than waiting on a prompt for
+    // somebody else's profile.
+    if (cn1vpInstalling) {
+        cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                @"A VPN profile installation is already in progress");
+        return;
+    }
+    cn1vpInstalling = YES;
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
         if (loadError != nil) {
+            cn1vpInstalling = NO;
             cn1vpAck(requestId, NO, CN1_VPN_ERR_UNAUTHORIZED,
                     [loadError localizedDescription]);
             return;
@@ -384,6 +402,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             manager.onDemandRules = [NSArray arrayWithObject:rule];
         }
         [manager saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
+            cn1vpInstalling = NO;
             if (saveError == nil) {
                 // The new profile is installed and owns the new generation,
                 // so the previous one's items can go. A failed save falls

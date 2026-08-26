@@ -384,9 +384,16 @@ public class AndroidCallBridge implements CallBridge {
             c.setCallerDisplayName(displayName,
                     TelecomManager.PRESENTATION_ALLOWED);
         }
-        // A call that becomes a video call mid-way is the ordinary upgrade,
-        // and Telecom has to be told or the system's own UI never offers it.
-        c.setVideo(hasVideo);
+        // Only when the update actually carries capability information.
+        // CallSession.update() has no video parameter and passes -1 and
+        // false, so applying the flag here turned every rename of a video
+        // call into a downgrade -- and onAnswer(videoState) then skipped the
+        // state the user had answered with, leaving Telecom showing the
+        // original bidirectional video. iOS never had this: CXCallUpdate
+        // leaves the fields an update does not set alone.
+        if (capabilityBits >= 0) {
+            c.setVideo(hasVideo);
+        }
     }
 
     @Override

@@ -817,6 +817,14 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
 - (void)pushRegistry:(PKPushRegistry *)registry
         didInvalidatePushTokenForType:(PKPushType)type {
     cn1clVoipToken = nil;
+    // Told, not just forgotten. Clearing the native cache alone left
+    // VoipPush.getToken() answering with the dead token and tokenChanged
+    // never firing, so the app went on believing its server could still
+    // reach it -- and every call sent to that token was simply lost.
+    // deliverToken already handles a null value; the -1 settles no request,
+    // which is right because nobody asked for this.
+    com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+            getThreadLocalData(), -1, JAVA_NULL);
 }
 
 - (void)pushRegistry:(PKPushRegistry *)registry
