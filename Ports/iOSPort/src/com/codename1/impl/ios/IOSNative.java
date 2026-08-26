@@ -2032,6 +2032,145 @@ public final class IOSNative {
     // IOSNearbyCallbacks.
 
     /** True when this build linked Nearby Interaction and the device has the radio. */
+    // ------------------------------------------------------------------
+    // com.codename1.call -- CallKit, PushKit and the Call Directory store.
+    // ------------------------------------------------------------------
+
+    /** True when this build linked CallKit and the OS provides it. */
+    native boolean callSupported();
+
+    /** True when this build linked PushKit. */
+    native boolean callVoipSupported();
+
+    /** True when this build generated a Call Directory extension. */
+    native boolean callDirectorySupported();
+
+    /** The CallBridge.CAPABILITY_* mask this platform offers. */
+    native int callCapabilities();
+
+    /** The CallAvailability ordinal describing whether a call could ring now. */
+    native int callAvailability();
+
+    /** The CallBridge.PERMISSION_* mask currently granted. */
+    native int callGrantedPermissions();
+
+    /** Asks for the permission bits, answering deliverPermissionResult. */
+    native void callRequestPermissions(int requestId, int permissionBits);
+
+    /** Installs the CXProvider configuration from a CallWire record. */
+    native void callConfigureProvider(int requestId, String configWire);
+
+    /** Reports a new incoming call to CallKit. */
+    native void callReportIncoming(int requestId, String callId,
+            String handleWire, String displayName, boolean hasVideo);
+
+    /** Reports a new outgoing call to CallKit. */
+    native void callReportOutgoing(int requestId, String callId,
+            String handleWire, String displayName, boolean hasVideo);
+
+    /** The outgoing call has begun connecting. */
+    native void callStartedConnecting(String callId, long timestampMs);
+
+    /** The outgoing call is connected. */
+    native void callOutgoingConnected(String callId, long timestampMs);
+
+    /** The incoming call is connected. */
+    native void callIncomingConnected(String callId, long timestampMs);
+
+    /** Updates what CallKit shows for a call already reported. */
+    native void callUpdate(String callId, String handleWire,
+            String displayName, boolean hasVideo);
+
+    /** The far end ended the call. */
+    native void callReportEnded(String callId, int endReasonOrdinal,
+            long timestampMs);
+
+    /** This side is ending the call. */
+    native void callEnd(int requestId, String callId, int endReasonOrdinal);
+
+    /** Holds or resumes a call. */
+    native void callSetHeld(int requestId, String callId, boolean held);
+
+    /** Mutes or unmutes a call. */
+    native void callSetMuted(int requestId, String callId, boolean muted);
+
+    /** Sends DTMF digits through CallKit. */
+    native void callSendDtmf(int requestId, String callId, String digits);
+
+    /** Groups or ungroups a call. */
+    native void callSetGroup(int requestId, String callId, String otherCallId);
+
+    /** The CallAudioRoute ordinal of the current output. */
+    native int callAudioRoute();
+
+    /** Asks for a particular audio route. */
+    native void callSetAudioRoute(int requestId, int routeOrdinal);
+
+    /** Shows the system audio route picker. */
+    native void callShowRoutePicker(int requestId, String callId);
+
+    /** Answers a CXAction delivered with this token. */
+    native void callCompleteAction(long actionToken, boolean fulfilled);
+
+    /** Registers for VoIP pushes. */
+    native void callRegisterVoipPush(int requestId);
+
+    /** Stops VoIP push delivery. */
+    native void callUnregisterVoipPush(int requestId);
+
+    /** Tells the native side whether application code is listening yet. */
+    native void callSetJavaReady(boolean ready);
+
+    /** Delivers every call reported natively but not yet seen by Java. */
+    native void callDrainPendingCalls(int requestId);
+
+    /** Installs the caller-identification data at this path. */
+    native void callSetDirectorySource(int requestId, String filePath);
+
+    /** Asks the system to re-read the directory extension. */
+    native void callReloadDirectory(int requestId);
+
+    /** Answers with a CallWire-encoded directory status record. */
+    native void callDirectoryStatus(int requestId);
+
+    // ------------------------------------------------------------------
+    // com.codename1.vpn -- NEVPNManager.
+    //
+    // Distinct from isVPNActive() above, which is always compiled in, needs
+    // no entitlement, and answers whether SOME VPN is carrying this device's
+    // traffic rather than managing one.
+    // ------------------------------------------------------------------
+
+    /** True when this build linked NetworkExtension for VPN management. */
+    native boolean vpnSupported();
+
+    /** True when this build generated a packet tunnel extension. */
+    native boolean vpnTunnelSupported();
+
+    /** The VpnBridge.CAPABILITY_* mask this platform offers. */
+    native int vpnCapabilities();
+
+    /** The VpnStatus ordinal of the managed connection. */
+    native int vpnStatus();
+
+    /** Installs or replaces the configuration from a VpnWire record. */
+    native void vpnInstallProfile(int requestId, String profileWire);
+
+    /** Removes the installed configuration. */
+    native void vpnRemoveProfile(int requestId);
+
+    /** Answers with the installed configuration as a VpnWire record. */
+    native void vpnLoadProfile(int requestId);
+
+    /** Brings the tunnel up. */
+    native void vpnStart(int requestId);
+
+    /** Takes the tunnel down. */
+    native void vpnStop(int requestId);
+
+    /** Starts or stops status-change delivery. */
+    native void vpnSetStatusListening(boolean listening);
+
     native boolean nearbyRangingSupported();
 
     /** True when this build linked AccessorySetupKit and the OS is new enough. */

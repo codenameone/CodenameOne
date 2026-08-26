@@ -388,6 +388,43 @@ public class IOSImplementation extends CodenameOneImplementation {
         return homeBridge;
     }
 
+    private IOSCallBridge callBridge;
+
+    private IOSVpnBridge vpnBridge;
+
+    /// The call bridge, on CallKit and PushKit.
+    ///
+    /// Only meaningful in builds that linked the call natives
+    /// (`CN1_INCLUDE_CALL`, flipped by the builder when the app references
+    /// `com.codename1.call`). Always returned rather than conditionally null,
+    /// for the same reason [#getNearbyBridge()] is: the bridge's own
+    /// `isCallSupported` / `isVoipPushSupported` / `isDirectorySupported`
+    /// answer honestly through the natives, which stub to unsupported when
+    /// the defines are off -- so an app built without any of it reports
+    /// NOT_SUPPORTED without this getter having to know how the app was
+    /// built. The three answer separately, which is what lets a build with
+    /// calls but no push report exactly that.
+    @Override
+    public com.codename1.call.spi.CallBridge getCallBridge() {
+        if (callBridge == null) {
+            callBridge = new IOSCallBridge(nativeInstance);
+        }
+        return callBridge;
+    }
+
+    /// The VPN bridge, on NEVPNManager.
+    ///
+    /// Distinct from `NetworkManager.isVPNActive()`, which is always
+    /// available and answers whether some VPN is carrying this device's
+    /// traffic rather than managing one.
+    @Override
+    public com.codename1.vpn.spi.VpnBridge getVpnBridge() {
+        if (vpnBridge == null) {
+            vpnBridge = new IOSVpnBridge(nativeInstance);
+        }
+        return vpnBridge;
+    }
+
     private IOSNearbyBridge nearbyBridge;
 
     @Override

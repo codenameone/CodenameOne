@@ -1,0 +1,1526 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+#import "CodenameOne_GLViewController.h"
+#import "CN1Call.h"
+
+#ifdef CN1_INCLUDE_CALL
+
+#include "com_codename1_impl_ios_IOSCallCallbacks.h"
+#import "java_lang_String.h"
+
+#if __has_include(<CallKit/CallKit.h>)
+#import <CallKit/CallKit.h>
+#import <AVFoundation/AVFoundation.h>
+#define CN1_CALL_HAS_CALLKIT 1
+#endif
+
+#if defined(CN1_CALL_VOIP) && __has_include(<PushKit/PushKit.h>)
+#import <PushKit/PushKit.h>
+#define CN1_CALL_HAS_PUSHKIT 1
+#endif
+
+// ---------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------
+
+// Declared per translation unit, as CN1Nearby.m and CN1Bluetooth.m do: these
+// live in IOSNative.m and no shared header exports them, so a file that uses
+// one without saying so compiles with an implicit declaration and then reads
+// its result out of the wrong register.
+extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString *str);
+extern NSString *toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
+
+static JAVA_OBJECT cn1clJString(NSString *s) {
+    return s == nil ? JAVA_NULL : fromNSString(getThreadLocalData(), s);
+}
+
+/// Replaces the characters a tab-delimited record cannot carry, exactly as
+/// CallWire.sanitize does on the Java side. A caller whose display name
+/// contains a tab would otherwise shift every field after it -- and a display
+/// name is attacker-influenced on any app that shows a remote party's chosen
+/// name.
+static NSString *cn1clSanitize(NSString *s) {
+    if (s == nil) {
+        return @"";
+    }
+    NSString *out = [s stringByReplacingOccurrencesOfString:@"\t" withString:@" "];
+    out = [out stringByReplacingOccurrencesOfString:@"\n" withString:@" "];
+    return [out stringByReplacingOccurrencesOfString:@"\r" withString:@" "];
+}
+
+static NSString *cn1clJoin(NSArray *fields) {
+    NSMutableArray *safe = [NSMutableArray arrayWithCapacity:[fields count]];
+    for (NSString *f in fields) {
+        [safe addObject:cn1clSanitize(f)];
+    }
+    return [safe componentsJoinedByString:@"\t"];
+}
+
+static NSArray *cn1clSplit(NSString *record) {
+    if (record == nil) {
+        return [NSArray array];
+    }
+    return [record componentsSeparatedByString:@"\t"];
+}
+
+static NSString *cn1clField(NSArray *fields, NSUInteger index) {
+    if (fields == nil || index >= [fields count]) {
+        return @"";
+    }
+    return [fields objectAtIndex:index];
+}
+
+static void cn1clAck(int requestId, BOOL ok, int error, NSString *message) {
+    com_codename1_impl_ios_IOSCallCallbacks_ack___int_boolean_int_java_lang_String(
+            getThreadLocalData(), requestId, ok ? JAVA_TRUE : JAVA_FALSE,
+            error, cn1clJString(message));
+}
+
+/// The value of an Info.plist key, or nil.
+static id cn1clPlist(NSString *key) {
+    return [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
+}
+
+static NSString *cn1clPlistString(NSString *key, NSString *fallback) {
+    id v = cn1clPlist(key);
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        return (NSString *)v;
+    }
+    return fallback;
+}
+
+static BOOL cn1clPlistBool(NSString *key, BOOL fallback) {
+    id v = cn1clPlist(key);
+    if ([v isKindOfClass:[NSString class]]) {
+        return [(NSString *)v boolValue];
+    }
+    if ([v isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)v boolValue];
+    }
+    return fallback;
+}
+
+#ifdef CN1_CALL_HAS_CALLKIT
+
+// ---------------------------------------------------------------------
+// state
+// ---------------------------------------------------------------------
+
+static CXProvider *cn1clProvider = nil;
+static CXCallController *cn1clController = nil;
+
+/// Calls this app currently has, keyed by canonical id string.
+static NSMutableDictionary *cn1clCalls = nil;
+
+/// CXActions delivered to Java and not yet answered, keyed by token.
+static NSMutableDictionary *cn1clActions = nil;
+static int64_t cn1clNextActionToken = 1;
+
+/// Calls reported to CallKit that Java has not yet seen.
+static NSMutableArray *cn1clPending = nil;
+
+/// Whether application code has installed a VoIP listener.
+static BOOL cn1clJavaReady = NO;
+
+static int cn1clRoute = CN1_CALL_ROUTE_EARPIECE;
+static BOOL cn1clConfigured = NO;
+static NSString *cn1clDirectoryPath = nil;
+
+static NSObject *cn1clLock = nil;
+
+static void cn1clEnsureState(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1clCalls = [[NSMutableDictionary alloc] init];
+        cn1clActions = [[NSMutableDictionary alloc] init];
+        cn1clPending = [[NSMutableArray alloc] init];
+        cn1clLock = [[NSObject alloc] init];
+    });
+}
+
+// ---------------------------------------------------------------------
+// the provider delegate
+// ---------------------------------------------------------------------
+
+/// Allocates a token for a CXAction and remembers it.
+///
+/// Java answers with completeAction; until it does, the action is neither
+/// fulfilled nor failed. Both are a few seconds from timing out, which is why
+/// the Java facade answers automatically for a listener that ignores one.
+static int64_t cn1clTrackAction(CXAction *action) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        int64_t token = cn1clNextActionToken++;
+        [cn1clActions setObject:action forKey:[NSNumber numberWithLongLong:token]];
+        return token;
+    }
+}
+
+@interface CN1CallProviderDelegate : NSObject <CXProviderDelegate>
+@end
+
+@implementation CN1CallProviderDelegate
+
+- (void)providerDidReset:(CXProvider *)provider {
+    // Every call is gone. Java is told so it can drop media WITHOUT ending
+    // calls that no longer exist.
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        [cn1clCalls removeAllObjects];
+        [cn1clActions removeAllObjects];
+    }
+    com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
+}
+
+- (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAction *)action {
+    com_codename1_impl_ios_IOSCallCallbacks_answerRequested___java_lang_String_long(
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
+    NSString *uuid = [action.callUUID UUIDString];
+    com_codename1_impl_ios_IOSCallCallbacks_endRequested___java_lang_String_long(
+            getThreadLocalData(), cn1clJString(uuid), cn1clTrackAction(action));
+    @synchronized (cn1clLock) {
+        [cn1clCalls removeObjectForKey:uuid];
+    }
+}
+
+- (void)provider:(CXProvider *)provider performSetHeldCallAction:(CXSetHeldCallAction *)action {
+    com_codename1_impl_ios_IOSCallCallbacks_holdRequested___java_lang_String_boolean_long(
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            action.onHold ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider performSetMutedCallAction:(CXSetMutedCallAction *)action {
+    com_codename1_impl_ios_IOSCallCallbacks_muteRequested___java_lang_String_boolean_long(
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            action.muted ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider performPlayDTMFCallAction:(CXPlayDTMFCallAction *)action {
+    com_codename1_impl_ios_IOSCallCallbacks_dtmfRequested___java_lang_String_java_lang_String_long(
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            cn1clJString(action.digits), cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
+    // The system asking this app to PLACE a call: Recents, or a voice
+    // assistant. No call exists yet; Java reports one with this id.
+    NSString *wire = cn1clJoin([NSArray arrayWithObjects:
+            [NSString stringWithFormat:@"%d",
+                    action.handle.type == CXHandleTypePhoneNumber
+                            ? CN1_CALL_HANDLE_PHONE
+                            : (action.handle.type == CXHandleTypeEmailAddress
+                                    ? CN1_CALL_HANDLE_EMAIL
+                                    : CN1_CALL_HANDLE_GENERIC)],
+            action.handle.value == nil ? @"" : action.handle.value, nil]);
+    com_codename1_impl_ios_IOSCallCallbacks_startCallRequested___java_lang_String_java_lang_String_boolean_long(
+            getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
+            cn1clJString(wire), action.video ? JAVA_TRUE : JAVA_FALSE,
+            cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider didActivateAudioSession:(AVAudioSession *)audioSession {
+    // THE moment media may start. Reported for whichever call is current;
+    // the Java side carries the id so an app with one call needs no
+    // bookkeeping.
+    NSString *uuid = nil;
+    @synchronized (cn1clLock) {
+        uuid = [[cn1clCalls allKeys] firstObject];
+    }
+    com_codename1_impl_ios_IOSCallCallbacks_audioActivated___java_lang_String_int(
+            getThreadLocalData(), cn1clJString(uuid), cn1clRoute);
+}
+
+- (void)provider:(CXProvider *)provider didDeactivateAudioSession:(AVAudioSession *)audioSession {
+    NSString *uuid = nil;
+    @synchronized (cn1clLock) {
+        uuid = [[cn1clCalls allKeys] firstObject];
+    }
+    com_codename1_impl_ios_IOSCallCallbacks_audioDeactivated___java_lang_String(
+            getThreadLocalData(), cn1clJString(uuid));
+}
+
+@end
+
+static CN1CallProviderDelegate *cn1clDelegate = nil;
+
+/// Builds the provider configuration from Info.plist ALONE.
+///
+/// Deliberately not from anything Java set: on a cold start a VoIP push is
+/// reported before application code has run, so the name the user sees has to
+/// come from the bundle. IPhoneBuilder writes these keys from the ios.call.*
+/// build hints.
+static CXProviderConfiguration *cn1clConfiguration(void) {
+    NSString *name = cn1clPlistString(@"CN1CallProviderName",
+            cn1clPlistString(@"CFBundleDisplayName",
+                    cn1clPlistString(@"CFBundleName", @"Codename One")));
+    CXProviderConfiguration *cfg;
+#if defined(__IPHONE_14_0)
+    if (@available(iOS 14.0, *)) {
+        cfg = [[CXProviderConfiguration alloc] init];
+    } else {
+        cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+    }
+#else
+    cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+#endif
+    cfg.supportsVideo = cn1clPlistBool(@"CN1CallSupportsVideo", NO);
+    cfg.includesCallsInRecents = cn1clPlistBool(@"CN1CallIncludesCallsInRecents", YES);
+    cfg.maximumCallGroups = 1;
+    cfg.maximumCallsPerCallGroup = 1;
+    cfg.supportedHandleTypes = [NSSet setWithObjects:
+            [NSNumber numberWithInteger:CXHandleTypeGeneric],
+            [NSNumber numberWithInteger:CXHandleTypePhoneNumber],
+            [NSNumber numberWithInteger:CXHandleTypeEmailAddress], nil];
+    NSString *ringtone = cn1clPlistString(@"CN1CallRingtoneSound", nil);
+    if (ringtone != nil) {
+        cfg.ringtoneSound = ringtone;
+    }
+    NSString *icon = cn1clPlistString(@"CN1CallIconTemplateImageName", nil);
+    if (icon != nil) {
+        UIImage *img = [UIImage imageNamed:icon];
+        if (img != nil) {
+            cfg.iconTemplateImageData = UIImagePNGRepresentation(img);
+        }
+    }
+    return cfg;
+}
+
+/// The provider, created on first use and never later than the push registry.
+static CXProvider *cn1clEnsureProvider(void) {
+    cn1clEnsureState();
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1clProvider = [[CXProvider alloc] initWithConfiguration:cn1clConfiguration()];
+        cn1clDelegate = [[CN1CallProviderDelegate alloc] init];
+        [cn1clProvider setDelegate:cn1clDelegate queue:nil];
+        cn1clController = [[CXCallController alloc] init];
+    });
+    return cn1clProvider;
+}
+
+// ---------------------------------------------------------------------
+// reporting
+// ---------------------------------------------------------------------
+
+static CXHandle *cn1clHandleFromWire(NSString *wire) {
+    NSArray *f = cn1clSplit(wire);
+    NSString *value = cn1clField(f, 1);
+    if ([value length] == 0) {
+        value = @" ";
+    }
+    int type = [cn1clField(f, 0) intValue];
+    CXHandleType t = CXHandleTypeGeneric;
+    if (type == CN1_CALL_HANDLE_PHONE) {
+        t = CXHandleTypePhoneNumber;
+    } else if (type == CN1_CALL_HANDLE_EMAIL) {
+        t = CXHandleTypeEmailAddress;
+    }
+    return [[CXHandle alloc] initWithType:t value:value];
+}
+
+/// The single funnel through which a call is reported to CallKit.
+///
+/// Both the push path and the Java path come through here, which is what
+/// keeps a socket and a push racing for the same call from reporting the uuid
+/// twice: CallKit answers a duplicate with
+/// CXErrorCodeIncomingCallErrorCallUUIDAlreadyExists and THROWS, so a
+/// duplicate is downgraded to an update instead.
+///
+/// requestId < 0 means the push path, which has nobody waiting on an answer.
+static void cn1clReportIncoming(int requestId, NSString *uuidString,
+        NSString *handleWire, NSString *displayName, BOOL hasVideo) {
+    cn1clEnsureState();
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    if (uuid == nil) {
+        if (requestId >= 0) {
+            cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID,
+                    @"Not a canonical call id");
+        }
+        return;
+    }
+    CXCallUpdate *update = [[CXCallUpdate alloc] init];
+    update.remoteHandle = cn1clHandleFromWire(handleWire);
+    if ([displayName length] > 0) {
+        update.localizedCallerName = displayName;
+    }
+    update.hasVideo = hasVideo;
+    update.supportsHolding = YES;
+    update.supportsDTMF = YES;
+    update.supportsGrouping = NO;
+    update.supportsUngrouping = NO;
+
+    BOOL known = NO;
+    @synchronized (cn1clLock) {
+        known = [cn1clCalls objectForKey:uuidString] != nil;
+    }
+    if (known) {
+        // Already ringing -- the other origin got here first.
+        [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
+        if (requestId >= 0) {
+            cn1clAck(requestId, YES, 0, nil);
+        }
+        return;
+    }
+    @synchronized (cn1clLock) {
+        [cn1clCalls setObject:uuidString forKey:uuidString];
+    }
+    [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid update:update
+            completion:^(NSError *error) {
+        if (error != nil) {
+            @synchronized (cn1clLock) {
+                [cn1clCalls removeObjectForKey:uuidString];
+            }
+            if (requestId >= 0) {
+                int code = CN1_CALL_ERR_CALL_REFUSED;
+                if (error.code == CXErrorCodeIncomingCallErrorFilteredByDoNotDisturb
+                        || error.code == CXErrorCodeIncomingCallErrorFilteredByBlockList) {
+                    code = CN1_CALL_ERR_CALL_FILTERED;
+                } else if (error.code == CXErrorCodeIncomingCallErrorCallUUIDAlreadyExists) {
+                    code = CN1_CALL_ERR_DUPLICATE_CALL;
+                }
+                cn1clAck(requestId, NO, code, [error localizedDescription]);
+            }
+            return;
+        }
+        if (requestId >= 0) {
+            cn1clAck(requestId, YES, 0, nil);
+        }
+    }];
+}
+
+/// Queues a pushed call for Java, and drains immediately when it is listening.
+static void cn1clQueuePushed(NSString *uuid, NSString *handleWire,
+        NSString *displayName, BOOL video, BOOL stale, BOOL synthesized,
+        NSString *data) {
+    cn1clEnsureState();
+    NSDictionary *rec = [NSDictionary dictionaryWithObjectsAndKeys:
+            uuid == nil ? @"" : uuid, @"uuid",
+            handleWire == nil ? @"" : handleWire, @"handle",
+            displayName == nil ? @"" : displayName, @"name",
+            [NSNumber numberWithBool:video], @"video",
+            [NSNumber numberWithBool:stale], @"stale",
+            [NSNumber numberWithBool:synthesized], @"synth",
+            data == nil ? @"" : data, @"data",
+            [NSNumber numberWithLongLong:
+                    (int64_t)([[NSDate date] timeIntervalSince1970] * 1000.0)], @"at",
+            nil];
+    @synchronized (cn1clLock) {
+        [cn1clPending addObject:rec];
+    }
+}
+
+static void cn1clDrain(int requestId) {
+    cn1clEnsureState();
+    NSArray *batch;
+    @synchronized (cn1clLock) {
+        batch = [NSArray arrayWithArray:cn1clPending];
+        [cn1clPending removeAllObjects];
+    }
+    for (NSDictionary *rec in batch) {
+        NSString *uuid = [rec objectForKey:@"uuid"];
+        BOOL stale = [[rec objectForKey:@"stale"] boolValue];
+        if (!stale) {
+            // A call whose uuid is no longer live ended while the app was
+            // getting here, so it is delivered as stale rather than as
+            // something the app could answer.
+            BOOL live = NO;
+            @synchronized (cn1clLock) {
+                live = [cn1clCalls objectForKey:uuid] != nil;
+            }
+            stale = !live;
+        }
+        com_codename1_impl_ios_IOSCallCallbacks_pushedCall___java_lang_String_java_lang_String_java_lang_String_boolean_boolean_boolean_java_lang_String_long(
+                getThreadLocalData(), cn1clJString(uuid),
+                cn1clJString([rec objectForKey:@"handle"]),
+                cn1clJString([rec objectForKey:@"name"]),
+                [[rec objectForKey:@"video"] boolValue] ? JAVA_TRUE : JAVA_FALSE,
+                stale ? JAVA_TRUE : JAVA_FALSE,
+                [[rec objectForKey:@"synth"] boolValue] ? JAVA_TRUE : JAVA_FALSE,
+                cn1clJString([rec objectForKey:@"data"]),
+                (JAVA_LONG)[[rec objectForKey:@"at"] longLongValue]);
+    }
+    if (requestId >= 0) {
+        com_codename1_impl_ios_IOSCallCallbacks_pendingCallsDrained___int_int(
+                getThreadLocalData(), requestId, (int)[batch count]);
+    }
+}
+
+#endif /* CN1_CALL_HAS_CALLKIT */
+
+// ---------------------------------------------------------------------
+// PushKit: the deadline path
+// ---------------------------------------------------------------------
+//
+// iOS terminates the app if didReceiveIncomingPushWithPayload returns without
+// reporting the call to CallKit, and repeated offences revoke VoIP push for
+// the installed app. That is a one-strike API, so NOTHING in this path
+// touches Java: the payload is read, the call is reported, the record is
+// queued, and only later -- when application code asks -- is any of it handed
+// up. There is exactly one code path whether the app was running or not,
+// because a fast path that only ran sometimes would be the half nobody
+// tested.
+
+#if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
+
+@interface CN1CallPushDelegate : NSObject <PKPushRegistryDelegate>
+@end
+
+static PKPushRegistry *cn1clRegistry = nil;
+static NSString *cn1clVoipToken = nil;
+static int cn1clTokenRequest = -1;
+
+/// The uuid a payload names, or a fresh one when it names none.
+///
+/// Refusing would return without reporting, which kills the process. So a
+/// malformed payload still rings -- flagged, so the server bug is findable
+/// rather than presenting as calls that never connect.
+static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
+    id raw = [call objectForKey:@"uuid"];
+    if ([raw isKindOfClass:[NSString class]]) {
+        NSUUID *parsed = [[NSUUID alloc] initWithUUIDString:(NSString *)raw];
+        if (parsed != nil) {
+            *synthesized = NO;
+            return [parsed UUIDString];
+        }
+    }
+    *synthesized = YES;
+    return [[NSUUID UUID] UUIDString];
+}
+
+@implementation CN1CallPushDelegate
+
+- (void)pushRegistry:(PKPushRegistry *)registry
+        didUpdatePushCredentials:(PKPushCredentials *)credentials
+        forType:(PKPushType)type {
+    const unsigned char *bytes = (const unsigned char *)[credentials.token bytes];
+    NSMutableString *hex =
+            [NSMutableString stringWithCapacity:[credentials.token length] * 2];
+    for (NSUInteger i = 0; i < [credentials.token length]; i++) {
+        [hex appendFormat:@"%02x", bytes[i]];
+    }
+    cn1clVoipToken = [hex copy];
+    if (cn1clTokenRequest >= 0) {
+        int req = cn1clTokenRequest;
+        cn1clTokenRequest = -1;
+        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                getThreadLocalData(), req, cn1clJString(cn1clVoipToken));
+    }
+}
+
+- (void)pushRegistry:(PKPushRegistry *)registry
+        didInvalidatePushTokenForType:(PKPushType)type {
+    cn1clVoipToken = nil;
+}
+
+- (void)pushRegistry:(PKPushRegistry *)registry
+        didReceiveIncomingPushWithPayload:(PKPushPayload *)payload
+        forType:(PKPushType)type
+        withCompletionHandler:(void (^)(void))completion {
+    // Everything below runs before this method returns, and none of it is
+    // Java. PushKit hands the payload already parsed, so there is no JSON
+    // parser in the deadline window either.
+    cn1clEnsureState();
+    id rawCall = [payload.dictionaryPayload objectForKey:@"cn1call"];
+    if (![rawCall isKindOfClass:[NSDictionary class]]) {
+        // A payload with no cn1call rings nothing, which is the case that
+        // gets the app killed. Reporting a placeholder and ending it at once
+        // is strictly better than returning without reporting: the process
+        // survives, and the user sees nothing.
+        NSString *uuid = [[NSUUID UUID] UUIDString];
+        CXCallUpdate *update = [[CXCallUpdate alloc] init];
+        update.remoteHandle = [[CXHandle alloc] initWithType:CXHandleTypeGeneric
+                                                      value:@" "];
+        [cn1clEnsureProvider() reportNewIncomingCallWithUUID:
+                [[NSUUID alloc] initWithUUIDString:uuid] update:update
+                completion:^(NSError *error) {
+            [cn1clEnsureProvider() reportCallWithUUID:
+                    [[NSUUID alloc] initWithUUIDString:uuid]
+                    endedAtDate:nil
+                    reason:CXCallEndedReasonFailed];
+            completion();
+        }];
+        return;
+    }
+    NSDictionary *call = (NSDictionary *)rawCall;
+    BOOL synthesized = NO;
+    NSString *uuidString = cn1clUuidFrom(call, &synthesized);
+
+    id cancel = [call objectForKey:@"cancel"];
+    if ([cancel respondsToSelector:@selector(boolValue)] && [cancel boolValue]) {
+        // A retraction: the call was cancelled before it was answered.
+        NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+        if (uuid != nil) {
+            id reason = [call objectForKey:@"reason"];
+            CXCallEndedReason r = CXCallEndedReasonRemoteEnded;
+            if ([reason respondsToSelector:@selector(intValue)]
+                    && [reason intValue] == CN1_CALL_END_UNANSWERED) {
+                r = CXCallEndedReasonUnanswered;
+            }
+            [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil reason:r];
+            @synchronized (cn1clLock) {
+                [cn1clCalls removeObjectForKey:uuidString];
+            }
+        }
+        completion();
+        return;
+    }
+
+    id handleValue = [call objectForKey:@"handle"];
+    NSString *handle = [handleValue isKindOfClass:[NSString class]]
+            ? (NSString *)handleValue : @"";
+    id typeValue = [call objectForKey:@"handleType"];
+    int handleType = CN1_CALL_HANDLE_GENERIC;
+    if ([typeValue isKindOfClass:[NSString class]]) {
+        if ([(NSString *)typeValue isEqualToString:@"phoneNumber"]) {
+            handleType = CN1_CALL_HANDLE_PHONE;
+        } else if ([(NSString *)typeValue isEqualToString:@"emailAddress"]) {
+            handleType = CN1_CALL_HANDLE_EMAIL;
+        }
+    }
+    NSString *handleWire = cn1clJoin([NSArray arrayWithObjects:
+            [NSString stringWithFormat:@"%d", handleType], handle, nil]);
+
+    id nameValue = [call objectForKey:@"displayName"];
+    NSString *name = [nameValue isKindOfClass:[NSString class]]
+            ? (NSString *)nameValue
+            : cn1clPlistString(@"CN1CallDefaultCallerName", @"");
+    id videoValue = [call objectForKey:@"video"];
+    BOOL video = [videoValue respondsToSelector:@selector(boolValue)]
+            && [videoValue boolValue];
+    id dataValue = [call objectForKey:@"data"];
+    NSString *data = [dataValue isKindOfClass:[NSString class]]
+            ? (NSString *)dataValue : nil;
+
+    int ttl = [cn1clPlistString(@"CN1CallPendingTTLSeconds", @"30") intValue];
+    id ttlValue = [call objectForKey:@"ttl"];
+    if ([ttlValue respondsToSelector:@selector(intValue)] && [ttlValue intValue] > 0) {
+        ttl = [ttlValue intValue];
+    }
+
+    cn1clQueuePushed(uuidString, handleWire, name, video, NO, synthesized, data);
+
+    // The report itself. requestId -1: nobody in Java is waiting on it.
+    cn1clReportIncoming(-1, uuidString, handleWire, name, video);
+
+    // A watchdog, so a call the application never claims is ended rather than
+    // left ringing forever on a lock screen the user cannot clear.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ttl * NSEC_PER_SEC),
+            dispatch_get_main_queue(), ^{
+        BOOL live = NO;
+        @synchronized (cn1clLock) {
+            live = [cn1clCalls objectForKey:uuidString] != nil;
+        }
+        if (live) {
+            NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+            [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil
+                    reason:CXCallEndedReasonUnanswered];
+            @synchronized (cn1clLock) {
+                [cn1clCalls removeObjectForKey:uuidString];
+            }
+        }
+    });
+
+    if (cn1clJavaReady) {
+        // Deliberately asynchronous and OUTSIDE this handler: the report above
+        // has already satisfied the deadline, and hopping to the main queue
+        // keeps the one code path from ever calling into the VM while the
+        // push handler is on the stack.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            cn1clDrain(-1);
+        });
+    }
+    completion();
+}
+
+@end
+
+static CN1CallPushDelegate *cn1clPushDelegate = nil;
+
+void cn1CallInstallPushRegistry(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1clEnsureState();
+        // The provider exists before the registry, so a push delivered during
+        // launch has something to report to.
+        cn1clEnsureProvider();
+        cn1clPushDelegate = [[CN1CallPushDelegate alloc] init];
+        cn1clRegistry = [[PKPushRegistry alloc]
+                initWithQueue:dispatch_get_main_queue()];
+        cn1clRegistry.delegate = cn1clPushDelegate;
+        cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
+    });
+}
+
+#else
+
+void cn1CallInstallPushRegistry(void) {
+    // No PushKit in this build.
+}
+
+#endif /* CN1_CALL_HAS_PUSHKIT */
+
+// ---------------------------------------------------------------------
+// The exported natives.
+//
+// Both halves are always defined. A build without CN1_INCLUDE_CALL still
+// links every symbol -- answering "unsupported" -- because a native method is
+// kept alive BY its symbol appearing in the native sources: absent it, the
+// dead-code pass drops the Java method and the feature ships inert with a
+// green build and nothing in the log.
+// ---------------------------------------------------------------------
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callVoipSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callDirectorySupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if defined(CN1_CALL_DIRECTORY) && defined(CN1_CALL_HAS_CALLKIT)
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callCapabilities___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    int caps = CN1_CALL_CAP_SYSTEM_UI | CN1_CALL_CAP_OUTGOING
+            | CN1_CALL_CAP_HOLD | CN1_CALL_CAP_MUTE | CN1_CALL_CAP_DTMF
+            | CN1_CALL_CAP_VIDEO | CN1_CALL_CAP_ROUTE_PICKER;
+#ifdef CN1_CALL_HAS_PUSHKIT
+    caps |= CN1_CALL_CAP_VOIP_PUSH;
+#endif
+#ifdef CN1_CALL_DIRECTORY
+    caps |= CN1_CALL_CAP_DIRECTORY;
+#endif
+    return caps;
+#else
+    return 0;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    // CXCallObserver reports every call on the device, including other apps'
+    // and the cellular one. A call this app does not own means CallKit will
+    // refuse the next report, which is worth knowing BEFORE telling a caller
+    // their call is ringing.
+    CXCallObserver *observer = [[CXCallObserver alloc] init];
+    for (CXCall *c in observer.calls) {
+        BOOL mine = NO;
+        @synchronized (cn1clLock) {
+            mine = cn1clCalls != nil
+                    && [cn1clCalls objectForKey:[c.UUID UUIDString]] != nil;
+        }
+        if (!mine && !c.hasEnded) {
+            return CN1_CALL_AVAIL_OTHER_APP;
+        }
+    }
+    return CN1_CALL_AVAIL_AVAILABLE;
+#else
+    return CN1_CALL_AVAIL_UNSUPPORTED;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callGrantedPermissions___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    // Owning a call needs no permission on iOS, so that bit is always set;
+    // the microphone is the one the user can refuse.
+    int mask = CN1_CALL_PERM_MANAGE_CALLS | CN1_CALL_PERM_NOTIFICATIONS;
+    if ([[AVAudioSession sharedInstance] recordPermission]
+            == AVAudioSessionRecordPermissionGranted) {
+        mask |= CN1_CALL_PERM_MICROPHONE;
+    }
+    return mask;
+#else
+    return 0;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callRequestPermissions___int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_INT permissionBits) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    if ((permissionBits & CN1_CALL_PERM_MICROPHONE) != 0) {
+        [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
+            int mask = CN1_CALL_PERM_MANAGE_CALLS | CN1_CALL_PERM_NOTIFICATIONS;
+            if (granted) {
+                mask |= CN1_CALL_PERM_MICROPHONE;
+            }
+            com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
+                    getThreadLocalData(), requestId, mask);
+        }];
+        return;
+    }
+    com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
+            getThreadLocalData(), requestId,
+            CN1_CALL_PERM_MANAGE_CALLS | CN1_CALL_PERM_NOTIFICATIONS);
+#else
+    com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
+            threadStateData, requestId, 0);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT configWire) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    // The provider's configuration is read from Info.plist rather than from
+    // this record, because a pushed call is reported before any of it could
+    // have been set. What this call does is prove the provider exists and
+    // give the Java side something to sequence against.
+    cn1clEnsureProvider();
+    cn1clConfigured = YES;
+    cn1clAck(requestId, YES, 0, nil);
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"This build did not link CallKit");
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callReportIncoming___int_java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
+        JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    cn1clReportIncoming(requestId, toNSString(threadStateData, callId),
+            toNSString(threadStateData, handleWire),
+            displayName == JAVA_NULL ? nil : toNSString(threadStateData, displayName),
+            hasVideo != JAVA_FALSE);
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"This build did not link CallKit");
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
+        JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSString *uuidString = toNSString(threadStateData, callId);
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    if (uuid == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID,
+                @"Not a canonical call id");
+        return;
+    }
+    CXStartCallAction *action = [[CXStartCallAction alloc]
+            initWithCallUUID:uuid
+            handle:cn1clHandleFromWire(toNSString(threadStateData, handleWire))];
+    action.video = hasVideo != JAVA_FALSE;
+    if (displayName != JAVA_NULL) {
+        action.contactIdentifier = toNSString(threadStateData, displayName);
+    }
+    cn1clEnsureProvider();
+    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            completion:^(NSError *error) {
+        if (error != nil) {
+            cn1clAck(requestId, NO, CN1_CALL_ERR_CALL_REFUSED,
+                    [error localizedDescription]);
+            return;
+        }
+        @synchronized (cn1clLock) {
+            [cn1clCalls setObject:uuidString forKey:uuidString];
+        }
+        cn1clAck(requestId, YES, 0, nil);
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"This build did not link CallKit");
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callStartedConnecting___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid != nil) {
+        [cn1clEnsureProvider() reportOutgoingCallWithUUID:uuid
+                startedConnectingAtDate:[NSDate dateWithTimeIntervalSince1970:
+                        (double)timestampMs / 1000.0]];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callOutgoingConnected___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid != nil) {
+        [cn1clEnsureProvider() reportOutgoingCallWithUUID:uuid
+                connectedAtDate:[NSDate dateWithTimeIntervalSince1970:
+                        (double)timestampMs / 1000.0]];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callIncomingConnected___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+    // CallKit has no incoming-connected report: an answered call is connected
+    // by the answer action itself. Present so the SPI is uniform.
+}
+
+void com_codename1_impl_ios_IOSNative_callUpdate___java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_OBJECT handleWire, JAVA_OBJECT displayName,
+        JAVA_BOOLEAN hasVideo) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid == nil) {
+        return;
+    }
+    CXCallUpdate *update = [[CXCallUpdate alloc] init];
+    if (handleWire != JAVA_NULL) {
+        NSString *wire = toNSString(threadStateData, handleWire);
+        if ([wire length] > 0) {
+            update.remoteHandle = cn1clHandleFromWire(wire);
+        }
+    }
+    if (displayName != JAVA_NULL) {
+        update.localizedCallerName = toNSString(threadStateData, displayName);
+    }
+    [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callReportEnded___java_lang_String_int_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_INT endReasonOrdinal, JAVA_LONG timestampMs) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSString *uuidString = toNSString(threadStateData, callId);
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    if (uuid == nil) {
+        return;
+    }
+    // The reason is what the system writes in the call log, so it is
+    // user-visible rather than cosmetic.
+    CXCallEndedReason reason = CXCallEndedReasonRemoteEnded;
+    switch (endReasonOrdinal) {
+        case CN1_CALL_END_UNANSWERED: reason = CXCallEndedReasonUnanswered; break;
+        case CN1_CALL_END_BUSY:       reason = CXCallEndedReasonUnanswered; break;
+        case CN1_CALL_END_FAILED:     reason = CXCallEndedReasonFailed; break;
+        case CN1_CALL_END_FILTERED:   reason = CXCallEndedReasonDeclinedElsewhere; break;
+        default:                      reason = CXCallEndedReasonRemoteEnded; break;
+    }
+    [cn1clEnsureProvider() reportCallWithUUID:uuid
+            endedAtDate:[NSDate dateWithTimeIntervalSince1970:
+                    (double)timestampMs / 1000.0]
+            reason:reason];
+    @synchronized (cn1clLock) {
+        [cn1clCalls removeObjectForKey:uuidString];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_INT endReasonOrdinal) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSString *uuidString = toNSString(threadStateData, callId);
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    BOOL known = NO;
+    @synchronized (cn1clLock) {
+        known = cn1clCalls != nil && [cn1clCalls objectForKey:uuidString] != nil;
+    }
+    if (uuid == nil || !known) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID,
+                @"No such call");
+        return;
+    }
+    CXEndCallAction *action = [[CXEndCallAction alloc] initWithCallUUID:uuid];
+    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            completion:^(NSError *error) {
+        @synchronized (cn1clLock) {
+            [cn1clCalls removeObjectForKey:uuidString];
+        }
+        if (error != nil) {
+            cn1clAck(requestId, NO, CN1_CALL_ERR_UNKNOWN,
+                    [error localizedDescription]);
+        } else {
+            cn1clAck(requestId, YES, 0, nil);
+        }
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetHeld___int_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN held) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
+        return;
+    }
+    CXSetHeldCallAction *action = [[CXSetHeldCallAction alloc]
+            initWithCallUUID:uuid onHold:held != JAVA_FALSE];
+    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            completion:^(NSError *error) {
+        cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
+                error == nil ? nil : [error localizedDescription]);
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetMuted___int_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN muted) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
+        return;
+    }
+    CXSetMutedCallAction *action = [[CXSetMutedCallAction alloc]
+            initWithCallUUID:uuid muted:muted != JAVA_FALSE];
+    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            completion:^(NSError *error) {
+        cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
+                error == nil ? nil : [error localizedDescription]);
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSendDtmf___int_java_lang_String_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT digits) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
+        return;
+    }
+    CXPlayDTMFCallAction *action = [[CXPlayDTMFCallAction alloc]
+            initWithCallUUID:uuid
+            digits:toNSString(threadStateData, digits)
+            type:CXPlayDTMFCallActionTypeSingleTone];
+    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            completion:^(NSError *error) {
+        cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
+                error == nil ? nil : [error localizedDescription]);
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetGroup___int_java_lang_String_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT otherCallId) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)];
+    if (uuid == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
+        return;
+    }
+    CXCallUpdate *update = [[CXCallUpdate alloc] init];
+    update.supportsGrouping = otherCallId != JAVA_NULL;
+    [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
+    cn1clAck(requestId, YES, 0, nil);
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    AVAudioSessionRouteDescription *route =
+            [[AVAudioSession sharedInstance] currentRoute];
+    for (AVAudioSessionPortDescription *port in route.outputs) {
+        if ([port.portType isEqualToString:AVAudioSessionPortBuiltInSpeaker]) {
+            return CN1_CALL_ROUTE_SPEAKER;
+        }
+        if ([port.portType isEqualToString:AVAudioSessionPortHeadphones]
+                || [port.portType isEqualToString:AVAudioSessionPortHeadsetMic]) {
+            return CN1_CALL_ROUTE_WIRED;
+        }
+        if ([port.portType isEqualToString:AVAudioSessionPortBluetoothHFP]
+                || [port.portType isEqualToString:AVAudioSessionPortBluetoothA2DP]
+                || [port.portType isEqualToString:AVAudioSessionPortBluetoothLE]) {
+            return CN1_CALL_ROUTE_BLUETOOTH;
+        }
+        if ([port.portType isEqualToString:AVAudioSessionPortBuiltInReceiver]) {
+            return CN1_CALL_ROUTE_EARPIECE;
+        }
+    }
+    return CN1_CALL_ROUTE_UNKNOWN;
+#else
+    return CN1_CALL_ROUTE_UNKNOWN;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetAudioRoute___int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_INT routeOrdinal) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    NSError *error = nil;
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    if (routeOrdinal == CN1_CALL_ROUTE_SPEAKER) {
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker
+                                   error:&error];
+    } else {
+        [session overrideOutputAudioPort:AVAudioSessionPortOverrideNone
+                                   error:&error];
+    }
+    if (error == nil) {
+        cn1clRoute = routeOrdinal;
+    }
+    cn1clAck(requestId, error == nil, CN1_CALL_ERR_AUDIO_FAILED,
+            error == nil ? nil : [error localizedDescription]);
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callShowRoutePicker___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    // There is no CallKit route picker to present; AVRoutePickerView is a UI
+    // component an app places itself. Answering false rather than pretending
+    // keeps an app from waiting for a sheet that will never appear.
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"iOS has no system call audio route picker to present");
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED, nil);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_LONG actionToken, JAVA_BOOLEAN fulfilled) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    cn1clEnsureState();
+    CXAction *action = nil;
+    NSNumber *key = [NSNumber numberWithLongLong:(int64_t)actionToken];
+    @synchronized (cn1clLock) {
+        action = [cn1clActions objectForKey:key];
+        [cn1clActions removeObjectForKey:key];
+    }
+    // A second answer for the same token finds nothing and does nothing. The
+    // facade's safety net and a slow application may both answer, and that
+    // race is not worth making anyone think about.
+    if (action == nil) {
+        return;
+    }
+    if (fulfilled != JAVA_FALSE) {
+        [action fulfill];
+    } else {
+        [action fail];
+    }
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+#if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
+    cn1CallInstallPushRegistry();
+    if (cn1clVoipToken != nil) {
+        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                threadStateData, requestId, cn1clJString(cn1clVoipToken));
+        return;
+    }
+    // The token arrives asynchronously; park the request for the delegate.
+    cn1clTokenRequest = requestId;
+#else
+    com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
+            threadStateData, requestId, CN1_CALL_ERR_NOT_SUPPORTED,
+            cn1clJString(@"This build did not link PushKit"));
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+#if defined(CN1_CALL_HAS_PUSHKIT) && defined(CN1_CALL_HAS_CALLKIT)
+    if (cn1clRegistry != nil) {
+        cn1clRegistry.desiredPushTypes = [NSSet set];
+    }
+    cn1clVoipToken = nil;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetJavaReady___boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_BOOLEAN ready) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    cn1clJavaReady = ready != JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callDrainPendingCalls___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+#ifdef CN1_CALL_HAS_CALLKIT
+    cn1clDrain(requestId);
+#else
+    com_codename1_impl_ios_IOSCallCallbacks_pendingCallsDrained___int_int(
+            threadStateData, requestId, 0);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callSetDirectorySource___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT filePath) {
+#if defined(CN1_CALL_DIRECTORY) && defined(CN1_CALL_HAS_CALLKIT)
+    // The extension runs in its own process and cannot see this one's memory,
+    // so the data has to reach it through the shared App Group container. The
+    // path handed in is inside the app's own home, so it is copied.
+    NSString *src = toNSString(threadStateData, filePath);
+    NSString *group = cn1clPlistString(@"CN1CallAppGroup", nil);
+    if (group == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
+                @"No App Group is configured for the call directory");
+        return;
+    }
+    NSURL *container = [[NSFileManager defaultManager]
+            containerURLForSecurityApplicationGroupIdentifier:group];
+    if (container == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
+                @"The configured App Group is not available to this app");
+        return;
+    }
+    NSURL *dest = [container URLByAppendingPathComponent:@"cn1calldirectory.tsv"];
+    NSError *error = nil;
+    [[NSFileManager defaultManager] removeItemAtURL:dest error:nil];
+    [[NSFileManager defaultManager] copyItemAtURL:[NSURL fileURLWithPath:src]
+                                            toURL:dest error:&error];
+    if (error != nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
+                [error localizedDescription]);
+        return;
+    }
+    cn1clDirectoryPath = [[dest path] copy];
+    cn1clAck(requestId, YES, 0, nil);
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"This build has no call directory extension");
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callReloadDirectory___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+#if defined(CN1_CALL_DIRECTORY) && defined(CN1_CALL_HAS_CALLKIT)
+    NSString *ext = cn1clPlistString(@"CN1CallDirectoryExtensionIdentifier", nil);
+    if (ext == nil) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_DIRECTORY_FAILED,
+                @"No call directory extension identifier is configured");
+        return;
+    }
+    [CXCallDirectoryManager.sharedInstance
+            reloadExtensionWithIdentifier:ext
+            completionHandler:^(NSError *error) {
+        cn1clAck(requestId, error == nil, CN1_CALL_ERR_DIRECTORY_FAILED,
+                error == nil ? nil : [error localizedDescription]);
+    }];
+#else
+    cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
+            @"This build has no call directory extension");
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_callDirectoryStatus___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+#if defined(CN1_CALL_DIRECTORY) && defined(CN1_CALL_HAS_CALLKIT)
+    NSString *ext = cn1clPlistString(@"CN1CallDirectoryExtensionIdentifier", nil);
+    if (ext == nil) {
+        com_codename1_impl_ios_IOSCallCallbacks_directoryStatus___int_java_lang_String(
+                threadStateData, requestId,
+                cn1clJString(cn1clJoin([NSArray arrayWithObjects:
+                        @"0", @"-1", @"no extension configured", nil])));
+        return;
+    }
+    [CXCallDirectoryManager.sharedInstance
+            getEnabledStatusForExtensionWithIdentifier:ext
+            completionHandler:^(CXCallDirectoryEnabledStatus status, NSError *error) {
+        // Enabled is the user's decision in Settings, and it is OFF by
+        // default -- an app whose numbers never appear has usually not been
+        // enabled rather than failed.
+        NSString *wire = cn1clJoin([NSArray arrayWithObjects:
+                status == CXCallDirectoryEnabledStatusEnabled ? @"1" : @"0",
+                @"-1",
+                error == nil ? @"ok" : [error localizedDescription], nil]);
+        com_codename1_impl_ios_IOSCallCallbacks_directoryStatus___int_java_lang_String(
+                getThreadLocalData(), requestId, cn1clJString(wire));
+    }];
+#else
+    com_codename1_impl_ios_IOSCallCallbacks_directoryStatus___int_java_lang_String(
+            threadStateData, requestId,
+            cn1clJString(@"0\t-1\tunsupported"));
+#endif
+}
+
+#else /* CN1_INCLUDE_CALL */
+
+// ---------------------------------------------------------------------
+// The unsupported half.
+//
+// Every symbol above is defined here too, answering "not supported". A build
+// that never referenced com.codename1.call links byte-identically to one that
+// did except for these bodies -- and, crucially, the Java methods survive the
+// dead-code pass, which keeps them BY their symbol appearing in a native
+// source.
+// ---------------------------------------------------------------------
+
+#include "com_codename1_impl_ios_IOSCallCallbacks.h"
+#import "java_lang_String.h"
+
+extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString *str);
+
+static JAVA_OBJECT cn1clOffString(NSString *s) {
+    return s == nil ? JAVA_NULL : fromNSString(getThreadLocalData(), s);
+}
+
+static void cn1clOffAck(int requestId) {
+    com_codename1_impl_ios_IOSCallCallbacks_ack___int_boolean_int_java_lang_String(
+            getThreadLocalData(), requestId, JAVA_FALSE,
+            CN1_CALL_ERR_NOT_SUPPORTED,
+            cn1clOffString(@"This build did not include com.codename1.call"));
+}
+
+void cn1CallInstallPushRegistry(void) {
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callVoipSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callDirectorySupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return JAVA_FALSE;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callCapabilities___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return 0;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return CN1_CALL_AVAIL_UNSUPPORTED;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callGrantedPermissions___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return 0;
+}
+
+void com_codename1_impl_ios_IOSNative_callRequestPermissions___int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_INT permissionBits) {
+    com_codename1_impl_ios_IOSCallCallbacks_permissionResult___int_int(
+            threadStateData, requestId, 0);
+}
+
+void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT configWire) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callReportIncoming___int_java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
+        JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
+        JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callStartedConnecting___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+}
+
+void com_codename1_impl_ios_IOSNative_callOutgoingConnected___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+}
+
+void com_codename1_impl_ios_IOSNative_callIncomingConnected___java_lang_String_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_LONG timestampMs) {
+}
+
+void com_codename1_impl_ios_IOSNative_callUpdate___java_lang_String_java_lang_String_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_OBJECT handleWire, JAVA_OBJECT displayName,
+        JAVA_BOOLEAN hasVideo) {
+}
+
+void com_codename1_impl_ios_IOSNative_callReportEnded___java_lang_String_int_long(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_OBJECT callId, JAVA_INT endReasonOrdinal, JAVA_LONG timestampMs) {
+}
+
+void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_INT endReasonOrdinal) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callSetHeld___int_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN held) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callSetMuted___int_java_lang_String_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN muted) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callSendDtmf___int_java_lang_String_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT digits) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callSetGroup___int_java_lang_String_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT otherCallId) {
+    cn1clOffAck(requestId);
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_callAudioRoute___R_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    return CN1_CALL_ROUTE_UNKNOWN;
+}
+
+void com_codename1_impl_ios_IOSNative_callSetAudioRoute___int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_INT routeOrdinal) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callShowRoutePicker___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT callId) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_LONG actionToken, JAVA_BOOLEAN fulfilled) {
+}
+
+void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
+            threadStateData, requestId, CN1_CALL_ERR_NOT_SUPPORTED,
+            cn1clOffString(@"This build did not include com.codename1.call"));
+}
+
+void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+}
+
+void com_codename1_impl_ios_IOSNative_callSetJavaReady___boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_BOOLEAN ready) {
+}
+
+void com_codename1_impl_ios_IOSNative_callDrainPendingCalls___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    com_codename1_impl_ios_IOSCallCallbacks_pendingCallsDrained___int_int(
+            threadStateData, requestId, 0);
+}
+
+void com_codename1_impl_ios_IOSNative_callSetDirectorySource___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT filePath) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callReloadDirectory___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    cn1clOffAck(requestId);
+}
+
+void com_codename1_impl_ios_IOSNative_callDirectoryStatus___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    com_codename1_impl_ios_IOSCallCallbacks_directoryStatus___int_java_lang_String(
+            threadStateData, requestId, cn1clOffString(@"0\t-1\tunsupported"));
+}
+
+#endif /* CN1_INCLUDE_CALL */
