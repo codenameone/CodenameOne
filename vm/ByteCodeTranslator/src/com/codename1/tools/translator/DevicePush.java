@@ -386,8 +386,7 @@ public final class DevicePush {
         // difference is only where the desktop accepts the connection from.
         boolean loopback = !lan;
         String peerId = peerId();
-        String peerName = System.getProperty("user.name") + "@"
-                + InetAddress.getLocalHost().getHostName();
+        String peerName = System.getProperty("user.name") + "@" + hostname();
         if (send(payload, port, peerId, loopback)) {
             return;
         }
@@ -724,6 +723,35 @@ public final class DevicePush {
         createParent(f);
         Files.write(f, id.getBytes(StandardCharsets.UTF_8));
         return id;
+    }
+
+    /**
+     * The machine's short hostname for the pairing prompt.
+     *
+     * <p>InetAddress.getLocalHost().getHostName() throws UnknownHostException
+     * on a machine whose hostname is not resolvable via DNS or /etc/hosts,
+     * which is common on freshly provisioned containers and on some
+     * laptops after a rename. Making a friendly label a prerequisite for
+     * pushing at all would be silly; fall back through env vars to a fixed
+     * label rather than let this abort the push.</p>
+     */
+    private static String hostname() {
+        try {
+            String h = InetAddress.getLocalHost().getHostName();
+            if (h != null && !h.isEmpty()) {
+                return h;
+            }
+        } catch (Exception ignore) {
+        }
+        String h = System.getenv("HOSTNAME");
+        if (h != null && !h.isEmpty()) {
+            return h;
+        }
+        h = System.getenv("COMPUTERNAME");
+        if (h != null && !h.isEmpty()) {
+            return h;
+        }
+        return "unknown-host";
     }
 
     /** Where the secrets established with each device are kept. */
