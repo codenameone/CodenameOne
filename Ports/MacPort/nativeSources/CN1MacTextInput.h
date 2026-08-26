@@ -59,6 +59,14 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// Whether the session accepts a newline as text rather than as "done".
 @property (nonatomic) BOOL multiline;
 
+/// The most characters the field will hold, or 0 for no limit.
+///
+/// Enforced here because nothing downstream does: an over-long value reaches
+/// TextArea.setText(), which RAISES maxSize to fit it and leaves the configured
+/// limit disabled for the rest of that component's life. The legacy path carries
+/// a real limit; the pure editor owns its own document and passes 0.
+@property (nonatomic) NSUInteger maxSize;
+
 /// YES when the pure Codename One editor engine drives this session -- an
 /// EditField, CodeEditor or RichTextArea, started through startTextInput -- and
 /// NO for the legacy TextField/TextArea path started through editStringAt.

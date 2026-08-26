@@ -849,12 +849,29 @@ static int CN1MacKeyCode(NSEvent *event) {
     if (NSMaxRange(range) > session.text.length) {
         return NO;
     }
+    NSString *inserted = string != nil ? string : @"";
+    // The field's maximum, enforced here because nothing after this point does.
+    // TextArea.setText() RAISES maxSize to fit an over-long value instead of
+    // refusing it, so one paste past the limit disables the limit permanently.
+    // Truncated rather than rejected outright, which is what a Mac text field
+    // does with a paste that does not fit.
+    if (session.maxSize > 0) {
+        NSUInteger remaining = session.text.length - range.length;
+        if (remaining >= session.maxSize) {
+            // Already full, and this edit adds rather than replaces.
+            if (inserted.length > 0) {
+                return NO;
+            }
+        } else if (inserted.length > session.maxSize - remaining) {
+            inserted = [inserted substringToIndex:session.maxSize - remaining];
+        }
+    }
     session.text = [session.text stringByReplacingCharactersInRange:range
-                                                         withString:string];
+                                                         withString:inserted];
     // Reported as the operation it is. The pure editor owns its own document and
     // cannot take a whole-text replacement; the legacy path ignores this and
     // sends the document at commit instead.
-    CN1MacTextInputNotifyReplace(range, string);
+    CN1MacTextInputNotifyReplace(range, inserted);
     return YES;
 }
 

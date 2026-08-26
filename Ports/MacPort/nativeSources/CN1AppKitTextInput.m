@@ -215,6 +215,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_
     // The pure editor engine's entry point. editStringAt, below, is the legacy
     // TextField/TextArea one, and the two report to different Java callbacks.
     [CN1MacTextInputSession sharedSession].pureEditor = YES;
+    // No limit: the pure editor owns its own document and enforces whatever
+    // limit it has there.
+    [CN1MacTextInputSession sharedSession].maxSize = 0;
     [[CN1MacTextInputSession sharedSession] startWithText:initial
                                                 selStart:selStart
                                                   selEnd:selEnd
@@ -272,10 +275,14 @@ void CN1MacTextInputSetText(NSString *text) {
 /// pure editor engine drives with an explicit selection, this one is handed only
 /// the text -- so the caret goes to the end, which is where a Mac puts it when a
 /// field takes focus by being clicked into rather than tabbed into.
-void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds) {
+void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     NSString *initial = text != nil ? text : @"";
     session.pureEditor = NO;
+    // Carried into the session because nothing downstream enforces it: an
+    // over-long value reaches TextArea.setText(), which raises maxSize to fit
+    // rather than refusing, so the configured limit is gone for good.
+    session.maxSize = maxSize > 0 ? (NSUInteger)maxSize : 0;
     session.editorBounds = bounds;
     // A caret rectangle is needed before the first updateTextInputState arrives,
     // or an input method opened on the first keystroke has nowhere to put its
