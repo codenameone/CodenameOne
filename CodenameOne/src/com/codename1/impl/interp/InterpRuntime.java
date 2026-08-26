@@ -1930,18 +1930,22 @@ public final class InterpRuntime {
 
     /// Where a static the interpreted hierarchy does not declare might live.
     ///
-    /// The host superclass chain first, then the host interfaces -- a constant
-    /// on an implemented interface is read as `PushedClass.FIELD`, and the
-    /// superclass walk answers `java/lang/Object`, which does not have it.
-    /// Every candidate is tried in turn because only the linker can say which
-    /// one actually declares it.
+    /// Host interfaces first, then the host superclass chain -- JVMS 5.4.3.2
+    /// resolves a field by checking each level's declared field, then its
+    /// superinterfaces, then its superclass; asking the linker for the
+    /// superclass first would let `setAccessible` return a private static
+    /// declared on the host superclass and mask the public one exposed by
+    /// a superinterface (`C extends HostA implements HostI` with
+    /// `HostA.X` private and `HostI.X` public should read `HostI.X`).
+    /// Every candidate is still tried in turn because only the linker can
+    /// say which one actually declares it.
     private String[] hostStaticOwners(InterpClass c) {
         Vector out = new Vector();
+        collectHostInterfaceOwners(c, out, new Vector());
         String superOwner = hostOwnerOf(c);
-        if (superOwner != null) {
+        if (superOwner != null && !out.contains(superOwner)) {
             out.addElement(superOwner);
         }
-        collectHostInterfaceOwners(c, out, new Vector());
         String[] owners = new String[out.size()];
         out.copyInto(owners);
         return owners;
