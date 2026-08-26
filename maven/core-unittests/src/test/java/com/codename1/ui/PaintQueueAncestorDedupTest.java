@@ -87,6 +87,20 @@ class PaintQueueAncestorDedupTest extends UITestBase {
     }
 
     @FormTest
+    void aPartiallyDirtyFormDoesNotDropTheChild() {
+        Form form = new Form("paint queue", BoxLayout.y());
+        CountingContainer child = showChild(form);
+
+        Display.getInstance().repaint(child);
+        // a form clipped to one corner is not guaranteed to cover the child, so the child's own
+        // entry has to survive
+        form.repaint(0, 0, 1, 1);
+        Display.impl.paintDirty();
+
+        assertEquals(1, child.paints, "the child must still be painted by its own queue entry");
+    }
+
+    @FormTest
     void childOnItsOwnStillPaints() {
         Form form = new Form("paint queue", BoxLayout.y());
         CountingContainer child = showChild(form);

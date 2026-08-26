@@ -181,7 +181,13 @@ public final class PaintSurface {
             // glyphs, a shadow -- composites twice and comes out darker. The parent's paint already
             // covers the child, so drop it, matching what the loop above does when the order is
             // reversed. Null slots are what cancelRepaint leaves too, and paintDirty skips them.
-            if (cmp instanceof Container) {
+            //
+            // Only when the parent repaints in full: paintDirty clips a component to its dirty
+            // region, so a parent holding one does not necessarily cover the child, and dropping it
+            // there would lose the paint rather than deduplicate it. The child's own dirty region is
+            // deliberately left alone -- keeping it means a later partial repaint still unions and
+            // requeues instead of being swallowed.
+            if (cmp instanceof Container && ((Component) cmp).getDirtyRegion() == null) {
                 for (int iter = 0; iter < paintQueueFill; iter++) {
                     Animation ani = paintQueue[iter];
                     if (!(ani instanceof Component)) {
