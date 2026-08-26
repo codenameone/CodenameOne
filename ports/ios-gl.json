@@ -1,36 +1,36 @@
 {
   "commit": "e1065051c0b032ed08c97ec19b23fce4268d8dae",
-  "generated_at": "2026-08-25T21:54:10Z",
+  "generated_at": "2026-08-26T04:54:58Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 338774000
+        "duration_ns": 290099000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 20693000
+        "duration_ns": 27964000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 113079000
+        "duration_ns": 121275000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 72265000
+        "duration_ns": 81836000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 324923000
+        "duration_ns": 394149000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 135738000
+        "duration_ns": 117806000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 159699000
+        "duration_ns": 196028000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32881093018",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/32923460226",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 176,
+    "pass": 177,
     "skip": 4
   },
   "tests": {
@@ -387,11 +387,7 @@
     },
     "GoogleWebMapScreenshotTest": {
       "feature": "native-web-maps",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=retry-created",
-        "screenshot-missing_actual:GoogleWebMap"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
