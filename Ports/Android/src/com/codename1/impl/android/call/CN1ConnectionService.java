@@ -327,6 +327,14 @@ public class CN1ConnectionService extends ConnectionService {
             all = CONNECTIONS.values().toArray(new CN1Connection[CONNECTIONS.size()]);
             CONNECTIONS.clear();
         }
+        // The parked system starts go too. A call the system asked this app
+        // to place is waiting on an ASYNCHRONOUS reportOutgoing, and a reset
+        // destroys its connection -- so a report that arrives afterwards
+        // would be adopted and acknowledged as successful, publishing a
+        // dialing session in Java for a Telecom call that no longer exists.
+        synchronized (SYSTEM_STARTED) {
+            SYSTEM_STARTED.clear();
+        }
         for (CN1Connection c : all) {
             c.setDisconnected(new DisconnectCause(DisconnectCause.CANCELED));
             c.destroy();

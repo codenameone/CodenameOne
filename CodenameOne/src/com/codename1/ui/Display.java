@@ -443,6 +443,28 @@ public final class Display extends CN1Constants {
     private Display() {
     }
 
+    /// How long [#init] waits for a retiring EDT to finish its teardown.
+    private static final long EDT_RETIREMENT_WAIT_MILLIS = 5000;
+
+    /// Waits for an EDT that has left its dispatch loop to finish tearing
+    /// down, so its teardown cannot run against a replacement.
+    ///
+    /// Returns at once when there is no such thread, when the caller IS that
+    /// thread -- joining self would deadlock -- or when the wait expires.
+    private static void awaitEdtRetirement() {
+        Thread retiring = INSTANCE.edt;
+        if (retiring == null || !INSTANCE.edtRetiring
+                || retiring == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
+            return;
+        }
+        try {
+            retiring.join(EDT_RETIREMENT_WAIT_MILLIS);
+        } catch (InterruptedException interrupted) {
+            // The caller's interrupt is not this method's to swallow.
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /// This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
     /// This method must be called before any Form is shown
     ///
@@ -454,6 +476,20 @@ public final class Display extends CN1Constants {
     ///
     /// this method is invoked internally do not invoke it!
     public static void init(Object m) {
+        // A previous EDT may still be inside the teardown that follows its
+        // dispatch loop, and that teardown ends with impl.deinitialize() and
+        // Desktop.disposeAll(). Both read state this method is about to
+        // REPLACE: impl is swapped a few lines below, so a retiring EDT
+        // reaching those calls afterwards would deinitialize the port this
+        // init just created and dispose the windows it is about to show --
+        // while its successor is already dispatching into them.
+        //
+        // Waiting is the whole answer: one EDT and one implementation at a
+        // time, which is what every other line here assumes. Bounded, so a
+        // teardown that has itself wedged cannot hang the app that is trying
+        // to start; past the bound the retirement flag still makes the block
+        // below start a fresh EDT rather than adopt the stuck one.
+        awaitEdtRetirement();
         if (!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
             INSTANCE.initialWindowSizeApplied = false;
