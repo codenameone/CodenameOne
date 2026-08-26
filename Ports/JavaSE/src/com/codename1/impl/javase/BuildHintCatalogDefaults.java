@@ -99,7 +99,7 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("ios.newStorageLocation")) {
         set("{{#Ios#ios.newStorageLocation}}.label", "New storage location");
         set("{{#Ios#ios.newStorageLocation}}.type", "Checkbox");
-        set("{{#Ios#ios.newStorageLocation}}.description", "true/false defaults to false but defined on new projects as true by default. This changes the storage directory on iOS from using caches to using the documents directory which is the recommended location but might break compatibility. This is described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]");
+        set("{{#Ios#ios.newStorageLocation}}.description", "Stores app files under the documents directory rather than caches, which is the location Apple recommends but which may break compatibility with an app that already shipped. Defaults to TRUE: `IPhoneBuilder` reads this hint with a default of `\"true\"`, so a build that says nothing gets it. Described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]");
         }
         if (!handWritten.contains("ios.objC")) {
         set("{{#Ios#ios.objC}}.label", "Obj c");
@@ -188,7 +188,7 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("android.debug")) {
         set("{{#Android#android.debug}}.label", "Debug");
         set("{{#Android#android.debug}}.type", "Checkbox");
-        set("{{#Android#android.debug}}.description", "true/false defaults to true - indicates whether to include the debug version in the build. Defaults conditionally rather than to a fixed value: when android.release is on it defaults to false, and when release is off it defaults to true, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451).");
+        set("{{#Android#android.debug}}.description", "Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` when `android.release` is on and `\"true\"` when it is off, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531).");
         }
         if (!handWritten.contains("android.disableR8")) {
         set("{{#Android#android.disableR8}}.label", "Disable r8");
@@ -229,7 +229,7 @@ final class BuildHintCatalogDefaults {
         if (!handWritten.contains("android.multidex")) {
         set("{{#Android#android.multidex}}.label", "Multidex");
         set("{{#Android#android.multidex}}.type", "Checkbox");
-        set("{{#Android#android.multidex}}.description", "Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on.");
+        set("{{#Android#android.multidex}}.description", "Multidex lets an Android binary reference more than 65536 methods. Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default of `\"true\"`, so a build that says nothing gets multidex. Set it to false to opt out, which builds a little faster and reinstates the limit.");
         }
         if (!handWritten.contains("android.newFirebaseMessaging")) {
         set("{{#Android#android.newFirebaseMessaging}}.label", "New firebase messaging");

@@ -2550,11 +2550,11 @@ public class CodenameOneSettings extends Lifecycle {
         // sweep that the root list had just taken them out of.
         collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
         String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
-                managedFromChain);
+                "compile", managedFromChain);
         collectRoots(compileGoalConfiguration(kotlin, "compile", "sourceDir",
                 kotlinRunsWithoutExecution(kotlin)), "sourceDir", properties, out);
         String helper = activePluginBlock(pomText, "build-helper-maven-plugin", "source",
-                managedFromChain);
+                "add-source", managedFromChain);
         if (helper != null) {
             // add-test-source uses the same element, so an execution that adds
             // TEST sources is passed over -- the same distinction the Kotlin
@@ -4033,6 +4033,30 @@ public class CodenameOneSettings extends Lifecycle {
         return value.trim();
     }
 
+    /// Whether `pluginBlock` has an enabled execution bound to `goal`.
+    ///
+    /// A null goal means the caller does not care, and any execution counts.
+    static boolean bindsGoal(String pluginBlock, String goal) {
+        if (pluginBlock == null) {
+            return false;
+        }
+        int at = pluginBlock.indexOf("<execution>");
+        while (at >= 0) {
+            int close = pluginBlock.indexOf("</execution>", at);
+            if (close < 0) {
+                return false;
+            }
+            String execution = pluginBlock.substring(at, close);
+            if (execution.indexOf("<phase>none</phase>") < 0
+                    && (goal == null
+                        || execution.indexOf("<goal>" + goal + "</goal>") >= 0)) {
+                return true;
+            }
+            at = pluginBlock.indexOf("<execution>", close);
+        }
+        return false;
+    }
+
     /// Whether this Kotlin plugin block compiles with no execution written.
     ///
     /// `<extensions>true</extensions>` is what binds compile without one, and a
@@ -4134,6 +4158,13 @@ public class CodenameOneSettings extends Lifecycle {
     /// plugin inherits. This POM's own managed block is nearer, so it wins.
     static String activePluginBlock(String pomText, String artifactId, String element,
                                     String managedFromChain) {
+        return activePluginBlock(pomText, artifactId, element, null, managedFromChain);
+    }
+
+    /// As above, with `goal` naming what a child execution has to bind before it
+    /// counts as replacing the managed one.
+    static String activePluginBlock(String pomText, String artifactId, String element,
+                                    String goal, String managedFromChain) {
         if (pomText == null) {
             return null;
         }
@@ -4148,7 +4179,12 @@ public class CodenameOneSettings extends Lifecycle {
             // <sourceDirs> here, the <execution> over there -- and returning
             // this block alone left the goal looking unbound, so the root it
             // configures was dropped.
-            return active.indexOf("<execution>") >= 0
+            // Whether the child binds THIS goal, not whether it has any
+            // execution at all. A child that adds an unrelated `test-compile`
+            // was taken as a complete replacement, so the managed execution
+            // binding the production goal was dropped and the root the child
+            // configures went with it.
+            return bindsGoal(active, goal)
                     ? active : active + executionsOf(pluginBlock(
                         managementOnly(pomText), artifactId), managedFromChain, artifactId);
         }
@@ -4245,7 +4281,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// The same, also consulting the parent chain's managed sections.
     static String compilerPluginBlock(String pomText, String managedFromChain) {
         String active = activePluginBlock(pomText, "maven-compiler-plugin", "encoding",
-                managedFromChain);
+                "compile", managedFromChain);
         if (active != null) {
             return active;
         }

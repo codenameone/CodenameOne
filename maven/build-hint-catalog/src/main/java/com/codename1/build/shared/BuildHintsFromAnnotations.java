@@ -72,10 +72,9 @@ final class BuildHintsFromAnnotations {
         h.add(new BuildHints.Hint("android.debug")
                 .annotatedAs(HintGroup.ANDROID, "debug")
                 .type(HintType.BOOLEAN)
-                .def("false")
                 .consumedBy("AndroidGradleBuilder")
                 .platform("android")
-                .doc("true/false defaults to true - indicates whether to include the debug version in the build. Defaults conditionally rather than to a fixed value: when android.release is on it defaults to false, and when release is off it defaults to true, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451)."));
+                .doc("Whether to include the debug version in the build. This hint has NO single default, which is why none is recorded: `AndroidGradleBuilder` reads it with a default of `\"false\"` when `android.release` is on and `\"true\"` when it is off, so a build that selects neither still produces something installable (AndroidGradleBuilder.java:447-451, :530-531)."));
         h.add(new BuildHints.Hint("android.disableR8")
                 .annotatedAs(HintGroup.ANDROID, "disableR8")
                 .type(HintType.BOOLEAN)
@@ -130,7 +129,7 @@ final class BuildHintsFromAnnotations {
                 .def("true")
                 .consumedBy("AndroidGradleBuilder")
                 .platform("android")
-                .doc("Boolean true/false defaults to false. Multidex allows Android binaries to reference more than 65536 methods. This slows builds a bit so you have it off by default but if you get a build error mentioning this limit you should turn this on."));
+                .doc("Multidex lets an Android binary reference more than 65536 methods. Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default of `\"true\"`, so a build that says nothing gets multidex. Set it to false to opt out, which builds a little faster and reinstates the limit."));
         h.add(new BuildHints.Hint("android.newFirebaseMessaging")
                 .annotatedAs(HintGroup.ANDROID, "newFirebaseMessaging")
                 .type(HintType.BOOLEAN)
@@ -487,7 +486,7 @@ final class BuildHintsFromAnnotations {
                 .def("true")
                 .consumedBy("IPhoneBuilder")
                 .platform("ios")
-                .doc("true/false defaults to false but defined on new projects as true by default. This changes the storage directory on iOS from using caches to using the documents directory which is the recommended location but might break compatibility. This is described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]"));
+                .doc("Stores app files under the documents directory rather than caches, which is the location Apple recommends but which may break compatibility with an app that already shipped. Defaults to TRUE: `IPhoneBuilder` reads this hint with a default of `\"true\"`, so a build that says nothing gets it. Described in https://github.com/codenameone/CodenameOne/issues/1480[this issue]"));
         h.add(new BuildHints.Hint("ios.objC")
                 .annotatedAs(HintGroup.IOS, "objC")
                 .type(HintType.BOOLEAN)

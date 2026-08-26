@@ -113,10 +113,11 @@ public @interface Ios {
             def = "6.0")
     String minDeploymentTarget() default "";
 
-    /// true/false defaults to false but defined on new projects as true by
-    /// default. This changes the storage directory on iOS from using caches to
-    /// using the documents directory which is the recommended location but might
-    /// break compatibility. This is described in
+    /// Stores app files under the documents directory rather than caches, which
+    /// is the location Apple recommends but which may break compatibility with
+    /// an app that already shipped. Defaults to TRUE: `IPhoneBuilder` reads this
+    /// hint with a default of `"true"`, so a build that says nothing gets it.
+    /// Described in
     /// https://github.com/codenameone/CodenameOne/issues/1480[this issue]
     @Hint(def = "true")
     boolean newStorageLocation() default false;

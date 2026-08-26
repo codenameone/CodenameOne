@@ -69,12 +69,12 @@ public @interface Android {
     @Hint(def = "enabled")
     String captureRecord() default "";
 
-    /// true/false defaults to true - indicates whether to include the debug
-    /// version in the build. Defaults conditionally rather than to a fixed value:
-    /// when android.release is on it defaults to false, and when release is off it
-    /// defaults to true, so a build that selects neither still produces something
-    /// installable (AndroidGradleBuilder.java:447-451).
-    @Hint(def = "false")
+    /// Whether to include the debug version in the build. This hint has NO single
+    /// default, which is why none is recorded: `AndroidGradleBuilder` reads it
+    /// with a default of `"false"` when `android.release` is on and `"true"`
+    /// when it is off, so a build that selects neither still produces something
+    /// installable (AndroidGradleBuilder.java:447-451, :530-531).
+    @Hint
     boolean debug() default false;
 
     /// Turns off R8, falling back to the older shrinker. Note that hardening
@@ -113,10 +113,10 @@ public @interface Android {
             def = "19")
     int minSdkVersion() default 0;
 
-    /// Boolean true/false defaults to false. Multidex allows Android binaries to
-    /// reference more than 65536 methods. This slows builds a bit so you have it
-    /// off by default but if you get a build error mentioning this limit you
-    /// should turn this on.
+    /// Multidex lets an Android binary reference more than 65536 methods.
+    /// Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default
+    /// of `"true"`, so a build that says nothing gets multidex. Set it to false
+    /// to opt out, which builds a little faster and reinstates the limit.
     @Hint(def = "true")
     boolean multidex() default false;
 

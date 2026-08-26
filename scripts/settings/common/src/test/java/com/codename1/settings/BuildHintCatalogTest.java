@@ -2316,6 +2316,42 @@ public class BuildHintCatalogTest {
         assertTrue(roots.contains("gen/from-child"), roots.toString());
     }
 
+    /// An unrelated child execution does not replace the managed binding.
+    ///
+    /// The child supplies the configuration and adds a `test-compile` of its
+    /// own; the execution that binds the PRODUCTION goal is still the managed
+    /// one. Treating any child execution as a complete replacement dropped it,
+    /// and the root the child configures went with it.
+    @Test
+    public void anUnrelatedChildExecutionKeepsTheManagedBinding() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/from-child</source></sources>"
+                + "</configuration>"
+                + "<executions><execution><goals><goal>add-test-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("gen/from-child"), roots.toString());
+
+        // ...and a child that DOES bind the goal replaces it, as before.
+        String replaces = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/child-owned</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> owned =
+                CodenameOneSettings.declaredSourceRoots(replaces, null, parentManaged);
+        assertTrue(owned.contains("gen/child-owned"), owned.toString());
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets
