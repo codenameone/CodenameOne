@@ -357,6 +357,17 @@ public class MacOSNativeBuilder extends Executor {
         // The frameworks travel in the translator's addLibs argument, which this
         // target was passing as "none".
         List<String> extraFrameworks = new ArrayList<String>();
+        // Unconditional, because the LAContext code in IOSNative.m is compiled
+        // on every macOS build -- it is excluded only on tvOS -- so there is no
+        // usage to detect.
+        //
+        // Raised in review as a link failure for biometric builds, and it is
+        // not one today: otool -L on the built binary shows
+        // LocalAuthentication already linked, because clang auto-links a
+        // framework whose module is imported. Named here anyway, so the link
+        // does not depend on modules and auto-linking staying enabled -- which
+        // is a build setting, not a property of this code.
+        extraFrameworks.add("LocalAuthentication.framework");
         if (usesBluetooth[0]) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {

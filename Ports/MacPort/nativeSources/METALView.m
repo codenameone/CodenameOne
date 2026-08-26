@@ -508,7 +508,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 extern void pointerPressed(int *x, int *y, int length);
 extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
-extern void CN1MacPointerButton(int button, int mask);
+extern void CN1MacPointerButton(int button, int mask, int modifiers);
+extern void CN1MacCopyTextSelection(void);
 extern void CN1MacPinchRelease(int x, int y);
 extern void pointerHoverNative(int x, int y);
 extern void pointerHoverPressedNative(int x, int y);
@@ -565,19 +566,49 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 #define CN1_PE_MASK_SECONDARY   (1 << 1)
 #define CN1_PE_BUTTON_MIDDLE    2
 #define CN1_PE_MASK_MIDDLE      (1 << 2)
+#define CN1_PE_MODIFIER_SHIFT   (1 << 0)
+#define CN1_PE_MODIFIER_CONTROL (1 << 1)
+#define CN1_PE_MODIFIER_ALT     (1 << 2)
+#define CN1_PE_MODIFIER_META    (1 << 3)
+
+/// PointerEvent's modifier mask for the keys held during this event.
+static int cn1ModifiersOf(NSEvent *event) {
+    NSEventModifierFlags flags = event.modifierFlags;
+    int m = 0;
+    if (flags & NSEventModifierFlagShift)   { m |= CN1_PE_MODIFIER_SHIFT; }
+    if (flags & NSEventModifierFlagControl) { m |= CN1_PE_MODIFIER_CONTROL; }
+    // Option is what Alt is called on a Mac keyboard, and Command is Meta.
+    if (flags & NSEventModifierFlagOption)  { m |= CN1_PE_MODIFIER_ALT; }
+    if (flags & NSEventModifierFlagCommand) { m |= CN1_PE_MODIFIER_META; }
+    return m;
+}
+
+/// The buttons currently HELD, which is what getButtonMask() answers.
+///
+/// Read from AppKit rather than staged from the event that triggered the call:
+/// on a release the triggering button is no longer down, and reporting it as
+/// held told every release listener the opposite of what had just happened.
+static int cn1HeldButtonMask(void) {
+    NSUInteger pressed = [NSEvent pressedMouseButtons];
+    int mask = 0;
+    if (pressed & (1 << 0)) { mask |= CN1_PE_MASK_PRIMARY; }
+    if (pressed & (1 << 1)) { mask |= CN1_PE_MASK_SECONDARY; }
+    if (pressed & (1 << 2)) { mask |= CN1_PE_MASK_MIDDLE; }
+    return mask;
+}
 
 - (void)mouseDown:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)mouseDragged:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)mouseUp:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, CN1_PE_MASK_PRIMARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_PRIMARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -585,17 +616,17 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 // three a middle click produced no pointer event at all and BUTTON_MIDDLE could
 // never be observed on this port.
 - (void)otherMouseDown:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)otherMouseDragged:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)otherMouseUp:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, CN1_PE_MASK_MIDDLE);
+    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -612,17 +643,17 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 // metadata; the base implementation answers false and only JavaSE overrides it,
 // so it stays false here as it does on Linux and Windows.
 - (void)rightMouseDown:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)rightMouseDragged:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)rightMouseUp:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, CN1_PE_MASK_SECONDARY);
+    CN1MacPointerButton(CN1_PE_BUTTON_SECONDARY, cn1HeldButtonMask(), cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -1416,14 +1447,35 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     if (action == @selector(selectAll:)) {
         return session.active && session.text.length > 0;
     }
-    if (action == @selector(cut:) || action == @selector(copy:)
-            || action == @selector(delete:)) {
+    if (action == @selector(cut:) || action == @selector(delete:)) {
+        // Editing commands, so they need an editing session. A lightweight
+        // selection is a selectable Label -- there is nothing to cut out of it.
         return [self cn1SelectionForEditing].length > 0;
+    }
+    if (action == @selector(copy:)) {
+        if (session.active) {
+            return [self cn1SelectionForEditing].length > 0;
+        }
+        // With no session the form's own TextSelection may hold one -- a
+        // selectable Label or SpanLabel, which the desktop selects by pressing
+        // rather than through the portable floating Copy menu. Enabled without
+        // asking whether it is empty: the answer lives in the component
+        // hierarchy, which belongs to the event dispatch thread, and this is
+        // AppKit's main thread asking synchronously while the menu opens. A Copy
+        // that turns out to have nothing to copy does nothing, which is a great
+        // deal better than a Copy that is permanently grey over selected text.
+        return YES;
     }
     return [super validateUserInterfaceItem:item];
 }
 
 - (void)copy:(id)sender {
+    if (![CN1MacTextInputSession sharedSession].active) {
+        // The form's own selection, copied on the event dispatch thread where
+        // the hierarchy can be walked safely.
+        CN1MacCopyTextSelection();
+        return;
+    }
     NSRange sel = [self cn1SelectionForEditing];
     if (sel.length == 0) {
         return;

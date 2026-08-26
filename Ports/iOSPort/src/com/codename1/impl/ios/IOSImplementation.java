@@ -2048,6 +2048,33 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
 
+    /// Copies the current lightweight text selection, if there is one.
+    ///
+    /// The AppKit port's Edit menu and Command-C reach the rendering view, and
+    /// when no native text-input session is running the only thing that can own
+    /// a selection is the form's own TextSelection -- selectable Labels and
+    /// SpanLabels, which the desktop selects with a press rather than through
+    /// the portable floating Copy menu. Without this there was no way to copy
+    /// them at all.
+    ///
+    /// Queued rather than answered here: TextSelection walks the component
+    /// hierarchy, which belongs to the event dispatch thread, and this is called
+    /// from AppKit's main thread.
+    public static void macCopyTextSelection() {
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Form f = com.codename1.ui.Display.getInstance().getCurrent();
+                if (f == null) {
+                    return;
+                }
+                com.codename1.ui.TextSelection sel = f.getTextSelection();
+                if (sel != null && sel.isEnabled()) {
+                    sel.copy();
+                }
+            }
+        });
+    }
+
     /// Records which mouse button produced the pointer event about to be
     /// dispatched.
     ///
@@ -2058,14 +2085,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// framework's context-menu and selection logic could not tell the two
     /// apart.
     ///
-    /// `button` and `mask` are PointerEvent constants; the type is always a
-    /// mouse here, since a Mac trackpad click arrives as one too.
-    public static void pointerButtonCallback(int button, int mask) {
+    /// `button`, `mask` and `modifiers` are PointerEvent constants; the type is
+    /// always a mouse here, since a Mac trackpad click arrives as one too.
+    ///
+    /// `mask` is the buttons still HELD, which is why a release passes what
+    /// AppKit reports after the release rather than the button that caused it --
+    /// getButtonMask() answers "what is down now", and staging the released
+    /// button there told a release listener the button was still pressed.
+    public static void pointerButtonCallback(int button, int mask, int modifiers) {
         if (instance == null) {
             return;
         }
         instance.setPointerEventMetadata(button, mask,
-                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0, 0, false);
+                com.codename1.ui.events.PointerEvent.TYPE_MOUSE, 1f, 0, 0, 0,
+                modifiers, false);
     }
 
     /// Invoked when the user moves a native window.

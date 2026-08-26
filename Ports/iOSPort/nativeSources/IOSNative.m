@@ -2444,9 +2444,14 @@ void CN1MacPinchRelease(int x, int y) {
         CN1_THREAD_GET_STATE_PASS_ARG x, y);
 }
 
-void CN1MacPointerButton(int button, int mask) {
-    com_codename1_impl_ios_IOSImplementation_pointerButtonCallback___int_int(
-        CN1_THREAD_GET_STATE_PASS_ARG button, mask);
+void CN1MacCopyTextSelection(void) {
+    com_codename1_impl_ios_IOSImplementation_macCopyTextSelection__(
+        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void CN1MacPointerButton(int button, int mask, int modifiers) {
+    com_codename1_impl_ios_IOSImplementation_pointerButtonCallback___int_int_int(
+        CN1_THREAD_GET_STATE_PASS_ARG button, mask, modifiers);
 }
 
 void CN1MacWindowDeliverMoved(int windowId) {
