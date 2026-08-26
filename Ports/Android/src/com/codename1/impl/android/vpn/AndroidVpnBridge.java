@@ -176,6 +176,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 // profile a user had already approved takes this path, and
                 // leaving it out meant load() described the previous profile
                 // after a restart while Android ran the new one.
+                // BOTH: the field is what storedWire() answers from for the
+                // rest of this process, so persisting only to Preferences
+                // left load() describing the profile this one replaced.
+                installedWire = wire;
                 Preferences.set(WIRE_PREF, strip(wire));
                 setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
@@ -201,11 +205,27 @@ public class AndroidVpnBridge implements VpnBridge {
                         + " it to be answered before installing again");
                 return;
             }
-            consentPending = true;
             String previous = storedWire();
+            consentPending = true;
             installedWire = wire;
-            com.codename1.impl.android.AndroidNativeUtil.startActivityForResult(
-                    consent, new Consent(this, requestId, previous));
+            try {
+                com.codename1.impl.android.AndroidNativeUtil
+                        .startActivityForResult(consent,
+                                new Consent(this, requestId, previous));
+            } catch (RuntimeException launchFailed) {
+                // The cached context can still LOOK like an Activity after
+                // the app is backgrounded, while the current activity that
+                // startActivityForResult consults is gone. Without this the
+                // prompt never opened and nothing ever cleared the flag, so
+                // every later install was refused as though a dialog were
+                // still up -- and the cached record described a profile that
+                // was never installed.
+                consentPending = false;
+                installedWire = previous;
+                fail(requestId, VpnError.UNAUTHORIZED,
+                        "The VPN consent prompt could not be shown: "
+                                + describe(launchFailed));
+            }
         } catch (Exception e) {
             fail(requestId, VpnError.INVALID_CONFIGURATION, describe(e));
         }
@@ -262,6 +282,17 @@ public class AndroidVpnBridge implements VpnBridge {
     public void removeProfile(int requestId) {
         if (!available()) {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
+            return;
+        }
+        if (consentPending) {
+            // A prompt for a profile this would delete is on screen. Removing
+            // underneath it answered success, and then the user's approval
+            // answered success too -- persisting the wire this method had
+            // just cleared and leaving Android provisioned after a removal
+            // the app was told had worked.
+            fail(requestId, VpnError.UNKNOWN,
+                    "A VPN consent prompt is on screen; wait for it to be"
+                    + " answered before removing the profile");
             return;
         }
         try {
