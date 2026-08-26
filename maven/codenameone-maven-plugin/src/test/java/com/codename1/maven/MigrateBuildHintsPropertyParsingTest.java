@@ -189,7 +189,12 @@ public class MigrateBuildHintsPropertyParsingTest {
         MigrateBuildHintsMojo mojo = new MigrateBuildHintsMojo();
         com.codename1.build.shared.BuildHints.Hint bool =
                 com.codename1.build.shared.BuildHints.byName("android.hideStatusBar");
-        assertEquals("true", mojo.toSourceLiteral(bool, "true", false));
+        // Toggle.ON, not `true`: the attribute has three states and a boolean
+        // literal cannot say which. A hint written in the properties file was
+        // deliberately set, so it migrates to ON -- never to DEFAULT, which would
+        // drop the setting and hand the decision back to the build server.
+        assertEquals("Toggle.ON", mojo.toSourceLiteral(bool, "true", false));
+        assertEquals("Toggle.OFF", mojo.toSourceLiteral(bool, "false", false));
         assertNull(mojo.toSourceLiteral(bool, "TRUE", false));
         assertNull(mojo.toSourceLiteral(bool, "True", false));
         assertNull(mojo.toSourceLiteral(bool, "true ", false));

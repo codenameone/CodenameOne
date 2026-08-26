@@ -61,7 +61,6 @@ public @interface IosPrivacy {
     /// It becomes the `NSCalendarsFullAccessUsageDescription` key in `Info.plist`.
     /// The App Store rejects an app that touches this resource without one.
     @Hint(name = "ios.NSCalendarsFullAccessUsageDescription",
-            def = "This app uses your calendars to read and schedule events.",
             consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     String calendarsFullAccessUsageDescription() default "";
 
@@ -77,7 +76,6 @@ public @interface IosPrivacy {
     /// `Info.plist`. The App Store rejects an app that touches this resource
     /// without one.
     @Hint(name = "ios.NSCalendarsWriteOnlyAccessUsageDescription",
-            def = "This app uses your calendar to schedule events.",
             consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     String calendarsWriteOnlyAccessUsageDescription() default "";
 
@@ -147,7 +145,6 @@ public @interface IosPrivacy {
     /// It becomes the `NSRemindersFullAccessUsageDescription` key in `Info.plist`.
     /// The App Store rejects an app that touches this resource without one.
     @Hint(name = "ios.NSRemindersFullAccessUsageDescription",
-            def = "This app uses your reminders to read and schedule tasks.",
             consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
     String remindersFullAccessUsageDescription() default "";
 

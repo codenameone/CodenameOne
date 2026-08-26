@@ -22,21 +22,29 @@
  */
 package com.codename1.annotations.buildhints;
 
-/// Accepted values of the `harden.strings` build hint.
+/// A build hint the build server reads as true or false, plus the state of not
+/// having said either.
 ///
-/// Each constant's `@HintValue` carries the string the build actually receives,
-/// which is not always the constant's own name.
-public enum HardenStrings {
+/// Not `boolean`, which cannot express the third state. `boolean x() default
+/// false` is read by anyone looking at it -- and by IDE completion -- as "off
+/// unless you turn it on", and for many hints that is simply untrue:
+/// `android.appBundle` defaults to ON at the server. The old declaration was
+/// harmless on the wire, because an attribute nobody writes is not written into
+/// the request either way, but it stated something about the server that the
+/// client does not get to decide and cannot keep true.
+///
+/// So the third state is named instead of guessed. [#DEFAULT] sends nothing and
+/// lets the server decide; [#ON] and [#OFF] are the developer overriding it.
+public enum Toggle {
     /// Say nothing, and let the build server apply its own default.
     @HintUnset
     DEFAULT,
 
-    @HintValue("off")
-    OFF,
+    /// Turn the hint on, whatever the server would otherwise have done.
+    @HintValue("true")
+    ON,
 
-    @HintValue("constants")
-    CONSTANTS,
-
-    @HintValue("all")
-    ALL;
+    /// Turn the hint off, whatever the server would otherwise have done.
+    @HintValue("false")
+    OFF;
 }

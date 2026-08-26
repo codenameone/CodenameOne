@@ -48,6 +48,9 @@ public final class BuildHintAnnotationBinding {
     private static final Map<String, String> HINTS = new HashMap<String, String>();
     /** "<enumSimpleName>#<CONSTANT>" to the value the build receives. */
     private static final Map<String, String> WIRE = new HashMap<String, String>();
+    /** "<enumSimpleName>#<CONSTANT>" of the constant meaning "not set". */
+    private static final java.util.Set<String> UNSET =
+            new java.util.HashSet<String>();
 
     static {
         DESCRIPTORS.put("Ios", "Lcom/codename1/annotations/buildhints/Ios;");
@@ -179,6 +182,20 @@ public final class BuildHintAnnotationBinding {
         WIRE.put("NativeThemeMode#MODERN", "modern");
         WIRE.put("NativeThemeMode#LEGACY", "legacy");
         WIRE.put("NativeThemeMode#CUSTOM", "custom");
+        WIRE.put("Toggle#ON", "true");
+        WIRE.put("Toggle#OFF", "false");
+
+        UNSET.add("AndroidThemeMode#DEFAULT");
+        UNSET.add("DesktopTitleBar#DEFAULT");
+        UNSET.add("HardenControlFlow#DEFAULT");
+        UNSET.add("HardenLevel#DEFAULT");
+        UNSET.add("HardenStrings#DEFAULT");
+        UNSET.add("InstallLocation#DEFAULT");
+        UNSET.add("IosDependencyManager#DEFAULT");
+        UNSET.add("IosProjectType#DEFAULT");
+        UNSET.add("IosThemeMode#DEFAULT");
+        UNSET.add("NativeThemeMode#DEFAULT");
+        UNSET.add("Toggle#DEFAULT");
     }
 
     private BuildHintAnnotationBinding() {
@@ -217,5 +234,32 @@ public final class BuildHintAnnotationBinding {
             simple = simple.substring(0, simple.length() - 1);
         }
         return WIRE.get(simple + "#" + constant);
+    }
+
+    /**
+     * Whether a constant means the developer said nothing.
+     *
+     * <p>Such a hint is not written into the build request at all, so the
+     * build server applies its own default. That decision is the server's
+     * and it may change it; nothing on the client restates it.</p>
+     *
+     * @param enumDescriptorOrName the enum type, as a descriptor or simple name
+     * @param constant the constant name as it appears in the class file
+     * @return true when the constant carries no value
+     */
+    public static boolean isUnset(String enumDescriptorOrName, String constant) {
+        return UNSET.contains(simpleNameOf(enumDescriptorOrName) + "#" + constant);
+    }
+
+    private static String simpleNameOf(String enumDescriptorOrName) {
+        String simple = enumDescriptorOrName;
+        int slash = simple.lastIndexOf('/');
+        if (slash >= 0) {
+            simple = simple.substring(slash + 1);
+        }
+        if (simple.endsWith(";")) {
+            simple = simple.substring(0, simple.length() - 1);
+        }
+        return simple;
     }
 }

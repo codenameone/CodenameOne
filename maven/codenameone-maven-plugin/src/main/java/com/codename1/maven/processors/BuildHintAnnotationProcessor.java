@@ -1674,6 +1674,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         if (raw instanceof String[]) {
             String[] pair = (String[]) raw;
             if (pair.length == 2) {
+                if (BuildHintAnnotationBinding.isUnset(pair[0], pair[1])) {
+                    // The developer named the constant that says nothing --
+                    // Toggle.DEFAULT and its per-enum siblings. Writing it is the
+                    // same statement as leaving the attribute out, so the hint is
+                    // not written and the build server applies its own default.
+                    // The alternative, sending the constant's name, would set the
+                    // hint to a value no builder recognises and every builder
+                    // silently ignores.
+                    return null;
+                }
                 String wire = BuildHintAnnotationBinding.wireValue(pair[0], pair[1]);
                 if (wire == null) {
                     ctx.error(cls, "@" + simpleName(descriptor) + "(" + member + ") uses the "

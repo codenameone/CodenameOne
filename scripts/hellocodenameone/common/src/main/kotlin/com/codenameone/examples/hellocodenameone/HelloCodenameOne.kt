@@ -40,8 +40,8 @@ import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
 import com.codenameone.examples.hellocodenameone.tests.KotlinUiTest
 import com.codename1.annotations.buildhints.*
 
-@Android(useAndroidX = true)
-@Ios(applicationQueriesSchemes = ["cydia"], newStorageLocation = true, uiscene = true)
+@Android(useAndroidX = Toggle.ON)
+@Ios(applicationQueriesSchemes = ["cydia"], newStorageLocation = Toggle.ON, uiscene = Toggle.ON)
 @IosPrivacy(cameraUsageDescription = "Used by the CI smoke test to verify the com.codename1.camera native bridge compiles. The app never opens a camera session.", healthShareUsageDescription = "Used by the CI smoke test to verify the com.codename1.health native bridge compiles. The app never reads real health data.", healthUpdateUsageDescription = "Used by the CI smoke test to verify the com.codename1.health write path compiles. The app never writes real health data.")
 open class HelloCodenameOne : Lifecycle() {
     override fun init(context: Any?) {

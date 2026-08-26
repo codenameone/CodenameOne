@@ -60,6 +60,9 @@ public final class BuildHintAnnotationReader {
     private static final int API = Opcodes.ASM9;
     private static final String HINT = "Lcom/codename1/annotations/buildhints/Hint;";
     private static final String HINT_VALUE = "Lcom/codename1/annotations/buildhints/HintValue;";
+    private static final String HINT_UNSET = "Lcom/codename1/annotations/buildhints/HintUnset;";
+    /// The enum standing in for a boolean, so the hint keeps a third state.
+    private static final String TOGGLE = "Toggle";
 
     private BuildHintAnnotationReader() {
     }
@@ -341,6 +344,10 @@ public final class BuildHintAnnotationReader {
                     return new FieldVisitor(API) {
                         @Override
                         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+                            if (HINT_UNSET.equals(desc)) {
+                                scanned.enumDomain.unset = constant;
+                                return null;
+                            }
                             if (!HINT_VALUE.equals(desc)) {
                                 return null;
                             }
@@ -452,6 +459,8 @@ public final class BuildHintAnnotationReader {
         private final Map<String, String> labels = new LinkedHashMap<String, String>();
         /// alternative spelling -> the constant it means
         private final Map<String, String> accepts = new LinkedHashMap<String, String>();
+        /// The constant marked @HintUnset, which sends nothing.
+        private String unset;
     }
 
     private static final class Attribute {
@@ -482,10 +491,6 @@ public final class BuildHintAnnotationReader {
                 hint.separator(separator);
             }
             applyType(hint, enums, separator);
-            String def = value("def", "");
-            if (def.length() > 0) {
-                hint.def(def);
-            }
             hint.platform(value("platform", groupDefaults.value("platform", "general")));
             if (values.containsKey("aliasOf")) {
                 hint.aliasOf(values.get("aliasOf"));
@@ -540,7 +545,21 @@ public final class BuildHintAnnotationReader {
                 return;
             }
             List<String> wire = new ArrayList<String>(domain.wire.values());
+            List<String> constants = new ArrayList<String>(domain.wire.keySet());
             hint.values(simple, wire.toArray(new String[wire.size()]));
+            hint.valueConstants(constants.toArray(new String[constants.size()]));
+            if (domain.unset != null) {
+                hint.unsetConstant(domain.unset);
+            }
+            // Toggle is how a hint that the build reads as true/false keeps a
+            // third state. It stays a BOOLEAN hint -- that is what the editor
+            // renders and what the documentation says -- while the binding still
+            // learns that ON sends "true", which upper-casing the value could
+            // never tell it.
+            if (TOGGLE.equals(simple)) {
+                hint.type(HintType.BOOLEAN);
+                return;
+            }
             if (!domain.accepts.isEmpty()) {
                 List<String> pairs = new ArrayList<String>();
                 for (Map.Entry<String, String> e : domain.accepts.entrySet()) {

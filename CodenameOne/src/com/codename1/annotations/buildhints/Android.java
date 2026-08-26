@@ -51,13 +51,12 @@ public @interface Android {
     /// https://developer.android.com/guide/topics/manifest/activity-element.html[Android
     /// docs for the activity element] for more information about the
     /// `android:launchMode` attribute.
-    @Hint(name = "android.activity.launchMode",
-            def = "singleTop")
+    @Hint(name = "android.activity.launchMode")
     String activityLaunchMode() default "";
 
     /// Produces an Android App Bundle (.aab) rather than an APK. Required for new
     /// Play Store submissions.
-    boolean appBundle() default false;
+    Toggle appBundle() default Toggle.DEFAULT;
 
     /// Android build-tools version. It also selects the compile SDK, so there is
     /// no separate compile-SDK hint.
@@ -66,7 +65,6 @@ public @interface Android {
 
     /// Indicates whether the `RECORD_AUDIO` permission should be requested. Can be
     /// `enabled` or any other value to disable this option
-    @Hint(def = "enabled")
     String captureRecord() default "";
 
     /// Whether to include the debug version in the build. This hint has NO single
@@ -75,17 +73,15 @@ public @interface Android {
     /// otherwise, so a build that selects neither still produces something
     /// installable (AndroidGradleBuilder.java:447-451, :530-531).
     @Hint
-    boolean debug() default false;
+    Toggle debug() default Toggle.DEFAULT;
 
     /// Turns off R8, falling back to the older shrinker. Note that hardening
     /// requires R8, so this conflicts with harden.level.
-    @Hint(def = "false")
-    boolean disableR8() default false;
+    Toggle disableR8() default Toggle.DEFAULT;
 
     /// Boolean true/false defaults to true. Allows disabling the proguard
     /// obfuscation even on release builds, notice that this isn't recommended
-    @Hint(def = "true")
-    boolean enableProguard() default false;
+    Toggle enableProguard() default Toggle.DEFAULT;
 
     /// Gradle dependency statements to add to the app module, such as
     /// implementation 'com.example:lib:1.0'.
@@ -94,13 +90,11 @@ public @interface Android {
     String[] gradleDep() default {};
 
     /// Hides the Android status bar.
-    @Hint(def = "false")
-    boolean hideStatusBar() default false;
+    Toggle hideStatusBar() default Toggle.DEFAULT;
 
     /// Maps to android:installLocation manifest entry defaults to auto. Can also
     /// be set to internalOnly or preferExternal.
-    @Hint(def = "auto")
-    InstallLocation installLocation() default InstallLocation.AUTO;
+    InstallLocation installLocation() default InstallLocation.DEFAULT;
 
     /// The license key for the Android app, this is required if you use in-app
     /// purchase on Android
@@ -109,21 +103,18 @@ public @interface Android {
     /// The least SDK required to run this app, the default value changes based on
     /// functionality but can be as low as 7. This corresponds to the XML attribute
     /// `android:minSdkVersion`.
-    @Hint(name = "android.min_sdk_version",
-            def = "19")
+    @Hint(name = "android.min_sdk_version")
     int minSdkVersion() default 0;
 
     /// Multidex lets an Android binary reference more than 65536 methods.
     /// Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default
     /// of `"true"`, so a build that says nothing gets multidex. Set it to false
     /// to opt out, which builds a little faster and reinstates the limit.
-    @Hint(def = "true")
-    boolean multidex() default false;
+    Toggle multidex() default Toggle.DEFAULT;
 
     /// Uses the current Firebase Cloud Messaging integration. Requires AndroidX
     /// and Gradle 8.13 or newer.
-    @Hint(def = "true")
-    boolean newFirebaseMessaging() default false;
+    Toggle newFirebaseMessaging() default Toggle.DEFAULT;
 
     /// Arguments for the keep option in proguard allowing you to keep a pattern of
     /// files for example, `-keep class com.mypackage.ProblemClass { *; }`
@@ -133,8 +124,7 @@ public @interface Android {
 
     /// true/false defaults to true - indicates whether to include the release
     /// version in the build
-    @Hint(def = "true")
-    boolean release() default false;
+    Toggle release() default Toggle.DEFAULT;
 
     /// Extra Gradle repositories to resolve dependencies from.
     @Hint(appendable = true,
@@ -157,7 +147,7 @@ public @interface Android {
     /// still maps to `hololight`. The default stays on `hololight` for existing
     /// apps until you flip in a future release.
     @Hint(name = "and.themeMode")
-    AndroidThemeMode themeMode() default AndroidThemeMode.AUTO;
+    AndroidThemeMode themeMode() default AndroidThemeMode.DEFAULT;
 
     /// Statements added to the top-level Gradle build file rather than the app
     /// module.
@@ -168,7 +158,7 @@ public @interface Android {
     /// Use Android X instead of support libraries. This will also run a
     /// find/replace on all source files to replace support libraries and artifacts
     /// with AndroidX equivalents.
-    boolean useAndroidX() default false;
+    Toggle useAndroidX() default Toggle.DEFAULT;
 
     /// defaults to an empty string. Allows developers of native Android code to
     /// add text within the application block to define things such as widgets,

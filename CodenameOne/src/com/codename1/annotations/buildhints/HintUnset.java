@@ -22,21 +22,25 @@
  */
 package com.codename1.annotations.buildhints;
 
-/// Accepted values of the `harden.strings` build hint.
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/// Marks the enum constant that means "nothing was chosen".
 ///
-/// Each constant's `@HintValue` carries the string the build actually receives,
-/// which is not always the constant's own name.
-public enum HardenStrings {
-    /// Say nothing, and let the build server apply its own default.
-    @HintUnset
-    DEFAULT,
-
-    @HintValue("off")
-    OFF,
-
-    @HintValue("constants")
-    CONSTANTS,
-
-    @HintValue("all")
-    ALL;
+/// An annotation member must declare a default -- Java has no null for one, and
+/// a member without a default is mandatory, which would force every attribute
+/// to be written. So the default has to name SOME constant, and the only honest
+/// one to name is a constant that says nothing.
+///
+/// A hint whose attribute is left at this constant is not written into the build
+/// request at all, exactly as an attribute the developer never mentioned is not.
+/// The build server then applies its own default, which is where that decision
+/// belongs: it is the server's to change, and an annotation that restated it
+/// would be a second copy going quietly stale in every app already compiled
+/// against it.
+@Retention(RetentionPolicy.CLASS)
+@Target(ElementType.FIELD)
+public @interface HintUnset {
 }

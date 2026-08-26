@@ -55,12 +55,11 @@ public @interface Build {
     /// set explicitly. `modern` = liquid glass + Material 3, `legacy` = iOS 7 flat
     /// + Holo Light, `custom` disables the framework native theme entirely. The
     /// legacy alias `cn1.nativeTheme` is still accepted.
-    NativeThemeMode nativeTheme() default NativeThemeMode.MODERN;
+    NativeThemeMode nativeTheme() default NativeThemeMode.DEFAULT;
 
     /// true/false (defaults to false). Blocks codename one from injecting its own
     /// resources when set to true, the only effect this has is in slightly
     /// reducing archive size. This might have adverse effects on some features of
     /// Codename One so it isn't recommended.
-    @Hint(def = "false")
-    boolean noExtraResources() default false;
+    Toggle noExtraResources() default Toggle.DEFAULT;
 }

@@ -75,9 +75,8 @@ public @interface Ios {
     /// Which native dependency manager to use: auto picks one from whichever of
     /// ios.pods and ios.spm.packages is set, and cocoapods, spm or both require
     /// the matching hint to be set. An unrecognized value fails the build.
-    @Hint(def = "auto",
-            consumedBy = {"IOSDependencyManager"})
-    IosDependencyManager dependencyManager() default IosDependencyManager.AUTO;
+    @Hint(consumedBy = {"IOSDependencyManager"})
+    IosDependencyManager dependencyManager() default IosDependencyManager.DEFAULT;
 
     /// Minimum iOS version the build targets. Set it to the lowest iOS you
     /// actually support; a higher value excludes older devices from the App Store
@@ -95,8 +94,7 @@ public @interface Ios {
     /// true/false (defaults to false). Whether to include the push capabilities in
     /// the iOS build. Notice that the IDE plugin has an "Include Push" check box
     /// you *should* use under the iOS section.
-    @Hint(def = "false")
-    boolean includePush() default false;
+    Toggle includePush() default Toggle.DEFAULT;
 
     /// UIInterfaceOrientationPortrait by default. Indicates the orientation, one
     /// or more of (separated by colon :): `UIInterfaceOrientationPortrait`,
@@ -109,8 +107,7 @@ public @interface Ios {
 
     /// The null and empty-string reads of this hint are presence checks; 6.0 is
     /// the substantive default (IPhoneBuilder.java:4671).
-    @Hint(kind = HintKind.VERSION,
-            def = "6.0")
+    @Hint(kind = HintKind.VERSION)
     String minDeploymentTarget() default "";
 
     /// Stores app files under the documents directory rather than caches, which
@@ -119,13 +116,11 @@ public @interface Ios {
     /// hint with a default of `"true"`, so a build that says nothing gets it.
     /// Described in
     /// https://github.com/codenameone/CodenameOne/issues/1480[this issue]
-    @Hint(def = "true")
-    boolean newStorageLocation() default false;
+    Toggle newStorageLocation() default Toggle.DEFAULT;
 
     /// Added the `-ObjC` compile flag to the project files which some native
     /// libraries require
-    @Hint(def = "false")
-    boolean objC() default false;
+    Toggle objC() default Toggle.DEFAULT;
 
     /// entries to inject into the iOS plist file during build.
     @Hint(appendable = true,
@@ -157,18 +152,16 @@ public @interface Ios {
     /// icon for iOS conventions (adding an overlay) that might not be appropriate
     /// on some icons. Setting this to true leaves the icon unchanged (only
     /// scaled).
-    @Hint(name = "ios.prerendered_icon",
-            def = "false")
-    boolean prerenderedIcon() default false;
+    @Hint(name = "ios.prerendered_icon")
+    Toggle prerenderedIcon() default Toggle.DEFAULT;
 
     /// one of ios, ipad, iphone (defaults to ios). Indicates whether the resulting
     /// binary is targeted to the iphone only or ipad only. Notice that the IDE
     /// plugin has a "Project Type" combo box you *should* use under the iOS
     /// section.
     @Hint(name = "ios.project_type",
-            def = "ios",
             consumedBy = {"IPhoneBuilder", "MacNativeBuilder"})
-    IosProjectType projectType() default IosProjectType.IOS;
+    IosProjectType projectType() default IosProjectType.DEFAULT;
 
     /// Swift Package Manager packages to link, one per entry, each written as
     /// identity|url|requirement.
@@ -191,7 +184,7 @@ public @interface Ios {
     /// `native-themes/ios-modern/theme.css`. `ios7` / `flat` is the same as `auto`
     /// - pre-liquid iOS 7 flat theme; `legacy` / `iphone` loads the pre-iOS 7
     /// iPhone theme. The `auto` -> modern flip is planned for a future release.
-    IosThemeMode themeMode() default IosThemeMode.AUTO;
+    IosThemeMode themeMode() default IosThemeMode.DEFAULT;
 
     /// true/false (defaults to true). Enables iOS UIScene lifecycle support.
     /// UIScene lets iOS manage one or more app UI sessions independently,
@@ -199,8 +192,7 @@ public @interface Ios {
     /// UIScene will be required starting with iOS 27, so this is now on by
     /// default; set the flag to `false` only if you need to temporarily fall back
     /// to the legacy `UIApplicationDelegate` lifecycle.
-    @Hint(def = "true")
-    boolean uiscene() default false;
+    Toggle uiscene() default Toggle.DEFAULT;
 
     /// Allows intercepting a URL call using the syntax `<string>urlPrefix<string>`
     String urlScheme() default "";

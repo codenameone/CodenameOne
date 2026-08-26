@@ -59,7 +59,7 @@ import com.codename1.annotations.buildhints.*;
 
 @Android(themeMode = AndroidThemeMode.MODERN)
 @Build(nativeTheme = NativeThemeMode.MODERN)
-@Ios(newStorageLocation = true, themeMode = IosThemeMode.MODERN)
+@Ios(newStorageLocation = Toggle.ON, themeMode = IosThemeMode.MODERN)
 @IosPrivacy(cameraUsageDescription = "Some functionality of the application requires your camera")
 public class CN1Playground extends Lifecycle {
     private static final boolean DEFAULT_DARK_MODE = true;

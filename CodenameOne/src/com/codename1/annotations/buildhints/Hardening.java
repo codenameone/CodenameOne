@@ -42,11 +42,10 @@ public @interface Hardening {
     /// Permits a local or source build to run with hardening requested but not
     /// applied. Without it such a build is refused, so a hardened app is never
     /// shipped from a target that can't actually harden it.
-    @Hint(def = "false")
-    boolean allowUnhardenedLocalBuild() default false;
+    Toggle allowUnhardenedLocalBuild() default Toggle.DEFAULT;
 
     /// Overrides control-flow obfuscation independently of harden.level.
-    HardenControlFlow controlFlow() default HardenControlFlow.OFF;
+    HardenControlFlow controlFlow() default HardenControlFlow.DEFAULT;
 
     /// Keep rules in ProGuard syntax, one per line, for classes that are resolved
     /// by name at runtime and so can't be found by the automatic analysis. Same
@@ -59,14 +58,13 @@ public @interface Hardening {
 
     /// Master switch for app hardening: off, standard, aggressive or paranoid. An
     /// unrecognized value fails the build rather than being treated as off.
-    @Hint(def = "off",
-            consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo", "Executor"})
-    HardenLevel level() default HardenLevel.OFF;
+    @Hint(consumedBy = {"AndroidGradleBuilder", "CN1BuildMojo", "Executor"})
+    HardenLevel level() default HardenLevel.DEFAULT;
 
     /// Overrides symbol renaming independently of harden.level.
-    boolean rename() default false;
+    Toggle rename() default Toggle.DEFAULT;
 
     /// Overrides string obfuscation independently of harden.level: off, constants
     /// or all.
-    HardenStrings strings() default HardenStrings.OFF;
+    HardenStrings strings() default HardenStrings.DEFAULT;
 }

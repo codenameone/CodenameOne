@@ -216,6 +216,8 @@ public final class BuildHints {
         private final List<String> values = new ArrayList<String>();
         private final Map<String, String> valueAliases = new LinkedHashMap<String, String>();
         private final List<String> valueLabels = new ArrayList<String>();
+        private final List<String> valueConstants = new ArrayList<String>();
+        private String unsetConstant;
         private String def;
         private String separator;
         private String platform = "general";
@@ -315,6 +317,25 @@ public final class BuildHints {
         }
 
         /** Optional human labels for the value domain, parallel to the values. */
+        /// The enum CONSTANT names, positionally matching {@link #values()}.
+        ///
+        /// Recorded rather than derived from the wire value: `Toggle.ON` sends
+        /// `true`, and upper-casing the value would look for a constant called
+        /// TRUE that does not exist. The annotation processor resolves a
+        /// constant through this table, so a mismatch is not a wrong value on
+        /// the wire but a build error.
+        public Hint valueConstants(String... constants) {
+            this.valueConstants.clear();
+            Collections.addAll(this.valueConstants, constants);
+            return this;
+        }
+
+        /// The constant that means "not set", which sends nothing at all.
+        public Hint unsetConstant(String constant) {
+            this.unsetConstant = constant;
+            return this;
+        }
+
         public Hint valueLabels(String... labels) {
             this.valueLabels.clear();
             Collections.addAll(this.valueLabels, labels);
@@ -418,6 +439,10 @@ public final class BuildHints {
             return null;
         }
         public List<String> valueLabels() { return Collections.unmodifiableList(valueLabels); }
+        public List<String> valueConstants() {
+            return Collections.unmodifiableList(valueConstants);
+        }
+        public String unsetConstant() { return unsetConstant; }
         public String def() { return def; }
         public String separator() { return separator; }
         public String platform() { return platform; }

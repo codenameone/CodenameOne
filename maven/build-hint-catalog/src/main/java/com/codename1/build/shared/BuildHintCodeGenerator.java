@@ -140,7 +140,7 @@ public final class BuildHintCodeGenerator {
                 byGroup.put(h.group(), list);
             }
             list.add(h);
-            if (h.type() == HintType.ENUM) {
+            if (h.enumName() != null) {
                 BuildHints.Hint previous = enums.put(h.enumName(), h);
                 if (previous != null && !previous.values().equals(h.values())) {
                     throw new IllegalStateException("Enum " + h.enumName()
@@ -192,39 +192,6 @@ public final class BuildHintCodeGenerator {
         }
     }
 
-    private static String defaultClause(BuildHints.Hint h) {
-        String d = h.def();
-        switch (h.type()) {
-            case BOOLEAN:
-                return "true".equals(d) ? "true" : "false";
-            case INT:
-                if (d != null && d.length() > 0) {
-                    try {
-                        return String.valueOf(Integer.parseInt(d.trim()));
-                    } catch (NumberFormatException ignored) {
-                        // fall through to zero
-                    }
-                }
-                return "0";
-            case ENUM:
-                String constant = d != null && h.values().contains(d)
-                        ? enumConstant(d) : enumConstant(h.values().get(0));
-                return h.enumName() + "." + constant;
-            case STRING_LIST:
-                return "{}";
-            default:
-                // A literal IP address in generated source reads to a static analyser
-                // as hardcoded configuration (PMD AvoidUsingHardCodedIP), and it is not
-                // load-bearing here: the annotation's default clause is documentation
-                // only, since the processor emits a hint solely for members the
-                // developer actually wrote. The real default stays in the javadoc.
-                if (d != null && LOOKS_LIKE_IP.matcher(d).matches()) {
-                    return "\"\"";
-                }
-                return "\"" + esc(d == null ? "" : d) + "\"";
-        }
-    }
-
     private static final java.util.regex.Pattern LOOKS_LIKE_IP =
             java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}|::1|[0-9a-fA-F:]*:[0-9a-fA-F:]+");
 
@@ -241,47 +208,6 @@ public final class BuildHintCodeGenerator {
         }
         String out = sb.toString();
         return Character.isDigit(out.charAt(0)) ? "V" + out : out;
-    }
-
-    private static String annotationSource(HintGroup group, List<BuildHints.Hint> hints) {
-        StringBuilder sb = new StringBuilder(LICENSE);
-        sb.append("package ").append(PKG).append(";\n\n");
-        sb.append("import java.lang.annotation.ElementType;\n");
-        sb.append("import java.lang.annotation.Retention;\n");
-        sb.append("import java.lang.annotation.RetentionPolicy;\n");
-        sb.append("import java.lang.annotation.Target;\n\n");
-        sb.append(doc(groupBlurb(group), ""));
-        sb.append("///\n");
-        sb.append(doc("Place this on your application's main class -- the class named by "
-                + "`codename1.mainName`. An attribute you do not set is not written at all, "
-                + "so the builder's own default applies. Each attribute's `@Hint(def)` "
-                + "records what that default is; the `default` clause below it is a neutral "
-                + "placeholder with no meaning at runtime.", ""));
-        sb.append("@Retention(RetentionPolicy.CLASS)\n");
-        sb.append("@Target(ElementType.TYPE)\n");
-        sb.append("public @interface ").append(group.annotationSimpleName()).append(" {\n");
-        for (int i = 0; i < hints.size(); i++) {
-            BuildHints.Hint h = hints.get(i);
-            sb.append("\n");
-            String text = h.doc();
-            if (text == null || text.length() == 0) {
-                text = group == HintGroup.IOS_PRIVACY
-                        ? "The text iOS shows when the app first asks for "
-                          + plistSubject(h.name()) + ". It becomes the `"
-                          + h.name().substring("ios.".length())
-                          + "` key in `Info.plist`. The App Store rejects an app that "
-                          + "touches this resource without one."
-                        : "Sets the `" + h.name() + "` build hint.";
-            }
-            if (h.deprecated() != null) {
-                sb.append("    @Deprecated\n");
-            }
-            sb.append(hintAnnotation(group, h, text));
-            sb.append("    ").append(javaType(h)).append(" ").append(h.attr())
-              .append("() default ").append(neutralDefault(h)).append(";\n");
-        }
-        sb.append("}\n");
-        return sb.toString();
     }
 
     /// The `@Hint` carrying what the attribute's signature cannot say.
@@ -364,20 +290,6 @@ public final class BuildHintCodeGenerator {
         }
     }
 
-    /// A default clause with no meaning, because the attribute's default has
-    /// none: a hint is written only where the developer set it. The builder's
-    /// real default is in `@Hint(def)`, which -- unlike this -- survives being
-    /// read back.
-    private static String neutralDefault(BuildHints.Hint h) {
-        switch (h.type()) {
-            case BOOLEAN: return "false";
-            case INT: return "0";
-            case ENUM: return h.enumName() + "." + enumConstant(h.values().get(0));
-            case STRING_LIST: return "{}";
-            default: return "\"\"";
-        }
-    }
-
     /// Turns ios.NSCameraUsageDescription into "the camera", so the generated
     /// sentence reads naturally rather than repeating the plist key.
     private static String plistSubject(String hintName) {
@@ -411,34 +323,6 @@ public final class BuildHintCodeGenerator {
         }
     }
 
-    private static String enumSource(String name, BuildHints.Hint origin) {
-        StringBuilder sb = new StringBuilder(LICENSE);
-        sb.append("package ").append(PKG).append(";\n\n");
-        sb.append(doc("Accepted values of the `" + origin.name() + "` build hint.", ""));
-        sb.append("///\n");
-        sb.append(doc("Each constant's `@HintValue` carries the string the build actually "
-                + "receives, which is not always the constant's own name.", ""));
-        sb.append("public enum ").append(name).append(" {\n");
-        List<String> values = origin.values();
-        List<String> labels = origin.valueLabels();
-        for (int i = 0; i < values.size(); i++) {
-            String v = values.get(i);
-            sb.append(i == 0 ? "" : "\n");
-            if (i < labels.size()) {
-                sb.append(doc(labels.get(i), "    "));
-            }
-            sb.append("    @HintValue(\"").append(esc(v)).append("\"");
-            if (i < labels.size() && labels.get(i) != null && labels.get(i).length() > 0) {
-                sb.append(", label = \"").append(esc(labels.get(i))).append("\"");
-            }
-            sb.append(")\n");
-            sb.append("    ").append(enumConstant(v));
-            sb.append(i == values.size() - 1 ? ";\n" : ",\n");
-        }
-        sb.append("}\n");
-        return sb.toString();
-    }
-
     private static String packageInfoSource(Map<HintGroup, List<BuildHints.Hint>> byGroup) {
         StringBuilder sb = new StringBuilder(LICENSE);
         sb.append(doc("Build hints expressed as annotations, so the compiler checks them.", ""));
@@ -454,7 +338,7 @@ public final class BuildHintCodeGenerator {
         sb.append(doc("Put the annotations on your application's main class:", ""));
         sb.append("///\n");
         sb.append("/// ```java\n");
-        sb.append("/// @Ios(newStorageLocation = true, themeMode = IosThemeMode.MODERN)\n");
+        sb.append("/// @Ios(newStorageLocation = Toggle.ON, themeMode = IosThemeMode.MODERN)\n");
         sb.append("/// @Android(themeMode = AndroidThemeMode.MODERN)\n");
         sb.append("/// @DesktopBuild(titleBar = DesktopTitleBar.NATIVE)\n");
         sb.append("/// public class MyApplication {\n");
@@ -515,7 +399,10 @@ public final class BuildHintCodeGenerator {
         sb.append("    /** \"<descriptor>#<member>\" to hint name. */\n");
         sb.append("    private static final Map<String, String> HINTS = new HashMap<String, String>();\n");
         sb.append("    /** \"<enumSimpleName>#<CONSTANT>\" to the value the build receives. */\n");
-        sb.append("    private static final Map<String, String> WIRE = new HashMap<String, String>();\n\n");
+        sb.append("    private static final Map<String, String> WIRE = new HashMap<String, String>();\n");
+        sb.append("    /** \"<enumSimpleName>#<CONSTANT>\" of the constant meaning \"not set\". */\n");
+        sb.append("    private static final java.util.Set<String> UNSET =\n");
+        sb.append("            new java.util.HashSet<String>();\n\n");
         sb.append("    static {\n");
         for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
             String simple = e.getKey().annotationSimpleName();
@@ -529,9 +416,25 @@ public final class BuildHintCodeGenerator {
         }
         sb.append("\n");
         for (Map.Entry<String, BuildHints.Hint> e : enums.entrySet()) {
-            for (String v : e.getValue().values()) {
+            List<String> values = e.getValue().values();
+            List<String> constants = e.getValue().valueConstants();
+            for (int i = 0; i < values.size(); i++) {
+                // The constant the enum really declares. Upper-casing the wire
+                // value invented TRUE for Toggle.ON, and the processor would
+                // have failed every project that set a boolean hint.
+                String constant = i < constants.size() ? constants.get(i)
+                        : enumConstant(values.get(i));
                 sb.append("        WIRE.put(\"").append(e.getKey()).append("#")
-                  .append(enumConstant(v)).append("\", \"").append(esc(v)).append("\");\n");
+                  .append(constant).append("\", \"").append(esc(values.get(i)))
+                  .append("\");\n");
+            }
+        }
+        sb.append("\n");
+        for (Map.Entry<String, BuildHints.Hint> e : enums.entrySet()) {
+            String unset = e.getValue().unsetConstant();
+            if (unset != null) {
+                sb.append("        UNSET.add(\"").append(e.getKey()).append("#")
+                  .append(unset).append("\");\n");
             }
         }
         sb.append("    }\n\n");
@@ -562,7 +465,28 @@ public final class BuildHintCodeGenerator {
         sb.append("            simple = simple.substring(slash + 1);\n        }\n");
         sb.append("        if (simple.endsWith(\";\")) {\n");
         sb.append("            simple = simple.substring(0, simple.length() - 1);\n        }\n");
-        sb.append("        return WIRE.get(simple + \"#\" + constant);\n    }\n");
+        sb.append("        return WIRE.get(simple + \"#\" + constant);\n    }\n\n");
+        sb.append("    /**\n");
+        sb.append("     * Whether a constant means the developer said nothing.\n");
+        sb.append("     *\n");
+        sb.append("     * <p>Such a hint is not written into the build request at all, so the\n");
+        sb.append("     * build server applies its own default. That decision is the server's\n");
+        sb.append("     * and it may change it; nothing on the client restates it.</p>\n");
+        sb.append("     *\n");
+        sb.append("     * @param enumDescriptorOrName the enum type, as a descriptor or simple name\n");
+        sb.append("     * @param constant the constant name as it appears in the class file\n");
+        sb.append("     * @return true when the constant carries no value\n");
+        sb.append("     */\n");
+        sb.append("    public static boolean isUnset(String enumDescriptorOrName, String constant) {\n");
+        sb.append("        return UNSET.contains(simpleNameOf(enumDescriptorOrName) + \"#\" + constant);\n    }\n\n");
+        sb.append("    private static String simpleNameOf(String enumDescriptorOrName) {\n");
+        sb.append("        String simple = enumDescriptorOrName;\n");
+        sb.append("        int slash = simple.lastIndexOf('/');\n");
+        sb.append("        if (slash >= 0) {\n");
+        sb.append("            simple = simple.substring(slash + 1);\n        }\n");
+        sb.append("        if (simple.endsWith(\";\")) {\n");
+        sb.append("            simple = simple.substring(0, simple.length() - 1);\n        }\n");
+        sb.append("        return simple;\n    }\n");
         sb.append("}\n");
         return sb.toString();
     }
@@ -683,7 +607,11 @@ public final class BuildHintCodeGenerator {
         sb.append("        h.add(new BuildHints.Hint(").append(quote(h.name())).append(")\n");
         sb.append("                .annotatedAs(HintGroup.").append(h.group().name())
           .append(", ").append(quote(h.attr())).append(")\n");
-        if (h.type() == HintType.ENUM) {
+        // A Toggle-typed hint is a BOOLEAN hint -- that is what the editor renders
+        // and what the docs say -- but it still has a constant domain, because
+        // ON sends "true" and DEFAULT sends nothing at all. Writing the type and
+        // the domain are not alternatives.
+        if (h.enumName() != null) {
             sb.append("                .values(").append(quote(h.enumName()));
             for (String v : h.values()) {
                 sb.append(", ").append(quote(v));
@@ -706,7 +634,22 @@ public final class BuildHintCodeGenerator {
                 }
                 sb.append(")\n");
             }
-        } else {
+            if (!h.valueConstants().isEmpty()) {
+                sb.append("                .valueConstants(");
+                for (int i = 0; i < h.valueConstants().size(); i++) {
+                    sb.append(i == 0 ? "" : ", ").append(quote(h.valueConstants().get(i)));
+                }
+                sb.append(")\n");
+            }
+            if (h.unsetConstant() != null) {
+                sb.append("                .unsetConstant(").append(quote(h.unsetConstant()))
+                  .append(")\n");
+            }
+        }
+        // AFTER the domain: values() sets the type to ENUM, so a Toggle hint
+        // written the other way round came back as an ENUM and the round-trip
+        // gate caught it.
+        if (h.type() != HintType.ENUM) {
             sb.append("                .type(HintType.").append(h.type().name()).append(")\n");
         }
         if (h.def() != null && h.def().length() > 0) {

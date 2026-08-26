@@ -32,8 +32,8 @@ import com.codename1.annotations.buildhints.*;
  * screenshots to the host over the CN1SS WebSocket, then prints
  * CN1SS:SUITE:FINISHED and exits.
  */
-@Android(gradleDep = {"implementation 'com.google.android.material:material:1.12.0'"}, useAndroidX = true)
-@Ios(newStorageLocation = true, uiscene = true)
+@Android(gradleDep = {"implementation 'com.google.android.material:material:1.12.0'"}, useAndroidX = Toggle.ON)
+@Ios(newStorageLocation = Toggle.ON, uiscene = Toggle.ON)
 public class FidelityApp extends Lifecycle {
     @Override
     public void runApp() {

@@ -706,8 +706,13 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                 // applies is per hint and this cannot know, so a value that is not
                 // already canonical is refused rather than normalised into one
                 // that may mean the opposite.
-                if ("true".equals(v)) return "true";
-                if ("false".equals(v)) return "false";
+                // Toggle, not a boolean literal: the attribute has three states
+                // and the properties line only ever expressed two of them. A
+                // hint that is present in the file was deliberately set, so it
+                // migrates to ON or OFF -- never to DEFAULT, which would silently
+                // drop the setting and hand the decision back to the server.
+                if ("true".equals(v)) return "Toggle.ON";
+                if ("false".equals(v)) return "Toggle.OFF";
                 return null;
             case INT:
                 try {

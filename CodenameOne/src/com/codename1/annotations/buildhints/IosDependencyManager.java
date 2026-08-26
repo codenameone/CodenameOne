@@ -27,6 +27,10 @@ package com.codename1.annotations.buildhints;
 /// Each constant's `@HintValue` carries the string the build actually receives,
 /// which is not always the constant's own name.
 public enum IosDependencyManager {
+    /// Say nothing, and let the build server apply its own default.
+    @HintUnset
+    DEFAULT,
+
     @HintValue("auto")
     AUTO,
 

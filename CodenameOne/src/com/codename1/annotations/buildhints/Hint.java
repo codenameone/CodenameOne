@@ -51,12 +51,13 @@ public @interface Hint {
     /// the authority on the spelling.
     String name() default "";
 
-    /// What the builder does when nobody sets the hint.
-    ///
-    /// Documentation, not behaviour: an attribute the developer leaves alone is
-    /// not written at all, so the builder's own default applies whatever this
-    /// says.
-    String def() default "";
+    // There is deliberately no `def` member. The build server owns what happens
+    // when a hint is not set, and it may change that; a copy of it here would be
+    // a second answer, baked into every app already compiled against this
+    // annotation and unable to follow. An attribute the developer leaves alone is
+    // not written into the request at all -- see HintUnset -- so the server's
+    // default is not merely documented but actually in force.
+
 
     /// What kind of string this is, when the attribute's Java type does not say.
     ///

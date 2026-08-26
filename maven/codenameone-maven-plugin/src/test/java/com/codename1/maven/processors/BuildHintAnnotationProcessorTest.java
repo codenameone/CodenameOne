@@ -67,10 +67,10 @@ public class BuildHintAnnotationProcessorTest {
 
     @Test
     public void aBooleanAttributeIsWrittenAsTrueOrFalse() throws Exception {
-        Properties p = hintsOf("@Ios(newStorageLocation = true)");
+        Properties p = hintsOf("@Ios(newStorageLocation = Toggle.ON)");
         assertEquals("true", p.getProperty("codename1.arg.ios.newStorageLocation"));
 
-        p = hintsOf("@Ios(newStorageLocation = false)");
+        p = hintsOf("@Ios(newStorageLocation = Toggle.OFF)");
         assertEquals("false", p.getProperty("codename1.arg.ios.newStorageLocation"));
     }
 
@@ -141,13 +141,34 @@ public class BuildHintAnnotationProcessorTest {
     }
 
     /// The other half of the same contract: a value the developer typed is
-    /// written even when it equals the annotation's declared default, because
-    /// typing it is a statement of intent.
+    /// written, because typing it is a statement of intent.
     @Test
-    public void anExplicitlyWrittenDefaultValueIsStillEmitted() throws Exception {
-        // ios.objC is declared `default true` by the generator.
-        Properties p = hintsOf("@Ios(objC = true)");
+    public void anExplicitlyWrittenValueIsStillEmitted() throws Exception {
+        Properties p = hintsOf("@Ios(objC = Toggle.ON)");
         assertEquals("true", p.getProperty("codename1.arg.ios.objC"));
+    }
+
+    /// The unset constant is written as if nothing had been written at all.
+    ///
+    /// An annotation member must name SOME constant as its default, so the one
+    /// it names says nothing. Naming it explicitly has to mean the same, or
+    /// there would be two ways to say "leave it alone" that behave differently.
+    /// Sending the constant's own name would set the hint to a value no builder
+    /// recognises and every builder silently ignores.
+    @Test
+    public void theUnsetConstantSendsNothing() throws Exception {
+        Properties p = hintsOf("@Ios(objC = Toggle.DEFAULT, teamId = \"T\")");
+        assertEquals("T", p.getProperty("codename1.arg.ios.teamId"));
+        assertNull("Toggle.DEFAULT must not be written",
+                p.getProperty("codename1.arg.ios.objC"));
+    }
+
+    /// ...and so does an enum's own unset constant.
+    @Test
+    public void anEnumsUnsetConstantSendsNothing() throws Exception {
+        Properties p = hintsOf("@Ios(themeMode = IosThemeMode.DEFAULT, teamId = \"T\")");
+        assertEquals("T", p.getProperty("codename1.arg.ios.teamId"));
+        assertNull(p.getProperty("codename1.arg.ios.themeMode"));
     }
 
     // ------------------------------------------------------------------
