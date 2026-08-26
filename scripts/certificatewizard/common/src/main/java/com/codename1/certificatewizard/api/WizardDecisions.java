@@ -6,6 +6,11 @@ import java.util.List;
 public final class WizardDecisions {
     public static final String WIDGET_EXTENSION_SUFFIX = ".CN1Widgets";
 
+    /// The document provider extension's App ID is the app's plus this, matching the target name
+    /// IPhoneBuilder generates and the PRODUCT_BUNDLE_IDENTIFIER it stamps on it. Apple signs an
+    /// extension against its own App ID, so a mismatch here is a signing failure at archive time.
+    public static final String DOCUMENT_PROVIDER_EXTENSION_SUFFIX = ".CN1Documents";
+
     private WizardDecisions() {
     }
 
@@ -14,6 +19,13 @@ public final class WizardDecisions {
             return null;
         }
         return mainBundleId.trim() + WIDGET_EXTENSION_SUFFIX;
+    }
+
+    public static String documentProviderExtensionBundleId(String mainBundleId) {
+        if (mainBundleId == null || mainBundleId.trim().isEmpty()) {
+            return null;
+        }
+        return mainBundleId.trim() + DOCUMENT_PROVIDER_EXTENSION_SUFFIX;
     }
 
     public static String defaultAppGroup(String packageName) {

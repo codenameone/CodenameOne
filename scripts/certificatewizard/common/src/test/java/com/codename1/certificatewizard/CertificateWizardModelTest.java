@@ -292,6 +292,54 @@ class CertificateWizardModelTest {
     }
 
     @Test
+    void documentProviderExtensionDecisionsAreDeterministic() {
+        // The suffix has to match the target name IPhoneBuilder generates and stamps as
+        // PRODUCT_BUNDLE_IDENTIFIER. Apple signs an extension against its own App ID, so a
+        // mismatch here is an archive-time signing failure naming neither side.
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app"));
+        assertNull(WizardDecisions.documentProviderExtensionBundleId(null));
+        assertNull(WizardDecisions.documentProviderExtensionBundleId("  "));
+    }
+
+    @Test
+    void documentProviderSigningWritesTheHintsAndBothProfiles() throws Exception {
+        Path settings = Files.createTempFile("cn1-settings", ".properties");
+        Files.writeString(settings, "codename1.packageName=com.example.app\n",
+                StandardCharsets.UTF_8);
+        SigningAssetInstaller.applyDocumentProviderSigning(settings.toString(),
+                "group.com.example.app", "/tmp/CN1Documents.mobileprovision",
+                "/tmp/CN1Documents_Development.mobileprovision");
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        // Enabling the feature is part of installing its signing: an App ID, an App Group and two
+        // profiles with no hint is a project that builds without the extension and leaves the
+        // developer with signing assets nothing consumes.
+        assertTrue(written.contains("codename1.arg.ios.documentProvider.enabled=true"));
+        assertTrue(written.contains(
+                "codename1.arg.ios.documentProvider.appGroup=group.com.example.app"));
+        assertTrue(written.contains(
+                "codename1.ios.appext.CN1Documents.provision=/tmp/CN1Documents.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.release.appext.CN1Documents.provision=/tmp/CN1Documents.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.debug.appext.CN1Documents.provision=/tmp/CN1Documents_Development.mobileprovision"));
+        assertTrue(written.contains("codename1.packageName=com.example.app"));
+    }
+
+    @Test
+    void documentProviderSigningWithoutDevelopmentProfileClearsStaleDebugKey() throws Exception {
+        Path settings = Files.createTempFile("cn1-settings", ".properties");
+        Files.writeString(settings, "codename1.packageName=com.example.app\n"
+                + "codename1.ios.debug.appext.CN1Documents.provision=/tmp/stale-dev.mobileprovision\n",
+                StandardCharsets.UTF_8);
+        SigningAssetInstaller.applyDocumentProviderSigning(settings.toString(),
+                "group.com.example.app", "/tmp/CN1Documents.mobileprovision", null);
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        assertFalse(written.contains("stale-dev.mobileprovision"));
+        assertTrue(written.contains("codename1.ios.debug.appext.CN1Documents.provision=\n"));
+    }
+
+    @Test
     void cloudServiceUsesGeneratedClientForClearSigningData() throws Exception {
         Path sourcePath = Paths.get("src/main/java/com/codename1/certificatewizard/api/CloudSigningService.java");
         if (!Files.exists(sourcePath)) {

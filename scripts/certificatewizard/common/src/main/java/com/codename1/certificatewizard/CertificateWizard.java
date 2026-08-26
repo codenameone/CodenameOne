@@ -1235,7 +1235,8 @@ public class CertificateWizard extends Lifecycle {
                         () -> autoSetupMacProject(PROFILE_MAC_STORE,
                                 () -> autoSetupMacProject(PROFILE_MAC_DIRECT,
                                         () -> autoSetupWidgetExtension(bundleIdentifier, appName,
-                                                () -> showPageMessage("Automatic signing setup completed.", false))))));
+                                                () -> autoSetupDocumentProviderExtension(bundleIdentifier, appName,
+                                                        () -> showPageMessage("Automatic signing setup completed.", false)))))));
     }
 
     private void autoSetupMacProject(String profileType) {
@@ -1321,27 +1322,92 @@ public class CertificateWizard extends Lifecycle {
         });
     }
 
+    /// What differs between the app extensions the wizard can sign for. Everything else --
+    /// find-or-create the App Group, enable it on the app and on the extension, create an App
+    /// Store profile and a development one, download both, write them into the project -- is the
+    /// same sequence against the same API, so it is written once here rather than once per
+    /// extension.
+    private static final class ExtensionSigning {
+        /// The target name Codename One generates, and the last component of the extension's
+        /// bundle id.
+        final String extensionName;
+        /// Human-readable, for messages and for the generated profile names.
+        final String label;
+        /// The extension's own App ID.
+        final String bundleIdentifier;
+        /// Writes the downloaded profiles into the project settings.
+        final SigningInstaller installer;
+
+        ExtensionSigning(String extensionName, String label, String bundleIdentifier,
+                SigningInstaller installer) {
+            this.extensionName = extensionName;
+            this.label = label;
+            this.bundleIdentifier = bundleIdentifier;
+            this.installer = installer;
+        }
+    }
+
+    private interface SigningInstaller {
+        void install(ProjectDefaults defaults, String releasePath, String debugPath)
+                throws Exception;
+    }
+
     private void autoSetupWidgetExtension(String bundleIdentifier, String appName, Runnable next) {
         if (binding == null || ProjectIO.readSurfacesManifest(binding.projectDir()) == null) {
             next.run();
             return;
         }
         ProjectDefaults defaults = projectDefaults();
-        final String groupId = resolveAppGroupIdentifier(defaults);
-        final String extIdentifier = WizardDecisions.widgetExtensionBundleId(defaults.packageName);
-        if (extIdentifier == null || groupId == null) {
+        String extIdentifier = WizardDecisions.widgetExtensionBundleId(defaults.packageName);
+        if (extIdentifier == null) {
             next.run();
             return;
         }
-        showPageMessage("Setting up widget extension signing...", false);
-        findOrCreateAppGroup(groupId, appName + " Shared", group -> refreshForAutoSetup(() ->
-                autoSetupWidgetExtensionAfterGroup(bundleIdentifier, appName, defaults, groupId, extIdentifier,
-                        group, next)));
+        autoSetupExtension(new ExtensionSigning("CN1Widgets", "widget extension", extIdentifier,
+                (d, release, debug) -> SigningAssetInstaller.applyWidgetExtensionSigning(
+                        binding.settings(), resolveAppGroupIdentifier(d), release, debug)),
+                bundleIdentifier, appName, next);
     }
 
-    private void autoSetupWidgetExtensionAfterGroup(String bundleIdentifier, String appName,
-            ProjectDefaults defaults, String groupId, String extIdentifier, SigningState.AppGroup group,
+    private void autoSetupDocumentProviderExtension(String bundleIdentifier, String appName,
             Runnable next) {
+        // Detected from the build hint rather than from a manifest: the document provider needs
+        // no build-time declaration of what it will publish, so the hint is the only signal that
+        // this project wants the extension at all.
+        if (binding == null
+                || !"true".equals(readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.enabled"))) {
+            next.run();
+            return;
+        }
+        ProjectDefaults defaults = projectDefaults();
+        String extIdentifier = WizardDecisions.documentProviderExtensionBundleId(defaults.packageName);
+        if (extIdentifier == null) {
+            next.run();
+            return;
+        }
+        autoSetupExtension(new ExtensionSigning("CN1Documents", "document provider extension",
+                extIdentifier,
+                (d, release, debug) -> SigningAssetInstaller.applyDocumentProviderSigning(
+                        binding.settings(), resolveAppGroupIdentifier(d), release, debug)),
+                bundleIdentifier, appName, next);
+    }
+
+    private void autoSetupExtension(ExtensionSigning ext, String bundleIdentifier, String appName,
+            Runnable next) {
+        ProjectDefaults defaults = projectDefaults();
+        final String groupId = resolveAppGroupIdentifier(defaults);
+        if (groupId == null) {
+            next.run();
+            return;
+        }
+        showPageMessage("Setting up " + ext.label + " signing...", false);
+        findOrCreateAppGroup(groupId, appName + " Shared", group -> refreshForAutoSetup(() ->
+                autoSetupExtensionAfterGroup(ext, bundleIdentifier, appName, defaults, group, next)));
+    }
+
+    private void autoSetupExtensionAfterGroup(ExtensionSigning ext, String bundleIdentifier,
+            String appName, ProjectDefaults defaults, SigningState.AppGroup group, Runnable next) {
         SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
         if (mainBundle == null) {
             showPageMessage("Main bundle ID could not be found after refresh.", true);
@@ -1354,85 +1420,89 @@ public class CertificateWizard extends Lifecycle {
                 showPageMessage(r.message, true);
                 return;
             }
-            ensureWidgetExtensionBundle(appName, defaults, extIdentifier, groupIds, next);
+            ensureExtensionBundle(ext, appName, defaults, groupIds, next);
         });
     }
 
-    private void ensureWidgetExtensionBundle(String appName, ProjectDefaults defaults, String extIdentifier,
-            List<String> groupIds, Runnable next) {
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
-        if (ext != null) {
-            enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next);
+    private void ensureExtensionBundle(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, List<String> groupIds, Runnable next) {
+        SigningState.BundleId existing = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
+        if (existing != null) {
+            enableExtensionGroupAndProfile(ext, appName, defaults, groupIds, next);
             return;
         }
-        showPageMessage("Creating widget extension bundle ID " + extIdentifier + "...", false);
-        service.createBundleId(extIdentifier, appName + " Widgets", true, r -> {
+        showPageMessage("Creating " + ext.label + " bundle ID " + ext.bundleIdentifier + "...", false);
+        service.createBundleId(ext.bundleIdentifier, appName + " " + ext.extensionName, true, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 return;
             }
             refreshForAutoSetup(() ->
-                    enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next));
+                    enableExtensionGroupAndProfile(ext, appName, defaults, groupIds, next));
         });
     }
 
-    private void enableWidgetExtensionGroupAndProfile(String appName, ProjectDefaults defaults,
-            String extIdentifier, List<String> groupIds, Runnable next) {
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
-        if (ext == null) {
-            showPageMessage("Widget extension bundle ID could not be found after refresh.", true);
+    private void enableExtensionGroupAndProfile(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, List<String> groupIds, Runnable next) {
+        SigningState.BundleId bundle = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
+        if (bundle == null) {
+            showPageMessage(capitalize(ext.label) + " bundle ID could not be found after refresh.",
+                    true);
             return;
         }
-        service.enableAppGroupCapability(ext.id(), groupIds, r -> {
+        service.enableAppGroupCapability(bundle.id(), groupIds, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 return;
             }
-            createWidgetExtensionProfile(appName, defaults, extIdentifier, next);
+            createExtensionProfile(ext, appName, defaults, next);
         });
     }
 
-    private void createWidgetExtensionProfile(String appName, ProjectDefaults defaults, String extIdentifier,
-            Runnable next) {
+    private void createExtensionProfile(ExtensionSigning ext, String appName,
+            ProjectDefaults defaults, Runnable next) {
         // The extension needs a distribution profile for release builds and a development
         // profile for debug device builds, mirroring codename1.ios.release.provision /
         // codename1.ios.debug.provision on the app itself. The App Store profile is
         // required; the development profile is skipped gracefully when no development
         // certificate or registered device is available.
-        ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_APP_STORE, releasePath ->
-                ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_DEVELOPMENT, debugPath ->
-                        installWidgetExtensionSigning(defaults, releasePath, debugPath, next)));
+        ensureExtensionProfile(ext, appName, PROFILE_APP_STORE, releasePath ->
+                ensureExtensionProfile(ext, appName, PROFILE_DEVELOPMENT, debugPath ->
+                        installExtensionSigning(ext, defaults, releasePath, debugPath, next)));
     }
 
-    private void ensureWidgetExtensionProfile(String appName, String extIdentifier, String profileType,
+    private void ensureExtensionProfile(ExtensionSigning ext, String appName, String profileType,
             com.codename1.util.OnComplete<String> onPath) {
-        SigningState.Profile existing = findProfile(extIdentifier, profileType);
+        SigningState.Profile existing = findProfile(ext.bundleIdentifier, profileType);
         if (existing != null) {
-            downloadWidgetExtensionProfile(existing, profileType, onPath);
+            downloadExtensionProfile(ext, existing, profileType, onPath);
             return;
         }
-        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
+        SigningState.BundleId bundle = findBundleByIdentifier(ext.bundleIdentifier, "IOS");
         List<SigningState.Certificate> compatible = WizardDecisions.compatibleCertificates(state, profileType);
         boolean development = PROFILE_DEVELOPMENT.equals(profileType);
-        if (ext == null || compatible.isEmpty()) {
+        if (bundle == null || compatible.isEmpty()) {
             if (development) {
                 onPath.completed(null);
                 return;
             }
-            showPageMessage("No distribution certificate was available for the widget extension profile.", true);
+            showPageMessage("No distribution certificate was available for the " + ext.label
+                    + " profile.", true);
             return;
         }
         List<String> certs = new ArrayList<String>();
         certs.add(compatible.get(0).appleCertId());
         List<String> devices = deviceIdsFor(profileType);
-        if (!WizardDecisions.canCreateProfile(profileType, ext.id(), certs, devices, appName)) {
-            showPageMessage("Skipped the widget extension development profile: register a device to create development signing assets.", true);
+        if (!WizardDecisions.canCreateProfile(profileType, bundle.id(), certs, devices, appName)) {
+            showPageMessage("Skipped the " + ext.label + " development profile: register a device "
+                    + "to create development signing assets.", true);
             onPath.completed(null);
             return;
         }
-        String profileName = appName + " Widgets " + (development ? "Development" : "App Store");
-        showPageMessage("Creating widget extension provisioning profile " + profileName + "...", false);
-        service.createProfile(profileName, profileType, ext.id(), certs, devices, r -> {
+        String profileName = appName + " " + ext.extensionName + " "
+                + (development ? "Development" : "App Store");
+        showPageMessage("Creating " + ext.label + " provisioning profile " + profileName + "...", false);
+        service.createProfile(profileName, profileType, bundle.id(), certs, devices, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
                 // A failed development profile shouldn't drop the App Store profile that
@@ -1443,23 +1513,25 @@ public class CertificateWizard extends Lifecycle {
                 return;
             }
             refreshForAutoSetup(() -> {
-                SigningState.Profile created = findProfile(extIdentifier, profileType);
+                SigningState.Profile created = findProfile(ext.bundleIdentifier, profileType);
                 if (created == null) {
-                    showPageMessage("Widget extension profile was created but could not be found after refresh.", true);
+                    showPageMessage(capitalize(ext.label) + " profile was created but could not be "
+                            + "found after refresh.", true);
                     if (development) {
                         onPath.completed(null);
                     }
                     return;
                 }
-                downloadWidgetExtensionProfile(created, profileType, onPath);
+                downloadExtensionProfile(ext, created, profileType, onPath);
             });
         });
     }
 
-    private void downloadWidgetExtensionProfile(SigningState.Profile profile, String profileType,
-            com.codename1.util.OnComplete<String> onPath) {
+    private void downloadExtensionProfile(ExtensionSigning ext, SigningState.Profile profile,
+            String profileType, com.codename1.util.OnComplete<String> onPath) {
         String fileName = PROFILE_DEVELOPMENT.equals(profileType)
-                ? "CN1Widgets_Development.mobileprovision" : "CN1Widgets.mobileprovision";
+                ? ext.extensionName + "_Development.mobileprovision"
+                : ext.extensionName + ".mobileprovision";
         service.downloadProfile(profile.id(), fileName, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
@@ -1472,20 +1544,28 @@ public class CertificateWizard extends Lifecycle {
         });
     }
 
-    private void installWidgetExtensionSigning(ProjectDefaults defaults, String releasePath, String debugPath,
-            Runnable next) {
+    private void installExtensionSigning(ExtensionSigning ext, ProjectDefaults defaults,
+            String releasePath, String debugPath, Runnable next) {
         try {
-            String groupId = resolveAppGroupIdentifier(defaults);
-            SigningAssetInstaller.applyWidgetExtensionSigning(binding.settings(), groupId, releasePath, debugPath);
+            ext.installer.install(defaults, releasePath, debugPath);
             clearPageMessage();
-            ToastBar.showMessage("Widget extension signing installed", FontImage.MATERIAL_CHECK);
+            ToastBar.showMessage(capitalize(ext.label) + " signing installed",
+                    FontImage.MATERIAL_CHECK);
             if (next != null) {
                 next.run();
             }
         } catch (Exception ex) {
             Log.e(ex);
-            showPageMessage("Failed to update widget extension settings: " + friendlyMessage(ex), true);
+            showPageMessage("Failed to update " + ext.label + " settings: " + friendlyMessage(ex),
+                    true);
         }
+    }
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) {
+            return s;
+        }
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private void generateAndroidKeystore(String alias, String password, String dname) {

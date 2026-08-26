@@ -274,6 +274,66 @@ final class IOSProvisioningPreflight {
         return problems;
     }
 
+    /**
+     * Whether the app extensions this build GENERATES can be signed.
+     *
+     * <p>Same failure as {@link #checkAppExtensions} and the same fix, but these targets never
+     * appear under {@code ios/app_extensions/}: the builder synthesizes them from build hints, so
+     * nothing on disk announces them and the folder-driven check above cannot see them. Without
+     * this, enabling the document provider and never creating its App ID produces a green local
+     * build and an Xcode failure minutes into a cloud one, naming a bundle id the developer never
+     * typed.</p>
+     *
+     * <p>Only the document provider is checked here. The other generated extensions (the Wallet
+     * pair, CN1Widgets, CN1MatterSetup) have exactly this shape and could join the table below,
+     * but each one turns a late cloud failure into an early local one for projects that build
+     * today, so they are left for a change that can be verified against real projects rather than
+     * folded in as a side effect.</p>
+     *
+     * @return one problem per generated extension that cannot be signed as configured
+     */
+    static List<Problem> checkGeneratedExtensions(Properties settings, boolean release) {
+        List<Problem> problems = new ArrayList<Problem>();
+        if (settings == null) {
+            return problems;
+        }
+        if (!"true".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.enabled")))) {
+            return problems;
+        }
+        if ("false".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.extension")))) {
+            // Explicitly opted out: the build generates no target, so there is nothing to sign.
+            return problems;
+        }
+        String packageName = trimmed(settings.getProperty("codename1.packageName"));
+        if (packageName == null || packageName.isEmpty()) {
+            return problems;
+        }
+        String name = "CN1Documents";
+        if (hasOwnProfileSetting(settings, name)) {
+            return problems;
+        }
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // No readable profile, or one that names no App ID: check() reports the former and
+            // neither is something to refuse a build over here.
+            return problems;
+        }
+        String bundleId = packageName + "." + name;
+        if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
+            // A wildcard App ID signs the whole subtree, so this build is fine as it is.
+            return problems;
+        }
+        problems.add(new Problem(appExtensionProfileMessage(name, bundleId, appProfile, release),
+                true));
+        return problems;
+    }
+
+    private static String trimmed(String value) {
+        return value == null ? null : value.trim();
+    }
+
     /** The app's own profile for this build type, or null when it cannot be read. */
     private static Profile appProfile(Properties settings, boolean release) {
         String path = settings.getProperty(provisioningProfileSettingKey(release));
@@ -323,6 +383,15 @@ final class IOSProvisioningPreflight {
         if (containsProfileFile(extension)) {
             return true;
         }
+        return hasOwnProfileSetting(settings, name);
+    }
+
+    /**
+     * The settings-only half of {@link #hasOwnProfile}, for an extension the builder GENERATES.
+     * There is no folder on disk to carry a {@code .mobileprovision}, so the project settings and
+     * the build hints are the only carriers.
+     */
+    private static boolean hasOwnProfileSetting(Properties settings, String name) {
         String[] keys = {
             "codename1.ios.appext." + name + ".provision",
             "codename1.ios.debug.appext." + name + ".provision",

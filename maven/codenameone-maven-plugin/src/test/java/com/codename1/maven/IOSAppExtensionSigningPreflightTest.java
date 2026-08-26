@@ -120,6 +120,59 @@ public class IOSAppExtensionSigningPreflightTest {
         return IOSProvisioningPreflight.checkAppExtensions(p, true, ios);
     }
 
+    // ---- extensions the builder GENERATES, which never appear on disk ----
+
+    private static List<IOSProvisioningPreflight.Problem> checkGenerated(Properties p) {
+        return IOSProvisioningPreflight.checkGeneratedExtensions(p, true);
+    }
+
+    @Test
+    public void generatedDocumentProviderWithNoProfileOfItsOwnIsRefused() throws Exception {
+        // No folder under ios/app_extensions -- the builder synthesizes this target from hints --
+        // so the folder-driven check cannot see it and this one has to.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).fatal);
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("com.example.app.CN1Documents"));
+    }
+
+    @Test
+    public void generatedDocumentProviderWithItsOwnProfileIsAccepted() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision", "/tmp/CN1Documents.mobileprovision");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void aWildcardAppIdCoversTheGeneratedDocumentProvider() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.*"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anAppThatDoesNotPublishDocumentsIsNotChecked() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        assertTrue(checkGenerated(p).isEmpty());
+        // Opting out generates no target, so there is nothing to sign and nothing to refuse.
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.documentProvider.extension", "false");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anUnreadableAppProfileIsNotReportedAsAnExtensionProblem() throws Exception {
+        // check() reports that as itself; refusing the build here would name the wrong cause.
+        Properties p = new Properties();
+        p.setProperty("codename1.packageName", "com.example.app");
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
     // ---- the failure this exists to catch ----
 
     @Test
