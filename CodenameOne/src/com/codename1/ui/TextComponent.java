@@ -83,7 +83,9 @@ import com.codename1.ui.layouts.LayeredLayout;
 /// @author Shai Almog
 public class TextComponent extends InputComponent {
     private static final int animationSpeed = 100;
-    private Container animationLayer;    private final TextField field = new TextField() {
+    private Container animationLayer;
+    private boolean hintAnimating;
+    private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
             if (isFocusAnimation()) {
@@ -100,28 +102,7 @@ public class TextComponent extends InputComponent {
             super.focusGainedInternal();
             if (isInitialized() && isFocusAnimation()) {
                 getLabel().setFocus(true);
-                if (!getLabel().isVisible()) {
-                    final Label text = new Label(getHint(), "TextHint");
-                    setHint("");
-                    final Label placeholder = new Label();
-                    Component.setSameSize(placeholder, field);
-                    animationLayer.add(BorderLayout.NORTH, text);
-                    animationLayer.add(BorderLayout.CENTER, placeholder);
-                    text.setX(getX());
-                    text.setY(getY());
-                    text.setWidth(getWidth());
-                    text.setHeight(getHeight());
-                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
-                    getAnimationManager().addAnimation(anim, new Runnable() {
-                        @Override
-                        public void run() {
-                            Component.setSameSize(field);
-                            text.remove();
-                            placeholder.remove();
-                            getLabel().setVisible(true);
-                        }
-                    });
-                }
+                syncHintPosition();
             }
         }
 
@@ -130,36 +111,88 @@ public class TextComponent extends InputComponent {
             super.focusLostInternal();
             if (isInitialized() && isFocusAnimation()) {
                 getLabel().setFocus(false);
-                if (TextComponent.this.getText().length() == 0 && TextComponent.this.getLabel().isVisible() && isOnTopMode()) {
-                    final Label text = new Label(getLabel().getText(), getLabel().getUIID());
-                    final Label placeholder = new Label();
-                    Component.setSameSize(placeholder, getLabel());
-                    animationLayer.add(BorderLayout.NORTH, placeholder);
-                    animationLayer.add(BorderLayout.CENTER, text);
-                    text.setX(getLabel().getX());
-                    text.setY(getLabel().getY());
-                    text.setWidth(getLabel().getWidth());
-                    text.setHeight(getLabel().getHeight());
-                    String hintLabelUIID = "TextHint";
-                    if (getHintLabel() != null) {
-                        hintLabelUIID = getHintLabel().getUIID();
-                    }
-                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
-                    getAnimationManager().addAnimation(anim, new Runnable() {
-                        @Override
-                        public void run() {
-                            setHint(getLabel().getText());
-                            getLabel().setVisible(false);
-                            Component.setSameSize(getLabel());
-                            text.remove();
-                            placeholder.remove();
-                        }
-                    });
-                }
+                syncHintPosition();
             }
         }
     };
     private Boolean focusAnimation;
+
+    /// Moves the hint into or out of the floating label position so it matches the current focus,
+    /// animating the transition. Focus can change again while that animation is queued -- selecting the
+    /// next field before typing anything is enough -- so the transition is driven from the focus state
+    /// rather than from the step it happens to be on, only one runs at a time, and the state is
+    /// re-checked once it completes.
+    private void syncHintPosition() {
+        if (hintAnimating || animationLayer == null || !isInitialized() || !isFocusAnimation()) {
+            return;
+        }
+        if (field.hasFocus()) {
+            if (!getLabel().isVisible()) {
+                animateHintToLabel();
+            }
+        } else {
+            if (getLabel().isVisible() && getText().length() == 0 && isOnTopMode()) {
+                animateLabelToHint();
+            }
+        }
+    }
+
+    private void animateHintToLabel() {
+        hintAnimating = true;
+        final Label text = new Label(field.getHint(), "TextHint");
+        field.setHint("");
+        final Label placeholder = new Label();
+        Component.setSameSize(placeholder, field);
+        animationLayer.add(BorderLayout.NORTH, text);
+        animationLayer.add(BorderLayout.CENTER, placeholder);
+        text.setX(field.getX());
+        text.setY(field.getY());
+        text.setWidth(field.getWidth());
+        text.setHeight(field.getHeight());
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation("FloatingHint", animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                Component.setSameSize(field);
+                text.remove();
+                placeholder.remove();
+                getLabel().setVisible(true);
+                hintAnimating = false;
+                syncHintPosition();
+            }
+        });
+    }
+
+    private void animateLabelToHint() {
+        hintAnimating = true;
+        final Label text = new Label(getLabel().getText(), getLabel().getUIID());
+        final Label placeholder = new Label();
+        Component.setSameSize(placeholder, getLabel());
+        animationLayer.add(BorderLayout.NORTH, placeholder);
+        animationLayer.add(BorderLayout.CENTER, text);
+        text.setX(getLabel().getX());
+        text.setY(getLabel().getY());
+        text.setWidth(getLabel().getWidth());
+        text.setHeight(getLabel().getHeight());
+        String hintLabelUIID = "TextHint";
+        if (field.getHintLabel() != null) {
+            hintLabelUIID = field.getHintLabel().getUIID();
+        }
+        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));
+        field.getAnimationManager().addAnimation(anim, new Runnable() {
+            @Override
+            public void run() {
+                field.setHint(getLabel().getText());
+                getLabel().setVisible(false);
+                Component.setSameSize(getLabel());
+                text.remove();
+                placeholder.remove();
+                hintAnimating = false;
+                syncHintPosition();
+            }
+        });
+    }
+
     /// Default constructor allows us to create an arbitrary text component
     public TextComponent() {
         initInput();
