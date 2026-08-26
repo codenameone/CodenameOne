@@ -2567,6 +2567,26 @@ public class CodenameOneSettings extends Lifecycle {
         return out;
     }
 
+    /// `pomText` with the sections that configure something OTHER than the
+    /// compilation removed.
+    ///
+    /// Plugin configuration is reached through activePluginBlock, which knows
+    /// which plugin and which goal it is reading; anything left here is being
+    /// searched by element name alone, and an element name is not evidence.
+    /// <reporting> and the resource lists go for the same reason -- none of them
+    /// tells the compiler where the sources are.
+    static String compileRootsOnly(String pomText) {
+        if (pomText == null) {
+            return null;
+        }
+        String out = pomText;
+        for (String section : new String[]{"pluginManagement", "plugins", "reporting",
+                                           "resources", "testResources"}) {
+            out = withoutElement(out, section);
+        }
+        return out;
+    }
+
     private static void collectDeclaredRoots(String pomText,
                                              java.util.Map<String, String> properties,
                                              String managedFromChain,
@@ -2576,7 +2596,14 @@ public class CodenameOneSettings extends Lifecycle {
         // naming src/main/templates in one of them is not saying it is
         // compiled, and treating it as a root put the templates back in the
         // sweep that the root list had just taken them out of.
-        collectRoots(elementValues(pomText, "sourceDirectory"), properties, out);
+        // The SAME scoping the two below already had, which this line did not:
+        // <sourceDirectory> is Maven's compile root only as a direct child of
+        // <build>. Checkstyle's <sourceDirectories><sourceDirectory> names a
+        // directory to ANALYSE, PMD's does the same, and reading the whole POM
+        // for the element made an analysis-only path a compile root -- so a
+        // dormant copy of the main class under it was searched ahead of the
+        // compiled source, which is how annotation-owned hints look editable.
+        collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"), properties, out);
         String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
                 "compile", managedFromChain);
         collectRoots(compileGoalConfiguration(kotlin, "compile", "sourceDir",

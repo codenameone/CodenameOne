@@ -2402,6 +2402,40 @@ public class BuildHintCatalogTest {
                 "lost the ancestor's binding: " + block);
     }
 
+    /// A plugin's `<sourceDirectory>` is not a compile root.
+    ///
+    /// Checkstyle and PMD both take `<sourceDirectories><sourceDirectory>` to
+    /// say what to ANALYSE. The element was read across the whole POM, so such a
+    /// path became a compile root, and a dormant copy of the main class under it
+    /// was searched ahead of the compiled source -- the same mistake the
+    /// `<source>` and `<sourceDir>` lookups were already scoped to avoid.
+    @Test
+    public void aPluginsSourceDirectoryIsNotACompileRoot() {
+        String pom = "<project><build>"
+                + "<sourceDirectory>src/main/java</sourceDirectory>"
+                + "<plugins><plugin><artifactId>maven-checkstyle-plugin</artifactId>"
+                + "<configuration><sourceDirectories>"
+                + "<sourceDirectory>analysis/only</sourceDirectory>"
+                + "</sourceDirectories></configuration></plugin></plugins>"
+                + "</build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("src/main/java"), roots.toString());
+        assertFalse(roots.contains("analysis/only"),
+                "an analysis-only directory became a compile root: " + roots);
+    }
+
+    /// ...and the same for a reporting section.
+    @Test
+    public void aReportingSourceDirectoryIsNotACompileRoot() {
+        String pom = "<project><reporting><plugins><plugin>"
+                + "<artifactId>maven-pmd-plugin</artifactId><configuration>"
+                + "<sourceDirectories><sourceDirectory>reports/only</sourceDirectory>"
+                + "</sourceDirectories></configuration></plugin></plugins></reporting>"
+                + "</project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
     /// Plugin-level configuration with no execution is dormant here too.
     ///
     /// `add-source` and the Kotlin `compile` goal run only where an execution
