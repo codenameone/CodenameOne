@@ -4049,6 +4049,14 @@ public class CodenameOneSettings extends Lifecycle {
         if (pluginBlock == null) {
             return false;
         }
+        // The id alone binds compile only where the extension lifecycle provides
+        // that execution. Without <extensions>true</extensions> the Kotlin
+        // plugin gets none injected, so `default-compile` with no <goal> is a
+        // name and nothing more -- and treating it as a binding puts
+        // src/main/kotlin in the roots for a module that compiles no Kotlin,
+        // where a dormant peer shadows the real annotation.
+        boolean lifecycleProvided =
+                pluginBlock.indexOf("<extensions>true</extensions>") >= 0;
         int at = pluginBlock.indexOf("<execution>");
         while (at >= 0) {
             int close = pluginBlock.indexOf("</execution>", at);
@@ -4058,7 +4066,8 @@ public class CodenameOneSettings extends Lifecycle {
             String execution = pluginBlock.substring(at, close);
             if (execution.indexOf("<phase>none</phase>") < 0
                     && (execution.indexOf("<goal>compile</goal>") >= 0
-                        || execution.indexOf("<id>default-compile</id>") >= 0)) {
+                        || (lifecycleProvided
+                            && execution.indexOf("<id>default-compile</id>") >= 0))) {
                 return true;
             }
             at = pluginBlock.indexOf("<execution>", close);

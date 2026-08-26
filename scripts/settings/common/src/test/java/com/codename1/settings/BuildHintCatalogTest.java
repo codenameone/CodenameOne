@@ -2256,6 +2256,42 @@ public class BuildHintCatalogTest {
                 CodenameOneSettings.declaredSourceRoots(pom).toString());
     }
 
+    /// The conventional Kotlin root needs a real binding, not just the id.
+    ///
+    /// Without `<extensions>true</extensions>` Maven injects no execution for
+    /// the Kotlin plugin, so `<id>default-compile</id>` with no `<goal>` binds
+    /// nothing -- and scanning `src/main/kotlin` for a module that compiles no
+    /// Kotlin lets a dormant peer there shadow the real annotation.
+    @Test
+    public void theConventionalKotlinRootNeedsARealBinding() {
+        String byIdAlone = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-compile</id></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertFalse(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(byIdAlone, "kotlin-maven-plugin",
+                        "sourceDir")));
+
+        // ...and with the extension lifecycle the same execution IS the binding.
+        String withExtensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<executions><execution><id>default-compile</id></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(withExtensions, "kotlin-maven-plugin",
+                        "sourceDir")));
+
+        // A named goal binds it either way.
+        String named = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(named, "kotlin-maven-plugin",
+                        "sourceDir")));
+    }
+
     /// A deprecated alias is not a second thing to set.
     ///
     /// The builder reads `android.captureRecord` and then lets
