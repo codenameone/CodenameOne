@@ -266,6 +266,50 @@ public class MacOSXcodeProjectTest {
                 .get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
     }
 
+    /**
+     * plistInject carries raw XML in every place it is documented -- both
+     * ios.plistInject and desktop.mac.plistInject -- and the raw form is the
+     * only one that can express a dict or an array. The builder recognises it
+     * and names the keys it is about to replace, because a generated key left
+     * duplicated is not a valid plist.
+     */
+    @Test
+    public void rawPlistFragmentsAreRecognisedAndTheirKeysNamed() {
+        String xml = "<key>CFBundleDocumentTypes</key>\n<array><dict>"
+                + "<key>CFBundleTypeName</key><string>Text</string></dict></array>\n"
+                + "<key>NSAppTransportSecurity</key><dict/>";
+        assertTrue(MacOSXcodeProject.isRawPlistFragment(xml));
+        assertEquals(Arrays.asList("CFBundleDocumentTypes", "CFBundleTypeName",
+                        "NSAppTransportSecurity"),
+                MacOSXcodeProject.injectedPlistKeys(xml));
+
+        // The shorthand keeps working and is not mistaken for XML.
+        assertFalse(MacOSXcodeProject.isRawPlistFragment("CFBundleName=Thing"));
+        assertTrue(MacOSXcodeProject.injectedPlistKeys("CFBundleName=Thing").isEmpty());
+
+        // A scan, not a parser: an unterminated key ends the scan rather than
+        // throwing, and null is simply nothing.
+        assertEquals(Arrays.asList("A"),
+                MacOSXcodeProject.injectedPlistKeys("<key>A</key><key>B"));
+        assertTrue(MacOSXcodeProject.injectedPlistKeys(null).isEmpty());
+        assertFalse(MacOSXcodeProject.isRawPlistFragment(null));
+    }
+
+    /** The raw fragment reaches the file verbatim, inside the dict. */
+    @Test
+    public void rawPlistFragmentIsWrittenIntoTheDict() throws Exception {
+        Map<String, Object> plist = new LinkedHashMap<String, Object>();
+        plist.put("CFBundleName", "Thing");
+        File out = File.createTempFile("cn1-plist", ".plist");
+        out.deleteOnExit();
+        MacOSXcodeProject.writePlist(plist, "<key>NSAppTransportSecurity</key><dict/>", out);
+        String written = new String(java.nio.file.Files.readAllBytes(out.toPath()), "UTF-8");
+        assertTrue(written.contains("<key>NSAppTransportSecurity</key><dict/>"));
+        assertTrue(written.indexOf("<key>NSAppTransportSecurity</key>")
+                > written.indexOf("<key>CFBundleName</key>"));
+        assertTrue(written.trim().endsWith("</plist>"));
+    }
+
     // ---- export options --------------------------------------------------
 
     @Test

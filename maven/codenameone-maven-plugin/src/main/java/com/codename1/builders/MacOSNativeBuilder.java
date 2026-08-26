@@ -684,23 +684,59 @@ public class MacOSNativeBuilder extends Executor {
             plist.put("CFBundleURLTypes", urlTypes);
         }
 
+        // ios.plistInject as well as macos.plistInject, like every other hint
+        // this builder reads. A project that was building mac-os-x-native
+        // before this port existed carries the iOS spelling, and the target name
+        // did not change under it -- so ignoring it means its document types,
+        // ATS exceptions and application services vanish from the bundle the
+        // first time it builds here, with nothing said.
         String inject = request.getArg("macos.plistInject", null);
-        if (inject != null && inject.trim().length() > 0) {
-            Map<String, Object> extra = new LinkedHashMap<String, Object>();
-            for (String line : inject.split("\n")) {
-                int eq = line.indexOf('=');
-                if (eq > 0) {
-                    extra.put(line.substring(0, eq).trim(), line.substring(eq + 1).trim());
-                }
+        if (inject == null || inject.trim().length() == 0) {
+            inject = request.getArg("ios.plistInject", null);
+            if (inject != null && inject.trim().length() > 0) {
+                log("Using ios.plistInject for the macOS bundle. macos.plistInject is the "
+                        + "spelling for this target; the iOS one is read so a migrated project "
+                        + "keeps working.");
             }
-            List<String> collisions = MacOSXcodeProject.mergePlist(plist, extra);
-            for (String key : collisions) {
-                log("macos.plistInject overrides the generated " + key
-                        + "; the port depends on the generated value, so check this deliberately.");
+        }
+        String rawInject = null;
+        if (inject != null && inject.trim().length() > 0) {
+            if (MacOSXcodeProject.isRawPlistFragment(inject)) {
+                // Raw <key>/<value> members, which is what the documented
+                // ios.plistInject and desktop.mac.plistInject both carry, and
+                // the only form that can express a dict or an array. Written
+                // verbatim for the reason macos.entitlements.extra is: this hint
+                // exists precisely for keys the builder does not model, so
+                // parsing it would defeat it.
+                rawInject = inject;
+                for (String key : MacOSXcodeProject.injectedPlistKeys(inject)) {
+                    if (plist.remove(key) != null) {
+                        // Removed rather than left to duplicate: two entries for
+                        // one key in a dict is not a valid plist, and which one
+                        // wins is up to whichever parser reads it.
+                        log("plistInject overrides the generated " + key
+                                + "; the port depends on the generated value, so check this "
+                                + "deliberately.");
+                    }
+                }
+            } else {
+                Map<String, Object> extra = new LinkedHashMap<String, Object>();
+                for (String line : inject.split("\n")) {
+                    int eq = line.indexOf('=');
+                    if (eq > 0) {
+                        extra.put(line.substring(0, eq).trim(), line.substring(eq + 1).trim());
+                    }
+                }
+                List<String> collisions = MacOSXcodeProject.mergePlist(plist, extra);
+                for (String key : collisions) {
+                    log("plistInject overrides the generated " + key
+                            + "; the port depends on the generated value, so check this "
+                            + "deliberately.");
+                }
             }
         }
 
-        MacOSXcodeProject.writePlist(plist, new File(srcRoot, appName + "-Info.plist"));
+        MacOSXcodeProject.writePlist(plist, rawInject, new File(srcRoot, appName + "-Info.plist"));
         writeAppIcon(request, srcRoot);
 
         // Written here rather than only at signing time, so mac-source hands the

@@ -196,6 +196,43 @@ public class MacOSXcodeProject {
      * {@code NSPrincipalClass} to anything other than {@code NSApplication}
      * produces a bundle that launches to nothing.</p>
      */
+    /**
+     * The keys a raw plist fragment declares, in order.
+     *
+     * <p>Scanned rather than parsed: the fragment is written verbatim, and the
+     * only thing the builder needs from it is which generated keys it is about
+     * to replace. Anything that is not a well formed {@code <key>...</key>} is
+     * simply not reported, which is the right answer for a scan whose job is to
+     * warn.</p>
+     */
+    public static List<String> injectedPlistKeys(String xml) {
+        List<String> keys = new ArrayList<String>();
+        if (xml == null) {
+            return keys;
+        }
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<key>", at);
+            if (open < 0) {
+                return keys;
+            }
+            int close = xml.indexOf("</key>", open);
+            if (close < 0) {
+                return keys;
+            }
+            keys.add(xml.substring(open + "<key>".length(), close).trim());
+            at = close + "</key>".length();
+        }
+    }
+
+    /**
+     * Whether a plist-inject value is a raw XML fragment rather than the
+     * {@code key=value} shorthand.
+     */
+    public static boolean isRawPlistFragment(String value) {
+        return value != null && value.indexOf("<key>") >= 0;
+    }
+
     public static List<String> mergePlist(Map<String, Object> base, Map<String, Object> inject) {
         List<String> collisions = new ArrayList<String>();
         for (Map.Entry<String, Object> e : inject.entrySet()) {

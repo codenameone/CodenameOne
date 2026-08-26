@@ -628,6 +628,9 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macos.entitlements.files.downloads
 |macOS builds. `true` adds `com.apple.security.files.downloads.read-write`, which is access to the Downloads folder without a panel. Default `false`, and separate from `macos.entitlements.files.userSelected` above because it's a wider grant than picking a file.
 
+|macos.plistInject
+|macOS builds. Raw XML members added to the generated `Info.plist`, the same form `ios.plistInject` takes -- for example `<key>NSAppTransportSecurity</key><dict/>`. A key that the build also generates is replaced by the injected one, and the build log names it. `ios.plistInject` is read when this is unset, so a project migrated from the Mac Catalyst build keeps its injections.
+
 |macos.hardenedRuntime
 |macOS builds. Sets Xcode's `ENABLE_HARDENED_RUNTIME`. Default `true`, because notarization requires it. This is the build setting; the entitlement hint below is a different thing despite the similar name.
 
