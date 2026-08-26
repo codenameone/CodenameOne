@@ -55,13 +55,13 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         if ("Android".equals(simpleName)) {
             return com.codename1.annotations.buildhints.Android.class;
         }
-        if ("AndroidThemeMode".equals(simpleName)) {
-            return com.codename1.annotations.buildhints.AndroidThemeMode.class;
+        if ("AndroidMinSdk".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.AndroidMinSdk.class;
         }
         if ("Build".equals(simpleName)) {
             return com.codename1.annotations.buildhints.Build.class;
         }
-        if ("Desktop".equals(simpleName)) {
+        if ("DesktopBuild".equals(simpleName)) {
             return com.codename1.annotations.buildhints.DesktopBuild.class;
         }
         if ("DesktopTitleBar".equals(simpleName)) {
@@ -79,6 +79,18 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         if ("Hardening".equals(simpleName)) {
             return com.codename1.annotations.buildhints.Hardening.class;
         }
+        if ("Hint".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.Hint.class;
+        }
+        if ("HintKind".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.HintKind.class;
+        }
+        if ("HintUnset".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.HintUnset.class;
+        }
+        if ("HintValue".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.HintValue.class;
+        }
         if ("InstallLocation".equals(simpleName)) {
             return com.codename1.annotations.buildhints.InstallLocation.class;
         }
@@ -94,14 +106,14 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         if ("IosProjectType".equals(simpleName)) {
             return com.codename1.annotations.buildhints.IosProjectType.class;
         }
-        if ("IosThemeMode".equals(simpleName)) {
-            return com.codename1.annotations.buildhints.IosThemeMode.class;
-        }
-        if ("NativeThemeMode".equals(simpleName)) {
-            return com.codename1.annotations.buildhints.NativeThemeMode.class;
-        }
         if ("OnDeviceDebug".equals(simpleName)) {
             return com.codename1.annotations.buildhints.OnDeviceDebug.class;
+        }
+        if ("ThemeMode".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.ThemeMode.class;
+        }
+        if ("Toggle".equals(simpleName)) {
+            return com.codename1.annotations.buildhints.Toggle.class;
         }
         return null;
     }
@@ -118,121 +130,65 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
-        if (target instanceof com.codename1.annotations.buildhints.AndroidThemeMode) {
-            try {
-                return invoke0((com.codename1.annotations.buildhints.AndroidThemeMode) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.DesktopTitleBar) {
-            try {
-                return invoke1((com.codename1.annotations.buildhints.DesktopTitleBar) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.HardenControlFlow) {
-            try {
-                return invoke2((com.codename1.annotations.buildhints.HardenControlFlow) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.HardenLevel) {
-            try {
-                return invoke3((com.codename1.annotations.buildhints.HardenLevel) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.HardenStrings) {
-            try {
-                return invoke4((com.codename1.annotations.buildhints.HardenStrings) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.InstallLocation) {
-            try {
-                return invoke5((com.codename1.annotations.buildhints.InstallLocation) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.IosDependencyManager) {
-            try {
-                return invoke6((com.codename1.annotations.buildhints.IosDependencyManager) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.IosProjectType) {
-            try {
-                return invoke7((com.codename1.annotations.buildhints.IosProjectType) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.IosThemeMode) {
-            try {
-                return invoke8((com.codename1.annotations.buildhints.IosThemeMode) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
-        if (target instanceof com.codename1.annotations.buildhints.NativeThemeMode) {
-            try {
-                return invoke9((com.codename1.annotations.buildhints.NativeThemeMode) target, name, safeArgs);
-            } catch (CN1AccessException ex) {
-                unsupported = ex;
-            }
-        }
         if (target instanceof com.codename1.annotations.buildhints.Android) {
             try {
-                return invoke10((com.codename1.annotations.buildhints.Android) target, name, safeArgs);
+                return invoke0((com.codename1.annotations.buildhints.Android) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.Build) {
             try {
-                return invoke11((com.codename1.annotations.buildhints.Build) target, name, safeArgs);
+                return invoke1((com.codename1.annotations.buildhints.Build) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.DesktopBuild) {
             try {
-                return invoke12((com.codename1.annotations.buildhints.DesktopBuild) target, name, safeArgs);
+                return invoke2((com.codename1.annotations.buildhints.DesktopBuild) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.Hardening) {
             try {
-                return invoke13((com.codename1.annotations.buildhints.Hardening) target, name, safeArgs);
+                return invoke3((com.codename1.annotations.buildhints.Hardening) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.buildhints.Hint) {
+            try {
+                return invoke4((com.codename1.annotations.buildhints.Hint) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.buildhints.HintValue) {
+            try {
+                return invoke5((com.codename1.annotations.buildhints.HintValue) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.Ios) {
             try {
-                return invoke14((com.codename1.annotations.buildhints.Ios) target, name, safeArgs);
+                return invoke6((com.codename1.annotations.buildhints.Ios) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.IosPrivacy) {
             try {
-                return invoke15((com.codename1.annotations.buildhints.IosPrivacy) target, name, safeArgs);
+                return invoke7((com.codename1.annotations.buildhints.IosPrivacy) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.buildhints.OnDeviceDebug) {
             try {
-                return invoke16((com.codename1.annotations.buildhints.OnDeviceDebug) target, name, safeArgs);
+                return invoke8((com.codename1.annotations.buildhints.OnDeviceDebug) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -243,97 +199,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.annotations.buildhints.AndroidThemeMode typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke1(com.codename1.annotations.buildhints.DesktopTitleBar typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke2(com.codename1.annotations.buildhints.HardenControlFlow typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke3(com.codename1.annotations.buildhints.HardenLevel typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke4(com.codename1.annotations.buildhints.HardenStrings typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke5(com.codename1.annotations.buildhints.InstallLocation typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke6(com.codename1.annotations.buildhints.IosDependencyManager typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke7(com.codename1.annotations.buildhints.IosProjectType typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke8(com.codename1.annotations.buildhints.IosThemeMode typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke9(com.codename1.annotations.buildhints.NativeThemeMode typedTarget, String name, Object[] safeArgs) throws Exception {
-        if ("wireValue".equals(name)) {
-            if (safeArgs.length == 0) {
-                return typedTarget.wireValue();
-            }
-        }
-        throw unsupportedInstance(typedTarget, name, safeArgs);
-    }
-
-    private static Object invoke10(com.codename1.annotations.buildhints.Android typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke0(com.codename1.annotations.buildhints.Android typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("activityLaunchMode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.activityLaunchMode();
@@ -457,7 +323,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.annotations.buildhints.Build typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke1(com.codename1.annotations.buildhints.Build typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("facebookAppId".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.facebookAppId();
@@ -481,7 +347,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.annotations.buildhints.DesktopBuild typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.annotations.buildhints.DesktopBuild typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("adaptToRetina".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.adaptToRetina();
@@ -520,7 +386,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.annotations.buildhints.Hardening typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.annotations.buildhints.Hardening typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("allowUnhardenedLocalBuild".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.allowUnhardenedLocalBuild();
@@ -554,7 +420,85 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.annotations.buildhints.Ios typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.annotations.buildhints.Hint typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("aliasOf".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.aliasOf();
+            }
+        }
+        if ("appendable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.appendable();
+            }
+        }
+        if ("deprecated".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.deprecated();
+            }
+        }
+        if ("enterpriseOnly".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.enterpriseOnly();
+            }
+        }
+        if ("external".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.external();
+            }
+        }
+        if ("kind".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.kind();
+            }
+        }
+        if ("link".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.link();
+            }
+        }
+        if ("name".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.name();
+            }
+        }
+        if ("platform".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.platform();
+            }
+        }
+        if ("separator".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.separator();
+            }
+        }
+        if ("valuePattern".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.valuePattern();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.annotations.buildhints.HintValue typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accepts".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.accepts();
+            }
+        }
+        if ("label".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.label();
+            }
+        }
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.annotations.buildhints.Ios typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addLibs".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.addLibs();
@@ -673,7 +617,17 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.annotations.buildhints.IosPrivacy typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.annotations.buildhints.IosPrivacy typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("bluetoothAlwaysUsageDescription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.bluetoothAlwaysUsageDescription();
+            }
+        }
+        if ("bluetoothPeripheralUsageDescription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.bluetoothPeripheralUsageDescription();
+            }
+        }
         if ("calendarsFullAccessUsageDescription".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.calendarsFullAccessUsageDescription();
@@ -729,6 +683,16 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
                 return typedTarget.microphoneUsageDescription();
             }
         }
+        if ("nearbyInteractionAllowOnceUsageDescription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nearbyInteractionAllowOnceUsageDescription();
+            }
+        }
+        if ("nearbyInteractionUsageDescription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.nearbyInteractionUsageDescription();
+            }
+        }
         if ("remindersFullAccessUsageDescription".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.remindersFullAccessUsageDescription();
@@ -739,10 +703,15 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
                 return typedTarget.remindersUsageDescription();
             }
         }
+        if ("speechRecognitionUsageDescription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.speechRecognitionUsageDescription();
+            }
+        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke16(com.codename1.annotations.buildhints.OnDeviceDebug typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.annotations.buildhints.OnDeviceDebug typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("android".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.android();
@@ -772,35 +741,53 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
-        if (type == com.codename1.annotations.buildhints.AndroidThemeMode.class) return getStaticField0(name);
+        if (type == com.codename1.annotations.buildhints.AndroidMinSdk.class) return getStaticField0(name);
         if (type == com.codename1.annotations.buildhints.DesktopTitleBar.class) return getStaticField1(name);
         if (type == com.codename1.annotations.buildhints.HardenControlFlow.class) return getStaticField2(name);
         if (type == com.codename1.annotations.buildhints.HardenLevel.class) return getStaticField3(name);
         if (type == com.codename1.annotations.buildhints.HardenStrings.class) return getStaticField4(name);
-        if (type == com.codename1.annotations.buildhints.InstallLocation.class) return getStaticField5(name);
-        if (type == com.codename1.annotations.buildhints.IosDependencyManager.class) return getStaticField6(name);
-        if (type == com.codename1.annotations.buildhints.IosProjectType.class) return getStaticField7(name);
-        if (type == com.codename1.annotations.buildhints.IosThemeMode.class) return getStaticField8(name);
-        if (type == com.codename1.annotations.buildhints.NativeThemeMode.class) return getStaticField9(name);
+        if (type == com.codename1.annotations.buildhints.HintKind.class) return getStaticField5(name);
+        if (type == com.codename1.annotations.buildhints.InstallLocation.class) return getStaticField6(name);
+        if (type == com.codename1.annotations.buildhints.IosDependencyManager.class) return getStaticField7(name);
+        if (type == com.codename1.annotations.buildhints.IosProjectType.class) return getStaticField8(name);
+        if (type == com.codename1.annotations.buildhints.ThemeMode.class) return getStaticField9(name);
+        if (type == com.codename1.annotations.buildhints.Toggle.class) return getStaticField10(name);
         throw unsupportedStaticField(type, name);
     }
 
     private static Object getStaticField0(String name) throws Exception {
-        if ("AUTO".equals(name)) return com.codename1.annotations.buildhints.AndroidThemeMode.AUTO;
-        if ("HOLOLIGHT".equals(name)) return com.codename1.annotations.buildhints.AndroidThemeMode.HOLOLIGHT;
-        if ("LEGACY".equals(name)) return com.codename1.annotations.buildhints.AndroidThemeMode.LEGACY;
-        if ("MODERN".equals(name)) return com.codename1.annotations.buildhints.AndroidThemeMode.MODERN;
-        throw unsupportedStaticField(com.codename1.annotations.buildhints.AndroidThemeMode.class, name);
+        if ("API_19".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_19;
+        if ("API_20".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_20;
+        if ("API_21".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_21;
+        if ("API_22".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_22;
+        if ("API_23".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_23;
+        if ("API_24".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_24;
+        if ("API_25".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_25;
+        if ("API_26".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_26;
+        if ("API_27".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_27;
+        if ("API_28".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_28;
+        if ("API_29".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_29;
+        if ("API_30".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_30;
+        if ("API_31".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_31;
+        if ("API_32".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_32;
+        if ("API_33".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_33;
+        if ("API_34".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_34;
+        if ("API_35".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_35;
+        if ("API_36".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.API_36;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.AndroidMinSdk.DEFAULT;
+        throw unsupportedStaticField(com.codename1.annotations.buildhints.AndroidMinSdk.class, name);
     }
 
     private static Object getStaticField1(String name) throws Exception {
         if ("CUSTOM".equals(name)) return com.codename1.annotations.buildhints.DesktopTitleBar.CUSTOM;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.DesktopTitleBar.DEFAULT;
         if ("NATIVE".equals(name)) return com.codename1.annotations.buildhints.DesktopTitleBar.NATIVE;
         if ("TOOLBAR".equals(name)) return com.codename1.annotations.buildhints.DesktopTitleBar.TOOLBAR;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.DesktopTitleBar.class, name);
     }
 
     private static Object getStaticField2(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.HardenControlFlow.DEFAULT;
         if ("OFF".equals(name)) return com.codename1.annotations.buildhints.HardenControlFlow.OFF;
         if ("ON".equals(name)) return com.codename1.annotations.buildhints.HardenControlFlow.ON;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.HardenControlFlow.class, name);
@@ -808,6 +795,7 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
 
     private static Object getStaticField3(String name) throws Exception {
         if ("AGGRESSIVE".equals(name)) return com.codename1.annotations.buildhints.HardenLevel.AGGRESSIVE;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.HardenLevel.DEFAULT;
         if ("OFF".equals(name)) return com.codename1.annotations.buildhints.HardenLevel.OFF;
         if ("PARANOID".equals(name)) return com.codename1.annotations.buildhints.HardenLevel.PARANOID;
         if ("STANDARD".equals(name)) return com.codename1.annotations.buildhints.HardenLevel.STANDARD;
@@ -817,46 +805,64 @@ public final class GeneratedAccess_com_codename1_annotations_buildhints {
     private static Object getStaticField4(String name) throws Exception {
         if ("ALL".equals(name)) return com.codename1.annotations.buildhints.HardenStrings.ALL;
         if ("CONSTANTS".equals(name)) return com.codename1.annotations.buildhints.HardenStrings.CONSTANTS;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.HardenStrings.DEFAULT;
         if ("OFF".equals(name)) return com.codename1.annotations.buildhints.HardenStrings.OFF;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.HardenStrings.class, name);
     }
 
     private static Object getStaticField5(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.HintKind.DEFAULT;
+        if ("PATH".equals(name)) return com.codename1.annotations.buildhints.HintKind.PATH;
+        if ("SECRET".equals(name)) return com.codename1.annotations.buildhints.HintKind.SECRET;
+        if ("TEXT_BLOCK".equals(name)) return com.codename1.annotations.buildhints.HintKind.TEXT_BLOCK;
+        if ("URL".equals(name)) return com.codename1.annotations.buildhints.HintKind.URL;
+        if ("VERSION".equals(name)) return com.codename1.annotations.buildhints.HintKind.VERSION;
+        if ("XML".equals(name)) return com.codename1.annotations.buildhints.HintKind.XML;
+        throw unsupportedStaticField(com.codename1.annotations.buildhints.HintKind.class, name);
+    }
+
+    private static Object getStaticField6(String name) throws Exception {
         if ("AUTO".equals(name)) return com.codename1.annotations.buildhints.InstallLocation.AUTO;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.InstallLocation.DEFAULT;
         if ("INTERNAL_ONLY".equals(name)) return com.codename1.annotations.buildhints.InstallLocation.INTERNAL_ONLY;
         if ("PREFER_EXTERNAL".equals(name)) return com.codename1.annotations.buildhints.InstallLocation.PREFER_EXTERNAL;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.InstallLocation.class, name);
     }
 
-    private static Object getStaticField6(String name) throws Exception {
+    private static Object getStaticField7(String name) throws Exception {
         if ("AUTO".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.AUTO;
         if ("BOTH".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.BOTH;
         if ("COCOAPODS".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.COCOAPODS;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.DEFAULT;
         if ("NONE".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.NONE;
         if ("SPM".equals(name)) return com.codename1.annotations.buildhints.IosDependencyManager.SPM;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.IosDependencyManager.class, name);
     }
 
-    private static Object getStaticField7(String name) throws Exception {
+    private static Object getStaticField8(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.IosProjectType.DEFAULT;
         if ("IOS".equals(name)) return com.codename1.annotations.buildhints.IosProjectType.IOS;
         if ("IPAD".equals(name)) return com.codename1.annotations.buildhints.IosProjectType.IPAD;
         if ("IPHONE".equals(name)) return com.codename1.annotations.buildhints.IosProjectType.IPHONE;
         throw unsupportedStaticField(com.codename1.annotations.buildhints.IosProjectType.class, name);
     }
 
-    private static Object getStaticField8(String name) throws Exception {
-        if ("AUTO".equals(name)) return com.codename1.annotations.buildhints.IosThemeMode.AUTO;
-        if ("IOS7".equals(name)) return com.codename1.annotations.buildhints.IosThemeMode.IOS7;
-        if ("LEGACY".equals(name)) return com.codename1.annotations.buildhints.IosThemeMode.LEGACY;
-        if ("MODERN".equals(name)) return com.codename1.annotations.buildhints.IosThemeMode.MODERN;
-        throw unsupportedStaticField(com.codename1.annotations.buildhints.IosThemeMode.class, name);
+    private static Object getStaticField9(String name) throws Exception {
+        if ("AUTO".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.AUTO;
+        if ("CUSTOM".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.CUSTOM;
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.DEFAULT;
+        if ("HOLOLIGHT".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.HOLOLIGHT;
+        if ("IOS7".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.IOS7;
+        if ("LEGACY".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.LEGACY;
+        if ("MODERN".equals(name)) return com.codename1.annotations.buildhints.ThemeMode.MODERN;
+        throw unsupportedStaticField(com.codename1.annotations.buildhints.ThemeMode.class, name);
     }
 
-    private static Object getStaticField9(String name) throws Exception {
-        if ("CUSTOM".equals(name)) return com.codename1.annotations.buildhints.NativeThemeMode.CUSTOM;
-        if ("LEGACY".equals(name)) return com.codename1.annotations.buildhints.NativeThemeMode.LEGACY;
-        if ("MODERN".equals(name)) return com.codename1.annotations.buildhints.NativeThemeMode.MODERN;
-        throw unsupportedStaticField(com.codename1.annotations.buildhints.NativeThemeMode.class, name);
+    private static Object getStaticField10(String name) throws Exception {
+        if ("DEFAULT".equals(name)) return com.codename1.annotations.buildhints.Toggle.DEFAULT;
+        if ("OFF".equals(name)) return com.codename1.annotations.buildhints.Toggle.OFF;
+        if ("ON".equals(name)) return com.codename1.annotations.buildhints.Toggle.ON;
+        throw unsupportedStaticField(com.codename1.annotations.buildhints.Toggle.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

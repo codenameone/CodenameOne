@@ -57,9 +57,9 @@ import java.util.Hashtable;
 import java.util.List;
 import com.codename1.annotations.buildhints.*;
 
-@Android(themeMode = AndroidThemeMode.MODERN)
-@Build(nativeTheme = NativeThemeMode.MODERN)
-@Ios(newStorageLocation = Toggle.ON, themeMode = IosThemeMode.MODERN)
+@Android(themeMode = ThemeMode.MODERN)
+@Build(nativeTheme = ThemeMode.MODERN)
+@Ios(newStorageLocation = Toggle.ON, themeMode = ThemeMode.MODERN)
 @IosPrivacy(cameraUsageDescription = "Some functionality of the application requires your camera")
 public class CN1Playground extends Lifecycle {
     private static final boolean DEFAULT_DARK_MODE = true;

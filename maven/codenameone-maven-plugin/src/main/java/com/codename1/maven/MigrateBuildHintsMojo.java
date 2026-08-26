@@ -740,7 +740,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             case ENUM: {
                 // A documented spelling that is not its own constant migrates to
                 // the constant it means -- ios.themeMode=flat becomes
-                // IosThemeMode.IOS7 -- rather than being refused as outside the
+                // ThemeMode.IOS7 -- rather than being refused as outside the
                 // domain, which is what an existing project setting a legacy
                 // spelling would have hit.
                 //
@@ -1120,7 +1120,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             } else if (importLines.indexOf(importOf(name, kotlin)) < 0) {
                 importLines.append(importOf(name, kotlin)).append('\n');
             }
-            // An enum-valued hint renders as `IosThemeMode.MODERN`, which is a
+            // An enum-valued hint renders as `ThemeMode.MODERN`, which is a
             // second type to account for -- without its own import the generated
             // annotation does not compile, so every enum-valued migration was
             // rolled back by its own verification build.

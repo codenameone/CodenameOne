@@ -289,6 +289,12 @@ public final class GeneratedAccess_com_codename1_surfaces {
                 return com.codename1.surfaces.SurfaceRasterizer.currentEntry((java.util.Map) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue());
             }
         }
+        if ("formatDynamicText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Long.class, java.lang.Long.class}, false);
+                return com.codename1.surfaces.SurfaceRasterizer.formatDynamicText((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).longValue());
+            }
+        }
         if ("layoutForSize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class, java.lang.String.class}, false);
@@ -382,6 +388,10 @@ public final class GeneratedAccess_com_codename1_surfaces {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
                 com.codename1.surfaces.Surfaces.publishRemote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.util.Map.class}, false);
+                com.codename1.surfaces.Surfaces.publishRemote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.util.Map) adaptedArgs[2]); return null;
             }
         }
         if ("registerWidgetKind".equals(name)) {

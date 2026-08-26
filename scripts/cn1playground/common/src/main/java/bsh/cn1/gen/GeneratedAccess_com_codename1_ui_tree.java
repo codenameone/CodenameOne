@@ -1012,6 +1012,11 @@ public final class GeneratedAccess_com_codename1_ui_tree {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getTreeState".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTreeState();

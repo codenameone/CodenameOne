@@ -84,7 +84,7 @@ import java.util.Map;
 import java.util.Set;
 import com.codename1.annotations.buildhints.*;
 
-@Build(nativeTheme = NativeThemeMode.MODERN)
+@Build(nativeTheme = ThemeMode.MODERN)
 @DesktopBuild(height = 900, interactiveScrollbars = Toggle.ON, titleBar = DesktopTitleBar.NATIVE, width = 1440)
 public class CodenameOneGUIBuilder extends Lifecycle {
     private static CodenameOneGUIBuilder active;

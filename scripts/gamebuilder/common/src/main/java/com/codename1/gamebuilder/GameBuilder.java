@@ -83,10 +83,10 @@ import com.codename1.annotations.buildhints.*;
 /// Every control is wired; the live preview plays in-place (toggle, no navigation) so
 /// there is never a dead-end screen. Behavior and structure are covered by tests
 /// (EditorControllerTest, GameBuilderStructureHarness).
-@Android(themeMode = AndroidThemeMode.MODERN)
-@Build(nativeTheme = NativeThemeMode.MODERN)
+@Android(themeMode = ThemeMode.MODERN)
+@Build(nativeTheme = ThemeMode.MODERN)
 @DesktopBuild(height = 800, titleBar = DesktopTitleBar.NATIVE, width = 1280)
-@Ios(themeMode = IosThemeMode.MODERN)
+@Ios(themeMode = ThemeMode.MODERN)
 public class GameBuilder extends Lifecycle {
 
     private EditorController controller;

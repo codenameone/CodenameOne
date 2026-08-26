@@ -82,10 +82,10 @@ import java.util.List;
 import java.util.Map;
 import com.codename1.annotations.buildhints.*;
 
-@Android(themeMode = AndroidThemeMode.MODERN)
-@Build(nativeTheme = NativeThemeMode.MODERN)
+@Android(themeMode = ThemeMode.MODERN)
+@Build(nativeTheme = ThemeMode.MODERN)
 @DesktopBuild(height = 820, interactiveScrollbars = Toggle.ON, titleBar = DesktopTitleBar.NATIVE, width = 1260)
-@Ios(themeMode = IosThemeMode.MODERN)
+@Ios(themeMode = ThemeMode.MODERN)
 public class CodenameOneSettings extends Lifecycle {
     public enum Section { BASIC, BUILD_HINTS, EXTENSIONS, ADVANCED }
 

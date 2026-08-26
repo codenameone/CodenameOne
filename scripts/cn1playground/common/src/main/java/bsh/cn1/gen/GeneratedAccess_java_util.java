@@ -4527,24 +4527,6 @@ public final class GeneratedAccess_java_util {
                 return typedTarget.comparator();
             }
         }
-        if ("compute".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.BiFunction.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.BiFunction.class}, false);
-                return typedTarget.compute((java.lang.Object) adaptedArgs[0], (java.util.function.BiFunction) adaptedArgs[1]);
-            }
-        }
-        if ("computeIfAbsent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.Function.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.Function.class}, false);
-                return typedTarget.computeIfAbsent((java.lang.Object) adaptedArgs[0], (java.util.function.Function) adaptedArgs[1]);
-            }
-        }
-        if ("computeIfPresent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.BiFunction.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.util.function.BiFunction.class}, false);
-                return typedTarget.computeIfPresent((java.lang.Object) adaptedArgs[0], (java.util.function.BiFunction) adaptedArgs[1]);
-            }
-        }
         if ("containsKey".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -4671,12 +4653,6 @@ public final class GeneratedAccess_java_util {
                 return typedTarget.lowerKey((java.lang.Object) adaptedArgs[0]);
             }
         }
-        if ("merge".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.util.function.BiFunction.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.util.function.BiFunction.class}, false);
-                return typedTarget.merge((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.util.function.BiFunction) adaptedArgs[2]);
-            }
-        }
         if ("navigableKeySet".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.navigableKeySet();
@@ -4702,12 +4678,6 @@ public final class GeneratedAccess_java_util {
             if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
                 typedTarget.putAll((java.util.Map) adaptedArgs[0]); return null;
-            }
-        }
-        if ("putIfAbsent".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class}, false);
-                return typedTarget.putIfAbsent((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
             }
         }
         if ("remove".equals(name)) {
