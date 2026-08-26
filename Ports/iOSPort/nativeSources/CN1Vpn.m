@@ -199,6 +199,23 @@ static NSString *cn1vpSecretAccount(NSString *base) {
             cn1vpLoadSecretGeneration() + 1];
 }
 
+/// Deletes the live generation's items and forgets it.
+///
+/// For a profile that has been removed rather than replaced: there is
+/// nothing left to reference them.
+static void cn1vpDiscardSecrets(void) {
+    int live = cn1vpLoadSecretGeneration();
+    if (live > 0) {
+        SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+                [NSString stringWithFormat:@"cn1vpn.psk.%d", live]));
+        SecItemDelete((__bridge CFDictionaryRef)cn1vpSecretQuery(
+                [NSString stringWithFormat:@"cn1vpn.password.%d", live]));
+    }
+    cn1vpSecretGeneration = 0;
+    [[NSUserDefaults standardUserDefaults]
+            setInteger:0 forKey:@"cn1vpn.secretGeneration"];
+}
+
 /// Retires the generations older than the one that just saved.
 ///
 /// Only after a successful save: until then the installed profile still
@@ -435,6 +452,15 @@ void com_codename1_impl_ios_IOSNative_vpnRemoveProfile___int(
     NEVPNManager *manager = [NEVPNManager sharedManager];
     [manager loadFromPreferencesWithCompletionHandler:^(NSError *loadError) {
         [manager removeFromPreferencesWithCompletionHandler:^(NSError *error) {
+            if (error == nil) {
+                // The profile that referenced them is gone, so the items are
+                // unreachable -- and left behind they were the user's VPN
+                // password and pre-shared key sitting in the app's keychain
+                // for ever, or until an install happened to retire that
+                // generation. Only after a SUCCESSFUL removal: a failed one
+                // leaves the profile installed and still needing them.
+                cn1vpDiscardSecrets();
+            }
             cn1vpAck(requestId, error == nil, CN1_VPN_ERR_UNKNOWN,
                     error == nil ? nil : [error localizedDescription]);
         }];

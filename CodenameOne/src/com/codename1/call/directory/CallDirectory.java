@@ -170,7 +170,16 @@ public final class CallDirectory {
             path = path + "/";
         }
         path = path + "cn1calldirectory.tsv";
-        OutputStream os = fs.openOutputStream(path);
+        // Written beside the live file and moved into place, because the
+        // reader is ANOTHER PROCESS: Android starts the screening service to
+        // judge a call whenever one arrives, including while this list is
+        // being written. Opening the live path truncates it first, so a
+        // screening that landed in the middle read an empty or half-written
+        // directory and let a number through that both the old list and the
+        // new one blocked -- and invalidating the cache afterwards cannot
+        // take back a call that has already rung.
+        String staging = path + ".new";
+        OutputStream os = fs.openOutputStream(staging);
         try {
             StringBuilder sb = new StringBuilder();
             long previous = -1;
@@ -189,6 +198,16 @@ public final class CallDirectory {
         } finally {
             os.close();
         }
+        // The move. rename() takes a NAME rather than a path -- it refuses
+        // one containing a separator -- and will not replace an existing
+        // file, so the old list is removed first. That window is a missing
+        // file rather than a truncated one, which the reader treats as an
+        // empty directory: the same answer it gives before any list is
+        // installed, and nothing like a half-parsed one.
+        if (fs.exists(path)) {
+            fs.delete(path);
+        }
+        fs.rename(staging, "cn1calldirectory.tsv");
         return path;
     }
 

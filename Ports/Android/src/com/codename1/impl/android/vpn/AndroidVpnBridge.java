@@ -202,9 +202,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 return;
             }
             consentPending = true;
+            String previous = storedWire();
             installedWire = wire;
             com.codename1.impl.android.AndroidNativeUtil.startActivityForResult(
-                    consent, new Consent(this, requestId));
+                    consent, new Consent(this, requestId, previous));
         } catch (Exception e) {
             fail(requestId, VpnError.INVALID_CONFIGURATION, describe(e));
         }
@@ -218,10 +219,13 @@ public class AndroidVpnBridge implements VpnBridge {
             implements com.codename1.impl.android.IntentResultListener {
         private final AndroidVpnBridge bridge;
         private final int requestId;
+        /// The record describing what was installed BEFORE this attempt.
+        private final String previous;
 
-        Consent(AndroidVpnBridge bridge, int requestId) {
+        Consent(AndroidVpnBridge bridge, int requestId, String previous) {
             this.bridge = bridge;
             this.requestId = requestId;
+            this.previous = previous;
         }
 
         @Override
@@ -236,8 +240,17 @@ public class AndroidVpnBridge implements VpnBridge {
                 bridge.setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
             } else {
-                bridge.installedWire = null;
-                Preferences.delete(WIRE_PREF);
+                // The PREVIOUS profile is untouched: Android installs nothing
+                // when the prompt is declined, so a replacement that the user
+                // refused leaves whatever was already provisioned in place.
+                // Clearing the record made load() answer null and getStatus()
+                // NOT_CONFIGURED for a VPN Android was still holding.
+                bridge.installedWire = previous;
+                if (previous == null) {
+                    Preferences.delete(WIRE_PREF);
+                } else {
+                    Preferences.set(WIRE_PREF, previous);
+                }
                 Vpn.deliverAck(requestId, false,
                         VpnError.USER_DECLINED.ordinal(),
                         "The user declined the VPN configuration prompt");

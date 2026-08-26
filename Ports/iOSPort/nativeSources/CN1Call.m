@@ -1665,6 +1665,23 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
         cn1clRegistry.desiredPushTypes = [NSSet set];
     }
     cn1clVoipToken = nil;
+    // Anything still waiting for credentials is failed rather than left
+    // parked: with delivery switched off no callback can settle it, and the
+    // invalidation path uses -1 and settles nothing. An AsyncResource that
+    // never answers is the failure this SPI exists to prevent.
+    NSArray *waiting = nil;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        waiting = [NSArray arrayWithArray:cn1clTokenRequests];
+        [cn1clTokenRequests removeAllObjects];
+    }
+    for (NSNumber *req in waiting) {
+        com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
+                getThreadLocalData(), [req intValue],
+                CN1_CALL_ERR_PUSH_UNAVAILABLE,
+                cn1clJString(@"VoIP push was unregistered before the token"
+                        @" arrived"));
+    }
 #endif
 }
 
