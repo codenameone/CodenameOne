@@ -886,18 +886,6 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null) {
                 return;
             }
-            // com.codename1.capture exists only to capture, so a reference to it
-            // is a reference to the camera and the microphone. com.codename1.media
-            // is NOT the same: it is overwhelmingly playback, and treating the
-            // whole package as capture gave an audio player the camera and
-            // microphone entitlements plus two privacy prompts it never uses --
-            // a broader sandbox than the app asked for and a misleading privacy
-            // declaration at review. Recording inside that package is picked out
-            // by method below.
-            if (cls.startsWith("com/codename1/capture/")) {
-                caps.usesCamera = true;
-                caps.usesMicrophone = true;
-            }
             if (cls.startsWith("com/codename1/bluetooth/")) {
                 caps.usesBluetooth = true;
             }
@@ -930,6 +918,26 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/media/")
                     && method.indexOf("createMediaRecorder") > -1) {
                 caps.usesMicrophone = true;
+            }
+            // Capture is matched by method for the same reason, one step finer:
+            // the package is entirely capture, but each entry point opens a
+            // different device. Granting both for any reference to the package
+            // declared the camera for an audio-only recorder, and the microphone
+            // for a photo app -- and merely naming VideoCaptureConstraints, or
+            // asking hasCamera(), declared both while opening nothing.
+            if (cls.startsWith("com/codename1/capture/")) {
+                if (method.indexOf("capturePhoto") > -1) {
+                    caps.usesCamera = true;
+                }
+                if (method.indexOf("captureAudio") > -1) {
+                    caps.usesMicrophone = true;
+                }
+                // Video records sound with the picture, so it is the one entry
+                // point that genuinely needs both.
+                if (method.indexOf("captureVideo") > -1) {
+                    caps.usesCamera = true;
+                    caps.usesMicrophone = true;
+                }
             }
         }
     }

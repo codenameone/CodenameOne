@@ -200,6 +200,46 @@ public class MacOSXcodeProjectTest {
                 .get(MacOSXcodeProject.ENT_DISABLE_LIBRARY_VALIDATION));
     }
 
+    /**
+     * The JIT keys the Mac Catalyst target has always written, so the two Mac
+     * targets produce the same entitlements for the same hints. The resolved
+     * value was being stored and never read, which left
+     * macos.entitlements.hardenedRuntime with no effect on this target at all.
+     */
+    @Test
+    public void hardenedRuntimeWritesTheJitDenialTheCatalystTargetWrites() {
+        // Developer ID: hardened, not sandboxed, JIT not asked for.
+        Map<String, Object> ent = MacOSXcodeProject.entitlements(false, false, null, false);
+        assertEquals(Boolean.FALSE, ent.get(MacOSXcodeProject.ENT_ALLOW_JIT));
+        assertEquals(Boolean.FALSE, ent.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
+
+        // Asking for JIT wins over the denial rather than contradicting it.
+        MacOSBuildHints.EntitlementOverrides jit = new MacOSBuildHints.EntitlementOverrides(
+                false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                true, true, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET);
+        Map<String, Object> withJit = MacOSXcodeProject.entitlements(false, jit, null, false);
+        assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_JIT));
+        assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
+
+        // Turned off, neither key is written -- which is what the hint is for.
+        MacOSBuildHints.EntitlementOverrides off = new MacOSBuildHints.EntitlementOverrides(
+                false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                false, false, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET);
+        Map<String, Object> without = MacOSXcodeProject.entitlements(false, off, null, false);
+        assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_JIT));
+        assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
+    }
+
     // ---- export options --------------------------------------------------
 
     @Test

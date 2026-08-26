@@ -294,9 +294,30 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
         if (positionSet != 0) {
             NSRect frame = [w frameRectForContentRect:cn1ToAppKitFrame(content)];
             [w setFrame:frame display:NO];
+            // Position is desktop-space and converts against the primary
+            // screen's scale, but the SIZE is this window's own drawable pixels.
+            // Which display that is cannot be known until the window has
+            // landed, so the size is corrected here: a 400-pixel window asked
+            // for on a 1x secondary came up 200 points wide because it had been
+            // divided by the 2x primary's scale.
+            CGFloat destScale = w.backingScaleFactor;
+            if (destScale > 0 && destScale != scale) {
+                NSRect placed = [w contentRectForFrameRect:w.frame];
+                CGFloat top = placed.origin.y + placed.size.height;
+                placed.size = NSMakeSize(MAX(width / destScale, 1), MAX(height / destScale, 1));
+                // AppKit measures from the bottom, so the origin moves to keep
+                // the top edge -- the one the caller positioned -- where it was
+                // put.
+                placed.origin.y = top - placed.size.height;
+                [w setFrame:[w frameRectForContentRect:placed] display:NO];
+            }
         } else {
             [w center];
         }
+        // Re-read rather than reused: the window may have been resized for its
+        // display just above, and the view and its framebuffer have to follow
+        // what the window actually is.
+        content = [w contentRectForFrameRect:w.frame];
         w.title = title;
 
         METALView *view = [[METALView alloc] initWithFrame:NSMakeRect(0, 0,

@@ -1190,9 +1190,27 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return;
     }
     if (selector == @selector(deleteToEndOfLine:) || selector == @selector(deleteToEndOfParagraph:)) {
-        NSRange tail = NSMakeRange(sel.location, len - sel.location);
-        [self cn1ReplaceRange:tail withString:@""];
-        [self cn1SetSelection:NSMakeRange(sel.location, 0)];
+        // To the end of THIS line, not of the text. Control-K in a multiline
+        // editor deleted every remaining line, because the range ran to len.
+        NSRange target;
+        if (sel.length > 0) {
+            // A selection is what Control-K acts on when there is one, the same
+            // as every other delete command here.
+            target = sel;
+        } else {
+            NSUInteger lineEnd = [self cn1LineEnd:sel.location inText:session.text];
+            if (lineEnd <= sel.location) {
+                // Already at the end of the line. AppKit's own behaviour is to
+                // take the newline itself, joining this line with the next.
+                lineEnd = MIN(sel.location + 1, len);
+            }
+            target = NSMakeRange(sel.location, lineEnd - sel.location);
+        }
+        if (target.length == 0) {
+            return;
+        }
+        [self cn1ReplaceRange:target withString:@""];
+        [self cn1SetSelection:NSMakeRange(target.location, 0)];
         [session commitFinished:NO];
         return;
     }

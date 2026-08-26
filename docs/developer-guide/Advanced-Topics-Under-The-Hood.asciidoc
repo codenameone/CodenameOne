@@ -625,8 +625,11 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |macos.entitlements.files.userSelected
 |macOS builds. `readwrite` (default), `readonly`, or `none`. Sets the matching `com.apple.security.files.user-selected.*` entitlement.
 
+|macos.hardenedRuntime
+|macOS builds. Sets Xcode's `ENABLE_HARDENED_RUNTIME`. Default `true`, because notarization requires it. This is the build setting; the entitlement hint below is a different thing despite the similar name.
+
 |macos.entitlements.hardenedRuntime
-|macOS builds. `true` enables hardened runtime restrictions. Default is `true` for `developerID` (notarization requires it), `false` for `appStore`.
+|macOS builds. `true` writes `com.apple.security.cs.allow-jit` and `com.apple.security.cs.allow-unsigned-executable-memory` into the entitlements as explicit denials; `false` leaves them out. It doesn't switch the hardened runtime on or off -- that's `macos.hardenedRuntime` above. Default is `true` for `developerID`, `false` for `appStore`.
 
 |macos.entitlements.allowJit
 |macOS builds. `true` enables `com.apple.security.cs.allow-jit` for hardened runtime. ParparVM is AOT-compiled so this is `false` by default; flip when bundling a JIT-using cn1lib.

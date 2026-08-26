@@ -289,6 +289,19 @@ public class MacOSXcodeProject {
         if (overrides.isAllowJit()) {
             ent.put(ENT_ALLOW_JIT, Boolean.TRUE);
             ent.put(ENT_ALLOW_UNSIGNED_MEMORY, Boolean.TRUE);
+        } else if (overrides.isHardenedRuntime()) {
+            // The explicit denial the Mac Catalyst target has always written for
+            // macNative.entitlements.hardenedRuntime. Reading the resolved value
+            // was missing here, which left that hint -- under either spelling --
+            // with no effect at all on this target.
+            //
+            // Note this hint is NOT the ENABLE_HARDENED_RUNTIME build setting,
+            // however much the names suggest it. On Catalyst it decides these
+            // two JIT keys and nothing else, and driving the build setting from
+            // it instead would give one hint name two different meanings across
+            // the two Mac targets. macos.hardenedRuntime is the build setting.
+            ent.put(ENT_ALLOW_JIT, Boolean.FALSE);
+            ent.put(ENT_ALLOW_UNSIGNED_MEMORY, Boolean.FALSE);
         }
         if (!appStore && loadsExternalCode) {
             // Only when the app actually loads code it did not ship. Adding it
