@@ -1,17 +1,18 @@
-name: _Build iOS port (reusable)
+name: _Build macOS port (reusable)
 
 # Reusable workflow that runs scripts/setup-workspace.sh + scripts/build-mac-port.sh
-# once per workflow run, populating shared caches that downstream test jobs (in
-# scripts-ios.yml, scripts-ios-native.yml, ios-packaging.yml) restore via the
-# same cache keys.
+# once per workflow run, and hands the built tree to scripts-macos.yml's test job
+# as both a cache and a workflow artifact.
 #
-# A separate "cn1-built-mac" cache is keyed on the CN1 source hash with no restore-
-# keys (exact match only). On hit, the entire setup-workspace + build-ios-port
-# sequence is skipped — the iOS port artifact in ~/.m2/repository/com/codenameone
-# is already correct for the current source state.
+# Separate from _build-ios-port.yml on purpose. That one is shared by
+# scripts-ios.yml, scripts-ios-native.yml and ios-packaging.yml through a single
+# cache key, so folding the mac port into its source hash would make an
+# AppKit-only change pay for four iOS rebuilds.
 #
-# This cache is shared across all three iOS workflows on the same branch, so
-# whichever workflow runs first populates it and the others skip the rebuild.
+# The "cn1-built-mac" cache is keyed on the CN1 source hash with no restore-keys
+# (exact match only). On hit, the entire setup-workspace + build-mac-port
+# sequence is skipped -- the port artifacts in ~/.m2/repository/com/codenameone
+# are already correct for the current source state.
 
 on:
   workflow_call:
@@ -27,7 +28,7 @@ jobs:
     outputs:
       cn1_built_mac_cache_key: ${{ steps.cn1_built_mac_key.outputs.key }}
     concurrency:
-      group: mac-ios-port-${{ github.workflow }}-${{ github.ref_name }}
+      group: mac-port-${{ github.workflow }}-${{ github.ref_name }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v6
@@ -121,22 +122,21 @@ jobs:
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 
-      # Built CN1 + iOS port artifacts. Restored after the m2 cache so it
+      # Built CN1 + mac port artifacts. Restored after the m2 cache so it
       # overwrites any stale com/codenameone subtree pulled in by the broader
       # m2 cache (whose key is keyed on POMs, not source).
       - name: Compute cn1-built-mac cache key
         id: cn1_built_mac_key
         # Single source of truth for the cache key, exposed as a job output
-        # so dependent jobs (build-ios, build-ios-metal in scripts-ios.yml,
-        # the iOS-native and packaging workflows) restore the EXACT key this
-        # job saved against. Computing the same hash again on each consumer
+        # so the dependent build-macos job restores the EXACT key this job
+        # saved against. Computing the same hash again on each consumer
         # job has been observed to produce a different value on some runners
         # (suspected: the find -type f traversal picks up runner-specific
         # filesystem metadata that survives between jobs). Sharing the key
         # via an output sidesteps that.
         run: echo "key=cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }}" >> "$GITHUB_OUTPUT"
 
-      - name: Cache built CN1 + iOS port artifacts
+      - name: Cache built CN1 + mac port artifacts
         id: cn1_built
         uses: actions/cache@v5
         with:
@@ -152,13 +152,13 @@ jobs:
         # codenameone-tools cache (keyed separately, on setup-workspace.sh) is
         # missing. Without the second condition a jars-cache hit short-circuits
         # setup-workspace and leaves tools/env.sh absent, which the dependent app
-        # jobs (build-ios*, native-ios, packaging, mac-native) need but only ever
-        # restore from cache -- so an evicted tools cache breaks all of them.
+        # job (build-macos) needs but only ever restores from cache -- so an
+        # evicted tools cache breaks it.
         if: steps.cn1_built.outputs.cache-hit != 'true' || steps.cn1_tools.outputs.cache-hit != 'true'
         run: ./scripts/setup-workspace.sh -q -DskipTests
         timeout-minutes: 40
 
-      - name: Build iOS port
+      - name: Build macOS port
         if: steps.cn1_built.outputs.cache-hit != 'true'
         run: ./scripts/build-mac-port.sh -q -DskipTests
         timeout-minutes: 40
@@ -166,7 +166,7 @@ jobs:
       - name: Report cache outcome
         run: |
           if [ "${{ steps.cn1_built.outputs.cache-hit }}" = "true" ]; then
-            echo "cn1-built-mac cache HIT for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — setup-workspace and build-ios-port were skipped."
+            echo "cn1-built-mac cache HIT for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — setup-workspace and build-mac-port were skipped."
           else
             echo "cn1-built-mac cache MISS for key cn1-built-mac-${{ runner.os }}-${{ steps.src_hash.outputs.hash }} — built fresh."
           fi
@@ -175,19 +175,19 @@ jobs:
       # cache. The cache above is kept for cross-run build-skip, but caches are
       # LRU-evicted once the repo cache store exceeds quota -- which, during long
       # runner-starvation queues, happened between this job and a dependent job's
-      # fail-on-cache-miss restore, hard-failing build-ios/metal/tv/watch/
-      # mac-native/packaging at the restore step before any work. Artifacts are
+      # fail-on-cache-miss restore, hard-failing the dependent job at the
+      # restore step before any work. Artifacts are
       # not evicted for the life of the run (and survive partial `--failed`
       # re-runs), so the handoff is reliable. tar relative to / so the home
       # (~/.m2) and workspace paths restore to identical absolute locations on
       # the consumer (same macos-15 image -> same /Users/runner paths).
-      - name: Bundle built CN1 + iOS port artifacts
+      - name: Bundle built CN1 + mac port artifacts
         run: |
           set -euo pipefail
           # Include codenameone-tools (the workspace tools dir holding
           # tools/env.sh) alongside the built tree. It is produced by
           # setup-workspace in this job and consumed by every dependent build
-          # script (build-ios-app.sh etc. read ${TMPDIR}/codenameone-tools/
+          # script (build-macos-app.sh reads ${TMPDIR}/codenameone-tools/
           # tools/env.sh, TMPDIR=runner.temp). It had its own evictable cache
           # too; when that cache was evicted mid-queue the dependent builds
           # failed with "Workspace tools not found" even after the cn1-built-mac
@@ -201,7 +201,7 @@ jobs:
             "${RUNNER_TEMP#/}/codenameone-tools"
           ls -la "$RUNNER_TEMP/cn1-built-mac-bundle.tar"
 
-      - name: Upload built CN1 + iOS port bundle
+      - name: Upload built CN1 + mac port bundle
         uses: actions/upload-artifact@v4
         with:
           name: cn1-built-mac-bundle
