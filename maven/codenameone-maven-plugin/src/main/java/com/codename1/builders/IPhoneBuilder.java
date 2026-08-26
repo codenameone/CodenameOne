@@ -654,7 +654,7 @@ public class IPhoneBuilder extends Executor {
         if (injected == null) {
             return false;
         }
-        int key = injected.indexOf("UIBackgroundModes");
+        int key = injected.indexOf("<key>UIBackgroundModes</key>");
         while (key >= 0) {
             int open = injected.indexOf("<array>", key);
             if (open < 0) {
@@ -668,7 +668,7 @@ public class IPhoneBuilder extends Executor {
             if (arrayHasString(body, "voip")) {
                 return true;
             }
-            key = injected.indexOf("UIBackgroundModes", close);
+            key = injected.indexOf("<key>UIBackgroundModes</key>", close);
         }
         return false;
     }
@@ -4935,7 +4935,12 @@ public class IPhoneBuilder extends Executor {
                     // a configuration that worked until the scanner noticed
                     // com.codename1.call.voip.
                     String injected = request.getArg("ios.plistInject", "");
-                    if (injected.contains("UIBackgroundModes")) {
+                    // The EXACT key: a fragment carrying MyUIBackgroundModes
+                    // matched a bare substring, so the builder treated the
+                    // background modes as user supplied, skipped
+                    // ios.background_modes, and left the real key absent --
+                    // an app registered for VoIP pushes that nothing wakes.
+                    if (injected.contains("<key>UIBackgroundModes</key>")) {
                         if (!injectedModesIncludeVoip(injected)) {
                             // Failed rather than warned. The two mechanisms
                             // cannot be combined -- plist assembly refuses a
@@ -4970,9 +4975,17 @@ public class IPhoneBuilder extends Executor {
                     // all three the API compiled, linked, and then failed
                     // every setEntries with "No App Group is configured".
                     callDirectoryExtensionEnabled = true;
-                    String group = request.getArg("ios.call.appGroup",
-                            IOSCallDirectoryExtensionBuilder
-                                    .defaultAppGroup(request.getPackageName()));
+                    // A present-but-empty hint is not an override: it
+                    // produced an empty App Group entitlement, no
+                    // CN1CallAppGroup in the host plist, and a profile check
+                    // that treated the empty requirement as satisfied -- so
+                    // the build reached signing with no shared container at
+                    // all.
+                    String groupHint = request.getArg("ios.call.appGroup", "");
+                    String group = groupHint.trim().length() > 0
+                            ? groupHint.trim()
+                            : IOSCallDirectoryExtensionBuilder
+                                    .defaultAppGroup(request.getPackageName());
                     callDirectoryAppGroup = group;
                     String appGroups = request.getArg("ios.app_groups", "");
                     if (!declaresAppGroup(appGroups, group)) {

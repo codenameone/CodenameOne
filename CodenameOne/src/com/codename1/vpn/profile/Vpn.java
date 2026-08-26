@@ -175,22 +175,17 @@ public final class Vpn {
         if (l == null) {
             return;
         }
-        boolean first;
         synchronized (LISTENERS) {
             if (LISTENERS.contains(l)) {
                 return;
             }
-            first = LISTENERS.isEmpty();
             LISTENERS.add(l);
             // Inside the lock, with the mutation that decided it. Told
             // afterwards, a replacement listener could turn delivery ON
             // before a departing one -- whose emptiness was computed
             // earlier -- turned it OFF, leaving a registered listener that
             // never heard another transition.
-            VpnBridge b = VpnRequests.bridge();
-            if (first && b != null) {
-                b.setStatusListening(true);
-            }
+            applyListening(!LISTENERS.isEmpty());
         }
     }
 
@@ -199,11 +194,60 @@ public final class Vpn {
         synchronized (LISTENERS) {
             LISTENERS.remove(l);
             // Inside the lock; see addStatusListener.
-            boolean last = LISTENERS.isEmpty();
+            applyListening(!LISTENERS.isEmpty());
+        }
+    }
+
+    /// What the port was last told about delivery, or null when it has not
+    /// been told.
+    private static Boolean deliveredListening;
+
+    /// Tells the port whether anyone is listening, remembering the answer.
+    ///
+    /// A first listener added before Display.init found no bridge, and every
+    /// later addition then saw a non-empty list and said nothing -- so iOS
+    /// never installed its status observer and Android never set its
+    /// listening flag. The wanted state is kept and applied by
+    /// [#publishListening] the moment a port appears.
+    ///
+    /// Caller holds LISTENERS.
+    private static void applyListening(boolean wanted) {
+        // The monitor is taken here as well as by the callers -- it is
+        // reentrant, and stating it is what lets an analyser see that this
+        // static is guarded rather than lazily initialised in the open.
+        synchronized (LISTENERS) {
             VpnBridge b = VpnRequests.bridge();
-            if (last && b != null) {
-                b.setStatusListening(false);
+            if (b == null) {
+                deliveredListening = null;
+                return;
             }
+            if (deliveredListening != null
+                    && deliveredListening.booleanValue() == wanted) {
+                return;
+            }
+            deliveredListening = Boolean.valueOf(wanted);
+            b.setStatusListening(wanted);
+        }
+    }
+
+    /// Delivers the listening state the port has not been told about.
+    ///
+    /// Called when a bridge is resolved, which is the first moment there is
+    /// anywhere to send it.
+    ///
+    /// @hidden not part of the public API.
+    public static void publishListening(VpnBridge b) {
+        if (b == null) {
+            return;
+        }
+        synchronized (LISTENERS) {
+            boolean wanted = !LISTENERS.isEmpty();
+            if (deliveredListening != null
+                    && deliveredListening.booleanValue() == wanted) {
+                return;
+            }
+            deliveredListening = Boolean.valueOf(wanted);
+            b.setStatusListening(wanted);
         }
     }
 

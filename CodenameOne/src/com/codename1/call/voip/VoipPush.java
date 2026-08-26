@@ -108,17 +108,42 @@ public final class VoipPush {
                 LISTENERS.add(l);
             }
         }
-        CallBridge b = CallRequests.bridge();
-        if (b == null) {
-            return;
-        }
+        // BEFORE the bridge lookup. Returning early when there is no port
+        // yet -- setListener from an app's init runs before Display.init --
+        // left this false while a listener was stored, so the readiness the
+        // bridge later published was "not listening" and the cold-start calls
+        // it was registered for stayed queued until they expired.
+        //
         // Through the shared flag: an action listener registered without
         // VoipPush counts too, and turning this off here must not silence a
         // Calls listener that is still installed.
         CallRequests.setPushesWanted(l != null);
-        if (l != null) {
-            b.drainPendingCalls(CallRequests.nextId());
+        drainWanted = l != null;
+        CallBridge b = CallRequests.bridge();
+        if (b == null) {
+            return;
         }
+        drainIfWanted(b);
+    }
+
+    /// Whether a listener is waiting for the calls the port already has.
+    private static boolean drainWanted;
+
+    /// Drains once, when there is somewhere to drain from.
+    ///
+    /// A listener installed before the port existed had nothing to ask, and
+    /// no later operation asked on its behalf -- so a call the native side
+    /// had already reported was never handed over.
+    ///
+    /// @hidden not part of the public API.
+    public static void drainIfWanted(CallBridge b) {
+        synchronized (VoipPush.class) {
+            if (!drainWanted || b == null) {
+                return;
+            }
+            drainWanted = false;
+        }
+        b.drainPendingCalls(CallRequests.nextId());
     }
 
     /// Registers for VoIP pushes, resolving with the token to give the

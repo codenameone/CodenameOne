@@ -50,7 +50,25 @@ public final class VpnRequests {
     ///
     /// Guarded on `Display.isInitialized()` for the reason
     /// `com.codename1.impl.call.CallRequests#bridge()` gives.
-    public static synchronized VpnBridge bridge() {
+    public static VpnBridge bridge() {
+        // NOT synchronized on this class while it calls into Vpn. The
+        // listener facade holds its own list monitor and calls this, so
+        // taking VpnRequests here and then reaching for that monitor is the
+        // two orders of the same pair -- a deadlock rather than a fix. The
+        // resolution takes this class's lock; the publication takes only the
+        // facade's.
+        VpnBridge b = resolveBridge();
+        if (b != null) {
+            // The first moment there is anywhere to send it: a listener
+            // registered before Display.init had no port to tell, and every
+            // later registration then saw a non-empty list and said nothing.
+            com.codename1.vpn.profile.Vpn.publishListening(b);
+        }
+        return b;
+    }
+
+    /// The port's bridge, with no side effects.
+    private static synchronized VpnBridge resolveBridge() {
         if (testBridge != null) {
             return testBridge;
         }

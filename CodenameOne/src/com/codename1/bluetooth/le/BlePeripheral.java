@@ -303,6 +303,18 @@ public abstract class BlePeripheral extends BluetoothDevice {
         // late success then publishes nothing and cannot overwrite the
         // timeout that a LATER operation has already moved past.
         final boolean[] published = new boolean[1];
+        // Cancelling the caller's resource has to reach the QUEUED one, which
+        // is inner since the queue watches it. Otherwise a cancel left inner
+        // pending, startOp did not skip it, and its eventual answer published
+        // state and completed a resource the caller had already given up on.
+        out.onResult(new AsyncResult<T>() {
+            @Override
+            public void onReady(T value, Throwable err) {
+                if (out.isCancelled()) {
+                    inner.cancel(true);
+                }
+            }
+        });
         inner.onResult(new AsyncResult<T>() {
             @Override
             public void onReady(T value, Throwable err) {

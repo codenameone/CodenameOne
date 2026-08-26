@@ -466,6 +466,16 @@ public final class Calls {
         CallSession s = new CallSession(callId, CallDirection.INCOMING, handle,
                 displayName, state);
         synchronized (SESSIONS) {
+            // Whatever is registered WINS. A drain running while socket
+            // signalling reports the same uuid could otherwise see nothing,
+            // let the report reserve, and then replace it -- so the report
+            // completed with one object while getSession() and every action
+            // used another, and ending either took the other out of the
+            // registry with it.
+            CallSession existing = SESSIONS.get(callId);
+            if (existing != null) {
+                return existing;
+            }
             SESSIONS.put(callId, s);
         }
         return s;

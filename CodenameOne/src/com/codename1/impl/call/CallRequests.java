@@ -82,7 +82,12 @@ public final class CallRequests {
     /// #### Returns
     ///
     /// the bridge, or null
-    public static synchronized CallBridge bridge() {
+    public static CallBridge bridge() {
+        // NOT synchronized on this class around the calls below: the facades
+        // hold their own monitors and call this, so taking this class's lock
+        // and then reaching for theirs is the two orders of one pair. The
+        // resolution and the readiness bookkeeping each take it briefly and
+        // separately.
         CallBridge b = resolveBridge();
         if (b != null) {
             // The first moment there is anywhere to send it. A listener
@@ -90,18 +95,28 @@ public final class CallRequests {
             // tell, and every later registration then saw no transition and
             // said nothing either -- so iOS held every CallKit action until
             // it timed out while a listener sat registered.
-            boolean wanted = actionsWanted || pushesWanted;
-            if (deliveredReady == null
-                    || deliveredReady.booleanValue() != wanted) {
-                deliveredReady = Boolean.valueOf(wanted);
+            boolean deliver = false;
+            boolean wanted = false;
+            synchronized (CallRequests.class) {
+                wanted = actionsWanted || pushesWanted;
+                if (deliveredReady == null
+                        || deliveredReady.booleanValue() != wanted) {
+                    deliveredReady = Boolean.valueOf(wanted);
+                    deliver = true;
+                }
+            }
+            if (deliver) {
                 b.setJavaReady(wanted);
             }
+            // And the calls the port is already holding, for a push listener
+            // that was registered before there was a port to ask.
+            com.codename1.call.voip.VoipPush.drainIfWanted(b);
         }
         return b;
     }
 
     /// The port's bridge, with no side effects.
-    private static CallBridge resolveBridge() {
+    private static synchronized CallBridge resolveBridge() {
         if (testBridge != null) {
             return testBridge;
         }
