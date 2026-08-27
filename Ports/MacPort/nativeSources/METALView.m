@@ -942,7 +942,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         [[self cn1ConsumedKeys] addIndex:event.keyCode];
         return;
     }
-    if ([CN1MacTextInputSession sharedSession].active) {
+    if (cn1OwnsSession(self, [CN1MacTextInputSession sharedSession])) {
         // Hands the key to the input context, which is what turns a keystroke
         // into insertText:, setMarkedText: or doCommandBySelector:. Doing this
         // rather than reading characters directly is what buys dead keys, CJK
@@ -1039,7 +1039,7 @@ static int CN1MacKeyCode(NSEvent *event) {
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (!session.active) {
+    if (!cn1OwnsSession(self, session)) {
         return;
     }
     [self cn1ForgetAnchor];
@@ -1074,7 +1074,7 @@ static int CN1MacKeyCode(NSEvent *event) {
         selectedRange:(NSRange)selectedRange
      replacementRange:(NSRange)replacementRange {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (!session.active) {
+    if (!cn1OwnsSession(self, session)) {
         return;
     }
     NSString *marked = [string isKindOfClass:[NSAttributedString class]]
@@ -1329,7 +1329,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 
 - (void)doCommandBySelector:(SEL)selector {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (!session.active) {
+    if (!cn1OwnsSession(self, session)) {
         [super doCommandBySelector:selector];
         return;
     }
@@ -1570,7 +1570,11 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 /// The selection, or an empty range when there is no session.
 - (NSRange)cn1SelectionForEditing {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (!session.active) {
+    // Ownership, not merely activity. The Edit menu and its shortcuts act on the
+    // key window, so a window that does not own the session must not report a
+    // selection out of it -- cutting from this menu would otherwise delete text
+    // from a field in another window.
+    if (!cn1OwnsSession(self, session)) {
         return NSMakeRange(NSNotFound, 0);
     }
     NSRange sel = session.selectedRange;
@@ -1578,6 +1582,17 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         return NSMakeRange(NSNotFound, 0);
     }
     return sel;
+}
+
+/// Whether the active text session belongs to THIS view.
+///
+/// The session is a singleton and making another window key does not end it, so
+/// a bare `active` test let every window's view claim the keystrokes and type
+/// into a field owned by a different window. A view that does not own the
+/// session treats keys as ordinary game and shortcut keys, which is what it
+/// would do with no session at all.
+static BOOL cn1OwnsSession(NSView *view, CN1MacTextInputSession *session) {
+    return session != nil && session.active && session.ownerView == view;
 }
 
 /// The process-wide clipboard blocks, set through Display.setProperty.
@@ -1619,12 +1634,12 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
         return NO;
     }
     if (action == @selector(paste:)) {
-        return session.active
+        return cn1OwnsSession(self, session)
             && [[NSPasteboard generalPasteboard] canReadObjectForClasses:@[[NSString class]]
                                                                  options:nil];
     }
     if (action == @selector(selectAll:)) {
-        return session.active && session.text.length > 0;
+        return cn1OwnsSession(self, session) && session.text.length > 0;
     }
     if (action == @selector(cut:) || action == @selector(delete:)) {
         // Editing commands, so they need an editing session. A lightweight
@@ -1632,7 +1647,7 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
         return [self cn1SelectionForEditing].length > 0;
     }
     if (action == @selector(copy:)) {
-        if (session.active) {
+        if (cn1OwnsSession(self, session)) {
             return [self cn1SelectionForEditing].length > 0;
         }
         // With no session the form's own TextSelection may hold one -- a
@@ -1655,9 +1670,11 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
     if (cn1CopyBlocked([CN1MacTextInputSession sharedSession])) {
         return;
     }
-    if (![CN1MacTextInputSession sharedSession].active) {
+    if (!cn1OwnsSession(self, [CN1MacTextInputSession sharedSession])) {
         // The form's own selection, copied on the event dispatch thread where
-        // the hierarchy can be walked safely.
+        // the hierarchy can be walked safely. Reached when no session is running
+        // AND when one belongs to another window, which is right either way:
+        // this window's own selection is what its Copy should take.
         CN1MacCopyTextSelection(self.cn1WindowId);
         return;
     }
@@ -1708,7 +1725,7 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
     if (cn1PasteBlocked(session)) {
         return;
     }
-    if (!session.active) {
+    if (!cn1OwnsSession(self, session)) {
         return;
     }
     NSString *pasted = [[NSPasteboard generalPasteboard]

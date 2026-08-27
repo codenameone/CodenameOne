@@ -129,6 +129,14 @@ void CN1MacTextInputNotifyEditorAction(void) {
              selStart:(NSInteger)selStart
                selEnd:(NSInteger)selEnd
             multiline:(BOOL)multiline {
+    // Whose window this session belongs to, captured now because now is when it
+    // is knowable: the field being edited is in the window the user just focused
+    // to reach it, so that window is key. Recorded rather than inferred later,
+    // since making another window key is exactly the event that used to steal
+    // the session.
+    NSWindow *keyWindow = [NSApp keyWindow];
+    self.ownerView = keyWindow != nil ? keyWindow.contentView
+                                      : [CN1MacHost sharedHost].renderingView;
     self.text = initialText != nil ? initialText : @"";
     NSInteger len = (NSInteger)self.text.length;
     // The framework can hand over a selection recorded against text it has since
@@ -222,6 +230,12 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_
     // No limit: the pure editor owns its own document and enforces whatever
     // limit it has there.
     [CN1MacTextInputSession sharedSession].maxSize = 0;
+    // And no inherited clipboard block. The session is a singleton, so a legacy
+    // TextField that was opened with blockCopyPaste left the flag set and the
+    // next pure editor -- an unrelated component that never asked for it --
+    // came up with copy, cut and paste refused. Every per-component field this
+    // path does not set has to be cleared here for the same reason.
+    [CN1MacTextInputSession sharedSession].blockCopyPaste = NO;
     [[CN1MacTextInputSession sharedSession] startWithText:initial
                                                 selStart:selStart
                                                   selEnd:selEnd

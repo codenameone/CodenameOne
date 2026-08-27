@@ -88,6 +88,15 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// menu still copied and pasted freely through them.
 @property (nonatomic) BOOL blockCopyPaste;
 
+/// The view whose window owns this session, or nil for the main surface.
+///
+/// The session is a singleton while the port is not: making another window key
+/// does not stop an editor running in the first one, so without an owner every
+/// window's view saw an active session and fed its own keystrokes into a field
+/// belonging to a different window. assign, because AppKit owns its views and a
+/// retain here would outlive the window.
+@property (nonatomic, assign) NSView *ownerView;
+
 /// Monotonic edit generation. Every edit reported to the pure editor carries
 /// one, and Java echoes the last generation it APPLIED back with each state
 /// push, so a slow round trip cannot regress the shadow under fast typing.
