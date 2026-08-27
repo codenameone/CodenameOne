@@ -767,6 +767,15 @@ _Atomic long cn1StallBuckets[CN1_STALL_CAUSES][CN1_STALL_BUCKETS];
 // slow runner makes cycles longer, it does not make the collector idle through demand.
 _Atomic long cn1GcCyclesOnDemand = 0;   // started immediately: a collection was owed
 _Atomic long cn1GcCyclesAfterIdle = 0;  // started after an idle wait expired or was woken
+// What the BiBOP grace pass walks versus what it finds. The pass exists to trace fresh
+// objects' subtrees, but it finds them by scanning every slot below bumpIndex on every
+// page allocated into since that page's last sweep -- so on a page that is mostly older
+// objects it pays for the whole page to find a handful of fresh ones.
+_Atomic long long cn1GraceSlotsWalked = 0;   // slots examined
+_Atomic long long cn1GraceSlotsFresh = 0;    // ...that were mark == -1
+_Atomic long long cn1GraceMarked = 0;        // ...and were non-leaf, so got a gcMarkObject
+_Atomic long long cn1GracePagesWalked = 0;   // pages whose slots were walked
+_Atomic long long cn1GracePagesSkipped = 0;  // pages skipped by gcAllocedSinceSweep
 // What gcMarkDrain's linear rescan of allObjectsInHeap actually costs and actually buys.
 // The rescan exists for the worklist-OVERFLOW case, but it runs unconditionally on every
 // call, and gcMarkWorklistPush does not dedupe -- so every already-marked legacy object is
@@ -2260,6 +2269,9 @@ void codenameOneGCMark() {
         while(gp != 0) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
+#ifdef CN1_GC_CONFORM
+                atomic_fetch_add_explicit(&cn1GracePagesSkipped, 1, memory_order_relaxed);
+#endif
                 gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
                 continue;
             }
@@ -2269,16 +2281,34 @@ void codenameOneGCMark() {
                                       memory_order_relaxed);
 #endif
             int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GracePagesWalked, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GraceSlotsWalked, (long long)gn, memory_order_relaxed);
+            { long long __fresh = 0, __marked = 0;
+#endif
             CN1_GC_TRUSTED_BEGIN();  // page-slot walk: authoritative references
             for(int gi = 0 ; gi < gn ; gi++) {
                 JAVA_OBJECT go = cn1BibopSlot(gp, gi);
                 if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
                    && go->__codenameOneParentClsReference != 0
                    && go->__codenameOneParentClsReference->markFunction != 0) {
+#ifdef CN1_GC_CONFORM
+                    __marked++;
+#endif
                     gcMarkObject(d, go, JAVA_FALSE);
                 }
+#ifdef CN1_GC_CONFORM
+                else if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_RELAXED) == -1) {
+                    __fresh++;   // fresh but leaf: no subtree, nothing to do
+                }
+#endif
             }
             CN1_GC_TRUSTED_END();
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GraceSlotsFresh, __fresh + __marked, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GraceMarked, __marked, memory_order_relaxed);
+            }
+#endif
             gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
             // DRAIN AS WE GO (issue #5537). This pass pushes EVERY fresh object on
             // every page, and "fresh" means "allocated since the last cycle" -- a
@@ -3031,12 +3061,32 @@ static _Atomic int cn1LegacyGcScheduled = 0;
 static _Atomic int cn1BibopGcScheduled = 0;
 #endif
 
-// Mutators currently stopped WAITING FOR THE COLLECTOR (the pacing park's run-ahead and
-// budget waits, and the pending-table wait in codenameOneGcMalloc). This is demand the
-// allocation counters cannot express: a thread parked on the collector allocates nothing,
-// so "bytes allocated since the cycle started" reads as quiet at exactly the moment the
-// application is most blocked. gcIdleWaitMillis must never idle while this is non-zero.
-_Atomic int cn1GcBlockedMutators = 0;
+
+// Request a collection from a thread that is ALREADY PARKED (threadActive == FALSE).
+//
+// java_lang_System_gc__ is Java: it enters synchronized(LOCK), and monitorEnter is a GC
+// SAFEPOINT. Calling it from a parked thread takes that thread back OUT of the parked
+// state -- which is the state the collector is spinning on in codenameOneGCMark's
+// while(t->threadActive) wait -- and can block it inside the monitor while the collector
+// waits for it to go quiescent. That is a circular wait, and it deadlocks: collector in
+// codenameOneGCMark waiting for a mutator, every mutator in cn1PacingPark re-requesting a
+// collection through the monitor. Captured with `sample` on a wedged process.
+//
+// The window is not new, but it used to be almost impossible to hit because the collector
+// spent nearly all of its time inside LOCK.wait() with the monitor released. Answering the
+// demand signal removed that idle and made the collector acquire LOCK once per cycle at
+// several hundred cycles a second, which turned a theoretical race into a reliable hang.
+//
+// forceGc is a plain boolean the collector re-reads at the top of every loop pass, so
+// setting it directly delivers the request without entering Java at all. The only thing
+// lost is the notify, and only when the collector happens to be inside LOCK.wait() -- in
+// which case the wait is the 200ms high-frequency one, because a mutator parked on the
+// pacing cap means allocation was heavy. A bounded 200ms late request, against a deadlock.
+static void cn1RequestGcFromParkedThread(void) {
+    // A plain store, and nothing else. Not startGCThread() either -- that is Java as well,
+    // and the callers' loop conditions already test gcThreadInstance for a dead collector.
+    set_static_java_lang_System_forceGc(JAVA_TRUE);
+}
 
 // Upper bound on the pending-table wait in codenameOneGcMalloc, in milliseconds of
 // 1ms sleeps. Its own constant rather than the pacing park's: this is a legacy-path
@@ -3125,16 +3175,16 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
                   + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
             long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
                                                                 memory_order_relaxed);
-            // TRIED AND REJECTED: also returning 0 whenever cn1GcBlockedMutators > 0, on
-            // the theory that a parked mutator is demand the byte counters cannot express.
-            // It is, but it is not demand the COLLECTOR can always answer -- a thread
-            // parked because the process budget is exhausted is waiting for memory that
-            // collecting will not produce, and treating it as demand made the collector
-            // run cycles back to back at 100% instead of idling, starving the very threads
-            // it was trying to serve: the -DCN1_PACING_NO_RESERVE arm under a simulated
-            // ceiling stopped finishing its fixed round count at all. The counter is kept
-            // because it is what the [GCSTALL] duty figure is built from; the idle
-            // decision deliberately does not read it.
+            // TRIED AND REJECTED: also returning 0 whenever any mutator was parked, on the
+            // theory that a parked mutator is demand the byte counters cannot express. It
+            // is, but it is not demand the COLLECTOR can always answer -- a thread parked
+            // because the process budget is exhausted is waiting for memory that collecting
+            // will not produce, and treating it as demand made the collector run cycles
+            // back to back at 100% instead of idling, starving the very threads it was
+            // trying to serve: the -DCN1_PACING_NO_RESERVE arm under a simulated ceiling
+            // stopped finishing its fixed round count at all. The counter that fed it is
+            // gone with it -- [GCSTALL]'s duty figure is built from the per-thread stall
+            // clocks, not from a parked-thread count.
             if(uncollected >= trigger) {
 #ifdef CN1_GC_CONFORM
                 atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
@@ -3143,6 +3193,19 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
             }
         }
 #endif
+        // A request was made, and consuming it must never drop this thread to the LONG
+        // idle. The code replaced here read
+        //
+        //     if(forceGc || isHighFrequencyGC()) { forceGc = false; LOCK.wait(200); }
+        //
+        // so forceGc GUARANTEED a 200ms wait; returning 30000 for a consumed request loses
+        // that guarantee, and it loses it in the worst case: a mutator parked on the
+        // process budget allocates nothing, so isHighFrequencyGC() reads quiet at exactly
+        // the moment someone is waiting. It then set forceGc from inside its park -- a
+        // plain store with no notify, because a parked thread must not enter a Java monitor
+        // -- and the collector slept through it. ProcessBudgetPacingIntegrationTest under a
+        // 120MB ceiling stalled out its whole 300s budget on this.
+        return 200;
     }
 #ifdef CN1_GC_CONFORM
     atomic_fetch_add_explicit(&cn1GcCyclesAfterIdle, 1, memory_order_relaxed);
@@ -4480,7 +4543,6 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         }
         CN1_GC_PARK_CAPTURE(threadStateData);
         CN1_STALL_T0(__stallVol);
-        atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
         threadStateData->threadActive = JAVA_FALSE;
         int spins = 0;
         while(cn1PacingVolume(which) > (long long)cap &&
@@ -4492,7 +4554,6 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             usleep((JAVA_INT)(500));
         }
         threadStateData->threadActive = JAVA_TRUE;
-        atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
         CN1_STALL_ADD(__stallVol, CN1_STALL_PACING_VOLUME, threadStateData);
         return;
     }
@@ -4564,9 +4625,23 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             atomic_fetch_add_explicit(&cn1PacingVolumeParks, 1, memory_order_relaxed);
         }
     }
+    // Ask ONCE while still ACTIVE, so the request carries a notify. Everything below runs
+    // parked, and a parked thread must not enter a Java monitor (see
+    // cn1RequestGcFromParkedThread), so the in-park re-requests are plain stores that
+    // reach the collector only at the top of its next loop pass. That is enough to keep an
+    // ALREADY-RUNNING collector going, and not enough to wake a sleeping one: a parked
+    // thread allocates nothing, so isHighFrequencyGC() reads quiet and the idle it chose
+    // is the 30s one. Without this call the process sat out the whole budget waiting for a
+    // collection nobody had scheduled -- ProcessBudgetPacingIntegrationTest under a 120MB
+    // ceiling, which is precisely the failure its own timeout message predicts.
+    {
+        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+        threadStateData->nativeAllocationMode = JAVA_TRUE;
+        java_lang_System_gc__(threadStateData);
+        threadStateData->nativeAllocationMode = wasNam;
+    }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     CN1_STALL_T0(__stallBudget);
-    atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
     int lastEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
@@ -4580,10 +4655,9 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         // collector drops to its 30s idle wait -- and we would then sit out the whole
         // budget waiting for reclamation nobody was doing.
         if((spins % CN1_PACING_GC_REQUEST_SPINS) == 0) {
-            JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
-            threadStateData->nativeAllocationMode = JAVA_TRUE;
-            java_lang_System_gc__(threadStateData);
-            threadStateData->nativeAllocationMode = wasNam;
+            // NOT java_lang_System_gc__: this thread is parked, and that call enters a Java
+            // monitor. See cn1RequestGcFromParkedThread.
+            cn1RequestGcFromParkedThread();
         }
         usleep((JAVA_INT)CN1_PACING_WAIT_SLEEP_US);
         spins++;
@@ -4637,7 +4711,6 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         usleep((JAVA_INT)(500));
     }
     threadStateData->threadActive = JAVA_TRUE;
-    atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
     CN1_STALL_ADD(__stallBudget, CN1_STALL_PACING_BUDGET, threadStateData);
 }
 
@@ -7884,9 +7957,13 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 #endif
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
+        // Request BEFORE parking, and through the flag rather than through Java: the call
+        // below used to run with threadActive already FALSE, and java_lang_System_gc__
+        // enters a Java monitor, which is a GC safepoint. See cn1RequestGcFromParkedThread
+        // for the deadlock that shape produces.
         invokedGC = YES;
+        cn1RequestGcFromParkedThread();
         threadStateData->threadActive = JAVA_FALSE;
-        java_lang_System_gc__(getThreadLocalData());
         while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(1000));
         }
@@ -7956,7 +8033,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 #ifdef CN1_GC_PENDING_WAIT_FULL_CYCLE
             // Ablation arm: the pre-fix shape -- wait the running cycle OUT, then ask for
             // another and wait for that one too.
-            atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
             CN1_GC_PARK_CAPTURE(threadStateData);
             threadStateData->threadActive = JAVA_FALSE;
             while(gcCurrentlyRunning) {
@@ -7990,7 +8066,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
                 threadStateData->nativeAllocationMode = wasNam;
             }
             CN1_GC_PARK_CAPTURE(threadStateData);   // PHASE 3b: native-stack capture at park
-            atomic_fetch_add_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
             threadStateData->threadActive = JAVA_FALSE;
             {
                 // Wait only for the migration, and stay parked for all of it: a cycle that
@@ -8008,7 +8083,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 #endif
             invokedGC = NO;
             threadStateData->threadActive = JAVA_TRUE;
-            atomic_fetch_sub_explicit(&cn1GcBlockedMutators, 1, memory_order_relaxed);
             CN1_STALL_ADD(__stallPending, CN1_STALL_PENDING_FULL, threadStateData);
         }
         {
@@ -10316,6 +10390,13 @@ static void cn1ReportStalls(void) {
                 ? (double)atomic_load_explicit(&cn1GcSnapSortNs, memory_order_relaxed)
                     / (double)atomic_load_explicit(&cn1ConsExtSorted, memory_order_relaxed)
                 : 0.0);
+    fprintf(stderr, "[GCSTALL] gracePagesWalked=%lld gracePagesSkipped=%lld"
+                    " graceSlotsWalked=%lld graceSlotsFresh=%lld graceMarked=%lld\n",
+            atomic_load_explicit(&cn1GracePagesWalked, memory_order_relaxed),
+            atomic_load_explicit(&cn1GracePagesSkipped, memory_order_relaxed),
+            atomic_load_explicit(&cn1GraceSlotsWalked, memory_order_relaxed),
+            atomic_load_explicit(&cn1GraceSlotsFresh, memory_order_relaxed),
+            atomic_load_explicit(&cn1GraceMarked, memory_order_relaxed));
     fprintf(stderr, "[GCSTALL] extSearches=%lld extHits=%lld bloomRejects=%lld\n",
             atomic_load_explicit(&cn1ConsExtSearches, memory_order_relaxed),
             atomic_load_explicit(&cn1ConsExtHits, memory_order_relaxed),
@@ -10831,6 +10912,24 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
 
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(getThreadLocalData(), src->length, cls, byteSize, src->dimensions);
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);
+    // SATB INSERTION barrier. This memcpy publishes every reference in the source into a
+    // BRAND NEW array without going through the per-element setter, so no barrier fired
+    // for any of them. The destination is by construction a fresh grace object, which is
+    // the exact case the insertion half exists for (see CN1_WRITE_BARRIER): if the source
+    // then dies, the copied-in objects are reachable only through an object the collector
+    // has already walked past, and the sweep frees them under a live reference.
+    //
+    // No deletion half: the destination was allocated two lines up and holds nothing that
+    // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
+#ifndef CN1_NO_BULK_INSERTION_BARRIER
+    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
+        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)(*arr).data;
+        for(int i = 0 ; i < arr->length ; i++) {
+            JAVA_OBJECT o = data[i];
+            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
+        }
+    }
+#endif
     return (JAVA_OBJECT)arr;
 }
 

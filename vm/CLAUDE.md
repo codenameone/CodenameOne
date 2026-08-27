@@ -189,3 +189,98 @@ Three things that cost real time here, all of them measurement rather than code:
   COUNTERS (`rescanSlots`, `extSearches`, `cyclesOnDemand`, stall histograms), which are
   stable, and treat any per-benchmark ratio under ~5% as noise; the whole-suite geomean over
   13 interleaved reps is 0.999.
+
+### The BiBOP grace pass: investigated, and deliberately not changed
+
+It is the single largest item left in a mark -- 50% on the legacy-heavy shape, ~70% on the
+pure-churn one. The conclusion is that it is not doing anything wasteful, and the one
+optimization that would help cannot be made safe with the gates this repo has.
+
+**What it costs, measured** (`[GCSTALL] gracePagesWalked/graceSlotsWalked/graceSlotsFresh/
+graceMarked`, `-DCN1_GC_CONFORM`): per cycle it skips ~9,950 pages on `gcAllocedSinceSweep`,
+walks ~1,900, and of the 1.2M slots it touches **82-91% are genuinely fresh** and 68-77% get
+a `gcMarkObject`. So the prune works and the walk is not the cost: the cost is
+**828,000-1,520,000 `gcMarkObject` calls per cycle**, at roughly 35ns each including the
+subsequent trace. The pass treats the entire fresh generation as roots, because the sweep's
+one-cycle grace rule keeps every fresh object whether or not it is reachable, and an OLD
+object reachable only through one of them would otherwise be swept under it.
+
+Skipping the non-fresh slots it walks would save ~5ms of ~30ms and needs a new per-page
+invariant (fresh slots are contiguous only on pages that have not allocated from their free
+list). Not worth it.
+
+**The optimization that would work, and why it is not here.** Objects allocated *while the
+SATB barrier is armed* do not need tracing at all: every reference stored into them is
+logged by the insertion half, which exists for exactly that case ("the container it is
+stored into is a fresh grace object not yet reachable"). Snapshotting each page's
+`bumpIndex` when the barrier arms and walking only below it would skip the ~60-70% of the
+fresh set allocated during the mark -- allocate-black, the standard answer.
+
+It depends entirely on the barrier being COMPLETE, and auditing that turned up two bulk
+copies of object references that bypass the per-element setter and so fire no insertion
+barrier at all: `java_lang_System_arraycopy` on an object array (it had the deletion half
+only) and `cloneArray` (it had neither). Both are fixed here, and the fix is free (geomean
+0.994) because it only runs during a mark.
+
+Then the decisive part: **the verifier cannot see this window.** Two purpose-built drivers --
+single-threaded and four-threaded, ~100 verify passes each, the destination made unreachable
+so only the grace rule keeps it -- report `violations=0` *with the barrier deliberately
+compiled out* (`-DCN1_NO_BULK_INSERTION_BARRIER`). The window is real by inspection and
+narrow enough that neither `run-gc-verify.sh` nor the gauntlet can open it. Making the grace
+pass depend on an invariant no gate can falsify would trade a measured 50% of mark time for
+a correctness risk that would surface as silent heap corruption in a customer app, days
+later, with no reproducer. `BulkCopyBarrier` stays in the verifier's driver list because it
+exercises both bulk paths; it is NOT a self-test, because a self-test that cannot fail is
+worse than none.
+
+If this is ever revisited, the thing to build FIRST is a way to drive an allocation into the
+residual window on purpose -- the phases after the grace walk and before `gcSatbActive` is
+cleared -- because without that, no version of this change can be validated.
+
+### Never call into Java from a parked thread
+
+`java_lang_System_gc__` enters `synchronized(LOCK)`, and `monitorEnter` is a GC safepoint.
+Calling it from a thread that has already published `threadActive = FALSE` takes that thread
+back OUT of the parked state -- which is the state `codenameOneGCMark` is spinning on in its
+`while(t->threadActive)` wait -- and can block it inside the monitor while the collector
+waits for it to go quiescent. That is a circular wait and it deadlocks the process:
+collector in the mark waiting for a mutator, every mutator in `cn1PacingPark` re-requesting
+a collection through the monitor.
+
+Two sites did this: the budgeted pacing wait's periodic re-request, and the calloc-failure
+path. Both now set `forceGc` directly (`cn1RequestGcFromParkedThread`), which is a plain
+store the collector re-reads at the top of every loop pass.
+
+**What that store loses is the notify, and "the collector will pick it up soon" is wrong
+twice over.** Both corrections were paid for with a second hang:
+
+- A plain store cannot wake a collector that is already inside `LOCK.wait()`, and a parked
+  mutator allocates nothing, so `isHighFrequencyGC()` reads quiet at exactly the moment
+  someone is waiting on it. The park therefore issues one real `java_lang_System_gc__`
+  BEFORE parking, while still active, so the request carries a notify; the in-park
+  re-requests stay plain stores, which is enough to keep an already-running collector going.
+- `gcIdleWaitMillis` must never answer a CONSUMED request with the long idle. The code it
+  replaced was `if(forceGc || isHighFrequencyGC()) { forceGc = false; LOCK.wait(200); }`, so
+  forceGc *guaranteed* a 200ms wait; returning 30000 for a request it just consumed drops
+  that guarantee in the one case that matters. `ProcessBudgetPacingIntegrationTest` under a
+  120MB ceiling stalled out its entire 300s budget on this, and its own timeout message
+  predicts it: "a park that waits on a collection nobody scheduled stalls exactly like
+  this".
+
+The window is not new. It was survivable only because the collector used to spend nearly all
+of its time inside `LOCK.wait()` with the monitor released; answering the demand signal
+removed that idle and made it acquire `LOCK` once per cycle at several hundred cycles a
+second, which turned a theoretical race into a reliable hang. **A latency fix can convert a
+dormant race into a live one -- the thing to re-run after one is the long soak, not the
+microbenchmark.**
+
+Two notes on finding it, because the first three hours went the wrong way:
+
+- **Ablation macros bisect a hang badly.** Every arm hung sometimes, which reads as "not this
+  one" for each in turn and is wrong: the hang was probabilistic and none of the ablations
+  touched the cause. What settled it in one shot was `sample <pid>` on the wedged process --
+  the GC thread in `codenameOneGCMark`, all four workers in `cn1PacingPark`, one of them
+  inside `java_lang_System_gc__`. Reach for the stacks first.
+- **A wall-clock elapsed figure can lie by minutes.** One soak rep reported `ELAPSED_MS=583031`
+  under a 120s `timeout` -- the machine had slept, so `System.currentTimeMillis()` jumped
+  while both the process and `timeout` were frozen. It had completed normally.

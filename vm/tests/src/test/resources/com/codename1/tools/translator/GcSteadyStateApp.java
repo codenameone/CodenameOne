@@ -77,7 +77,7 @@ public class GcSteadyStateApp {
 
     /** Rounds per worker. Sized for a few hundred collection cycles: the gate compares the
      * second half of the run against the first, so it needs enough cycles in each. */
-    private static final int ROUNDS = 24;
+    private static final int ROUNDS = 44;
 
     /** A retained legacy population, held for the whole run, so the collector's table walks
      * cost something. Reference-carrying on purpose -- the rescan skips objects with no

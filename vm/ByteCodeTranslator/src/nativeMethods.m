@@ -967,14 +967,37 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
-    // SATB deletion barrier: an object arraycopy overwrites dst[dstOffset..+length)
-    // with a bulk memmove that bypasses the per-element setter, so preserve those
-    // overwritten references for the current mark cycle. No-op (one flag load) off-GC.
+    // SATB barrier, BOTH halves: an object arraycopy replaces dst[dstOffset..+length)
+    // with a bulk memmove that bypasses the per-element setter, so neither half fires on
+    // its own. No-op (one flag load) off-GC.
+    //
+    // The DELETION half preserves the references being overwritten, for the usual
+    // snapshot reason.
+    //
+    // The INSERTION half preserves the references being written IN, and it was missing.
+    // That half exists (see CN1_WRITE_BARRIER in cn1_globals.h) specifically to keep an
+    // object alive when "the container it is stored into is a fresh grace object not yet
+    // reachable" -- so copying into a freshly allocated Object[] during a mark, and then
+    // dropping the source, left the copied-in objects unmarked. The BiBOP grace pass
+    // covers most of that window by walking fresh slots, but not a destination allocated
+    // after the walk has passed its page, and not the belt/fixpoint phases that run after
+    // it. The result is a live object swept with a surviving reference to it -- the
+    // container->content class of crash the insertion half was added for.
+    //
+    // Both reads happen BEFORE the memmove, which is also what makes this correct for the
+    // overlapping src/dst that arraycopy is contractually required to support.
     if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
         JAVA_ARRAY_OBJECT* dstData = (JAVA_ARRAY_OBJECT*)(*dstArr).data;
+#ifndef CN1_NO_BULK_INSERTION_BARRIER
+        JAVA_ARRAY_OBJECT* srcData = (JAVA_ARRAY_OBJECT*)(*srcArr).data;
+#endif
         for(int i = 0 ; i < length ; i++) {
             JAVA_OBJECT o = dstData[dstOffset + i];
             if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
+#ifndef CN1_NO_BULK_INSERTION_BARRIER
+            JAVA_OBJECT n = srcData[srcOffset + i];
+            if(n != JAVA_NULL && !CN1_IS_TAGGED(n)) cn1SatbEnqueue(n);
+#endif
         }
     }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines

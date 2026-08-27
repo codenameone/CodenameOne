@@ -29,7 +29,7 @@ unset CN1_GC_FAULT CN1_GC_VERIFY_SOFT CN1_GC_VERIFY_AGING CN1_GC_VERIFY_ALL \
 # Every workload that allocates enough to drive real collection cycles. The
 # point is coverage of ALLOCATION SHAPES, not of answers: page-heap churn,
 # monitors, finalizers, threads, oversized/legacy objects, adopted survivors.
-DRIVERS="${*:-GraceAudit LegacyGrace GcStress MtStress MapTorture SbTorture FusedTest ThreadChurn LargeArrayLoad}"
+DRIVERS="${*:-GraceAudit LegacyGrace BulkCopyBarrier GcStress MtStress MapTorture SbTorture FusedTest ThreadChurn LargeArrayLoad}"
 
 fail=0
 for d in $DRIVERS; do

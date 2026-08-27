@@ -118,7 +118,13 @@ class GcSteadyStateIntegrationTest {
 
     /**
      * Wall-clock samples needed before the second series means anything. The emitter runs
-     * at 1Hz and the workload is tens of seconds, so this is a floor and not a target.
+     * at 1Hz, so this is a floor on how long the fixture must run and not a target.
+     *
+     * <p>The fixture's ROUNDS was raised from 24 to 44 to keep it above this line: making
+     * the collector faster made the fixed round count finish in nine seconds, and this
+     * assertion failed on the SUCCESS. The floor is what makes the wall-clock series
+     * non-vacuous, so the right answer was to lengthen the workload, not to lower it --
+     * but note the coupling, because the next improvement will hit it again.</p>
      */
     private static final int MIN_WALL_ROWS = 10;
 
