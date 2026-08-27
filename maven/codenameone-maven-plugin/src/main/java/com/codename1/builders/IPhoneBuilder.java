@@ -6484,11 +6484,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (macNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
-                    // Told before the entitlements are written, so the Mac slice declares the
-                    // same App Group the iOS one does. Without it the Mac app publishes into a
-                    // container its own extension cannot open.
-                    macNativeBuilder.setDocumentProviderAppGroup(
-                            documentProviderEnabled ? documentsAppGroup : null);
+                    // Deliberately no App Group in the Mac entitlements for the document
+                    // provider: FileProvider is unavailable on Mac Catalyst, so that slice hosts
+                    // no extension and nothing there would use the group. An entitlement the Mac
+                    // provisioning profile does not carry fails signing, so an unused capability
+                    // is not free.
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
                     macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
@@ -11301,10 +11301,7 @@ public class IPhoneBuilder extends Executor {
                 .setAppGroupId(documentsAppGroup)
                 .setDisplayName(documentsDisplayName)
                 .setDeploymentTarget(request.getArg("ios.documentProvider.deploymentTarget",
-                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS))
-                // A Catalyst build signs this extension as its own sandboxed macOS process, so
-                // it needs entitlements the iOS slice must not carry.
-                .setCatalystTarget(macNativeBuilder.isEnabled());
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS));
         String extensionName = docBuilder.getExtensionName();
         File extensionDir = new File(distDir, extensionName);
         IOSWalletExtensionBuilder.writeFileMap(docBuilder.buildFileMap(), extensionDir);
@@ -11376,27 +11373,20 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
                 + "embed_file = embed_phase.add_file_reference(fileref)\n");
         if (macNativeBuilder.isEnabled()) {
-            // Unlike the widget extension, this one travels to the Catalyst slice. The reason the
-            // widget extension is filtered out is that the Mac entitlements carry no app group --
-            // and for this feature they now do, because setDocumentProviderAppGroup told the Mac
-            // builder to write it. FileProvider is available to Catalyst, so the Mac app hosts
-            // the same extension the iOS app does rather than shipping without the feature.
-            buildSettingsMap.put("SUPPORTS_MACCATALYST", "YES");
-            // Must match the app target, which MacNativeBuilder sets to YES. On the Catalyst
-            // destination that turns the app's bundle id into "maccatalyst.<id>"; an embedded
-            // extension has to stay nested under whatever the host actually resolves to, so
-            // leaving this NO would ship an appex whose id is no longer prefixed by the app's
-            // and fail the archive.
-            buildSettingsMap.put("DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER", "YES");
-            // Per-SDK, so the iOS slice keeps its own entitlements and only the Mac one picks up
-            // the sandbox keys. Written straight into the Xcode build settings rather than
-            // through buildSettings.properties: Properties.load splits on the first '=', which a
-            // "[sdk=macosx*]" key contains.
-            String catalystEntitlements = docBuilder.getCatalystEntitlementsName();
-            if (catalystEntitlements != null) {
-                buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS[sdk=macosx*]",
-                        extensionName + "/" + catalystEntitlements);
-            }
+            // Kept off the Catalyst slice, exactly as the widget extension is, and for a harder
+            // reason than the widget one: FileProvider is API_UNAVAILABLE(macCatalyst), so the
+            // generated Swift does not compile under macabi at all -- "'NSFileProviderDomain' is
+            // unavailable in Mac Catalyst", and the same for every other type it names. A
+            // Catalyst app cannot host this extension however it is entitled.
+            //
+            // The iOS app keeps its provider; the Catalyst slice ships without one, and the
+            // app-side natives take their stub branch there so the API is an honest no-op.
+            // macOS support belongs to the AppKit port, which builds against the macOS SDK where
+            // FileProvider exists.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {

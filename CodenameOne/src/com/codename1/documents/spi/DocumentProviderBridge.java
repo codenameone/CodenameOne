@@ -27,7 +27,7 @@ package com.codename1.documents.spi;
 /// whole public API an inert no-op).
 ///
 /// Everything crosses this boundary as data -- a JSON index produced by the core serializer and
-/// files on disk -- never as live model objects. On iOS and macOS the reader is an app extension
+/// files on disk -- never as live model objects. On iOS the reader is an app extension
 /// in a *separate process* that runs while the app is dead, so implementations MUST persist what
 /// they are given into a container both processes can reach (the App Group container on Apple
 /// platforms; ordinary app storage on Android, where the provider shares the app's process).

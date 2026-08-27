@@ -47,13 +47,13 @@ import java.util.Date;
  * of text "notes", writes each one into the shared directory and publishes a two-level tree over
  * them. Adding or deleting a note republishes, and the browser picks the change up.
  *
- * <p>Where to see it: on iOS open the Files app and look under "Browse" alongside iCloud Drive; on
- * macOS look in Finder's sidebar; on Android open any app's storage picker and choose "Browse".
+ * <p>Where to see it: on iOS open the Files app and look under "Browse" alongside iCloud Drive;
+ * on Android open any app's storage picker and choose "Browse".
  * The location is served by a separate process that runs while this app is dead, which is why the
  * app publishes data rather than answering questions -- see the Document Provider chapter of the
  * developer guide.</p>
  *
- * <p>The build wires the native plumbing (the iOS/macOS file provider extension and its App Group,
+ * <p>The build wires the native plumbing (the iOS file provider extension and its App Group,
  * the Android documents provider) purely because this class references
  * {@code com.codename1.documents}. In the simulator {@code isSupported()} answers false -- there is
  * no desktop browser to publish into -- but everything is still written under {@code cn1documents}

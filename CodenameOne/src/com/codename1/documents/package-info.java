@@ -20,8 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/// Exposes an app's documents to the system file browser -- the Files app on iOS, Finder on macOS
-/// and the storage picker on Android -- so its content is browsable, and openable by other apps,
+/// Exposes an app's documents to the system file browser -- the Files app on iOS and the storage
+/// picker on Android -- so its content is browsable, and openable by other apps,
 /// without the app being launched.
 ///
 /// Start at `DocumentProvider`. Build a tree of `DocumentNode`s, point each file either at bytes

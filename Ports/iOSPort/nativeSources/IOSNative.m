@@ -16392,7 +16392,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
 //
 // TARGET_OS_* rather than a restructure: this file is shared verbatim with the AppKit macOS
 // port, and the iOS slice has to stay byte-for-byte what it was.
-#if defined(CN1_USE_DOCUMENTS) && (TARGET_OS_IOS || TARGET_OS_OSX)
+//
+// Mac Catalyst is excluded, and not as a policy choice: FileProvider is marked
+// API_UNAVAILABLE(macCatalyst), so importing it under macabi does not compile. Catalyst reports
+// TARGET_OS_IOS, which is why the test is not simply for iOS. A Catalyst build therefore takes
+// the stub branch below, documentProviderSupported() answers false, and the API is an honest
+// no-op there. The AppKit macOS port is unaffected -- it builds against the macOS SDK, where
+// FileProvider is available.
+#if defined(CN1_USE_DOCUMENTS) && (TARGET_OS_OSX || (TARGET_OS_IOS && !TARGET_OS_MACCATALYST))
 #import <FileProvider/FileProvider.h>
 
 // The domain identifier is fixed rather than derived from the bundle id: it is scoped to this

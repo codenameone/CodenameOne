@@ -292,23 +292,6 @@ class MacNativeBuilder {
      * (suffixed {@code -AppStore} / {@code -DeveloperID}); for a single
      * channel a single file named after the main class is emitted.
      */
-    /// The App Group the generated document provider extension shares with the app, or null when
-    /// this build generates no such extension. The Mac entitlements have to carry it too: the
-    /// extension resolves its container from the group, and an app whose Mac slice lacks the
-    /// entitlement publishes into a container the extension cannot open.
-    private String documentProviderAppGroup;
-
-    /// @param appGroup the shared App Group, or null when no document provider is generated
-    void setDocumentProviderAppGroup(String appGroup) {
-        this.documentProviderAppGroup = appGroup == null || appGroup.trim().isEmpty()
-                ? null : appGroup.trim();
-    }
-
-    /// Whether this Mac build hosts the generated document provider extension.
-    boolean hasDocumentProvider() {
-        return documentProviderAppGroup != null;
-    }
-
     void writeEntitlements(BuildRequest request, File appSrcDir) throws IOException {
         appSrcDir.mkdirs();
         if ("both".equalsIgnoreCase(distribution)) {
@@ -339,7 +322,6 @@ class MacNativeBuilder {
         boolean allowJit = parseEntitlementBool(request,
                 "macNative.entitlements.allowJit", false);
         String extra = request.getArg("macNative.entitlements.extra", "");
-        String documentGroup = documentProviderAppGroup;
 
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -351,15 +333,6 @@ class MacNativeBuilder {
         }
         if (networkClient) {
             sb.append("    <key>com.apple.security.network.client</key>\n    <true/>\n");
-        }
-        if (documentGroup != null) {
-            // Same group id the iOS slice declares. Apple resolves an App Group per platform, so
-            // the app and its extension meet in a Mac-side container of their own -- but both
-            // bundles still have to name it or neither can open it.
-            sb.append("    <key>com.apple.security.application-groups</key>\n");
-            sb.append("    <array>\n        <string>")
-                    .append(documentGroup.replace("&", "&amp;").replace("<", "&lt;"))
-                    .append("</string>\n    </array>\n");
         }
         if (networkServer) {
             sb.append("    <key>com.apple.security.network.server</key>\n    <true/>\n");

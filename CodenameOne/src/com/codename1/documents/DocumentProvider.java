@@ -27,7 +27,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.Display;
 
 /// The static entry point for exposing your app's documents to the system file browser: the Files
-/// app on iOS, Finder's sidebar on macOS, the storage picker on Android. Publish a tree, and your
+/// app on iOS, the storage picker on Android. Publish a tree, and your
 /// content becomes browsable from outside your app -- and openable by other apps -- without the
 /// user launching yours.
 ///
@@ -52,7 +52,7 @@ import com.codename1.ui.Display;
 ///
 /// #### The reader is not your app
 ///
-/// On iOS and macOS the browser talks to a generated app *extension*, a separate process that runs
+/// On iOS the browser talks to a generated app *extension*, a separate process that runs
 /// while your app is dead and cannot call your Java code. That is why this API publishes data
 /// rather than installing callbacks: the tree is serialized into a container both processes can
 /// read, and the extension serves the browser from it. Publish whenever your data changes -- after

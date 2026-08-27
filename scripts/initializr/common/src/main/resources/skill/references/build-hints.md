@@ -41,7 +41,7 @@ When in doubt, search the developer guide for the exact key name — there are h
 | `codename1.arg.ios.beforeFinishLaunching=...` | Native code inserted before iOS's `application:didFinishLaunchingWithOptions:` returns. |
 | `codename1.arg.ios.newStorageLocation=true` | Use modern iOS storage paths (recommended for new apps). |
 | `codename1.arg.ios.wallet.extension=true` | Generate an Apple Wallet issuer-provisioning extension (iOS 14+). See *Apple Wallet issuer provisioning* below. |
-| `codename1.arg.ios.documentProvider.enabled=true` | Publish the app's content as a location in the system file browser (Files on iOS, Finder on macOS, the storage picker on Android). See *Document provider* below. |
+| `codename1.arg.ios.documentProvider.enabled=true` | Publish the app's content as a location in the system file browser (Files on iOS, the storage picker on Android). See *Document provider* below. |
 
 ## Android
 
@@ -106,7 +106,7 @@ This is an advanced, issuer-only feature — most apps never need it. The compil
 
 ## Document provider
 
-Publishes app content as a browsable location in the system file browser: the Files app on iOS, Finder's sidebar on macOS, the storage picker on Android. Referencing `com.codename1.documents` is what makes the build generate the native plumbing -- an app-extension target plus App Group on Apple platforms, a `DocumentsProvider` in the manifest on Android.
+Publishes app content as a browsable location in the system file browser: the Files app on iOS, the storage picker on Android. Referencing `com.codename1.documents` is what makes the build generate the native plumbing -- an app-extension target plus App Group on iOS, a `DocumentsProvider` in the manifest on Android.
 
 Publish a tree of `DocumentNode`s through `com.codename1.documents.DocumentProvider`. Content comes either from bytes written under `DocumentProvider.getSharedDirectory()` (a node's `path`) or on demand from an HTTPS endpoint you host (a node's `remoteId` plus `setRemoteEndpoint`).
 

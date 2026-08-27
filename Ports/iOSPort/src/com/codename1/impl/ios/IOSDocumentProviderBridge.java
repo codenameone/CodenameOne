@@ -48,7 +48,10 @@ import java.io.OutputStream;
 /// paths): `java.io.File`'s mutating methods are unimplemented natives on the ParparVM runtime --
 /// referencing them fails the native link.
 ///
-/// Shared unchanged with the AppKit macOS port, which reaches the same natives.
+/// Shared unchanged with the AppKit macOS port, which reaches the same natives: they compile
+/// against the macOS SDK, where FileProvider exists. They answer unsupported on Mac Catalyst,
+/// where it does not -- FileProvider is API_UNAVAILABLE(macCatalyst), so that slice hosts no
+/// extension and the public API is an honest no-op there.
 ///
 /// This whole class is dead code unless the build linked the document provider natives (the
 /// `CN1_USE_DOCUMENTS` define the builder flips when the app references `com.codename1.documents`);

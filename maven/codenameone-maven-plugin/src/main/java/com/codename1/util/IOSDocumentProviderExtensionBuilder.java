@@ -91,7 +91,6 @@ public class IOSDocumentProviderExtensionBuilder {
     private String shortVersion = "1.0";
     private String bundleVersion = "1";
     private boolean macTarget;
-    private boolean catalystTarget;
 
     public IOSDocumentProviderExtensionBuilder() {}
 
@@ -143,24 +142,6 @@ public class IOSDocumentProviderExtensionBuilder {
         return this;
     }
 
-    /**
-     * Declares that this iOS target also ships as a Mac Catalyst slice.
-     *
-     * <p>Distinct from {@link #setMacTarget(boolean)}: the target is still iOS, built from the
-     * iOS SDK, and keeps its iOS entitlements. What this adds is a SECOND entitlements file for
-     * the macOS SDK, because the Catalyst slice is a separately signed sandboxed process and the
-     * host app's Mac entitlements do not carry over to it.</p>
-     */
-    public IOSDocumentProviderExtensionBuilder setCatalystTarget(boolean catalystTarget) {
-        this.catalystTarget = catalystTarget;
-        return this;
-    }
-
-    /** Name of the Catalyst-only entitlements file, or null when there is no Mac slice. */
-    public String getCatalystEntitlementsName() {
-        return catalystTarget ? extensionName + "-Catalyst.entitlements" : null;
-    }
-
     public String getExtensionName() {
         return extensionName;
     }
@@ -207,13 +188,6 @@ public class IOSDocumentProviderExtensionBuilder {
         LinkedHashMap<String, byte[]> map = new LinkedHashMap<String, byte[]>();
         map.put("Info.plist", utf8(buildInfoPlist()));
         map.put(extensionName + ".entitlements", utf8(buildEntitlements()));
-        if (catalystTarget) {
-            // The Catalyst slice signs this extension as its own sandboxed macOS process, and the
-            // host app's Mac entitlements do not reach it. Without the network-client key
-            // CN1DocumentRemote's URLSession request is refused by the sandbox, and every
-            // remote-only document simply appears missing.
-            map.put(getCatalystEntitlementsName(), utf8(buildMacEntitlements()));
-        }
         map.put("buildSettings.properties", utf8(buildBuildSettings()));
         for (String source : SHARED_SOURCES) {
             map.put(source, utf8(loadResource(source)));
@@ -331,34 +305,6 @@ public class IOSDocumentProviderExtensionBuilder {
             sb.append("    <key>com.apple.security.network.client</key>\n");
             sb.append("    <true/>\n");
         }
-        sb.append("</dict>\n");
-        sb.append("</plist>\n");
-        return sb.toString();
-    }
-
-    /**
-     * The entitlements the macOS side needs: the shared group plus the sandbox keys.
-     *
-     * <p>A separate file rather than folded into the iOS one, because a single target serves both
-     * slices. {@code app-sandbox} is meaningless on iOS, where the sandbox is not opt-in, and
-     * putting it in the entitlements the iOS slice signs with invites a provisioning mismatch for
-     * a key that buys nothing there.</p>
-     */
-    private String buildMacEntitlements() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        sb.append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-                + "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n");
-        sb.append("<plist version=\"1.0\">\n");
-        sb.append("<dict>\n");
-        sb.append("    <key>com.apple.security.application-groups</key>\n");
-        sb.append("    <array>\n");
-        sb.append("        <string>").append(escapeXml(appGroupId)).append("</string>\n");
-        sb.append("    </array>\n");
-        sb.append("    <key>com.apple.security.app-sandbox</key>\n");
-        sb.append("    <true/>\n");
-        sb.append("    <key>com.apple.security.network.client</key>\n");
-        sb.append("    <true/>\n");
         sb.append("</dict>\n");
         sb.append("</plist>\n");
         return sb.toString();
