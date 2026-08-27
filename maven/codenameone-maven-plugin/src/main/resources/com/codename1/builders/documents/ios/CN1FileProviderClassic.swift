@@ -59,6 +59,14 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         inFlightLock.unlock()
     }
 
+    /// Whether a stop has arrived for `url` since `generation` was taken. Read-only: the
+    /// in-flight entry is claimed by finishFetch, so this is the after-the-write check.
+    private func stillWanted(at url: URL, generation: Int) -> Bool {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        return (stopGeneration[url] ?? 0) == generation
+    }
+
     /// Whether the fetch that started at `generation` may still write to `url`.
     private func finishFetch(at url: URL, generation: Int) -> Bool {
         inFlightLock.lock()
@@ -282,10 +290,15 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 return
             }
             let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
-            if !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
-                                                     version: requested,
-                                                     credentials: credentials,
-                                                     containerURL: container) {
+            // Checked again after the write, for the stop as well as for the publication. A stop
+            // arriving during place() finds no task left to cancel -- this fetch had already
+            // claimed it -- so it only bumps the generation and deletes the URL, and place() then
+            // puts the file back. Reading the generation once more is what catches that.
+            if !self.stillWanted(at: url, generation: generation)
+                || !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                          version: requested,
+                                                          credentials: credentials,
+                                                          containerURL: container) {
                 try? FileManager.default.removeItem(at: url)
                 completionHandler(NSFileProviderError(.noSuchItem))
                 return
