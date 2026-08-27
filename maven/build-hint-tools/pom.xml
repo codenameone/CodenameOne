@@ -72,7 +72,11 @@
                         <configuration>
                             <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
                             <classpathScope>compile</classpathScope>
-                            <arguments>
+                            <!-- combine.self=override: see the note in the
+                                 Settings module's pom. A plugin level
+                                 configuration elsewhere in the build must not
+                                 merge its own arguments into this array. -->
+                            <arguments combine.self="override">
                                 <argument>${project.basedir}/../../CodenameOne/src</argument>
                                 <argument>${project.build.testOutputDirectory}</argument>
                             </arguments>
