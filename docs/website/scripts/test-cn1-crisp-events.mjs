@@ -30,7 +30,7 @@ function control() {
   };
 }
 
-function load(consent, search = "") {
+function load(consent, search = "", pathname = "/playground/", experimentArm = null) {
   const timers = [];
   const documentListeners = {};
   const banner = control();
@@ -68,9 +68,14 @@ function load(consent, search = "") {
     },
   });
 
+  const localStore = storage();
+  if (experimentArm) {
+    localStore.setItem("cn1-exp-004-arm-v1", experimentArm);
+  }
+
   const window = {
     location: {
-      pathname: "/playground/",
+      pathname,
       search,
     },
     setTimeout(callback) {
@@ -85,7 +90,7 @@ function load(consent, search = "") {
     decodeURIComponent,
     document,
     encodeURIComponent,
-    localStorage: storage(),
+    localStorage: localStore,
     sessionStorage: storage(),
     URL,
     URLSearchParams,
@@ -141,6 +146,36 @@ function events(state) {
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
   assert.equal(eventCommands(state).length, 0,
     "a project download must not be recorded without analytics consent");
+}
+
+{
+  const state = load("accepted", "", "/", "ownership");
+  const recorded = events(state);
+  assert.equal(recorded.length, 1, "an eligible homepage view should record one arm exposure");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+  assert.equal(recorded[0][1].experiment_id, "EXP-004");
+  assert.equal(recorded[0][1].experiment_arm, "ownership");
+}
+
+{
+  const state = load(null, "", "/", "reach");
+  assert.equal(eventCommands(state).length, 0, "experiment exposure must wait for consent");
+  state.accept.click();
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "Exp004ReachExposure");
+}
+
+{
+  const state = load("accepted", "", "/initializr/", "reach");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 2, "a project download should keep the base event and add its arm event");
+  assert.equal(recorded[0][0], "InitializrProjectDownloaded");
+  assert.equal(recorded[0][1].experiment_arm, "reach");
+  assert.equal(recorded[1][0], "Exp004ReachDownload");
+  assert.equal(recorded[1][1].experiment_id, "EXP-004");
 }
 
 {
