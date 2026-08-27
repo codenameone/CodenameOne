@@ -92,8 +92,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     }
 
     /// Moves a staged file onto the shared URL, but only while this request still owns it.
+    ///
+    /// - Parameter stillPublished: re-read of the publication, made with the bytes already in
+    ///   place and the URL's gate still held. It has to run here rather than after the call
+    ///   returns: a request that finds itself superseded reports success on the strength of the
+    ///   newer bytes being there, and if the newer request could still withdraw them afterwards
+    ///   that success would name a URL with nothing at it. Holding the gate across the write and
+    ///   the check makes "superseded" mean "someone newer put bytes there AND stood behind
+    ///   them", which is the only version of it an older request can safely answer with.
     private func install(_ staged: URL, at url: URL, generation: Int,
-                         sequence: Int) -> CN1InstallOutcome {
+                         sequence: Int, stillPublished: () -> Bool) -> CN1InstallOutcome {
         let lock = gate(for: url)
         lock.lock()
         defer { lock.unlock() }
@@ -120,48 +128,24 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         if let error = CN1FileProviderClassic.place(staged, at: url, copy: false) {
             return .failed(error)
         }
+        // The publication is checked again, now that the bytes are where the browser reads them.
+        // The check before the download covers a clear or a rewrite that finished before this;
+        // this one covers one that landed during it, which would otherwise leave the withdrawn
+        // document in storage the clear had just purged, readable through a folder the browser
+        // still has open.
+        if !stillPublished() {
+            try? FileManager.default.removeItem(at: url)
+            // The URL is left unclaimed, so a request that started earlier and is still holding
+            // its own copy installs it rather than standing back for bytes that are gone.
+            inFlightLock.lock()
+            installedSequence[url] = 0
+            inFlightLock.unlock()
+            return .withdrawn
+        }
         inFlightLock.lock()
         installedSequence[url] = sequence
         inFlightLock.unlock()
         return .installed
-    }
-
-    /// Removes bytes this request installed, after a check made once they were in place found
-    /// the publication had moved.
-    ///
-    /// Only while this request is still the one whose bytes are there. A materialization that
-    /// started later may have replaced them between the install and this call, and those bytes
-    /// answer a publication this request knows nothing about -- removing them would evict a
-    /// current document because an older request found an older one withdrawn. A stop takes the
-    /// file itself, so there is nothing to remove after one.
-    private func discardInstalled(at url: URL, generation: Int, sequence: Int) {
-        let lock = gate(for: url)
-        lock.lock()
-        defer { lock.unlock() }
-        inFlightLock.lock()
-        let owner = installedSequence[url] ?? 0
-        let stopped = (stopGeneration[url] ?? 0) != generation
-        if owner == sequence {
-            installedSequence[url] = 0
-        }
-        inFlightLock.unlock()
-        guard owner == sequence, !stopped else {
-            return
-        }
-        try? FileManager.default.removeItem(at: url)
-    }
-
-    /// Whether the shared URL currently holds bytes, asked under its gate.
-    ///
-    /// The gate is what makes the answer meaningful: install and discardInstalled both hold it,
-    /// so this cannot see the moment between a newer request's install and its validation. A
-    /// discard AFTER this returns is not a wrong answer -- the file was there when the answer was
-    /// made -- and the system asks again the next time it wants the item.
-    private func materialized(at url: URL) -> Bool {
-        let lock = gate(for: url)
-        lock.lock()
-        defer { lock.unlock() }
-        return FileManager.default.fileExists(atPath: url.path)
     }
 
     private func beginFetch(at url: URL) -> Int {
@@ -492,32 +476,22 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                         return
                     }
                     switch self.install(staged, at: url, generation: stopped,
-                                        sequence: sequence) {
+                                        sequence: sequence, stillPublished: {
+                        CN1DocumentItem.localStamp(path: path, containerURL: container)
+                                == sourceStamp
+                            && CN1FileProviderClassic.stillPublished(identifier, path: path,
+                                                                     generation: publication,
+                                                                     containerURL: container)
+                    }) {
                     case .installed:
-                        // And again, now that the bytes are where the browser reads them. The
-                        // check above covers a clear or a rewrite that finished before the
-                        // install; this one covers one that landed during it, which would
-                        // otherwise leave the withdrawn document in storage the clear had just
-                        // purged, readable through a folder the browser still has open.
-                        guard CN1DocumentItem.localStamp(path: path, containerURL: container)
-                                == sourceStamp,
-                              CN1FileProviderClassic.stillPublished(identifier, path: path,
-                                                                    generation: publication,
-                                                                    containerURL: container) else {
-                            self.discardInstalled(at: url, generation: stopped,
-                                                  sequence: sequence)
-                            self.providePlaceholder(at: url) { _ in }
-                            completionHandler(NSFileProviderError(.noSuchItem))
-                            return
-                        }
                         completionHandler(nil)
                     case .superseded:
-                        // Someone else's newer bytes are there, and that request runs this same
-                        // check for itself -- which can also REMOVE them, so this answers on what
-                        // is at the URL rather than assuming. Under the gate, so it cannot land
-                        // between that request's install and its own validation.
-                        completionHandler(self.materialized(at: url)
-                                          ? nil : NSFileProviderError(.noSuchItem))
+                        // Someone else's newer bytes are there, and they passed that request's
+                        // own check before it let go of the gate.
+                        completionHandler(nil)
+                    case .withdrawn:
+                        self.providePlaceholder(at: url) { _ in }
+                        completionHandler(NSFileProviderError(.noSuchItem))
                     case .stopped:
                         completionHandler(NSFileProviderError(.noSuchItem))
                     case .failed(let error):
@@ -587,28 +561,26 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // The download is already a private file, so this is the same claim the local branch
             // makes: the shared URL is written only while this request still owns it, under its
             // gate, so a stop and a reopen cannot both be writing there.
-            switch self.install(fetched, at: url, generation: generation, sequence: sequence) {
+            switch self.install(fetched, at: url, generation: generation, sequence: sequence,
+                                stillPublished: {
+                // The second of the two checks the comment above promises: an account switch or
+                // a republish landing during the install would otherwise leave the previous
+                // account's document at the shared URL, reported as a success under the new
+                // publication.
+                CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                      version: requested,
+                                                      credentials: credentials,
+                                                      containerURL: container)
+            }) {
             case .installed:
-                // The second of the two checks the comment above promises, made once the bytes
-                // are where the browser reads them: an account switch or a republish landing
-                // during the install would otherwise leave the previous account's document in
-                // the shared URL, reported as a success under the new publication.
-                guard CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
-                                                            version: requested,
-                                                            credentials: credentials,
-                                                            containerURL: container) else {
-                    self.discardInstalled(at: url, generation: generation, sequence: sequence)
-                    self.providePlaceholder(at: url) { _ in }
-                    completionHandler(NSFileProviderError(.noSuchItem))
-                    return
-                }
                 completionHandler(nil)
             case .superseded:
-                // Someone else's newer bytes are there, and that request runs this same check
-                // for itself -- which can also REMOVE them, so this answers on what is at the
-                // URL rather than assuming.
-                completionHandler(self.materialized(at: url)
-                                  ? nil : NSFileProviderError(.noSuchItem))
+                // Someone else's newer bytes are there, and they passed that request's own check
+                // before it let go of the gate.
+                completionHandler(nil)
+            case .withdrawn:
+                self.providePlaceholder(at: url) { _ in }
+                completionHandler(NSFileProviderError(.noSuchItem))
             case .stopped:
                 completionHandler(NSFileProviderError(.noSuchItem))
             case .failed(let error):
@@ -786,6 +758,9 @@ private enum CN1InstallOutcome {
     /// A later request for the same URL had already written newer bytes for the same item, so
     /// this one is satisfied without touching them.
     case superseded
+    /// The bytes were written and then taken away again: the publication moved while they were
+    /// being installed, so the URL is left with nothing at it and unclaimed.
+    case withdrawn
     /// A stop took the URL away while this request was working.
     case stopped
     /// The move itself failed.
