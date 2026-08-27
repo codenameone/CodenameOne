@@ -1238,14 +1238,17 @@ public abstract class Executor {
     private static final long PERM_SCAN_MAX_TOTAL_BYTES = 256L * 1024 * 1024;
 
     /** The entry-count companion, for an archive of many small bombs. */
-    private static final int PERM_SCAN_MAX_ENTRIES = 50000;
+    // Package-visible, with the budget class, so the limits can be exercised
+    // directly: this accounting has now been wrong twice and neither time was
+    // reachable from a public entry point.
+    static final int PERM_SCAN_MAX_ENTRIES = 50000;
 
     /**
      * The running extraction budget for one archive, shared by the outer scan and
      * the nested-jar descent so the two cannot disagree about the limit -- and so
      * a bomb cannot get twice the budget by being nested.
      */
-    private static final class PermScanBudget {
+    static final class PermScanBudget {
         private long total;
         private int extracted;
         private int entries;
@@ -1360,7 +1363,10 @@ public abstract class Executor {
      *
      * @return the next free number
      */
-    private void extractNestedClassesForPermissions(InputStream nested, File tmp,
+    // static and package-visible so a test can drive the real loop: asserting
+    // that the budget counts is worth little unless something also asserts
+    // this loop charges it.
+    static void extractNestedClassesForPermissions(InputStream nested, File tmp,
             PermScanBudget budget) throws IOException {
         java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
         java.util.zip.ZipEntry inner;

@@ -185,4 +185,74 @@ class ExecutorArchiveExtractionTest {
                 classes, resources, sources);
         return resources;
     }
+
+    /**
+     * Every nested entry is charged, not only the ones extracted.
+     *
+     * <p>The budget bounded bytes long before it bounded entries, and an entry
+     * that is drained rather than kept carries no data at all -- so a nested
+     * archive of empty or directory entries cost nothing and could be repeated
+     * without limit, while its ZIP headers compressed to almost nothing inside
+     * the enclosing archive. The byte budgets cannot see that case, which is
+     * why the count is asserted on its own here.</p>
+     */
+    @Test
+    void chargesEveryEntryAgainstTheCountBudget() throws Exception {
+        Executor.PermScanBudget budget = new Executor.PermScanBudget();
+        for (int i = 0; i < Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+            budget.entry("entry" + i + "/");
+        }
+
+        IOException tooMany = assertThrows(IOException.class,
+                () -> budget.entry("one-past-the-budget/"));
+        assertTrue(tooMany.getMessage().contains("refusing to keep scanning"),
+                "the message should say why it stopped, got: " + tooMany.getMessage());
+    }
+
+    /**
+     * A drained entry is charged exactly like an extracted one. Counting only
+     * what reaches disk is the shape of the original bug.
+     */
+    @Test
+    void aDrainedEntryCostsTheSameAsAnExtractedOne() throws Exception {
+        Executor.PermScanBudget drained = new Executor.PermScanBudget();
+        Executor.PermScanBudget extracted = new Executor.PermScanBudget();
+        for (int i = 0; i < Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+            drained.entry("directory" + i + "/");
+            extracted.entry("Class" + i + ".class");
+        }
+
+        assertThrows(IOException.class, () -> drained.entry("next/"));
+        assertThrows(IOException.class, () -> extracted.entry("Next.class"));
+    }
+
+    /**
+     * The real nested-scan loop refuses an archive made of empty entries.
+     *
+     * <p>This is the assertion that constrains the fix rather than the helper:
+     * charging the budget is only useful if the loop does the charging, and a
+     * test that calls {@code entry()} itself would still pass with the call
+     * removed. The archive here carries no class data at all, so every byte
+     * budget stays untouched and only the entry count can stop it.</p>
+     */
+    @Test
+    void aNestedArchiveOfEmptyEntriesIsRefused() throws Exception {
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        ZipOutputStream zos = new ZipOutputStream(raw);
+        for (int i = 0; i < Executor.PERM_SCAN_MAX_ENTRIES + 10; i++) {
+            zos.putNextEntry(new ZipEntry("d" + i + "/"));
+            zos.closeEntry();
+        }
+        zos.close();
+
+        File scratch = temporaryDirectory.resolve("nested-scan").toFile();
+        assertTrue(scratch.mkdirs());
+
+        IOException refused = assertThrows(IOException.class,
+                () -> Executor.extractNestedClassesForPermissions(
+                        new ByteArrayInputStream(raw.toByteArray()), scratch,
+                        new Executor.PermScanBudget()));
+        assertTrue(refused.getMessage().contains("refusing to keep scanning"),
+                "expected the entry-count refusal, got: " + refused.getMessage());
+    }
 }
