@@ -6246,11 +6246,6 @@ extern SKPayment *paymentInstance;
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
 - (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
-// UIKit-only helper. AppKit's equivalent is a different API rather than a
-// renamed one, so this is inert on the native macOS port until it is ported.
-#if TARGET_OS_OSX
-#else
-#endif
     if(datepickerPopover) {
         if(currentDatePickerDate != nil) {
 #ifndef CN1_USE_ARC
