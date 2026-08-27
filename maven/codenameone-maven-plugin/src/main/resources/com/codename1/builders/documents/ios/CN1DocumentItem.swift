@@ -227,26 +227,39 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         "\(value.utf8.count):\(value)"
     }
 
+    /// What a locally backed file looks like right now, or nil when it is not there.
+    ///
+    /// The file number as well as the size and the date. A publish that swaps the bytes by
+    /// writing a temporary file and renaming it over the old one -- which is how anything careful
+    /// replaces a file, and how the Codename One side writes the index itself -- gives the path a
+    /// different file, and it can carry the size and the timestamp of the one it replaced. Size
+    /// and date alone would call that unchanged and the browser would go on serving what it
+    /// cached.
+    ///
+    /// The publish revision is deliberately NOT folded in: it moves on every publish, so every
+    /// materialized local document would be re-read whenever the app republishes anything. What
+    /// that would additionally catch is an in-place rewrite that restores both the size and the
+    /// modification time, which nothing reachable through FileSystemStorage can do -- it has no
+    /// way to set a timestamp.
+    ///
+    /// Shared with the providers, which take it before and after copying a file: the bytes handed
+    /// over and the version they are labelled with have to come from the same snapshot, and that
+    /// only holds if both are measured the same way.
+    static func localStamp(path: String, containerURL: URL) -> String? {
+        guard let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
+              let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) else {
+            return nil
+        }
+        let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
+        let modified = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
+        let file = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
+        return "disk-\(size)-\(modified)-\(file)"
+    }
+
     private var contentStamp: String {
         if let path = node.path, !path.isEmpty, let container = containerURL,
-           let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
-           let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
-            let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
-            let modified = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
-            // The file number as well as the size and the date. A publish that swaps the bytes by
-            // writing a temporary file and renaming it over the old one -- which is how anything
-            // careful replaces a file, and how the Codename One side writes the index itself --
-            // gives the path a different file, and it can carry the size and the timestamp of the
-            // one it replaced. Size and date alone would call that unchanged and the browser would
-            // go on serving what it cached.
-            //
-            // The publish revision is deliberately NOT folded in here: it moves on every publish,
-            // so every materialized local document would be re-read whenever the app republishes
-            // anything. What that would additionally catch is an in-place rewrite that restores
-            // both the size and the modification time, which nothing reachable through
-            // FileSystemStorage can do -- it has no way to set a timestamp.
-            let file = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
-            return "disk-\(size)-\(modified)-\(file)"
+           let stamp = CN1DocumentItem.localStamp(path: path, containerURL: container) {
+            return stamp
         }
         // Remote content has no local bytes to measure, so the app's declared size and date are
         // the only per-item signal there is. They are trusted rather than overridden with the

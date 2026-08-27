@@ -154,6 +154,13 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 // content, it must provide a clone of that content as the URL passed to the
                 // completion handler." Handing over the app's own file would unlink it out of the
                 // shared container on the first open, and every later open would find nothing.
+                // The source as it stands before the copy. The app can rewrite a published file
+                // without republishing -- the index revision does not move for that -- and the
+                // item rebuilt afterwards takes its content version from the file as it is THEN,
+                // so the handoff could carry the old or half-copied bytes under a version that
+                // describes the new ones. Cached as current, and never asked for again.
+                let sourceStamp = CN1DocumentItem.localStamp(path: path,
+                                                             containerURL: containerURL)
                 let handoff: URL
                 do {
                     handoff = try handoffDirectory().appendingPathComponent(UUID().uuidString)
@@ -176,7 +183,13 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                         // can land during it, and the copy finishes from the source handle either
                         // way -- so without this the previous publication's bytes are handed over
                         // after the logout that was supposed to remove them.
-                        if let current = CN1FileProviderExtension.publishedItem(
+                        if CN1DocumentItem.localStamp(path: path, containerURL: container)
+                            != sourceStamp {
+                            // The source moved under the copy. Refused rather than versioned: the
+                            // system asks again and gets bytes and a version that agree.
+                            try? FileManager.default.removeItem(at: handoff)
+                            once.call(nil, nil, NSFileProviderError(.noSuchItem))
+                        } else if let current = CN1FileProviderExtension.publishedItem(
                                 for: itemIdentifier, path: path, generation: generation,
                                 containerURL: container) {
                             if !once.call(handoff, current, nil) {
