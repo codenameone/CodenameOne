@@ -53,6 +53,25 @@ public class IOSDocumentProviderExtensionBuilderTest {
     }
 
     @Test
+    public void aDeploymentTargetThatIsNotAVersionIsRefused() {
+        // It is interpolated into a single-quoted Ruby literal in the target-creating script, and
+        // it arrives from a build hint, so a quote in it would close the literal and the rest
+        // would be Ruby the build runs. Nothing downstream catches that: the comparison that
+        // picks the FileProvider API reads leading digits, so a value starting like a version
+        // wins it and is emitted verbatim.
+        assertThrows(IllegalStateException.class,
+                () -> validBuilder().setDeploymentTarget("16.0'; system('id'); '").buildFileMap());
+        assertThrows(IllegalStateException.class,
+                () -> validBuilder().setDeploymentTarget("").buildFileMap());
+        assertThrows(IllegalStateException.class,
+                () -> validBuilder().setDeploymentTarget("16.0 ").buildFileMap());
+        assertThrows(IllegalStateException.class,
+                () -> validBuilder().setDeploymentTarget("16..0").buildFileMap());
+        assertThrows(IllegalStateException.class,
+                () -> validBuilder().setDeploymentTarget(null).buildFileMap());
+    }
+
+    @Test
     public void fileMapCarriesTheTargetAndExactlyOneProvider() throws Exception {
         Map<String, byte[]> files = validBuilder().buildFileMap();
         assertTrue(files.containsKey("Info.plist"));

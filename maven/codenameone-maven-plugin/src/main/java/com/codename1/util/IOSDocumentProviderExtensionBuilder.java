@@ -124,6 +124,39 @@ public class IOSDocumentProviderExtensionBuilder {
         return this;
     }
 
+    /**
+     * <p>A version number and nothing else: digits, separated by dots.</p>
+     *
+     * <p>Checked because this value is interpolated into the Ruby that creates the Xcode target,
+     * inside a single-quoted literal, and it arrives from a build hint. A value carrying a quote
+     * would close that literal and the rest would be Ruby the build then runs. Nothing downstream
+     * catches it either: the comparison that picks the FileProvider API reads leading digits, so
+     * something that starts like a version wins it and is emitted verbatim.</p>
+     *
+     * <p>A positive pattern rather than a list of characters to strip -- the failure being
+     * prevented is "someone thought of a character I did not".</p>
+     */
+    private static boolean isVersion(String value) {
+        if (value == null || value.length() == 0 || value.length() > 24) {
+            return false;
+        }
+        boolean digitSinceDot = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digitSinceDot = true;
+            } else if (c == '.') {
+                if (!digitSinceDot) {
+                    return false;
+                }
+                digitSinceDot = false;
+            } else {
+                return false;
+            }
+        }
+        return digitSinceDot;
+    }
+
     /** Sets the version strings the embedded bundle must match the host app on. */
     public IOSDocumentProviderExtensionBuilder setVersions(String shortVersion,
             String bundleVersion) {
@@ -220,6 +253,10 @@ public class IOSDocumentProviderExtensionBuilder {
         if (hostBundleId == null || hostBundleId.trim().length() == 0) {
             throw new IllegalStateException("The document provider extension needs the host app's "
                     + "bundle id to derive its own");
+        }
+        if (!isVersion(deploymentTarget)) {
+            throw new IllegalStateException("The document provider deployment target must be a "
+                    + "version number such as \"16.0\", was: " + deploymentTarget);
         }
         if (macTarget && compareVersions(deploymentTarget, MIN_REPLICATED_MACOS) < 0) {
             throw new IllegalStateException("The macOS document provider requires macOS "

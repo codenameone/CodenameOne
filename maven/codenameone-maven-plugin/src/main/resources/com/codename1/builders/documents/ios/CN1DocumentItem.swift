@@ -215,11 +215,18 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // default. DocumentNode documents the other half of that bargain -- declare them, and
         // keep them accurate.
         if let remoteId = node.remoteId, node.lastModified != nil || node.size != nil {
+            // The credential generation leads, so an account switch invalidates what the browser
+            // cached even when the node id, the remote id, the size and the date all survive it.
+            // Without that the system reuses its materialized copy and never asks for the item,
+            // so the credential check on the download path is never reached.
             // The remote id is part of the stamp, not just the declared metadata. Repointing a
             // node at different content of the same length -- a new revision of an invoice under
             // a new key -- moves nothing else here, and the browser would go on serving the bytes
             // it cached for the old object.
-            return "meta-\(remoteId)-\(node.lastModified ?? -1)-\(node.size ?? -1)"
+            let generation = containerURL.map {
+                CN1DocumentRemote.credentialGeneration(containerURL: $0)
+            } ?? ""
+            return "meta-\(generation)-\(remoteId)-\(node.lastModified ?? -1)-\(node.size ?? -1)"
         }
         return "rev-\(revision)"
     }

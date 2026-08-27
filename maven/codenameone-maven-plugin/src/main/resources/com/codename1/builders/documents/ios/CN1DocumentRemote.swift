@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import CryptoKit
 import FileProvider
 import Foundation
 
@@ -47,6 +48,40 @@ enum CN1DocumentRemote {
     /// and start again, over and over.
     ///
     /// The token is not returned, only compared, and it never leaves the extension.
+    /// A short, non-secret value that changes whenever the credential does.
+    ///
+    /// Folded into the content version of every remote item, which is what makes an account
+    /// switch invalidate what the browser has cached. Without it a switch that reuses a node id,
+    /// its remote id and its declared size and date produces the same version, and File Provider
+    /// keeps serving the previous account's materialized bytes -- never asking for the item at
+    /// all, so the credential check on the download path is never reached.
+    ///
+    /// Hashed rather than used directly, because a content version is a value the system stores
+    /// and hands around: the bearer token must not travel in it. Truncated to 128 bits, which
+    /// nothing accidental collides.
+    ///
+    /// Memoized against the settings file's modification date so a large enumeration does not
+    /// re-read and re-hash it per item -- a stat each, which is what the local branch already
+    /// costs.
+    static func credentialGeneration(containerURL: URL) -> String {
+        let url = containerURL.appendingPathComponent("cn1documents/endpoint.json")
+        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        let key = "\(url.path)|\(modified?.timeIntervalSince1970 ?? -1)"
+        return generationLock.withLock {
+            if let cached = generationCache[key] {
+                return cached
+            }
+            let digest = SHA256.hash(data: Data(credentialStamp(containerURL: containerURL).utf8))
+            let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+            // One entry per settings file per revision; a handful over a process lifetime.
+            generationCache[key] = hex
+            return hex
+        }
+    }
+
+    private static let generationLock = NSLock()
+    private static var generationCache: [String: String] = [:]
+
     static func credentialStamp(containerURL: URL) -> String {
         guard let settings = settings(containerURL: containerURL) else {
             return ""
