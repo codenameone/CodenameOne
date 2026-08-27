@@ -576,6 +576,39 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aHeldCallThatEndedBeforeItsListenerArrivesIsStale() {
+        // A pushed call with nobody to hand it to waits in HELD, and the call
+        // does NOT wait with it: the far end hangs up, or the platform
+        // retires it, and the session ends. PushedCall is immutable, so the
+        // replay went on describing it as live -- and an app following the
+        // documented shape reads isStale() to decide whether to attach
+        // signalling and media, so it attached them to a call that was over.
+        String id = CallId.random();
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        VoipPush.deliverPushedCall(id,
+                CallWire.encodeHandle(CallHandle.phone("+14155551212")),
+                "Ada", false, false, false, "room-9",
+                System.currentTimeMillis());
+        // It ends while nothing is listening. Through the port-facing
+        // delivery, because the simulated platform only ends calls IT
+        // created and this one was injected as a push.
+        Calls.deliverCallEnded(id, CallEndReason.REMOTE_ENDED.ordinal());
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSession(id) != null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertNull(Calls.getSession(id), "the call is over before the replay");
+
+        final List<PushedCall> got = new ArrayList<PushedCall>();
+        VoipPush.setListener(new Collector(got));
+        waitFor(got, 1);
+        assertTrue(got.get(0).isStale(),
+                "a call that ended while held must be replayed as stale");
+    }
+
+    @Test
     public void aDeferredEndThatFailsKeepsTheSession() {
         // The documented behaviour of failing an end action is that the
         // system UI restores the call. Forgetting the session on dispatch

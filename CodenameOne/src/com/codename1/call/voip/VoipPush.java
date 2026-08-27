@@ -439,11 +439,42 @@ public final class VoipPush {
             }
             for (VoipPushListener l : ls) {
                 if (call != null) {
-                    l.callReceived(call);
+                    l.callReceived(current());
                 } else {
                     l.tokenChanged(newToken);
                 }
             }
+        }
+
+        /// The call as it stands NOW, rather than as it stood when it was
+        /// queued.
+        ///
+        /// A held call waits in HELD for as long as it takes a listener to
+        /// arrive, and the call itself does not wait with it: the far end
+        /// hangs up, or the platform retires it, and Calls marks the session
+        /// ENDED and forgets it. PushedCall is immutable, so the replay went
+        /// on saying stale=false and handed the new listener a dead call
+        /// described as live -- inviting it to attach signalling and media,
+        /// which is exactly what isStale() exists to prevent it doing.
+        ///
+        /// Re-read here rather than mended when the call ends, because this
+        /// is the point where the answer is used; a flag set earlier would
+        /// have to be kept right through every later transition.
+        private PushedCall current() {
+            if (call.isStale()) {
+                // Already stale, and never registered: a stale call gets a
+                // DETACHED session, so the lookup below would say "gone"
+                // about something that was never there and this would rebuild
+                // it for no reason.
+                return call;
+            }
+            CallSession s = call.getSession();
+            if (s != null && s.getState() != CallState.ENDED
+                    && Calls.getSession(s.getCallId()) != null) {
+                return call;
+            }
+            return new PushedCall(s, call.getData(), true,
+                    call.isIdentifierSynthesized(), call.getReceivedAt());
         }
     }
 
