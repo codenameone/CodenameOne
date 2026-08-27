@@ -161,6 +161,27 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
         return;
     }
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+    // PushContent is filled in BEFORE any callback, the way the UIKit router
+    // does it, and before the managed-envelope branch below rather than after
+    // it. An application that reads PushContent.get() inside
+    // PushCallback.push() saw exists() false, or fields left from the previous
+    // push, even though the callback itself arrived -- and a managed push, which
+    // returns from that branch without reaching the decoder, saw exactly that.
+    com_codename1_push_PushContent_reset__(threadStateData);
+    // What the user did with the notification, when this push arrived because
+    // they did something. Carried from the response rather than read off the
+    // payload: only the delegate callback has it, and by the time the pacing
+    // queue hands the push over the response is long gone. It belongs to the
+    // notification, not to the payload shape, so a managed push carries it too.
+    if (actionId != nil) {
+        com_codename1_push_PushContent_setActionId___java_lang_String(
+            threadStateData, fromNSString(threadStateData, actionId));
+    }
+    if (textResponse != nil) {
+        com_codename1_push_PushContent_setTextResponse___java_lang_String(
+            threadStateData, fromNSString(threadStateData, textResponse));
+    }
+
     // Managed push carries the canonical typed envelope as a JSON object under
     // "cn1". It goes out intact, with a null type, BEFORE the historical
     // aps/meta decoder can split or rewrite it -- which is what the UIKit
@@ -187,23 +208,6 @@ static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSStri
     id meta = [userInfo objectForKey:@"meta"];
     BOOL includedBody = NO;
 
-    // PushContent is filled in BEFORE any callback, the way the UIKit router
-    // does it. An application that reads PushContent.get() inside
-    // PushCallback.push() saw exists() false, or fields left from the previous
-    // push, even though the callback itself arrived.
-    com_codename1_push_PushContent_reset__(threadStateData);
-    // What the user did with the notification, when this push arrived because
-    // they did something. Carried from the response rather than read off the
-    // payload: only the delegate callback has it, and by the time the pacing
-    // queue hands the push over the response is long gone.
-    if (actionId != nil) {
-        com_codename1_push_PushContent_setActionId___java_lang_String(
-            threadStateData, fromNSString(threadStateData, actionId));
-    }
-    if (textResponse != nil) {
-        com_codename1_push_PushContent_setTextResponse___java_lang_String(
-            threadStateData, fromNSString(threadStateData, textResponse));
-    }
     id mediaUrl = [userInfo objectForKey:@"media-url"];
     if ([mediaUrl isKindOfClass:[NSString class]]) {
         com_codename1_push_PushContent_setImageUrl___java_lang_String(

@@ -869,6 +869,12 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         // the view that is already rendering into it.
         NSWindow *old = rec.window;
         BOOL wasVisible = old.isVisible;
+        // Whether it held the keyboard, which is not implied by being on screen.
+        // setUtilityWindow() is a chrome and task-switcher property an
+        // application may set after showing the window, and restoring every
+        // visible window as the key one took the keyboard away from whatever the
+        // user was actually typing into.
+        BOOL wasKey = old.isKeyWindow;
         // Miniaturization is part of the state being carried over, and it is not
         // implied by visibility: a miniaturized window reports isVisible NO. Lost
         // here, the rebuilt window either came back on screen while the framework
@@ -943,7 +949,11 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         // come back with live close and minimize buttons.
         cn1SetWindowChromeEnabled(fresh, rec.inputEnabled);
         if (wasVisible) {
-            [fresh makeKeyAndOrderFront:nil];
+            if (wasKey) {
+                [fresh makeKeyAndOrderFront:nil];
+            } else {
+                [fresh orderFront:nil];
+            }
         }
         if (wasMiniaturized) {
             // Ordered in first: AppKit miniaturizes a window that is on screen,
