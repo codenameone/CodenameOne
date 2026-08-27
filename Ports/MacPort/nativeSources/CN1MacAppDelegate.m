@@ -571,17 +571,24 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
             continue;
         }
         NSString *spec = url.isFileURL ? url.path : [url absoluteString];
+        // Every URL, not just the first. Finder hands over the whole selection
+        // in one call -- opening five files, or dropping them on the Dock icon,
+        // is one openURLs: with five entries -- and breaking after the first
+        // discarded the rest with nothing left to recover them from.
+        //
         // A launch URL arrives before the Java side exists, which is the whole
-        // point of a launch URL, so it is held rather than dropped.
+        // point of a launch URL, so those are held rather than dropped. The
+        // readiness test stays inside the loop: the queue is drained on the main
+        // thread, so it cannot flip part way through this one, and keeping it
+        // here means each URL takes whichever path is correct for it.
         if (!cn1MacJavaReady) {
             if (cn1MacPendingURLs == nil) {
                 cn1MacPendingURLs = [[NSMutableArray alloc] init];
             }
             [cn1MacPendingURLs addObject:spec];
-            break;
+            continue;
         }
         cn1MacDeliverURL(spec);
-        break;
     }
 }
 

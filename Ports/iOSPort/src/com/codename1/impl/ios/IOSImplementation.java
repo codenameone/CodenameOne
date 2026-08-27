@@ -1115,6 +1115,30 @@ public class IOSImplementation extends CodenameOneImplementation {
     // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
     private static List<com.codename1.ui.Command> macNativeCommands;
 
+    /**
+     * One menu field with the row and column delimiters taken out of it.
+     *
+     * <p>The rows are joined by newlines and the columns by tabs, and both the
+     * command label and the menu hint are user-facing strings a localization can
+     * put anything into. A newline in a label produced an extra native row while
+     * the Java list backing fireMacMenuCommand() still held one entry per
+     * command, so every later item carried a tag pointing at the wrong command
+     * and selecting one ran something else. A tab shifted the label and shortcut
+     * columns of its own row.</p>
+     *
+     * <p>Replaced rather than backslash-escaped: an escape needs the two native
+     * parsers -- the AppKit one and the Catalyst one -- to unescape in step with
+     * this, and neither a newline nor a tab means anything in a menu item, which
+     * renders on one line. Turning them into spaces costs nothing anyone can
+     * see and cannot desynchronize the two sides.</p>
+     */
+    private static String menuField(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
     @Override
     public void setNativeCommands(Vector commands) {
         if (!isDesktop()) {
@@ -1145,7 +1169,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (sb.length() > 0) {
                     sb.append('\n');
                 }
-                sb.append(hint).append('\t').append(name).append('\t')
+                sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
                         .append(c.getDesktopShortcutKeyChar()).append('\t')
                         .append(c.getDesktopShortcutModifiers());
                 filtered.add(c);
