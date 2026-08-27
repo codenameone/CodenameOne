@@ -146,9 +146,14 @@ final class CN1DocumentIndex {
         // metadata version, the guard on an in-flight copy, and the fallback content version.
         //
         // Bounded rather than a loop: the writer is not adversarial, it is an app publishing, so
-        // a couple of retries covers a republish landing mid-read. The last attempt is returned
-        // whatever it says -- a stale revision is better than an empty browser, and the next
-        // publish signals again.
+        // a couple of retries covers a republish landing mid-read. A last attempt that still saw
+        // the file move is returned only when the decoded document carries its OWN revision:
+        // tree and stamp are then one publication, merely an older one, and a stale-but-whole
+        // tree beats an empty browser because the next publish signals again. Without that field
+        // the only stamp available is the second stat, which may belong to a publication these
+        // bytes are not from -- an old tree presented as the current one, which the metadata
+        // version, the guard on an in-flight copy and the fallback content version all believe.
+        // There is nothing honest to answer there, so it answers nothing.
         for attempt in 0..<3 {
             let before = modificationStamp(of: url)
             guard let data = try? Data(contentsOf: url) else {
@@ -159,13 +164,16 @@ final class CN1DocumentIndex {
                 return nil
             }
             let after = modificationStamp(of: url)
-            if before == after || attempt == 2 {
+            if before == after {
                 // The publisher's own revision when it wrote one. It differs for every
                 // publication, which the file's modification time does not: two publishes inside
                 // one filesystem tick share a timestamp, and a download fetched against the first
                 // was then accepted after the second. The timestamp remains the fallback for an
                 // index written before the field existed.
                 return CN1DocumentIndex(root: doc.root, revision: doc.rev ?? after)
+            }
+            if attempt == 2, let revision = doc.rev {
+                return CN1DocumentIndex(root: doc.root, revision: revision)
             }
         }
         return nil

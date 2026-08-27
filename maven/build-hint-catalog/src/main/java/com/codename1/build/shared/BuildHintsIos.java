@@ -667,8 +667,9 @@ final class BuildHintsIos {
                 .doc("Declares that this project publishes documents to the system file browser. "
                         + "The build detects a reference to com.codename1.documents on its own, so "
                         + "this is redundant for the build itself; it exists because the "
-                        + "Certificate Wizard and the signing preflight cannot read bytecode and "
-                        + "need to know that the CN1Documents extension will be generated."));
+                        + "Certificate Wizard and the signing preflight work without reading "
+                        + "bytecode and need to know that the CN1Documents extension will be "
+                        + "generated."));
 
         h.add(new Hint("ios.documentProvider.appGroup")
                 .group(HintGroup.IOS)
@@ -676,7 +677,7 @@ final class BuildHintsIos {
                 .platform("ios")
                 .doc("App Group id starting with 'group.' shared by the app and the generated "
                         + "CN1Documents extension, defaulting to 'group.' followed by the app's "
-                        + "package name. It is the entire transport between the two processes: "
+                        + "package name. This id carries everything the two processes share: "
                         + "the app publishes its index into the group and the extension reads it "
                         + "from there, so without it the published location appears empty."));
 

@@ -357,19 +357,27 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             // it is current -- and never ask again.
             return nil
         }
-        return item(for: node, resolved: resolved, in: index, containerURL: containerURL)
+        // Frozen to the credential the download was accepted under, the way the local branch is
+        // frozen to the source it copied. The remote content version leads with the generation,
+        // and an account switch landing between this guard and the system's read of that version
+        // would otherwise label the old account's bytes with the new account's version -- cached
+        // as current, and never asked for again.
+        return item(for: node, resolved: resolved, in: index, containerURL: containerURL,
+                    credentialGeneration: CN1DocumentRemote.generation(for: credentials))
     }
 
     /// Builds the item for a node the caller has already resolved in a freshly loaded index.
     private static func item(for node: CN1DocumentNode, resolved: String,
                              in index: CN1DocumentIndex, containerURL: URL,
-                             localStamp: String? = nil) -> NSFileProviderItem {
+                             localStamp: String? = nil,
+                             credentialGeneration: String? = nil) -> NSFileProviderItem {
         let parentId = index.parents[resolved]
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
             : CN1DocumentIndex.identifier(for: parentId!)
         return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
-                               revision: index.revision, localStamp: localStamp)
+                               revision: index.revision, localStamp: localStamp,
+                               credentialGeneration: credentialGeneration)
     }
 
     func enumerator(for containerItemIdentifier: NSFileProviderItemIdentifier,

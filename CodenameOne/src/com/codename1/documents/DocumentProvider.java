@@ -96,6 +96,13 @@ public final class DocumentProvider {
     /// sandbox, so a file written to `FileSystemStorage`'s home directory is *not* visible to the
     /// extension. Always resolve paths against this value.
     ///
+    /// Update published content by writing a NEW file and republishing the tree against it,
+    /// never by rewriting a file already in the published tree. Another app can be reading a
+    /// published file at any moment, and rewriting one in place refills the same file underneath
+    /// that reader, which sees the two versions spliced together. Publishing the replacement
+    /// under a new name and then calling `publish` gives every reader a whole document: the ones
+    /// already reading finish the old file, and the ones that come after open the new one.
+    ///
     /// #### Returns
     ///
     /// the shared directory path, or null when unsupported on this port

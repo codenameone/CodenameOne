@@ -344,7 +344,7 @@ final class BuildHintsAndroid {
                         + "way to declare the feature when the code that publishes lives in a "
                         + "cn1lib rather than in the app: the build's usage scan reads the "
                         + "application's own classes, so an app that only calls a library which "
-                        + "publishes documents is not detected. Falls back to "
+                        + "publishes documents goes undetected. Falls back to "
                         + "ios.documentProvider.enabled when unset, so a project that sets one "
                         + "gets both."));
 

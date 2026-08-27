@@ -89,18 +89,29 @@ enum CN1DocumentRemote {
             if cn1SameOpaqueKey(stamp, lastStamp) {
                 return lastGeneration
             }
-            // CommonCrypto rather than CryptoKit: this file is also compiled into the
-            // pre-iOS-16 provider, whose deployment target can be iOS 11 or 12, and CryptoKit
-            // starts at 13. Swift checks availability at compile time whether or not the call is
-            // reachable, so importing it there fails the build outright.
-            let bytes = Array(stamp.utf8)
-            var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-            CC_SHA256(bytes, CC_LONG(bytes.count), &digest)
-            let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
+            let hex = generation(for: stamp)
             lastStamp = stamp
             lastGeneration = hex
             return hex
         }
+    }
+
+    /// The generation of a credential stamp already in hand.
+    ///
+    /// Separate from the memoized reader above so a caller that has ACCEPTED a download under a
+    /// particular credential can stamp the item it hands back with that one. Reading the live
+    /// credential again there would let an account switch between the acceptance and the
+    /// system's read of the item version label the old account's bytes with the new account's
+    /// version -- cached as current, and never asked for again.
+    static func generation(for stamp: String) -> String {
+        // CommonCrypto rather than CryptoKit: this file is also compiled into the pre-iOS-16
+        // provider, whose deployment target can be iOS 11 or 12, and CryptoKit starts at 13.
+        // Swift checks availability at compile time whether or not the call is reachable, so
+        // importing it there fails the build outright.
+        let bytes = Array(stamp.utf8)
+        var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        CC_SHA256(bytes, CC_LONG(bytes.count), &digest)
+        return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
     private static let generationLock = NSLock()

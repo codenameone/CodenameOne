@@ -197,6 +197,18 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // after it keeps the departed account's bytes readable for as long as the picker holds
         // it, which is exactly what logout is supposed to end. Nothing slow runs inside -- the
         // index read and the open are local -- so this does not hold publish() off the disk.
+        //
+        // The descriptor is on the app's own file, not on a copy of it. A copy would not make
+        // the read atomic: writing a published file in place truncates and refills that inode,
+        // and a copy taken while that is happening is torn too -- and worse, it hands the
+        // reader torn bytes that then look like a whole immutable document and get cached as
+        // one. Nothing available here pins an inode's contents against its own writer.
+        //
+        // So the contract is the one the shared directory already documents: publish content by
+        // writing a NEW file and republishing, never by rewriting a file already in the
+        // published tree. The Apple side copies for an unrelated reason -- File Provider hands the
+        // system a URL it owns -- and the remote branch below copies because the bytes are the
+        // request's own; neither is atomicity.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
             if (local != null && local.exists()) {

@@ -47,18 +47,27 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     ///   system's read would have the copied bytes labelled with the new file's version -- cached
     ///   as current, and never asked for again. An item that is only being enumerated passes
     ///   nothing and describes the file as it is.
+    /// - Parameter credentialGeneration: the credential the bytes being handed over were
+    ///   fetched under, for a remote item handed over WITH a download. The remote content
+    ///   version leads with the generation, and reading it live instead would let an account
+    ///   switch between the download's acceptance and the system's read of the version label the
+    ///   old account's bytes with the new account's version. An item that is only being
+    ///   enumerated passes nothing and describes the credential as it is.
     init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier,
          identifier: NSFileProviderItemIdentifier? = nil, containerURL: URL? = nil,
-         revision: String = "", localStamp: String? = nil) {
+         revision: String = "", localStamp: String? = nil,
+         credentialGeneration: String? = nil) {
         self.node = node
         self.parentId = parentId
         self.identifier = identifier ?? CN1DocumentIndex.identifier(for: node.id)
         self.containerURL = containerURL
         self.revision = revision
         self.frozenLocalStamp = localStamp
+        self.frozenCredentialGeneration = credentialGeneration
     }
 
     private let frozenLocalStamp: String?
+    private let frozenCredentialGeneration: String?
 
     var itemIdentifier: NSFileProviderItemIdentifier {
         identifier
@@ -293,7 +302,7 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
             // node at different content of the same length -- a new revision of an invoice under
             // a new key -- moves nothing else here, and the browser would go on serving the bytes
             // it cached for the old object.
-            let generation = containerURL.map {
+            let generation = frozenCredentialGeneration ?? containerURL.map {
                 CN1DocumentRemote.credentialGeneration(containerURL: $0)
             } ?? ""
             // The remote id is length-prefixed. It is free-form text and the fields are joined
@@ -310,7 +319,9 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
             // browser holds. Without this the version stays "rev-<revision>" across an account
             // switch that did not republish, and the previous account's materialized bytes are
             // served as current.
-            return "rev-\(revision)-\(CN1DocumentRemote.credentialGeneration(containerURL: container))"
+            let generation = frozenCredentialGeneration
+                ?? CN1DocumentRemote.credentialGeneration(containerURL: container)
+            return "rev-\(revision)-\(generation)"
         }
         return "rev-\(revision)"
     }

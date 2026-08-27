@@ -39,6 +39,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/documents/
 On iOS the shared directory is inside the App Group container, not your app's own sandbox. A file written to `FileSystemStorage`'s home directory is *not* visible to the extension. Always resolve paths against `getSharedDirectory()`.
 ====
 
+[WARNING]
+====
+Update published content by writing a new file and republishing the tree against it, never by rewriting a file already in the published tree. Another app can be reading a published file at any moment, and rewriting one in place refills the same file underneath that reader, which sees the two versions spliced together. Publish the replacement under a new name and call `publish` again: the readers already open finish the old file, and the ones that come after open the new one.
+====
+
 *From your server.* Give the node a `remoteId` and tell the extension where to fetch it. The index can then list far more than the device holds, which is what a cloud drive wants.
 
 [source,java]
