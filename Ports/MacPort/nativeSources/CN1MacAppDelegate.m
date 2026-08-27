@@ -389,6 +389,19 @@ static void cn1MacRefreshSurfaceHidden(void) {
 
 extern void CN1MacWindowsDeliverAppHidden(BOOL hidden);
 
+/// Recomputes the suspended state after something changed which windows are on
+/// screen.
+///
+/// The state depends on CN1MacAnyWindowVisible(), so every path that shows,
+/// hides, minimizes, restores or destroys a window has to say so -- otherwise
+/// showing a window while the main one is minimized leaves the application
+/// suspended and the new window never paints, and hiding the last one leaves it
+/// running with nothing on screen. Exported because those paths live in
+/// CN1AppKitWindows.m; the computation itself stays private.
+void CN1MacWindowVisibilityChanged(void) {
+    cn1MacRefreshSurfaceHidden();
+}
+
 /// The application was hidden or unhidden -- Cmd-H, or Hide Others elsewhere.
 void CN1MacDeliverAppHidden(BOOL hidden) {
     cn1MacAppHidden = hidden;

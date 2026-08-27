@@ -87,6 +87,7 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 /// delegate methods are the first callers.
 static void cn1DeliverHiddenWithOwner(CN1MacWindowRecord *rec);
 static void cn1ApplyMinimumSize(CN1MacWindowRecord *rec);
+extern void CN1MacWindowVisibilityChanged(void);
 static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
 
 @implementation CN1MacWindowRecord
@@ -137,10 +138,12 @@ static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
     // a child the application had hidden itself is indistinguishable from one
     // the owner took down.
     cn1DeliverHiddenWithOwner(self);
+    CN1MacWindowVisibilityChanged();
 }
 
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
     cn1DeliverShownWithOwner(self);
+    CN1MacWindowVisibilityChanged();
 }
 
 - (void)windowDidChangeScreen:(NSNotification *)notification {
@@ -529,6 +532,8 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_T
         [rec.window orderOut:nil];
         [rec.window close];
         [cn1WindowTable() replaceObjectAtIndex:slot withObject:[NSNull null]];
+        // A destroyed window is one fewer on screen.
+        CN1MacWindowVisibilityChanged();
     });
 }
 
@@ -553,6 +558,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             // been said explicitly.
             rec.hiddenByApp = NO;
             cn1DeliverShownWithOwner(rec);
+            CN1MacWindowVisibilityChanged();
             // AppKit hands back a usable window synchronously, so the content is
             // ready as soon as it is on screen. Catalyst has to wait for a scene
             // to activate before it can say this.
@@ -569,6 +575,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             // matters: hiding a window while the application itself is hidden
             // must not be undone by the later unhide.
             rec.hiddenByApp = NO;
+            CN1MacWindowVisibilityChanged();
         }
     });
 }
@@ -583,6 +590,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowReopen___int_R_boolean(CO
         [rec.window makeKeyAndOrderFront:nil];
         rec.hiddenByApp = NO;
         cn1DeliverShownWithOwner(rec);
+        CN1MacWindowVisibilityChanged();
         ok = YES;
     });
     return ok ? JAVA_TRUE : JAVA_FALSE;
