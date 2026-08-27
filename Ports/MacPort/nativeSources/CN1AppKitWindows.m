@@ -948,6 +948,25 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         fresh.delegate = rec;
         fresh.level = level;
         fresh.contentMinSize = minSize;
+        // Every record that remembered the OLD window as its owner is repointed
+        // at the replacement, before the record below drops the last reference
+        // to it. pendingOwner outlives the first show now, so it is no longer
+        // only the never-shown windows that hold one: a child hidden with
+        // orderOut: has been detached from AppKit's side and is remembered ONLY
+        // here, so it is not in ownedChildren and a sweep of that list would
+        // miss it. Left alone it would be re-attached on its next show to a
+        // window that has been closed and released.
+        //
+        // Before rec.window is reassigned, because that releases old.
+        for (id entry in cn1WindowTable()) {
+            if (entry == [NSNull null]) {
+                continue;
+            }
+            CN1MacWindowRecord *other = (CN1MacWindowRecord *)entry;
+            if (other.pendingOwner == old) {
+                other.pendingOwner = fresh;
+            }
+        }
         rec.window = fresh;
         rec.utility = utility != 0;
         // addChildWindow: ORDERS THE CHILD IN -- measured, not assumed: adding a
@@ -974,12 +993,9 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         for (NSWindow *child in ownedChildren) {
             if (child.isVisible || child.isMiniaturized) {
                 [fresh addChildWindow:child ordered:NSWindowAbove];
-            } else {
-                CN1MacWindowRecord *childRec = cn1RecordForWindow(child);
-                if (childRec != nil) {
-                    childRec.pendingOwner = fresh;
-                }
             }
+            // A child that is off screen is left to its next show, which finds
+            // the replacement in the pendingOwner the sweep above repointed.
         }
         // The view carries cn1InputEnabled across with it, but the chrome is the
         // new window's own: a window blocked by a modal dialog would otherwise
