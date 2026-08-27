@@ -51,9 +51,10 @@ import java.util.List;
 ///
 /// Nothing here carries packets. The configuration is handed to the operating
 /// system, which runs its own IKEv2 or IPsec client; the app starts it, stops
-/// it and watches it. An app that needs to implement the tunnel itself wants
-/// [com.codename1.vpn.tunnel] instead, and should read that package's
-/// documentation before committing to it.
+/// it and watches it. Implementing the tunnel itself is a different and much
+/// larger undertaking -- see the note in the `com.codename1.vpn` package
+/// documentation -- and this API stays useful around it either way, for the
+/// install, the status and the control.
 ///
 /// #### The user is asked, every time a configuration is installed
 ///

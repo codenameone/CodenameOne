@@ -509,7 +509,14 @@ public final class Display extends CN1Constants {
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            if (INSTANCE.edt == null) {
+            // A recorded thread that is no longer ALIVE is not a dispatch
+            // thread. Nothing clears this field when an EDT terminates, so
+            // testing only for null left a dead thread recorded for ever and
+            // re-initialising never started a working one -- the display then
+            // has no dispatch at all. This is a thread that has actually
+            // died, not one that might be mid-teardown; the speculative
+            // machinery that used to be here was removed on purpose.
+            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.

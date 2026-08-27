@@ -26,7 +26,8 @@ package com.codename1.vpn;
 ///
 /// The list is short because it is limited to what **both** platforms can be
 /// asked to run without the app shipping its own tunnel. Anything else needs
-/// [com.codename1.vpn.tunnel], which is a much larger commitment.
+/// a packet tunnel, which is a much larger commitment; see the
+/// `com.codename1.vpn` package documentation.
 ///
 /// The ordinals cross the SPI boundary, so **existing constants must not be
 /// reordered**.

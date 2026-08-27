@@ -625,6 +625,14 @@ public class LocalCallBridge implements CallBridge {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
             return;
         }
+        // Refused BEFORE the playback is scheduled. Round 76 sorted the
+        // operations by whether they mutate the simulated call and left this
+        // one out, but a delivery is an effect too: ok() reported BUSY while
+        // dtmfRequested still fired, so application media transmitted digits
+        // for a request the platform had rejected.
+        if (refused(requestId)) {
+            return;
+        }
         ok(requestId);
         // The round trip CallKit performs: an app puts the tone into its own
         // media when dtmfRequested fires, so a simulation that acknowledged

@@ -690,6 +690,50 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aRejectedSystemStartDoesNotStayPendingForEver() {
+        // A deferred start keeps its PENDING_STARTS entry so a later
+        // reportOutgoing can claim it. Only a report or a provider reset ever
+        // removed one, so an app that DECLINES system-placed calls -- from
+        // Recents, or a voice assistant -- left an id and an action in a
+        // static map on every refusal, for the life of the process.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void startCallRequested(String callId, CallHandle handle,
+                    boolean video, CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        String id = CallId.random();
+        bridge.simulateStartCallRequest(id,
+                CallHandle.phone("+14155551212"), false);
+        waitFor(seen, 1);
+        assertEquals(1, pendingStartCount(), "held while it is deferred");
+
+        seen.get(0).fail();
+        long limit = System.currentTimeMillis() + 5000;
+        while (pendingStartCount() > 0 && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(0, pendingStartCount(),
+                "a rejected start must not stay pending");
+    }
+
+    /// The size of Calls' private PENDING_STARTS map.
+    private static int pendingStartCount() {
+        try {
+            java.lang.reflect.Field f =
+                    Calls.class.getDeclaredField("PENDING_STARTS");
+            f.setAccessible(true);
+            return ((java.util.Map<?, ?>) f.get(null)).size();
+        } catch (Exception e) {
+            throw new AssertionError("could not read PENDING_STARTS: " + e);
+        }
+    }
+
+    @Test
     public void aDeferredEndThatFailsKeepsTheSession() {
         // The documented behaviour of failing an end action is that the
         // system UI restores the call. Forgetting the session on dispatch

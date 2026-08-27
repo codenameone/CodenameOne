@@ -38,8 +38,8 @@ Every callback in this family arrives on the EDT.
 === Five Things Worth Knowing Before You Design Around This
 
 *Codename One doesn't carry the voice.* There is no codec here, no
-signalling and no WebRTC, and none is planned: those are your app's, and there
-are good libraries for them. What was missing was everything _around_ the
+signalling and no WebRTC: those are your app's, and there are good libraries
+for them. What was missing was everything _around_ the
 media, and without it an app couldn't ring at all while backgrounded -- which
 is why a Codename One app couldn't previously be a calling app no matter how
 good its audio was.

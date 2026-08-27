@@ -61,6 +61,9 @@ public final class CallAction {
     private TimerTask safetyTask;
     private Runnable onFulfilled;
 
+    /// Runs on ANY answer, whatever the outcome; see [#whenAnswered].
+    private Runnable onAnswered;
+
     CallAction(long token, String callId) {
         this.token = token;
         this.callId = callId;
@@ -185,6 +188,27 @@ public final class CallAction {
     /// moment, so the call was never forgotten.
     ///
     /// Runs immediately when the action has already been fulfilled.
+    /// Runs `hook` once this action is answered, whatever the outcome and
+    /// whether or not the platform still held it.
+    ///
+    /// Separate from [#whenFulfilled], which is the local EFFECT of a
+    /// successful answer and is skipped when the platform has given up. This
+    /// is bookkeeping: whoever registered it has state keyed on an action
+    /// that is now over, and it has to go whether the answer was a fulfil, a
+    /// failure, or the safety net firing.
+    void whenAnswered(Runnable hook) {
+        boolean now;
+        synchronized (this) {
+            if (!answered) {
+                onAnswered = hook;
+            }
+            now = answered;
+        }
+        if (now) {
+            hook.run();
+        }
+    }
+
     void whenFulfilled(Runnable hook) {
         boolean now;
         synchronized (this) {
@@ -222,6 +246,7 @@ public final class CallAction {
     /// only keeps the common case off the bridge.
     void answer(boolean fulfilled) {
         Runnable hook;
+        Runnable cleanup;
         synchronized (this) {
             if (answered) {
                 return;
@@ -230,6 +255,8 @@ public final class CallAction {
             this.fulfilled = fulfilled;
             hook = fulfilled ? onFulfilled : null;
             onFulfilled = null;
+            cleanup = onAnswered;
+            onAnswered = null;
         }
         cancelSafetyNet();
         // The PLATFORM IS ASKED FIRST, and its answer decides whether the
@@ -253,6 +280,12 @@ public final class CallAction {
         if (hook != null && stillHeld) {
             // Outside the lock: the hook ends up in Calls, which takes its own.
             hook.run();
+        }
+        if (cleanup != null) {
+            // UNCONDITIONAL, unlike the hook above. This one exists to drop
+            // state keyed on an action that is now over, and the action is
+            // over whether the platform still held it or not.
+            cleanup.run();
         }
     }
 }

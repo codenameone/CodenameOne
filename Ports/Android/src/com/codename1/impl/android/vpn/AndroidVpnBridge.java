@@ -931,7 +931,15 @@ public class AndroidVpnBridge implements VpnBridge {
                             p.getRemoteIdentifier() == null
                                     ? p.getServerAddress()
                                     : p.getRemoteIdentifier());
-            if (p.getSharedSecret() != null) {
+            // NON-EMPTY, not merely non-null. A profile carrying a valid
+            // username and password plus sharedSecret("") took this branch
+            // with a zero-length key and threw the credentials away -- while
+            // iOS reads the same empty PSK as absent and uses the pair. The
+            // install gate lets that profile through precisely because the
+            // pair is valid, so the two ports have to agree on what an empty
+            // secret means.
+            if (p.getSharedSecret() != null
+                    && p.getSharedSecret().length() > 0) {
                 BUILDER.getMethod("setAuthPsk", byte[].class)
                         .invoke(b, (Object) utf8Bytes(p.getSharedSecret()));
             } else {

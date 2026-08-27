@@ -1017,6 +1017,16 @@ public final class Calls {
                             synchronized (PENDING_STARTS) {
                                 PENDING_STARTS.remove(callId);
                             }
+                        } else {
+                            // Deferred, so the entry STAYS for a later
+                            // reportOutgoing to claim -- but only a report or
+                            // a provider reset ever removed it, so an action
+                            // the app went on to reject, or that the safety
+                            // net failed, left its id and action in this
+                            // static map for the life of the process. A
+                            // calling app that declines system-placed calls
+                            // grows it without bound.
+                            a.whenAnswered(new PendingStartCleanup(callId, a));
                         }
                         settleStart(a);
                     }
@@ -1129,6 +1139,32 @@ public final class Calls {
 
         /// Settles a system START request, which fails when unanswered.
         /// See the START arm for why this one is not settle().
+        /// Drops a deferred start no report ever claimed.
+        ///
+        /// A named static class rather than an anonymous one so it holds no
+        /// synthetic reference to an enclosing scope.
+        private static final class PendingStartCleanup implements Runnable {
+            private final String callId;
+            private final CallAction action;
+
+            PendingStartCleanup(String callId, CallAction action) {
+                this.callId = callId;
+                this.action = action;
+            }
+
+            @Override
+            public void run() {
+                // IDENTITY-checked, like Calls.forget: a report may have
+                // claimed this entry and a newer start may already own the
+                // id, and removing that one would strand it.
+                synchronized (PENDING_STARTS) {
+                    if (PENDING_STARTS.get(callId) == action) { //NOPMD CompareObjectsWithEquals
+                        PENDING_STARTS.remove(callId);
+                    }
+                }
+            }
+        }
+
         private static void settleStart(CallAction a) {
             if (!a.isDeferred() && !a.isAnswered()) {
                 a.answer(false);

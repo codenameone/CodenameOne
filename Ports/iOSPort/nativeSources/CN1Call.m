@@ -750,8 +750,16 @@ static int cn1clMaxPerGroup = 1;
 static int cn1clCapacity(void) {
     cn1clEnsureState();
     @synchronized (cn1clLock) {
-        int total = cn1clMaxGroups * cn1clMaxPerGroup;
-        return total > 0 ? total : 1;
+        // The GROUP limit, not groups times calls-per-group. Every call this
+        // port reports carries supportsGrouping = NO, and CallSession's
+        // groupWith answers NOT_SUPPORTED on every port, so each call is its
+        // own single-call group and maximumCallsPerCallGroup is never the
+        // binding constraint. Multiplying them said there was room for a
+        // second call under maximumCallGroups(1).maximumCallsPerGroup(2),
+        // and CallKit then refused the report for want of a second GROUP.
+        // If grouping is ever implemented this becomes a product again --
+        // and cn1clMaxPerGroup is mirrored ready for that.
+        return cn1clMaxGroups > 0 ? cn1clMaxGroups : 1;
     }
 }
 
@@ -1505,8 +1513,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
     // and the cellular one. A call this app does not own means CallKit will
     // refuse the next report, which is worth knowing BEFORE telling a caller
     // their call is ringing.
+    // RELEASED on every exit: this target compiles with
+    // CLANG_ENABLE_OBJC_ARC=NO, so the alloc below is +1 and nothing else
+    // owns it. getAvailability() is documented as the call to make before
+    // every incoming call, so leaking one observer -- and the call list it
+    // retains -- per invocation is a leak that grows with use.
     CXCallObserver *observer = [[CXCallObserver alloc] init];
     int mineLive = 0;
+    BOOL foreign = NO;
     for (CXCall *c in observer.calls) {
         if (c.hasEnded) {
             continue;
@@ -1517,9 +1531,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
                     && [cn1clCalls objectForKey:[c.UUID UUIDString]] != nil;
         }
         if (!mine) {
-            return CN1_CALL_AVAIL_OTHER_APP;
+            foreign = YES;
+            break;
         }
         mineLive++;
+    }
+    [observer release];
+    if (foreign) {
+        return CN1_CALL_AVAIL_OTHER_APP;
     }
     if (mineLive >= cn1clCapacity()) {
         // OUR OWN calls fill the provider. cn1clConfiguration defaults to

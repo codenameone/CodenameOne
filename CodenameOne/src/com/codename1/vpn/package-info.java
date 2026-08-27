@@ -33,11 +33,13 @@
 ///   every app that says "connect to VPN" actually wants. That is
 ///   [com.codename1.vpn.profile].
 /// - **Shipping a tunnel of your own**, which receives raw IP packets and
-///   decides what to do with them. On iOS that code runs in a separate
-///   process that no Java virtual machine runs inside, so it cannot be
-///   written in this framework at all, and the entitlement for it is one
-///   Apple grants case by case. That is [com.codename1.vpn.tunnel], and its
-///   documentation is mostly about what it cannot do.
+///   decides what to do with them. That is a much larger commitment: on iOS
+///   it runs in a Network Extension, a separate process with its own bundle,
+///   and its entitlement -- `com.apple.developer.networking.networkextension`
+///   -- is one Apple grants case by case rather than one a paid account
+///   switches on; on Android it is a `VpnService` in the app's own process.
+///   The two platforms hand packets over differently, so any portable shape
+///   has to expose that difference rather than hide it.
 ///
 /// #### Detecting a VPN is a different question and already answered
 ///
