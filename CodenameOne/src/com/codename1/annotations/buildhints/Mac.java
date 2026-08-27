@@ -174,8 +174,8 @@ public @interface Mac {
     Toggle hardenedRuntime() default Toggle.DEFAULT;
 
     /// macOS builds. `true` grants the hardened-runtime exception for loading
-    /// unsigned libraries. A Codename One application does not dlopen anything,
-    /// but a cn1lib shipping a dylib needs this, or the load is refused at
+    /// unsigned libraries. A Codename One application doesn't load code that
+    /// way, but a cn1lib shipping a dylib needs this, or the load is refused at
     /// runtime with nothing in the application's own logs.
     Toggle loadsExternalCode() default Toggle.DEFAULT;
 
