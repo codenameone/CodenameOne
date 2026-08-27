@@ -93,6 +93,30 @@ public class LocalCallBridge implements CallBridge {
     private int route = CallAudioRoute.EARPIECE.ordinal();
     private String directoryPath;
     private long nextToken = 1;
+
+    /// What each outstanding action was asking for, so completeAction can
+    /// apply the OUTCOME rather than only record it. Guarded by this.
+    ///
+    /// A simulation that records the boolean and leaves its own state alone
+    /// models the opposite of both devices: a failed end leaves CallKit and
+    /// Telecom showing the call, and a failed answer does not leave it
+    /// active. Tests written against that exercise behaviour no device has.
+    private final Map<Long, PendingSim> simActions = new HashMap<Long, PendingSim>();
+
+    /// One outstanding simulated action.
+    private static final class PendingSim {
+        private final String callId;
+        private final int kind;
+
+        PendingSim(String callId, int kind) {
+            this.callId = callId;
+            this.kind = kind;
+        }
+    }
+
+    /// Action kinds completeAction has to undo or finish.
+    private static final int SIM_ANSWER = 1;
+    private static final int SIM_END = 2;
     private String voipToken = "SIMULATED-VOIP-TOKEN";
 
     /// One simulated call.
@@ -294,8 +318,16 @@ public class LocalCallBridge implements CallBridge {
         }
         c.state = CallState.ACTIVE;
         final long token = nextToken();
+        synchronized (this) {
+            simActions.put(Long.valueOf(token), new PendingSim(callId, SIM_ANSWER));
+        }
         later(LATENCY_MILLIS, new AnswerDelivery(callId, token));
-        audioOn(callId);
+        // NO audio here. Both platforms activate the session only once the
+        // answer action has been fulfilled, and a listener that defers for
+        // longer than the gap between these two timers used to get
+        // audioSessionActivated before it had accepted the call -- and, if it
+        // then FAILED the answer, no deactivation either. A simulator test
+        // could start and keep media for a call the app never took.
     }
 
     /// Simulates the user hanging up through the system UI.
@@ -304,8 +336,13 @@ public class LocalCallBridge implements CallBridge {
         if (c == null) {
             return;
         }
-        c.state = CallState.ENDED;
-        later(LATENCY_MILLIS, new EndDelivery(callId, nextToken()));
+        // NOT ended yet: the user has ASKED. Both platforms keep the call up
+        // until the action is fulfilled, and restore it when it is failed.
+        final long token = nextToken();
+        synchronized (this) {
+            simActions.put(Long.valueOf(token), new PendingSim(callId, SIM_END));
+        }
+        later(LATENCY_MILLIS, new EndDelivery(callId, token));
     }
 
     /// Simulates the far end hanging up.
@@ -610,8 +647,47 @@ public class LocalCallBridge implements CallBridge {
         // outcome is recorded so a test can tell fulfilled from failed --
         // which is the whole difference between an action the app handled and
         // a system start it ignored.
+        PendingSim done;
         synchronized (this) {
             lastActionFulfilled = Boolean.valueOf(fulfilled);
+            done = simActions.remove(Long.valueOf(actionToken));
+        }
+        if (done == null) {
+            return;
+        }
+        SimCall c = find(done.callId);
+        if (c == null) {
+            return;
+        }
+        if (done.kind == SIM_ANSWER) {
+            if (fulfilled) {
+                c.state = CallState.ACTIVE;
+                // THE moment media may start, which is what both platforms
+                // say and what the facade documents.
+                audioOn(done.callId);
+            } else {
+                // A refused answer ends the call on both platforms; there is
+                // nothing else the system can do with a call the app will not
+                // take.
+                c.state = CallState.ENDED;
+                forgetSimCall(done.callId);
+            }
+            return;
+        }
+        if (done.kind == SIM_END) {
+            if (fulfilled) {
+                c.state = CallState.ENDED;
+                forgetSimCall(done.callId);
+            }
+            // A failed end leaves the call up, which is what CallKit and
+            // Telecom both do -- the app said it could not hang up.
+        }
+    }
+
+    /// Drops a call from the simulated platform's own book.
+    private void forgetSimCall(String callId) {
+        synchronized (calls) {
+            calls.remove(callId);
         }
     }
 
@@ -718,6 +794,30 @@ public class LocalCallBridge implements CallBridge {
             return;
         }
         later(AUDIO_MILLIS, new AudioDelivery(callId, route, true));
+    }
+
+    /// The state the simulated PLATFORM has this call in, or null when it
+    /// has no such call.
+    ///
+    /// Presence alone is not enough to tell the interesting cases apart: a
+    /// refused end leaves the call present on both sides, and what a test
+    /// needs to know is whether the platform still considers it live.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public CallState callState(String callId) {
+        SimCall c = find(callId);
+        return c == null ? null : c.state;
+    }
+
+    /// Whether the simulated PLATFORM still holds this call.
+    ///
+    /// Distinct from Calls.getSession: a test that inspects only the facade
+    /// cannot tell whether the two agree, and the cases worth simulating are
+    /// exactly the ones where they might not.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public boolean hasCall(String callId) {
+        return find(callId) != null;
     }
 
     private SimCall find(String callId) {

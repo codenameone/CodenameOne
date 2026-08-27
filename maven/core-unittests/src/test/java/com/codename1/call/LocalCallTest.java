@@ -404,6 +404,31 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aRefusedEndLeavesTheCallUpOnBothSides() {
+        // The simulation is only worth testing against while it models what
+        // the devices do. A failed end used to leave the simulated platform
+        // at ENDED while Calls correctly kept the session ringing -- so a
+        // test inspecting both saw a disagreement no device produces. CallKit
+        // and Telecom both RESTORE a call whose end the app refused.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void endRequested(String callId, CallAction action) {
+                seen.add(action);
+                // The app says it could not hang up.
+                action.fail();
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        waitFor(seen, 1);
+
+        assertNotNull(Calls.getSession(id), "the facade keeps the call");
+        assertSame(CallState.RINGING, bridge.callState(id),
+                "and the platform it models still has it ringing");
+    }
+
+    @Test
     public void anIgnoredActionIsFulfilledRatherThanDropped() {
         // Silence has to mean "done": the platform kills a call whose action
         // goes unanswered, so a listener that does nothing must still answer.
