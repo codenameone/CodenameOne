@@ -62,8 +62,8 @@ A boolean hint takes `Toggle`, not `boolean`. `Toggle.ON` and `Toggle.OFF` say
 what you want, and leaving the attribute out entirely means you have said
 nothing, so the build service applies whatever it applies today. That's why the
 Default column reads _(set by the build)_ for these hints: the annotation
-deliberately records no default of its own, because a value compiled into your
-app can't follow the build service when the service changes it.
+records no default of its own, by design: a value compiled into your app can't
+follow the build service when the service changes it.
 
 A hint with a closed set of values takes an enum, so `@Ios(themeMode = ...)`
 offers you the four themes that exist and rejects anything else at compile time.
@@ -71,9 +71,8 @@ Hints whose accepted values are open-ended stay `String`.
 
 The long tail of hints has no annotation, and neither do the open-ended families
 such as `android.permission.<NAME>`, because a Java annotation can't express a
-map. Set those in `codenameone_settings.properties` exactly as before. You can
-mix the two forms freely in one project, as long as no single hint is declared
-in both.
+map. Set those in `codenameone_settings.properties` exactly as before. You can mix
+the two forms in one project, as long as no single hint is declared in both.
 
 [IMPORTANT]
 ====
