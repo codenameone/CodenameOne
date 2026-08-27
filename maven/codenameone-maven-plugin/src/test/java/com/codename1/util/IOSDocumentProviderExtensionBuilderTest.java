@@ -143,6 +143,26 @@ public class IOSDocumentProviderExtensionBuilderTest {
     }
 
     @Test
+    public void theCatalystSliceGetsItsOwnEntitlements() throws Exception {
+        Map<String, byte[]> plain = validBuilder().buildFileMap();
+        assertFalse(plain.containsKey("CN1Documents-Catalyst.entitlements"),
+                "an iOS-only build has no Mac slice to entitle");
+
+        Map<String, byte[]> catalyst = validBuilder().setCatalystTarget(true).buildFileMap();
+        String mac = text(catalyst, "CN1Documents-Catalyst.entitlements");
+        // Without the network entitlement the sandbox refuses CN1DocumentRemote's request and
+        // every remote-only document appears missing on the Mac slice.
+        assertTrue(mac.contains("com.apple.security.network.client"), mac);
+        assertTrue(mac.contains("com.apple.security.app-sandbox"), mac);
+        assertTrue(mac.contains("group.com.example.myapp"), mac);
+
+        // The iOS entitlements must NOT gain the sandbox key: it buys nothing where the sandbox
+        // is not opt-in, and invites a provisioning mismatch on the slice that does sign with it.
+        String ios = text(catalyst, "CN1Documents.entitlements");
+        assertFalse(ios.contains("app-sandbox"), ios);
+    }
+
+    @Test
     public void buildSettingsPointXcodeAtTheGeneratedPlistAndEntitlements() throws Exception {
         String settings = text(validBuilder().buildFileMap(), "buildSettings.properties");
         assertTrue(settings.contains("PRODUCT_BUNDLE_IDENTIFIER=com.example.myapp.CN1Documents"),

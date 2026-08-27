@@ -1238,6 +1238,14 @@ public class CertificateWizard extends Lifecycle {
     /// group is needed for the extension -- left the app's own development and App Store profiles
     /// without com.apple.security.application-groups, while the builder puts that entitlement in
     /// the app. The device build then cannot sign, on the path the wizard recommends.
+    /// Set when this run actually changed the main App ID's App Group association. Profiles are
+    /// snapshots of an App ID's capabilities, so any that predate the change have to be reissued
+    /// rather than reused.
+    private boolean appGroupsJustChanged;
+
+    /// Profile types already reissued in this run, so a delete that does not take cannot loop.
+    private final java.util.Set<String> reissuedProfiles = new java.util.HashSet<String>();
+
     private void autoSetupMainAppGroups(String bundleIdentifier, String appName, Runnable next) {
         boolean widgets = binding != null
                 && ProjectIO.readSurfacesManifest(binding.projectDir()) != null;
@@ -1276,6 +1284,12 @@ public class CertificateWizard extends Lifecycle {
                 showPageMessage("Main bundle ID could not be found after refresh.", true);
                 return;
             }
+            // Treated as a change whenever the groups are asserted, because the signing state
+            // carries no per-bundle App Group association to compare against -- there is no way
+            // from here to tell "already had these" from "just gained them". A needless reissue
+            // costs a round trip and produces an equivalent profile; a skipped one installs a
+            // profile without application-groups and the next device build cannot sign.
+            appGroupsJustChanged = true;
             service.enableAppGroupCapability(mainBundle.id(), appleIds, r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
@@ -1508,20 +1522,15 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupExtensionAfterGroup(ExtensionSigning ext, String bundleIdentifier,
             String appName, ProjectDefaults defaults, SigningState.AppGroup group, Runnable next) {
-        SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
-        if (mainBundle == null) {
-            showPageMessage("Main bundle ID could not be found after refresh.", true);
-            return;
-        }
+        // The main App ID is deliberately left alone here. enableAppGroupCapability REPLACES the
+        // association rather than adding to it, so a per-extension call carrying only its own
+        // group would wipe whatever the other extensions need: with widgets and documents on
+        // different groups, widget setup would leave only the widget group and document setup
+        // only the document group, and profiles issued from that App ID afterwards would be
+        // missing one of them. autoSetupMainAppGroups already associated the union, once.
         List<String> groupIds = new ArrayList<String>();
         groupIds.add(group.id());
-        service.enableAppGroupCapability(mainBundle.id(), groupIds, r -> {
-            if (!r.ok) {
-                showPageMessage(r.message, true);
-                return;
-            }
-            ensureExtensionBundle(ext, appName, defaults, groupIds, next);
-        });
+        ensureExtensionBundle(ext, appName, defaults, groupIds, next);
     }
 
     private void ensureExtensionBundle(ExtensionSigning ext, String appName,
@@ -1743,6 +1752,29 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         SigningState.Profile existing = findProfile(bundleIdentifier, profileType);
+        if (existing != null && appGroupsJustChanged && existing.id() != null
+                && reissuedProfiles.add(profileType)) {
+            // The App ID gained an App Group a moment ago, and a provisioning profile is a
+            // snapshot of the capabilities the App ID had when it was issued. Reusing one that
+            // predates the change installs a profile without application-groups while the
+            // builder puts that entitlement in the app, and the next device build cannot sign.
+            // Deleting it here is safe: the branch below recreates it from the same certificate
+            // and devices.
+            showPageMessage("Reissuing " + profileTypeLabel(profileType)
+                    + " after the App Group change...", false);
+            service.deleteProfile(existing.id(), r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                // Re-enter: the profile is gone now, so the creation path below runs. Guarded by
+                // reissuedProfiles so a delete the service reports but does not perform cannot
+                // turn this into a loop.
+                refreshForAutoSetup(() ->
+                        autoSetupProfile(bundleIdentifier, appName, profileType, next));
+            });
+            return;
+        }
         if (existing != null) {
             installPair(compatible.get(0), existing, profileTypeLabel(profileType) + " signing assets installed",
                     next);

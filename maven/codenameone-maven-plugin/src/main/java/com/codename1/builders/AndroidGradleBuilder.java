@@ -2045,6 +2045,12 @@ public class AndroidGradleBuilder extends Executor {
                     // hit that does switch it on is an application class referencing the API,
                     // which is the intended signal -- and the same reasoning every other feature
                     // gate in this scan relies on.
+                    // Library-encapsulated usage is deliberately out of scope here. This reads
+                    // the application's own classes; a cn1lib that publishes on the app's behalf
+                    // is packaged separately and is not walked, which is true of every feature
+                    // gate in this scan rather than of this one. Rescanning library bytecode is a
+                    // change to that shared machinery, not to this line -- the documented route
+                    // for a library is android.documentProvider.enabled.
                     if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
                         usesDocuments = true;
                     }

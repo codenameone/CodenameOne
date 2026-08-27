@@ -146,7 +146,19 @@ public final class DocumentProvider {
     ///
     /// - `endpoint`: the HTTPS base URL, or null to serve only from the shared directory
     /// - `authToken`: a bearer token sent with each request, or null for none
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the endpoint is not HTTPS
     public static void setRemoteEndpoint(String endpoint, String authToken) {
+        if (endpoint != null && endpoint.length() > 0 && !isHttps(endpoint)) {
+            // Refused rather than passed on. The readers send the bearer token as an
+            // Authorization header on every fetch, and they run outside this app -- so an
+            // "http://" typo here would hand the token, and the documents it unlocks, to the
+            // network in the clear on any platform whose cleartext policy still allows it.
+            throw new IllegalArgumentException("The document endpoint must be HTTPS; got \""
+                    + endpoint + "\".");
+        }
         DocumentProviderBridge b = bridgeInternal();
         if (b == null) {
             return;
@@ -195,6 +207,16 @@ public final class DocumentProvider {
         } catch (Throwable t) {
             Log.e(t);
         }
+    }
+
+    private static boolean isHttps(String endpoint) {
+        // Deliberately not a URI parse: this runs on every port including ones with a reduced
+        // java.net, and the only question is the scheme.
+        if (endpoint.length() < 8) {
+            return false;
+        }
+        String scheme = endpoint.substring(0, 8);
+        return "https://".equals(scheme.toLowerCase());
     }
 
     /// Test seam: installs a bridge, bypassing platform resolution.

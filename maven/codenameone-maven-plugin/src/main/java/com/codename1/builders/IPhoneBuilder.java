@@ -11301,7 +11301,10 @@ public class IPhoneBuilder extends Executor {
                 .setAppGroupId(documentsAppGroup)
                 .setDisplayName(documentsDisplayName)
                 .setDeploymentTarget(request.getArg("ios.documentProvider.deploymentTarget",
-                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS));
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS))
+                // A Catalyst build signs this extension as its own sandboxed macOS process, so
+                // it needs entitlements the iOS slice must not carry.
+                .setCatalystTarget(macNativeBuilder.isEnabled());
         String extensionName = docBuilder.getExtensionName();
         File extensionDir = new File(distDir, extensionName);
         IOSWalletExtensionBuilder.writeFileMap(docBuilder.buildFileMap(), extensionDir);
@@ -11385,6 +11388,15 @@ public class IPhoneBuilder extends Executor {
             // leaving this NO would ship an appex whose id is no longer prefixed by the app's
             // and fail the archive.
             buildSettingsMap.put("DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER", "YES");
+            // Per-SDK, so the iOS slice keeps its own entitlements and only the Mac one picks up
+            // the sandbox keys. Written straight into the Xcode build settings rather than
+            // through buildSettings.properties: Properties.load splits on the first '=', which a
+            // "[sdk=macosx*]" key contains.
+            String catalystEntitlements = docBuilder.getCatalystEntitlementsName();
+            if (catalystEntitlements != null) {
+                buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS[sdk=macosx*]",
+                        extensionName + "/" + catalystEntitlements);
+            }
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
