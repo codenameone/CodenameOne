@@ -220,6 +220,33 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aRetryAfterAResetKeepsItsOwnSession() {
+        // A call id is reusable the moment its call is gone, and a reset
+        // followed by an immediate retry is the ordinary way that happens.
+        // The old report's late answer used to remove whatever the id named
+        // -- which by then was the RETRY's session: accepted, handed to its
+        // caller, and absent from getSession() for the rest of its life.
+        String id = CallId.random();
+        CallSession first = ring(id);
+        assertSame(first, Calls.getSession(id));
+
+        bridge.simulateProviderReset();
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSessions().length > 0
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+
+        CallSession retry = ring(id);
+        assertSame(retry, Calls.getSession(id),
+                "the retry owns the id now");
+        // Whatever the first report still had to say cannot unregister it.
+        first.reportEndedRemotely(CallEndReason.REMOTE_ENDED);
+        assertSame(retry, Calls.getSession(id),
+                "the stale report must not forget the retry's session");
+    }
+
+    @Test
     public void aProviderResetEndsTheSessionsTheAppStillHolds() {
         // Clearing the map is not enough: an app keeps the CallSession a
         // report handed it, and a reset says every call is gone. Left

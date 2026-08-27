@@ -177,8 +177,9 @@ public final class CallSession {
         CallBridge b = CallRequests.bridge();
         state = CallState.ENDED;
         // Unconditional here, unlike end(): this is the app telling the
-        // framework the call is already over, not asking for it to be.
-        Calls.forget(callId);
+        // framework the call is already over, not asking for it to be. Still
+        // identity-checked, because the id can already name a newer call.
+        Calls.forget(callId, this);
         if (b != null) {
             b.reportCallEnded(callId, reason == null
                     ? CallEndReason.REMOTE_ENDED.ordinal() : reason.ordinal(),
@@ -277,7 +278,7 @@ public final class CallSession {
                 return;
             }
             session.state = CallState.ENDED;
-            Calls.forget(session.getCallId());
+            Calls.forget(session.getCallId(), session);
         }
     }
 

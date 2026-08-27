@@ -363,7 +363,7 @@ public final class Calls {
         @Override
         public void onReady(Boolean value, Throwable error) {
             if (error != null) {
-                forget(id);
+                forget(id, session);
                 out.error(error);
                 return;
             }
@@ -379,7 +379,7 @@ public final class Calls {
                 // would give the app one that getSession() does not know and
                 // no operation can address.
                 session.setStateInternal(CallState.ENDED);
-                forget(id);
+                forget(id, session);
                 out.error(new CallException(CallError.PROVIDER_RESET,
                         "The system's call provider was reset"));
                 return;
@@ -508,6 +508,26 @@ public final class Calls {
     static void forget(String callId) {
         synchronized (SESSIONS) {
             SESSIONS.remove(callId);
+        }
+    }
+
+    /// Forgets `callId` only while it still names `session`.
+    ///
+    /// Every caller that HOLDS the session it is retiring goes through here.
+    /// A call id can be reused the moment the previous call is gone -- a
+    /// provider reset followed by an immediate retry is the ordinary way --
+    /// and a late answer belonging to the OLD report would otherwise remove
+    /// the new one: accepted, returned to its caller, and absent from
+    /// getSession() and getSessions() for the rest of its life.
+    static void forget(String callId, CallSession session) {
+        if (session == null) {
+            forget(callId);
+            return;
+        }
+        synchronized (SESSIONS) {
+            if (SESSIONS.get(callId) == session) { //NOPMD CompareObjectsWithEquals
+                SESSIONS.remove(callId);
+            }
         }
     }
 
@@ -748,7 +768,7 @@ public final class Calls {
             if (session != null) {
                 session.setStateInternal(CallState.ENDED);
             }
-            forget(callId);
+            forget(callId, session);
         }
     }
 
@@ -1007,7 +1027,11 @@ public final class Calls {
                         // ended session in getSessions() addressing a native
                         // call that no longer exists. The action arms settle
                         // their tokens in a finally for the same reason.
-                        forget(callId);
+                        //
+                        // Identity-checked: this end belongs to the session
+                        // dispatched with it, and the id may already name a
+                        // newer one.
+                        forget(callId, session);
                     }
                     break;
                 }
