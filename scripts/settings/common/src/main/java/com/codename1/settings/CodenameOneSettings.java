@@ -2692,12 +2692,18 @@ public class CodenameOneSettings extends Lifecycle {
                 // is the element, and matching `<sourceDirs>` literally missed
                 // exactly the execution that asks for both lists.
                 if (containerValues(execution, element).isEmpty()) {
-                    if (execution.indexOf("combine.self=\"override\"") < 0) {
+                    // On the <configuration> element, which is what Maven reads
+                    // it off when it discards the inherited configuration.
+                    if (!"override".equals(
+                            attributeOf(execution, "configuration", "combine.self"))) {
                         out.add(pluginLevel);
                     }
                 } else {
                     out.add(execution);
-                    if (execution.indexOf("combine.children=\"append\"") >= 0) {
+                    // ...and combine.children on the container whose children are
+                    // being appended, which the comment above already said and the
+                    // whole-block search did not do.
+                    if ("append".equals(attributeOf(execution, element, "combine.children"))) {
                         out.add(pluginLevel);
                     }
                 }
@@ -3367,6 +3373,11 @@ public class CodenameOneSettings extends Lifecycle {
     /// `<relativePath>` when it says, `../pom.xml` when it does not, which is
     /// Maven's own default. Null when the POM declares no parent at all.
     static String parentPomPath(String pomPath, String pomText) {
+        // Commented out is not declared. Every other rule in this reader strips
+        // first; this one did not, so a <parent> or a <relativePath> parked
+        // inside <!-- --> chose the POM whose properties and managed source
+        // roots were then inherited.
+        pomText = withoutComments(pomText);
         if (pomPath == null || pomText == null || pomText.indexOf("<parent>") < 0) {
             return null;
         }
@@ -4327,6 +4338,70 @@ public class CodenameOneSettings extends Lifecycle {
         return false;
     }
 
+    /// The value of `attribute` on `element`'s start tag, or null.
+    ///
+    /// Read off the named element rather than searched for in the whole block:
+    /// Maven's combine.self and combine.children apply to the element they are
+    /// written on, so `indexOf("combine.self=\"override\"")` also matched one
+    /// written on an unrelated child and discarded a configuration the build
+    /// really does inherit. Single quotes and spaces around `=` are legal XML,
+    /// and a literal search missed both.
+    static String attributeOf(String xml, String element, String attribute) {
+        if (xml == null || element == null || attribute == null) {
+            return null;
+        }
+        int at = 0;
+        while (true) {
+            at = xml.indexOf("<" + element, at);
+            if (at < 0) {
+                return null;
+            }
+            int after = at + element.length() + 1;
+            char follows = after < xml.length() ? xml.charAt(after) : '>';
+            if (follows != ' ' && follows != '\t' && follows != '\n' && follows != '\r'
+                    && follows != '>' && follows != '/') {
+                // <sourceDirsSomethingElse>, not this element.
+                at = after;
+                continue;
+            }
+            int close = xml.indexOf('>', at);
+            if (close < 0) {
+                return null;
+            }
+            String value = attributeIn(xml.substring(after, close), attribute);
+            if (value != null) {
+                return value;
+            }
+            at = close + 1;
+        }
+    }
+
+    /// `attribute`'s value inside one start tag's attribute text, or null.
+    private static String attributeIn(String tag, String attribute) {
+        int at = tag.indexOf(attribute);
+        while (at >= 0) {
+            int i = at + attribute.length();
+            while (i < tag.length() && (tag.charAt(i) == ' ' || tag.charAt(i) == '\t')) {
+                i++;
+            }
+            if (i < tag.length() && tag.charAt(i) == '=') {
+                i++;
+                while (i < tag.length() && (tag.charAt(i) == ' ' || tag.charAt(i) == '\t')) {
+                    i++;
+                }
+                if (i < tag.length() && (tag.charAt(i) == '"' || tag.charAt(i) == '\'')) {
+                    char quote = tag.charAt(i);
+                    int end = tag.indexOf(quote, i + 1);
+                    if (end > i) {
+                        return tag.substring(i + 1, end);
+                    }
+                }
+            }
+            at = tag.indexOf(attribute, at + 1);
+        }
+        return null;
+    }
+
     /// Whether `pluginBlock` has an enabled execution bound to `goal`.
     ///
     /// A null goal means the caller does not care, and any execution counts.
@@ -4744,7 +4819,12 @@ public class CodenameOneSettings extends Lifecycle {
         int at = indexOfArtifactId(text, artifactId, 0);
         while (at >= 0) {
             int open = text.lastIndexOf("<plugin>", at);
-            int close = text.indexOf("</plugin>", at);
+            // The MATCHING close, not the first one. kotlin-maven-plugin's own
+            // configuration nests <compilerPlugins><plugin>spring</plugin>, which
+            // is how every Kotlin+Spring POM is written, and stopping at that
+            // inner </plugin> cut the block off before its <executions> -- so the
+            // Kotlin source roots the reader is looking for were not there.
+            int close = matchingClose(text, open, "plugin");
             if (open >= 0 && close > open) {
                 out.add(text.substring(open, close));
                 at = indexOfArtifactId(text, artifactId, close);
@@ -4753,6 +4833,39 @@ public class CodenameOneSettings extends Lifecycle {
             }
         }
         return out;
+    }
+
+    /// The `</element>` that closes the `<element>` at `open`, or -1.
+    ///
+    /// By depth, because these elements nest: an element that contains another
+    /// of the same name is closed by the SECOND `</element>`, and taking the
+    /// first truncates the block at the inner one.
+    private static int matchingClose(String text, int open, String element) {
+        if (text == null || open < 0) {
+            return -1;
+        }
+        String openTag = "<" + element + ">";
+        String closeTag = "</" + element + ">";
+        int depth = 0;
+        int at = open;
+        while (at >= 0 && at < text.length()) {
+            int nextOpen = text.indexOf(openTag, at);
+            int nextClose = text.indexOf(closeTag, at);
+            if (nextClose < 0) {
+                return -1;
+            }
+            if (nextOpen >= 0 && nextOpen < nextClose) {
+                depth++;
+                at = nextOpen + openTag.length();
+            } else {
+                depth--;
+                if (depth == 0) {
+                    return nextClose;
+                }
+                at = nextClose + closeTag.length();
+            }
+        }
+        return -1;
     }
 
     /// The `<executions>` element of `pluginBlock`, or "" when it has none.
@@ -4791,7 +4904,7 @@ public class CodenameOneSettings extends Lifecycle {
                 out.append(pomText.substring(at));
                 return out.toString();
             }
-            int close = pomText.indexOf("</plugin>", open);
+            int close = matchingClose(pomText, open, "plugin");
             if (close < 0) {
                 out.append(pomText.substring(at));
                 return out.toString();
@@ -4831,7 +4944,7 @@ public class CodenameOneSettings extends Lifecycle {
                 out.append(pomText.substring(at));
                 return out.toString();
             }
-            int close = pomText.indexOf("</plugin>", open);
+            int close = matchingClose(pomText, open, "plugin");
             if (close < 0) {
                 out.append(pomText.substring(at));
                 return out.toString();
@@ -5045,7 +5158,9 @@ public class CodenameOneSettings extends Lifecycle {
             return null;
         }
         int open = pomText.lastIndexOf("<plugin>", at);
-        int close = pomText.indexOf("</plugin>", at);
+        // The MATCHING close: kotlin-maven-plugin nests <compilerPlugins><plugin>,
+        // and the first </plugin> ends the block before its own <executions>.
+        int close = matchingClose(pomText, open, "plugin");
         if (open < 0 || close < 0) {
             return null;
         }

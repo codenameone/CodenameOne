@@ -26,6 +26,7 @@ import com.codename1.build.shared.BuildHints;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static com.codename1.build.shared.BuildHints.ARG_PREFIX;
 
 /**
  * Joins a build hint contributed by a cn1lib's {@code codenameone_library_appended.properties}
@@ -52,9 +53,6 @@ import java.util.regex.Pattern;
  * doubled, so libraries written to either convention merge correctly and unchanged.</p>
  */
 public class LibraryHintMerger {
-
-    /** Prefix every build hint carries inside a settings/library properties file. */
-    private static final String ARG_PREFIX = "codename1.arg.";
 
     private LibraryHintMerger() {
     }

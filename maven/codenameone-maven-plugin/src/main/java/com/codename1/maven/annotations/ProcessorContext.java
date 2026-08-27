@@ -68,7 +68,7 @@ public final class ProcessorContext {
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
-        this(outputClassDir, stubSourceDir, classIndex, log, null, null, null);
+        this(outputClassDir, stubSourceDir, classIndex, log, null, null, null, null, null, null);
     }
 
     /// Full form, adding the project configuration.
@@ -77,52 +77,25 @@ public final class ProcessorContext {
     /// `codenameone_settings.properties`, without any `-D` overlay: a hint given
     /// on the command line is the documented way to override one for a single
     /// build, so it must never be mistaken for something the project declares.
-    public ProcessorContext(File outputClassDir, File stubSourceDir,
-                             Map<String, AnnotatedClass> classIndex, Log log,
-                             File projectDir, Properties projectSettings,
-                             String mainClassBinaryName) {
-        this(outputClassDir, stubSourceDir, classIndex, log, projectDir, projectSettings,
-                mainClassBinaryName, null);
-    }
-
-    /// Adds the module's configured compile source roots.
     ///
-    /// Passed in rather than guessed at from the project directory: a module may
-    /// add `generated-sources`, or a Kotlin root, or replace the conventional one
-    /// altogether, and a processor that assumes `src/main/java` would decide a
-    /// perfectly live class has no source.
-    public ProcessorContext(File outputClassDir, File stubSourceDir,
-                             Map<String, AnnotatedClass> classIndex, Log log,
-                             File projectDir, Properties projectSettings,
-                             String mainClassBinaryName, List<String> compileSourceRoots) {
-        this(outputClassDir, stubSourceDir, classIndex, log, projectDir, projectSettings,
-                mainClassBinaryName, compileSourceRoots, null);
-    }
-
-    /// Adds the encoding the module's sources are COMPILED with.
+    /// `compileSourceRoots` is passed in rather than guessed at from the project
+    /// directory: a module may add `generated-sources`, or a Kotlin root, or
+    /// replace the conventional one altogether, and a processor that assumes
+    /// `src/main/java` would decide a perfectly live class has no source.
     ///
+    /// `sourceEncoding` is the encoding the module's sources are COMPILED with.
     /// A processor that reads a source file back has to decode it the way javac
     /// did or it is reading a different text. Guessing from the bytes settles
     /// UTF-16 and UTF-8 but cannot separate one single-byte encoding from
     /// another, so a Windows-1251 source came back as the wrong -- and equally
     /// valid -- identifier characters. Null means the module did not say, which
     /// a reader must treat as "cannot tell" rather than as a licence to guess.
-    public ProcessorContext(File outputClassDir, File stubSourceDir,
-                             Map<String, AnnotatedClass> classIndex, Log log,
-                             File projectDir, Properties projectSettings,
-                             String mainClassBinaryName, List<String> compileSourceRoots,
-                             String sourceEncoding) {
-        this(outputClassDir, stubSourceDir, classIndex, log, projectDir, projectSettings,
-                mainClassBinaryName, compileSourceRoots, sourceEncoding, null);
-    }
-
-    /// Adds the compile classpath, which is where the build hint ANNOTATIONS
-    /// live.
     ///
-    /// A processor that must know what an annotation member sets reads the
-    /// annotation itself, off this classpath. The alternative was a generated
-    /// table listing every annotation by name -- a second statement of which
-    /// types exist, which had to be regenerated whenever one was added.
+    /// `compileClasspath` is where the build hint ANNOTATIONS live. A processor
+    /// that must know what an annotation member sets reads the annotation
+    /// itself, off this classpath. The alternative was a generated table listing
+    /// every annotation by name -- a second statement of which types exist,
+    /// which had to be regenerated whenever one was added.
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log,
                              File projectDir, Properties projectSettings,

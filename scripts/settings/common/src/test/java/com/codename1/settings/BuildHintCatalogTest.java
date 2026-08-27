@@ -1844,6 +1844,39 @@ public class BuildHintCatalogTest {
                         + "</executions></plugin></plugins></build></project>");
         assertFalse(overridden.contains("src/shared/kt"), overridden.toString());
 
+        // Both attributes are read off the element Maven reads them off, not
+        // found anywhere in the execution. combine.self on a nested element says
+        // nothing about the configuration as a whole, and a whole-block search
+        // discarded an inherited list because of it.
+        java.util.List<String> nested = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<compilerPlugins combine.self=\"override\">"
+                        + "<plugin>spring</plugin></compilerPlugins></configuration>"
+                        + "</execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(nested.contains("src/shared/kt"), nested.toString());
+
+        // Single quotes and spaces around = are legal XML; a literal search for
+        // combine.children="append" saw neither.
+        java.util.List<String> quoted = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs combine.children = 'append'>"
+                        + "<sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(quoted.contains("src/main/kt"), quoted.toString());
+        assertTrue(quoted.contains("src/shared/kt"), quoted.toString());
+
         // A project-directory expression is deterministic, so it is resolved
         // rather than discarded.
         java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
@@ -3310,6 +3343,19 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", "<project></project>"));
         assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
                 "<project><parent><relativePath></relativePath></parent></project>"));
+
+        // Commented out is not declared. Every other rule in this reader strips
+        // comments first; this one did not, so a <parent> someone parked inside
+        // <!-- --> chose the POM whose properties and managed roots the module
+        // then inherited.
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                "<project><!-- <parent><relativePath>../old</relativePath></parent> -->"
+                        + "</project>"));
+        assertEquals("/p/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent>"
+                                + "<!-- <relativePath>../old/pom.xml</relativePath> -->"
+                                + "</parent></project>"));
 
         // The path arithmetic the walk depends on.
         assertEquals("/p/pom.xml", CodenameOneSettings.normalizePath("/p/common/../pom.xml"));
