@@ -119,6 +119,15 @@ static NSMenu *cn1TopLevelMenu(NSMenu *mainMenu, NSString *title, BOOL createIfM
     return menu;
 }
 
+/// Titles of the top-level menus this file invented for a desktop-menu hint.
+///
+/// Only these may be pruned when they empty out. The standard menus -- File,
+/// Edit, View, Window, Help and the application menu -- belong to the
+/// application whether or not any command is currently in them, and removing an
+/// empty File menu because the visible Form has no File commands would be a far
+/// worse bug than the one this fixes.
+static NSMutableSet *cn1GeneratedMenuTitles = nil;
+
 /// Removes every item this file added on a previous pass, so a rebuild replaces
 /// the commands rather than appending a second copy of them.
 static void cn1RemovePreviousCommands(NSMenu *menu) {
@@ -132,6 +141,32 @@ static void cn1RemovePreviousCommands(NSMenu *menu) {
     }
     for (NSMenuItem *item in doomed) {
         [menu removeItem:item];
+    }
+}
+
+/// Drops the invented menus that no longer hold anything.
+///
+/// Command items are removed above, but the container created for a hint stayed
+/// behind: moving from a Form with a Tools command to one without left an empty
+/// Tools menu in the bar, and every Form introducing a new hint added another
+/// that never went away.
+static void cn1PruneEmptyGeneratedMenus(NSMenu *mainMenu) {
+    if (cn1GeneratedMenuTitles == nil) {
+        return;
+    }
+    NSMutableArray *doomed = [NSMutableArray array];
+    for (NSMenuItem *item in mainMenu.itemArray) {
+        NSMenu *sub = item.submenu;
+        if (sub != nil && sub.numberOfItems == 0
+                && [cn1GeneratedMenuTitles containsObject:sub.title]) {
+            [doomed addObject:item];
+        }
+    }
+    for (NSMenuItem *item in doomed) {
+        // Forgotten as well as removed: the next pass recreates and re-registers
+        // it if a command asks for that hint again.
+        [cn1GeneratedMenuTitles removeObject:item.submenu.title];
+        [mainMenu removeItem:item];
     }
 }
 
@@ -178,6 +213,7 @@ void CN1MacHostSetMenuCommands(NSArray *rows) {
         }
     }
     cn1RemovePreviousCommands(mainMenu);
+    cn1PruneEmptyGeneratedMenus(mainMenu);
 
     NSMenu *appMenu = mainMenu.numberOfItems > 0 ? [mainMenu itemAtIndex:0].submenu : nil;
     NSMutableDictionary *appended = [NSMutableDictionary dictionary];
@@ -196,7 +232,14 @@ void CN1MacHostSetMenuCommands(NSArray *rows) {
         if (standard == nil) {
             // No hint at all means the default commands menu, and a hint that
             // matches no standard menu names one of the application's own.
-            target = cn1TopLevelMenu(mainMenu, hint.length == 0 ? @"Commands" : hint, YES);
+            NSString *generated = hint.length == 0 ? @"Commands" : hint;
+            target = cn1TopLevelMenu(mainMenu, generated, YES);
+            if (target != nil) {
+                if (cn1GeneratedMenuTitles == nil) {
+                    cn1GeneratedMenuTitles = [[NSMutableSet alloc] init];
+                }
+                [cn1GeneratedMenuTitles addObject:generated];
+            }
         } else if ([standard isEqualToString:@"__app__"]) {
             target = appMenu;
         } else {
