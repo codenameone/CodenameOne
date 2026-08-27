@@ -380,8 +380,14 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
         }
         // Opened on an allowed value too, so the picker does not start on a
         // minute it will refuse to commit.
+        //
+        // Never for a date-only picker. It has no minute element for a step to
+        // constrain, but rounding still moved the instant -- 23:59 with the
+        // default five-minute step becomes 00:00 the NEXT DAY, and since the
+        // control shows no time there is nothing on screen to reveal that the
+        // date shifted. The user accepts a day they never chose.
         long long seeded = time;
-        if (controller.minuteStep > 1) {
+        if (type != 1 && controller.minuteStep > 1) {
             long long stepMs = (long long)controller.minuteStep * 60000;
             seeded = ((seeded + stepMs / 2) / stepMs) * stepMs;
         }

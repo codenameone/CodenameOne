@@ -9130,6 +9130,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(key.equalsIgnoreCase("os.gzip")) {
             return "true";
         }
+        // NSURLSession follows a redirect inside the native stack, so the
+        // framework never sees where a download actually came from. Answered
+        // here rather than inferred from the platform name because the native
+        // macOS port inherits this class -- and shares the behaviour -- while a
+        // skinless JavaSE build on a Mac reports the same platform name and does
+        // not. ModelCache reads it to decide whether a pinned digest is
+        // mandatory.
+        if(key.equalsIgnoreCase("cn1.nativeRedirects")) {
+            return "true";
+        }
         if(key.equalsIgnoreCase("OS")) {
             return "iOS";
         }

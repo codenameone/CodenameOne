@@ -306,13 +306,25 @@ public final class ModelCache {
     }
 
     static boolean requiresPinnedModelDigest() {
-        // "mac" as well as "ios": the native macOS port shares the Apple
-        // networking stack, so NSURLSession follows the redirect below the
-        // portable layer there too and the digest is the only thing that can
-        // say what was actually downloaded.
-        String platform = Display.getInstance().getPlatformName();
-        return "ios".equals(platform) || "mac".equals(platform);
+        // Asked as a CAPABILITY, not read off the platform label. The label
+        // cannot answer this: a skinless JavaSE desktop build on a Mac also
+        // reports "mac" (JavaSEPort.getPlatformName), and it uses the portable
+        // network layer, so keying on the name made a previously valid
+        // two-argument fetch() start throwing on JavaSE desktop.
+        //
+        // The property is answered by the ports whose platform follows the
+        // redirect underneath us -- the Apple ParparVM ports, where NSURLSession
+        // does it inside the native stack and the digest is the only thing that
+        // can say what was actually downloaded. Every other port leaves the
+        // default and needs no digest.
+        return "true".equals(Display.getInstance()
+                .getProperty(NATIVE_REDIRECTS_PROPERTY, "false"));
     }
+
+    /// Set to {@code true} by a port whose platform follows HTTP redirects below
+    /// the portable network layer, so the framework cannot see where a download
+    /// actually came from.
+    static final String NATIVE_REDIRECTS_PROPERTY = "cn1.nativeRedirects";
 
     static FetchRegistration registerFetch(
             String fileName, String url, String sha256) {

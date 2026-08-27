@@ -208,6 +208,51 @@ public class MacOSBuildHintsTest {
     /// developer finds out by hand at upload time rather than from the build.
     /// Same reasoning as the sandbox, which was already refused for this
     /// channel.
+    /// The shared installer hint is refused only when two PACKAGES would carry
+    /// it, which is not the same as two channels.
+    ///
+    /// It has been wrong in both directions: first answering for both channels,
+    /// so an App Store package and a Developer ID package were signed with one
+    /// certificate and at least one was rejected after a green build; then
+    /// refusing whenever a build had two channels, which broke the ordinary
+    /// distribution=both default where only the store channel produces a pkg at
+    /// all.
+    @Test
+    public void theSharedInstallerIdentityAnswersWhileOnlyOnePackageIsSigned() {
+        // One channel: unambiguous.
+        assertEquals("Developer ID Installer: Someone",
+                parse(raw("macos.distribution", "developerID",
+                        "macos.packaging", "pkg",
+                        "macos.signingIdentity.installer", "Developer ID Installer: Someone"), "p")
+                        .getInstallerIdentityFor("developerID"));
+
+        // Two channels on the DEFAULT packaging: pkg for the store, dmg for
+        // direct download, so exactly one package is signed.
+        MacOSBuildHints dflt = parse(raw("macos.distribution", "both",
+                "macos.signingIdentity.installer", "3rd Party Mac Developer Installer: Someone"), "p");
+        assertEquals("3rd Party Mac Developer Installer: Someone",
+                dflt.getInstallerIdentityFor("appStore"));
+
+        // Two channels that both produce a package: no single certificate can
+        // be right, so the shared hint is refused rather than misapplied.
+        MacOSBuildHints bothPkg = parse(raw("macos.distribution", "both",
+                "macos.packaging", "pkg",
+                "macos.signingIdentity.installer", "3rd Party Mac Developer Installer: Someone"), "p");
+        assertNull(bothPkg.getInstallerIdentityFor("appStore"));
+        assertNull(bothPkg.getInstallerIdentityFor("developerID"));
+
+        // A per-channel identity always wins, including then.
+        MacOSBuildHints perChannel = parse(raw("macos.distribution", "both",
+                "macos.packaging", "pkg",
+                "macos.signingIdentity.installer", "shared",
+                "macos.signingIdentity.installer.appStore", "3rd Party Mac Developer Installer: A",
+                "macos.signingIdentity.installer.developerID", "Developer ID Installer: B"), "p");
+        assertEquals("3rd Party Mac Developer Installer: A",
+                perChannel.getInstallerIdentityFor("appStore"));
+        assertEquals("Developer ID Installer: B",
+                perChannel.getInstallerIdentityFor("developerID"));
+    }
+
     @Test
     public void appStorePackagingIsAlwaysPkg() {
         MacOSBuildHints pinned = parse(raw("macos.distribution", "both",
