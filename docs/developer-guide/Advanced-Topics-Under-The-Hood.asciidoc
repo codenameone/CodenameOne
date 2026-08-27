@@ -67,7 +67,7 @@ app can't follow the build service when the service changes it.
 
 A hint with a closed set of values takes an enum, so `@Ios(themeMode = ...)`
 offers you the four themes that exist and rejects anything else at compile time.
-Hints whose accepted values are open ended stay `String`.
+Hints whose accepted values are open-ended stay `String`.
 
 The long tail of hints has no annotation, and neither do the open-ended families
 such as `android.permission.<NAME>`, because a Java annotation can't express a
