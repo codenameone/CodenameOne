@@ -458,6 +458,9 @@ public class LocalCallBridge implements CallBridge {
 
     @Override
     public void configureProvider(int requestId, String configWire) {
+        if (refused(requestId)) {
+            return;
+        }
         configured = true;
         ok(requestId);
     }
@@ -494,6 +497,9 @@ public class LocalCallBridge implements CallBridge {
         if (availability != 0) {
             fail(requestId, CallError.CALL_REFUSED,
                     "The system will not ring a call right now");
+            return;
+        }
+        if (refused(requestId)) {
             return;
         }
         synchronized (calls) {
@@ -577,6 +583,9 @@ public class LocalCallBridge implements CallBridge {
                     "The simulated platform refused to end the call");
             return;
         }
+        if (refused(requestId)) {
+            return;
+        }
         remove(callId);
         later(LATENCY_MILLIS, new AudioDelivery(callId, route, false));
         ok(requestId);
@@ -589,6 +598,9 @@ public class LocalCallBridge implements CallBridge {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
             return;
         }
+        if (refused(requestId)) {
+            return;
+        }
         c.state = held ? CallState.HELD : CallState.ACTIVE;
         ok(requestId);
     }
@@ -598,6 +610,9 @@ public class LocalCallBridge implements CallBridge {
         SimCall c = find(callId);
         if (c == null) {
             fail(requestId, CallError.INVALID_ID, "No such call: " + callId);
+            return;
+        }
+        if (refused(requestId)) {
             return;
         }
         c.muted = muted;
@@ -639,6 +654,9 @@ public class LocalCallBridge implements CallBridge {
 
     @Override
     public void setAudioRoute(int requestId, int routeOrdinal) {
+        if (refused(requestId)) {
+            return;
+        }
         this.route = routeOrdinal;
         ok(requestId);
     }
@@ -782,6 +800,9 @@ public class LocalCallBridge implements CallBridge {
             fail(requestId, CallError.NOT_SUPPORTED, null);
             return;
         }
+        if (refused(requestId)) {
+            return;
+        }
         this.directoryPath = filePath;
         ok(requestId);
     }
@@ -863,6 +884,28 @@ public class LocalCallBridge implements CallBridge {
 
     private synchronized long nextToken() {
         return nextToken++;
+    }
+
+    /// Whether the simulated platform is refusing this request, consuming
+    /// the primed failure.
+    ///
+    /// Asked BEFORE anything is mutated. A device that refuses an operation
+    /// does not half-perform it -- CallKit and Telecom either carry it out or
+    /// leave the call exactly as it was -- but ok() consumed the flag AFTER
+    /// the mutation, so a refused hold still moved the simulated call to
+    /// HELD. The facade left its session alone, so the two disagreed, and a
+    /// test reading the bridge could assert a state no device produces. That
+    /// is the opposite of what this simulation is for. endCall already had
+    /// this shape for its own flag; this is the same rule for the general
+    /// one.
+    private boolean refused(int requestId) {
+        if (!failNext) {
+            return false;
+        }
+        failNext = false;
+        fail(requestId, CallError.BUSY,
+                "The simulated platform refused the request");
+        return true;
     }
 
     private void ok(int requestId) {

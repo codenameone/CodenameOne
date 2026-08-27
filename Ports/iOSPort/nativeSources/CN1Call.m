@@ -1083,6 +1083,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     // -1 settles nothing and still reaches the tokenChanged listener, which
     // is what the rotation case needs.
     NSArray *waiting = nil;
+    NSString *delivered = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
         // The STORE and the drain under one lock, which is the lock a
@@ -1090,6 +1091,14 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // outside it left a registration able to read nil from a token this
         // callback had already produced.
         cn1clVoipToken = [hex copy];
+        // CAPTURED with the batch. The deliveries below re-read the global,
+        // and callUnregisterVoipPush clears it under this same lock -- so an
+        // unregister landing between the drain and the loop had every pending
+        // register answered SUCCESSFULLY with nil, which is neither what this
+        // callback produced nor the failure the unregister path intends. The
+        // waiters and the value they are being told about have to come out
+        // of the lock together.
+        delivered = cn1clVoipToken;
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
         [cn1clTokenRequests removeAllObjects];
     }
@@ -1098,7 +1107,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // and still reaches the tokenChanged listener, which is what this
         // case needs.
         com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
-                getThreadLocalData(), -1, cn1clJString(cn1clVoipToken));
+                getThreadLocalData(), -1, cn1clJString(delivered));
         return;
     }
     // One settlement per waiting registration. deliverToken tells the
@@ -1107,7 +1116,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     for (NSNumber *req in waiting) {
         com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
                 getThreadLocalData(), [req intValue],
-                cn1clJString(cn1clVoipToken));
+                cn1clJString(delivered));
     }
 }
 

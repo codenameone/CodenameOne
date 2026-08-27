@@ -912,6 +912,29 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aRefusedHoldLeavesTheSimulatedPlatformWhereItWas() {
+        // The session half of this is covered above. What was NOT is the
+        // simulated platform: it moved the call to the requested state and
+        // only then consumed the primed failure, so the bridge reported a
+        // state the request had just been told it could not have. No device
+        // does that -- CallKit and Telecom either carry an operation out or
+        // leave the call exactly as it was -- so a test reading the bridge
+        // could confirm behaviour that cannot happen, which is the opposite
+        // of what this simulation is for.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        CallAwait.value(s.setHeld(true));
+        assertSame(CallState.HELD, bridge.callState(id));
+
+        bridge.primeOperationFailure();
+        CallAwait.errorOf(s.setHeld(false));
+        assertSame(CallState.HELD, bridge.callState(id),
+                "a refused resume must leave the simulated platform held");
+        assertSame(CallState.HELD, s.getState(),
+                "and the session with it");
+    }
+
+    @Test
     public void aRefusedMuteDoesNotMoveTheSessionFlag() {
         String id = CallId.random();
         CallSession s = ring(id);
