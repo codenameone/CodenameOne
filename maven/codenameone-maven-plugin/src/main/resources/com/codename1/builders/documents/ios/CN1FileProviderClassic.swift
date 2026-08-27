@@ -632,7 +632,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // And the same credential the download was authorized with. An account switch that reuses
         // both the node id and the server's key for it would otherwise pass everything above,
         // and the previous account's bytes would be written into the new account's file.
-        return CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials
+        // By bytes, not by Swift's canonical String equality: the token is opaque, and two
+        // tokens differing only in normalization are == while being different credentials.
+        return cn1SameOpaqueKey(CN1DocumentRemote.credentialStamp(containerURL: containerURL),
+                                credentials)
     }
 
     private static func place(_ source: URL, at destination: URL, copy: Bool) -> Error? {

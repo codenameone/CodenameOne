@@ -344,7 +344,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
               // local file's version and never ask again.
               !cn1HasLocalContent(node, containerURL: containerURL),
               CN1RemoteVersion(node, revision: index.revision) == version,
-              CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
+              cn1SameOpaqueKey(CN1DocumentRemote.credentialStamp(containerURL: containerURL),
+                               credentials) else {
             // The credential is compared as well as the node and the remote object: an account
             // switch reuses node ids, and can reuse the server's keys for them, so those two
             // alone would let the previous account's bytes through.

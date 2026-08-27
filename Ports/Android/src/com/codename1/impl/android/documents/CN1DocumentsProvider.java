@@ -190,22 +190,31 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // account may reuse, so the open would return the NEW account's bytes to a request the
         // old one made -- and a revoked grant does not reach into a call already running. The
         // descriptor is closed rather than returned when the publication moved under it.
+        //
+        // The check and the open are one step, under the same lock the bridge holds across
+        // publish, clear and the endpoint write. Checking first and opening afterwards only
+        // narrows the gap: clear() could still land in between, and a descriptor handed out
+        // after it keeps the departed account's bytes readable for as long as the picker holds
+        // it, which is exactly what logout is supposed to end. Nothing slow runs inside -- the
+        // index read and the open are local -- so this does not hold publish() off the disk.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
             if (local != null && local.exists()) {
-                ParcelFileDescriptor descriptor =
-                        ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
-                CN1DocumentStore.Index current = CN1DocumentStore.loadIndex(getContext());
-                CN1DocumentStore.Node reread =
-                        current == null ? null : current.nodes.get(documentId);
-                if (current != null && current.revision.equals(index.revision)
-                        && reread != null && node.path.equals(reread.path)) {
-                    return descriptor;
-                }
-                try {
-                    descriptor.close();
-                } catch (IOException err) {
-                    Log.w(TAG, "Could not close a withdrawn descriptor for " + documentId, err);
+                synchronized (CN1DocumentStore.WRITE_LOCK) {
+                    ParcelFileDescriptor descriptor =
+                            ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
+                    CN1DocumentStore.Index current = CN1DocumentStore.loadIndex(getContext());
+                    CN1DocumentStore.Node reread =
+                            current == null ? null : current.nodes.get(documentId);
+                    if (current != null && current.revision.equals(index.revision)
+                            && reread != null && node.path.equals(reread.path)) {
+                        return descriptor;
+                    }
+                    try {
+                        descriptor.close();
+                    } catch (IOException err) {
+                        Log.w(TAG, "Could not close a withdrawn descriptor for " + documentId, err);
+                    }
                 }
                 throw new FileNotFoundException("Published document " + documentId
                         + " was withdrawn while it was being opened");
@@ -230,25 +239,34 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // Node ids are the app's own record keys and a switch reuses them, so the check is the
         // remote id AND the credential the download was authorized with, which is the thing a
         // switch always changes.
-        if (!stillPublished(documentId, node, index.revision, credentials)) {
-            if (!cached.delete()) {
-                Log.w(TAG, "Could not delete the withdrawn download " + cached);
+        //
+        // Both under the store's lock, for the same reason the local branch above is: a clear()
+        // landing between the check and the open cannot cancel a binder call already inside
+        // openDocument, and the download lives in a request-owned cache file clear() has no
+        // reason to walk -- so without the lock a logout could be followed by the picker still
+        // receiving the departed account's bytes. The download itself ran outside the lock and
+        // takes as long as the network takes; only the check and the local open are inside it.
+        synchronized (CN1DocumentStore.WRITE_LOCK) {
+            if (!stillPublished(documentId, node, index.revision, credentials)) {
+                if (!cached.delete()) {
+                    Log.w(TAG, "Could not delete the withdrawn download " + cached);
+                }
+                throw new FileNotFoundException("Published document " + documentId
+                        + " was withdrawn while it was being fetched");
             }
-            throw new FileNotFoundException("Published document " + documentId
-                    + " was withdrawn while it was being fetched");
-        }
-        // Unlinked whether or not the descriptor is created. The open itself can fail -- a
-        // process out of file descriptors is the ordinary way -- and leaving the download behind
-        // there put a whole document in the cache per attempt, which nothing reads and nothing
-        // clears. On success the descriptor keeps the inode alive for as long as the caller
-        // reads it, so the bytes survive while the name does not: that is what stops a download
-        // outliving the request that fetched it, and what keeps a departed user's document out
-        // of a directory clear() has no reason to walk.
-        try {
-            return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
-        } finally {
-            if (!cached.delete()) {
-                Log.w(TAG, "Could not delete the served download " + cached);
+            // Unlinked whether or not the descriptor is created. The open itself can fail -- a
+            // process out of file descriptors is the ordinary way -- and leaving the download
+            // behind there put a whole document in the cache per attempt, which nothing reads
+            // and nothing clears. On success the descriptor keeps the inode alive for as long as
+            // the caller reads it, so the bytes survive while the name does not: that is what
+            // stops a download outliving the request that fetched it, and what keeps a departed
+            // user's document out of a directory clear() has no reason to walk.
+            try {
+                return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+            } finally {
+                if (!cached.delete()) {
+                    Log.w(TAG, "Could not delete the served download " + cached);
+                }
             }
         }
     }

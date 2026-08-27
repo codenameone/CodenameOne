@@ -80,7 +80,13 @@ enum CN1DocumentRemote {
     static func credentialGeneration(containerURL: URL) -> String {
         let stamp = credentialStamp(containerURL: containerURL)
         return generationLock.withLock {
-            if stamp == lastStamp {
+            // By bytes. A bearer token is opaque, and Swift compares Strings canonically: two
+            // tokens that differ only in normalization -- the same letters written precomposed
+            // and decomposed -- are == to each other while being different bytes on the wire.
+            // The memo would then hand the second account the first one's generation, an
+            // unchanged content version, and the browser would keep serving what it had
+            // materialized under the old token.
+            if cn1SameOpaqueKey(stamp, lastStamp) {
                 return lastGeneration
             }
             // CommonCrypto rather than CryptoKit: this file is also compiled into the
