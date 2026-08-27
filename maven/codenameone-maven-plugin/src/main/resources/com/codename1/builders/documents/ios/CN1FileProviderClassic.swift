@@ -67,20 +67,52 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         return created
     }
 
-    /// Moves a staged file onto the shared URL, but only while this request still owns it.
+    /// A number for this materialization, rising per URL.
     ///
-    /// - Returns: nil when the file is in place, an error when the move failed, and
-    ///   NSFileProviderError(.noSuchItem) when a stop claimed the URL first -- in which case
-    ///   nothing was written and the staged file has been removed.
-    private func install(_ staged: URL, at url: URL, generation: Int) -> Error? {
+    /// The stop generation cannot order two requests that no stop separates: an app that
+    /// replaces the bytes behind an unchanged path and signals gets a second
+    /// startProvidingItem while the first copy is still running, and both hold the same stop
+    /// generation and the same publication revision. Without an order between them the one that
+    /// finishes LAST wins, which is not the one that started last -- so a slow older copy could
+    /// replace newer bytes with stale ones.
+    private var materializationSequence: [URL: Int] = [:]
+    private var installedSequence: [URL: Int] = [:]
+
+    private func beginMaterialization(at url: URL) -> Int {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        let next = (materializationSequence[url] ?? 0) + 1
+        materializationSequence[url] = next
+        return next
+    }
+
+    /// Moves a staged file onto the shared URL, but only while this request still owns it.
+    private func install(_ staged: URL, at url: URL, generation: Int,
+                         sequence: Int) -> CN1InstallOutcome {
         let lock = gate(for: url)
         lock.lock()
         defer { lock.unlock() }
         guard stillWanted(at: url, generation: generation) else {
             try? FileManager.default.removeItem(at: staged)
-            return NSFileProviderError(.noSuchItem)
+            return .stopped
         }
-        return CN1FileProviderClassic.place(staged, at: url, copy: false)
+        inFlightLock.lock()
+        let alreadyInstalled = installedSequence[url] ?? 0
+        inFlightLock.unlock()
+        if alreadyInstalled > sequence {
+            // A materialization that started after this one has already put its bytes there.
+            // They are this item's bytes too -- a newer read of the same path -- so this request
+            // is satisfied by them and must not overwrite them with what it copied earlier.
+            try? FileManager.default.removeItem(at: staged)
+            return .superseded
+        }
+        if let error = CN1FileProviderClassic.place(staged, at: url, copy: false) {
+            return .failed(error)
+        }
+        inFlightLock.lock()
+        installedSequence[url] = sequence
+        inFlightLock.unlock()
+        return .installed
     }
 
     private func beginFetch(at url: URL) -> Int {
@@ -332,6 +364,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 // check cannot see that, because nothing about the publication changed.
                 let publication = index.revision
                 let stopped = beginFetch(at: url)
+                let sequence = beginMaterialization(at: url)
                 let container = containerURL
                 // Off the provider thread, as the replicated provider's copy is. This one is
                 // called on the thread that has to return from startProvidingItem, and copying a
@@ -354,11 +387,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                         completionHandler(NSFileProviderError(.noSuchItem))
                         return
                     }
-                    let placed = self.install(staged, at: url, generation: stopped)
-                    if placed != nil {
+                    switch self.install(staged, at: url, generation: stopped,
+                                        sequence: sequence) {
+                    case .installed, .superseded:
+                        completionHandler(nil)
+                    case .stopped:
+                        completionHandler(NSFileProviderError(.noSuchItem))
+                    case .failed(let error):
                         self.providePlaceholder(at: url) { _ in }
+                        completionHandler(error)
                     }
-                    completionHandler(placed)
                 }
                 return
             }
@@ -379,6 +417,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // Registered below so stopProvidingItem can reach it; the generation is captured first
         // so a stop landing after the download finishes is still seen.
         let generation = beginFetch(at: url)
+        let sequence = beginMaterialization(at: url)
         // The completion has to name its OWN task to drop the right entry, and the task does not
         // exist until fetch returns -- so it is handed over in a box, filled in below before
         // anything can start: the task comes back suspended.
@@ -417,17 +456,19 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // The download is already a private file, so this is the same claim the local branch
             // makes: the shared URL is written only while this request still owns it, under its
             // gate, so a stop and a reopen cannot both be writing there.
-            let placed = self.install(fetched, at: url, generation: generation)
-            if placed != nil {
-                // Either the move failed or a stop claimed the URL first. The download goes
-                // either way: install moves rather than copies, so a failed move leaves the whole
-                // file where it landed, and the likely reason is a full volume that every retry
-                // would make worse. The placeholder is rewritten for the failure case; after a
-                // stop it is already there, and writing it again costs nothing.
+            switch self.install(fetched, at: url, generation: generation, sequence: sequence) {
+            case .installed, .superseded:
+                completionHandler(nil)
+            case .stopped:
+                completionHandler(NSFileProviderError(.noSuchItem))
+            case .failed(let error):
+                // install moves rather than copies, so a failed move leaves the whole download
+                // where it landed -- and the likely reason is a full volume that every retry
+                // would make worse. The placeholder goes back with it.
                 try? FileManager.default.removeItem(at: fetched)
                 self.providePlaceholder(at: url) { _ in }
+                completionHandler(error)
             }
-            completionHandler(placed)
         }
         // Registered before it is started, so a stop arriving in between finds a task to cancel
         // rather than a download it can only refuse to store afterwards.
@@ -541,4 +582,17 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 /// run and no synchronisation is needed on top of that ordering.
 private final class CN1FetchBox {
     var task: URLSessionTask?
+}
+
+/// What became of a staged file when it was offered to the shared URL.
+private enum CN1InstallOutcome {
+    /// In place: this request wrote the bytes.
+    case installed
+    /// A later request for the same URL had already written newer bytes for the same item, so
+    /// this one is satisfied without touching them.
+    case superseded
+    /// A stop took the URL away while this request was working.
+    case stopped
+    /// The move itself failed.
+    case failed(Error)
 }
