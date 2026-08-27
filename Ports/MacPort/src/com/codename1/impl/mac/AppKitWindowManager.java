@@ -54,11 +54,11 @@ class AppKitWindowManager extends WindowManager {
     //   1. The manager is never told which window is key. The native side knows
     //      (CN1MacWindowRecord's windowDidBecomeKey:) and delivers it to
     //      Desktop.setFocusedWindow, which does not route back down to the port.
-    //   2. IOSImplementation.setNativeCommands publishes ONE global list, and
-    //      fireMacMenuCommand(int) resolves a click through the single static
-    //      macNativeCommands. Per-window menus need the published list and the
-    //      resolution list to change together, or a click on the newly shown
-    //      menu invokes the previous window's command by index.
+    //   2. IOSImplementation.setNativeCommands publishes ONE global map, so the
+    //      bar carries whichever window set commands last rather than the one
+    //      that is key. Resolution itself is safe across a swap -- the items
+    //      carry command ids, so a click always runs the command whose label the
+    //      user saw (see macNativeCommands) -- but nothing performs the swap.
     //   3. The menu bar is what the macOS screenshot goldens capture, so a swap
     //      that fires at the wrong moment is a suite-wide diff.
     //

@@ -224,7 +224,13 @@ void CN1MacHostSetMenuCommands(NSArray *rows) {
         NSString *label = cols.count > 1 ? cols[1] : rows[i];
         int keyChar = cols.count > 2 ? [cols[2] intValue] : 0;
         int modifiers = cols.count > 3 ? [cols[3] intValue] : 0;
-        NSMenuItem *item = cn1MakeCommandItem(label, keyChar, modifiers, (NSInteger)i);
+        // The tag is the command's id, not its row number. Java publishes the map
+        // fireMacMenuCommand() resolves through before this menu is built, so a row
+        // number can outlive the list that gave it meaning -- an item still on screen
+        // would then name whichever command had since taken that position. An id names
+        // one command for as long as anything can still click it.
+        NSInteger commandId = cols.count > 4 ? (NSInteger)[cols[4] intValue] : (NSInteger)i;
+        NSMenuItem *item = cn1MakeCommandItem(label, keyChar, modifiers, commandId);
 
         BOOL placeAtStart = NO;
         NSString *standard = cn1StandardMenuForHint(hint, &placeAtStart);

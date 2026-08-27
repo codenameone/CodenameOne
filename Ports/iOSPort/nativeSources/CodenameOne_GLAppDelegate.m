@@ -1142,9 +1142,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
     if (cn1MacMenuLabels == nil || cn1MacMenuLabels.count == 0) {
         return;
     }
-    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>" rows by hint, preserving
-    // first-seen order. The row index is the command index passed back to Java, so it must match
-    // IOSImplementation's filtered list.
+    // Group the "<hint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>" rows by hint,
+    // preserving first-seen order. Column 4 is what gets passed back to Java: an id naming one
+    // command, rather than a row number, because Java publishes its map before this menu is rebuilt
+    // and a row number outlives the list that gave it meaning. See IOSImplementation.
     NSMutableArray<NSString *> *groupOrder = [NSMutableArray array];
     NSMutableDictionary<NSString *, NSMutableArray<UICommand *> *> *groups = [NSMutableDictionary dictionary];
     for (NSUInteger i = 0; i < cn1MacMenuLabels.count; i++) {
@@ -1154,6 +1155,7 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
         NSString *label = (cols.count > 1) ? cols[1] : row;
         int shortcutKeyChar = (cols.count > 2) ? [cols[2] intValue] : 0;
         int shortcutModifiers = (cols.count > 3) ? [cols[3] intValue] : 0;
+        NSNumber *commandId = (cols.count > 4) ? @([cols[4] intValue]) : @(i);
         UICommand *cmd;
         if (shortcutKeyChar != 0) {
             // Java Command modifier flags: PRIMARY=1 (Command on mac), SHIFT=2, ALT=4
@@ -1167,12 +1169,12 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
                                           action:@selector(cn1MenuAction:)
                                            input:input
                                    modifierFlags:flags
-                                    propertyList:@(i)];
+                                    propertyList:commandId];
         } else {
             cmd = [UICommand commandWithTitle:label
                                         image:nil
                                        action:@selector(cn1MenuAction:)
-                                 propertyList:@(i)];
+                                 propertyList:commandId];
         }
         NSMutableArray<UICommand *> *bucket = groups[hint];
         if (bucket == nil) {

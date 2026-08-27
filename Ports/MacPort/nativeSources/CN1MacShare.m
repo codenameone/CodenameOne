@@ -110,6 +110,15 @@ void CN1MacPresentSharePicker(NSArray *items, BOOL useRect, CGRect rectInPixels,
         }
         return;
     }
+    // No pending owner is named here, unlike showNativePicker(). rectInPixels is
+    // relative to the source component's window, so anchoring in the key window is
+    // wrong for a share opened programmatically for a component in a visible
+    // non-key window -- but nothing on this side can say which window that is.
+    // CodenameOneImplementation.share() receives the rectangle and nothing else,
+    // and every window the port could name from here (the key window,
+    // Desktop.getFocusedWindow()) is the one already resolved below, so naming it
+    // would constrain nothing. Fixing it means the share SPI carrying its source
+    // component the way showNativePicker(int, Component, ...) does.
     NSView *host = CN1MacKeyRenderingHostView();
     CGFloat scale = CN1MacHostViewScale(host);
     NSRect anchor;

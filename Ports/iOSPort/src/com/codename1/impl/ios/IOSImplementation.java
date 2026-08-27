@@ -1111,9 +1111,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setWindowTitle(t == null ? "" : t);
     }
 
-    // Commands currently exposed in the Mac native menu, index-aligned with the labels pushed to
-    // native; fireMacMenuCommand(int) (invoked from the native menu action) resolves through this.
-    private static List<com.codename1.ui.Command> macNativeCommands;
+    // Commands currently exposed in the Mac native menu, keyed by the id carried in each native
+    // menu item; fireMacMenuCommand(int) (invoked from the native menu action) resolves through
+    // this.
+    //
+    // Keyed by id rather than by row number, and the superseded generation is kept, because the two
+    // sides do not change together: this map is published here on the EDT, while the menu whose
+    // items carry the keys is rebuilt later on the main queue. A row number identifies a position,
+    // so throughout that interval every item the user could still see and click resolved its
+    // position against a list that no longer described it, and selecting one ran whichever command
+    // now sat at that index. An id identifies the command itself, so a stale item runs the command
+    // whose label the user actually clicked, and an item older than one generation resolves to
+    // nothing rather than to something arbitrary.
+    private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macNativeCommands;
+    private static volatile java.util.HashMap<Integer, com.codename1.ui.Command> macSupersededCommands;
+    private static int nextMacCommandId = 1;
 
     /**
      * One menu field with the row and column delimiters taken out of it.
@@ -1144,8 +1156,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (!isDesktop()) {
             return;
         }
-        ArrayList<com.codename1.ui.Command> filtered = new ArrayList<com.codename1.ui.Command>();
-        // Encode one row per command as "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>",
+        java.util.HashMap<Integer, com.codename1.ui.Command> published =
+                new java.util.HashMap<Integer, com.codename1.ui.Command>();
+        // Encode one row per command as
+        // "<menuHint>\t<label>\t<shortcutKeyChar>\t<shortcutModifiers>\t<commandId>",
         // rows separated by '\n'. The native side groups rows into the matching standard macOS menus
         // (App/File/Edit/View/Window/Help) or a top-level menu named by the hint; an empty hint means
         // the default commands menu. A non-zero shortcutKeyChar produces a UIKeyCommand so the menu
@@ -1169,26 +1183,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (sb.length() > 0) {
                     sb.append('\n');
                 }
+                int commandId = nextMacCommandId++;
                 sb.append(menuField(hint)).append('\t').append(menuField(name)).append('\t')
                         .append(c.getDesktopShortcutKeyChar()).append('\t')
-                        .append(c.getDesktopShortcutModifiers());
-                filtered.add(c);
+                        .append(c.getDesktopShortcutModifiers()).append('\t')
+                        .append(commandId);
+                published.put(Integer.valueOf(commandId), c);
             }
         }
-        macNativeCommands = filtered;
+        macSupersededCommands = macNativeCommands;
+        macNativeCommands = published;
         nativeInstance.setNativeMenuCommands(sb.toString());
     }
 
     /**
-     * Invoked from the native Mac menu action when the user selects the command at the given
-     * index. Dispatches the corresponding Codename One command on the EDT.
+     * Invoked from the native Mac menu action when the user selects a command, identified by the id
+     * the item carries. Dispatches the corresponding Codename One command on the EDT.
      */
-    public static void fireMacMenuCommand(final int index) {
-        final List<com.codename1.ui.Command> cmds = macNativeCommands;
-        if (cmds == null || index < 0 || index >= cmds.size()) {
+    public static void fireMacMenuCommand(final int commandId) {
+        java.util.HashMap<Integer, com.codename1.ui.Command> live = macNativeCommands;
+        java.util.HashMap<Integer, com.codename1.ui.Command> superseded = macSupersededCommands;
+        Integer key = Integer.valueOf(commandId);
+        com.codename1.ui.Command resolved = live == null ? null : live.get(key);
+        if (resolved == null && superseded != null) {
+            resolved = superseded.get(key);
+        }
+        if (resolved == null) {
             return;
         }
-        final com.codename1.ui.Command c = cmds.get(index);
+        final com.codename1.ui.Command c = resolved;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
