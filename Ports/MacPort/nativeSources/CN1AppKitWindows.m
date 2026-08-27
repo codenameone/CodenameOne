@@ -138,6 +138,18 @@ static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
     // a child the application had hidden itself is indistinguishable from one
     // the owner took down.
     cn1DeliverHiddenWithOwner(self);
+    // Deliberately NOT refreshing the aggregate here. isVisible is still YES at
+    // this point -- that is the whole reason the cascade runs now -- so asking
+    // "is any window still on screen" would answer yes about the window being
+    // minimized, and the answer is recomputed in windowDidMiniaturize: instead.
+}
+
+- (void)windowDidMiniaturize:(NSNotification *)notification {
+    // The aggregate, once AppKit has actually changed isVisible. Minimizing the
+    // last visible window while the main one was already minimized otherwise
+    // left the application unsuspended with nothing on screen: painting and
+    // timers carried on, because the only refresh ran a moment too early to see
+    // it go.
     CN1MacWindowVisibilityChanged();
 }
 
