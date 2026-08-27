@@ -257,16 +257,13 @@ public class CN1ConnectionService extends ConnectionService {
     private static void answerReport(String callId, boolean ok, int error,
             String message) {
         Integer requestId;
-        if (callId != null) {
-            forgetPendingAddress(callId);
-        }
         synchronized (PENDING_REPORTS) {
-            requestId = callId == null ? null : PENDING_REPORTS.remove(callId);
+            requestId = takeReportLocked(callId);
             if (requestId == null && PENDING_REPORTS.size() == 1) {
                 // Telecom answered with nothing we could key on and exactly
                 // one report is outstanding, so it is that one.
                 String only = PENDING_REPORTS.keySet().iterator().next();
-                requestId = PENDING_REPORTS.remove(only);
+                requestId = takeReportLocked(only);
             }
         }
         if (requestId != null) {
@@ -327,16 +324,29 @@ public class CN1ConnectionService extends ConnectionService {
         }
     }
 
-    /// Forgets a parked address once its report has been answered.
-    private static void forgetPendingAddress(String callId) {
-        synchronized (PENDING_REPORTS) {
-            for (Map.Entry<String, String> e : PENDING_ADDRESSES.entrySet()) {
-                if (e.getValue().equals(callId)) {
-                    PENDING_ADDRESSES.remove(e.getKey());
-                    return;
-                }
+    /// Removes a parked report AND the address parked with it, answering the
+    /// request id it carried.
+    ///
+    /// The single place a report leaves the tables, so the two cannot
+    /// diverge. They did: a reset cleared the reports and left the addresses,
+    /// and a later system-placed call to the same address matched a stale id
+    /// -- adopted as an app report, acknowledging nothing and never
+    /// delivering startCallRequested, so the app never heard about the call
+    /// at all. The same leak sat in the single-outstanding-report fallback
+    /// below, which removed a report by a different key.
+    ///
+    /// Must be called holding PENDING_REPORTS.
+    private static Integer takeReportLocked(String callId) {
+        if (callId == null) {
+            return null;
+        }
+        for (Map.Entry<String, String> e : PENDING_ADDRESSES.entrySet()) {
+            if (e.getValue().equals(callId)) {
+                PENDING_ADDRESSES.remove(e.getKey());
+                break;
             }
         }
+        return PENDING_REPORTS.remove(callId);
     }
 
     /// Answers a parked report that Telecom never called back about.
@@ -484,7 +494,11 @@ public class CN1ConnectionService extends ConnectionService {
             PENDING.clear();
         }
         synchronized (PENDING_REPORTS) {
+            // BOTH, or the addresses outlive the reports they belong to and
+            // a later system-placed call to one of them is mistaken for an
+            // app report that no longer exists.
             PENDING_REPORTS.clear();
+            PENDING_ADDRESSES.clear();
         }
         route = CallAudioRoute.EARPIECE.ordinal();
     }
