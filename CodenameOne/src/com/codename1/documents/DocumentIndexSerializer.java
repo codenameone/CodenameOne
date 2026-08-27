@@ -83,9 +83,40 @@ public final class DocumentIndexSerializer {
         validate(root);
         Map<String, Object> doc = new LinkedHashMap<String, Object>();
         doc.put("v", Integer.valueOf(VERSION));
+        doc.put("rev", nextRevision());
         doc.put("root", toMap(root));
         return JSONWriter.toJson(doc);
     }
+
+    /// A value that differs for every publication.
+    ///
+    /// The readers need to tell one publication from another: a download that started against
+    /// the previous one has to be refused, and an item with no declared size or date has nothing
+    /// else to version it by. They used to take that from the index file's modification time,
+    /// which is only as fine as the filesystem's clock -- two publications in the same
+    /// millisecond were one revision, and a response fetched against the first was accepted
+    /// after the second.
+    ///
+    /// The clock still leads, so revisions sort the way publications happened. The counter
+    /// separates publications inside one tick, and the token separates process lifetimes -- a
+    /// counter alone would repeat after a restart, and a restart is exactly when an app republishes.
+    private static synchronized String nextRevision() {
+        revisionCounter++;
+        return Long.toString(System.currentTimeMillis()) + "-"
+                + Integer.toHexString(revisionCounter) + "-" + PROCESS_TOKEN;
+    }
+
+    private static int revisionCounter;
+
+    /// Distinguishes this run of the app from the last one.
+    ///
+    /// The identity hash of a fresh object, which differs between runs on every implementation
+    /// this ships to. It is belt and braces rather than the load-bearing part: the clock leads
+    /// the revision, so two runs would have to publish inside the same millisecond for the token
+    /// to matter at all, and a restart cannot happen in that window. Not persisted, because
+    /// storage the app was never asked for is a worse price than a collision nobody can construct.
+    private static final String PROCESS_TOKEN =
+            Integer.toHexString(System.identityHashCode(new Object()));
 
     /// Parses an index produced by `serialize`.
     ///

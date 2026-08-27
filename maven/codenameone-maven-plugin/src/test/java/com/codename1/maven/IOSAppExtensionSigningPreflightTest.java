@@ -143,7 +143,8 @@ public class IOSAppExtensionSigningPreflightTest {
     public void generatedDocumentProviderWithItsOwnProfileIsAccepted() throws Exception {
         Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
-        p.setProperty("codename1.ios.appext.CN1Documents.provision", "/tmp/CN1Documents.mobileprovision");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
         assertTrue(checkGenerated(p).isEmpty());
     }
 
@@ -160,7 +161,8 @@ public class IOSAppExtensionSigningPreflightTest {
         assertTrue(problems.get(0).message, problems.get(0).message.contains("App Groups"));
 
         // A profile of its own settles it, wildcard app profile or not.
-        p.setProperty("codename1.ios.appext.CN1Documents.provision", "/tmp/CN1Documents.mobileprovision");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
         assertTrue(checkGenerated(p).isEmpty());
     }
 
@@ -245,7 +247,8 @@ public class IOSAppExtensionSigningPreflightTest {
         File ios = iosDir();
         extensionFolder(ios, "MyExtension");
         Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
-        p.setProperty("codename1.ios.release.appext.MyExtension.provision", "/certs/ext.mobileprovision");
+        p.setProperty("codename1.ios.release.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
         assertTrue(check(p, ios).isEmpty());
     }
 
@@ -258,7 +261,8 @@ public class IOSAppExtensionSigningPreflightTest {
         File ios = iosDir();
         extensionFolder(ios, "MyExtension");
         Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
-        p.setProperty("codename1.ios.debug.appext.MyExtension.provision", "/certs/ext.mobileprovision");
+        p.setProperty("codename1.ios.debug.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
         assertEquals(1, check(p, ios).size());
     }
 
@@ -294,11 +298,29 @@ public class IOSAppExtensionSigningPreflightTest {
         // at any extension.
         p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(false),
                 appProfile.getAbsolutePath());
-        p.setProperty("codename1.ios.appext.MyExtension.provision", "/certs/dist.mobileprovision");
+        p.setProperty("codename1.ios.appext.MyExtension.provision",
+                profile("Ext", "ABCD1234.com.example.app.MyExtension").getAbsolutePath());
         p.setProperty("codename1.ios.debug.appext.MyExtension.provision", "");
         assertEquals(1, IOSProvisioningPreflight.checkAppExtensions(p, false, ios).size());
         // The release build is unaffected: its own profile is there.
         assertTrue(IOSProvisioningPreflight.checkAppExtensions(p, true, ios).isEmpty());
+    }
+
+    @Test
+    public void aProfilePathThatIsNotThereDoesNotSatisfyIt() throws Exception {
+        // CN1BuildMojo warns that the file is missing, skips encoding it and submits the build
+        // anyway, so a stale path leaves the extension with no profile on the server. Accepting
+        // the setting here would wave through exactly the late failure this check prevents.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.ios.appext.MyExtension.provision", "/nowhere/ext.mobileprovision");
+        assertEquals(1, check(p, ios).size());
+
+        // A path that IS there satisfies it.
+        File real = profile("Ext", "ABCD1234.com.example.app.MyExtension");
+        p.setProperty("codename1.ios.appext.MyExtension.provision", real.getAbsolutePath());
+        assertTrue(check(p, ios).isEmpty());
     }
 
     @Test

@@ -117,12 +117,17 @@ public final class CN1DocumentStore {
         public final Map<String, Node> nodes = new HashMap<String, Node>();
         public String rootId;
 
-        /// Identifies the publication this index IS, so a reader that started work against it can
-        /// tell whether the app has published or cleared since. The index file is replaced whole
-        /// on every publish and deleted by clear(), so its modification time answers that without
-        /// the format having to grow a field. Zero when there is no file, which is itself a
-        /// distinct state: nothing is published.
-        public long revision;
+        /// Identifies the publication this index IS, so a reader that started work against it
+        /// can tell whether the app has published or cleared since.
+        ///
+        /// The publisher writes it, and it differs for every publication. The file's modification
+        /// time was the obvious source and is not good enough: it is only as fine as the
+        /// filesystem's clock, so two publishes inside one tick were one revision and a download
+        /// fetched against the first was accepted after the second. That timestamp is still the
+        /// fallback for an index written before the field existed.
+        ///
+        /// Empty when there is no file, which is itself a distinct state: nothing is published.
+        public String revision = "";
     }
 
     /// Reads the index the app last published, or null when it has published nothing yet -- which
@@ -141,7 +146,10 @@ public final class CN1DocumentStore {
             Index index = new Index();
             Node rootNode = read(root, null, index);
             index.rootId = rootNode.id;
-            index.revision = file.lastModified();
+            index.revision = doc.optString("rev", "");
+            if (index.revision.length() == 0) {
+                index.revision = Long.toString(file.lastModified());
+            }
             return index;
         } catch (JSONException err) {
             return null;

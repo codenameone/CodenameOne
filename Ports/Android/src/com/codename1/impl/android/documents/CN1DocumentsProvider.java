@@ -242,11 +242,11 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// same bargain: an app that declares neither gets no per-item change detection, which
     /// DocumentNode documents.
     private boolean stillPublished(String documentId, CN1DocumentStore.Node requested,
-            long revision, String[] credentials) {
+            String revision, String[] credentials) {
         CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
         CN1DocumentStore.Node node = index == null ? null : index.nodes.get(documentId);
         if (node != null && requested.size < 0 && requested.lastModified < 0
-                && index.revision != revision) {
+                && !index.revision.equals(revision)) {
             // A node that declared neither a size nor a date has nothing per-item to compare, so
             // it is bound to the publication it was requested from -- the same fallback its
             // content version uses. Without this an object revised under the same remote id, and

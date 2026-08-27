@@ -211,8 +211,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // server-side revision usually keeps its key, so an app republishing the node with a new
         // size or date while the old bytes are still arriving has to be able to reject them.
         let requested = CN1RemoteVersion(node, revision: index.revision)
-        let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
-        CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container) { fetched, error in
+        // Read once, so the credential the request is sent with is the one the completion is
+        // checked against; see CN1DocumentRemote.stamp.
+        let settings = CN1DocumentRemote.settings(containerURL: container)
+        let credentials = CN1DocumentRemote.stamp(settings)
+        CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings) { fetched, error in
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
                 return

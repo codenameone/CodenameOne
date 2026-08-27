@@ -457,9 +457,26 @@ final class IOSProvisioningPreflight {
                 return false;
             }
         }
-        String[] keys = {
+        // The two path-valued keys are checked as PATHS, the rest only for a value. A path is
+        // the one carrier this can verify, and a stale or mistyped one is the likely mistake:
+        // CN1BuildMojo warns that the file is missing, skips encoding it, and submits the build
+        // anyway, so the extension reaches the server with no profile and fails signing -- the
+        // late failure this check exists to prevent, waved through by the setting that was
+        // supposed to prevent it.
+        String[] paths = {
             "codename1.ios.appext." + name + ".provision",
-            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.ios." + qualifier + ".appext." + name + ".provision"
+        };
+        for (String key : paths) {
+            String value = settings.getProperty(key);
+            if (value != null && !value.trim().isEmpty()) {
+                String resolved = resolvePlaceholders(value.trim(), settings);
+                if (resolved.indexOf("${") < 0 && new File(resolved).isFile()) {
+                    return true;
+                }
+            }
+        }
+        String[] keys = {
             "codename1.arg.ios.appext." + name + ".provisioningData",
             "codename1.arg.ios.appext." + name + ".provisioningURL",
             "codename1.arg.ios." + qualifier + ".appext." + name + ".provisioningURL"

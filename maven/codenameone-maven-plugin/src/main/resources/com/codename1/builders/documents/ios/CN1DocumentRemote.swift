@@ -89,7 +89,18 @@ enum CN1DocumentRemote {
     private static var generationCache: [String: String] = [:]
 
     static func credentialStamp(containerURL: URL) -> String {
-        guard let settings = settings(containerURL: containerURL) else {
+        stamp(settings(containerURL: containerURL))
+    }
+
+    /// The stamp of settings already in hand.
+    ///
+    /// A request has to be validated against the credential it was actually SENT with. Reading
+    /// the file once for the stamp and again inside the fetch let the two disagree: an account
+    /// changing A to B and back while a slow response was in flight left the check comparing A
+    /// against A while the request had gone out with B's token, so B's bytes were served through
+    /// A's publication. The caller captures the settings once and both use that.
+    static func stamp(_ settings: Settings?) -> String {
+        guard let settings = settings else {
             return ""
         }
         return (settings.endpoint ?? "") + "\u{0}" + (settings.authToken ?? "")
@@ -113,10 +124,10 @@ enum CN1DocumentRemote {
     ///   `NSFileProviderManager` named. The classic provider copies the result itself and passes
     ///   the ordinary temporary directory.
     @discardableResult
-    static func fetch(remoteId: String, containerURL: URL,
+    static func fetch(remoteId: String, settings: Settings?,
                       destination: URL = FileManager.default.temporaryDirectory,
                       completion: @escaping (URL?, Error?) -> Void) -> URLSessionTask? {
-        guard let settings = settings(containerURL: containerURL),
+        guard let settings = settings,
               let base = settings.endpoint,
               var components = URLComponents(string: base) else {
             completion(nil, CN1DocumentRemote.noEndpoint())

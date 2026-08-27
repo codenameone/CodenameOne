@@ -39,6 +39,9 @@ struct CN1DocumentNode: Decodable {
 
 struct CN1DocumentIndexDocument: Decodable {
     let v: Int
+    /// The publication's own revision, written by the publisher. Optional so an index written
+    /// before the field existed still parses; the file's modification time stands in there.
+    let rev: String?
     let root: CN1DocumentNode
 }
 
@@ -157,7 +160,12 @@ final class CN1DocumentIndex {
             }
             let after = modificationStamp(of: url)
             if before == after || attempt == 2 {
-                return CN1DocumentIndex(root: doc.root, revision: after)
+                // The publisher's own revision when it wrote one. It differs for every
+                // publication, which the file's modification time does not: two publishes inside
+                // one filesystem tick share a timestamp, and a download fetched against the first
+                // was then accepted after the second. The timestamp remains the fallback for an
+                // index written before the field existed.
+                return CN1DocumentIndex(root: doc.root, revision: doc.rev ?? after)
             }
         }
         return nil

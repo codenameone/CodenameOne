@@ -182,8 +182,11 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // Captured before the download starts, so what comes back is checked against what was
         // asked for rather than against whatever happens to be current when it arrives.
         let requested = CN1RemoteVersion(node, revision: index.revision)
-        let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
-        let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container,
+        // Read once. The stamp the completion is checked against and the credential the request
+        // is sent with are the same pair, which two separate reads could not promise.
+        let settings = CN1DocumentRemote.settings(containerURL: container)
+        let credentials = CN1DocumentRemote.stamp(settings)
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings,
                                            destination: handoffDirectory()) { url, error in
             if let url = url {
                 // The publication is re-read before the bytes are handed over. A download
