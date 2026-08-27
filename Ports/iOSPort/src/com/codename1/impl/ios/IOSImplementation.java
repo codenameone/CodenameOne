@@ -11222,27 +11222,39 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static PushCallback pushCallback;
     
-    /// A push that arrived before anything was registered to receive it.
+    /// Pushes that arrived before anything was registered to receive them.
     ///
     /// A managed notification can cold-launch the application, and the native
     /// replay runs as soon as the framework is callable -- which is before the
     /// main class's init() has installed the callback, because installing it is
     /// queued on the EDT. Dropped there, the very notification that launched the
-    /// application was the one it never saw. Held instead, and delivered when a
-    /// callback appears.
-    private static String pendingPushMessage;
-    private static String pendingPushType;
+    /// application was the one it never saw.
+    ///
+    /// A LIST, not one slot. A legacy type 3 payload carrying both an alert and
+    /// metadata reaches pushReceived TWICE -- both native routers send the alert
+    /// and then the metadata -- so a single slot kept the metadata and threw the
+    /// user-visible alert away. Every pair is held, in the order the native side
+    /// sent them, and replayed in that order.
+    ///
+    /// Bounded so a callback that never arrives cannot grow this without limit;
+    /// the oldest goes first, because the newest is the one the user just acted
+    /// on.
+    private static final int MAX_PENDING_PUSHES = 16;
+    private static final java.util.ArrayList<String[]> pendingPushes =
+            new java.util.ArrayList<String[]>();
 
-    /// Delivers a push held from before a callback existed, if there is one.
+    /// Delivers every push held from before a callback existed, in order.
     private static void firePendingPush() {
-        String message = pendingPushMessage;
-        String type = pendingPushType;
-        if (message == null || pushCallback == null) {
+        if (pushCallback == null || pendingPushes.isEmpty()) {
             return;
         }
-        pendingPushMessage = null;
-        pendingPushType = null;
-        pushReceived(message, type);
+        // Copied and cleared first: pushReceived is re-entered below, and it
+        // must not see the queue it is draining.
+        String[][] held = pendingPushes.toArray(new String[pendingPushes.size()][]);
+        pendingPushes.clear();
+        for (String[] pair : held) {
+            pushReceived(pair[0], pair[1]);
+        }
     }
 
     public static void pushReceived(final String message, final String type) {
@@ -11267,11 +11279,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             // Held rather than dropped: registration is imminent on a cold
             // launch, and firing the completion handler here told the system the
-            // notification had been handled when nothing had seen it. Only the
-            // most recent is kept, which is what the system itself delivers on a
-            // launch from a notification.
-            pendingPushMessage = message;
-            pendingPushType = type;
+            // notification had been handled when nothing had seen it.
+            if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
+                pendingPushes.remove(0);
+            }
+            pendingPushes.add(new String[] {message, type});
             nativeInstance.firePushCompletionHandler();
             /*
             // Removing this section because the race condition shouldn't happen
