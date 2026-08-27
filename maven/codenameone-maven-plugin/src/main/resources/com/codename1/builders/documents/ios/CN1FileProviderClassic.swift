@@ -492,8 +492,8 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // exist until fetch returns -- so it is handed over in a box, filled in below before
         // anything can start: the task comes back suspended.
         let box = CN1FetchBox()
-        let task = CN1DocumentRemote.fetch(remoteId: remoteId,
-                                           settings: settings) { fetched, error in
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings,
+                                           expectedSize: node.size) { fetched, error in
             self.clearFetch(box.task, at: url)
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))

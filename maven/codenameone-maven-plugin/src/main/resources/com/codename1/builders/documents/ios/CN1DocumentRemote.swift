@@ -144,9 +144,15 @@ enum CN1DocumentRemote {
     ///   the process temporary directory is not guaranteed to be, so it passes the directory
     ///   `NSFileProviderManager` named. The classic provider copies the result itself and passes
     ///   the ordinary temporary directory.
+    /// - Parameter expectedSize: the size the app declared for this document, when it declared
+    ///   one. A body that does not match it is refused: an endpoint can answer 200 with something
+    ///   that is not the document -- an error page, a login redirect rendered as a page -- and the
+    ///   item still advertises the declared size and versions itself by it, so the browser would
+    ///   show and cache that as the document.
     @discardableResult
     static func fetch(remoteId: String, settings: Settings?,
                       destination: URL = FileManager.default.temporaryDirectory,
+                      expectedSize: Int64? = nil,
                       completion: @escaping (URL?, Error?) -> Void) -> URLSessionTask? {
         guard let settings = settings,
               let base = settings.endpoint,
@@ -202,6 +208,16 @@ enum CN1DocumentRemote {
             let dest = destination.appendingPathComponent(UUID().uuidString)
             do {
                 try FileManager.default.moveItem(at: location, to: dest)
+                if let expectedSize = expectedSize {
+                    let attributes = try? FileManager.default.attributesOfItem(atPath: dest.path)
+                    let actual = (attributes?[FileAttributeKey.size] as? NSNumber)?.int64Value ?? -1
+                    if actual != expectedSize {
+                        try? FileManager.default.removeItem(at: dest)
+                        completion(nil, CN1DocumentRemote.sizeMismatch(expected: expectedSize,
+                                                                       actual: actual))
+                        return
+                    }
+                }
                 completion(dest, nil)
             } catch {
                 completion(nil, error)
@@ -246,6 +262,14 @@ enum CN1DocumentRemote {
             NSLocalizedDescriptionKey:
                 "This item is stored remotely but no endpoint was configured. Call "
                 + "DocumentProvider.setRemoteEndpoint before publishing remote items."
+        ])
+    }
+
+    private static func sizeMismatch(expected: Int64, actual: Int64) -> NSError {
+        NSError(domain: "com.codename1.documents", code: 3, userInfo: [
+            NSLocalizedDescriptionKey:
+                "The document endpoint answered \(actual) bytes for a document the app declared "
+                + "as \(expected)."
         ])
     }
 

@@ -383,6 +383,16 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 } finally {
                     out.close();
                 }
+                // A 200 is not proof that the body is the document. An endpoint answering an
+                // error page, or a login redirect rendered as a page, arrives complete and
+                // without a transport error; accepting it would hand the picker those bytes as
+                // the document while the row still advertises -- and revises by -- the declared
+                // size. Only checked when the app declared a size: a node published without one
+                // has nothing to compare against.
+                if (node.size >= 0 && partial.length() != node.size) {
+                    throw new IOException("The document endpoint answered " + partial.length()
+                            + " bytes for a document the app declared as " + node.size);
+                }
             } catch (Throwable t) {
                 if (!partial.delete()) {
                     Log.w(TAG, "Could not delete the partial download " + partial);

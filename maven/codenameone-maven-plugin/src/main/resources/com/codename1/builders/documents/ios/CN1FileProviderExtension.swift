@@ -244,7 +244,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             return progress
         }
         let task = CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings,
-                                           destination: destination) { url, error in
+                                           destination: destination,
+                                           expectedSize: node.size) { url, error in
             if let url = url {
                 // The publication is re-read before the bytes are handed over. A download
                 // outlives the request that started it, and the app may have cleared or
