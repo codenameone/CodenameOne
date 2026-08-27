@@ -216,3 +216,16 @@ func cn1SameOpaqueKey(_ a: String?, _ b: String?) -> Bool {
     }
     return Array(a.utf8) == Array(b.utf8)
 }
+
+/// Whether this node is served from the shared directory rather than from the endpoint.
+///
+/// Both providers prefer a local path when one resolves, so a node that has gained one has
+/// stopped being a remote item -- and a download still in flight for it is answering a question
+/// nobody is asking any more.
+func cn1HasLocalContent(_ node: CN1DocumentNode, containerURL: URL) -> Bool {
+    guard let path = node.path, !path.isEmpty,
+          let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL) else {
+        return false
+    }
+    return FileManager.default.fileExists(atPath: local.path)
+}

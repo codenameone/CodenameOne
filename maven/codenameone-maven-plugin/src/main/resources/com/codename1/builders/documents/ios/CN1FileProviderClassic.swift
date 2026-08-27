@@ -619,6 +619,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], cn1SameOpaqueKey(node.remoteId, remoteId),
+              // Still served remotely; see the replicated provider. A republish that gives the
+              // node a local path makes that path the source, and a download in flight for it is
+              // answering a question nobody is asking any more.
+              !cn1HasLocalContent(node, containerURL: containerURL),
               // The declared version too: the remote id is the app's key for the object and a
               // server-side revision keeps it, so an id match alone would move the previous
               // revision's bytes into storage after the newer publication is already current.

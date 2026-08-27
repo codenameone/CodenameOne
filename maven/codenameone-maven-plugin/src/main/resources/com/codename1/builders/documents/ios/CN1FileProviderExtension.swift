@@ -336,6 +336,12 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], cn1SameOpaqueKey(node.remoteId, remoteId),
+              // Still served remotely. A republish can give the node a local path -- the app
+              // caching what it just uploaded -- and a local path WINS: the item's content
+              // version would then be read from that file while the bytes handed over are the
+              // ones the download fetched, so the browser would cache the remote bytes under the
+              // local file's version and never ask again.
+              !cn1HasLocalContent(node, containerURL: containerURL),
               CN1RemoteVersion(node, revision: index.revision) == version,
               CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
             // The credential is compared as well as the node and the remote object: an account

@@ -269,17 +269,16 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             String revision, String[] credentials) {
         CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
         CN1DocumentStore.Node node = index == null ? null : index.nodes.get(documentId);
-        if (node != null && requested.size < 0 && requested.lastModified < 0
-                && !index.revision.equals(revision)) {
-            // A node that declared neither a size nor a date has nothing per-item to compare, so
-            // it is bound to the publication it was requested from -- the same fallback its
-            // content version uses. Without this an object revised under the same remote id, and
-            // republished while the old response was still streaming, passed every check because
-            // both sides read -1.
+        if (node != null && requested.lastModified < 0 && !index.revision.equals(revision)) {
+            // A node with no DATE has nothing per-item to compare, so it is bound to the
+            // publication it was requested from -- the same fallback its content version uses on
+            // the Apple side. A size is not a change signal: content can change to different
+            // bytes of the same length, so an object revised under the same remote id and
+            // republished while the old response was still streaming passed every check.
             //
-            // A node that DOES declare metadata is deliberately not bound to the revision: that
-            // would discard every download racing any publish, which for a drive of any size is
-            // the expensive wrong default. DocumentNode documents the other half of the bargain.
+            // A node that declares a date is deliberately not bound to the revision: that would
+            // discard every download racing any publish, which for a drive of any size is the
+            // expensive wrong default. DocumentNode documents the other half of the bargain.
             return false;
         }
         // openDocument only reaches this for a node whose remote id it already checked, but the

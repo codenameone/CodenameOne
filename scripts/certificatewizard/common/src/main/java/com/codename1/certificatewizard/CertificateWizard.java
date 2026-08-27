@@ -1243,10 +1243,19 @@ public class CertificateWizard extends Lifecycle {
     /// group is needed for the extension -- left the app's own development and App Store profiles
     /// without com.apple.security.application-groups, while the builder puts that entitlement in
     /// the app. The device build then cannot sign, on the path the wizard recommends.
-    /// Set when this run actually changed the main App ID's App Group association. Profiles are
-    /// snapshots of an App ID's capabilities, so any that predate the change have to be reissued
-    /// rather than reused.
-    private boolean appGroupsJustChanged;
+    ///
+    /// Whether a profile can still sign what this build produces.
+    ///
+    /// Apple marks a profile INVALID when its App ID's capabilities change, which is exactly what
+    /// enabling the App Group does -- so the profiles that have to be reissued say so themselves,
+    /// and this reads that rather than guessing. It used to retire every matching profile
+    /// whenever the groups were asserted, because the signing state carries no per-bundle group
+    /// association to compare against; asserting them is not the same as changing them, so a
+    /// second run of automatic setup deleted profiles that were perfectly good -- a colleague's
+    /// among them, since they belong to the App ID rather than to whoever made them.
+    private static boolean isUsableProfile(SigningState.Profile profile) {
+        return profile.status() == null || "ACTIVE".equals(profile.status());
+    }
 
     /// Profile IDs already retired in this run, so a delete that does not take cannot loop.
     private final java.util.Set<Long> reissuedProfiles = new java.util.HashSet<Long>();
@@ -1319,12 +1328,6 @@ public class CertificateWizard extends Lifecycle {
                 showPageMessage("Main bundle ID could not be found after refresh.", true);
                 return;
             }
-            // Treated as a change whenever the groups are asserted, because the signing state
-            // carries no per-bundle App Group association to compare against -- there is no way
-            // from here to tell "already had these" from "just gained them". A needless reissue
-            // costs a round trip and produces an equivalent profile; a skipped one installs a
-            // profile without application-groups and the next device build cannot sign.
-            appGroupsJustChanged = true;
             service.enableAppGroupCapability(mainBundle.id(), appleIds, r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
@@ -1616,17 +1619,18 @@ public class CertificateWizard extends Lifecycle {
     private void ensureExtensionProfile(ExtensionSigning ext, String appName, String profileType,
             com.codename1.util.OnComplete<String> onPath) {
         SigningState.Profile existing = findProfile(ext.bundleIdentifier, profileType);
-        if (existing != null && appGroupsJustChanged && existing.id() != null
+        if (existing != null && !isUsableProfile(existing) && existing.id() != null
                 && reissuedProfiles.add(existing.id())) {
-            // Same snapshot problem as the app's own profiles, and reached the same way: the
-            // extension's App ID was given the App Group a moment ago in
-            // enableExtensionGroupAndProfile, so a profile issued before that carries no
-            // application-groups entitlement while the generated extension declares one. Signing
-            // fails on the extension, with a message naming the extension's bundle ID and not the
-            // cause. Retire it and let the creation path below issue a current one.
+            // The same snapshot problem as the app's own profiles: the extension's App ID was
+            // given the App Group a moment ago in enableExtensionGroupAndProfile, and Apple marks
+            // the profiles that predate a capability change INVALID. One of those cannot sign the
+            // generated extension -- it carries no application-groups entitlement while the
+            // extension declares one -- and the failure names the extension's bundle ID rather
+            // than the cause. A profile that is still ACTIVE already covers the current
+            // capabilities and is left where it is.
             showPageMessage("Reissuing the " + ext.label + " "
-                    + profileTypeLabel(profileType) + " profile after the App Group change...",
-                    false);
+                    + profileTypeLabel(profileType) + " profile, which the App Group change "
+                    + "invalidated...", false);
             service.deleteProfile(existing.id(), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
@@ -1806,14 +1810,15 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         SigningState.Profile existing = findProfile(bundleIdentifier, profileType);
-        if (existing != null && appGroupsJustChanged && existing.id() != null
+        if (existing != null && !isUsableProfile(existing) && existing.id() != null
                 && reissuedProfiles.add(existing.id())) {
-            // The App ID gained an App Group a moment ago, and a provisioning profile is a
-            // snapshot of the capabilities the App ID had when it was issued. Reusing one that
-            // predates the change installs a profile without application-groups while the
-            // builder puts that entitlement in the app, and the next device build cannot sign.
+            // A provisioning profile is a snapshot of the capabilities the App ID had when it
+            // was issued, and Apple marks the ones a capability change left behind INVALID.
+            // Installing such a profile gives the build no application-groups entitlement while
+            // the builder puts that group in the app, and the next device build cannot sign.
             // Deleting it here is safe: the branch below recreates it from the same certificate
-            // and devices.
+            // and devices. A profile that is still ACTIVE is not touched -- it covers the App
+            // ID's current capabilities, and it may well be a colleague's.
             //
             // Keyed by profile ID, not by profile type. An account can hold several development
             // or App Store profiles for one bundle ID, and findProfile answers with one of them:
@@ -1823,7 +1828,7 @@ public class CertificateWizard extends Lifecycle {
             // same ID, which is already in the set, so the flow falls through and installs it
             // rather than deleting forever.
             showPageMessage("Reissuing " + profileTypeLabel(profileType)
-                    + " after the App Group change...", false);
+                    + ", which the App Group change invalidated...", false);
             service.deleteProfile(existing.id(), r -> {
                 if (!r.ok) {
                     showPageMessage(r.message, true);
