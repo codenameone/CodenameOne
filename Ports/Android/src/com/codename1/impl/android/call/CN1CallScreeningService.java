@@ -229,9 +229,9 @@ public class CN1CallScreeningService extends CallScreeningService {
             final Runnable whenDone) {
         if (Build.VERSION.SDK_INT < 29) {
             if (requestId >= 0) {
-                Calls.deliverAck(requestId, false,
-                        com.codename1.call.CallError.NOT_SUPPORTED.ordinal(),
-                        "The call screening role needs Android 10 or newer");
+                // Below API 29 the role does not exist, which the contract
+                // calls a false rather than a failure.
+                Calls.deliverAckValue(requestId, false);
             }
             if (whenDone != null) {
                 whenDone.run();
@@ -384,9 +384,11 @@ public class CN1CallScreeningService extends CallScreeningService {
     }
 
     private static void unsupported(int requestId) {
-        Calls.deliverAck(requestId, false,
-                com.codename1.call.CallError.NOT_SUPPORTED.ordinal(),
-                "This device offers no call screening role");
+        // FALSE, not an error. requestScreeningRole() documents that it
+        // "resolves false where the role was refused or does not exist", so
+        // an app handling an ordinary denial in its success callback got an
+        // exception instead -- for the outcome the contract calls normal.
+        Calls.deliverAckValue(requestId, false);
     }
 
     /// Answers the role request once the user has decided.
@@ -426,9 +428,9 @@ public class CN1CallScreeningService extends CallScreeningService {
         /// Hands this one caller the outcome, exactly once.
         private void answer(boolean granted) {
             if (requestId >= 0) {
-                Calls.deliverAck(requestId, granted,
-                        com.codename1.call.CallError.UNAUTHORIZED.ordinal(),
-                        "The user declined the call screening role");
+                // The user's answer either way, as a value. A decline is
+                // the documented false, not an exception.
+                Calls.deliverAckValue(requestId, granted);
             }
             if (whenDone != null) {
                 // The mask callers re-read getGrantedPermissions(), so they

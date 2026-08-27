@@ -22,6 +22,7 @@
  */
 package com.codename1.call;
 
+import com.codename1.call.directory.CallDirectory;
 import com.codename1.call.session.CallAction;
 import com.codename1.call.session.CallActionAdapter;
 import com.codename1.call.session.CallActionListener;
@@ -731,6 +732,22 @@ public class LocalCallTest {
         } catch (Exception e) {
             throw new AssertionError("could not read PENDING_STARTS: " + e);
         }
+    }
+
+    @Test
+    public void aRefusedScreeningRoleResolvesFalseRatherThanThrowing() {
+        // requestScreeningRole() documents that it "resolves false where the
+        // role was refused or does not exist". Routing the refusal through
+        // the ack channel made deliverAck call error(), so an app handling an
+        // ordinary denial in its success callback got an exception for the
+        // outcome the contract calls normal. The simulation reports no
+        // simulation grants the role by default, so the refusal is primed --
+        // which is itself the point: an app could not rehearse "the user
+        // said no" off-device before.
+        bridge.primeRoleRefusal();
+        assertEquals(Boolean.FALSE,
+                CallAwait.value(CallDirectory.requestScreeningRole()),
+                "a refused role resolves false rather than throwing");
     }
 
     @Test

@@ -119,6 +119,7 @@ public class LocalCallBridge implements CallBridge {
     private static final int SIM_ANSWER = 1;
     private static final int SIM_END = 2;
     private String voipToken = "SIMULATED-VOIP-TOKEN";
+    private boolean roleRefused;
 
     /// One simulated call.
     private static final class SimCall {
@@ -182,6 +183,13 @@ public class LocalCallBridge implements CallBridge {
     /// Whether the user has switched caller identification on.
     public void setDirectoryEnabled(boolean value) {
         this.directoryEnabled = value;
+    }
+
+    /// Makes the next screening-role request come back refused.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public void primeRoleRefusal() {
+        this.roleRefused = true;
     }
 
     /// Makes the next end request be refused by the simulated platform.
@@ -725,6 +733,25 @@ public class LocalCallBridge implements CallBridge {
         return true;
     }
 
+    /// Answers a request with a boolean OUTCOME.
+    ///
+    /// A named class rather than an anonymous one so it holds no synthetic
+    /// outer reference.
+    private static final class AckValueDelivery implements Runnable {
+        private final int requestId;
+        private final boolean value;
+
+        AckValueDelivery(int requestId, boolean value) {
+            this.requestId = requestId;
+            this.value = value;
+        }
+
+        @Override
+        public void run() {
+            Calls.deliverAckValue(requestId, value);
+        }
+    }
+
     /// Drops a call from the simulated platform's own book.
     private void forgetSimCall(String callId) {
         synchronized (calls) {
@@ -839,6 +866,15 @@ public class LocalCallBridge implements CallBridge {
 
     @Override
     public void requestScreeningRole(int requestId) {
+        if (roleRefused) {
+            roleRefused = false;
+            // FALSE, not a failure: requestScreeningRole documents a refusal
+            // as a resolved false, and a simulation that could only ever
+            // grant the role left an app unable to exercise the path where
+            // the user says no -- which is the path worth rehearsing.
+            later(LATENCY_MILLIS, new AckValueDelivery(requestId, false));
+            return;
+        }
         ok(requestId);
     }
 

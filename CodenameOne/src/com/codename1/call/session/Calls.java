@@ -714,6 +714,22 @@ public final class Calls {
     /// A call ended for a reason that did not come from this app.
     ///
     /// @hidden not part of the public API.
+    /// Answers a request whose contract is a boolean OUTCOME rather than
+    /// success or failure.
+    ///
+    /// deliverAck turns false into an error, which is right for an operation
+    /// that failed and wrong for one whose documented answer is "no". The
+    /// screening role is the latter: refused, or absent on this device,
+    /// resolves false.
+    ///
+    /// @hidden not part of the public API.
+    public static void deliverAckValue(int requestId, boolean value) {
+        EdtResult<Boolean> r = CallRequests.takeAck(requestId);
+        if (r != null) {
+            r.complete(Boolean.valueOf(value));
+        }
+    }
+
     public static void deliverCallEnded(String callId, int reasonOrdinal) {
         dispatch(new ActionEvent(ActionEvent.ENDED, callId, 0L, false, null,
                 null, false, reasonOrdinal));

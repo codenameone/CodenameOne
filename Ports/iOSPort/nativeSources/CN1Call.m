@@ -271,6 +271,10 @@ static void cn1clDropAudioLocked(NSString *uuidString) {
             && [cn1clAudioCall isEqualToString:uuidString]) {
         // Retired rather than forgotten: CallKit deactivates the session
         // after the call is gone, and that callback still has to name it.
+        // The previous retiring owner goes first: this slot holds the +1
+        // that cn1clOwnAudio made, and overwriting it dropped one string per
+        // call that ended while another was already retiring.
+        [cn1clAudioRetiring release];
         cn1clAudioRetiring = cn1clAudioCall;
         cn1clAudioCall = nil;
     }
@@ -413,6 +417,10 @@ static int cn1clCurrentRoute(void);
 static void cn1clOwnAudio(NSString *uuidString) {
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        // Balanced: the copy is +1 and this slot owns it, so replacing it
+        // without releasing leaked one string per call for the life of the
+        // process.
+        [cn1clAudioCall release];
         cn1clAudioCall = [uuidString copy];
     }
 }
@@ -426,7 +434,12 @@ static NSString *cn1clAudioOwner(void) {
     cn1clEnsureState();
     @synchronized (cn1clLock) {
         if (cn1clAudioCall != nil && [cn1clCalls objectForKey:cn1clAudioCall] != nil) {
-            return cn1clAudioCall;
+            // Retained and autoreleased because it ESCAPES the lock: the
+            // caller reads it after this returns, and the slot can be
+            // released by an end arriving on another thread in between.
+            // Handing out the raw pointer is what made releasing these
+            // slots unsafe before.
+            return [[cn1clAudioCall retain] autorelease];
         }
         if ([cn1clCalls count] == 1) {
             return [[cn1clCalls allKeys] firstObject];
@@ -443,7 +456,9 @@ static NSString *cn1clAudioDeactivating(void) {
     cn1clEnsureState();
     @synchronized (cn1clLock) {
         if (cn1clAudioRetiring != nil) {
-            NSString *retiring = cn1clAudioRetiring;
+            // The slot's +1 goes into the pool rather than to the caller,
+            // which neither expects nor discharges ownership.
+            NSString *retiring = [cn1clAudioRetiring autorelease];
             cn1clAudioRetiring = nil;
             return retiring;
         }
@@ -489,7 +504,9 @@ static int64_t cn1clTrackAction(CXAction *action) {
         // a session that no longer exists -- and a stale system start would
         // have the app place a call the user asked for before the reset.
         [cn1clQueuedActions removeAllObjects];
+        [cn1clAudioCall release];
         cn1clAudioCall = nil;
+        [cn1clAudioRetiring release];
         cn1clAudioRetiring = nil;
         // Every report in flight belongs to the provider that has just gone,
         // so their completions must not touch what comes after them.
