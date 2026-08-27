@@ -509,7 +509,14 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
         cn1MacPendingActive = 0;
         return;
     }
-    com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    // The macOS callback, not the iOS one. Resigning active on a Mac means
+    // another application came to the front; this one's windows are still on
+    // screen and still painted. The iOS callback sets the minimized flag, which
+    // parks the EDT and suppresses network error dialogs -- doing either to a
+    // visible window stops its animations and swallows its errors for as long as
+    // the user is in another app. The surface tracker above owns that flag, and
+    // hiding and miniaturizing are what set it.
+    com_codename1_impl_ios_IOSImplementation_macApplicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 - (void)applicationDidHide:(NSNotification *)notification {

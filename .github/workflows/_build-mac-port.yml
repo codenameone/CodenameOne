@@ -110,6 +110,14 @@ jobs:
           # builds nothing this port consumes. Over-invalidating costs a rebuild,
           # under-invalidating costs a green run against code that was never
           # compiled, so where the two disagree this errs at the former.
+          #
+          # -print0/-0 and sorting the shasum OUTPUT rather than the file list:
+          # widening the scope to maven/ brought in filenames containing spaces
+          # (the archetype's Eclipse .launch files), and `sort | xargs shasum`
+          # splits those on whitespace -- shasum then reports "No such file" for
+          # each fragment and the key is computed from an error message. Sorting
+          # the output keeps the result order-independent without needing a
+          # null-aware sort.
           # CodenameOneDesigner/src is here because maven/designer is a pom and
           # nothing else -- it sets <sourceDirectory>../../CodenameOneDesigner/src,
           # so the module the build script rebuilds by name compiles a tree that
@@ -118,8 +126,8 @@ jobs:
           SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
               CodenameOneDesigner/src \
               maven \
-              \( -name target -o -name .git -o -path 'maven/core-unittests' \) -prune -o -type f -print 2>/dev/null \
-              | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+              \( -name target -o -name .git -o -path 'maven/core-unittests' \) -prune -o -type f -print0 2>/dev/null \
+              | xargs -0 shasum -a 256 | sort | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           SCRIPT_HASH=$(shasum -a 256 \

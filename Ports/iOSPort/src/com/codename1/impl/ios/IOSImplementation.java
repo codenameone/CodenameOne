@@ -11962,6 +11962,36 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Use this method to pause ongoing tasks, disable timers, and throttle down 
      * OpenGL ES frame rates. Games should use this method to pause the game.
      */
+    /// The macOS counterpart, which does NOT treat losing focus as being
+    /// minimized.
+    ///
+    /// On a Mac, resigning active means another application became frontmost.
+    /// The window is still on screen and still being painted, so setting the
+    /// minimized flag the iOS callback sets is wrong twice over: shouldEDTSleep()
+    /// parks the EDT for a minimized application, which stops the animations in a
+    /// form the user can see, and the network layer suppresses error dialogs for
+    /// one, which swallows them for as long as the user is in another app.
+    ///
+    /// Nothing is lost by leaving the flag alone here, because the events that
+    /// genuinely hide the surface are tracked separately: the AppKit delegate's
+    /// applicationDidHide: and its window miniaturization observers both route to
+    /// applicationDidEnterBackground, which is what owns the flag.
+    ///
+    /// The lifecycle notification still fires -- an application that wants to
+    /// pause on losing focus is entitled to -- and isActive still goes false.
+    public static void macApplicationWillResignActive() {
+        if(instance.life != null) {
+            safeCallSerially(new Runnable() {
+                public void run() {
+                    if(instance.life != null) {
+                        instance.life.applicationWillResignActive();
+                    }
+                }
+            });
+        }
+        instance.isActive = false;
+    }
+
     public static void applicationWillResignActive() {
         minimized = true;
         callInterruptionActive = true;

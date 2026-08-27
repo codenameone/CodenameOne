@@ -1215,32 +1215,111 @@ public abstract class Executor {
      * and duplicating that decision here is how the two would drift.</p>
      */
     /**
-     * Extracts the {@code .class} entries of a nested archive, continuing the
-     * caller's flat numbering.
+     * What one library archive may expand to while it is scanned for protected
+     * API usage.
      *
-     * @return the next free number
+     * <p>The archives are customer-supplied and this scan runs on a shared build
+     * host, so the extraction needs a budget: a few kilobytes of deflate stream
+     * expands without limit, and filling the temporary disk takes down every
+     * build on the machine rather than only the one that submitted the
+     * archive.</p>
+     *
+     * <p>Generous against real libraries by a wide margin. A class file is
+     * bounded by the JVM's own method and constant-pool limits and is rarely past
+     * a megabyte, and a large cn1lib holds thousands of them rather than tens of
+     * thousands. Exceeding a budget abandons the scan for that archive through
+     * the warning {@link #scanArchiveForPermissions} already prints, rather than
+     * failing the build: refusing to scan is not a reason to refuse to build, and
+     * the warning says which entitlements are consequently unjustified.</p>
      */
-    private int extractNestedClassesForPermissions(InputStream nested, File tmp, int extracted)
-            throws IOException {
-        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
-        java.util.zip.ZipEntry inner;
-        while ((inner = zis.getNextEntry()) != null) {
-            if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
-                continue;
+    private static final long PERM_SCAN_MAX_ENTRY_BYTES = 16L * 1024 * 1024;
+
+    /** The aggregate companion to {@link #PERM_SCAN_MAX_ENTRY_BYTES}. */
+    private static final long PERM_SCAN_MAX_TOTAL_BYTES = 256L * 1024 * 1024;
+
+    /** The entry-count companion, for an archive of many small bombs. */
+    private static final int PERM_SCAN_MAX_ENTRIES = 50000;
+
+    /**
+     * The running extraction budget for one archive, shared by the outer scan and
+     * the nested-jar descent so the two cannot disagree about the limit -- and so
+     * a bomb cannot get twice the budget by being nested.
+     */
+    private static final class PermScanBudget {
+        private long total;
+        private int extracted;
+
+        /**
+         * The file the next entry extracts to, numbered flat.
+         *
+         * <p>Flattened onto a counter rather than the entry's own path: the
+         * scanner reads the class's own name out of its bytecode, never off the
+         * file system, and a flat name cannot escape the temporary directory the
+         * way an archive path could.</p>
+         */
+        File nextFile(File tmp) throws IOException {
+            if (extracted >= PERM_SCAN_MAX_ENTRIES) {
+                throw new IOException("more than " + PERM_SCAN_MAX_ENTRIES
+                        + " class entries; refusing to keep extracting");
             }
-            File out = new File(tmp, (extracted++) + ".class");
+            return new File(tmp, (extracted++) + ".class");
+        }
+
+        /**
+         * Copies one entry under the budget.
+         *
+         * @param declared the size the archive CLAIMS, used only to skip an entry
+         *                 without reading it. It comes out of the same untrusted
+         *                 file as the bytes, so it is a hint and never the bound.
+         */
+        void copy(InputStream in, File out, String name, long declared) throws IOException {
+            if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
+                throw new IOException("class entry " + name + " declares " + declared
+                        + " bytes; refusing to extract it");
+            }
             FileOutputStream fos = new FileOutputStream(out);
             try {
                 byte[] buf = new byte[8192];
                 int n;
-                while ((n = zis.read(buf)) != -1) {
+                long entryBytes = 0;
+                while ((n = in.read(buf)) != -1) {
+                    entryBytes += n;
+                    total += n;
+                    // Checked as the bytes arrive, which is the only check a
+                    // compression bomb cannot lie its way past.
+                    if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                        throw new IOException("class entry " + name + " expands past "
+                                + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                    }
+                    if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                        throw new IOException("class entries expand beyond the "
+                                + PERM_SCAN_MAX_TOTAL_BYTES
+                                + " byte scan budget; refusing to keep extracting");
+                    }
                     fos.write(buf, 0, n);
                 }
             } finally {
                 fos.close();
             }
         }
-        return extracted;
+    }
+
+    /**
+     * Extracts the {@code .class} entries of a nested archive, continuing the
+     * caller's flat numbering.
+     *
+     * @return the next free number
+     */
+    private void extractNestedClassesForPermissions(InputStream nested, File tmp,
+            PermScanBudget budget) throws IOException {
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
+        java.util.zip.ZipEntry inner;
+        while ((inner = zis.getNextEntry()) != null) {
+            if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
+                continue;
+            }
+            budget.copy(zis, budget.nextFile(tmp), inner.getName(), inner.getSize());
+        }
     }
 
     private void scanArchiveForPermissions(File archive, ClassScanner scanner) throws IOException {
@@ -1252,7 +1331,7 @@ public abstract class Executor {
             java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
             try {
                 java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-                int extracted = 0;
+                PermScanBudget budget = new PermScanBudget();
                 while (entries.hasMoreElements()) {
                     java.util.zip.ZipEntry entry = entries.nextElement();
                     if (entry.isDirectory()) {
@@ -1273,8 +1352,7 @@ public abstract class Executor {
                         try {
                             InputStream nested = zip.getInputStream(entry);
                             try {
-                                extracted = extractNestedClassesForPermissions(
-                                        nested, tmp, extracted);
+                                extractNestedClassesForPermissions(nested, tmp, budget);
                             } finally {
                                 nested.close();
                             }
@@ -1290,23 +1368,9 @@ public abstract class Executor {
                     if (!entry.getName().endsWith(".class")) {
                         continue;
                     }
-                    // Flattened onto a counter rather than the entry's own path:
-                    // the scanner reads the class's own name out of its bytecode,
-                    // never off the file system, and a flat name cannot escape
-                    // the temporary directory the way an archive path could.
-                    File out = new File(tmp, (extracted++) + ".class");
                     InputStream in = zip.getInputStream(entry);
                     try {
-                        FileOutputStream fos = new FileOutputStream(out);
-                        try {
-                            byte[] buf = new byte[8192];
-                            int n;
-                            while ((n = in.read(buf)) != -1) {
-                                fos.write(buf, 0, n);
-                            }
-                        } finally {
-                            fos.close();
-                        }
+                        budget.copy(in, budget.nextFile(tmp), entry.getName(), entry.getSize());
                     } finally {
                         in.close();
                     }
