@@ -86,19 +86,26 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         // file and its rename, and the rename would then put the departing user's index back
         // after the clear had returned.
         synchronized (CN1DocumentStore.WRITE_LOCK) {
-            rememberFolders(ctx);
+            CN1DocumentStore.Index previous = CN1DocumentStore.loadIndex(ctx);
+            rememberFolders(previous);
             try {
                 CN1DocumentStore.writeAtomically(CN1DocumentStore.indexFile(ctx),
                         indexJson.getBytes("UTF-8"));
             } catch (IOException err) {
                 Log.e(TAG, "Could not publish the document index", err);
+                return;
             }
+            // A document dropped by this publish loses its grants HERE, not at logout. An app
+            // that opened it through the picker can have persisted access to it, and clear()
+            // only knows about what the last index held -- so a node removed by an ordinary
+            // publish kept its grant, and a later account republishing that id handed the old
+            // holder the new content with no picker in sight.
+            revokeWithdrawn(ctx, previous, CN1DocumentStore.loadIndex(ctx));
         }
     }
 
     /// Records the folders of the index that is about to be replaced or deleted.
-    private void rememberFolders(Context ctx) {
-        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
+    private void rememberFolders(CN1DocumentStore.Index index) {
         if (index == null) {
             return;
         }
@@ -189,11 +196,33 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         synchronized (CN1DocumentStore.WRITE_LOCK) {
             // Remembered before the tree goes, or the folders that just disappeared could not be
             // named afterwards and an open picker would keep showing them.
-            rememberFolders(ctx);
+            rememberFolders(CN1DocumentStore.loadIndex(ctx));
             revokeGrants(ctx);
             CN1DocumentStore.deleteTree(CN1DocumentStore.baseDir(ctx));
         }
         signalChange();
+    }
+
+    /// Withdraws the grants for documents this publish no longer carries.
+    ///
+    /// Reads the index back after the write rather than trusting the JSON it was handed: the
+    /// comparison has to be between what a reader will see now and what one saw before, and a
+    /// write that did not take should withdraw nothing.
+    private void revokeWithdrawn(Context ctx, CN1DocumentStore.Index previous,
+            CN1DocumentStore.Index current) {
+        String authority = authority();
+        if (authority == null || previous == null || current == null) {
+            return;
+        }
+        for (CN1DocumentStore.Node node : previous.nodes.values()) {
+            if (current.nodes.containsKey(node.id)) {
+                continue;
+            }
+            revoke(ctx, DocumentsContract.buildDocumentUri(authority, node.id), node.id);
+            if (node.folder && android.os.Build.VERSION.SDK_INT >= 21) {
+                revoke(ctx, DocumentsContract.buildTreeDocumentUri(authority, node.id), node.id);
+            }
+        }
     }
 
     /// Withdraws the URI permissions this provider handed out for the documents being cleared.
