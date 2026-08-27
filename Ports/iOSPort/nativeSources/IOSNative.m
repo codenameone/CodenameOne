@@ -6960,11 +6960,15 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
     // framework for one call.
     (void)peer;
 #else
+    // Hoisted for the same reason as the share natives: the block captured peer,
+    // a scalar, so nothing retained the artwork across the dispatch and a
+    // collection between the queue and the run freed it. Predates the macOS port
+    // and is fixed alongside it because it is the same defect.
+    GLUIImage* glll = peer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)peer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
        
         if ([MPNowPlayingInfoCenter class])  {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)peer);
             CN1Image* i = [glll getImage];
             MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithImage:i];
             NSArray *keys = [NSArray arrayWithObjects:
@@ -12864,11 +12868,21 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         // window is on a display of a different density.
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
     }
+    // Hoisted out of the block ON PURPOSE. The block captured imagePeer, which
+    // is a JAVA_LONG -- a scalar -- so nothing retained the image across the
+    // dispatch. This native returns as soon as the block is queued, and
+    // IOSImplementation.share() holds the Image only in a local, so the
+    // collector could run NativeImage.finalize() first; that calls releasePeer,
+    // which is a plain [o release] of this very object. The block then read a
+    // freed peer. Capturing the OBJECT instead is what fixes it: copying a block
+    // onto the heap retains the Objective-C pointers it captures and releases
+    // them when the block is disposed, which is exactly the ownership this
+    // needed and could never get from an integer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSMutableArray* dataToShare = [NSMutableArray array];
         if (imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer);
             CN1Image* i = [glll getImage];
             if (someText != nil) [dataToShare addObject:someText];
             if (i != nil) [dataToShare addObject:i];
@@ -12899,11 +12913,16 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
         cgrect.size.width = cgrect.size.width / scaleValue;
         cgrect.size.height = cgrect.size.height / scaleValue;
     }
+    // Hoisted for the same reason as the macOS branch above: the block captured
+    // imagePeer, a scalar, so nothing retained the image across the dispatch and
+    // a collection between the queue and the run freed it. This half predates
+    // the macOS port and is fixed with it rather than left as the one arm of the
+    // same function that still reads a freed peer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
         if(imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
             CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];
@@ -12972,11 +12991,21 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
     }
     int cbId = (int)callbackId;
+    // Hoisted out of the block ON PURPOSE. The block captured imagePeer, which
+    // is a JAVA_LONG -- a scalar -- so nothing retained the image across the
+    // dispatch. This native returns as soon as the block is queued, and
+    // IOSImplementation.share() holds the Image only in a local, so the
+    // collector could run NativeImage.finalize() first; that calls releasePeer,
+    // which is a plain [o release] of this very object. The block then read a
+    // freed peer. Capturing the OBJECT instead is what fixes it: copying a block
+    // onto the heap retains the Objective-C pointers it captures and releases
+    // them when the block is disposed, which is exactly the ownership this
+    // needed and could never get from an integer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSMutableArray* dataToShare = [NSMutableArray array];
         if (imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)(uintptr_t)imagePeer);
             CN1Image* i = [glll getImage];
             if (someText != nil) [dataToShare addObject:someText];
             if (i != nil) [dataToShare addObject:i];
@@ -13005,11 +13034,16 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
         cgrect.size.height = cgrect.size.height / scaleValue;
     }
     int cbId = (int)callbackId;
+    // Hoisted for the same reason as the macOS branch above: the block captured
+    // imagePeer, a scalar, so nothing retained the image across the dispatch and
+    // a collection between the queue and the run freed it. This half predates
+    // the macOS port and is fixed with it rather than left as the one arm of the
+    // same function that still reads a freed peer.
+    GLUIImage* glll = imagePeer != 0 ? (BRIDGE_CAST GLUIImage*)((void *)imagePeer) : nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSArray* dataToShare;
         if(imagePeer != 0) {
-            GLUIImage* glll = (BRIDGE_CAST GLUIImage*)((void *)imagePeer);
             CN1Image* i = [glll getImage];
             if(someText != nil) {
                 dataToShare = [NSArray arrayWithObjects:someText, i, nil];

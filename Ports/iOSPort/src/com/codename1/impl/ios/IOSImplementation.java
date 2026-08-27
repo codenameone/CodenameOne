@@ -12360,7 +12360,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 result = com.codename1.share.ShareResult.failed(errorMessage);
                 break;
         }
-        listener.onResult(result);
+        // On the EDT, because ShareResultListener says "Always invoked on the
+        // EDT" and this arrives from a UIKit/AppKit main-queue completion
+        // handler, which is not it. A listener that updates the UI -- which is
+        // most of the reason to have one -- was racing the painter.
+        final com.codename1.share.ShareResult delivered = result;
+        final com.codename1.share.ShareResultListener target = listener;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                target.onResult(delivered);
+            }
+        });
     }
 
     @Override
@@ -12408,7 +12418,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                 result = com.codename1.printing.PrintResult.failed(errorMessage);
                 break;
         }
-        listener.onResult(result);
+        // On the EDT, for the same reason as the share callback above:
+        // PrintResultListener documents the same guarantee and this arrives from
+        // the same kind of main-queue completion handler.
+        final com.codename1.printing.PrintResult delivered = result;
+        final com.codename1.printing.PrintResultListener target = listener;
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                target.onResult(delivered);
+            }
+        });
     }
 
     private Purchase pur;
