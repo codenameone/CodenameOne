@@ -1050,7 +1050,6 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     for (NSUInteger i = 0; i < [credentials.token length]; i++) {
         [hex appendFormat:@"%02x", bytes[i]];
     }
-    cn1clVoipToken = [hex copy];
     // Delivered EVERY time, not only when a register() is waiting. APNs
     // rotates a VoIP token while the app stays installed, and the rotation
     // used to update this variable and stop -- so the app's server kept the
@@ -1060,6 +1059,11 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     NSArray *waiting = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        // The STORE and the drain under one lock, which is the lock a
+        // registration reads the token and parks itself under. Storing
+        // outside it left a registration able to read nil from a token this
+        // callback had already produced.
+        cn1clVoipToken = [hex copy];
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
         [cn1clTokenRequests removeAllObjects];
     }
@@ -1964,15 +1968,27 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
     if (cn1clRegistry != nil) {
         cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
     }
-    if (cn1clVoipToken != nil) {
-        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
-                threadStateData, requestId, cn1clJString(cn1clVoipToken));
-        return;
-    }
-    // The token arrives asynchronously; park the request for the delegate.
+    // The token READ and the parking under one lock, and the delegate stores
+    // the token and drains the waiters under the same one. Split, the
+    // credentials callback could land between this check and the insert:
+    // it stores the token, sees no waiters, emits only its unsolicited -1
+    // delivery, and this registration then parks behind the sole callback
+    // that would ever have answered it. An AsyncResource that never settles
+    // is the failure this SPI exists to prevent.
     cn1clEnsureState();
+    NSString *known = nil;
     @synchronized (cn1clLock) {
-        [cn1clTokenRequests addObject:[NSNumber numberWithInt:requestId]];
+        known = cn1clVoipToken;
+        if (known == nil) {
+            [cn1clTokenRequests addObject:[NSNumber numberWithInt:requestId]];
+        }
+    }
+    if (known != nil) {
+        // Answered OUTSIDE the lock: this calls into the VM, and the lock is
+        // one the delegate takes.
+        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                threadStateData, requestId, cn1clJString(known));
+        return;
     }
 #else
     com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(

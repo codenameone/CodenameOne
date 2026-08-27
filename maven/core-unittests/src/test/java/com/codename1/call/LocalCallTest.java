@@ -688,6 +688,32 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aListenerInstalledAfterTheTokenArrivedStillHearsIt() {
+        // PushKit supplies credentials during a cold launch -- the registry
+        // is built in willFinishLaunching, so this is the ordinary ordering
+        // rather than a race -- and with no listener yet the delivery was
+        // dropped. The documented setListener(); register(); sequence then
+        // got the SAME token back, so "changed" was false and tokenChanged
+        // never fired: an app following the example, which ignores the
+        // returned resource, never registered its token with its server and
+        // could not be called at all.
+        VoipPush.deliverToken(-1, "cafebabe");
+
+        final List<String> tokens = new ArrayList<String>();
+        VoipPush.setListener(new VoipPushListener() {
+            public void callReceived(PushedCall call) {
+            }
+
+            public void tokenChanged(String token) {
+                tokens.add(token);
+            }
+        });
+        waitFor(tokens, 1);
+        assertEquals("cafebabe", tokens.get(0),
+                "a listener has to be told the token it has never seen");
+    }
+
+    @Test
     public void aPushedCallDeliveredTooEarlyIsHeldRatherThanDropped() {
         // The port's readiness flag is the UNION of the two listener kinds,
         // so an app that registers a Calls ACTION listener and no VoipPush

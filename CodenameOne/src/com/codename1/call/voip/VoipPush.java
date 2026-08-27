@@ -129,6 +129,29 @@ public final class VoipPush {
         if (b != null) {
             drainIfWanted(b);
         }
+        // The TOKEN this listener has never been told about.
+        //
+        // PushKit supplies credentials during a cold launch -- the registry
+        // is created in willFinishLaunching, so this is the ordinary
+        // ordering, not a race -- and with no listener installed yet the
+        // delivery was dropped. The documented setListener(); register();
+        // sequence then got the same token back from native, so "changed" was
+        // false and tokenChanged never fired at all: an app following the
+        // example, which ignores the returned resource, never registered its
+        // token with its server and could not be called.
+        //
+        // Round 46 declined to hold tokens on the grounds that replaying a
+        // stale one would tell a listener its token had changed when it had
+        // not. That is right for a listener that has already been told and
+        // wrong for one that has not -- which is this case, and which is why
+        // the question is asked per listener rather than per token.
+        String known;
+        synchronized (VoipPush.class) {
+            known = token;
+        }
+        if (l != null && known != null) {
+            post(new Delivery(null, known));
+        }
         // Anything that arrived before this listener existed. Taken out under
         // the monitor and delivered outside it, so a listener that installs
         // another one from callReceived does not deadlock.
