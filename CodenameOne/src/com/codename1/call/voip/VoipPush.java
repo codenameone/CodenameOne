@@ -353,12 +353,22 @@ public final class VoipPush {
                 // gets it.
                 //
                 // A token is not requeued, for the reason post() gives.
-                if (call != null) {
-                    synchronized (LISTENERS) {
-                        HELD.add(this);
-                    }
+                if (call == null) {
+                    return;
                 }
-                return;
+                // RE-READ under the monitor, and only held if it is still
+                // true. Between the empty snapshot above and this block a
+                // setListener can install a listener and drain an
+                // already-empty HELD -- so adding here would park the call
+                // behind a listener that is live right now, and nothing would
+                // look at HELD again until the NEXT setListener.
+                synchronized (LISTENERS) {
+                    if (LISTENERS.isEmpty()) {
+                        HELD.add(this);
+                        return;
+                    }
+                    ls = LISTENERS.toArray(new VoipPushListener[LISTENERS.size()]);
+                }
             }
             for (VoipPushListener l : ls) {
                 if (call != null) {

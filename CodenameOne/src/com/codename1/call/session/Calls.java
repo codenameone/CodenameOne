@@ -185,6 +185,27 @@ public final class Calls {
         return report(callId, handle, displayName, video, CallDirection.OUTGOING);
     }
 
+    /// Bumped by every provider reset. Guarded by SESSIONS.
+    ///
+    /// A report inserts its session and only then opens the request the port
+    /// will answer. A reset landing between the two clears the session but
+    /// cannot fail a request that does not exist yet, so the report went on
+    /// against a provider that is gone and handed the app a live-looking
+    /// CallSession that Calls.getSession() knows nothing about. Comparing the
+    /// generation at handover is what closes a window that spans two
+    /// critical sections.
+    private static int resetGeneration;
+
+    /// START actions the system raised and Java has not answered, by call id.
+    ///
+    /// The documented answer to startCallRequested is a
+    /// [#reportOutgoing] with the id it was handed -- not a call to
+    /// [CallAction#fulfill]. Reporting IS handling the request, so it has to
+    /// answer the action; without that a listener following the contract
+    /// exactly had its own call destroyed the moment it returned.
+    private static final Map<String, CallAction> PENDING_STARTS =
+            new HashMap<String, CallAction>();
+
     private static AsyncResource<CallSession> report(String callId,
             CallHandle handle, String displayName, boolean video,
             CallDirection direction) {
@@ -220,6 +241,7 @@ public final class Calls {
         CallSession session = new CallSession(id, direction, handle, displayName,
                 direction == CallDirection.INCOMING
                         ? CallState.RINGING : CallState.DIALING);
+        int reportedGeneration;
         synchronized (SESSIONS) {
             // Only live calls are in the map; forget() removes an ended one,
             // so presence is the whole test.
@@ -229,12 +251,24 @@ public final class Calls {
                 return out;
             }
             SESSIONS.put(id, session);
+            reportedGeneration = resetGeneration;
+        }
+        // The app has answered the system's request by reporting the call,
+        // which is exactly what startCallRequested documents. Taken BEFORE
+        // the platform is asked, so the START arm's settle cannot fail an
+        // action this report is in the middle of honouring.
+        CallAction started;
+        synchronized (PENDING_STARTS) {
+            started = PENDING_STARTS.remove(id);
+        }
+        if (started != null && !started.isAnswered()) {
+            started.answer(true);
         }
         int reqId = CallRequests.nextId();
         EdtResult<Boolean> ack = CallRequests.openAck(reqId);
         // The session is only handed over once the system has accepted it,
         // so an app can never act on a call that was refused.
-        ack.onResult(new SessionHandover(out, session, id));
+        ack.onResult(new SessionHandover(out, session, id, reportedGeneration));
         String wire = CallWire.encodeHandle(handle);
         if (direction == CallDirection.INCOMING) {
             b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
@@ -316,11 +350,14 @@ public final class Calls {
         private final EdtResult<CallSession> out;
         private final CallSession session;
         private final String id;
+        private final int generation;
 
-        SessionHandover(EdtResult<CallSession> out, CallSession session, String id) {
+        SessionHandover(EdtResult<CallSession> out, CallSession session,
+                String id, int generation) {
             this.out = out;
             this.session = session;
             this.id = id;
+            this.generation = generation;
         }
 
         @Override
@@ -328,9 +365,26 @@ public final class Calls {
             if (error != null) {
                 forget(id);
                 out.error(error);
-            } else {
-                out.complete(session);
+                return;
             }
+            boolean reset;
+            synchronized (SESSIONS) {
+                reset = resetGeneration != generation;
+            }
+            if (reset) {
+                // A provider reset ran while this report was in flight. It
+                // could not fail the request -- the request did not exist
+                // when the reset swept them -- so the platform's acceptance
+                // refers to a provider that is gone. Handing the session over
+                // would give the app one that getSession() does not know and
+                // no operation can address.
+                session.setStateInternal(CallState.ENDED);
+                forget(id);
+                out.error(new CallException(CallError.PROVIDER_RESET,
+                        "The system's call provider was reset"));
+                return;
+            }
+            out.complete(session);
         }
     }
 
@@ -866,6 +920,9 @@ public final class Calls {
                 }
                 case START: {
                     CallAction a = new CallAction(token, callId);
+                    synchronized (PENDING_STARTS) {
+                        PENDING_STARTS.put(callId, a);
+                    }
                     try {
                         for (CallActionListener l : ls) {
                             l.startCallRequested(callId, handle, video, a);
@@ -889,6 +946,13 @@ public final class Calls {
                         //
                         // Failing ends the call instead, which is what the
                         // user sees when an app cannot take their request.
+                        //
+                        // A listener that DID report the call has already
+                        // answered this action through report() above, so
+                        // this only fires for one that did nothing at all.
+                        synchronized (PENDING_STARTS) {
+                            PENDING_STARTS.remove(callId);
+                        }
                         settleStart(a);
                     }
                     break;
@@ -952,6 +1016,16 @@ public final class Calls {
                             s.setStateInternal(CallState.ENDED);
                         }
                         SESSIONS.clear();
+                        // Inside the same monitor the sessions are cleared
+                        // under, so a report that got its generation before
+                        // this cannot also have survived the clear.
+                        resetGeneration++;
+                    }
+                    // The provider that raised them is gone, so a report
+                    // arriving later must not answer an action belonging to
+                    // it.
+                    synchronized (PENDING_STARTS) {
+                        PENDING_STARTS.clear();
                     }
                     // Then everything in flight. The provider is gone and the
                     // native side has dropped the request ids with it, so a

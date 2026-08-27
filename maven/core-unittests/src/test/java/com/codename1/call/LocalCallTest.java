@@ -242,6 +242,36 @@ public class LocalCallTest {
     }
 
     @Test
+    public void reportingTheCallAnswersTheSystemStart() {
+        // The documented answer to startCallRequested is a reportOutgoing
+        // with the id it was handed -- NOT a call to fulfill(). Failing an
+        // action the listener had honoured destroyed the very call it had
+        // just placed: on Android reportOutgoing adopts the connection and
+        // acknowledges it, and the failed token then tore that connection
+        // down, handing the app a CallSession for a call Telecom had ended.
+        final List<String> started = new ArrayList<String>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void startCallRequested(String callId, CallHandle handle,
+                    boolean video, CallAction action) {
+                started.add(callId);
+                Calls.reportOutgoing(callId, handle, "Ada", video);
+            }
+        });
+        String id = CallId.random();
+        bridge.simulateStartCallRequest(id, CallHandle.phone("+14155551212"),
+                false);
+        waitFor(started, 1);
+
+        long limit = System.currentTimeMillis() + 5000;
+        while (bridge.getLastActionFulfilled() == null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(Boolean.TRUE, bridge.getLastActionFulfilled(),
+                "reporting the call IS handling the request");
+    }
+
+    @Test
     public void anIgnoredSystemStartIsFailedRatherThanFulfilled() {
         // The one action where silence does NOT mean done. Everywhere else
         // the app was asked to do something to a call that exists, and the
