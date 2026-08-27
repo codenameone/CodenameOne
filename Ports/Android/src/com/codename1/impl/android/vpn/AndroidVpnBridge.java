@@ -167,7 +167,13 @@ public class AndroidVpnBridge implements VpnBridge {
             return;
         }
         if (p.getProtocol() == VpnProtocol.IPSEC) {
-            fail(requestId, VpnError.INVALID_CONFIGURATION,
+            // NOT_SUPPORTED, which is what VpnProtocol.IPSEC documents this
+            // platform answering. The profile is not malformed -- it is
+            // perfectly valid, and installs on iOS -- so calling it invalid
+            // told an app that branches on the typed error to reject the
+            // user's configuration instead of falling back to IKEv2 or
+            // hiding the option.
+            fail(requestId, VpnError.NOT_SUPPORTED,
                     "Android's managed VPN offers IKEv2 only; IPSEC is an iOS"
                     + " configuration");
             return;

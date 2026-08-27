@@ -165,6 +165,31 @@ public class LocalVpnTest {
     }
 
     @Test
+    public void aReplacementBridgeIsToldTheListenerIsStillThere() {
+        // The cache remembered the VALUE, not who had been told it. A new
+        // bridge -- what a Display re-init produces -- starts with its own
+        // listening flag false, so "already delivered true" was true of a
+        // bridge that no longer exists and the replacement was never asked to
+        // watch. A listener registered the whole time then saw no status
+        // change at all.
+        Vpn.addStatusListener(new VpnStatusListener() {
+            public void vpnStatusChanged(VpnStatus status) {
+            }
+        });
+        assertTrue(bridge.isStatusListening(),
+                "the first bridge is watching");
+
+        LocalVpnBridge replacement = new LocalVpnBridge();
+        VpnRequests.resetForTest(replacement);
+        Vpn.addStatusListener(new VpnStatusListener() {
+            public void vpnStatusChanged(VpnStatus status) {
+            }
+        });
+        assertTrue(replacement.isStatusListening(),
+                "so is the one that replaced it");
+    }
+
+    @Test
     public void removingDuringAStartDoesNotLeaveAConnectedTunnel() {
         // The simulation moves state over time, which is its whole point --
         // so a remove() landing inside a start's delay used to be OVERTAKEN

@@ -99,9 +99,11 @@ public final class CallRequests {
             boolean wanted = false;
             synchronized (CallRequests.class) {
                 wanted = actionsWanted || pushesWanted;
-                if (deliveredReady == null
+                if (deliveredTo != b //NOPMD CompareObjectsWithEquals
+                        || deliveredReady == null
                         || deliveredReady.booleanValue() != wanted) {
                     deliveredReady = Boolean.valueOf(wanted);
+                    deliveredTo = b;
                     deliver = true;
                 }
             }
@@ -165,6 +167,7 @@ public final class CallRequests {
             actionsWanted = false;
             pushesWanted = false;
             deliveredReady = null;
+            deliveredTo = null;
         }
         com.codename1.call.session.Calls.resetForTest();
         com.codename1.call.voip.VoipPush.resetForTest();
@@ -233,14 +236,26 @@ public final class CallRequests {
                 deliveredReady = null;
                 return;
             }
-            if (before == after && deliveredReady != null
+            // The BRIDGE as well as the value, for the reason
+            // Vpn.publishListening gives: a Display re-init builds a new
+            // bridge whose own readiness starts false, and a value-only cache
+            // said "already told it true" about the bridge that is gone -- so
+            // the replacement was never told Java was listening, and on iOS
+            // that means every CallKit action is held until it times out.
+            if (deliveredTo == b && before == after //NOPMD CompareObjectsWithEquals
+                    && deliveredReady != null
                     && deliveredReady.booleanValue() == after) {
                 return;
             }
             deliveredReady = Boolean.valueOf(after);
+            deliveredTo = b;
             b.setJavaReady(after);
         }
     }
+
+    /// The bridge deliveredReady was told, so a replacement is told again
+    /// even when the value has not changed.
+    private static CallBridge deliveredTo;
 
     /// What the port was last told, or null when it has not been told.
     ///

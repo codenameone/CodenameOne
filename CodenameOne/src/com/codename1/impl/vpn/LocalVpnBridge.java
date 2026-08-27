@@ -207,6 +207,16 @@ public class LocalVpnBridge implements VpnBridge {
         this.listening = value;
     }
 
+    /// Whether the facade has asked this bridge to watch the tunnel.
+    ///
+    /// A replacement bridge starts false, so a test can tell whether the
+    /// facade told the NEW one rather than only the one it replaced.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public boolean isStatusListening() {
+        return listening;
+    }
+
     /// Moves to a new status, telling the facade when anyone is listening.
     ///
     /// Public because the simulator drives it directly: a tunnel dropping

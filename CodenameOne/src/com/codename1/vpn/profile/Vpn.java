@@ -236,6 +236,10 @@ public final class Vpn {
     /// been told.
     private static Boolean deliveredListening;
 
+    /// The bridge deliveredListening was told, so a replacement is told
+    /// again even when the value has not changed.
+    private static VpnBridge deliveredTo;
+
     /// Tells the port whether anyone is listening, remembering the answer.
     ///
     /// A first listener added before Display.init found no bridge, and every
@@ -253,6 +257,7 @@ public final class Vpn {
             VpnBridge b = VpnRequests.bridge();
             if (b == null) {
                 deliveredListening = null;
+                deliveredTo = null;
                 return;
             }
             if (deliveredListening != null
@@ -276,11 +281,19 @@ public final class Vpn {
         }
         synchronized (LISTENERS) {
             boolean wanted = !LISTENERS.isEmpty();
-            if (deliveredListening != null
+            // The BRIDGE as well as the value. A Display re-init builds a new
+            // bridge whose own listening flag starts false, and a value-only
+            // cache said "already told it true" about the bridge that is
+            // gone -- so the replacement was never asked to watch, and no
+            // status change reached a listener that had been registered the
+            // whole time.
+            if (deliveredTo == b //NOPMD CompareObjectsWithEquals
+                    && deliveredListening != null
                     && deliveredListening.booleanValue() == wanted) {
                 return;
             }
             deliveredListening = Boolean.valueOf(wanted);
+            deliveredTo = b;
             b.setStatusListening(wanted);
         }
     }
