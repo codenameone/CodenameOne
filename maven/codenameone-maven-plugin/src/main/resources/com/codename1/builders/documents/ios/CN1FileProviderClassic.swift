@@ -121,13 +121,27 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         return stopGeneration[url] ?? 0
     }
 
-    private func registerFetch(_ task: URLSessionTask?, at url: URL) {
+    /// Registers a suspended task, unless a stop has already overtaken it.
+    ///
+    /// The generation is captured before the task exists, and a stop can land in between: it
+    /// finds nothing to cancel, moves the generation, and this used to register and start the
+    /// download anyway -- the whole file came down, on the user's data, only to be discarded by
+    /// the check at the end. Registration is where that is caught, because it is the first
+    /// moment the task and the lock are both in hand.
+    ///
+    /// - Returns: true when the task is registered and may be started.
+    private func registerFetch(_ task: URLSessionTask?, at url: URL, generation: Int) -> Bool {
         guard let task = task else {
-            return
+            return false
         }
         inFlightLock.lock()
+        if (stopGeneration[url] ?? 0) != generation {
+            inFlightLock.unlock()
+            return false
+        }
         inFlight[url] = task
         inFlightLock.unlock()
+        return true
     }
 
     /// Drops this fetch's entry, and only this one.
@@ -424,6 +438,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         let box = CN1FetchBox()
         let task = CN1DocumentRemote.fetch(remoteId: remoteId,
                                            settings: settings) { fetched, error in
+            guard !box.rejected else {
+                return
+            }
             self.clearFetch(box.task, at: url)
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
@@ -471,10 +488,19 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
         }
         // Registered before it is started, so a stop arriving in between finds a task to cancel
-        // rather than a download it can only refuse to store afterwards.
+        // rather than a download it can only refuse to store afterwards -- and if a stop got
+        // here first, the task is never started at all.
         box.task = task
-        registerFetch(task, at: url)
-        task?.resume()
+        if registerFetch(task, at: url, generation: generation) {
+            task?.resume()
+        } else {
+            // Answered here rather than through the task: it was never resumed, so nothing else
+            // will call back for it. The flag stops the fetch's own completion from answering a
+            // second time if cancelling a suspended task delivers one.
+            box.rejected = true
+            task?.cancel()
+            completionHandler(NSFileProviderError(.noSuchItem))
+        }
     }
 
     override func stopProvidingItem(at url: URL) {
@@ -582,6 +608,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 /// run and no synchronisation is needed on top of that ordering.
 private final class CN1FetchBox {
     var task: URLSessionTask?
+    /// Set when the request was answered without ever starting the task, so its completion --
+    /// if a cancelled suspended task delivers one -- does not answer a second time.
+    var rejected = false
 }
 
 /// What became of a staged file when it was offered to the shared URL.
