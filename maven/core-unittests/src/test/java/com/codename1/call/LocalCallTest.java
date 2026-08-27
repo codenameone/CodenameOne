@@ -751,6 +751,33 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aStaleSessionCannotEndTheCallThatReusedItsId() {
+        // Both ports resolve an end by call ID alone, so a session that no
+        // longer owns its id must not reach them. A provider reset retires
+        // the old session while the app retries the SAME id, and a late
+        // signalling callback on the retained old object then hung up the
+        // new live call.
+        String id = CallId.random();
+        CallSession stale = ring(id);
+        bridge.simulateProviderReset();
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSession(id) != null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        CallSession live = ring(id);
+        assertSame(live, Calls.getSession(id), "the retry owns the id now");
+
+        stale.reportEndedRemotely(CallEndReason.REMOTE_ENDED);
+        sleepFor(200);
+        assertSame(live, Calls.getSession(id),
+                "a stale session must not end the call that reused its id");
+        assertSame(CallState.RINGING, bridge.callState(id),
+                "and the simulated platform still has it");
+        CallAwait.assertFailedWith(CallError.INVALID_ID, stale.end(null));
+    }
+
+    @Test
     public void aDeferredEndThatFailsKeepsTheSession() {
         // The documented behaviour of failing an end action is that the
         // system UI restores the call. Forgetting the session on dispatch

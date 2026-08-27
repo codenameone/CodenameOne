@@ -23,6 +23,8 @@
 package com.codename1.call.session;
 
 import com.codename1.call.CallDirection;
+import com.codename1.call.CallError;
+import com.codename1.call.CallException;
 import com.codename1.call.CallEndReason;
 import com.codename1.call.CallHandle;
 import com.codename1.call.CallState;
@@ -203,6 +205,16 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
+        if (!Calls.owns(callId, this)) {
+            // This session no longer names the call its id points at -- it
+            // was replaced after a provider reset, or it is a detached one
+            // describing a call that is already over. Ending BY ID from here
+            // would hang up whatever holds the id now.
+            EdtResult<Boolean> stale = new EdtResult<Boolean>();
+            stale.error(new CallException(CallError.INVALID_ID,
+                    "This session no longer names a live call"));
+            return stale;
+        }
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
         // The state moves and the session is forgotten only if the system
@@ -223,11 +235,14 @@ public final class CallSession {
         synchronized (this) {
             state = CallState.ENDED;
         }
-        // Unconditional here, unlike end(): this is the app telling the
-        // framework the call is already over, not asking for it to be. Still
-        // identity-checked, because the id can already name a newer call.
-        Calls.forget(callId, this);
-        if (b != null) {
+        // The native report is made only if THIS session still owned the id.
+        // forget() is identity-checked, so a stale session leaves the
+        // replacement registered -- but the report went out regardless, and
+        // both ports resolve it by call id alone, so a late signalling
+        // callback on a retained old session ended the new live call that
+        // had reused the id after a provider reset.
+        boolean owned = Calls.forget(callId, this);
+        if (b != null && owned) {
             b.reportCallEnded(callId, reason == null
                     ? CallEndReason.REMOTE_ENDED.ordinal() : reason.ordinal(),
                     System.currentTimeMillis());

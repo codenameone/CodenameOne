@@ -546,15 +546,34 @@ public final class Calls {
     /// and a late answer belonging to the OLD report would otherwise remove
     /// the new one: accepted, returned to its caller, and absent from
     /// getSession() and getSessions() for the rest of its life.
-    static void forget(String callId, CallSession session) {
+    static boolean forget(String callId, CallSession session) {
         if (session == null) {
             forget(callId);
-            return;
+            return false;
         }
         synchronized (SESSIONS) {
             if (SESSIONS.get(callId) == session) { //NOPMD CompareObjectsWithEquals
                 SESSIONS.remove(callId);
+                return true;
             }
+        }
+        return false;
+    }
+
+    /// Whether `session` is still the one registered under `callId`.
+    ///
+    /// The ports resolve an operation by call id alone, so a session that no
+    /// longer owns its id must not reach them: after a provider reset and a
+    /// retry of the same id, a late callback on the RETAINED old session
+    /// would otherwise end the new live call. forget() is already
+    /// identity-checked for the same reason; this is the same question asked
+    /// before an operation rather than after it.
+    static boolean owns(String callId, CallSession session) {
+        if (session == null) {
+            return false;
+        }
+        synchronized (SESSIONS) {
+            return SESSIONS.get(callId) == session; //NOPMD CompareObjectsWithEquals
         }
     }
 
