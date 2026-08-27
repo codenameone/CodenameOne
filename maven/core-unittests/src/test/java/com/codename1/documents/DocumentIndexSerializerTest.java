@@ -176,6 +176,49 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesTwoChildrenShownUnderOneName() {
+        // A file browser addresses an item by its name within its folder. Apple's replicated
+        // provider says so outright: two items at the same parent and filename make it "bounce"
+        // one of them, so the user sees an item that cannot be opened even though the ids differ.
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        root.add(DocumentNode.file("a", "Invoice.pdf"));
+        root.add(DocumentNode.file("b", "Invoice.pdf"));
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(root));
+        assertTrue(err.getMessage().contains("Invoice.pdf"), err.getMessage());
+
+        // The same name in DIFFERENT folders is fine -- that is the whole point of folders.
+        DocumentNode split = DocumentNode.folder("root", "Root");
+        DocumentNode first = DocumentNode.folder("f1", "2030");
+        first.add(DocumentNode.file("a", "Invoice.pdf"));
+        DocumentNode second = DocumentNode.folder("f2", "2031");
+        second.add(DocumentNode.file("b", "Invoice.pdf"));
+        split.add(first);
+        split.add(second);
+        assertNotNull(DocumentIndexSerializer.serialize(split));
+
+        // Compared as the reader will SHOW them: a node with no name falls back to its id, and an
+        // empty name is normalized to "item", so neither can smuggle a duplicate past this.
+        DocumentNode viaId = DocumentNode.folder("root", "Root");
+        viaId.add(DocumentNode.file("report", null));
+        viaId.add(DocumentNode.file("other", "report"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(viaId));
+
+        DocumentNode viaEmpty = DocumentNode.folder("root", "Root");
+        viaEmpty.add(DocumentNode.file("a", ""));
+        viaEmpty.add(DocumentNode.file("b", "item"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(viaEmpty));
+
+        // Case is not folded: these are two items on iOS, whose data volume is case-sensitive.
+        DocumentNode cased = DocumentNode.folder("root", "Root");
+        cased.add(DocumentNode.file("a", "Invoice.pdf"));
+        cased.add(DocumentNode.file("b", "invoice.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(cased));
+    }
+
+    @Test
     void refusesComponentsTooLongForAFilesystem() {
         // 255 bytes is where every filesystem the tree lands on stops. Past it the pre-iOS-16
         // provider's createDirectory fails with ENAMETOOLONG, and it fails at OPEN time: the item

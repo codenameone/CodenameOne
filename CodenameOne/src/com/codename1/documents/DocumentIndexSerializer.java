@@ -144,9 +144,34 @@ public final class DocumentIndexSerializer {
                     + " bytes; the limit is " + MAX_COMPONENT_BYTES + "). Shorten the id, or put "
                     + "the long part in the name.");
         }
+        Set<String> siblingNames = new HashSet<String>();
         for (DocumentNode child : node.getChildren()) {
+            String childName = displayName(child);
+            if (!siblingNames.add(childName)) {
+                throw new IllegalArgumentException("Two children of \"" + effective + "\" are "
+                        + "both shown as \"" + childName + "\". A file browser addresses an item "
+                        + "by its name within its folder, so two that share one there is a folder "
+                        + "with an item the user cannot open -- Apple's provider drops one of "
+                        + "them. Distinct ids are not enough; give them distinct names.");
+            }
             validate(child);
         }
+    }
+
+    /// The name a reader will actually show for this node, which is what has to be unique among
+    /// its siblings.
+    ///
+    /// It is not simply `getName()`: the readers fall back to the id when no name is set, and an
+    /// empty name is normalized to "item" rather than shown as nothing. Comparing the raw values
+    /// would let a node named "" and one named "item" through, and the browser would then see one
+    /// name twice.
+    ///
+    /// Case is deliberately not folded. Two siblings differing only in case collide on a
+    /// case-insensitive volume and not on iOS, whose data volume is case-sensitive, and refusing
+    /// them here would reject a tree that works on the platform this ships for.
+    private static String displayName(DocumentNode node) {
+        String name = node.getName() != null ? node.getName() : node.getId();
+        return name.length() == 0 ? "item" : name;
     }
 
     /// The most bytes a single path component may take.
