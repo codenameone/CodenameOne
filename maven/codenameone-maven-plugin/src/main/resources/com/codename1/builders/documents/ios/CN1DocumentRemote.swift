@@ -123,6 +123,11 @@ enum CN1DocumentRemote {
     /// dismiss to the `Progress` returned by `fetchContents`; without the task behind it, that
     /// cancel stops nothing and a large download keeps running -- on the user's mobile data, in a
     /// process the system already memory-limits harder than the app.
+    /// The task is returned SUSPENDED: the caller resumes it once it has been registered
+    /// wherever a cancellation would look for it. Starting it here left a window in which a stop
+    /// found nothing to cancel and the download ran to completion anyway, paid for out of the
+    /// user's data rather than out of a check.
+    ///
     /// - Parameter destination: the directory the downloaded file is moved into. The replicated
     ///   provider has to hand the system a file on the same volume as the user-visible URL, which
     ///   the process temporary directory is not guaranteed to be, so it passes the directory
@@ -191,7 +196,6 @@ enum CN1DocumentRemote {
                 completion(nil, error)
             }
         }
-        task.resume()
         return task
     }
 

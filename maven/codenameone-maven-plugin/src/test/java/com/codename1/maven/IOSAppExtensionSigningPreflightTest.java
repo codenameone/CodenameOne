@@ -62,6 +62,14 @@ public class IOSAppExtensionSigningPreflightTest {
 
     /** A profile of the shape the parser insists on, covering one App ID. */
     private File profile(String name, String appIdentifier) throws Exception {
+        return profile(name, appIdentifier, null);
+    }
+
+    /// @param appGroup the App Group the profile grants, or null for one that grants none
+    private File profile(String name, String appIdentifier, String appGroup) throws Exception {
+        String groups = appGroup == null ? ""
+                : "<key>com.apple.security.application-groups</key><array><string>"
+                        + appGroup + "</string></array>";
         String plist = HEAD
                 + "<key>Name</key><string>" + name + "</string>\n"
                 + "<key>UUID</key><string>0f7ac3c1-4d0e-4e8a-9d1f-8b6a2c5e7d90</string>\n"
@@ -69,6 +77,7 @@ public class IOSAppExtensionSigningPreflightTest {
                 + "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>\n"
                 + "<key>Entitlements</key><dict>"
                 + "<key>application-identifier</key><string>" + appIdentifier + "</string>"
+                + groups
                 + "<key>get-task-allow</key><false/></dict>\n"
                 + "</dict></plist>";
         byte[] payload = plist.getBytes("UTF-8");
@@ -145,6 +154,33 @@ public class IOSAppExtensionSigningPreflightTest {
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
                 profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
+    public void anExtensionProfileWithoutTheAppGroupIsRefused() throws Exception {
+        // A profile is a snapshot of the capabilities its App ID had when it was issued, so one
+        // made before App Groups was enabled matches the bundle id and still cannot sign a target
+        // that declares the group -- and the failure lands in Xcode, talking about an entitlement.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(0, problems.size());
+
+        // Grants some OTHER group: that is a profile this can judge, and it cannot sign.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Other", "ABCD1234.com.example.app.CN1Documents",
+                        "group.com.example.other").getAbsolutePath());
+        problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Group"));
+
+        // Grants the group the build will ask for: accepted.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Right", "ABCD1234.com.example.app.CN1Documents",
+                        "group.com.example.app").getAbsolutePath());
         assertTrue(checkGenerated(p).isEmpty());
     }
 

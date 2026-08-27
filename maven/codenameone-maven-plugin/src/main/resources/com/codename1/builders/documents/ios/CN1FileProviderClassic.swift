@@ -320,7 +320,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             completionHandler(placed)
         }
+        // Registered before it is started, so a stop arriving in between finds a task to cancel
+        // rather than a download it can only refuse to store afterwards.
         registerFetch(task, at: url)
+        task?.resume()
     }
 
     override func stopProvidingItem(at url: URL) {

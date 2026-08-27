@@ -176,6 +176,13 @@ public final class DocumentIndexSerializer {
         if (loneSurrogate < 0) {
             loneSurrogate = loneSurrogateAt(node.getId());
         }
+        if (loneSurrogate < 0 && node.getPath() != null) {
+            // The local path travels the same lossy path as the ids and lands in the same place:
+            // "?" for the surrogate, and the readers then resolve a DIFFERENT file under the
+            // shared directory -- one whose name really does contain a question mark, if the app
+            // wrote such a file.
+            loneSurrogate = loneSurrogateAt(node.getPath());
+        }
         if (loneSurrogate < 0 && node.getRemoteId() != null) {
             // The remote id travels the same lossy path and is worse when it breaks: it is the
             // key the readers send to the endpoint, so a "?" in place of the surrogate asks the
@@ -184,8 +191,8 @@ public final class DocumentIndexSerializer {
             loneSurrogate = loneSurrogateAt(node.getRemoteId());
         }
         if (loneSurrogate >= 0) {
-            throw new IllegalArgumentException("A document id, name or remote id contains an "
-                    + "unpaired surrogate (index " + loneSurrogate + ", on the node shown as \""
+            throw new IllegalArgumentException("A document id, name, path or remote id contains "
+                    + "an unpaired surrogate (index " + loneSurrogate + ", on the node shown as \""
                     + effective + "\"). It cannot be encoded as UTF-8, and the index is written "
                     + "as UTF-8: the character becomes \"?\", two values that differed only "
                     + "there become one, and the reader then rejects the whole index as holding "

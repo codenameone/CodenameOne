@@ -168,6 +168,10 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                             once.call(nil, nil, NSFileProviderError(.noSuchItem))
                         }
                     } catch {
+                        // Whatever the copy managed to write goes with the failure. The likely
+                        // cause is a full volume, and leaving a partial file behind makes the
+                        // next attempt at the same document fail the same way with less room.
+                        try? FileManager.default.removeItem(at: handoff)
                         once.call(nil, nil, CN1DocumentRemote.providerError(error))
                     }
                     progress.completedUnitCount = 1
@@ -252,6 +256,10 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             once.call(nil, nil, CocoaError(.userCancelled))
             progress?.completedUnitCount = 1
         }
+        // Started only now that the handler above can reach it. Resuming inside fetch left a
+        // window in which a cancellation found nothing to cancel and the download ran to
+        // completion regardless.
+        task?.resume()
         return progress
     }
 

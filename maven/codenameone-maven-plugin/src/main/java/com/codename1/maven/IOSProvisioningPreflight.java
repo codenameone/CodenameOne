@@ -90,6 +90,12 @@ final class IOSProvisioningPreflight {
          * wildcard). Null when the profile does not carry one.
          */
         String applicationIdentifier;
+        /**
+         * The {@code com.apple.security.application-groups} entitlement, or null when the
+         * profile carries none. A generated document provider always declares an App Group, so a
+         * profile without it cannot sign that target however well its bundle id matches.
+         */
+        List<String> appGroups;
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -312,6 +318,15 @@ final class IOSProvisioningPreflight {
         }
         String name = "CN1Documents";
         if (hasOwnProfileSetting(settings, name, release)) {
+            // A profile of its own, but the right one? The generated target always declares the
+            // App Group it resolves its container from, so a profile issued before that group
+            // was enabled on the App ID matches the bundle id and still cannot sign it -- and
+            // the failure lands in Xcode, talking about an entitlement. Only a profile supplied
+            // as a local PATH can be read; a hosted URL or base64 blob is checked by the server.
+            Problem groupProblem = appGroupProblem(settings, name, release);
+            if (groupProblem != null) {
+                problems.add(groupProblem);
+            }
             return problems;
         }
         Profile appProfile = appProfile(settings, release);
@@ -359,6 +374,59 @@ final class IOSProvisioningPreflight {
                 + "The Certificate Wizard does all of this for you.\n"
                 + "The app's own profile has to change too: it carries the same App Group, which "
                 + "a wildcard App ID cannot authorize either.";
+    }
+
+    /// Whether the extension profile supplied as a local path grants the App Group the
+    /// generated target declares, or null when there is nothing to say.
+    ///
+    /// Silent when the profile cannot be read or carries no App Groups entitlement at all: this
+    /// gates a hard refusal, and neither is evidence that signing will fail -- an unreadable
+    /// file is reported by check() itself, and a profile whose entitlements this cannot parse is
+    /// not a profile this should judge.
+    private static Problem appGroupProblem(Properties settings, String name, boolean release) {
+        String configured = trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.appGroup"));
+        if (configured == null || configured.isEmpty()) {
+            String packageName = trimmed(settings.getProperty("codename1.packageName"));
+            if (packageName == null || packageName.isEmpty()) {
+                return null;
+            }
+            configured = "group." + packageName;
+        }
+        String qualifier = release ? "release" : "debug";
+        String[] paths = {
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.ios.appext." + name + ".provision"
+        };
+        for (String key : paths) {
+            String value = settings.getProperty(key);
+            if (value == null || value.trim().isEmpty()) {
+                continue;
+            }
+            String resolved = resolvePlaceholders(value.trim(), settings);
+            if (resolved.indexOf("${") >= 0 || !new File(resolved).isFile()) {
+                continue;
+            }
+            Profile profile;
+            try {
+                profile = parse(readFile(new File(resolved)));
+            } catch (Exception ex) {
+                return null;
+            }
+            if (profile.appGroups == null || profile.appGroups.contains(configured)) {
+                return null;
+            }
+            return new Problem("The " + name + " provisioning profile named by " + key + " ("
+                    + profile.name + ") does not grant the App Group \"" + configured + "\". The "
+                    + "generated extension declares that group -- it is how it reads the tree the "
+                    + "app publishes -- so signing fails on the entitlement rather than on the "
+                    + "profile's name. Enable App Groups on the " + name + " App ID, add \""
+                    + configured + "\" to it, and regenerate the profile: a profile is a snapshot "
+                    + "of the capabilities its App ID had when it was issued, so one made before "
+                    + "the change never gains them. The Certificate Wizard does this for you.",
+                    true);
+        }
+        return null;
     }
 
     private static String trimmed(String value) {
@@ -844,6 +912,20 @@ final class IOSProvisioningPreflight {
         Element applicationIdentifier = valueForKey(doc, "application-identifier");
         if (applicationIdentifier != null && "string".equals(applicationIdentifier.getTagName())) {
             profile.applicationIdentifier = applicationIdentifier.getTextContent().trim();
+        }
+        // Same nesting, same reason: this is what says whether the profile can sign a target
+        // that declares an App Group, which every generated document provider does.
+        Element groups = valueForKey(doc, "com.apple.security.application-groups");
+        if (groups != null && "array".equals(groups.getTagName())) {
+            List<String> found = new ArrayList<String>();
+            NodeList values = groups.getElementsByTagName("string");
+            for (int i = 0; i < values.getLength(); i++) {
+                String value = values.item(i).getTextContent().trim();
+                if (!value.isEmpty()) {
+                    found.add(value);
+                }
+            }
+            profile.appGroups = found;
         }
         profile.type = deriveType(doc);
         return profile;
