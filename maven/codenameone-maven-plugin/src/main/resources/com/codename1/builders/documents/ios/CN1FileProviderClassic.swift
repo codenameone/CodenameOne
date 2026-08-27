@@ -252,6 +252,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                         completionHandler(NSFileProviderError(.noSuchItem))
                         return
                     }
+                    if placed != nil {
+                        self.providePlaceholder(at: url) { _ in }
+                    }
                     completionHandler(placed)
                 }
                 return
@@ -317,6 +320,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 try? FileManager.default.removeItem(at: url)
                 completionHandler(NSFileProviderError(.noSuchItem))
                 return
+            }
+            if placed != nil {
+                // place() cleaned up what it wrote; the placeholder it replaced has to come back
+                // or the browser is left with neither a document nor a stand-in for one.
+                self.providePlaceholder(at: url) { _ in }
             }
             completionHandler(placed)
         }
@@ -407,6 +415,12 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             return nil
         } catch {
+            // Whatever was written before the failure goes with it. The placeholder was already
+            // replaced by the time a copy can fail part-way -- a full volume is the likely cause
+            // -- so leaving it there would put a truncated document at the materialization path,
+            // visible to every later provider call as though it were the real one. The caller
+            // writes the placeholder back.
+            try? FileManager.default.removeItem(at: destination)
             return error
         }
     }

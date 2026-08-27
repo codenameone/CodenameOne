@@ -327,6 +327,14 @@ final class IOSProvisioningPreflight {
             if (groupProblem != null) {
                 problems.add(groupProblem);
             }
+            // And the app's own profile, which carries the same group: the builder puts the App
+            // Group into the host's entitlements too, so a main profile issued before the group
+            // was enabled fails signing even when the extension's profile is perfect. Checking
+            // only the extension would have moved the failure rather than prevented it.
+            Problem hostProblem = hostAppGroupProblem(settings, release);
+            if (hostProblem != null) {
+                problems.add(hostProblem);
+            }
             return problems;
         }
         Profile appProfile = appProfile(settings, release);
@@ -384,14 +392,9 @@ final class IOSProvisioningPreflight {
     /// file is reported by check() itself, and a profile whose entitlements this cannot parse is
     /// not a profile this should judge.
     private static Problem appGroupProblem(Properties settings, String name, boolean release) {
-        String configured = trimmed(settings.getProperty(
-                "codename1.arg.ios.documentProvider.appGroup"));
-        if (configured == null || configured.isEmpty()) {
-            String packageName = trimmed(settings.getProperty("codename1.packageName"));
-            if (packageName == null || packageName.isEmpty()) {
-                return null;
-            }
-            configured = "group." + packageName;
+        String configured = configuredAppGroup(settings);
+        if (configured == null) {
+            return null;
         }
         String qualifier = release ? "release" : "debug";
         String[] paths = {
@@ -427,6 +430,36 @@ final class IOSProvisioningPreflight {
                     true);
         }
         return null;
+    }
+
+    /// The same check against the app's own profile.
+    private static Problem hostAppGroupProblem(Properties settings, boolean release) {
+        String configured = configuredAppGroup(settings);
+        Profile profile = appProfile(settings, release);
+        if (configured == null || profile == null || profile.appGroups == null
+                || profile.appGroups.contains(configured)) {
+            return null;
+        }
+        return new Problem("The app's own provisioning profile (" + profile.name + ") does not "
+                + "grant the App Group \"" + configured + "\". Publishing documents puts that "
+                + "group in the app's entitlements as well as the extension's -- they meet in the "
+                + "container it names -- so the app itself fails to sign. Enable App Groups on "
+                + "the app's App ID, add \"" + configured + "\" to it, and regenerate the "
+                + "profile. The Certificate Wizard does this for you.", true);
+    }
+
+    /// The App Group this build will ask for, or null when it cannot be worked out.
+    private static String configuredAppGroup(Properties settings) {
+        String configured = trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.appGroup"));
+        if (configured != null && !configured.isEmpty()) {
+            return configured;
+        }
+        String packageName = trimmed(settings.getProperty("codename1.packageName"));
+        if (packageName == null || packageName.isEmpty()) {
+            return null;
+        }
+        return "group." + packageName;
     }
 
     private static String trimmed(String value) {

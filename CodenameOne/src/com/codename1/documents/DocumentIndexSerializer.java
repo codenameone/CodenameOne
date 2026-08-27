@@ -322,15 +322,22 @@ public final class DocumentIndexSerializer {
     /// makes the accepted set one where equal-looking names are equal strings, which is what the
     /// sibling check needs.
     private static int combiningMarkAt(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
+        // By CODE POINT, not by char. The supplementary compatibility ideographs live at
+        // U+2F800-U+2FA1F and arrive here as surrogate pairs, so a char-by-char scan never sees
+        // them -- and U+2F800 is one of the clearest cases there is: it normalizes to U+4E3D, so
+        // the two spellings are one filename on an Apple volume and two strings here.
+        int i = 0;
+        while (i < value.length()) {
+            int c = value.codePointAt(i);
             if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
                     || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
                     || (c >= 0xFE20 && c <= 0xFE2F)
                     || c == 0x212B || c == 0x2126 || c == 0x212A
-                    || (c >= 0xF900 && c <= 0xFAFF)) {
+                    || (c >= 0xF900 && c <= 0xFAFF)
+                    || (c >= 0x2F800 && c <= 0x2FA1F)) {
                 return i;
             }
+            i += Character.charCount(c);
         }
         return -1;
     }

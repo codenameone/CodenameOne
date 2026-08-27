@@ -24,6 +24,7 @@ package com.codename1.impl.android.documents;
 
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.util.Log;
@@ -189,9 +190,42 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
             // Remembered before the tree goes, or the folders that just disappeared could not be
             // named afterwards and an open picker would keep showing them.
             rememberFolders(ctx);
+            revokeGrants(ctx);
             CN1DocumentStore.deleteTree(CN1DocumentStore.baseDir(ctx));
         }
         signalChange();
+    }
+
+    /// Withdraws the URI permissions this provider handed out for the documents being cleared.
+    ///
+    /// An app that opened a document through the picker can PERSIST its grant, and a grant
+    /// outlives the tree: deleting the index takes the content away but leaves the permission
+    /// behind. Node ids are the app's own record keys and an account switch reuses them -- the
+    /// download path is built around that -- so the next login republishing "invoice-1" would
+    /// hand the previous holder the new account's document through a URI it already has, with no
+    /// picker in sight.
+    ///
+    /// Best effort by nature: a grant this process did not issue is not ours to revoke, and the
+    /// call is documented to do nothing in that case rather than to fail. It runs before the
+    /// deletion so the index can still say which documents there are.
+    private void revokeGrants(Context ctx) {
+        String authority = authority();
+        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
+        if (authority == null || index == null) {
+            return;
+        }
+        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+        for (CN1DocumentStore.Node node : index.nodes.values()) {
+            try {
+                ctx.revokeUriPermission(
+                        DocumentsContract.buildDocumentUri(authority, node.id), flags);
+            } catch (Throwable t) {
+                // One document that cannot be revoked must not stop the rest, and must not stop
+                // the deletion below either -- the content going away is the part that matters.
+                Log.w(TAG, "Could not revoke access to " + node.id, t);
+            }
+        }
     }
 
     /// Hand-built rather than routed through a serializer: two optional strings do not justify

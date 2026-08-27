@@ -294,10 +294,22 @@ class DocumentIndexSerializerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(compatibility));
 
+        // The supplementary compatibility block too, which a char-by-char scan cannot see: it
+        // arrives as a surrogate pair. U+2F800 normalizes to U+4E3D.
+        DocumentNode supplementary = DocumentNode.folder("root", "Root");
+        supplementary.add(DocumentNode.file("a", new String(Character.toChars(0x2F800)) + ".txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(supplementary));
+
         // The ordinary letter it normalizes to is accepted.
         DocumentNode plain = DocumentNode.folder("root", "Root");
         plain.add(DocumentNode.file("a", "\u00c5.pdf"));
         assertNotNull(DocumentIndexSerializer.serialize(plain));
+
+        // And an ordinary supplementary character -- an emoji -- is not refused by that range.
+        DocumentNode emoji = DocumentNode.folder("root", "Root");
+        emoji.add(DocumentNode.file("a", "party\ud83c\udf89.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(emoji));
     }
 
     @Test
