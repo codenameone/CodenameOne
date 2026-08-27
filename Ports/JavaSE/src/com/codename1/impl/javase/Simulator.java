@@ -493,6 +493,17 @@ public class Simulator {
         String expectedMain = configuredMainClass(projectDir);
         FoundManifest found = findAnnotationManifest(projectDir, classPathStr, expectedMain);
         if (found == null) {
+            // Annotations on the main class but no manifest means process-annotations
+            // did not run -- an upgraded or hand-written POM that never bound the
+            // goal. CN1BuildMojo refuses a device build for exactly this, so
+            // returning quietly here made the simulator the one place where the
+            // annotated hints vanish with nothing said, and local and device
+            // behaviour diverge for the same project.
+            //
+            // A warning rather than a refusal: the simulator's job is to start, and
+            // the hints it is missing are build settings, not something it cannot
+            // run without.
+            warnIfAnnotatedButUnprocessed(classPathStr, expectedMain);
             return;
         }
         java.util.Properties p = found.hints;
@@ -1033,6 +1044,117 @@ public class Simulator {
                     main.trim().replace('.', '/') + ".class") != null;
         }
         return found.file == null || classFileBeside(found.file, main) != null;
+    }
+
+    /** Descriptors of the build hint annotations, as they appear in a class file. */
+    private static final String HINT_ANNOTATION_MARKER = "com/codename1/annotations/buildhints/";
+
+    /**
+     * Says so when the main class carries build hint annotations that nothing
+     * turned into a manifest.
+     *
+     * <p>By scanning the class file's bytes for the annotations package rather
+     * than reading the bytecode: an annotation's type appears in the constant
+     * pool as a descriptor, and the simulator has no class reader. That is wider
+     * than reading the annotation table -- a main class that merely mentions the
+     * package would match too -- which is acceptable for a warning and is why
+     * this does not refuse anything.</p>
+     */
+    static void warnIfAnnotatedButUnprocessed(String classPathStr, String main) {
+        byte[] bytes = mainClassBytes(classPathStr, main);
+        if (bytes == null) {
+            return;
+        }
+        String text;
+        try {
+            text = new String(bytes, "ISO-8859-1");
+        } catch (java.io.UnsupportedEncodingException never) {
+            return;
+        }
+        if (text.indexOf(HINT_ANNOTATION_MARKER) < 0) {
+            return;
+        }
+        System.err.println("Warning: " + main + " carries build hint annotations, but no "
+                + ANNOTATION_HINTS_ENTRY + " was found, so none of them are in effect here. "
+                + "The cn1 process-annotations goal has to run on the module that compiles the "
+                + "main class; a device build refuses this outright.");
+    }
+
+    /** Every byte of {@code f}, or null when it is absent or unreadable. */
+    private static byte[] readAllBytes(File f) {
+        if (f == null) {
+            return null;
+        }
+        try {
+            java.io.InputStream in = new FileInputStream(f);
+            try {
+                return drain(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** Every byte of one jar entry, or null when it is not there. */
+    private static byte[] jarEntryBytes(File jar, String entryName) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(jar);
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return null;
+            }
+            java.io.InputStream in = zip.getInputStream(entry);
+            try {
+                return drain(in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException ex) {
+            return null;
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // read-only archive
+                }
+            }
+        }
+    }
+
+    private static byte[] drain(java.io.InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int r;
+        while ((r = in.read(buf)) > 0) {
+            out.write(buf, 0, r);
+        }
+        return out.toByteArray();
+    }
+
+    /** {@code main}'s class file bytes from the first classpath element holding it. */
+    private static byte[] mainClassBytes(String classPathStr, String main) {
+        if (classPathStr == null || main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        for (String element
+                : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (element.length() == 0) {
+                continue;
+            }
+            File f = new File(element);
+            byte[] bytes = f.isDirectory()
+                    ? readAllBytes(fileIfPresent(new File(f, entry.replace('/', File.separatorChar))))
+                    : (f.isFile() ? jarEntryBytes(f, entry) : null);
+            if (bytes != null) {
+                return bytes;
+            }
+        }
+        return null;
     }
 
     /**

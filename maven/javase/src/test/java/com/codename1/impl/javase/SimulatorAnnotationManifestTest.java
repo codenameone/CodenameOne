@@ -575,4 +575,82 @@ public class SimulatorAnnotationManifestTest {
             os.close();
         }
     }
+
+
+    /**
+     * Annotations on the main class with no manifest are said out loud.
+     *
+     * <p>It means process-annotations never ran -- an upgraded or hand-written POM
+     * that did not bind the goal. CN1BuildMojo refuses a device build for exactly
+     * this, so staying quiet here made the simulator the one place the annotated
+     * hints vanish with nothing said.</p>
+     */
+    @Test
+    public void anAnnotatedMainClassWithNoManifestSaysSo(@TempDir File tmp) throws Exception {
+        File classes = new File(tmp, "classes");
+        writeClassContaining(classes, "com/example/MyApp.class",
+                "Lcom/codename1/annotations/buildhints/Ios;");
+
+        String warning = captureStderr(new Runnable() {
+            public void run() {
+                Simulator.warnIfAnnotatedButUnprocessed(classes.getAbsolutePath(),
+                        "com.example.MyApp");
+            }
+        });
+        assertTrue(warning.contains("com.example.MyApp"), warning);
+        assertTrue(warning.contains("process-annotations"), warning);
+    }
+
+    /** A main class with no build hint annotations is not warned about. */
+    @Test
+    public void anUnannotatedMainClassIsSilent(@TempDir File tmp) throws Exception {
+        File classes = new File(tmp, "classes");
+        writeClassContaining(classes, "com/example/MyApp.class", "Ljava/lang/String;");
+
+        String warning = captureStderr(new Runnable() {
+            public void run() {
+                Simulator.warnIfAnnotatedButUnprocessed(classes.getAbsolutePath(),
+                        "com.example.MyApp");
+            }
+        });
+        assertEquals("", warning.trim(), warning);
+    }
+
+    /** Neither is a project whose main class is not on the classpath at all. */
+    @Test
+    public void aMainClassThatIsNotThereIsSilent(@TempDir File tmp) throws Exception {
+        String warning = captureStderr(new Runnable() {
+            public void run() {
+                Simulator.warnIfAnnotatedButUnprocessed(tmp.getAbsolutePath(),
+                        "com.example.Absent");
+            }
+        });
+        assertEquals("", warning.trim(), warning);
+    }
+
+    /** A stand-in class file: the scan reads bytes, not structure. */
+    private static void writeClassContaining(File classes, String entry, String marker)
+            throws Exception {
+        File f = new File(classes, entry.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().mkdirs() || f.getParentFile().isDirectory());
+        FileOutputStream os = new FileOutputStream(f);
+        try {
+            os.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+            os.write(marker.getBytes("ISO-8859-1"));
+        } finally {
+            os.close();
+        }
+    }
+
+    private static String captureStderr(Runnable body) {
+        java.io.PrintStream original = System.err;
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        try {
+            System.setErr(new java.io.PrintStream(buffer, true));
+            body.run();
+        } finally {
+            System.setErr(original);
+        }
+        return buffer.toString();
+    }
 }
