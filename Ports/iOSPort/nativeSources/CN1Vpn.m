@@ -760,6 +760,11 @@ void com_codename1_impl_ios_IOSNative_vpnStart___int(
         // touched; an install that began while this load was in flight is
         // caught here and nowhere else.
         cn1vpEnsureInstallLock();
+        // CLAIMED, not merely tested. Releasing the lock before touching the
+        // manager left the whole start outside the reservation: an install
+        // could claim it in that gap and be saving a replacement while this
+        // brought the old profile up, both reporting success. A check and an
+        // act that are not one critical section are not a guard at all.
         @synchronized (cn1vpInstallLock) {
             if (cn1vpInstalling) {
                 cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
@@ -767,9 +772,16 @@ void com_codename1_impl_ios_IOSNative_vpnStart___int(
                         " to finish");
                 return;
             }
+            cn1vpInstalling = YES;
         }
         NSError *error = nil;
         [[manager connection] startVPNTunnelAndReturnError:&error];
+        // Released the moment the platform has the request, on every path.
+        // Left set, every later install would be refused as though an
+        // operation were still running.
+        @synchronized (cn1vpInstallLock) {
+            cn1vpInstalling = NO;
+        }
         if (error != nil) {
             cn1vpAck(requestId, NO, CN1_VPN_ERR_CONNECT_FAILED,
                     [error localizedDescription]);
@@ -806,6 +818,11 @@ void com_codename1_impl_ios_IOSNative_vpnStop___int(
         // touched; an install that began while this load was in flight is
         // caught here and nowhere else.
         cn1vpEnsureInstallLock();
+        // CLAIMED, not merely tested. Releasing the lock before touching the
+        // manager left the whole start outside the reservation: an install
+        // could claim it in that gap and be saving a replacement while this
+        // brought the old profile up, both reporting success. A check and an
+        // act that are not one critical section are not a guard at all.
         @synchronized (cn1vpInstallLock) {
             if (cn1vpInstalling) {
                 cn1vpAck(requestId, NO, CN1_VPN_ERR_UNKNOWN,
@@ -813,8 +830,12 @@ void com_codename1_impl_ios_IOSNative_vpnStop___int(
                         " to finish");
                 return;
             }
+            cn1vpInstalling = YES;
         }
         [[manager connection] stopVPNTunnel];
+        @synchronized (cn1vpInstallLock) {
+            cn1vpInstalling = NO;
+        }
         cn1vpAck(requestId, YES, 0, nil);
     }];
 #else

@@ -850,8 +850,23 @@ static void cn1clQueuePushed(NSString *uuid, NSString *handleWire,
     }
 }
 
+/// Whether Java has ever asked for the pending calls itself.
+///
+/// Only VoipPush.setListener does that, so it answers the question the union
+/// readiness flag cannot: is there a listener that can actually receive a
+/// pushed call. Never cleared -- a listener that registers and unregisters
+/// leaves the Java side able to hold a delivery until the next one arrives,
+/// which is not true of a process that has never had one at all.
+static BOOL cn1clPushDrainSeen = NO;
+
 static void cn1clDrain(int requestId) {
     cn1clEnsureState();
+    if (requestId >= 0) {
+        // An EXPLICIT drain: the one VoipPush asks for. The internal replay
+        // (-1) must not count, or the first pushed call would mark the
+        // process ready on its own behalf.
+        cn1clPushDrainSeen = YES;
+    }
     NSArray *batch;
     @synchronized (cn1clLock) {
         batch = [NSArray arrayWithArray:cn1clPending];
@@ -1153,7 +1168,14 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         }
     });
 
-    if (cn1clJavaReady) {
+    // Java readiness is the UNION of the two listener kinds, so an app with a
+    // Calls action listener and no VoipPush one made it true. Draining on
+    // that took the call off cn1clUnclaimed -- the TTL watchdog's list -- and
+    // handed it to a facade with no push listener, which had nothing to give
+    // it to. The explicit drain is VoipPush's own operation, so having seen
+    // one is what says a push listener exists; before that the call stays
+    // queued and stays the watchdog's.
+    if (cn1clJavaReady && cn1clPushDrainSeen) {
         // Deliberately asynchronous and OUTSIDE this handler: the report above
         // has already satisfied the deadline, and hopping to the main queue
         // keeps the one code path from ever calling into the VM while the

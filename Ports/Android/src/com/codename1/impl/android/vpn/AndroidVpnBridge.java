@@ -449,6 +449,12 @@ public class AndroidVpnBridge implements VpnBridge {
         // provisioned and the caller is left with a running tunnel that is
         // not the one it asked for, both requests having reported success --
         // or be accepted a moment before a removal deleted the profile.
+        // RESERVED, not merely tested. Reading the flag under the monitor and
+        // releasing it before the platform call left the whole start outside
+        // the reservation: an install could claim it in that gap and be
+        // provisioning a replacement while this brought the old profile up.
+        // A check and an act that are not one critical section are not a
+        // guard at all.
         synchronized (this) {
             if (operationPending) {
                 fail(requestId, VpnError.UNKNOWN,
@@ -456,6 +462,7 @@ public class AndroidVpnBridge implements VpnBridge {
                         + " to finish before starting the tunnel");
                 return;
             }
+            operationPending = true;
         }
         try {
             startRequested = true;
@@ -491,6 +498,13 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
                     describe(e));
+        } finally {
+            // Released on EVERY path, success or failure. Left set, the next
+            // install would be refused for ever as though an operation were
+            // still running.
+            synchronized (this) {
+                operationPending = false;
+            }
         }
     }
 
@@ -519,6 +533,7 @@ public class AndroidVpnBridge implements VpnBridge {
         // The same reservation, for the same reason as startVpn: stopping
         // a tunnel whose profile is being replaced acts on the one the
         // install is about to remove.
+        // Reserved through the platform call; see startVpn.
         synchronized (this) {
             if (operationPending) {
                 fail(requestId, VpnError.UNKNOWN,
@@ -526,6 +541,7 @@ public class AndroidVpnBridge implements VpnBridge {
                         + " to finish before stopping the tunnel");
                 return;
             }
+            operationPending = true;
         }
         VpnStatus before = reconciledStatus();
         boolean wasRequested = startRequested;
@@ -557,6 +573,11 @@ public class AndroidVpnBridge implements VpnBridge {
             setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
+        } finally {
+            // See startVpn: released on every path.
+            synchronized (this) {
+                operationPending = false;
+            }
         }
     }
 

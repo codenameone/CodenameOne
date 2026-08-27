@@ -1473,11 +1473,14 @@ public final class Display extends CN1Constants {
         servedImpl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
-        // Only if it is still THIS thread. An init() during the teardown has
-        // already installed a live successor, and clearing the field then
-        // would leave the display with a running EDT it no longer knows
-        // about -- isEdt() answering false on the dispatch thread itself.
-        if (!superseded) {
+        // RE-READ, not the decision cached above. disposeAll() and
+        // deinitialize() run in between, and a successor can be installed
+        // during them whenever the wait in init() timed out or was
+        // interrupted -- so the earlier answer can be stale by now. Clearing
+        // the field on that stale answer would leave the display with a
+        // running EDT it no longer knows about: isEdt() false on the dispatch
+        // thread itself, and the next init() unable to see it.
+        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
             INSTANCE.edt = null;
         }
     }
