@@ -124,9 +124,15 @@ static void cn1PickerFinish(JAVA_LONG result) {
     // which also meant the value shown when the popover opened was not the value
     // that went in.
     JAVA_LONG millis = (JAVA_LONG)llround([date timeIntervalSince1970] * 1000.0);
+    // Types 2 and 3 are TIME and DATE_AND_TIME, 5 to 7 the durations -- every
+    // type whose value carries minutes the step is meant to constrain. 3 was
+    // omitted, so a date-and-time picker configured for quarter hours took 10:07
+    // and returned it: the step was advertised and not enforced, which is the
+    // same defect this snap exists to fix for TIME.
     if (self.minuteStep > 1
-            && (self.pickerType == 2 || self.pickerType == 5
-                || self.pickerType == 6 || self.pickerType == 7)) {
+            && (self.pickerType == 2 || self.pickerType == 3
+                || self.pickerType == 5 || self.pickerType == 6
+                || self.pickerType == 7)) {
         // Snapped rather than configured: NSDatePicker has no minute-step
         // property, so the control lets the user land anywhere and the value is
         // rounded to the nearest allowed one on commit. Without this the
