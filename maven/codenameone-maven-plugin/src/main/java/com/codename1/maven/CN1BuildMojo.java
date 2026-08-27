@@ -2729,7 +2729,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             // recorded fingerprint against the compiled class is what tells those
             // apart; without it the build silently ships the older values and the
             // guard below never runs.
-            String mismatch = digestMismatch(new File(element), expectedMain, found);
+            String mismatch = digestMismatch(new File(element), expectedMain, found, classpathElements);
             if (mismatch != null) {
                 getLog().debug("cn1: ignoring build hints from " + element + " -- " + mismatch);
                 stale = mismatch;
@@ -2918,32 +2918,58 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * Why a manifest cannot have come from the class beside it, or null when it can.
      *
      * <p>Answered only when both halves are actually available: with no
-     * {@code codename1.mainName}, no class file for it in this classpath element,
+     * {@code codename1.mainName}, no class file for it ANYWHERE on the classpath,
      * or no recorded fingerprint, there is nothing to compare and the manifest is
      * taken at face value -- the same as before this check existed. It refuses
      * only on positive evidence of a mismatch.</p>
      */
-    private String digestMismatch(File element, String expectedMain, Properties manifest) {
+    private String digestMismatch(File element, String expectedMain, Properties manifest,
+                                  List<String> classpathElements) {
         String recorded = manifest.getProperty(
                 com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY);
         if (expectedMain == null || recorded == null || recorded.length() == 0) {
             return null;
         }
-        try {
-            com.codename1.maven.annotations.AnnotatedClass cls = readClass(element, expectedMain);
-            if (cls == null) {
-                return null;
+        // Beside the manifest first, then anywhere on the classpath. Looking only
+        // beside it answers "no evidence" for the layout that packages resources
+        // apart from classes, and a manifest with no evidence against it is taken
+        // at face value -- so a manifest left by a build that no longer runs the
+        // processor applied its obsolete hints, and counted as proof the processor
+        // ran, while the recompiled class sat in another element.
+        com.codename1.maven.annotations.AnnotatedClass cls = classOnClasspath(element, expectedMain);
+        if (cls == null) {
+            for (String other : classpathElements) {
+                cls = classOnClasspath(new File(other), expectedMain);
+                if (cls != null) {
+                    break;
+                }
             }
+        }
+        if (cls == null) {
+            return null;
+        }
+        try {
             String actual = com.codename1.maven.processors.BuildHintAnnotationProcessor
                     .sourceDigest(cls);
             if (recorded.equals(actual)) {
                 return null;
             }
             return "it was generated from a different set of annotations on "
-                    + expectedMain + " than the one compiled into " + element;
-        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+                    + expectedMain + " than the one compiled onto the classpath";
+        } catch (com.codename1.maven.annotations.ProcessingException ex) {
             // Unreadable is not evidence of staleness.
-            getLog().debug("cn1: could not fingerprint " + expectedMain + " in " + element, ex);
+            getLog().debug("cn1: could not fingerprint " + expectedMain, ex);
+            return null;
+        }
+    }
+
+    /** {@code expectedMain} read out of {@code element}, or null when it is not there. */
+    private com.codename1.maven.annotations.AnnotatedClass classOnClasspath(File element,
+                                                                           String expectedMain) {
+        try {
+            return readClass(element, expectedMain);
+        } catch (IOException | com.codename1.maven.annotations.ProcessingException ex) {
+            getLog().debug("cn1: could not look for " + expectedMain + " in " + element, ex);
             return null;
         }
     }

@@ -321,6 +321,50 @@ public class AnnotationBuildHintMergeTest {
         assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
     }
 
+    /// ...but only while nothing on the classpath contradicts it.
+    ///
+    /// The digest check looked for the main class beside the manifest and nowhere
+    /// else, so the resources-apart layout above answered "no evidence" -- and a
+    /// manifest left by a build that no longer runs the processor was applied
+    /// anyway, its obsolete values counting as proof that the processor ran and
+    /// suppressing the refusal below, while the recompiled class sat in another
+    /// element. The class is the same class wherever it is, so it can settle
+    /// this, and the build says the processor never ran instead of shipping the
+    /// older values.
+    @Test
+    public void aManifestApartFromItsClassIsCheckedAgainstTheClassElsewhere() throws Exception {
+        File resources = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest=" + digestOf("@Ios(teamId = \"OLD\")") + "\n"
+                + "codename1.arg.ios.teamId=OLD\n");
+        File classes = tmp.newFolder();
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        try {
+            mergeAll(target, Arrays.asList(resources, classes), "MyApp", "com.example");
+            fail("the stale apart manifest was applied despite the recompiled class");
+        } catch (InvocationTargetException ex) {
+            assertTrue(String.valueOf(ex.getCause().getMessage()),
+                    ex.getCause().getMessage().contains("left over from an earlier build"));
+        }
+        assertNull(target.getProperty("codename1.arg.ios.teamId"));
+    }
+
+    /// ...and the same layout with a digest that agrees is applied.
+    @Test
+    public void aManifestApartFromAMatchingClassIsApplied() throws Exception {
+        File resources = manifest("cn1.buildHints.mainClass=com.example.MyApp\n"
+                + "cn1.buildHints.sourceDigest="
+                + digestOf("@Ios(teamId = \"ABCDE12345\")") + "\n"
+                + "codename1.arg.ios.teamId=ABCDE12345\n");
+        File classes = tmp.newFolder();
+        writeAnnotatedClass(classes);
+
+        Properties target = new Properties();
+        mergeAll(target, Arrays.asList(resources, classes), "MyApp", "com.example");
+        assertEquals("ABCDE12345", target.getProperty("codename1.arg.ios.teamId"));
+    }
+
     /// An authoritative manifest that sets nothing still ends the search.
     ///
     /// `@Ios()` with no members is legal Java -- it is what is left after the

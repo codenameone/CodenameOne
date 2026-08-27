@@ -504,4 +504,75 @@ public class SimulatorAnnotationManifestTest {
         assertEquals("does not describe the compiled com/example/MyApp.class",
                 Simulator.staleManifestReason(found.hints, found));
     }
+
+    /**
+     * A manifest packaged apart from its class is judged against the class
+     * wherever the classpath holds it.
+     *
+     * <p>The staleness check used to look only beside the manifest, so a
+     * resource-only element answered "no evidence" and the manifest was taken at
+     * face value -- publishing an obsolete set of hints while the class it claims
+     * to describe sat recompiled in another element. That is the layout the
+     * `apart` fallback exists to support, so it cannot simply be refused; it has
+     * to be checked.</p>
+     */
+    @Test
+    public void aManifestApartFromItsClassIsJudgedAgainstTheClassElsewhere(@TempDir File tmp)
+            throws Exception {
+        File resources = new File(tmp, "resources-only");
+        File classes = new File(tmp, "classes-only");
+        manifestIn(resources, "com.example.MyApp", "MINIMAL");
+        writeClassOnly(classes);
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", "0000deadbeef"),
+                new File(resources, "META-INF/codenameone/build-hints.properties"),
+                null, "resources-only");
+        String cp = resources.getAbsolutePath() + File.pathSeparator + classes.getAbsolutePath();
+        assertEquals("does not describe the compiled com/example/MyApp.class",
+                Simulator.staleManifestReason(found.hints, found, cp));
+    }
+
+    /** ...and the same layout with a digest that agrees is current, not stale. */
+    @Test
+    public void aManifestApartFromAMatchingClassIsCurrent(@TempDir File tmp) throws Exception {
+        File resources = new File(tmp, "resources-only");
+        File classes = new File(tmp, "classes-only");
+        manifestIn(resources, "com.example.MyApp", "MINIMAL");
+        writeClassOnly(classes);
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", classBytesDigest()),
+                new File(resources, "META-INF/codenameone/build-hints.properties"),
+                null, "resources-only");
+        String cp = resources.getAbsolutePath() + File.pathSeparator + classes.getAbsolutePath();
+        assertNull(Simulator.staleManifestReason(found.hints, found, cp));
+    }
+
+    /** With the class nowhere on the classpath there is still nothing to compare. */
+    @Test
+    public void aManifestWithNoClassAnywhereIsStillTakenAtFaceValue(@TempDir File tmp)
+            throws Exception {
+        File resources = new File(tmp, "resources-only");
+        manifestIn(resources, "com.example.MyApp", "MINIMAL");
+
+        Simulator.FoundManifest found = new Simulator.FoundManifest(
+                stamped("com.example.MyApp", "0000deadbeef"),
+                new File(resources, "META-INF/codenameone/build-hints.properties"),
+                null, "resources-only");
+        assertNull(Simulator.staleManifestReason(found.hints, found,
+                resources.getAbsolutePath()));
+    }
+
+    /** The main class alone, with no manifest of its own. */
+    private static void writeClassOnly(File dir) throws Exception {
+        File cls = new File(dir, "com/example/MyApp.class");
+        assertTrue(cls.getParentFile().mkdirs());
+        FileOutputStream os = new FileOutputStream(cls);
+        try {
+            os.write(CLASS_BYTES);
+        } finally {
+            os.close();
+        }
+    }
 }

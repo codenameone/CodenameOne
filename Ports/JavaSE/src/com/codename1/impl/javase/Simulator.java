@@ -819,7 +819,7 @@ public class Simulator {
                                 // sat in a later entry. The first stale one is
                                 // kept so that finding NO current manifest still
                                 // says why.
-                                if (staleManifestReason(loaded, found) == null) {
+                                if (staleManifestReason(loaded, found, classPathStr) == null) {
                                     if (manifestIsColocated(loaded, found)) {
                                         return found;
                                     }
@@ -862,7 +862,7 @@ public class Simulator {
                             && expectedMain.equals(loaded.getProperty("cn1.buildHints.mainClass"))) {
                         FoundManifest found = new FoundManifest(loaded, null, dir,
                                 entryName + " in " + dir.getName());
-                        if (staleManifestReason(loaded, found) == null) {
+                        if (staleManifestReason(loaded, found, classPathStr) == null) {
                             if (manifestIsColocated(loaded, found)) {
                                 return found;
                             }
@@ -884,7 +884,7 @@ public class Simulator {
         if (loaded != null) {
             FoundManifest found =
                     new FoundManifest(loaded, conventional, null, conventional.toString());
-            if (staleManifestReason(loaded, found) == null) {
+            if (staleManifestReason(loaded, found, classPathStr) == null) {
                 if (manifestIsColocated(loaded, found)) {
                     return found;
                 }
@@ -971,6 +971,22 @@ public class Simulator {
      */
     static String staleManifestReason(java.util.Properties manifest,
                                       FoundManifest found) {
+        return staleManifestReason(manifest, found, null);
+    }
+
+    /**
+     * The same, also comparing against a main class packaged apart from the
+     * manifest.
+     *
+     * <p>Looking only beside the manifest answers "no evidence" for the layout
+     * that packages resources separately from classes, and a manifest with no
+     * evidence against it is accepted -- so a stale manifest in a resource-only
+     * element published last build's hints while the class it claims to describe
+     * sat, recompiled, in another element. The class is the same class wherever
+     * it is on the classpath, so compare against the first one found.</p>
+     */
+    static String staleManifestReason(java.util.Properties manifest,
+                                      FoundManifest found, String classPathStr) {
         String main = manifest.getProperty("cn1.buildHints.mainClass");
         if (main == null || main.trim().length() == 0) {
             return null;
@@ -981,6 +997,9 @@ public class Simulator {
             String actual = found.jar != null
                     ? digestOfJarEntry(found.jar, entry)
                     : digestOfFile(classFileBeside(found.file, main));
+            if (actual == null) {
+                actual = digestOfClassOnClassPath(classPathStr, main);
+            }
             if (actual != null) {
                 return recorded.equals(actual) ? null
                         : "does not describe the compiled " + entry;
@@ -1014,6 +1033,36 @@ public class Simulator {
                     main.trim().replace('.', '/') + ".class") != null;
         }
         return found.file == null || classFileBeside(found.file, main) != null;
+    }
+
+    /**
+     * The digest of {@code main}'s class file, from the first classpath element
+     * that holds it, or null when the classpath does not hold it at all.
+     */
+    private static String digestOfClassOnClassPath(String classPathStr, String main) {
+        if (classPathStr == null || main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String entry = main.trim().replace('.', '/') + ".class";
+        for (String element
+                : classPathStr.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            if (element.length() == 0) {
+                continue;
+            }
+            File f = new File(element);
+            String digest = f.isDirectory()
+                    ? digestOfFile(fileIfPresent(new File(f, entry.replace('/', File.separatorChar))))
+                    : (f.isFile() ? digestOfJarEntry(f, entry) : null);
+            if (digest != null) {
+                return digest;
+            }
+        }
+        return null;
+    }
+
+    /** {@code f} when it is a file, so a missing one digests as null. */
+    private static File fileIfPresent(File f) {
+        return f != null && f.isFile() ? f : null;
     }
 
     private static File classFileBeside(File manifestFile, String main) {
