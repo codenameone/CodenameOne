@@ -862,6 +862,22 @@ static CXHandle *cn1clHandleFromWire(NSString *wire) {
 /// duplicate is downgraded to an update instead.
 ///
 /// requestId < 0 means the push path, which has nobody waiting on an answer.
+/// Retires a PUSHED call CallKit refused, as the first-report path does.
+///
+/// A pushed call has no request id to fail, so the only way the app hears
+/// about it is the ended callback -- without which Java keeps a RINGING
+/// session for a uuid the system never accepted.
+static void cn1clRetireRefusedPush(NSString *uuidString, NSError *error) {
+    @synchronized (cn1clLock) {
+        [cn1clCalls removeObjectForKey:uuidString];
+        cn1clDropAudioLocked(uuidString);
+        [cn1clUnclaimed removeObject:uuidString];
+    }
+    com_codename1_impl_ios_IOSCallCallbacks_callEnded___java_lang_String_int(
+            getThreadLocalData(), cn1clJString(uuidString),
+            CN1_CALL_END_FAILED);
+}
+
 static void cn1clReportIncoming(int requestId, NSString *uuidString,
         NSString *handleWire, NSString *displayName, BOOL hasVideo) {
     cn1clEnsureState();
@@ -918,12 +934,39 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
         }
         reportGeneration = cn1clProviderGeneration;
     }
-    if (known) {
-        // Already ringing -- the other origin got here first.
+    if (known && requestId >= 0) {
+        // Already ringing -- the other origin got here first. Updating is
+        // enough for a JAVA-originated report: nothing in CallKit's contract
+        // obliges a second reportNewIncomingCall, and making one would draw
+        // CXErrorCodeIncomingCallErrorCallUUIDAlreadyExists for a call that
+        // is perfectly fine.
         [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
-        if (requestId >= 0 && !stillPending) {
+        if (!stillPending) {
             cn1clAck(requestId, YES, 0, nil);
         }
+        return;
+    }
+    if (known) {
+        // A PUSH for a call already live, which is a different obligation.
+        // PushKit requires that every didReceiveIncomingPushWithPayload
+        // reach reportNewIncomingCallWithUUID -- a redelivery by APNs or the
+        // server is still a push -- and a process that completes one without
+        // reporting is terminated, with repeat offences revoking VoIP
+        // delivery for the installed app. So it IS reported, and the
+        // duplicate error the report then draws is treated as the benign
+        // answer it is: the call is already up, which is what was wanted.
+        [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid
+                update:update completion:^(NSError *error) {
+            if (error != nil
+                    && error.code != CXErrorCodeIncomingCallErrorCallUUIDAlreadyExists) {
+                // Anything else means the call really is not up, and the
+                // ordinary refusal handling applies -- the same retire-the-
+                // session path a first report takes.
+                cn1clRetireRefusedPush(uuidString, error);
+                return;
+            }
+            [cn1clEnsureProvider() reportCallWithUUID:uuid updated:update];
+        }];
         return;
     }
     [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid update:update
@@ -1180,6 +1223,11 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // registration reads the token and parks itself under. Storing
         // outside it left a registration able to read nil from a token this
         // callback had already produced.
+        // Balanced: this slot owns the copy, and every rotation replaced it
+        // without releasing. Readers take a retain-autoreleased snapshot
+        // under this lock, so nothing outside holds a bare pointer to the
+        // value being dropped.
+        [cn1clVoipToken release];
         cn1clVoipToken = [hex copy];
         // CAPTURED with the batch. The deliveries below re-read the global,
         // and callUnregisterVoipPush clears it under this same lock -- so an
@@ -1188,7 +1236,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // callback produced nor the failure the unregister path intends. The
         // waiters and the value they are being told about have to come out
         // of the lock together.
-        delivered = cn1clVoipToken;
+        delivered = [[cn1clVoipToken retain] autorelease];
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
         [cn1clTokenRequests removeAllObjects];
     }
@@ -1218,6 +1266,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // this raced the read at callRegisterVoipPush with no ordering at
         // all -- two writers (this and callUnregisterVoipPush, which runs on
         // a Java thread) against one locked reader.
+        [cn1clVoipToken release];
         cn1clVoipToken = nil;
     }
     // Told, not just forgotten. Clearing the native cache alone left
@@ -1535,6 +1584,19 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
     // owns it. getAvailability() is documented as the call to make before
     // every incoming call, so leaking one observer -- and the call list it
     // retains -- per invocation is a leak that grows with use.
+    // NOT_CONFIGURED first, for the same reason the report is refused: this
+    // call exists so an app can tell the far end to stop retrying INSTEAD of
+    // finding out from a failed report, and answering AVAILABLE moments
+    // before refusing that report is the one answer that makes it useless.
+    // Android and the simulation both say so already.
+    BOOL configured;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        configured = cn1clConfigured;
+    }
+    if (!configured) {
+        return CN1_CALL_AVAIL_NOT_CONFIGURED;
+    }
     CXCallObserver *observer = [[CXCallObserver alloc] init];
     int mineLive = 0;
     BOOL foreign = NO;
@@ -2245,7 +2307,7 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
         BOOL wanted = cn1clRegistry == nil
                 || [cn1clRegistry.desiredPushTypes count] > 0;
         @synchronized (cn1clLock) {
-            known = cn1clVoipToken;
+            known = [[cn1clVoipToken retain] autorelease];
             if (known == nil && wanted) {
                 [cn1clTokenRequests addObject:
                         [NSNumber numberWithInt:(int)requestId]];
@@ -2288,6 +2350,7 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
     @synchronized (cn1clLock) {
         // The clear belongs in here with the drain, not above it: this runs
         // on a Java thread, and the token is read under this lock.
+        [cn1clVoipToken release];
         cn1clVoipToken = nil;
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
         [cn1clTokenRequests removeAllObjects];
@@ -2419,6 +2482,10 @@ void com_codename1_impl_ios_IOSNative_callSetDirectorySource___int_java_lang_Str
                 [error localizedDescription]);
         return;
     }
+    // Balanced like the token above: this slot owned every copy and kept
+    // none of the previous ones, so a caller-ID app leaked a path string on
+    // every directory refresh.
+    [cn1clDirectoryPath release];
     cn1clDirectoryPath = [[dest path] copy];
     cn1clAck(requestId, YES, 0, nil);
 #else

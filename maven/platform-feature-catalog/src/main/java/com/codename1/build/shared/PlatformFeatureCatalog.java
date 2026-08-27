@@ -731,7 +731,13 @@ public final class PlatformFeatureCatalog {
                 // SIM's -- arrives exactly at API 26. Below it Telecom offers
                 // nothing to degrade to, so the port reports the capability
                 // absent and an app branches on Calls.isSupported().
-                .androidMinimumSdk(26)
+                //
+                // Which is why there is NO androidMinimumSdk here. Folding 26
+                // into the generated minSdk stopped the app installing on
+                // 19-25 at all, so the very fallback this comment describes
+                // could never run -- a calling app was simply unavailable to
+                // those devices instead of degrading on them. The bridge is
+                // guarded at runtime; that is the whole mechanism.
                 .description("System call integration (CallKit, Telecom)"));
 
         // A superset of the above, and priced accordingly. The voip
@@ -742,7 +748,6 @@ public final class PlatformFeatureCatalog {
                 .iosFrameworks("CallKit", "PushKit", "AVFoundation")
                 .iosPlist("NSMicrophoneUsageDescription",
                          "Carries the audio of a call.")
-                .androidMinimumSdk(26)
                 .description("VoIP push wake-up for incoming calls"));
 
         // Deliberately NOT a superset. An app that only labels or blocks

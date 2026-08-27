@@ -74,8 +74,7 @@
 #define CN1_CALL_AVAIL_OTHER_APP 2
 #define CN1_CALL_AVAIL_NOT_PERMITTED 3
 #define CN1_CALL_AVAIL_UNSUPPORTED 4
-// 5 is NOT_CONFIGURED, which iOS never reports: the provider is built during
-// launch and needs nothing from Java.
+#define CN1_CALL_AVAIL_NOT_CONFIGURED 5
 #define CN1_CALL_AVAIL_THIS_APP 6
 
 // com.codename1.call.session.CallAudioRoute ordinals.
