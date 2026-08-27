@@ -197,11 +197,48 @@ public class MacOSBuildHintsTest {
         MacOSBuildHints both = parse(raw("macos.distribution", "both"), "p");
         assertEquals("pkg", both.getPackagingFor("appStore"));
         assertEquals("dmg", both.getPackagingFor("developerID"));
+    }
 
+    /// An explicit macos.packaging steers the Developer ID channel and is
+    /// ignored for the App Store one, which is always a pkg.
+    ///
+    /// This assertion used to read the other way, and what it pinned was a build
+    /// that reported success while producing nothing submittable: App Store
+    /// Connect takes a pkg, so a dmg or a zipped .app is rejected, and the
+    /// developer finds out by hand at upload time rather than from the build.
+    /// Same reasoning as the sandbox, which was already refused for this
+    /// channel.
+    @Test
+    public void appStorePackagingIsAlwaysPkg() {
         MacOSBuildHints pinned = parse(raw("macos.distribution", "both",
                 "macos.packaging", "dmg"), "p");
-        assertEquals("dmg", pinned.getPackagingFor("appStore"));
+        assertEquals("pkg", pinned.getPackagingFor("appStore"));
         assertEquals("dmg", pinned.getPackagingFor("developerID"));
+        assertTrue("the ignored override has to be reported, not applied silently",
+                warningMentioning(pinned, "macos.packaging=dmg"));
+
+        // An App-Store-only build with an unsubmittable packaging is the case
+        // that produced no usable artifact at all rather than one of two.
+        MacOSBuildHints storeOnly = parse(raw("macos.distribution", "appStore",
+                "macos.packaging", "app"), "p");
+        assertEquals("pkg", storeOnly.getPackagingFor("appStore"));
+        assertTrue(warningMentioning(storeOnly, "macos.packaging=app"));
+
+        // pkg and both already yield a pkg for the store, so neither is an
+        // override being refused and neither should warn.
+        MacOSBuildHints fine = parse(raw("macos.distribution", "both",
+                "macos.packaging", "both"), "p");
+        assertEquals("pkg", fine.getPackagingFor("appStore"));
+        assertFalse(warningMentioning(fine, "macos.packaging"));
+    }
+
+    private static boolean warningMentioning(MacOSBuildHints hints, String needle) {
+        for (String w : hints.getWarnings()) {
+            if (w.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The store requires the sandbox; a directly distributed build usually does

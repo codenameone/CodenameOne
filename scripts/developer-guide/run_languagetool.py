@@ -477,6 +477,48 @@ def is_accepted(flagged_text, accept_re, surrounding_after=""):
 LANGUAGETOOL_VERSION = os.environ.get("LANGUAGETOOL_VERSION", "6.6")
 
 
+def _pin_engine_directory(language_tool_python):
+    """Make LANGUAGETOOL_VERSION the engine that actually runs.
+
+    language_tool_download_version only decides what gets DOWNLOADED. Which
+    install then starts is decided by get_language_tool_directory(), and that
+    returns max() over every LanguageTool-* directory in the cache -- the
+    lexicographically greatest, with no reference to the version that was
+    asked for. So on a developer machine that has ever pulled a newer engine
+    (a 6.9 snapshot, say) the pin is silently ignored and the local run
+    disagrees with CI, whose cache is empty and therefore happens to hold only
+    the pinned version. That is precisely the failure this pin exists to
+    prevent, so it is not enough to ask nicely.
+
+    LTP_JAR_DIR_PATH is consulted ahead of that max(), so pointing it at the
+    pinned directory is what makes the pin bind. Set after the download call,
+    because download_lt() returns early when it is already set.
+    """
+    try:
+        from language_tool_python import download_lt
+        from language_tool_python import utils
+    except ImportError:
+        return
+    if os.environ.get("LTP_JAR_DIR_PATH"):
+        # Someone is deliberately pointing at their own build; leave it alone.
+        return
+    try:
+        download_lt.download_lt(LANGUAGETOOL_VERSION)
+        pinned = os.path.join(utils.get_language_tool_download_path(),
+                              "LanguageTool-" + LANGUAGETOOL_VERSION)
+    except Exception as exc:
+        print("could not pin the LanguageTool engine: %s" % exc, file=sys.stderr)
+        return
+    if os.path.isdir(pinned):
+        os.environ["LTP_JAR_DIR_PATH"] = pinned
+    else:
+        print(
+            "LanguageTool %s is not in the cache after download; running against "
+            "whatever the library picks." % LANGUAGETOOL_VERSION,
+            file=sys.stderr,
+        )
+
+
 def run_languagetool(text, language="en-US", accept_re=None):
     try:
         import language_tool_python
@@ -487,6 +529,7 @@ def run_languagetool(text, language="en-US", accept_re=None):
         )
         return None
 
+    _pin_engine_directory(language_tool_python)
     try:
         tool = language_tool_python.LanguageTool(
             language, language_tool_download_version=LANGUAGETOOL_VERSION

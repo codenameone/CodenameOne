@@ -13088,6 +13088,77 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN
 #endif
 }
 
+#if TARGET_OS_OSX
+/// A print view that paginates a PDF instead of flattening it.
+///
+/// AppKit prints a view, not a file, and the obvious way to print a PDF -- put
+/// it in an NSImageView -- prints exactly one page, because an NSPDFImageRep
+/// draws whichever page currentPage names and that starts at the first. The
+/// document is not rejected and no error is raised; the job simply comes out
+/// short, and reports success.
+///
+/// So the pagination is declared to AppKit instead: knowsPageRange: says how
+/// many pages there are, rectForPage: selects the one being printed and returns
+/// its size, and drawRect: draws whatever page rectForPage: last selected --
+/// which is the order AppKit calls them in. Pages are numbered from 1 by the
+/// print system and from 0 by NSPDFImageRep, which is the off-by-one to watch.
+///
+/// Not flipped: PDF user space has its origin at the bottom left and so does an
+/// unflipped NSView, so leaving the default means the rep needs no transform.
+@interface CN1MacPDFPrintView : NSView {
+    NSPDFImageRep* _cn1Pdf;
+}
+- (instancetype)initWithPDF:(NSPDFImageRep*)pdf;
+@end
+
+@implementation CN1MacPDFPrintView
+
+- (instancetype)initWithPDF:(NSPDFImageRep*)pdf {
+    // Sized to the first page so the view has a sensible frame before the print
+    // system asks; rectForPage: resizes it per page, which is what lets a
+    // document with mixed page sizes print correctly rather than being scaled
+    // to whatever the first page happened to be.
+    [pdf setCurrentPage:0];
+    NSRect first = [pdf bounds];
+    self = [super initWithFrame:NSMakeRect(0, 0, first.size.width, first.size.height)];
+    if (self != nil) {
+#ifdef CN1_USE_ARC
+        _cn1Pdf = pdf;
+#else
+        _cn1Pdf = [pdf retain];
+#endif
+    }
+    return self;
+}
+
+- (BOOL)knowsPageRange:(NSRangePointer)range {
+    range->location = 1;
+    range->length = (NSUInteger)[_cn1Pdf pageCount];
+    return YES;
+}
+
+- (NSRect)rectForPage:(NSInteger)page {
+    [_cn1Pdf setCurrentPage:page - 1];
+    NSRect b = [_cn1Pdf bounds];
+    NSRect frame = NSMakeRect(0, 0, b.size.width, b.size.height);
+    [self setFrame:frame];
+    return frame;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+    [_cn1Pdf drawInRect:[self bounds]];
+}
+
+#ifndef CN1_USE_ARC
+- (void)dealloc {
+    [_cn1Pdf release];
+    [super dealloc];
+}
+#endif
+
+@end
+#endif
+
 // Prints the file at path through UIPrintInteractionController and reports
 // the outcome to IOSImplementation.printDocumentCallback using the supplied
 // callbackId. Status codes mirror com.codename1.printing.PrintResult:
@@ -13100,21 +13171,48 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
         POOL_BEGIN();
         NSString* ns = fixFilePath(filePath);
         struct ThreadLocalData* threadStateData = getThreadLocalData();
-        // AppKit prints a view rather than a URL, so the document is loaded into
-        // an image -- NSImage reads PDF as well as the raster formats, which
-        // covers what UIPrintInteractionController would accept.
-        NSImage* doc = [[NSFileManager defaultManager] fileExistsAtPath:ns]
-            ? [[NSImage alloc] initWithContentsOfFile:ns]
-            : nil;
-        if (doc == nil) {
+        BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:ns];
+        // A PDF is printed page by page, never as an image. NSImage wraps a PDF
+        // in an NSPDFImageRep whose currentPage defaults to the first, and
+        // drawing it draws THAT page -- so a multi-page document printed one
+        // page and the operation still reported COMPLETED. The remaining pages
+        // were not refused, they were silently dropped, which is the failure
+        // nobody notices until the paper is in their hand.
+        NSPDFImageRep* pdf = nil;
+        if (exists) {
+            NSData* data = [NSData dataWithContentsOfFile:ns];
+            if (data != nil) {
+                pdf = [[NSPDFImageRep alloc] initWithData:data];
+            }
+        }
+        // Sniffed from the bytes rather than trusted from the extension or the
+        // mime type, both of which the caller supplies and neither of which has
+        // to be right.
+        NSView* view = nil;
+        if (pdf != nil && pdf.pageCount > 0) {
+            view = [[CN1MacPDFPrintView alloc] initWithPDF:pdf];
+        } else {
+            NSImage* doc = exists ? [[NSImage alloc] initWithContentsOfFile:ns] : nil;
+            if (doc != nil) {
+                NSImageView* iv = [[NSImageView alloc]
+                        initWithFrame:NSMakeRect(0, 0, doc.size.width, doc.size.height)];
+                iv.image = doc;
+                iv.imageScaling = NSImageScaleProportionallyUpOrDown;
+                view = iv;
+#ifndef CN1_USE_ARC
+                [doc release];
+#endif
+            }
+        }
+#ifndef CN1_USE_ARC
+        [pdf release];
+#endif
+        if (view == nil) {
             JAVA_OBJECT jErrMsg = fromNSString(threadStateData, @"The document cannot be printed");
             com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(threadStateData, (JAVA_INT)cbId, 3, jErrMsg);
             POOL_END();
             return;
         }
-        NSImageView* view = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, doc.size.width, doc.size.height)];
-        view.image = doc;
-        view.imageScaling = NSImageScaleProportionallyUpOrDown;
         NSPrintInfo* info = [NSPrintInfo sharedPrintInfo];
         info.jobDisposition = NSPrintSpoolJob;
         NSPrintOperation* op = [NSPrintOperation printOperationWithView:view printInfo:info];
@@ -13125,7 +13223,6 @@ void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang
         com_codename1_impl_ios_IOSImplementation_printDocumentCallback___int_int_java_lang_String(threadStateData, (JAVA_INT)cbId, completed ? 1 : 2, JAVA_NULL);
 #ifndef CN1_USE_ARC
         [view release];
-        [doc release];
 #endif
         POOL_END();
     });

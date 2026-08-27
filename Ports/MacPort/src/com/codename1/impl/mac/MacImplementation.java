@@ -71,6 +71,24 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// False, because nothing on this port can ever deliver it. The capability
+    /// is a promise that `Lifecycle.onReceivedSharedContent()` will be called,
+    /// and the single producer of that callback is the share-extension handler
+    /// in `CodenameOne_GLAppDelegate.m` -- a UIKit source this build excludes,
+    /// fed by an app extension the macOS builder deliberately does not generate.
+    /// The AppKit URL handler is not a substitute: it delivers through `AppArg`
+    /// and the `URLCallback` interface, which is a different API.
+    ///
+    /// Inheriting the iOS answer meant an application that gates its sharing UI
+    /// on this waited for a callback that had no way to arrive -- worse than a
+    /// missing feature, because it looks like one that is merely slow.
+    @Override
+    public boolean isReceiveSharedContentSupported() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
     /// False until there is an AppKit capture path. The inherited answer is an
     /// unconditional true, but capturePhoto() and captureVideo() are inherited
     /// from the iOS port and cannot work here: the macOS builder never sets

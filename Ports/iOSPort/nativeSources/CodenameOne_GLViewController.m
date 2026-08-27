@@ -6208,13 +6208,23 @@ extern SKPayment *paymentInstance;
 #endif
 
 
+// One complete arm per platform, rather than a shared body with the signature
+// switched above it. Written as a nested #if it emitted, on tvOS, the opening
+// brace of the id-typed signature and then skipped the body AND its closing
+// brace -- which live in the #else -- so every method after this one parsed
+// inside it and the first of them failed with "use of undeclared identifier".
+// The macOS arm was the same mistake mirrored: it dropped the signature and
+// kept the lone closing brace, which is unnoticed only because the mac build
+// excludes this file altogether.
 #if TARGET_OS_TV
+// tvOS has no UIPopoverController, so the delegate exists to satisfy the
+// protocol and there is never a popover for it to report dismissed.
 - (void) popoverControllerDidDismissPopover:(id) popoverController {
-#else
+}
+#elif !TARGET_OS_OSX
 // UIKit-only declaration: the type in its signature does not exist on macOS,
 // so the whole declaration is dropped rather than just its body. Guarding
 // only the body would leave a signature naming an unknown type.
-#if !TARGET_OS_OSX
 - (void) popoverControllerDidDismissPopover:(UIPopoverController *) popoverController {
 // UIKit-only helper. AppKit's equivalent is a different API rather than a
 // renamed one, so this is inert on the native macOS port until it is ported.
@@ -6237,7 +6247,6 @@ extern SKPayment *paymentInstance;
         popoverControllerInstance = nil;
         galleryPopover = NO;
     }
-#endif
 }
 #endif
 

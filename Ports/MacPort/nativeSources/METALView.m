@@ -1001,12 +1001,26 @@ static int CN1MacKeyCode(NSEvent *event) {
     session.markedRange = marked.length > 0
         ? NSMakeRange(range.location, marked.length)
         : NSMakeRange(NSNotFound, 0);
-    session.selectedRange = NSMakeRange(range.location + selectedRange.location,
-                                        selectedRange.length);
+    // Clamped to what was ACCEPTED, not to what the input method proposed. The
+    // two differ whenever the field's maxSize truncated the marked run: the IME
+    // reports a caret inside the composition it offered, so accepting one unit
+    // of a two-unit composition with the caret at offset 2 would put
+    // selectedRange past the end of the document. Every later replacement-range
+    // check and text-input query is validated against the document length, so
+    // they all start failing and the field stops accepting input.
+    NSUInteger selStart = selectedRange.location;
+    if (selStart > marked.length) {
+        selStart = marked.length;
+    }
+    NSUInteger selLength = selectedRange.length;
+    if (selStart + selLength > marked.length) {
+        selLength = marked.length - selStart;
+    }
+    session.selectedRange = NSMakeRange(range.location + selStart, selLength);
     // The composing run, so the pure editor can render it as uncommitted. The
     // replacement above already told it what changed; this says the change is
-    // still being composed.
-    CN1MacTextInputNotifyComposing(marked, (NSInteger)selectedRange.location);
+    // still being composed. The clamped caret, for the same reason.
+    CN1MacTextInputNotifyComposing(marked, (NSInteger)selStart);
     [session commitFinished:NO];
 }
 

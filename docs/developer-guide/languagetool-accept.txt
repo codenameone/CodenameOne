@@ -688,3 +688,9 @@ Bonjour
 # The Apple verb for signing a build. Not "code signing" here: this is the
 # spelling in the error an unavailable entitlement produces.
 codesigning
+# The usual short form of "interoperability" in this context -- the security
+# chapter is describing a mode kept for talking to legacy systems.
+interop
+# In wide technical use for "performs well", and the word the comparison prose
+# actually wants -- "performs well" does not fit the adjective position.
+performant
