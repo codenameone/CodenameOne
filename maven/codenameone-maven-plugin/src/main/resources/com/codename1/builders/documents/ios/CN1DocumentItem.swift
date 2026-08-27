@@ -46,7 +46,7 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
          revision: String = "") {
         self.node = node
         self.parentId = parentId
-        self.identifier = identifier ?? NSFileProviderItemIdentifier(node.id)
+        self.identifier = identifier ?? CN1DocumentIndex.identifier(for: node.id)
         self.containerURL = containerURL
         self.revision = revision
     }

@@ -58,7 +58,7 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
                 let parent: NSFileProviderItemIdentifier =
                     (parentId == nil || parentId == index.rootId)
                         ? .rootContainer
-                        : NSFileProviderItemIdentifier(parentId!)
+                        : CN1DocumentIndex.identifier(for: parentId!)
                 return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
                                        revision: index.revision)
             }
@@ -66,14 +66,14 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
             observer.finishEnumerating(upTo: nil)
             return
         }
-        let resolved = CN1DocumentEnumerator.resolve(containerId, in: index)
-        guard let children = index.childIds[resolved] else {
+        guard let resolved = CN1DocumentEnumerator.resolve(containerId, in: index),
+              let children = index.childIds[resolved] else {
             observer.finishEnumerating(upTo: nil)
             return
         }
         let parent: NSFileProviderItemIdentifier = resolved == index.rootId
             ? .rootContainer
-            : NSFileProviderItemIdentifier(resolved)
+            : CN1DocumentIndex.identifier(for: resolved)
         let items = children.compactMap { id -> CN1DocumentItem? in
             guard let node = index.nodes[id] else { return nil }
             return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
@@ -97,7 +97,11 @@ final class CN1DocumentEnumerator: NSObject, NSFileProviderEnumerator {
 
     /// Maps the browser's root token onto whatever id the app gave its root node.
     static func resolve(_ identifier: NSFileProviderItemIdentifier,
-                        in index: CN1DocumentIndex) -> String {
-        identifier == .rootContainer ? index.rootId : identifier.rawValue
+                        in index: CN1DocumentIndex) -> String? {
+        if identifier == .rootContainer {
+            return index.rootId
+        }
+        // Anything that is not one of ours is a system token, not a node.
+        return CN1DocumentIndex.nodeId(for: identifier)
     }
 }

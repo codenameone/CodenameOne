@@ -33,6 +33,8 @@ import com.codename1.impl.android.AndroidNativeUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /// The Android implementation of the document provider SPI.
 ///
@@ -62,17 +64,42 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         return dir.getAbsolutePath();
     }
 
+    /// Folder ids that existed before the last publish or clear.
+    ///
+    /// A folder cursor is registered against its own child-documents URI, and notifying the roots
+    /// URI does not reach it. Notifying only the folders in the NEW index therefore leaves an open
+    /// picker sitting on a folder the publish removed -- it keeps its rows until it happens to
+    /// requery. These are remembered across the write so the notification can cover what left as
+    /// well as what arrived.
+    private final List<String> staleFolderIds = new ArrayList<String>();
+
     @Override
     public void publishIndex(String indexJson) {
         Context ctx = context();
         if (ctx == null || indexJson == null) {
             return;
         }
+        rememberFolders(ctx);
         try {
             CN1DocumentStore.writeAtomically(CN1DocumentStore.indexFile(ctx),
                     indexJson.getBytes("UTF-8"));
         } catch (IOException err) {
             Log.e(TAG, "Could not publish the document index", err);
+        }
+    }
+
+    /// Records the folders of the index that is about to be replaced or deleted.
+    private void rememberFolders(Context ctx) {
+        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
+        if (index == null) {
+            return;
+        }
+        synchronized (staleFolderIds) {
+            for (CN1DocumentStore.Node node : index.nodes.values()) {
+                if (node.folder && !staleFolderIds.contains(node.id)) {
+                    staleFolderIds.add(node.id);
+                }
+            }
         }
     }
 
@@ -107,14 +134,21 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         // Deliberately not inside a catch(Throwable): the generic iteration below compiles to a
         // checkcast, and ParparVM does not throw for a failed cast -- a handler wrapping this
         // would be one the device can never run. Each notify guards itself instead.
-        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
-        if (index == null) {
-            return;
+        List<String> folders = new ArrayList<String>();
+        synchronized (staleFolderIds) {
+            folders.addAll(staleFolderIds);
+            staleFolderIds.clear();
         }
-        for (CN1DocumentStore.Node node : index.nodes.values()) {
-            if (node.folder) {
-                notify(resolver, DocumentsContract.buildChildDocumentsUri(authority, node.id));
+        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(ctx);
+        if (index != null) {
+            for (CN1DocumentStore.Node node : index.nodes.values()) {
+                if (node.folder && !folders.contains(node.id)) {
+                    folders.add(node.id);
+                }
             }
+        }
+        for (int i = 0; i < folders.size(); i++) {
+            notify(resolver, DocumentsContract.buildChildDocumentsUri(authority, folders.get(i)));
         }
     }
 
@@ -133,6 +167,9 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (ctx == null) {
             return;
         }
+        // Remembered before the tree goes, or the folders that just disappeared could not be
+        // named afterwards and an open picker would keep showing them.
+        rememberFolders(ctx);
         CN1DocumentStore.deleteTree(CN1DocumentStore.baseDir(ctx));
         signalChange();
     }

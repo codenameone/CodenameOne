@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import FileProvider
 import Foundation
 import UniformTypeIdentifiers
 
@@ -76,6 +77,29 @@ final class CN1DocumentIndex {
 
     /// Reads the index the app last published into the shared container. Returns nil when the app
     /// has published nothing yet, which is an empty file browser rather than an error.
+    /// Prefix carried by every identifier this provider hands the system.
+    ///
+    /// `DocumentNode` places no restriction on ids, so without a namespace an app id equal to a
+    /// File Provider token -- `NSFileProviderItemIdentifier.rootContainer.rawValue`, or the
+    /// working-set one -- is indistinguishable from the token itself: the node is listed, and
+    /// every later request for it is answered by the root or swallowed by the working-set
+    /// enumeration. Prefixing makes the two spaces disjoint by construction rather than by a
+    /// rule the publisher has to remember.
+    private static let identifierPrefix = "cn1:"
+
+    /// The identifier the system should use for a published node.
+    static func identifier(for nodeId: String) -> NSFileProviderItemIdentifier {
+        NSFileProviderItemIdentifier(identifierPrefix + nodeId)
+    }
+
+    /// The published node an identifier refers to, or nil when it is a system token.
+    static func nodeId(for identifier: NSFileProviderItemIdentifier) -> String? {
+        guard identifier.rawValue.hasPrefix(identifierPrefix) else {
+            return nil
+        }
+        return String(identifier.rawValue.dropFirst(identifierPrefix.count))
+    }
+
     /// The directory published `path` values are relative to.
     static func filesDirectory(containerURL: URL) -> URL {
         containerURL.appendingPathComponent("cn1documents/files", isDirectory: true)

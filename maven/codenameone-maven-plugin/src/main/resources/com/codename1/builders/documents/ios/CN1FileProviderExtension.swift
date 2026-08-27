@@ -51,8 +51,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        let resolved = CN1DocumentEnumerator.resolve(identifier, in: index)
-        guard let node = index.nodes[resolved] else {
+        guard let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved] else {
             completionHandler(nil, NSFileProviderError(.noSuchItem))
             progress.completedUnitCount = 1
             return progress
@@ -61,7 +61,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         if resolved == index.rootId {
             parent = .rootContainer
         } else if let parentId = index.parents[resolved], parentId != index.rootId {
-            parent = NSFileProviderItemIdentifier(parentId)
+            parent = CN1DocumentIndex.identifier(for: parentId)
         } else {
             parent = .rootContainer
         }
@@ -86,8 +86,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        let resolved = CN1DocumentEnumerator.resolve(itemIdentifier, in: index)
-        guard let node = index.nodes[resolved], !node.folder else {
+        guard let resolved = CN1DocumentEnumerator.resolve(itemIdentifier, in: index),
+              let node = index.nodes[resolved], !node.folder else {
             completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
             progress.completedUnitCount = 1
             return progress
@@ -95,7 +95,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         let parentId = index.parents[resolved]
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
-            : NSFileProviderItemIdentifier(parentId!)
+            : CN1DocumentIndex.identifier(for: parentId!)
         let item = CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
                                    revision: index.revision)
 

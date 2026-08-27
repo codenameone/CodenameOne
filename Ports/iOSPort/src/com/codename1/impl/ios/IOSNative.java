@@ -1364,6 +1364,19 @@ public final class IOSNative {
     /** True when this build linked the document provider natives and the app group resolves. */
     native boolean documentProviderSupported();
 
+    /**
+     * Atomically replaces {@code target} with {@code source}, both absolute paths.
+     *
+     * <p>The published index is read by the extension, which is a different process: a delete
+     * followed by a rename leaves a window in which there is no index at all, and an enumeration
+     * landing there reports an empty tree. No lock in this process can close that window. POSIX
+     * rename replaces in one step -- the old file stays visible until the new one takes its
+     * name -- and a failure leaves the previous publication intact rather than destroyed.</p>
+     *
+     * @return true when the replacement happened
+     */
+    native boolean documentsReplaceFile(String source, String target);
+
     // --- App intents (Core Spotlight + App Intents) -------------------------
     // Backs com.codename1.intents. Two frameworks with different floors sit behind these:
     // Core Spotlight is Objective-C and available well below this port's minimum, while App

@@ -72,6 +72,14 @@ public final class DocumentIndexSerializer {
             throw new IllegalArgumentException("Two document nodes share the id \"" + duplicate
                     + "\". Ids must be unique across the whole published tree.");
         }
+        if (!root.isFolder()) {
+            // Both platforms expect the provider's root to be a directory: Android publishes it
+            // as the root document id and would then report a non-directory MIME type for it,
+            // and Apple's .rootContainer would carry no content-enumeration capability. The
+            // location exists in both cases and cannot be browsed.
+            throw new IllegalArgumentException("The published root must be a folder; \""
+                    + root.getId() + "\" is a file.");
+        }
         validate(root);
         Map<String, Object> doc = new LinkedHashMap<String, Object>();
         doc.put("v", Integer.valueOf(VERSION));
@@ -104,33 +112,26 @@ public final class DocumentIndexSerializer {
         return fromMap((Map) root);
     }
 
-    /// Identifiers the Apple file provider reserves for containers of its own. A node carrying
-    /// one is listed and then unreachable: every later request for it resolves to the published
-    /// root, or is answered by the working-set enumeration instead.
-    private static final String[] RESERVED_IDS = {
-        "NSFileProviderRootContainerItemIdentifier",
-        "NSFileProviderWorkingSetContainerItemIdentifier",
-        "NSFileProviderTrashContainerItemIdentifier",
-    };
-
     /// Refuses a tree the platform readers cannot serve faithfully.
     ///
-    /// Both rules exist because `DocumentNode` accepts any non-empty id and any name, and the
-    /// consequences only appear on a device: a reserved id resolves to the wrong item, and a name
-    /// carrying a separator becomes several path components in the pre-iOS-16 provider, whose
-    /// identifier round-trip then reads the wrong directory and cannot open the file at all.
+    /// The rule is about the name the readers actually use, which is not always the name that was
+    /// set: `CN1DocumentItem.filename` falls back to the node id when no name was given, and the
+    /// pre-iOS-16 provider builds a storage URL from it. A separator in either therefore becomes
+    /// several path components, and that provider's identifier round-trip then reads the wrong
+    /// directory and cannot open the file at all. "." and ".." are refused for the same reason.
+    ///
+    /// Reserved File Provider identifiers need no rule here: ids are namespaced before they
+    /// become NSFileProviderItemIdentifiers, so an app id can no longer collide with a system
+    /// token whatever it says.
     private static void validate(DocumentNode node) {
-        for (int i = 0; i < RESERVED_IDS.length; i++) {
-            if (RESERVED_IDS[i].equals(node.getId())) {
-                throw new IllegalArgumentException("\"" + node.getId() + "\" is reserved by the "
-                        + "platform file provider and cannot be used as a document id.");
-            }
+        String effective = node.getName() != null ? node.getName() : node.getId();
+        if (effective.indexOf('/') >= 0 || effective.indexOf('\\') >= 0) {
+            throw new IllegalArgumentException("\"" + effective + "\" contains a path separator. "
+                    + "A document is shown under a single file name; put the structure in folders "
+                    + "instead.");
         }
-        String name = node.getName();
-        if (name != null && (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0)) {
-            throw new IllegalArgumentException("The document name \"" + name + "\" contains a path "
-                    + "separator. Names are shown as a single file name; put the structure in "
-                    + "folders instead.");
+        if (".".equals(effective) || "..".equals(effective)) {
+            throw new IllegalArgumentException("\"" + effective + "\" is not a usable file name.");
         }
         for (DocumentNode child : node.getChildren()) {
             validate(child);

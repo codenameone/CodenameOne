@@ -47,14 +47,14 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         guard let index = index() else {
             throw NSFileProviderError(.noSuchItem)
         }
-        let resolved = CN1DocumentEnumerator.resolve(identifier, in: index)
-        guard let node = index.nodes[resolved] else {
+        guard let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved] else {
             throw NSFileProviderError(.noSuchItem)
         }
         let parentId = index.parents[resolved]
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
-            : NSFileProviderItemIdentifier(parentId!)
+            : CN1DocumentIndex.identifier(for: parentId!)
         // The root answers to .rootContainer, never to the app's own id for it.
         let identifier: NSFileProviderItemIdentifier? =
             resolved == index.rootId ? .rootContainer : nil
@@ -74,10 +74,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // DocumentNode puts no restriction on them, so an id like "account/42" would otherwise
         // become two path components -- and persistentIdentifierForItem, which reads back a
         // single component, would return "42" and then resolve to no such item.
+        // The leaf is sanitized independently of the display name. The publisher refuses names
+        // carrying a separator, but this provider also serves whatever index is on disk, and a
+        // name like "reports/2031.pdf" here would add a directory level -- after which
+        // persistentIdentifierForItem reads "reports" instead of the encoded id and nothing can
+        // be materialized. A "../" leaf would walk out of the per-item directory entirely, and
+        // the copy and remove below would follow it.
         return storageURL
             .appendingPathComponent(CN1FileProviderClassic.encode(identifier.rawValue),
                                     isDirectory: true)
-            .appendingPathComponent(item.filename)
+            .appendingPathComponent(CN1FileProviderClassic.storageLeaf(item.filename))
     }
 
     override func persistentIdentifierForItem(at url: URL) -> NSFileProviderItemIdentifier? {
@@ -101,6 +107,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 
     static func decode(_ component: String) -> String? {
         component.removingPercentEncoding
+    }
+
+    /// Reduces a display name to something safe as a single path component.
+    static func storageLeaf(_ filename: String) -> String {
+        var leaf = filename.replacingOccurrences(of: "/", with: "_")
+        leaf = leaf.replacingOccurrences(of: "\\", with: "_")
+        if leaf.isEmpty || leaf == "." || leaf == ".." {
+            leaf = "item"
+        }
+        return leaf
     }
 
     override func providePlaceholder(at url: URL,
@@ -129,8 +145,8 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             completionHandler(NSFileProviderError(.noSuchItem))
             return
         }
-        let resolved = CN1DocumentEnumerator.resolve(identifier, in: index)
-        guard let node = index.nodes[resolved], !node.folder else {
+        guard let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved], !node.folder else {
             completionHandler(NSFileProviderError(.noSuchItem))
             return
         }

@@ -1229,7 +1229,83 @@ public class CertificateWizard extends Lifecycle {
         }
     }
 
+    /// Enables every App Group an extension in this project needs on the MAIN App ID, before any
+    /// of the app's own profiles are created.
+    ///
+    /// A provisioning profile is a snapshot of the App ID's capabilities at the moment it is
+    /// issued, and nothing in this flow reissues the app's profiles afterwards. Enabling the
+    /// group later -- which is where the per-extension setup does it, because that is where the
+    /// group is needed for the extension -- left the app's own development and App Store profiles
+    /// without com.apple.security.application-groups, while the builder puts that entitlement in
+    /// the app. The device build then cannot sign, on the path the wizard recommends.
+    private void autoSetupMainAppGroups(String bundleIdentifier, String appName, Runnable next) {
+        boolean widgets = binding != null
+                && ProjectIO.readSurfacesManifest(binding.projectDir()) != null;
+        boolean documents = binding != null && "true".equals(readSetting(binding.settings(),
+                "codename1.arg.ios.documentProvider.enabled"));
+        if (!widgets && !documents) {
+            next.run();
+            return;
+        }
+        ProjectDefaults defaults = projectDefaults();
+        // One group per extension kind, de-duplicated: a project using both usually shares one.
+        List<String> wanted = new ArrayList<String>();
+        if (widgets) {
+            addIfMissing(wanted, resolveAppGroupIdentifier(defaults));
+        }
+        if (documents) {
+            addIfMissing(wanted, resolveDocumentProviderAppGroup(defaults));
+        }
+        if (wanted.isEmpty()) {
+            next.run();
+            return;
+        }
+        showPageMessage("Enabling App Groups on " + bundleIdentifier + "...", false);
+        enableGroupsOnMainBundle(bundleIdentifier, appName, wanted, 0,
+                new ArrayList<String>(), next);
+    }
+
+    /// Creates each wanted group in turn, then enables the whole set on the main App ID at once.
+    /// Enabling replaces the capability's group list rather than adding to it, so they have to
+    /// travel together.
+    private void enableGroupsOnMainBundle(String bundleIdentifier, String appName,
+            List<String> wanted, int index, List<String> appleIds, Runnable next) {
+        if (index >= wanted.size()) {
+            SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+            if (mainBundle == null) {
+                showPageMessage("Main bundle ID could not be found after refresh.", true);
+                return;
+            }
+            service.enableAppGroupCapability(mainBundle.id(), appleIds, r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                refreshForAutoSetup(next);
+            });
+            return;
+        }
+        findOrCreateAppGroup(wanted.get(index), appName + " Shared", group -> {
+            appleIds.add(group.id());
+            refreshForAutoSetup(() -> enableGroupsOnMainBundle(bundleIdentifier, appName, wanted,
+                    index + 1, appleIds, next));
+        });
+    }
+
+    private static void addIfMissing(List<String> list, String value) {
+        if (value != null && value.length() > 0 && !list.contains(value)) {
+            list.add(value);
+        }
+    }
+
     private void autoSetupDefaultProfiles(String bundleIdentifier, String appName) {
+        // The group goes on the App ID first; everything after this issues profiles that have to
+        // carry it.
+        autoSetupMainAppGroups(bundleIdentifier, appName,
+                () -> autoSetupDefaultProfilesAfterGroups(bundleIdentifier, appName));
+    }
+
+    private void autoSetupDefaultProfilesAfterGroups(String bundleIdentifier, String appName) {
         autoSetupCertificate(bundleIdentifier, appName, PROFILE_DEVELOPMENT,
                 () -> autoSetupCertificate(bundleIdentifier, appName, PROFILE_APP_STORE,
                         () -> autoSetupMacProject(PROFILE_MAC_STORE,

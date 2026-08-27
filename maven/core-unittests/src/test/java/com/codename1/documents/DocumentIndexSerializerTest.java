@@ -165,26 +165,20 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
-    void refusesIdsTheFileProviderReserves() {
-        // A node carrying one of these is listed and then unreachable: every later request for it
-        // resolves to the published root, or is swallowed by the working-set enumeration.
-        for (String reserved : new String[] {
-                "NSFileProviderRootContainerItemIdentifier",
-                "NSFileProviderWorkingSetContainerItemIdentifier",
-                "NSFileProviderTrashContainerItemIdentifier"}) {
-            DocumentNode root = DocumentNode.folder("root", "Root");
-            root.add(DocumentNode.file(reserved, "x.txt"));
-            IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
-                    () -> DocumentIndexSerializer.serialize(root), reserved);
-            assertTrue(err.getMessage().contains("reserved"), err.getMessage());
-        }
+    void refusesAFileAsTheRoot() {
+        // Both platforms expect the provider root to be a directory: Android would publish a
+        // non-directory MIME type as the root document, and Apple's .rootContainer would carry no
+        // content-enumeration capability. The location exists and cannot be browsed.
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(DocumentNode.file("root", "a.txt")));
+        assertTrue(err.getMessage().contains("must be a folder"), err.getMessage());
     }
 
     @Test
     void refusesNamesCarryingAPathSeparator() {
-        // The pre-iOS-16 provider builds a URL from the name, so a separator becomes several path
-        // components and its identifier round-trip then reads the wrong directory -- the item is
-        // listed and cannot be opened.
+        // The pre-iOS-16 provider builds a storage URL from the name, so a separator becomes
+        // several path components and its identifier round-trip then reads the wrong directory --
+        // the item is listed and cannot be opened.
         DocumentNode root = DocumentNode.folder("root", "Root");
         root.add(DocumentNode.file("f", "reports/2031.pdf"));
         IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
@@ -195,6 +189,19 @@ class DocumentIndexSerializerTest {
         backslash.add(DocumentNode.file("g", "reports\\2031.pdf"));
         assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(backslash));
+
+        // The name the reader uses is not always the name that was set: it falls back to the id.
+        // Validating only a non-null name let file("account/42", null) through, and that is the
+        // value the classic provider would have put in the URL.
+        DocumentNode viaId = DocumentNode.folder("root", "Root");
+        viaId.add(DocumentNode.file("account/42", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(viaId));
+
+        DocumentNode dots = DocumentNode.folder("root", "Root");
+        dots.add(DocumentNode.file("d", ".."));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(dots));
     }
 
     @Test

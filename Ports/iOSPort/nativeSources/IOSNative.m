@@ -16561,10 +16561,32 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_TH
     return JAVA_FALSE;
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    if (source == JAVA_NULL || target == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *from = toNSString(CN1_THREAD_STATE_PASS_ARG source);
+    NSString *to = toNSString(CN1_THREAD_STATE_PASS_ARG target);
+    // rename(2) rather than NSFileManager: -moveItemAtPath: refuses an existing destination, and
+    // removing it first is exactly the window this exists to close. rename replaces atomically
+    // within a filesystem, which the two paths always share -- both are inside the App Group
+    // container.
+    BOOL ok = rename([from fileSystemRepresentation], [to fileSystemRepresentation]) == 0;
+    if (!ok) {
+        NSLog(@"Codename One: could not replace %@ with %@ (errno %d)", to, from, errno);
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
 #else
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_NULL;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return JAVA_FALSE;
 }
 void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 }
@@ -16586,6 +16608,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath___R_java_
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, source, target);
 }
 
 // --- App intents (Core Spotlight + App Intents) ------------------------------

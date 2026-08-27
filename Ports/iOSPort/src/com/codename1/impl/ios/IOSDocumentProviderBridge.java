@@ -223,6 +223,17 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
             String tmpName = name + "." + (tempCounter++) + ".tmp";
             String tmp = dir + "/" + tmpName;
             write(tmp, data);
+            // One step, because the reader is a different process. The lock above orders writers
+            // inside this app and can do nothing about the extension, which may enumerate at any
+            // instant: deleting the target first would leave a window with no index in it, and an
+            // enumeration landing there reports an empty tree. A failed replace also has to leave
+            // the previous publication intact rather than destroyed.
+            if (nativeInstance.documentsReplaceFile(tmp, target)) {
+                return;
+            }
+            // The native is a no-op in a build that did not link the document natives at all --
+            // the simulator, or an app that never referenced the API. Nothing is enumerating
+            // there, so the two-step fallback is safe.
             if (fs.exists(target)) {
                 fs.delete(target);
             }
