@@ -406,9 +406,11 @@ public final class DocumentIndexSerializer {
         // the two spellings are one filename on an Apple volume and two strings here.
         int i = 0;
         while (i < value.length()) {
-            // Character.codePointAt, not String.codePointAt: the iOS and CLDC runtimes carry
-            // the helper and not the instance method, and a translated app that names a method
-            // the runtime does not have fails to link rather than to compile.
+            // Character.codePointAt, not String.codePointAt: the iOS and CLDC runtimes carry the
+            // helper and not the instance method. This module is compiled twice -- by Maven
+            // against the JDK, where the instance method exists, and by the Ant build against
+            // Ports/CLDC11, where it does not -- so the first accepts what the second refuses,
+            // and the Maven tests pass over a core that cannot be built for the device.
             int c = Character.codePointAt(value, i);
             if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
                     || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
