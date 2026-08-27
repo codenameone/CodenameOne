@@ -905,6 +905,18 @@ public final class Calls {
                     // -- directly, or through the deferred safety timer --
                     // holding an active session over a call iOS had put back
                     // to ringing and Android had destroyed.
+                    if (session == null) {
+                        // The call ended while this sat on the EDT. Native
+                        // callbacks are queued rather than delivered inline,
+                        // so an answer can arrive after the end that
+                        // followed it -- and telling the app to answer a
+                        // call that is over has it accept signalling and
+                        // start answer work for nothing. The later
+                        // completeAction refusal is too late; the listener
+                        // has already run.
+                        settle(a);
+                        break;
+                    }
                     a.whenFulfilled(new StateChange(session, CallState.ACTIVE));
                     try {
                         for (CallActionListener l : ls) {

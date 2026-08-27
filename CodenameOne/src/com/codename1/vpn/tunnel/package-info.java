@@ -41,4 +41,11 @@
 /// The packet loop is [VpnTunnel] and is written once. What differs is how
 /// packets arrive, and [TunnelTransport] states that difference plainly
 /// rather than papering over it.
+///
+/// #### No port hosts this yet
+///
+/// The API and its simulation are here; the `VpnService` on Android and the
+/// Network Extension target on iOS are not. Until they land, a subclass of
+/// [VpnTunnel] runs under test and nowhere else, and nothing in a built app
+/// will call it. This note goes when the ports do.
 package com.codename1.vpn.tunnel;

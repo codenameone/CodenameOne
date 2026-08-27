@@ -191,6 +191,20 @@ public final class Vpn {
     ///
     /// The result never carries the password -- the platform keeps it. See
     /// [VpnProfile#getPassword()].
+    ///
+    /// #### On Android this is this app's RECORD, not a platform read
+    ///
+    /// `VpnManager` provisions, deletes, starts and stops; it has no call
+    /// that hands a profile back. So the description here is the one this
+    /// app kept when it installed, and it can outlive the real thing -- the
+    /// user removing the VPN in Settings, or app data restored onto a device
+    /// that never had it, both leave the record saying a profile exists.
+    ///
+    /// It corrects itself the first time the platform contradicts it: a
+    /// start or a stop that comes back "nothing is provisioned" drops the
+    /// record and moves the status to NOT_CONFIGURED. An app that must be
+    /// certain should [#start] rather than trust a description, and watch
+    /// the status. iOS reads the real configuration and has no such gap.
     public static AsyncResource<VpnProfile> load() {
         final EdtResult<VpnProfile> out = new EdtResult<VpnProfile>();
         VpnBridge b = VpnRequests.bridge();

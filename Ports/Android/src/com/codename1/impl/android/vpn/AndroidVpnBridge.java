@@ -679,10 +679,20 @@ public class AndroidVpnBridge implements VpnBridge {
         VpnStatus before = reconciledStatus();
         boolean wasRequested = startRequested;
         try {
-            startRequested = false;
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
-            setStatus(VpnStatus.DISCONNECTED);
+            // DISCONNECTING is where this STAYS. stopProvisionedVpnProfile
+            // only submits the request; Android tears the tunnel down after
+            // it returns, and traffic can still be on it. Publishing
+            // DISCONNECTED here announced an end that had not happened, and
+            // clearing startRequested first meant the transport callback --
+            // the only thing that knows when it really did -- was then
+            // ignored as somebody else's tunnel. The watcher owns the
+            // transition now, which is what it is for.
+            //
+            // startRequested is cleared by onTunnelTransport when the
+            // transport goes, or by the failure path below if the platform
+            // refuses.
             endOperation(mine);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
@@ -833,6 +843,13 @@ public class AndroidVpnBridge implements VpnBridge {
     void onTunnelTransport(boolean available) {
         if (!startRequested) {
             return;
+        }
+        if (!available) {
+            // The tunnel is actually gone, which is the point at which this
+            // app stops owning one -- whether it asked to stop or the user
+            // did it from Settings. stopVpn used to clear this itself and
+            // publish DISCONNECTED before the teardown had happened.
+            startRequested = false;
         }
         setStatus(available ? VpnStatus.CONNECTED : VpnStatus.DISCONNECTED);
     }
