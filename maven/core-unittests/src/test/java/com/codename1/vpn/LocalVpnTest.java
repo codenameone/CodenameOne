@@ -25,7 +25,9 @@ package com.codename1.vpn;
 import com.codename1.impl.vpn.LocalVpnBridge;
 import com.codename1.impl.vpn.VpnRequests;
 import com.codename1.vpn.profile.Vpn;
+import com.codename1.util.AsyncResource;
 import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnStatus;
 import com.codename1.vpn.VpnProtocol;
 import com.codename1.vpn.profile.VpnProfile;
 import com.codename1.vpn.profile.VpnStatusListener;
@@ -160,6 +162,35 @@ public class LocalVpnTest {
         back.onDemand(true);
         VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
                 Vpn.install(back));
+    }
+
+    @Test
+    public void removingDuringAStartDoesNotLeaveAConnectedTunnel() {
+        // The simulation moves state over time, which is its whole point --
+        // so a remove() landing inside a start's delay used to be OVERTAKEN
+        // by it: the profile was gone and NOT_CONFIGURED published, and the
+        // pending transition then announced CONNECTED and acknowledged
+        // success. A connected tunnel with no profile is a state no device
+        // can produce, which makes it exactly the wrong thing for a test to
+        // be able to depend on.
+        VpnAwait.value(Vpn.install(profile()));
+
+        // The start's answers are HELD so the removal can land inside its
+        // delay, which is the ordering the simulation exists to produce and
+        // the one a real tunnel takes.
+        List<Runnable> held = new ArrayList<Runnable>();
+        bridge.setDeferred(held);
+        AsyncResource<Boolean> starting = Vpn.start();
+        bridge.setDeferred(null);
+        VpnAwait.value(Vpn.remove());
+        for (Runnable r : held) {
+            r.run();
+        }
+
+        assertSame(VpnStatus.NOT_CONFIGURED, Vpn.getStatus(),
+                "the removal is the last word, not the start behind it");
+        assertNotNull(VpnAwait.errorOf(starting),
+                "a start whose profile was removed did not succeed");
     }
 
     @Test

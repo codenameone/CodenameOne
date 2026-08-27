@@ -276,14 +276,40 @@ static void cn1clDropAudioLocked(NSString *uuidString) {
 /// The block is what will run at replay time; nothing is fulfilled or failed
 /// here, because CallKit's own timeout is the only honest deadline and the
 /// app is expected to be listening within a fraction of it.
-static BOOL cn1clHoldUntilReady(void (^deliver)(void)) {
+static BOOL cn1clHoldUntilReady(CXAction *action, void (^deliver)(void)) {
     cn1clEnsureState();
     @synchronized (cn1clLock) {
         if (cn1clJavaReady) {
             return NO;
         }
-        [cn1clQueuedActions addObject:[deliver copy]];
+        // Keyed by the action so the timeout below can withdraw it. CallKit
+        // gives an action a few seconds and then rejects it; a queue that
+        // only ever grows replayed the answer, hang-up or hold minutes later,
+        // when a listener finally arrived -- acting on user intent the system
+        // had already discarded, and moving Java's session to match.
+        [cn1clQueuedActions addObject:@{
+            @"action": action == nil ? [NSNull null] : action,
+            @"deliver": [deliver copy]
+        }];
         return YES;
+    }
+}
+
+/// Drops a held action the system has given up on.
+static void cn1clWithdrawHeldAction(CXAction *action) {
+    if (action == nil) {
+        return;
+    }
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        NSMutableArray *keep = [NSMutableArray array];
+        for (NSDictionary *entry in cn1clQueuedActions) {
+            id held = [entry objectForKey:@"action"];
+            if (held != action) {
+                [keep addObject:entry];
+            }
+        }
+        [cn1clQueuedActions setArray:keep];
     }
 }
 
@@ -306,8 +332,11 @@ static void cn1clReplayQueuedActions(void) {
         held = [NSArray arrayWithArray:cn1clQueuedActions];
         [cn1clQueuedActions removeAllObjects];
     }
-    for (void (^deliver)(void) in held) {
-        deliver();
+    for (NSDictionary *entry in held) {
+        void (^deliver)(void) = [entry objectForKey:@"deliver"];
+        if (deliver != nil) {
+            deliver();
+        }
     }
 }
 
@@ -459,7 +488,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     cn1clClaim([action.callUUID UUIDString]);
     // Held when the app has no listener yet: a pushed call rings before any
     // of its code runs, and the user can answer it there and then.
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         com_codename1_impl_ios_IOSCallCallbacks_answerRequested___java_lang_String_long(
                 getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
                 cn1clTrackAction(action));
@@ -486,7 +515,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // CallSession.end() answered INVALID_ID for a call the system was still
     // showing, and availability checks misread it as somebody else's.
     // cn1clCompleteAction drops it once the action is fulfilled.
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         com_codename1_impl_ios_IOSCallCallbacks_endRequested___java_lang_String_long(
                 getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
                 cn1clTrackAction(action));
@@ -511,7 +540,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     if (!action.onHold) {
         cn1clOwnAudio([action.callUUID UUIDString]);
     }
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         com_codename1_impl_ios_IOSCallCallbacks_holdRequested___java_lang_String_boolean_long(
                 getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
                 action.onHold ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
@@ -529,7 +558,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [action fulfill];
         return;
     }
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         com_codename1_impl_ios_IOSCallCallbacks_muteRequested___java_lang_String_boolean_long(
                 getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
                 action.muted ? JAVA_TRUE : JAVA_FALSE, cn1clTrackAction(action));
@@ -542,7 +571,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
 }
 
 - (void)provider:(CXProvider *)provider performPlayDTMFCallAction:(CXPlayDTMFCallAction *)action {
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         com_codename1_impl_ios_IOSCallCallbacks_dtmfRequested___java_lang_String_java_lang_String_long(
                 getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
                 cn1clJString(action.digits), cn1clTrackAction(action));
@@ -552,6 +581,20 @@ static int64_t cn1clTrackAction(CXAction *action) {
     com_codename1_impl_ios_IOSCallCallbacks_dtmfRequested___java_lang_String_java_lang_String_long(
             getThreadLocalData(), cn1clJString([action.callUUID UUIDString]),
             cn1clJString(action.digits), cn1clTrackAction(action));
+}
+
+- (void)provider:(CXProvider *)provider timedOutPerformingAction:(CXAction *)action {
+    // CallKit has given up on this action, so whatever the user asked for is
+    // no longer something the system will carry out. A held copy replayed
+    // afterwards would act on intent that has expired -- answering a call the
+    // system has already treated as unanswered, or hanging up one the user
+    // has since been reconnected to -- and would move Java's session to match
+    // a state CallKit is not in.
+    //
+    // Nothing is fulfilled or failed here: the action is already over as far
+    // as the system is concerned, and cn1clCompleteAction ignores a token it
+    // no longer holds.
+    cn1clWithdrawHeldAction(action);
 }
 
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
@@ -577,7 +620,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // Held like the other five while the app has no listener. A start that
     // reached an empty facade was auto-fulfilled, so the call Recents or Siri
     // asked for was never placed and no session was ever created.
-    if (cn1clHoldUntilReady(^{
+    if (cn1clHoldUntilReady(action, ^{
         [self provider:provider performStartCallAction:action];
     })) {
         return;

@@ -55,6 +55,9 @@ public class LocalVpnBridge implements VpnBridge {
     private boolean userAccepts = true;
     private boolean authenticates = true;
     private String profileWire;
+
+    /// Bumped by every profile mutation; see [Transition].
+    private int profileEpoch;
     private VpnStatus status = VpnStatus.NOT_CONFIGURED;
     private boolean listening;
 
@@ -130,6 +133,8 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         this.profileWire = wire;
+        // Anything already scheduled belongs to the profile this replaces.
+        this.profileEpoch++;
         setStatus(VpnStatus.DISCONNECTED);
         ok(requestId);
     }
@@ -141,6 +146,7 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         profileWire = null;
+        profileEpoch++;
         setStatus(VpnStatus.NOT_CONFIGURED);
         ok(requestId);
     }
@@ -178,7 +184,7 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         later(CONNECT_MILLIS, new Transition(this, VpnStatus.CONNECTED));
-        later(CONNECT_MILLIS, new AckDelivery(requestId, true, 0, null));
+        later(CONNECT_MILLIS, new EpochAck(this, profileEpoch, requestId));
     }
 
     @Override
@@ -356,17 +362,61 @@ public class LocalVpnBridge implements VpnBridge {
 
     /// A deferred move to a new status. Holds the bridge deliberately -- the
     /// transition is the bridge's own state change, not a callback.
-    private static final class Transition implements Runnable {
+    /// A delayed status change that a later profile mutation can invalidate.
+    ///
+    /// The simulation's whole point is that state moves over time, so a
+    /// remove() landing during a start's delay used to be overtaken by it:
+    /// the profile was gone and NOT_CONFIGURED published, and the pending
+    /// transition then announced CONNECTED and acknowledged success. A
+    /// simulated tunnel connected to a profile that does not exist is a state
+    /// no device can produce, which makes it exactly the wrong thing to let a
+    /// test depend on.
+    /// An acknowledgement a later profile mutation turns into a failure.
+    ///
+    /// Reporting success for a start whose profile was removed mid-flight
+    /// would have the caller believe it has a tunnel; the removal is the
+    /// answer the caller actually got.
+    private static final class EpochAck implements Runnable {
         private final LocalVpnBridge bridge;
-        private final VpnStatus target;
+        private final int epoch;
+        private final int requestId;
 
-        Transition(LocalVpnBridge bridge, VpnStatus target) {
+        EpochAck(LocalVpnBridge bridge, int epoch, int requestId) {
             this.bridge = bridge;
-            this.target = target;
+            this.epoch = epoch;
+            this.requestId = requestId;
         }
 
         @Override
         public void run() {
+            if (bridge.profileEpoch != epoch) {
+                Vpn.deliverAck(requestId, false,
+                        VpnError.NOT_CONFIGURED.ordinal(),
+                        "The profile was removed while the tunnel was coming"
+                        + " up");
+                return;
+            }
+            Vpn.deliverAck(requestId, true, 0, null);
+        }
+    }
+
+    private static final class Transition implements Runnable {
+        private final LocalVpnBridge bridge;
+        private final VpnStatus target;
+        private final int epoch;
+
+        Transition(LocalVpnBridge bridge, VpnStatus target) {
+            this.bridge = bridge;
+            this.target = target;
+            this.epoch = bridge.profileEpoch;
+        }
+
+        @Override
+        public void run() {
+            if (bridge.profileEpoch != epoch) {
+                // The profile this transition belongs to is gone.
+                return;
+            }
             bridge.setStatus(target);
         }
     }
