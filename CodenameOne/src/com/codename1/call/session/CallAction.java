@@ -95,6 +95,18 @@ public final class CallAction {
             if (answered) {
                 return;
             }
+            if (safety != null) {
+                // ALREADY deferred, and one timer is enough. A second defer
+                // -- two listeners registered on the same action, or one
+                // listener calling twice -- used to build another Timer and
+                // overwrite the field, so answer() could only ever cancel the
+                // newest. The first went on running: its task fires, answers
+                // an action that is already answered, and its NON-DAEMON
+                // thread keeps a desktop JVM alive. That is precisely what
+                // cancelSafetyNet cancels the timer as well as the task to
+                // avoid, undone by the field no longer naming it.
+                return;
+            }
             safety = new Timer();
             safetyTask = new SafetyNet(this);
             try {

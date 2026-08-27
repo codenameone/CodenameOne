@@ -2110,6 +2110,16 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
                 cn1clJString(@"VoIP push was unregistered before the token"
                         @" arrived"));
     }
+    // And Java is TOLD the token is gone, exactly as the invalidation
+    // callback does. Clearing only the native copy left VoipPush.getToken()
+    // answering with the revoked token, a newly installed listener replaying
+    // it, and -- if a later registration produced the SAME value -- no
+    // tokenChanged at all, because nothing had changed as far as Java could
+    // see. An app following the documented listener flow would then never
+    // re-register with its server. The -1 settles no request, which is right:
+    // this is not an answer to anything, it is a state change.
+    com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+            getThreadLocalData(), -1, JAVA_NULL);
 #endif
 }
 

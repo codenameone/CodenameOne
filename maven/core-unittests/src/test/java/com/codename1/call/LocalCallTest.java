@@ -609,6 +609,53 @@ public class LocalCallTest {
     }
 
     @Test
+    public void deferringTwiceLeavesNoTimerThreadBehind() {
+        // Two listeners on one action both defer it -- or one defers twice --
+        // and each call used to build a Timer and overwrite the field, so
+        // answer() could cancel only the newest. The first went on running,
+        // and java.util.Timer has no daemon constructor, so its thread keeps
+        // a desktop JVM alive long after the call is over. The action being
+        // answered exactly once hides this completely at the API level; the
+        // only thing that shows it is the thread.
+        int before = liveTimerThreads();
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void endRequested(String callId, CallAction action) {
+                action.defer();
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        waitFor(seen, 1);
+        seen.get(0).fulfill();
+
+        long limit = System.currentTimeMillis() + 2000;
+        while (liveTimerThreads() > before
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(before, liveTimerThreads(),
+                "answering must leave no safety timer running");
+    }
+
+    /// Live java.util.Timer threads, which is where a leaked safety net shows.
+    private static int liveTimerThreads() {
+        int n = 0;
+        Thread[] all = new Thread[Thread.activeCount() * 2 + 16];
+        int found = Thread.enumerate(all);
+        for (int i = 0; i < found; i++) {
+            Thread t = all[i];
+            if (t != null && t.isAlive() && t.getName().startsWith("Timer-")) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    @Test
     public void aDeferredEndThatFailsKeepsTheSession() {
         // The documented behaviour of failing an end action is that the
         // system UI restores the call. Forgetting the session on dispatch
