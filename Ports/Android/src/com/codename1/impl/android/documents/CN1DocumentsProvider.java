@@ -441,6 +441,14 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             // location stops responding.
             connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
             connection.setReadTimeout(READ_TIMEOUT_MILLIS);
+            // Never from a cache. Every revision of a document is fetched from the SAME url,
+            // because a server-side revision usually keeps its key -- the assumption the whole
+            // version machinery is built on -- so a cacheable response for it stands for a
+            // document rather than for a revision of one. An app that installed an
+            // HttpResponseCache would have the old body handed back for a republished item, and
+            // the size and publication checks would accept it as the new one. The Apple readers
+            // refuse the same thing for the same reason.
+            connection.setUseCaches(false);
             if (endpoint[1] != null && endpoint[1].length() > 0) {
                 connection.setRequestProperty("Authorization", "Bearer " + endpoint[1]);
             }

@@ -195,7 +195,20 @@ enum CN1DocumentRemote {
             completion(nil, CN1DocumentRemote.noEndpoint())
             return nil
         }
-        var request = URLRequest(url: url)
+        // Never from a cache. Every revision of a document is fetched from the SAME url --
+        // "<endpoint>/fetch?id=<remoteId>" -- because a server-side revision usually keeps its
+        // key, which is the assumption the whole version machinery is built on. A cacheable
+        // response for that url therefore stands for a document, not for a revision of one: an
+        // app republishing the item with new bytes of the same length would be handed the old
+        // body by URLSession, and the size and publication checks would accept it and label it
+        // with the NEW content version -- stale content the browser then treats as current and
+        // never asks for again.
+        //
+        // Nothing is lost by refusing it. The system materializes what it fetches and only comes
+        // back when the item's version moved, so an HTTP cache underneath that answers questions
+        // nobody asked twice.
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData,
+                                 timeoutInterval: 60)
         if let token = settings.authToken, !token.isEmpty {
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         }
