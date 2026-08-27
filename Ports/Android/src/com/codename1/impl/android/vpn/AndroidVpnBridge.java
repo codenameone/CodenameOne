@@ -71,8 +71,26 @@ public class AndroidVpnBridge implements VpnBridge {
 
     private final Context context;
     private String installedWire;
+    /// The tunnel state and whether anybody is being told about it.
+    ///
+    /// Guarded by `this`, like installedWire and the reservation, because
+    /// TunnelWatcher writes them from Android's connectivity callback thread
+    /// while application code reads getStatus() and registers listeners on
+    /// another. Unguarded, getStatus() could sit at CONNECTING after the
+    /// tunnel came up, and setStatus() could miss a listener that had just
+    /// been installed and swallow the transition. Not volatile: setStatus
+    /// reads one and writes the other, which wants a single critical
+    /// section, and startRequested is volatile only because it is a lone
+    /// flag with no such pairing.
     private VpnStatus status = VpnStatus.NOT_CONFIGURED;
     private boolean listening;
+
+    /// Whether a listener is being fed. Guarded like the field it reads.
+    private boolean isListening() {
+        synchronized (this) {
+            return listening;
+        }
+    }
     private ConnectivityManager.NetworkCallback networkCallback;
 
     /// Guards the watcher registration. Its own monitor rather than the
@@ -157,10 +175,13 @@ public class AndroidVpnBridge implements VpnBridge {
     /// because Android gives an app no way to tell its own tunnel from
     /// another app's -- the reason onTunnelTransport is gated the way it is.
     private VpnStatus reconciledStatus() {
-        if (status == VpnStatus.NOT_CONFIGURED && storedWire() != null) {
-            status = VpnStatus.DISCONNECTED;
+        synchronized (this) {
+            // storedWire() takes this same monitor; it is reentrant.
+            if (status == VpnStatus.NOT_CONFIGURED && storedWire() != null) {
+                status = VpnStatus.DISCONNECTED;
+            }
+            return status;
         }
-        return status;
     }
 
     @Override
@@ -414,7 +435,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // configuration still existed after the removal it had just
             // reported as successful.
             startRequested = false;
-            if (!listening) {
+            if (!isListening()) {
                 stopWatchingTheTunnel();
             }
             setStatus(VpnStatus.NOT_CONFIGURED);
@@ -676,7 +697,9 @@ public class AndroidVpnBridge implements VpnBridge {
 
     @Override
     public void setStatusListening(boolean value) {
-        this.listening = value;
+        synchronized (this) {
+            this.listening = value;
+        }
         if (value) {
             // Before the first callback, so the baseline a new listener sees
             // is the profile Android actually holds.
@@ -796,8 +819,14 @@ public class AndroidVpnBridge implements VpnBridge {
     }
 
     void setStatus(VpnStatus s) {
-        this.status = s;
-        if (listening) {
+        boolean notify;
+        synchronized (this) {
+            this.status = s;
+            notify = listening;
+        }
+        if (notify) {
+            // OUTSIDE the monitor: the delivery reaches application code,
+            // which calls straight back in here.
             Vpn.deliverStatusChanged(s.ordinal());
         }
     }

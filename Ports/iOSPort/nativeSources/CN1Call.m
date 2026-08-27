@@ -975,14 +975,21 @@ static BOOL cn1clPushDrainSeen = NO;
 
 static void cn1clDrain(int requestId) {
     cn1clEnsureState();
-    if (requestId >= 0) {
-        // An EXPLICIT drain: the one VoipPush asks for. The internal replay
-        // (-1) must not count, or the first pushed call would mark the
-        // process ready on its own behalf.
-        cn1clPushDrainSeen = YES;
-    }
     NSArray *batch;
     @synchronized (cn1clLock) {
+        if (requestId >= 0) {
+            // An EXPLICIT drain: the one VoipPush asks for. The internal
+            // replay (-1) must not count, or the first pushed call would mark
+            // the process ready on its own behalf.
+            //
+            // Written under the lock the push handler reads it through.
+            // Java sets this from the EDT and the handler runs on the main
+            // queue, so an unsynchronized write left the handler free to see
+            // the old NO, skip the only automatic drain, and leave the call
+            // queued until its TTL watchdog ended it -- with a listener
+            // installed and waiting the whole time.
+            cn1clPushDrainSeen = YES;
+        }
         batch = [NSArray arrayWithArray:cn1clPending];
         [cn1clPending removeAllObjects];
     }
@@ -1300,7 +1307,13 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     // it to. The explicit drain is VoipPush's own operation, so having seen
     // one is what says a push listener exists; before that the call stays
     // queued and stays the watchdog's.
-    if (cn1clJavaReady && cn1clPushDrainSeen) {
+    BOOL readyToDrain;
+    @synchronized (cn1clLock) {
+        // BOTH flags in one snapshot, under the lock each is written through,
+        // so this cannot read a half-updated pair.
+        readyToDrain = cn1clJavaReady && cn1clPushDrainSeen;
+    }
+    if (readyToDrain) {
         // Deliberately asynchronous and OUTSIDE this handler: the report above
         // has already satisfied the deadline, and hopping to the main queue
         // keeps the one code path from ever calling into the VM while the

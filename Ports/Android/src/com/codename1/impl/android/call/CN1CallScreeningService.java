@@ -238,6 +238,8 @@ public class CN1CallScreeningService extends CallScreeningService {
             }
             return;
         }
+        // Filled only when the prompt could not be launched; see below.
+        List<RoleResult> orphaned = new ArrayList<RoleResult>();
         try {
             Class<?> rmClass = Class.forName("android.app.role.RoleManager");
             // Every reflective result is tested with instanceof before it is
@@ -311,13 +313,33 @@ public class CN1CallScreeningService extends CallScreeningService {
                 // prompt never opened and nothing cleared the flag, so every
                 // later request was refused as BUSY for the life of the
                 // process -- the same shape the VPN consent path had.
+                //
+                // The WAITERS go too. rolePending is set inside the monitor
+                // and released before this call, so a second request can be
+                // parked in between -- and clearing only the flag left those
+                // waiting on a prompt that never opened, for ever. The outer
+                // catch fails this request; nothing else would have failed
+                // theirs. Drained under the monitor that fills the list, so
+                // one cannot be added after this has run.
                 synchronized (CN1CallScreeningService.class) {
                     rolePending = false;
+                    orphaned = new ArrayList<RoleResult>(ROLE_WAITERS);
+                    ROLE_WAITERS.clear();
                 }
                 throw launchFailed;
             }
         } catch (Exception e) {
             finish(requestId, whenDone, false);
+        }
+        // OUTSIDE the try, and not merely for tidiness: iterating a
+        // List<RoleResult> compiles to a CHECKCAST on each element, and a
+        // CHECKCAST inside a catch(Exception) is what
+        // scripts/check-cast-semantics.sh fails the build on -- ParparVM does
+        // not throw for a failed cast, so that handler would never run on
+        // iOS. Answering the waiters is not something a broad catch should be
+        // wrapped around anyway.
+        for (RoleResult w : orphaned) {
+            w.neverPrompted();
         }
     }
 
@@ -396,6 +418,11 @@ public class CN1CallScreeningService extends CallScreeningService {
             this.whenDone = whenDone;
         }
 
+        /// Answers as a request whose prompt never opened.
+        private void neverPrompted() {
+            finish(requestId, whenDone, false);
+        }
+
         /// Hands this one caller the outcome, exactly once.
         private void answer(boolean granted) {
             if (requestId >= 0) {
@@ -416,11 +443,13 @@ public class CN1CallScreeningService extends CallScreeningService {
             // First, and whatever the outcome: a declined prompt that never
             // cleared this would block every later request for the life of
             // the process.
-            RoleResult[] waiting;
+            // Copied, not toArray'd, for the reason the launch-failure path
+            // gives: the same implicit cast, kept out of both places so the
+            // pattern is uniform.
+            List<RoleResult> waiting;
             synchronized (CN1CallScreeningService.class) {
                 rolePending = false;
-                waiting = ROLE_WAITERS.toArray(
-                        new RoleResult[ROLE_WAITERS.size()]);
+                waiting = new ArrayList<RoleResult>(ROLE_WAITERS);
                 ROLE_WAITERS.clear();
             }
             enabled = resultCode == Activity.RESULT_OK;
