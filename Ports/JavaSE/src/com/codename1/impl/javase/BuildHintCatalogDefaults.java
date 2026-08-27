@@ -59,16 +59,15 @@ final class BuildHintCatalogDefaults {
         Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();
         for (Map<String, Object> h : hints) {
             String name = str(h, "name");
-            String group = str(h, "group");
-            if (name == null || group == null) {
-                continue;
-            }
-            if (handWritten.contains(name)) {
+            // The annotation's own simple name, recorded by the generator: it is
+            // not derivable from the group here, since DESKTOP is @DesktopBuild
+            // and GENERAL is @Build.
+            String annotation = str(h, "annotation");
+            if (name == null || annotation == null || handWritten.contains(name)) {
                 continue;
             }
             // Join the hand-written group when there is one, and leave its label
             // alone: it carries a description this file has no equivalent for.
-            String annotation = groupAnnotation(group);
             String existing = BuildHintSchemaDefaults.declaredGroupFor(annotation);
             if (existing != null) {
                 annotation = existing;
@@ -90,26 +89,6 @@ final class BuildHintCatalogDefaults {
         }
     }
 
-    /**
-     * ANDROID to Android, ON_DEVICE_DEBUG to OnDeviceDebug.
-     *
-     * <p>The annotation's simple name is what the editor's property key uses,
-     * and the data file records the enum constant.</p>
-     */
-    private static String groupAnnotation(String group) {
-        StringBuilder sb = new StringBuilder();
-        boolean upper = true;
-        for (int i = 0; i < group.length(); i++) {
-            char c = group.charAt(i);
-            if (c == '_') {
-                upper = true;
-                continue;
-            }
-            sb.append(upper ? Character.toUpperCase(c) : Character.toLowerCase(c));
-            upper = false;
-        }
-        return sb.toString();
-    }
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> load() {

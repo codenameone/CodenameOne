@@ -91,6 +91,28 @@ public class BuildHintCatalogDefaultsTest {
                 "harden.rename was registered under a second group");
     }
 
+    /**
+     * The group key is the annotation's real name, not one derived from the enum.
+     *
+     * <p>DESKTOP is `@DesktopBuild` -- `@Desktop` would clash with the public
+     * com.codename1.ui.Desktop class -- and GENERAL is `@Build`. Camel-casing the
+     * enum constant produced `Desktop` and `General`, group keys that name
+     * nothing, so the editor's own idea of the annotation disagreed with the
+     * annotation a developer would have to write.</p>
+     */
+    @Test
+    public void theGroupKeyIsTheAnnotationsRealName() {
+        BuildHintSchemaDefaults.register();
+        BuildHintCatalogDefaults.register();
+
+        assertNotNull(System.getProperty("codename1.arg.{{#DesktopBuild#desktop.titleBar}}.label"));
+        assertNotNull(System.getProperty("codename1.arg.{{#Build#facebook.appId}}.label"));
+        assertNull(System.getProperty("codename1.arg.{{@Desktop}}.label"),
+                "the group key was camel-cased from the enum instead of naming @DesktopBuild");
+        assertNull(System.getProperty("codename1.arg.{{@General}}.label"),
+                "the group key was camel-cased from the enum instead of naming @Build");
+    }
+
     /** A hand-written hint keeps its own description; the catalog does not restate it. */
     @Test
     public void aHandWrittenHintIsNotRegisteredTwice() {

@@ -45,12 +45,18 @@ public enum HintGroup {
     // one -- gets "reference to Desktop is ambiguous" on the annotation. A
     // compile error on the annotation that exists to give better compile errors.
     DESKTOP("DesktopBuild", "desktop."),
-    MAC_NATIVE("MacNative", "macNative."),
-    WINDOWS("Windows", "windows."),
-    LINUX("Linux", "linux."),
-    JAVASCRIPT("JavaScript", "javascript."),
-    TV_NATIVE("TvNative", "tvNative."),
-    WATCH_NATIVE("WatchNative", "watchNative."),
+    // Grouped by prefix but not annotated: there is no @MacNative and no
+    // @Windows. A name here is a CLAIM that the annotation exists -- the guide
+    // prints it as `@MacNative(attr)` and cn1:migrate-build-hints writes it into
+    // a source file -- so naming one that does not is how a hint would be
+    // migrated to an annotation nobody can compile. Add the name when the
+    // annotation is added; BuildHintAnnotationReaderTest holds the two together.
+    MAC_NATIVE(null, "macNative."),
+    WINDOWS(null, "windows."),
+    LINUX(null, "linux."),
+    JAVASCRIPT(null, "javascript."),
+    TV_NATIVE(null, "tvNative."),
+    WATCH_NATIVE(null, "watchNative."),
     HARDENING("Hardening", "harden."),
     ON_DEVICE_DEBUG("OnDeviceDebug", null),
     IOS_PRIVACY("IosPrivacy", null),
@@ -67,7 +73,7 @@ public enum HintGroup {
         this.keyPrefix = keyPrefix;
     }
 
-    /** Simple name of the annotation type, or null for {@link #NONE}. */
+    /** Simple name of the annotation type, or null when the group has none. */
     public String annotationSimpleName() {
         return annotationSimpleName;
     }

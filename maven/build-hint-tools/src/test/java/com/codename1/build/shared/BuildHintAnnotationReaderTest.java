@@ -141,6 +141,26 @@ public class BuildHintAnnotationReaderTest {
 
     /// The real annotation sources, so this tests the tree that ships rather
     /// than a fixture that resembles it.
+    /// Every group that names an annotation has one.
+    ///
+    /// The name is a CLAIM: the developer guide prints `@Name(attr)` from it and
+    /// cn1:migrate-build-hints writes that spelling into a source file. Six
+    /// groups carried the name of an annotation that was never written, so the
+    /// moment one of their hints gained an `attr` the tooling would have offered
+    /// an annotation nobody can compile.
+    @Test
+    public void everyGroupThatNamesAnAnnotationHasOne() {
+        File src = annotationSources();
+        List<String> missing = new ArrayList<String>();
+        for (HintGroup g : HintGroup.values()) {
+            String name = g.annotationSimpleName();
+            if (name != null && !new File(src, name + ".java").isFile()) {
+                missing.add(g.name() + " names @" + name + ", which does not exist");
+            }
+        }
+        assertTrue(missing.isEmpty(), String.valueOf(missing));
+    }
+
     private static File annotationSources() {
         File src = new File("../../CodenameOne/src/com/codename1/annotations/buildhints");
         assertTrue(src.isDirectory(), "annotation sources not found at " + src.getAbsolutePath());

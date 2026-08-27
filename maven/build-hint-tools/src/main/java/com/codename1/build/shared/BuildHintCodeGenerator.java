@@ -199,6 +199,10 @@ public final class BuildHintCodeGenerator {
             members.add(member("editor", BuildHints.editorWidget(h.type())));
             members.add(member("label", humanize(h.attr())));
             members.add(member("groupLabel", groupLabel(h.group())));
+            // The annotation's own simple name, because the loaders cannot derive
+            // it: DESKTOP is @DesktopBuild and GENERAL is @Build, so a loader that
+            // camel-cased the enum constant made up group keys of its own.
+            members.add(member("annotation", h.group().annotationSimpleName()));
             if (h.valuePattern() != null) {
                 members.add(member("valuePattern", h.valuePattern()));
             }
@@ -302,7 +306,9 @@ public final class BuildHintCodeGenerator {
         sb.append("//\n");
         sb.append("// The Annotation column names the compiler-checked form where one exists;\n");
         sb.append("// those hints can be written on the application's main class instead of in\n");
-        sb.append("// codenameone_settings.properties.\n\n");
+        sb.append("// codenameone_settings.properties. Their Default reads \"set by the\n");
+        sb.append("// build\": leaving the attribute out means the build decides, and the\n");
+        sb.append("// annotation deliberately does not pin down what it decides.\n\n");
         sb.append("[cols=\"2,1,1,2,4\"]\n");
         sb.append("|===\n");
         sb.append("|Name |Type |Default |Annotation |Description\n\n");
@@ -320,8 +326,14 @@ public final class BuildHintCodeGenerator {
                 sb.append("// vale-skip: Microsoft.Quotes: this is a literal default value, ")
                   .append("not prose -- the quotes belong to the value.\n");
             }
+            // An annotated hint records no default on purpose: the attribute has
+            // to mean "nothing was said" so the build server decides, and the
+            // server may change that answer. Saying so beats "(none)", which
+            // reads as "there is no default" next to a description that often
+            // states one.
             sb.append('|').append(h.def() == null || h.def().length() == 0
-                    ? "_(none)_" : "`" + cell(h.def()) + "`").append('\n');
+                    ? (h.isAnnotated() ? "_(set by the build)_" : "_(none)_")
+                    : "`" + cell(h.def()) + "`").append('\n');
             sb.append('|').append(h.isAnnotated()
                     ? "`@" + h.group().annotationSimpleName() + "(" + h.attr() + ")`"
                     : (h.isDynamic() ? "_(properties file only)_" : "_(none)_")).append('\n');

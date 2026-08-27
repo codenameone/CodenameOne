@@ -1401,7 +1401,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             List<String> blackListJars = new ArrayList<String>();
             getLog().info("Project artifacts: "+project.getArtifacts());
             // For local JavaScript builds we need codenameone-core and java-runtime classes
-            // in the staged jar — the build server normally re-supplies those, but ParparVM's
+            // in the staged jar -- the build server normally re-supplies those, but ParparVM's
             // ByteCodeTranslator runs locally here and resolves everything from the staged class
             // directory.
             boolean localJsBuild = isLocalJavascriptBuild(buildTarget);
