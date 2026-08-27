@@ -242,6 +242,38 @@ public class LocalCallTest {
     }
 
     @Test
+    public void anIgnoredSystemStartIsFailedRatherThanFulfilled() {
+        // The one action where silence does NOT mean done. Everywhere else
+        // the app was asked to do something to a call that exists, and the
+        // platform kills an action nobody answers -- so fulfilling is right.
+        // A START asks this app to PLACE a call, and only a
+        // Calls.reportOutgoing can do that. An adapter subclassed for other
+        // events does not override startCallRequested at all, so fulfilling
+        // claimed the call had been placed when nothing had happened: iOS
+        // closes the adoption window, Android leaves the connection dialing
+        // for ever, and a call from Recents or an assistant is acknowledged
+        // and never placed.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            // startCallRequested deliberately NOT overridden.
+            public void answerRequested(String callId, CallAction action) {
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        bridge.simulateStartCallRequest(id, CallHandle.phone("+14155551212"),
+                false);
+        long limit = System.currentTimeMillis() + 5000;
+        while (bridge.getLastActionFulfilled() == null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(Boolean.FALSE, bridge.getLastActionFulfilled(),
+                "an unhandled system start must fail, not report success");
+        assertTrue(seen.isEmpty());
+    }
+
+    @Test
     public void anIgnoredActionIsFulfilledRatherThanDropped() {
         // Silence has to mean "done": the platform kills a call whose action
         // goes unanswered, so a listener that does nothing must still answer.

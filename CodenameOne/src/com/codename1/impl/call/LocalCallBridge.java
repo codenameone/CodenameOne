@@ -606,8 +606,26 @@ public class LocalCallBridge implements CallBridge {
     @Override
     public void completeAction(long actionToken, boolean fulfilled) {
         // Nothing to time out against here; the simulation's purpose is to
-        // let the facade's own answer-exactly-once logic be exercised.
+        // let the facade's own answer-exactly-once logic be exercised. The
+        // outcome is recorded so a test can tell fulfilled from failed --
+        // which is the whole difference between an action the app handled and
+        // a system start it ignored.
+        synchronized (this) {
+            lastActionFulfilled = Boolean.valueOf(fulfilled);
+        }
     }
+
+    /// How the facade last answered an action, or null if it has not.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public Boolean getLastActionFulfilled() {
+        synchronized (this) {
+            return lastActionFulfilled;
+        }
+    }
+
+    /// See [#getLastActionFulfilled]. Guarded by this.
+    private Boolean lastActionFulfilled;
 
     @Override
     public void registerVoipPush(int requestId) {

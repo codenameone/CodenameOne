@@ -871,10 +871,25 @@ public final class Calls {
                             l.startCallRequested(callId, handle, video, a);
                         }
                     } finally {
-                        // A listener that throws must not leave the action
-                        // unanswered: the platform then times it out, and the
-                        // system UI and the app disagree with nothing in the log.
-                        settle(a);
+                        // FAILED when unanswered, unlike every other action.
+                        //
+                        // Elsewhere silence means "done": the app was asked to
+                        // do something to a call that exists, and the platform
+                        // kills an action nobody answers. A START is the
+                        // opposite -- the system is asking this app to PLACE a
+                        // call, and the answer is a Calls.reportOutgoing that
+                        // only the app can make. An adapter subclassed for
+                        // other events, which is the ordinary way to write
+                        // one, does not override startCallRequested at all;
+                        // fulfilling for it claimed the call had been placed
+                        // when nothing had happened. iOS then closes the
+                        // adoption window and Android leaves the connection
+                        // dialing for ever, so a call from Recents or an
+                        // assistant is acknowledged and never placed.
+                        //
+                        // Failing ends the call instead, which is what the
+                        // user sees when an app cannot take their request.
+                        settleStart(a);
                     }
                     break;
                 }
@@ -966,6 +981,14 @@ public final class Calls {
         private static void settle(CallAction a) {
             if (!a.isDeferred() && !a.isAnswered()) {
                 a.answer(true);
+            }
+        }
+
+        /// Settles a system START request, which fails when unanswered.
+        /// See the START arm for why this one is not settle().
+        private static void settleStart(CallAction a) {
+            if (!a.isDeferred() && !a.isAnswered()) {
+                a.answer(false);
             }
         }
     }

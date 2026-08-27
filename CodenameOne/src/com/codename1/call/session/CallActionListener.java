@@ -58,6 +58,13 @@ public interface CallActionListener {
     /// entry in Recents, or asked a voice assistant to call somebody through
     /// this app. No call exists yet -- report one with
     /// [Calls#reportOutgoing] using the id carried here.
+    ///
+    /// Unlike every other action here, an unanswered request is **failed**
+    /// rather than fulfilled, and the system call ends. Nothing else can
+    /// place the call, so reporting success for a request the app ignored
+    /// would leave it dialing for ever. An app that does not place calls on
+    /// the system's behalf can leave this alone; one that does must either
+    /// report the call or answer the action itself.
     void startCallRequested(String callId, CallHandle handle, boolean video,
             CallAction action);
 
