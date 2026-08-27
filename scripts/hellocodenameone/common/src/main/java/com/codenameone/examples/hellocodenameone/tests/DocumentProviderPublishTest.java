@@ -101,6 +101,10 @@ public class DocumentProviderPublishTest extends BaseTest {
             // Clearing must be safe everywhere, including when nothing was ever published.
             DocumentProvider.clear();
             DocumentProvider.clear();
+            // The device runner waits for this before moving on. A test that returns true
+            // without it never reports DONE, and the suite fails the whole port with
+            // "timeout waiting for DONE stage=created" rather than naming the test.
+            done();
             return true;
         } catch (Throwable t) {
             t.printStackTrace();
