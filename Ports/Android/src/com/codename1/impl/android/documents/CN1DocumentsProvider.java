@@ -237,16 +237,20 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("Published document " + documentId
                     + " was withdrawn while it was being fetched");
         }
-        ParcelFileDescriptor descriptor =
-                ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
-        // Unlinked once it is open. The descriptor keeps the inode alive for as long as the
-        // caller reads it, so the bytes survive while the name does not. That is what stops a
-        // download outliving the request that fetched it -- and what keeps a departed user's
-        // document out of a cache directory clear() has no reason to walk.
-        if (!cached.delete()) {
-            Log.w(TAG, "Could not delete the served download " + cached);
+        // Unlinked whether or not the descriptor is created. The open itself can fail -- a
+        // process out of file descriptors is the ordinary way -- and leaving the download behind
+        // there put a whole document in the cache per attempt, which nothing reads and nothing
+        // clears. On success the descriptor keeps the inode alive for as long as the caller
+        // reads it, so the bytes survive while the name does not: that is what stops a download
+        // outliving the request that fetched it, and what keeps a departed user's document out
+        // of a directory clear() has no reason to walk.
+        try {
+            return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+        } finally {
+            if (!cached.delete()) {
+                Log.w(TAG, "Could not delete the served download " + cached);
+            }
         }
-        return descriptor;
     }
 
     /// Whether the document still names the same remote object, at the same version, under the
