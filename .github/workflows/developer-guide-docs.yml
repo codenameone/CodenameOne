@@ -8,13 +8,19 @@ on:
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'
       - '.github/workflows/developer-guide-docs.yml'
-      # The build hint table is rendered from the catalog rather than committed,
-      # so a change to either the catalog or the renderer changes what this guide
-      # contains without touching a single file under docs/. While the table was
-      # checked in that edit showed up as a docs diff and triggered this workflow
-      # for free; generating it on the fly took that away, and a malformed table
-      # would then have merged and surfaced in the release documentation build.
+      # The build hint table is rendered rather than committed, so a change to
+      # anything it is rendered FROM changes what this guide contains without
+      # touching a single file under docs/. While the table was checked in that
+      # edit showed up as a docs diff and triggered this workflow for free;
+      # generating it on the fly took that away, and a malformed table would then
+      # have merged and surfaced in the release documentation build.
+      #
+      # All four inputs, not just the catalog: the annotations are the source of
+      # truth for the hints they expose and their prose goes straight into the
+      # Description column, and build-hint-tools is the renderer itself.
+      - 'CodenameOne/src/com/codename1/annotations/buildhints/**'
       - 'maven/build-hint-catalog/**'
+      - 'maven/build-hint-tools/**'
       - 'scripts/gen-build-hint-table.sh'
   release:
     types: [published]
@@ -49,8 +55,12 @@ jobs:
               - '.github/workflows/developer-guide-docs.yml'
               # Triggering the workflow is not enough on its own: the HTML and PDF
               # build and the steps beside it are gated on this filter, so the
-              # inputs the table is rendered from have to satisfy it too.
+              # SAME four inputs listed under on.pull_request.paths have to
+              # satisfy it too. Two copies of one list, and they had already
+              # drifted from what the table is actually rendered from.
+              - 'CodenameOne/src/com/codename1/annotations/buildhints/**'
               - 'maven/build-hint-catalog/**'
+              - 'maven/build-hint-tools/**'
               - 'scripts/gen-build-hint-table.sh'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
