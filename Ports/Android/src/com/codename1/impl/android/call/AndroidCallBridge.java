@@ -276,6 +276,16 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     private boolean granted(String permission) {
+        if (Build.VERSION.SDK_INT < 23) {
+            // checkSelfPermission arrived in API 23, and calling it below that
+            // is a NoSuchMethodError rather than a false. The Android
+            // builder's default minimum is still 19, so an app that merely
+            // REFERENCES the call API and asks for the permission mask on a
+            // KitKat device crashed instead of being told what it had. The
+            // manifest IS the answer before Marshmallow: everything declared
+            // is granted at install time, there being nothing to revoke.
+            return declaresPermission(permission);
+        }
         return context.checkSelfPermission(permission)
                 == PackageManager.PERMISSION_GRANTED;
     }

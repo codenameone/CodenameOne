@@ -151,6 +151,34 @@ public class LocalVpnTest {
     }
 
     @Test
+    public void anEmptySecretDoesNotMakeALoadedProfileInstallable() {
+        // load() never carries the secrets -- the platform holds them -- so a
+        // loaded description is marked withheld and refused until a real
+        // credential is supplied. Both setters cleared that marker whatever
+        // they were handed, so passing null or "" said "here are the secrets"
+        // while supplying none. iOS then read the zero-length key as
+        // authenticationMethod None, saved it as a success, and retired the
+        // keychain generation the working profile was using.
+        //
+        // A PSK profile has no username, so install()'s password gate cannot
+        // catch this one; the marker is the only thing standing in the way.
+        VpnProfile psk = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .sharedSecret("s3cret");
+        VpnAwait.value(Vpn.install(psk));
+        VpnProfile back = VpnAwait.value(Vpn.load());
+        // Asserted through install(), not the internal marker: the refusal
+        // IS the contract, and the marker is not public API.
+        back.sharedSecret("");
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(back));
+
+        back.sharedSecret("s3cret");
+        assertEquals(Boolean.TRUE, VpnAwait.value(Vpn.install(back)),
+                "a real secret is what makes it installable again");
+    }
+
+    @Test
     public void aUsernameWithAnEmptyPasswordIsRefused() {
         // An empty password is not a password, and it was the one credential
         // that got all the way through. install()'s gate asked whether the

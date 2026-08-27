@@ -100,15 +100,31 @@ public final class VpnProfile {
         // connection that would not authenticate.
         this.passwordKnown = pass != null && pass.length() > 0;
         // Supplying a credential is what makes a loaded description
-        // installable again; see markSecretsWithheld.
-        this.secretsWithheld = false;
+        // installable again; see markSecretsWithheld. Only a REAL credential
+        // does: clearing the marker for a null or empty one let a profile
+        // that came from load() -- which never carries its secrets -- be
+        // installed straight back with nothing behind it.
+        if (this.passwordKnown) {
+            this.secretsWithheld = false;
+        }
         return this;
     }
 
     /// Authenticates with a pre-shared key.
     public VpnProfile sharedSecret(String value) {
         this.sharedSecret = value;
-        this.secretsWithheld = false;
+        // The same rule as the password above, and it was missing here. A
+        // PSK profile from load() edited with sharedSecret(null) or ("")
+        // cleared the marker and passed install(): iOS read the zero-length
+        // key as NEVPNIKEAuthenticationMethodNone, saved that configuration
+        // successfully, and retired the keychain generation holding the
+        // working secret -- so a VPN that had authenticated for months could
+        // not any more, with a successful acknowledgement to say all was
+        // well. The username/password gate in install() does not cover this,
+        // because a PSK profile has no username to notice.
+        if (value != null && value.length() > 0) {
+            this.secretsWithheld = false;
+        }
         return this;
     }
 
