@@ -219,6 +219,42 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesNamesAndIdsAFilesystemCannotCarry() {
+        // NUL terminates a path, so a name holding one cannot be given to the filesystem at all;
+        // the pre-iOS-16 provider kept it in the storage leaf and failed only when the listed
+        // item was opened.
+        DocumentNode nul = DocumentNode.folder("root", "Root");
+        nul.add(DocumentNode.file("a", "report\u0000.pdf"));
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(nul));
+        assertTrue(err.getMessage().contains("U+0"), err.getMessage());
+
+        DocumentNode newline = DocumentNode.folder("root", "Root");
+        newline.add(DocumentNode.file("a", "report\n.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(newline));
+
+        // An unpaired surrogate has no UTF-8 encoding, and every writer here encodes as UTF-8:
+        // it becomes "?", two ids differing only there become one on disk, and the reader then
+        // rejects the whole index as holding a duplicate -- the location disappears.
+        DocumentNode surrogate = DocumentNode.folder("root", "Root");
+        surrogate.add(DocumentNode.file("\ud800", "fine.pdf"));
+        IllegalArgumentException idErr = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(surrogate));
+        assertTrue(idErr.getMessage().contains("unpaired surrogate"), idErr.getMessage());
+
+        DocumentNode inName = DocumentNode.folder("root", "Root");
+        inName.add(DocumentNode.file("a", "report\udc00.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(inName));
+
+        // A properly paired one is an ordinary character and is accepted.
+        DocumentNode paired = DocumentNode.folder("root", "Root");
+        paired.add(DocumentNode.file("a", "report\ud83d\ude00.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(paired));
+    }
+
+    @Test
     void refusesADecomposedName() {
         // Apple's filesystems compare names after canonical normalization, so "e" + U+0301 and
         // the precomposed letter are one file there and two strings here -- the sibling check

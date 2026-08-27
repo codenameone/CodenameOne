@@ -164,6 +164,26 @@ public final class DocumentIndexSerializer {
         if (".".equals(effective) || "..".equals(effective)) {
             throw new IllegalArgumentException("\"" + effective + "\" is not a usable file name.");
         }
+        int control = controlCharacterAt(effective);
+        if (control >= 0) {
+            throw new IllegalArgumentException("\"" + effective + "\" contains U+"
+                    + Integer.toHexString(effective.charAt(control)).toUpperCase() + " at index "
+                    + control + ", which cannot appear in a file name. A path cannot carry a NUL "
+                    + "byte at all, and the rest of the control range makes a name the browser "
+                    + "cannot show or the user retype.");
+        }
+        int loneSurrogate = loneSurrogateAt(effective);
+        if (loneSurrogate < 0) {
+            loneSurrogate = loneSurrogateAt(node.getId());
+        }
+        if (loneSurrogate >= 0) {
+            throw new IllegalArgumentException("A document id or name contains an unpaired "
+                    + "surrogate (index " + loneSurrogate + " of \"" + effective + "\" or of the "
+                    + "id). It cannot be encoded as UTF-8, and the readers write the index as "
+                    + "UTF-8: the character becomes \"?\", two ids that differed only there "
+                    + "become one, and the whole index is then rejected as holding a duplicate -- "
+                    + "so the location disappears rather than one document going missing.");
+        }
         int mark = combiningMarkAt(effective);
         if (mark >= 0) {
             throw new IllegalArgumentException("\"" + effective + "\" contains U+"
@@ -229,6 +249,44 @@ public final class DocumentIndexSerializer {
     /// ENAMETOOLONG, and it fails at open time: the item is listed, the user taps it, and nothing
     /// happens. Refusing the publish says which node is at fault instead.
     private static final int MAX_COMPONENT_BYTES = 255;
+
+    /// The index of the first character a file name cannot carry, or -1.
+    ///
+    /// NUL terminates a path, so a name holding one is a name the filesystem cannot be given.
+    /// The rest of the C0 range and DEL are refused with it: they are not illegal everywhere, but
+    /// a name carrying a newline or a backspace is one no browser shows honestly and no user can
+    /// retype, and nothing publishes one on purpose.
+    private static int controlCharacterAt(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c == 0x7F) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /// The index of the first unpaired surrogate, or -1.
+    ///
+    /// A lone surrogate is not a character: it has no UTF-8 encoding, and every writer here
+    /// encodes as UTF-8, replacing it with "?". Two ids differing only in that character then
+    /// become one on disk, and a reader that finds a duplicate rejects the index whole -- so the
+    /// published location vanishes instead of one document going missing, which is a far worse
+    /// failure than the one the publisher was asked to prevent.
+    private static int loneSurrogateAt(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (Character.isHighSurrogate(c)) {
+                if (i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(i + 1))) {
+                    return i;
+                }
+                i++;
+            } else if (Character.isLowSurrogate(c)) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     /// The index of the first character that makes the name non-canonical, or -1.
     ///

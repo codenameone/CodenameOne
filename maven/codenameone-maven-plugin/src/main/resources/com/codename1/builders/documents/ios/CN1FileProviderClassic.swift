@@ -31,6 +31,42 @@ import Foundation
 /// materialized there first. It is generated only when asked for, and the two are never both in
 /// a target -- they claim the same extension point.
 final class CN1FileProviderClassic: NSFileProviderExtension {
+    /// The downloads currently running, by the URL each was asked to materialize.
+    ///
+    /// This API hands out no Progress and no per-request handle -- stopProvidingItem is told
+    /// about a URL, not about a transfer -- so the only way to reach a running fetch is to keep
+    /// the map. Doing without looked defensible while the cost was counted as wasted data. It is
+    /// not: a download completing after a stop RECREATES the file the system had just evicted,
+    /// and answers a request nobody is waiting for any more.
+    private let inFlightLock = NSLock()
+    private var inFlight: [URL: URLSessionTask] = [:]
+    /// Bumped whenever a URL is stopped, so a fetch that had already finished downloading when
+    /// the stop arrived can still tell that it is no longer wanted.
+    private var stopGeneration: [URL: Int] = [:]
+
+    private func beginFetch(at url: URL) -> Int {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        return stopGeneration[url] ?? 0
+    }
+
+    private func registerFetch(_ task: URLSessionTask?, at url: URL) {
+        guard let task = task else {
+            return
+        }
+        inFlightLock.lock()
+        inFlight[url] = task
+        inFlightLock.unlock()
+    }
+
+    /// Whether the fetch that started at `generation` may still write to `url`.
+    private func finishFetch(at url: URL, generation: Int) -> Bool {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        inFlight.removeValue(forKey: url)
+        return (stopGeneration[url] ?? 0) == generation
+    }
+
     private lazy var containerURL: URL = FileManager.default
         .containerURL(forSecurityApplicationGroupIdentifier: CN1DocumentConfig.appGroupId)
         ?? FileManager.default.temporaryDirectory
@@ -202,10 +238,6 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             completionHandler(NSFileProviderError(.noSuchItem))
             return
         }
-        // The task is deliberately dropped here. The classic API hands out no Progress and no
-        // per-request cancellation handle -- `stopProvidingItem` is told about a URL, not about a
-        // transfer -- so there is nothing to hang a cancel on without keeping a URL-to-task map
-        // alive in the extension. The replicated path, which every supported OS uses, does cancel.
         let container = containerURL
         // Captured before the download starts, for the reason the replicated provider gives: a
         // server-side revision usually keeps its key, so an app republishing the node with a new
@@ -215,8 +247,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // checked against; see CN1DocumentRemote.stamp.
         let settings = CN1DocumentRemote.settings(containerURL: container)
         let credentials = CN1DocumentRemote.stamp(settings)
-        CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings) { fetched, error in
+        // Registered below so stopProvidingItem can reach it; the generation is captured first
+        // so a stop landing after the download finishes is still seen.
+        let generation = beginFetch(at: url)
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId,
+                                           settings: settings) { fetched, error in
             guard let fetched = fetched else {
+                _ = self.finishFetch(at: url, generation: generation)
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
                 return
             }
@@ -229,6 +266,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // still has the folder open. Both checks are needed: the first covers a clear that
             // finished before the write, the second a clear that landed during it. A clear after
             // the second check purges the file itself.
+            guard self.finishFetch(at: url, generation: generation) else {
+                // Stopped while this was in flight. The bytes are dropped rather than placed: the
+                // system evicted this URL and is not waiting for it any more.
+                try? FileManager.default.removeItem(at: fetched)
+                completionHandler(NSFileProviderError(.noSuchItem))
+                return
+            }
             guard CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
                                                         version: requested,
                                                         credentials: credentials,
@@ -248,9 +292,20 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             completionHandler(placed)
         }
+        registerFetch(task, at: url)
     }
 
     override func stopProvidingItem(at url: URL) {
+        // Any download still running for this URL is cancelled first, and the generation moves so
+        // one that has already finished downloading cannot place its bytes either. Without that,
+        // a fetch completing just after this call rebuilds the very file the eviction below
+        // removed, and hands the system a document it stopped asking for.
+        inFlightLock.lock()
+        let task = inFlight.removeValue(forKey: url)
+        stopGeneration[url] = (stopGeneration[url] ?? 0) + 1
+        inFlightLock.unlock()
+        task?.cancel()
+
         // The materialized copy is a cache of content the app owns, so dropping it loses nothing
         // and keeps the working directory from growing without bound.
         try? FileManager.default.removeItem(at: url)
