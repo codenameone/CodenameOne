@@ -225,6 +225,13 @@ public final class DocumentProvider {
     /// token are forgotten and the shared directory is emptied. Call this on logout -- the shared
     /// container outlives your process, so documents left there stay browsable by anyone holding
     /// the device.
+    ///
+    /// Everything the app owns is gone by the time this returns. On Apple platforms one step is
+    /// the system's rather than the app's: taking the published location away is a request to the
+    /// file provider daemon, and this waits a few seconds for it. If the daemon is slow the call
+    /// returns anyway rather than holding up a logout, and items the system had already copied out
+    /// of the container can stay visible until it catches up. Nothing is left pending on the app's
+    /// side, and there is no API that makes the system faster.
     public static void clear() {
         DocumentProviderBridge b = bridgeInternal();
         if (b == null) {

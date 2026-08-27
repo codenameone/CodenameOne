@@ -1295,11 +1295,8 @@ public class CertificateWizard extends Lifecycle {
         // is also exactly the set the next build will demand.
         if (binding != null) {
             String declared = readSetting(binding.settings(), "codename1.arg.ios.app_groups");
-            if (declared != null) {
-                String[] parts = declared.split(",");
-                for (int i = 0; i < parts.length; i++) {
-                    addIfMissing(wanted, parts[i].trim());
-                }
+            for (String group : WizardDecisions.declaredAppGroups(declared)) {
+                addIfMissing(wanted, group);
             }
         }
         if (widgets) {
@@ -1428,6 +1425,20 @@ public class CertificateWizard extends Lifecycle {
         return firstNonEmpty(fromManifest, WizardDecisions.defaultAppGroup(defaults.packageName));
     }
 
+    /// The bundle id to provision for the document provider.
+    ///
+    /// The project can rename the generated target through the extension's build settings, and
+    /// the builder applies that override to the Xcode target. Provisioning the default name
+    /// instead would create an App ID and profiles for a target nobody is building: the wizard
+    /// would finish reporting success, and the build would then fail in signing -- which is also
+    /// what the provisioning preflight now reports, having learned to read the same override.
+    private String resolveDocumentProviderBundleId(ProjectDefaults defaults) {
+        return WizardDecisions.documentProviderExtensionBundleId(defaults.packageName,
+                binding == null ? null : readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.buildSettings"
+                                + ".PRODUCT_BUNDLE_IDENTIFIER"));
+    }
+
     /// The App Group to provision for the document provider.
     ///
     /// A project that already names one in ios.documentProvider.appGroup keeps it. Falling
@@ -1528,7 +1539,7 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         ProjectDefaults defaults = projectDefaults();
-        String extIdentifier = WizardDecisions.documentProviderExtensionBundleId(defaults.packageName);
+        String extIdentifier = resolveDocumentProviderBundleId(defaults);
         if (extIdentifier == null) {
             next.run();
             return;

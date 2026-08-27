@@ -16565,9 +16565,17 @@ void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_M
         // deleted from -- are still there to be browsed. The wait can also be a real one, since
         // the operation may be sitting behind a registration that has not finished.
         //
-        // Bounded, because a wedged provider daemon must not take the app with it: past the
-        // deadline the removal is still queued and still runs, it simply is not waited for, and
-        // the log says the location may linger until it does.
+        // Bounded, and deliberately so, rather than waiting until the system says it is done.
+        // This runs on whatever thread the app calls clear() from, in the middle of a logout: an
+        // open-ended wait hands a provider daemon in trouble the power to hang the app there,
+        // which is a worse failure than a system cache that outlives the call. Past the deadline
+        // nothing is abandoned -- the removal is still queued and the system still performs it --
+        // and there is no API that makes it happen sooner.
+        //
+        // What can be seen in that window is narrower than it looks. The published tree and the
+        // copies in the group container are already gone, synchronously, above; an enumeration
+        // therefore answers empty. What the system may still show is its OWN store of items it
+        // had materialized, which only removeDomain clears.
         NSCondition *finished = [[NSCondition alloc] init];
         __block BOOL removed = NO;
         cn1DocumentsQueueDomainOp(^(void (^done)(void)) {

@@ -158,6 +158,38 @@ class CertificateWizardModelTest {
     }
 
     @Test
+    void declaredAppGroupsSplitOnWhitespaceAsWellAsCommas() {
+        // The documented format is space delimited, and IPhoneBuilder reads the hint that way.
+        // Splitting on commas alone made "group.a group.b" ONE identifier: automatic setup then
+        // tried to create a group by that impossible name instead of preserving the two the
+        // project already had, and the App ID's association lost both.
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups("group.example.share group.example.other"));
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups("group.example.share,group.example.other"));
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups(" group.example.share , group.example.other "));
+        assertEquals(java.util.Arrays.asList("group.example.share"),
+                WizardDecisions.declaredAppGroups("group.example.share group.example.share"));
+        assertTrue(WizardDecisions.declaredAppGroups(null).isEmpty());
+        assertTrue(WizardDecisions.declaredAppGroups("   ").isEmpty());
+    }
+
+    @Test
+    void documentProviderBundleIdFollowsTheOverriddenTargetName() {
+        // The project can rename the generated target through its build settings and the builder
+        // applies that; provisioning the default name would create an App ID and profiles for a
+        // target nobody is building, so setup would report success and the build fail in signing.
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app", null));
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app", "  "));
+        assertEquals("com.example.app.files",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app",
+                        " com.example.app.files "));
+    }
+
+    @Test
     void createAppGroupFindsOrCreatesAndAppearsInRefreshedState() {
         MockSigningService service = new MockSigningService();
         final SigningState.AppGroup[] first = new SigningState.AppGroup[1];

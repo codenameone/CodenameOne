@@ -50,6 +50,39 @@ public final class WizardDecisions {
         return mainBundleId.trim() + DOCUMENT_PROVIDER_EXTENSION_SUFFIX;
     }
 
+    /// The document provider's App ID, honouring a target renamed through its build settings.
+    ///
+    /// The project can override PRODUCT_BUNDLE_IDENTIFIER for the generated target and the
+    /// builder applies it, so provisioning the default name would create an App ID and profiles
+    /// for a target nobody is building -- setup reporting success and the build then failing in
+    /// signing. The provisioning preflight reads the same override.
+    public static String documentProviderExtensionBundleId(String mainBundleId, String override) {
+        if (override != null && !override.trim().isEmpty()) {
+            return override.trim();
+        }
+        return documentProviderExtensionBundleId(mainBundleId);
+    }
+
+    /// The App Groups a project declares in ios.app_groups.
+    ///
+    /// Commas AND whitespace, which is how IPhoneBuilder reads the same hint and how the
+    /// documented format writes it. Splitting on commas alone turned "group.a group.b" into one
+    /// identifier: the wizard then tried to create a group by that impossible name instead of
+    /// preserving the two the project already had, and the App ID lost both.
+    public static java.util.List<String> declaredAppGroups(String declared) {
+        java.util.List<String> groups = new java.util.ArrayList<String>();
+        if (declared == null) {
+            return groups;
+        }
+        for (String token : declared.split("[,\\s]+")) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty() && !groups.contains(trimmed)) {
+                groups.add(trimmed);
+            }
+        }
+        return groups;
+    }
+
     public static String defaultAppGroup(String packageName) {
         if (packageName == null || packageName.trim().isEmpty()) {
             return null;
