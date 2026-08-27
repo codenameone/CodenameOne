@@ -176,6 +176,8 @@ static void cn1OnMain(dispatch_block_t block) {
     }
 }
 
+static CGFloat cn1DesktopScale(void);
+
 /// Codename One works in device pixels and AppKit in points, so every geometry
 /// value crossing the bridge is scaled by the window's backing factor.
 /// The window's OWN backing scale, for drawable sizes only.
@@ -185,7 +187,10 @@ static CGFloat cn1WindowScale(CN1MacWindowRecord *rec) {
     if (rec != nil && rec.window != nil) {
         return rec.window.backingScaleFactor;
     }
-    return [NSScreen mainScreen].backingScaleFactor;
+    // No window means no drawable, so the answer is arbitrary -- but it must not
+    // be ARBITRARY PER CALL. mainScreen follows the key window, so the fallback
+    // changed as the user moved focus between displays of different densities.
+    return cn1DesktopScale();
 }
 
 /// The single scale every desktop coordinate is expressed in.
@@ -200,7 +205,17 @@ static CGFloat cn1WindowScale(CN1MacWindowRecord *rec) {
 /// cn1PrimaryScreenHeight, which the y flip already uses for exactly this
 /// reason.
 static CGFloat cn1DesktopScale(void) {
-    CGFloat s = [NSScreen mainScreen].backingScaleFactor;
+    // screens[0], not mainScreen. NSScreen.mainScreen is the screen holding the
+    // KEY WINDOW, not the primary one, so on a mixed-DPI setup this changed the
+    // unit of every window bound and monitor rectangle as focus moved between a
+    // Retina and a 1x display -- while the y flip above stayed on screens[0],
+    // leaving the two halves of one conversion disagreeing. A restored window
+    // then jumps or resizes for no reason the user did anything to cause.
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count == 0) {
+        return 1;
+    }
+    CGFloat s = [screens objectAtIndex:0].backingScaleFactor;
     return s > 0 ? s : 1;
 }
 
@@ -301,10 +316,11 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
         : @"";
     __block int slot = -1;
     cn1OnMain(^{
-        CGFloat scale = [NSScreen mainScreen].backingScaleFactor;
-        if (scale <= 0) {
-            scale = 1;
-        }
+        // The desktop scale, because x/y are desktop coordinates -- the same
+        // unit setBounds and the monitor rectangles use. Reading mainScreen here
+        // meant a window created while a 1x display held focus was placed and
+        // sized in that display's unit and then reported back in the primary's.
+        CGFloat scale = cn1DesktopScale();
         // Creation takes the CONTENT rect, unlike setBounds/getBounds which are
         // the outer-frame pair the WindowManager SPI specifies. Deliberate: the
         // size an application asks for at creation is the area it draws into,

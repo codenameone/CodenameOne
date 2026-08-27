@@ -28,9 +28,15 @@ CGFloat CN1AppKitBackingScale(NSView *view) {
     if (w != nil) {
         return [w backingScaleFactor];
     }
-    NSScreen *screen = [NSScreen mainScreen];
-    if (screen != nil) {
-        return [screen backingScaleFactor];
+    // The primary screen, not mainScreen: mainScreen is whichever screen holds
+    // the key window, so an unparented view's scale would change as the user
+    // moved focus between displays of different densities.
+    NSArray<NSScreen *> *screens = [NSScreen screens];
+    if (screens.count > 0) {
+        CGFloat s = [[screens objectAtIndex:0] backingScaleFactor];
+        if (s > 0) {
+            return s;
+        }
     }
     return 1.0;
 }

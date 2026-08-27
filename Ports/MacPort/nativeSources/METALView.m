@@ -1543,7 +1543,13 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     if (sel.length == 0) {
         return;
     }
-    if (![self cn1ReplaceRange:sel withString:@""]) {
+    // Only -1 is a refusal. cn1ReplaceRange: answers the number of characters
+    // it ACCEPTED, and a deletion accepts none -- so testing it as a boolean
+    // took the failure path on every successful delete, after the shadow text
+    // had already been mutated: the legacy editor never got commitFinished:
+    // and the pure editor kept a selection over characters that no longer
+    // exist, which then corrupts the next edit.
+    if ([self cn1ReplaceRange:sel withString:@""] < 0) {
         return;
     }
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
