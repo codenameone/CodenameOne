@@ -89,7 +89,17 @@ public class AndroidVpnBridge implements VpnBridge {
     /// Covers the WHOLE operation rather than just the consent dialog: the
     /// already-authorized install path never shows one, and two of those
     /// racing could provision in one order and persist in the other.
-    private boolean operationPending;
+    /// Who holds the one-operation-at-a-time reservation, or null.
+    ///
+    /// An OWNER rather than a flag, because a release has to be able to ask
+    /// "is this still mine". Acknowledgements settle inline when the
+    /// operation was started on the EDT, so the app's callback runs before
+    /// this method's finally does -- and if that callback starts an install,
+    /// the reservation the finally then cleared belonged to the CONSENT
+    /// DIALOG that install had just opened. A third operation could walk in
+    /// while the user was still looking at the prompt. Releasing twice is
+    /// only harmless while nobody has claimed it in between.
+    private Object operationOwner;
 
     public AndroidVpnBridge(Context context) {
         this.context = context;
@@ -185,14 +195,15 @@ public class AndroidVpnBridge implements VpnBridge {
         // load() describing A while Android ran B. The window is the whole
         // operation, not the dialog, so the reservation has to open here.
         String previous;
+        Object mine = new Object();
         synchronized (this) {
-            if (operationPending) {
+            if (operationOwner != null) {
                 fail(requestId, VpnError.UNKNOWN,
                         "Another VPN profile operation is still in progress;"
                         + " wait for it to finish before installing again");
                 return;
             }
-            operationPending = true;
+            operationOwner = mine;
             previous = storedWire();
         }
         boolean handedOff = false;
@@ -226,7 +237,7 @@ public class AndroidVpnBridge implements VpnBridge {
                 // until the work is done; it is held until the last thing
                 // the work PUBLISHES has been published.
                 setStatus(VpnStatus.DISCONNECTED);
-                endOperation();
+                endOperation(mine);
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;
             }
@@ -234,7 +245,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // AndroidCallBridge.currentActivity. A bridge first obtained from
             // a service could otherwise never show a consent prompt again.
             if (currentActivity() == null || consent == null) {
-                endOperation();
+                endOperation(mine);
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "Installing a VPN needs a foreground activity to show"
                         + " the consent prompt");
@@ -256,7 +267,8 @@ public class AndroidVpnBridge implements VpnBridge {
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(consent,
-                                new Consent(this, requestId, previous, wire));
+                                new Consent(this, requestId, previous,
+                                        wire, mine));
                 // From here the reservation belongs to Consent.
                 handedOff = true;
             } catch (RuntimeException launchFailed) {
@@ -267,13 +279,13 @@ public class AndroidVpnBridge implements VpnBridge {
                 // every later install was refused as though a dialog were
                 // still up -- and the cached record described a profile that
                 // was never installed.
-                endOperation();
+                endOperation(mine);
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "The VPN consent prompt could not be shown: "
                                 + describe(launchFailed));
             }
         } catch (Exception e) {
-            endOperation();
+            endOperation(mine);
             fail(requestId, VpnError.INVALID_CONFIGURATION, describe(e));
         } finally {
             // Released on every path that did not hand it to Consent --
@@ -281,9 +293,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // for ever so every later install was refused as though a dialog
             // were still up.
             if (!handedOff) {
-                synchronized (this) {
-                    operationPending = false;
-                }
+                endOperation(mine);
             }
         }
     }
@@ -302,8 +312,13 @@ public class AndroidVpnBridge implements VpnBridge {
         /// re-read a field another install may have replaced.
         private final String attempted;
 
+        /// The reservation this prompt was handed, so it releases the one
+        /// it owns rather than whatever happens to be set when it finishes.
+        private final Object token;
+
         Consent(AndroidVpnBridge bridge, int requestId, String previous,
-                String attempted) {
+                String attempted, Object token) {
+            this.token = token;
             this.bridge = bridge;
             this.requestId = requestId;
             this.previous = previous;
@@ -349,9 +364,7 @@ public class AndroidVpnBridge implements VpnBridge {
             if (approved) {
                 bridge.setStatus(VpnStatus.DISCONNECTED);
             }
-            synchronized (bridge) {
-                bridge.operationPending = false;
-            }
+            bridge.endOperation(token);
             if (approved) {
                 Vpn.deliverAck(requestId, true, 0, null);
             } else {
@@ -375,8 +388,9 @@ public class AndroidVpnBridge implements VpnBridge {
         // status and tunnel ownership -- or a start could bring the
         // replacement up and have its callbacks ignored, because
         // startRequested was cleared after it.
+        Object mine = new Object();
         synchronized (this) {
-            if (operationPending) {
+            if (operationOwner != null) {
                 // An install owns the profile: a prompt is on screen, or an
                 // already-authorized install is between provisioning and
                 // persisting. Either way deleting now would race it.
@@ -385,7 +399,7 @@ public class AndroidVpnBridge implements VpnBridge {
                         + " to finish before removing the profile");
                 return;
             }
-            operationPending = true;
+            operationOwner = mine;
         }
         try {
             synchronized (this) {
@@ -404,16 +418,14 @@ public class AndroidVpnBridge implements VpnBridge {
                 stopWatchingTheTunnel();
             }
             setStatus(VpnStatus.NOT_CONFIGURED);
-            endOperation();
+            endOperation(mine);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
-            endOperation();
+            endOperation(mine);
             fail(requestId, VpnError.UNKNOWN, describe(e));
         } finally {
             // Released on every path; see startVpn.
-            synchronized (this) {
-                operationPending = false;
-            }
+            endOperation(mine);
         }
     }
 
@@ -510,14 +522,15 @@ public class AndroidVpnBridge implements VpnBridge {
         // provisioning a replacement while this brought the old profile up.
         // A check and an act that are not one critical section are not a
         // guard at all.
+        Object mine = new Object();
         synchronized (this) {
-            if (operationPending) {
+            if (operationOwner != null) {
                 fail(requestId, VpnError.UNKNOWN,
                         "A VPN profile operation is in progress; wait for it"
                         + " to finish before starting the tunnel");
                 return;
             }
-            operationPending = true;
+            operationOwner = mine;
         }
         try {
             startRequested = true;
@@ -533,7 +546,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // until the network callback says otherwise. Answering the request
             // now is the honest thing: "the platform accepted the request" is
             // all that is actually known.
-            endOperation();
+            endOperation(mine);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             startRequested = false;
@@ -551,7 +564,7 @@ public class AndroidVpnBridge implements VpnBridge {
             }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED
                     : VpnStatus.DISCONNECTED);
-            endOperation();
+            endOperation(mine);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
                     describe(e));
@@ -559,9 +572,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // Released on EVERY path, success or failure. Left set, the next
             // install would be refused for ever as though an operation were
             // still running.
-            synchronized (this) {
-                operationPending = false;
-            }
+            endOperation(mine);
         }
     }
 
@@ -586,10 +597,14 @@ public class AndroidVpnBridge implements VpnBridge {
     ///
     /// So: every state change first, then this, then the ack or the failure.
     /// The finallys are kept -- they still cover the paths that return before
-    /// publishing anything -- and releasing twice is harmless.
-    private void endOperation() {
+    /// publishing anything -- and they pass the same token, so a finally that
+    /// runs after the acknowledgement handed the reservation to somebody else
+    /// leaves it alone.
+    private void endOperation(Object token) {
         synchronized (this) {
-            operationPending = false;
+            if (operationOwner == token) {
+                operationOwner = null;
+            }
         }
     }
 
@@ -611,14 +626,15 @@ public class AndroidVpnBridge implements VpnBridge {
         // a tunnel whose profile is being replaced acts on the one the
         // install is about to remove.
         // Reserved through the platform call; see startVpn.
+        Object mine = new Object();
         synchronized (this) {
-            if (operationPending) {
+            if (operationOwner != null) {
                 fail(requestId, VpnError.UNKNOWN,
                         "A VPN profile operation is in progress; wait for it"
                         + " to finish before stopping the tunnel");
                 return;
             }
-            operationPending = true;
+            operationOwner = mine;
         }
         VpnStatus before = reconciledStatus();
         boolean wasRequested = startRequested;
@@ -627,7 +643,7 @@ public class AndroidVpnBridge implements VpnBridge {
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
             setStatus(VpnStatus.DISCONNECTED);
-            endOperation();
+            endOperation(mine);
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             // DISCONNECTING was set before the platform was asked, so a
@@ -649,14 +665,12 @@ public class AndroidVpnBridge implements VpnBridge {
                 forgetInstalledProfile();
             }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
-            endOperation();
+            endOperation(mine);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
         } finally {
             // See startVpn: released on every path.
-            synchronized (this) {
-                operationPending = false;
-            }
+            endOperation(mine);
         }
     }
 
