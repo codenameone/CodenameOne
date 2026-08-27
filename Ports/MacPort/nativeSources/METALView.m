@@ -332,7 +332,21 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     // old size, and presentFramebuffer's blit would then copy old dimensions
     // into a smaller destination -- a Metal validation failure or a crash. All
     // three move together in applyPendingFrameBufferSize.
+    //
+    // And the framework is WOKEN, not merely invalidated. This view is layer
+    // hosted with no drawRect: or updateLayer path, so setNeedsDisplay: alone
+    // reaches nothing: an idle main window resized to a new size kept its old
+    // layout and its old framebuffer until some unrelated change happened to
+    // paint, because applyPendingFrameBufferSize -- and the screenSizeChanged()
+    // inside it -- only runs when a frame starts. Asking for a repaint is what
+    // makes that frame happen; the Metal resources still change at its boundary
+    // and screenSizeChanged() still runs on the thread that paints.
     [self setNeedsDisplay:YES];
+    extern BOOL cn1MacRuntimeIsJavaReady(void);
+    extern void repaintUI(void);
+    if (cn1MacRuntimeIsJavaReady()) {
+        repaintUI();
+    }
 }
 
 /// Applies a recorded resize. Render thread only, at a frame boundary.
@@ -1234,10 +1248,17 @@ static int CN1MacKeyCode(NSEvent *event) {
     if (inserted == nil) {
         return;
     }
-    if (!session.multiline && [inserted rangeOfString:@"\n"].location != NSNotFound) {
+    if (!session.multiline
+            && [inserted rangeOfCharacterFromSet:
+                    [NSCharacterSet newlineCharacterSet]].location != NSNotFound) {
         // A single line field takes a newline as "done", so a pasted paragraph
         // becomes one line rather than silently losing everything after the
         // first break.
+        //
+        // Tested against the SAME character set the normalization below uses. A
+        // bare carriage return, or the Unicode line and paragraph separators an
+        // input method can produce, contain no "\n" at all: the guard skipped
+        // them and the separator went into a single-line TextField unchanged.
         inserted = [[inserted componentsSeparatedByCharactersInSet:
                         [NSCharacterSet newlineCharacterSet]]
                     componentsJoinedByString:@" "];
