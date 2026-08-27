@@ -527,6 +527,72 @@ class BytecodeComplianceMojoTest {
     }
 
 
+    /**
+     * Capping a class version invalidates the build hint manifest's digest, and
+     * re-stamping repairs it.
+     *
+     * <p>The manifest records the main class's own bytes so the simulator, which
+     * has no bytecode reader, can tell a current manifest from a leftover. Both
+     * rewrites in this mojo change those bytes in place, so a manifest written
+     * before them describes a class that no longer exists on disk: the simulator
+     * reads it as stale and publishes none of the annotated hints. Whichever of
+     * this goal and process-annotations runs last has to leave the stamp
+     * describing the class that is actually there.</p>
+     */
+    @Test
+    void rewritingAClassInvalidatesTheBuildHintStampUntilItIsTakenAgain(@TempDir Path tempDir)
+            throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Files.createDirectories(outputDir);
+        Path classFile = writeClassWithVersion(outputDir, "app/TooNew", Opcodes.V17 + 1);
+
+        Path manifest = outputDir.resolve("META-INF/codenameone/build-hints.properties");
+        Files.createDirectories(manifest.getParent());
+        Files.write(manifest,
+                ("cn1.buildHints.mainClass=app.TooNew\n"
+                        + "cn1.buildHints.classDigest=" + sha256Of(classFile.toFile()) + "\n"
+                        + "codename1.arg.desktop.titleBar=NATIVE\n").getBytes("ISO-8859-1"));
+        String before = digestIn(manifest);
+        assertEquals(sha256Of(classFile.toFile()), before, "the stamp should start out correct");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        assertEquals(1, enforceMaxClassVersion(mojo, outputDir.toFile(), Opcodes.V17));
+
+        assertFalse(sha256Of(classFile.toFile()).equals(before),
+                "capping the version should have changed the class on disk");
+
+        com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .restampClassDigest(outputDir.toFile());
+
+        assertEquals(sha256Of(classFile.toFile()), digestIn(manifest),
+                "the stamp still describes the class as it was before the rewrite");
+        assertTrue(new String(Files.readAllBytes(manifest), "ISO-8859-1")
+                        .contains("codename1.arg.desktop.titleBar=NATIVE"),
+                "re-stamping must leave the hints alone");
+    }
+
+    private static String digestIn(Path manifest) throws Exception {
+        java.util.Properties p = new java.util.Properties();
+        java.io.InputStream in = Files.newInputStream(manifest);
+        try {
+            p.load(in);
+        } finally {
+            in.close();
+        }
+        return p.getProperty("cn1.buildHints.classDigest");
+    }
+
+    private static String sha256Of(java.io.File f) throws Exception {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        md.update(Files.readAllBytes(f.toPath()));
+        StringBuilder hex = new StringBuilder();
+        for (byte b : md.digest()) {
+            hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+            hex.append(Character.forDigit(b & 0xF, 16));
+        }
+        return hex.toString();
+    }
+
     private int enforceMaxClassVersion(BytecodeComplianceMojo mojo, java.io.File outputDir, int maxVersion) throws Exception {
         Method method = BytecodeComplianceMojo.class.getDeclaredMethod("enforceMaxClassVersion", java.io.File.class, int.class);
         method.setAccessible(true);

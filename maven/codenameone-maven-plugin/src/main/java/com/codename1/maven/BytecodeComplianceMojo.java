@@ -174,6 +174,27 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         InvocationRewriteSummary invocationRewriteSummary = applyInvocationRewrites(outputDir);
         lastInvocationRewriteSummary = invocationRewriteSummary;
 
+        // Both calls above rewrite class files IN PLACE -- capping a class to the
+        // supported version, and redirecting a call the runtime does not have. If
+        // the main class is one of them, its bytes no longer match the digest the
+        // build hint manifest recorded, and the simulator -- which has no bytecode
+        // reader and so compares the class file itself -- reads a manifest written
+        // moments ago as stale and publishes none of the annotated hints.
+        //
+        // Every pom in this repository runs process-annotations after this goal,
+        // where the stamp would be taken from the rewritten bytes anyway. Stamping
+        // here as well is what makes that ordering stop mattering: whichever of
+        // the two runs last leaves a manifest describing the class on disk. A
+        // no-op when there is no manifest, which is every project that declares
+        // its hints in codenameone_settings.properties.
+        try {
+            com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .restampClassDigest(outputDir);
+        } catch (IOException ioe) {
+            throw new MojoExecutionException(
+                    "Could not stamp the build hint manifest under " + outputDir, ioe);
+        }
+
         List<File> dependencyJars = getDependencyJarsForScanning();
         Map<String, ClassMetadata> allowedIndex = buildClassIndex(Arrays.asList(getJavaRuntimeJar(), getCodenameOneJar()));
         Map<String, ClassMetadata> projectAndDependencyIndex = buildClassIndexWithOutput(outputDir, dependencyJars);
