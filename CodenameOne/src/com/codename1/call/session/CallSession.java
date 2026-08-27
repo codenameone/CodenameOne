@@ -112,7 +112,8 @@ public final class CallSession {
     /// is being rung. Ignored for an incoming call.
     public void reportStartedConnecting() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || direction != CallDirection.OUTGOING) {
+        if (b == null || direction != CallDirection.OUTGOING
+                || !Calls.owns(callId, this)) {
             return;
         }
         if (!moveUnlessOver(CallState.DIALING)) {
@@ -157,7 +158,8 @@ public final class CallSession {
     /// actually flowing, because it starts the duration the user sees.
     public void reportConnected() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || !moveUnlessOver(CallState.ACTIVE)) {
+        if (b == null || !Calls.owns(callId, this)
+                || !moveUnlessOver(CallState.ACTIVE)) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -179,6 +181,11 @@ public final class CallSession {
     /// mixed pair of the two.
     public void update(CallHandle newHandle, String newDisplayName) {
         CallBridge b = CallRequests.bridge();
+        if (!Calls.owns(callId, this)) {
+            // The local fields are left alone too: this object no longer
+            // describes anything the system knows about.
+            return;
+        }
         if (newHandle != null) {
             synchronized (this) {
                 handle = newHandle;
@@ -206,14 +213,7 @@ public final class CallSession {
             return Calls.unsupported();
         }
         if (!Calls.owns(callId, this)) {
-            // This session no longer names the call its id points at -- it
-            // was replaced after a provider reset, or it is a detached one
-            // describing a call that is already over. Ending BY ID from here
-            // would hang up whatever holds the id now.
-            EdtResult<Boolean> stale = new EdtResult<Boolean>();
-            stale.error(new CallException(CallError.INVALID_ID,
-                    "This session no longer names a live call"));
-            return stale;
+            return staleSession();
         }
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
@@ -235,6 +235,19 @@ public final class CallSession {
         synchronized (this) {
             state = CallState.ENDED;
         }
+        // The registry entry is released and the port told immediately
+        // after, not atomically. Review asked for a tombstone held across
+        // the native call, or native identity by generation. Neither is
+        // written here on purpose: the window is two adjacent statements on
+        // one thread, and to lose it another thread would have to complete a
+        // whole reportIncoming for the same id in between -- which the ports
+        // themselves refuse while the call is still live natively, because
+        // that is a duplicate. A tombstone buys that sliver and adds a way
+        // for an id to become permanently unusable when a native report
+        // throws; generation-tagged native identity is a much larger change
+        // to both ports for the same sliver. Reporting only when this
+        // session OWNED the entry is the part that was actually reachable.
+        //
         // The native report is made only if THIS session still owned the id.
         // forget() is identity-checked, so a stale session leaves the
         // replacement registered -- but the report went out regardless, and
@@ -249,11 +262,29 @@ public final class CallSession {
         }
     }
 
+    /// A resource already failed because this session lost its id.
+    ///
+    /// Every operation here reaches the port with nothing but the call id,
+    /// and the ports resolve by that alone -- so an object the app still
+    /// holds after a provider reset, or a detached one describing a call
+    /// that is already over, would otherwise act on whatever owns the id
+    /// now. end() was gated first; this is the same question for the rest of
+    /// them, which is where it should have been asked in the first place.
+    private static EdtResult<Boolean> staleSession() {
+        EdtResult<Boolean> stale = new EdtResult<Boolean>();
+        stale.error(new CallException(CallError.INVALID_ID,
+                "This session no longer names a live call"));
+        return stale;
+    }
+
     /// Holds or resumes the call.
     public AsyncResource<Boolean> setHeld(boolean held) {
         CallBridge b = CallRequests.bridge();
         if (b == null) {
             return Calls.unsupported();
+        }
+        if (!Calls.owns(callId, this)) {
+            return staleSession();
         }
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
@@ -277,6 +308,9 @@ public final class CallSession {
         if (b == null) {
             return Calls.unsupported();
         }
+        if (!Calls.owns(callId, this)) {
+            return staleSession();
+        }
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);
         // Applied from the acknowledgement for the same reason as setHeld.
@@ -290,6 +324,9 @@ public final class CallSession {
         CallBridge b = CallRequests.bridge();
         if (b == null) {
             return Calls.unsupported();
+        }
+        if (!Calls.owns(callId, this)) {
+            return staleSession();
         }
         int id = CallRequests.nextId();
         EdtResult<Boolean> r = CallRequests.openAck(id);

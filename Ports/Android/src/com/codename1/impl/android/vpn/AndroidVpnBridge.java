@@ -197,6 +197,25 @@ public class AndroidVpnBridge implements VpnBridge {
                     "The profile has no server address");
             return;
         }
+        // BOTH credentials is a combination this platform cannot express.
+        // Ikev2VpnProfile.Builder's setAuthPsk and setAuthUsernamePassword
+        // each SET the authentication method, so the second call replaces
+        // the first and only one survives -- while iOS installs the shared
+        // secret and turns extended authentication on as well, which is the
+        // common arrangement for a gateway that wants both. Taking the PSK
+        // and dropping the pair provisioned cleanly and then could not
+        // connect, with nothing to see in either profile. Refused instead,
+        // and named, because a materially different profile acknowledged as
+        // success is the worse answer.
+        if (p.getSharedSecret() != null && p.getSharedSecret().length() > 0
+                && p.getUsername() != null && p.getUsername().length() > 0
+                && p.isPasswordKnown()) {
+            fail(requestId, VpnError.NOT_SUPPORTED,
+                    "Android cannot combine a shared secret with a username"
+                    + " and password in one managed profile; install one or"
+                    + " the other");
+            return;
+        }
         if (p.getProtocol() == VpnProtocol.IPSEC) {
             // NOT_SUPPORTED, which is what VpnProtocol.IPSEC documents this
             // platform answering. The profile is not malformed -- it is

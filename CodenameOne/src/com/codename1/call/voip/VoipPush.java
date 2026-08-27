@@ -245,6 +245,16 @@ public final class VoipPush {
         if (b != null) {
             b.unregisterVoipPush(CallRequests.nextId());
         }
+        // The CACHE goes here, not only wherever a port happens to tell us.
+        // An explicit opt-out means the token this app holds is no longer
+        // one anybody should act on, and leaving it left getToken() handing
+        // back a dead value and a later setListener replaying it as though
+        // it were current. iOS does deliver a null now, but that is an
+        // asynchronous courtesy from one port; the facade's own contract
+        // should not depend on it.
+        synchronized (VoipPush.class) {
+            token = null;
+        }
     }
 
     /// The last known token, or null.
