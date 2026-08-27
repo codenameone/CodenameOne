@@ -67,7 +67,22 @@ final class CN1DocumentIndex {
         index(root, parent: nil)
     }
 
+    /// The first id that was already taken when it was inserted, if any.
+    ///
+    /// The publisher refuses a tree whose ids collide, and refuses the spellings that
+    /// normalization rewrites so that two ids cannot become one key here. This is the backstop
+    /// for whatever that cannot see: these keys are Swift Strings, compared canonically, and the
+    /// publisher has no normalizer to call -- so a pair it could not rule out arrives as two
+    /// nodes and lands on one key, and the second would silently replace the first while both
+    /// rows stayed in the tree. Two names, one document, no error anywhere. Refusing the whole
+    /// index instead is the same trade the publisher makes: the location reads as empty, which
+    /// the app can see and fix, rather than quietly wrong.
+    private(set) var duplicateId: String?
+
     private func index(_ node: CN1DocumentNode, parent: String?) {
+        if nodes[node.id] != nil {
+            duplicateId = node.id
+        }
         nodes[node.id] = node
         if let parent = parent {
             parents[node.id] = parent
@@ -165,18 +180,29 @@ final class CN1DocumentIndex {
             }
             let after = modificationStamp(of: url)
             if before == after {
+                // The revision is the publisher's own when it wrote one; see below.
                 // The publisher's own revision when it wrote one. It differs for every
                 // publication, which the file's modification time does not: two publishes inside
                 // one filesystem tick share a timestamp, and a download fetched against the first
                 // was then accepted after the second. The timestamp remains the fallback for an
                 // index written before the field existed.
-                return CN1DocumentIndex(root: doc.root, revision: doc.rev ?? after)
+                return accept(CN1DocumentIndex(root: doc.root, revision: doc.rev ?? after))
             }
             if attempt == 2, let revision = doc.rev {
-                return CN1DocumentIndex(root: doc.root, revision: revision)
+                return accept(CN1DocumentIndex(root: doc.root, revision: revision))
             }
         }
         return nil
+    }
+
+    /// Refuses a tree whose ids collided when it was flattened.
+    private static func accept(_ index: CN1DocumentIndex) -> CN1DocumentIndex? {
+        if let duplicate = index.duplicateId {
+            NSLog("[cn1documents] the published index names \(duplicate) twice, or twice in "
+                + "spellings that are one name after normalization; refusing it")
+            return nil
+        }
+        return index
     }
 
     private static func modificationStamp(of url: URL) -> String {

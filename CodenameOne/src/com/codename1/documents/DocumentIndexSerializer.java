@@ -220,7 +220,10 @@ public final class DocumentIndexSerializer {
                     + "and its normalized twin are one file there while they are two strings "
                     + "here -- and the browser hides one of the pair. Use the normalized "
                     + "spelling: \"\u00e9\" rather than \"e\" followed by U+0301, and the "
-                    + "ordinary letter rather than a letterlike or compatibility form.");
+                    + "ordinary letter rather than a letterlike or compatibility form. For a "
+                    + "few scripts normalization goes the other way -- U+0F73 is U+0F71 U+0F72, "
+                    + "and U+FB2A is U+05E9 U+05C1 -- so it is the normalized spelling that "
+                    + "counts, not the shorter one.");
         }
         if (utf8Length(effective) > MAX_COMPONENT_BYTES) {
             throw new IllegalArgumentException("\"" + effective + "\" is too long to be a file "
@@ -291,51 +294,6 @@ public final class DocumentIndexSerializer {
                 || (c >= 0xD7B0 && c <= 0xD7FF);
     }
 
-    /// Every code point Unicode canonically decomposes to exactly one OTHER code point.
-    ///
-    /// A closed set, not a selection: these are the characters that are a different character
-    /// after normalization, so a name using one is a name the filesystem stores under a
-    /// different spelling. The CJK compatibility ideographs are the bulk of it and come as
-    /// blocks; the rest are named individually because that is how many there are.
-    private static boolean isCanonicalSingleton(int c) {
-        switch (c) {
-            case 0x0374: // GREEK NUMERAL SIGN -> MODIFIER LETTER PRIME
-            case 0x037E: // GREEK QUESTION MARK -> SEMICOLON
-            case 0x0387: // GREEK ANO TELEIA -> MIDDLE DOT
-            case 0x1F71: // the oxia forms, each to its tonos twin
-            case 0x1F73:
-            case 0x1F75:
-            case 0x1F77:
-            case 0x1F79:
-            case 0x1F7B:
-            case 0x1F7D:
-            case 0x1FBB:
-            case 0x1FBE: // GREEK PROSGEGRAMMENI -> GREEK SMALL LETTER IOTA
-            case 0x1FC9:
-            case 0x1FCB:
-            case 0x1FD3: // IOTA WITH DIALYTIKA AND OXIA -> WITH DIALYTIKA AND TONOS
-            case 0x1FDB:
-            case 0x1FE3: // UPSILON WITH DIALYTIKA AND OXIA
-            case 0x1FEB:
-            case 0x1FEE: // DIALYTIKA AND OXIA -> GREEK DIALYTIKA TONOS
-            case 0x1FEF: // GREEK VARIA -> GRAVE ACCENT
-            case 0x1FF9:
-            case 0x1FFB:
-            case 0x1FFD: // GREEK OXIA -> ACUTE ACCENT
-            case 0x2000: // EN QUAD -> EN SPACE
-            case 0x2001: // EM QUAD -> EM SPACE
-            case 0x2126: // OHM SIGN -> GREEK CAPITAL LETTER OMEGA
-            case 0x212A: // KELVIN SIGN -> LATIN CAPITAL LETTER K
-            case 0x212B: // ANGSTROM SIGN -> LATIN CAPITAL LETTER A WITH RING ABOVE
-            case 0x2329: // LEFT-POINTING ANGLE BRACKET -> LEFT ANGLE BRACKET
-            case 0x232A: // RIGHT-POINTING ANGLE BRACKET -> RIGHT ANGLE BRACKET
-                return true;
-            default:
-                // CJK compatibility ideographs, and their supplementary block.
-                return (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x2F800 && c <= 0x2FA1F);
-        }
-    }
-
     /// The index of the first character a file name cannot carry, or -1.
     ///
     /// NUL terminates a path, so a name holding one is a name the filesystem cannot be given.
@@ -374,32 +332,105 @@ public final class DocumentIndexSerializer {
         return -1;
     }
 
-    /// The index of the first character that makes the name non-canonical, or -1.
+    /// Code points a canonical normalization rewrites on their own.
     ///
-    /// Two kinds, both of which give Apple's filesystems a name that is not the one written here.
+    /// Two kinds, and one rule: refuse every spelling that is not the normalized one. A SINGLETON
+    /// is a character that normalizes to a different single character -- U+212B ANGSTROM SIGN is
+    /// U+00C5, U+1F71 GREEK ALPHA WITH OXIA is U+03AC WITH TONOS. A PRESENTATION FORM is a
+    /// precomposed character Unicode excludes from composition, so normalizing it takes it apart
+    /// instead of leaving it alone: U+FB2A HEBREW SHIN WITH SHIN DOT becomes U+05E9 U+05C1, and
+    /// U+0F73 TIBETAN VOWEL SIGN II becomes U+0F71 U+0F72. Either way the character and its
+    /// normalized spelling are one name on an Apple volume and one key in a Swift dictionary,
+    /// while they are two strings here.
     ///
-    /// A COMBINING MARK means the name is decomposed: "e" followed by U+0301 is the same file as
-    /// the precomposed letter. The blocks are the ones that carry accents -- the combining
-    /// diacriticals, their supplement and extended range, the symbols block, and the half marks.
+    /// Derived from the Unicode character database rather than chosen: every code point whose
+    /// NFC form differs from itself. Sorted pairs of inclusive bounds.
+    private static final int[] RENORMALIZED = {
+        0x0340, 0x0341, 0x0343, 0x0344, 0x0374, 0x0374, 0x037E, 0x037E,
+        0x0387, 0x0387, 0x0958, 0x095F, 0x09DC, 0x09DD, 0x09DF, 0x09DF,
+        0x0A33, 0x0A33, 0x0A36, 0x0A36, 0x0A59, 0x0A5B, 0x0A5E, 0x0A5E,
+        0x0B5C, 0x0B5D, 0x0F43, 0x0F43, 0x0F4D, 0x0F4D, 0x0F52, 0x0F52,
+        0x0F57, 0x0F57, 0x0F5C, 0x0F5C, 0x0F69, 0x0F69, 0x0F73, 0x0F73,
+        0x0F75, 0x0F76, 0x0F78, 0x0F78, 0x0F81, 0x0F81, 0x0F93, 0x0F93,
+        0x0F9D, 0x0F9D, 0x0FA2, 0x0FA2, 0x0FA7, 0x0FA7, 0x0FAC, 0x0FAC,
+        0x0FB9, 0x0FB9, 0x1F71, 0x1F71, 0x1F73, 0x1F73, 0x1F75, 0x1F75,
+        0x1F77, 0x1F77, 0x1F79, 0x1F79, 0x1F7B, 0x1F7B, 0x1F7D, 0x1F7D,
+        0x1FBB, 0x1FBB, 0x1FBE, 0x1FBE, 0x1FC9, 0x1FC9, 0x1FCB, 0x1FCB,
+        0x1FD3, 0x1FD3, 0x1FDB, 0x1FDB, 0x1FE3, 0x1FE3, 0x1FEB, 0x1FEB,
+        0x1FEE, 0x1FEF, 0x1FF9, 0x1FF9, 0x1FFB, 0x1FFB, 0x1FFD, 0x1FFD,
+        0x2000, 0x2001, 0x2126, 0x2126, 0x212A, 0x212B, 0x2329, 0x232A,
+        0x2ADC, 0x2ADC, 0xF900, 0xFA0D, 0xFA10, 0xFA10, 0xFA12, 0xFA12,
+        0xFA15, 0xFA1E, 0xFA20, 0xFA20, 0xFA22, 0xFA22, 0xFA25, 0xFA26,
+        0xFA2A, 0xFA6D, 0xFA70, 0xFAD9, 0xFB1D, 0xFB1D, 0xFB1F, 0xFB1F,
+        0xFB2A, 0xFB36, 0xFB38, 0xFB3C, 0xFB3E, 0xFB3E, 0xFB40, 0xFB41,
+        0xFB43, 0xFB44, 0xFB46, 0xFB4E, 0x1D15E, 0x1D164, 0x1D1BB, 0x1D1C0,
+        0x2F800, 0x2FA1D,
+    };
+
+    /// Code points that follow a base in a composition the normalizer PERFORMS.
     ///
-    /// A SINGLETON is a character that normalizes to a different single character with no mark
-    /// involved -- U+212B ANGSTROM SIGN is U+00C5, and U+1F71 GREEK SMALL LETTER ALPHA WITH OXIA
-    /// is U+03AC WITH TONOS -- so two names can be one filename with neither of them decomposed.
-    /// Unicode's singleton canonical decompositions are a closed set and this is all of it: the
-    /// three letterlike signs, the Greek numeral sign, question mark and ano teleia, the oxia
-    /// forms and the other Greek Extended singletons, the two quads, the two angle brackets, and
-    /// the CJK compatibility ideographs, which are big enough to take by range.
+    /// These are what a decomposed spelling is made of -- "e" followed by U+0301 -- so refusing
+    /// them refuses the decomposed half of every composable pair and keeps the composed one,
+    /// which is what normalization produces and what a person types. The voiced kana are the
+    /// case that matters most in practice: a file copied from a Mac arrives as the kana followed
+    /// by U+3099, and the app's own spelling is the single character.
     ///
-    /// The combining ranges are the generic diacriticals, deliberately: those are the marks that
-    /// decompose letters which HAVE a precomposed spelling. A script whose marks have no
-    /// precomposed form -- Devanagari, Hebrew points, Arabic vowels, Thai -- lives outside them
-    /// and is not touched, which is why this can refuse decomposed spellings without refusing
-    /// whole writing systems.
+    /// Only the compositions that are PERFORMED, and only marks whose refusal cannot cost a
+    /// normalized name. Unicode excludes some compositions, and there the decomposed sequence IS
+    /// the normalized spelling: U+FB2A is U+05E9 U+05C1 and U+0958 is U+0915 U+093C, so refusing
+    /// their marks would refuse normalized Hebrew and the Indic nukta letters outright. U+093C
+    /// and U+0338 appear in both kinds and are left out for that reason; the marks that appear
+    /// only in a normalized spelling made of OTHER marks, like U+0301 in U+0344, stay in, since
+    /// refusing those costs nothing a name can carry.
     ///
-    /// This is not a normalizer and does not claim to be one; there is none to call here. What
-    /// it does is make the accepted set one where equal-looking names are equal strings, which
-    /// is what the sibling check needs.
-    private static int combiningMarkAt(String value) {
+    /// Derived from the character database rather than chosen, and re-derived by the test.
+    /// Sorted pairs of inclusive bounds.
+    private static final int[] COMPOSING_TAIL = {
+        0x0300, 0x0304, 0x0306, 0x030C, 0x030F, 0x030F, 0x0311, 0x0311,
+        0x0313, 0x0314, 0x031B, 0x031B, 0x0323, 0x0328, 0x032D, 0x032E,
+        0x0330, 0x0331, 0x0342, 0x0342, 0x0345, 0x0345, 0x0653, 0x0655,
+        0x09BE, 0x09BE, 0x09D7, 0x09D7, 0x0B3E, 0x0B3E, 0x0B56, 0x0B57,
+        0x0BBE, 0x0BBE, 0x0BD7, 0x0BD7, 0x0C56, 0x0C56, 0x0CC2, 0x0CC2,
+        0x0CD5, 0x0CD6, 0x0D3E, 0x0D3E, 0x0D57, 0x0D57, 0x0DCA, 0x0DCA,
+        0x0DCF, 0x0DCF, 0x0DDF, 0x0DDF, 0x102E, 0x102E, 0x1B35, 0x1B35,
+        0x3099, 0x309A, 0x110BA, 0x110BA, 0x11127, 0x11127, 0x1133E, 0x1133E,
+        0x11357, 0x11357, 0x113B8, 0x113B8, 0x113BB, 0x113BB, 0x113C2, 0x113C2,
+        0x113C9, 0x113C9, 0x114B0, 0x114B0, 0x114BA, 0x114BA, 0x114BD, 0x114BD,
+        0x115AF, 0x115AF, 0x11930, 0x11930, 0x1611E, 0x16120, 0x16129, 0x16129,
+        0x16D67, 0x16D67,
+    };
+
+    private static boolean inRanges(int c, int[] ranges) {
+        for (int i = 0; i < ranges.length; i += 2) {
+            if (c < ranges[i]) {
+                // Sorted, so the first range that starts above it ends the search.
+                return false;
+            }
+            if (c <= ranges[i + 1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The index of the first character that makes the value non-canonical, or -1.
+    ///
+    /// The rule is one sentence: the only accepted spelling of a name is the normalized one.
+    /// Apple's filesystems compare names after canonical normalization and Swift compares
+    /// Strings the same way, so two spellings of one name are two strings here and ONE key
+    /// there -- the sibling check passes, and then one node overwrites the other.
+    ///
+    /// There is no normalizer to call. This class is translated for the iOS runtime, which has
+    /// no `java.text.Normalizer`, so the property is carried by two tables derived from the
+    /// character database instead: the code points normalization rewrites on their own, and the
+    /// marks that follow a base in a composition it performs. Between them every unnormalized
+    /// spelling is refused and the normalized one is accepted, which is what the sibling check
+    /// needs -- including for the scripts a mark-block heuristic gets backwards, where the
+    /// DECOMPOSED sequence is the normalized spelling and the precomposed character is not.
+    ///
+    /// `DocumentIndexSerializerTest` re-derives both halves from `java.text.Normalizer` over the
+    /// whole code point space, so neither table can fall behind the property it stands for.
+    static int combiningMarkAt(String value) {
         // By CODE POINT, not by char. The supplementary compatibility ideographs live at
         // U+2F800-U+2FA1F and arrive here as surrogate pairs, so a char-by-char scan never sees
         // them -- and U+2F800 is one of the clearest cases there is: it normalizes to U+4E3D, so
@@ -412,11 +443,8 @@ public final class DocumentIndexSerializer {
             // Ports/CLDC11, where it does not -- so the first accepts what the second refuses,
             // and the Maven tests pass over a core that cannot be built for the device.
             int c = Character.codePointAt(value, i);
-            if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
-                    || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
-                    || (c >= 0xFE20 && c <= 0xFE2F)
-                    || isConjoiningJamo(c)
-                    || isCanonicalSingleton(c)) {
+            if (inRanges(c, RENORMALIZED) || inRanges(c, COMPOSING_TAIL)
+                    || isConjoiningJamo(c)) {
                 return i;
             }
             i += Character.charCount(c);

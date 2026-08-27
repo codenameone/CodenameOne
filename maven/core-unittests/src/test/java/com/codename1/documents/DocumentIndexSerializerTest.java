@@ -263,6 +263,123 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void onlyTheNormalizedSpellingIsAccepted() {
+        // The property the serializer's two tables exist to provide, re-derived here rather than
+        // trusted. Accepting two spellings of one name would put two ids in this index that are
+        // ONE key in the readers -- Swift dictionaries and Apple filesystems both compare
+        // canonically -- so one node would silently overwrite the other and two rows in the tree
+        // would open one document. Refusing the normalized spelling would refuse text that is
+        // already correct, which is how a first attempt at this refused normalized Hebrew.
+        //
+        // java.text.Normalizer is the source of truth here and cannot be the one in the
+        // serializer: that class is translated for the iOS runtime, which has no normalizer at
+        // all. The JDK's Unicode version is older than the one the tables were derived from, so
+        // this proves them complete up to what the JDK knows and leaves their extra entries as a
+        // superset, which is the safe direction.
+        java.util.Set<Integer> performed = new java.util.HashSet<>();
+        java.util.Set<Integer> normalizedSpelling = new java.util.HashSet<>();
+        for (int c = Character.MIN_CODE_POINT; c <= Character.MAX_CODE_POINT; c++) {
+            if (c >= 0xD800 && c <= 0xDFFF) {
+                continue;
+            }
+            String self = new String(Character.toChars(c));
+            String decomposed = java.text.Normalizer.normalize(self,
+                    java.text.Normalizer.Form.NFD);
+            if (decomposed.equals(self)) {
+                continue;
+            }
+            String normalized = java.text.Normalizer.normalize(self,
+                    java.text.Normalizer.Form.NFC);
+            String name = "U+" + Integer.toHexString(c).toUpperCase();
+
+            // Soundness: whatever normalization produces has to be publishable. Skipped when it
+            // is a bare mark sequence -- U+0340 normalizes to U+0300, one mark to another --
+            // which carries no text of its own, and where refusing both spellings is safe.
+            if (!isMark(Character.codePointAt(normalized, 0))) {
+                assertTrue(DocumentIndexSerializer.combiningMarkAt(normalized) < 0,
+                        "The normalized spelling of " + name + " is refused, so text that is "
+                                + "already correct cannot be published");
+            }
+
+            // Completeness, first half: a character normalization rewrites on its own must be
+            // refused, or it and its normalized spelling are two ids and one key.
+            if (!self.equals(normalized)) {
+                assertTrue(DocumentIndexSerializer.combiningMarkAt(self) >= 0,
+                        name + " and its normalized spelling are both accepted, so two ids that "
+                                + "are one key in the readers would pass");
+            }
+
+            int[] parts = decomposed.codePoints().toArray();
+            if (parts.length < 2 || (c >= 0xAC00 && c <= 0xD7A3)) {
+                continue;
+            }
+            if (normalized.equals(self)) {
+                for (int i = 1; i < parts.length; i++) {
+                    performed.add(parts[i]);
+                }
+            } else if (!isMark(parts[0])) {
+                for (int i = 1; i < parts.length; i++) {
+                    normalizedSpelling.add(parts[i]);
+                }
+            }
+        }
+
+        // Completeness, second half: the marks a decomposed spelling is made of, for every
+        // composition the normalizer performs. Minus the ones that also carry a normalized
+        // spelling of their own -- U+093C is the nukta in both U+0929, which composes, and
+        // U+0958, which does not -- because refusing those would refuse correct text.
+        performed.removeAll(normalizedSpelling);
+        for (int mark : performed) {
+            assertTrue(DocumentIndexSerializer.combiningMarkAt(new String(Character.toChars(mark)))
+                            >= 0,
+                    "U+" + Integer.toHexString(mark).toUpperCase() + " only ever appears in a "
+                            + "decomposed spelling and is accepted, so that spelling and its "
+                            + "composed twin would both pass");
+        }
+    }
+
+    private static boolean isMark(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.NON_SPACING_MARK || type == Character.COMBINING_SPACING_MARK
+                || type == Character.ENCLOSING_MARK;
+    }
+
+    @Test
+    void refusesATibetanPrecomposedVowel() {
+        // U+0F73 TIBETAN VOWEL SIGN II is canonically U+0F71 U+0F72, and Tibetan is outside every
+        // generic diacritical block, so both spellings used to be accepted: two nodes, distinct
+        // names, one key in the reader.
+        //
+        // Note which way round it goes. Unicode excludes this composition, so the normalizer
+        // takes the precomposed character APART -- the sequence is the normalized spelling and
+        // the single character is the one refused, the opposite of the Latin case below.
+        DocumentNode precomposed = DocumentNode.folder("root", "Root");
+        precomposed.add(DocumentNode.file("a", "\u0f73.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(precomposed));
+
+        DocumentNode sequence = DocumentNode.folder("root", "Root");
+        sequence.add(DocumentNode.file("a", "\u0f71\u0f72.txt"));
+        assertNotNull(DocumentIndexSerializer.serialize(sequence));
+    }
+
+    @Test
+    void acceptsNormalizedHebrewWithPoints() {
+        // The same shape as the Tibetan case, and the reason the rule cannot be "refuse every
+        // mark that appears in a decomposition". U+FB2A HEBREW SHIN WITH SHIN DOT normalizes to
+        // U+05E9 U+05C1, so the sequence is the normalized spelling: refusing its marks would
+        // refuse normalized Hebrew outright.
+        DocumentNode pointed = DocumentNode.folder("root", "Root");
+        pointed.add(DocumentNode.file("a", "\u05e9\u05b7\u05c1.txt"));
+        assertNotNull(DocumentIndexSerializer.serialize(pointed));
+
+        DocumentNode presentation = DocumentNode.folder("root", "Root");
+        presentation.add(DocumentNode.file("a", "\ufb2a.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(presentation));
+    }
+
+    @Test
     void refusesADecomposedName() {
         // Apple's filesystems compare names after canonical normalization, so "e" + U+0301 and
         // the precomposed letter are one file there and two strings here -- the sibling check

@@ -146,6 +146,16 @@ public final class CN1DocumentStore {
             Index index = new Index();
             Node rootNode = read(root, null, index);
             index.rootId = rootNode.id;
+            // Out of the same bytes as the tree, so the stamp and what it stamps are always one
+            // publication. The Apple reader has to stat around its read to get that guarantee --
+            // it reads and stats separately, and the app replaces this file by rename while it
+            // does -- and refuses to pair a tree with a revision that is not its own. Here the
+            // whole file is read in one call, so there is nothing to pair wrongly.
+            //
+            // Except in the fallback below, which is the one stamp that does not come from the
+            // bytes: a modification time read after them can belong to a later publication. It
+            // stands for an index written without the field, which nothing this framework
+            // publishes produces -- the serializer has always written it.
             index.revision = doc.optString("rev", "");
             if (index.revision.length() == 0) {
                 index.revision = Long.toString(file.lastModified());
