@@ -344,6 +344,32 @@ public abstract class BlePeripheral extends BluetoothDevice {
         return publishBeforeDone(out, new NoApply<T>());
     }
 
+    /// Hands one resource's outcome to another, but only if it can claim it.
+    ///
+    /// A named class rather than addListener, which settles the target
+    /// without asking, and rather than an anonymous one so it holds no
+    /// synthetic outer reference.
+    private static final class Forward<T> implements AsyncResult<T> {
+        private final Claiming<T> target;
+
+        Forward(Claiming<T> target) {
+            this.target = target;
+        }
+
+        @Override
+        public void onReady(T value, Throwable err) {
+            if (!target.claim()) {
+                return;
+            }
+            if (err == null) {
+                target.complete(value);
+            } else {
+                target.error(err instanceof Exception ? (Exception) err
+                        : new RuntimeException(err));
+            }
+        }
+    }
+
     /// Publishes nothing of its own; see [#publishOnly].
     private static final class NoApply<T> implements AsyncResult<T> {
         @Override
@@ -598,7 +624,13 @@ public abstract class BlePeripheral extends BluetoothDevice {
                 }
             });
         }
-        joined.addListener(out);
+        // Through the CLAIM, not addListener. The inherited forwarder tests
+        // isDone() and then calls complete(), which are two steps: a cancel
+        // landing between them returns true, and the joined arm then
+        // overwrites the cancelled resource and runs its success callbacks.
+        // Every other publication in this class goes through the claim; this
+        // one was reaching AsyncResource directly.
+        joined.onResult(new Forward<Boolean>(out));
         return out;
     }
 

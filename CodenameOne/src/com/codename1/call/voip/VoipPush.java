@@ -159,11 +159,17 @@ public final class VoipPush {
             // receiving calls -- the exact failure the replay exists to
             // prevent, arrived at from the other side.
             //
+            // Addressed to THIS listener, not to whoever is registered when
+            // it runs. Two setListener calls before the EDT drains queued two
+            // replays of the same value, and both found the replacement
+            // installed -- so it heard tokenChanged twice, which the
+            // value check cannot filter because the value never changed.
+            //
             // Not covered by a unit test on purpose: core-unittests never
             // initialises Display, so post() runs every delivery inline on
             // the calling thread and nothing can overtake anything. A test
             // there would assert the harness, not this.
-            post(new Delivery(null, known));
+            post(new Delivery(null, known, l));
         }
         // Anything that arrived before this listener existed. Taken out under
         // the monitor and delivered outside it, so a listener that installs
@@ -371,14 +377,25 @@ public final class VoipPush {
     private static final class Delivery implements Runnable {
         private final PushedCall call;
         private final String newToken;
+        /// The listener this delivery was made FOR, or null for anyone.
+        ///
+        /// A replay belongs to the listener that installed itself; a rotation
+        /// belongs to whoever is listening when it lands.
+        private final VoipPushListener addressee;
 
         Delivery(PushedCall call) {
-            this(call, null);
+            this(call, null, null);
         }
 
         Delivery(PushedCall call, String newToken) {
+            this(call, newToken, null);
+        }
+
+        Delivery(PushedCall call, String newToken,
+                VoipPushListener addressee) {
             this.call = call;
             this.newToken = newToken;
+            this.addressee = addressee;
         }
 
         /// Whether a later delivery has already superseded this one.
@@ -438,6 +455,13 @@ public final class VoipPush {
                 }
             }
             for (VoipPushListener l : ls) {
+                if (addressee != null && addressee != l) { //NOPMD CompareObjectsWithEquals
+                    // Somebody else's replay. Identity, not equals: two
+                    // listeners that compare equal are still two
+                    // registrations, and only the one that asked should be
+                    // told what it missed.
+                    continue;
+                }
                 if (call != null) {
                     l.callReceived(current());
                 } else {

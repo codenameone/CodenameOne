@@ -555,7 +555,8 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
             ipsec.useExtendedAuthentication = [user length] > 0;
             cfg = ipsec;
         } else {
-            NEVPNProtocolIKEv2 *ike = [[NEVPNProtocolIKEv2 alloc] init];
+            NEVPNProtocolIKEv2 *ike =
+                    [[[NEVPNProtocolIKEv2 alloc] init] autorelease];
             ike.authenticationMethod = [psk length] > 0
                     ? NEVPNIKEAuthenticationMethodSharedSecret
                     : NEVPNIKEAuthenticationMethodNone;
@@ -899,6 +900,11 @@ void com_codename1_impl_ios_IOSNative_vpnSetStatusListening___boolean(
         cn1vpObserver = cn1vpWatcher;
     } else if (!wanted && cn1vpObserver != nil) {
         [[NSNotificationCenter defaultCenter] removeObserver:cn1vpObserver];
+        // RELEASED, not merely forgotten. Both statics point at the one +1
+        // allocation above, and NSNotificationCenter does not retain its
+        // observer -- so dropping the pointers leaked a watcher on every
+        // add/remove cycle a listener made.
+        [cn1vpWatcher release];
         cn1vpObserver = nil;
         cn1vpWatcher = nil;
     }
