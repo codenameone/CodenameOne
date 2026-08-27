@@ -27,6 +27,7 @@ import com.codename1.call.CallError;
 import com.codename1.call.CallException;
 import com.codename1.call.CallHandle;
 import com.codename1.call.CallHandleType;
+import com.codename1.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -219,6 +220,45 @@ public final class CallWire {
     }
 
     /// Maps a type ordinal, tolerating one this build does not know.
+    /// Decodes the comma-separated handle-type ordinals a configuration
+    /// carries in one field.
+    ///
+    /// Answers an EMPTY list for a field that is absent or blank, which the
+    /// callers read as "the app named none" rather than as "the app wants
+    /// none" -- the two differ, and only the caller knows its defaults.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fields`: the split record
+    /// - `index`: the field holding the ordinals
+    ///
+    /// #### Returns
+    ///
+    /// the types, never null
+    public static java.util.List<CallHandleType> handleTypes(String[] fields,
+            int index) {
+        java.util.List<CallHandleType> out =
+                new java.util.ArrayList<CallHandleType>();
+        String raw = field(fields, index);
+        if (raw.length() == 0) {
+            return out;
+        }
+        for (String part : StringUtil.tokenize(raw, ',')) {
+            String trimmed = part.trim();
+            if (trimmed.length() == 0) {
+                continue;
+            }
+            try {
+                out.add(handleType(Integer.parseInt(trimmed)));
+            } catch (NumberFormatException notAnOrdinal) {
+                // A record this class did not write; the rest may still be
+                // usable, and handleType already clamps an out-of-range one.
+                continue;
+            }
+        }
+        return out;
+    }
+
     public static CallHandleType handleType(int ordinal) {
         CallHandleType[] values = CallHandleType.values();
         if (ordinal < 0 || ordinal >= values.length) {

@@ -22,7 +22,9 @@
  */
 package com.codename1.call;
 
+import com.codename1.call.CallHandleType;
 import com.codename1.impl.call.CallWire;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -137,5 +139,28 @@ public class CallWireTest {
                 new String[]{CallWire.flagOf(true), CallWire.flagOf(false)}));
         assertTrue(CallWire.flag(f, 0));
         assertFalse(CallWire.flag(f, 1));
+    }
+
+    @Test
+    public void handleTypesDecodeFromOneField() {
+        // The Android account registers its Telecom schemes from these, so a
+        // record it cannot read means an app that said "phone numbers only"
+        // is registered for SIP as well -- and Telecom then routes it a call
+        // it said it could not take.
+        String[] f = CallWire.split("a\t1\tb\tc\td\t1,0\te");
+        List<CallHandleType> types = CallWire.handleTypes(f, 5);
+        assertEquals(2, types.size());
+        assertTrue(types.contains(CallHandleType.PHONE_NUMBER));
+        assertTrue(types.contains(CallHandleType.GENERIC));
+
+        // An absent or blank field is "the app named none", which the caller
+        // reads against its own defaults -- not "the app wants none".
+        assertTrue(CallWire.handleTypes(f, 99).isEmpty());
+        assertTrue(CallWire.handleTypes(CallWire.split("a\tb"), 1).isEmpty());
+
+        // A record this class did not write does not cost the rest of it.
+        List<CallHandleType> messy =
+                CallWire.handleTypes(CallWire.split("x\t1,zz,2"), 1);
+        assertEquals(2, messy.size());
     }
 }

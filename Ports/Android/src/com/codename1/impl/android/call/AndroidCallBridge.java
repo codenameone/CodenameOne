@@ -363,9 +363,37 @@ public class AndroidCallBridge implements CallBridge {
                         | PhoneAccount.CAPABILITY_VIDEO_CALLING;
             }
             PhoneAccount.Builder builder = PhoneAccount.builder(handle, label)
-                    .setCapabilities(caps)
-                    .addSupportedUriScheme(PhoneAccount.SCHEME_TEL)
-                    .addSupportedUriScheme(PhoneAccount.SCHEME_SIP);
+                    .setCapabilities(caps);
+            // The SCHEMES the app said it handles, as iOS registers the
+            // matching supportedHandleTypes. Registering both regardless let
+            // Telecom route a system-originated SIP call to an app that had
+            // explicitly said it takes phone numbers only -- and gave an
+            // app that wanted neither no way to say so.
+            //
+            // tel carries PHONE_NUMBER; sip carries the two address-shaped
+            // kinds, because Telecom has no scheme of its own for either and
+            // a SIP URI is what both arrive as.
+            boolean tel = false;
+            boolean sip = false;
+            for (CallHandleType t : CallWire.handleTypes(f, 5)) {
+                if (t == CallHandleType.PHONE_NUMBER) {
+                    tel = true;
+                } else {
+                    sip = true;
+                }
+            }
+            if (!tel && !sip) {
+                // A configuration that named none is not a configuration that
+                // wants none; the defaults are phone-number and generic.
+                tel = true;
+                sip = true;
+            }
+            if (tel) {
+                builder.addSupportedUriScheme(PhoneAccount.SCHEME_TEL);
+            }
+            if (sip) {
+                builder.addSupportedUriScheme(PhoneAccount.SCHEME_SIP);
+            }
             if (inRecents) {
                 // An EXTRA rather than a capability, and the string is
                 // spelled out rather than named: PhoneAccount

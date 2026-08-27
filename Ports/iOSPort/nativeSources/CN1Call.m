@@ -911,9 +911,36 @@ static void cn1clQueuePushed(NSString *uuid, NSString *handleWire,
                     (int64_t)([[NSDate date] timeIntervalSince1970] * 1000.0)], @"at",
             nil];
     @synchronized (cn1clLock) {
-        [cn1clPending addObject:rec];
+        // ONE record per uuid. APNs retries a VoIP payload and a server that
+        // resends is doing what it should, and the CallKit report itself is
+        // already deduplicated -- but the QUEUE was not, so a drain handed
+        // callReceived to the app once per copy for a single live
+        // CallSession. Signalling would attach, answer or start media twice
+        // for one call.
+        //
+        // A stale record is exempt: it is a missed-call notice rather than a
+        // live call, and two of those are two rows in a log.
+        BOOL duplicate = NO;
         if (uuid != nil && !stale) {
-            [cn1clUnclaimed addObject:uuid];
+            for (NSDictionary *queued in cn1clPending) {
+                if ([[queued objectForKey:@"uuid"] isEqualToString:uuid]
+                        && ![[queued objectForKey:@"stale"] boolValue]) {
+                    duplicate = YES;
+                    break;
+                }
+            }
+            if (!duplicate && [cn1clCalls objectForKey:uuid] != nil
+                    && ![cn1clUnclaimed containsObject:uuid]) {
+                // Already drained and live: Java has this call, so a resend
+                // is a repeat of something it has already been told.
+                duplicate = YES;
+            }
+        }
+        if (!duplicate) {
+            [cn1clPending addObject:rec];
+            if (uuid != nil && !stale) {
+                [cn1clUnclaimed addObject:uuid];
+            }
         }
     }
 }
