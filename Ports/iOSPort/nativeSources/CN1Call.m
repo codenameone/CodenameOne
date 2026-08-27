@@ -295,6 +295,24 @@ static BOOL cn1clHoldUntilReady(CXAction *action, void (^deliver)(void)) {
     }
 }
 
+/// Drops the tracked copy of an action the system has given up on, so a
+/// later completion finds nothing to answer.
+static void cn1clForgetTrackedAction(CXAction *action) {
+    if (action == nil) {
+        return;
+    }
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        NSArray *keys = [cn1clActions allKeys];
+        for (NSNumber *key in keys) {
+            if ([cn1clActions objectForKey:key] == action) {
+                [cn1clActions removeObjectForKey:key];
+                return;
+            }
+        }
+    }
+}
+
 /// Drops a held action the system has given up on.
 static void cn1clWithdrawHeldAction(CXAction *action) {
     if (action == nil) {
@@ -595,6 +613,13 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // as the system is concerned, and cn1clCompleteAction ignores a token it
     // no longer holds.
     cn1clWithdrawHeldAction(action);
+    // And the TRACKED copy, which is the other place an expired action can
+    // hide. Java being ready is not the same as Java being prompt: with a
+    // blocked EDT the action is tracked and its event queued rather than
+    // held, so withdrawing only from the held queue left the token in
+    // cn1clActions -- and when the EDT resumed, cn1clCompleteAction fetched
+    // a CXAction CallKit had already timed out and answered it.
+    cn1clForgetTrackedAction(action);
 }
 
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {

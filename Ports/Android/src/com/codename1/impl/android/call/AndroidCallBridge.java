@@ -142,7 +142,21 @@ public class AndroidCallBridge implements CallBridge {
         if (!isCallSupported()) {
             return CallAvailability.UNSUPPORTED.ordinal();
         }
-        if ((getGrantedPermissions() & PERMISSION_MANAGE_CALLS) == 0) {
+        int granted = getGrantedPermissions();
+        if ((granted & PERMISSION_MANAGE_CALLS) == 0) {
+            return CallAvailability.NOT_PERMITTED.ordinal();
+        }
+        // NOTIFICATIONS TOO, on the versions that ask for them. A
+        // self-managed call has no system call UI on Android -- this port
+        // rings with its own full-screen notification -- so without the
+        // permission the OS suppresses it and the user gets no ringing
+        // screen and no Answer or Decline. Telecom would still accept the
+        // call, leaving the app believing it is ringing while nothing is.
+        //
+        // Reported as NOT_PERMITTED, which is what it is: an app that asks
+        // can recover by requesting it, and one that has been refused should
+        // not be reporting incoming calls at all.
+        if ((granted & PERMISSION_NOTIFICATIONS) == 0) {
             return CallAvailability.NOT_PERMITTED.ordinal();
         }
         TelecomManager tm = telecom();

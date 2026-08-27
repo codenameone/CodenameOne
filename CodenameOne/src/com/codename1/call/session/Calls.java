@@ -950,8 +950,20 @@ public final class Calls {
                         // A listener that DID report the call has already
                         // answered this action through report() above, so
                         // this only fires for one that did nothing at all.
-                        synchronized (PENDING_STARTS) {
-                            PENDING_STARTS.remove(callId);
+                        //
+                        // A DEFERRED action keeps its entry: defer() says the
+                        // report is coming later, which is the documented way
+                        // to place a call asynchronously. Dropping the entry
+                        // when the listener returned meant that report could
+                        // no longer answer the action, and its own safety
+                        // timer then failed a request the app had honoured --
+                        // destroying the system-started connection after the
+                        // report had already succeeded. The entry is cleared
+                        // by that report, or by a provider reset.
+                        if (!a.isDeferred()) {
+                            synchronized (PENDING_STARTS) {
+                                PENDING_STARTS.remove(callId);
+                            }
                         }
                         settleStart(a);
                     }

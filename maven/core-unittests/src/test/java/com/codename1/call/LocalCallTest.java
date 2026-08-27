@@ -272,6 +272,40 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aDeferredStartIsStillAnsweredByTheReport() {
+        // defer() is the documented way to place the call asynchronously, so
+        // the adoption entry has to outlive the listener returning. Dropping
+        // it there left the later report unable to answer the action, and its
+        // own safety timer then failed a request the app had honoured --
+        // destroying the system-started connection after the report had
+        // already succeeded.
+        final List<CallAction> deferred = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void startCallRequested(String callId, CallHandle handle,
+                    boolean video, CallAction action) {
+                action.defer();
+                deferred.add(action);
+            }
+        });
+        String id = CallId.random();
+        bridge.simulateStartCallRequest(id, CallHandle.phone("+14155551212"),
+                false);
+        waitFor(deferred, 1);
+        assertNull(bridge.getLastActionFulfilled(),
+                "a deferred action is not answered when the listener returns");
+
+        // The report arrives later, exactly as defer() promises.
+        Calls.reportOutgoing(id, CallHandle.phone("+14155551212"), "Ada", false);
+        long limit = System.currentTimeMillis() + 5000;
+        while (bridge.getLastActionFulfilled() == null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(Boolean.TRUE, bridge.getLastActionFulfilled(),
+                "the deferred report still answers the start request");
+    }
+
+    @Test
     public void anIgnoredSystemStartIsFailedRatherThanFulfilled() {
         // The one action where silence does NOT mean done. Everywhere else
         // the app was asked to do something to a call that exists, and the
