@@ -32,6 +32,14 @@
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 **/build/*
+# `build` is a build directory everywhere except in com.codename1.build.shared,
+# where it is a Java package name. Without this, a NEW source file there is
+# silently untracked -- git add skips it, the module compiles locally from the
+# working tree, and CI fails on a file nobody can see is missing. The existing
+# files survive only because they predate the rule above, and
+# check-build-hint-catalog.sh tells you to add hints to exactly this package.
+!maven/build-hint-catalog/src/main/java/**
+!maven/build-hint-catalog/src/test/java/**
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
