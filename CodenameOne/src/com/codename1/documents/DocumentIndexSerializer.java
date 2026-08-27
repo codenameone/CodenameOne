@@ -359,7 +359,7 @@ public final class DocumentIndexSerializer {
     /// become one on disk, and a reader that finds a duplicate rejects the index whole -- so the
     /// published location vanishes instead of one document going missing, which is a far worse
     /// failure than the one the publisher was asked to prevent.
-    private static int loneSurrogateAt(String value) {
+    static int loneSurrogateAt(String value) {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (Character.isHighSurrogate(c)) {

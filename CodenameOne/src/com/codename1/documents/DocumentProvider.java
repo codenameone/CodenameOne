@@ -159,6 +159,27 @@ public final class DocumentProvider {
             throw new IllegalArgumentException("The document endpoint must be HTTPS; got \""
                     + endpoint + "\".");
         }
+        // Both values are written to disk as UTF-8, by every bridge. An unpaired surrogate has
+        // no UTF-8 encoding and becomes "?", so the endpoint that is read back is a different URL
+        // and the token that is sent is a different credential -- a request to the wrong place,
+        // or one the server rejects, with nothing in either message pointing at the character
+        // that did it.
+        int badEndpoint = endpoint == null ? -1
+                : DocumentIndexSerializer.loneSurrogateAt(endpoint);
+        if (badEndpoint >= 0) {
+            throw new IllegalArgumentException("The document endpoint contains an unpaired "
+                    + "surrogate at index " + badEndpoint + ". It cannot be encoded as UTF-8, "
+                    + "and the readers store it as UTF-8, so the URL they use would not be the "
+                    + "one given here.");
+        }
+        int badToken = authToken == null ? -1
+                : DocumentIndexSerializer.loneSurrogateAt(authToken);
+        if (badToken >= 0) {
+            throw new IllegalArgumentException("The document endpoint's auth token contains an "
+                    + "unpaired surrogate at index " + badToken + ". It cannot be encoded as "
+                    + "UTF-8, and the readers store it as UTF-8, so the credential they send "
+                    + "would not be the one given here.");
+        }
         DocumentProviderBridge b = bridgeInternal();
         if (b == null) {
             return;

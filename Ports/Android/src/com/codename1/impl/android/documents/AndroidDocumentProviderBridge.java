@@ -48,7 +48,26 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
 
     @Override
     public boolean isDocumentProviderSupported() {
-        return context() != null && authority() != null;
+        Context ctx = context();
+        String authority = authority();
+        if (ctx == null || authority == null) {
+            return false;
+        }
+        // The MANIFEST decides this, not the package name. The authority is derived and always
+        // resolvable as a string, so answering from it said yes to an app whose build never
+        // added the <provider> -- documents publishing only from a cn1lib, where the usage scan
+        // reads the application's own classes and the developer did not set
+        // android.documentProvider.enabled. Publishing then succeeded, wrote its index, and no
+        // location ever appeared in the picker. Asking the package manager is asking whether
+        // anything is listening.
+        try {
+            return ctx.getPackageManager().resolveContentProvider(authority, 0) != null;
+        } catch (Throwable t) {
+            // A package manager that cannot answer is not evidence the provider is missing, and
+            // this gates the whole public API: an honest maybe is better than a silent no.
+            Log.w(TAG, "Could not resolve the document provider authority " + authority, t);
+            return true;
+        }
     }
 
     @Override
