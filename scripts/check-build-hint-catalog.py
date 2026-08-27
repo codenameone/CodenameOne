@@ -10,6 +10,7 @@ green build, no effect, nobody noticed.
 Held against a baseline rather than failing outright: a large tail of hints
 predates the catalog. The point is that *new* code cannot add another one.
 """
+import json
 import collections, fnmatch, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,9 +29,6 @@ def catalog():
             continue
         with open(os.path.join(src, fn), encoding="utf-8") as fh:
             text = fh.read()
-        # BuildHintsFromAnnotations is generated and qualifies the type, so both
-        # spellings count -- the hints the annotations expose are catalogued
-        # there rather than in the hand-written files.
         for m in re.finditer(r'new (?:BuildHints\.)?Hint\("((?:[^"\\]|\\.)*)"\)', text):
             names.add(m.group(1))
         for m in re.finditer(r'\.dynamic\("((?:[^"\\]|\\.)*)"\)', text):
@@ -39,7 +37,24 @@ def catalog():
         for m in re.finditer(r'family\(h,\s*"((?:[^"\\]|\\.)*)"', text):
             names.add(m.group(1))
             patterns.add(m.group(1))
+    # The hints the ANNOTATIONS declare are not in these files at all -- they are
+    # declared in CodenameOne/src and rendered into the generated data file. That
+    # file is the same rendering the Settings editor reads, so reading it here
+    # asks the same question of the same answer.
+    names.update(annotated_names())
     return names, patterns
+
+
+ANNOTATED_DATA = os.path.join(
+    ROOT, "maven/build-hint-catalog/src/main/resources/cn1-build-hints.json")
+
+
+def annotated_names():
+    """Hint names from the generated data file, or nothing when it is absent."""
+    if not os.path.exists(ANNOTATED_DATA):
+        return set()
+    with open(ANNOTATED_DATA, encoding="utf-8") as fh:
+        return {h["name"] for h in json.load(fh)}
 
 
 DOC_ROOTS = [

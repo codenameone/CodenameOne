@@ -226,50 +226,41 @@ nothing at all.
 **A hint is described in exactly one place, and which place depends on whether
 it has an annotation.**
 
-The ~82 hints exposed as annotation attributes are described by the annotation
-itself, in `CodenameOne/src/com/codename1/annotations/buildhints`. Those files
-are HAND-WRITTEN and are the source of truth. The attribute's Java type is the
-hint's type, an enum's constants are its value domain, and `@Hint` carries what
-javac cannot infer -- the wire key where it differs from the attribute name, the
-prose, the builder's default, and how a cn1lib appends. `@HintValue` carries an
-enum constant's wire value and the other spellings the builder accepts.
-`HintKind` names what a `String` really holds, because the editor picks a
-version field, a masked field or a multi-line box and Java says `String` for all
-three.
+A hint is declared in exactly one of two places:
 
-The remaining ~473 -- the dynamic families, the build-service-only hints and the
-long tail with no annotation -- are described in `maven/build-hint-catalog`.
+- **With an annotation** -- `CodenameOne/src/com/codename1/annotations/buildhints`,
+  hand-written and the source of truth. The attribute's Java type IS the hint's
+  type, an enum's constants ARE its value domain, and `@Hint` carries only what
+  javac cannot infer. See that package's `package-info.java`.
+- **Without one** -- the dynamic families, build-service-only hints and the long
+  tail, in `maven/build-hint-catalog`.
 
-Everything else is a GENERATED VIEW of those two, and none of it is a place to
-edit:
+Nothing else states a hint. `BuildHintCodeGenerator` generates no code: it
+renders the annotated hints into `cn1-build-hints.json` for the two editors that
+are Codename One apps and have no bytecode reader (Settings, and the simulator's
+hint editor, which keeps its own copy because its module does not depend on the
+catalog), plus the developer guide's table, which is not checked in. Anything
+that CAN read bytecode -- the Maven plugin, the annotation processor -- reads the
+annotations through `BuildHintAnnotationReader` instead.
 
-- `BuildHintsFromAnnotations` in the catalog, so the Settings tool (a Codename
-  One app, with no bytecode reader) sees the annotated hints too
-- `BuildHintAnnotationBinding`, which the annotation processor reads back
-- the developer guide's build hint table, rendered by
-  `scripts/gen-build-hint-table.sh` every time the guide is built and **not**
-  checked in (both renderers -- `developer-guide-docs.yml` and
-  `scripts/website/build.sh` -- call it first)
-- the simulator's Build Hint editor schema (`BuildHintCatalogDefaults`)
-- the agent reference's annotation table (`skill/references/build-hints.md`)
+Two things worth knowing before editing: `@Hint` has CLASS retention, so
+reflection cannot see it and everything reads it with ASM; and the annotations
+never state what the build server does when a hint is not set, because that is
+the server's to change (see `HintUnset`).
 
-Adding a hint to a builder means describing it in the same change -- as an
-annotation attribute if it should have one, in the catalog otherwise.
-`BuildHintAnnotationReader` reads the annotations out of their COMPILED classes,
-so `@Hint` has CLASS retention and the generator compiles the sources itself
-rather than requiring a core build. Regenerate with:
+Adding a hint to a builder means declaring it in the same change. Regenerate and
+check with:
 
 ```bash
 source tools/env.sh
-scripts/gen-build-hint-annotations.sh          # rewrite the generated views
+scripts/gen-build-hint-annotations.sh          # rewrite the data file
 scripts/gen-build-hint-annotations.sh --check  # what CI runs
-scripts/check-build-hint-catalog.sh            # every hint the code reads is catalogued
+scripts/check-build-hint-catalog.sh            # every hint the code reads is declared
 ```
 
-`scripts/build-hint-catalog-baseline.txt` is a ratchet, and it is **empty**: every
-hint the code reads is described. A new entry means a hint went in without a
-catalog row. The same gate refuses a `codename1.arg.*` key in our own docs and
-project templates that no builder reads.
+`scripts/build-hint-catalog-baseline.txt` is an **empty** ratchet: a new entry
+means a hint went in undeclared. The same gate refuses a `codename1.arg.*` key in
+our docs and templates that no builder reads.
 
 Do not re-run `tools/build-hint-bootstrap/` -- it seeded the catalog once and
 would overwrite hand edits.

@@ -32,15 +32,6 @@
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 **/build/*
-# ...but `build` is also a legitimate Java package name, and com.codename1.build.shared
-# is where the catalogs shared with the build service live. Without these, a new file
-# there is silently untracked: `git add` skips it, the module compiles locally from the
-# working tree, and CI fails with "No sources to compile". The existing files in that
-# package survive only because they were added before the rule above.
-!**/src/main/java/**/build/
-!**/src/main/java/**/build/**
-!**/src/test/java/**/build/
-!**/src/test/java/**/build/**
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties

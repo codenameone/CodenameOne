@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# Regenerates the build hint annotations in
-# CodenameOne/src/com/codename1/annotations/buildhints from the catalog in
-# maven/build-hint-catalog, along with the BuildHintAnnotationBinding table the
-# annotation processor reads back.
+# Renders the build hint ANNOTATIONS into the forms that cannot read them.
+#
+# The annotations in CodenameOne/src/com/codename1/annotations/buildhints are
+# hand-written and are the source; nothing here writes into that package. This
+# produces cn1-build-hints.json for the two editors that are Codename One apps
+# and so have no bytecode reader -- the Settings tool and the simulator's hint
+# editor -- and the developer guide's table, which is not checked in.
 #
 #   scripts/gen-build-hint-annotations.sh            # write into the tree
 #   scripts/gen-build-hint-annotations.sh --check    # fail if anything changed
 #
-# The output is checked in. CodenameOne/src is compiled by the Maven core
-# module, the Ant/NetBeans project and the IDE projects alike, and only the
-# first would see sources generated into target/ -- the others would quietly
-# build a codenameone-core.jar without the annotations in it. Checking the
-# sources in also means @Ios( completes in the IDE, which is the point.
+# The data file is checked in because it ships inside those applications, and
+# --check is what stops it drifting from the annotations beside it.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -35,7 +35,7 @@ asm_cp() {
 }
 
 ANN_ROOT="$REPO_ROOT/CodenameOne/src"
-CATALOG_SRC="$CATALOG/src/main/java"
+CATALOG_DATA="$CATALOG/src/main/resources"
 
 check=0
 [ "${1:-}" = "--check" ] && check=1
@@ -47,11 +47,14 @@ check=0
 echo "gen-build-hint-annotations: building the catalog" >&2
 (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
 
-JAVASE_SRC="$REPO_ROOT/Ports/JavaSE/src"
+# The simulator's copy of the data file. maven/javase does not depend on the
+# catalog module, so it carries its own resource; both copies are written in
+# this one run and both are checked below, so they cannot disagree.
+JAVASE_DATA="$REPO_ROOT/maven/javase/src/main/resources"
 GUIDE_TABLE="$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc"
 
 java -cp "$CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator \
-     "$ANN_ROOT" "$CATALOG_SRC" "$JAVASE_SRC" "$GUIDE_TABLE"
+     "$ANN_ROOT" "$CATALOG_DATA" "$JAVASE_DATA" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then
   # The developer guide's table is deliberately absent: it is not checked in, so
@@ -62,10 +65,10 @@ if [ "$check" -eq 1 ]; then
   # truth for the hints they expose, and BuildHintAnnotationReader reads them
   # back rather than any file restating them. Policing them here would report a
   # deliberate edit as drift.
-  # BuildHintAnnotationBinding is gone: the processor reads the annotation
-  # package off the classpath instead of consulting a generated mirror of it.
-  targets=("maven/build-hint-catalog/src/main/java/com/codename1/build/shared/BuildHintsFromAnnotations.java"
-           "Ports/JavaSE/src/com/codename1/impl/javase/BuildHintCatalogDefaults.java")
+  # No generated Java at all: the processor reads the annotation package off the
+  # classpath, and these two are the data file the editors read.
+  targets=("maven/build-hint-catalog/src/main/resources/cn1-build-hints.json"
+           "maven/javase/src/main/resources/cn1-build-hints.json")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
     echo "::error::Generated build hint views are out of date." >&2

@@ -22,6 +22,10 @@
  */
 package com.codename1.build.shared;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -73,10 +77,12 @@ public final class BuildHints {
         BuildHintsGeneral.register(h);
         BuildHintsDynamic.register(h);
         BuildHintsExternal.register(h);
-        // The hints the annotations expose, rendered back into the catalog for
-        // the consumers that cannot read bytecode -- the Settings editor above
-        // all. A view of the annotations, not a second statement of them.
-        BuildHintsFromAnnotations.register(h);
+        // The hints the annotations expose, read from the generated data file.
+        // A rendering of the annotations for the consumers that cannot read
+        // bytecode -- the Settings editor above all -- and not a second
+        // statement of them. Anything that CAN read bytecode reads the
+        // annotations directly and never comes here.
+        h.addAll(BuildHintsJson.load());
 
         Map<String, Hint> byName = new LinkedHashMap<String, Hint>();
         for (Hint entry : h) {
@@ -487,6 +493,283 @@ public final class BuildHints {
         @Override
         public String toString() {
             return name;
+        }
+    }
+
+    /**
+     * Reads the generated build hint data file.
+     *
+     * <p>Nested rather than its own file on purpose. The repository ignores
+     * every path with a {@code build} directory segment in it, and this package
+     * has one in its NAME, so a new file here is silently untracked: git add
+     * skips it, the module builds locally from the working tree, and CI fails on
+     * a file nobody can see is missing.</p>
+     *
+     * <p>Hand-written parser rather than a JSON library: this module has no
+     * dependencies beyond JUnit on purpose, because the build service shares it.
+     * It reads the subset the generator writes -- an array of objects whose
+     * values are strings or arrays of strings -- and nothing else.</p>
+     */
+    static final class BuildHintsJson {
+
+        private BuildHintsJson() {
+        }
+
+
+        /** Where the generator writes it, on the classpath of whoever needs it. */
+        static final String RESOURCE = "/cn1-build-hints.json";
+
+        /** Every hint the data file describes, or an empty list when it is absent. */
+        static List<BuildHints.Hint> load() {
+            InputStream in = BuildHints.class.getResourceAsStream(RESOURCE);
+            if (in == null) {
+                return new ArrayList<BuildHints.Hint>();
+            }
+            try {
+                return parse(readAll(in));
+            } catch (IOException ex) {
+                throw new IllegalStateException("Could not read " + RESOURCE, ex);
+            } finally {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // read-only stream
+                }
+            }
+        }
+
+        static String readAll(InputStream in) throws IOException {
+            BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            return sb.toString();
+        }
+
+        /** The array of hint objects `json` holds. */
+        static List<BuildHints.Hint> parse(String json) {
+            List<BuildHints.Hint> out = new ArrayList<BuildHints.Hint>();
+            Cursor c = new Cursor(json);
+            c.skipWhitespace();
+            c.expect('[');
+            c.skipWhitespace();
+            if (c.peek() == ']') {
+                return out;
+            }
+            while (true) {
+                out.add(toHint(c.readObject()));
+                c.skipWhitespace();
+                char ch = c.next();
+                if (ch == ']') {
+                    return out;
+                }
+                if (ch != ',') {
+                    throw new IllegalStateException("Expected , or ] at " + c.at);
+                }
+                c.skipWhitespace();
+            }
+        }
+
+        private static BuildHints.Hint toHint(Map<String, Object> o) {
+            BuildHints.Hint h = new BuildHints.Hint(str(o, "name"));
+            h.annotatedAs(HintGroup.valueOf(str(o, "group")), str(o, "attr"));
+            List<String> values = list(o, "values");
+            if (!values.isEmpty()) {
+                h.values(str(o, "enum"), values.toArray(new String[values.size()]));
+                List<String> aliases = list(o, "valueAliases");
+                if (!aliases.isEmpty()) {
+                    h.valueAliases(aliases.toArray(new String[aliases.size()]));
+                }
+                List<String> labels = list(o, "valueLabels");
+                if (!labels.isEmpty()) {
+                    h.valueLabels(labels.toArray(new String[labels.size()]));
+                }
+                List<String> constants = list(o, "valueConstants");
+                if (!constants.isEmpty()) {
+                    h.valueConstants(constants.toArray(new String[constants.size()]));
+                }
+                String unset = str(o, "unsetConstant");
+                if (unset != null) {
+                    h.unsetConstant(unset);
+                }
+            }
+            // AFTER the domain: values() sets the type to ENUM, so a Toggle-backed
+            // BOOLEAN hint written the other way round comes back as an enum.
+            String type = str(o, "type");
+            if (type != null) {
+                h.type(HintType.valueOf(type));
+            }
+            String pattern = str(o, "valuePattern");
+            if (pattern != null) {
+                h.valuePattern(pattern);
+            }
+            String separator = str(o, "separator");
+            if (separator != null) {
+                h.separator(separator);
+            }
+            String platform = str(o, "platform");
+            if (platform != null) {
+                h.platform(platform);
+            }
+            String aliasOf = str(o, "aliasOf");
+            if (aliasOf != null) {
+                h.aliasOf(aliasOf);
+            }
+            String deprecated = str(o, "deprecated");
+            if (deprecated != null) {
+                h.deprecated(deprecated);
+            }
+            if (o.containsKey("external")) {
+                h.external();
+            }
+            if (o.containsKey("enterpriseOnly")) {
+                h.enterpriseOnly();
+            }
+            String link = str(o, "link");
+            if (link != null) {
+                h.link(link);
+            }
+            String doc = str(o, "doc");
+            return h.doc(doc == null ? "" : doc);
+        }
+
+        private static String str(Map<String, Object> o, String key) {
+            Object v = o.get(key);
+            return v instanceof String ? (String) v : null;
+        }
+
+        @SuppressWarnings("unchecked")
+        private static List<String> list(Map<String, Object> o, String key) {
+            Object v = o.get(key);
+            return v instanceof List ? (List<String>) v : new ArrayList<String>();
+        }
+
+        /** A position in the text, with just enough to read the emitted subset. */
+        private static final class Cursor {
+            private final String s;
+            private int at;
+
+            Cursor(String s) {
+                this.s = s;
+            }
+
+            void skipWhitespace() {
+                while (at < s.length() && Character.isWhitespace(s.charAt(at))) {
+                    at++;
+                }
+            }
+
+            char peek() {
+                return at < s.length() ? s.charAt(at) : '\0';
+            }
+
+            char next() {
+                return at < s.length() ? s.charAt(at++) : '\0';
+            }
+
+            void expect(char c) {
+                if (next() != c) {
+                    throw new IllegalStateException("Expected " + c + " at " + (at - 1));
+                }
+            }
+
+            Map<String, Object> readObject() {
+                Map<String, Object> out = new LinkedHashMap<String, Object>();
+                skipWhitespace();
+                expect('{');
+                skipWhitespace();
+                if (peek() == '}') {
+                    next();
+                    return out;
+                }
+                while (true) {
+                    skipWhitespace();
+                    String key = readString();
+                    skipWhitespace();
+                    expect(':');
+                    skipWhitespace();
+                    out.put(key, peek() == '[' ? readArray() : readValue());
+                    skipWhitespace();
+                    char c = next();
+                    if (c == '}') {
+                        return out;
+                    }
+                    if (c != ',') {
+                        throw new IllegalStateException("Expected , or } at " + (at - 1));
+                    }
+                }
+            }
+
+            List<String> readArray() {
+                List<String> out = new ArrayList<String>();
+                expect('[');
+                skipWhitespace();
+                if (peek() == ']') {
+                    next();
+                    return out;
+                }
+                while (true) {
+                    skipWhitespace();
+                    out.add(readString());
+                    skipWhitespace();
+                    char c = next();
+                    if (c == ']') {
+                        return out;
+                    }
+                    if (c != ',') {
+                        throw new IllegalStateException("Expected , or ] at " + (at - 1));
+                    }
+                }
+            }
+
+            Object readValue() {
+                if (peek() == '"') {
+                    return readString();
+                }
+                if (s.startsWith("true", at)) {
+                    at += 4;
+                    return Boolean.TRUE;
+                }
+                if (s.startsWith("false", at)) {
+                    at += 5;
+                    return Boolean.FALSE;
+                }
+                if (s.startsWith("null", at)) {
+                    at += 4;
+                    return null;
+                }
+                throw new IllegalStateException("Unexpected value at " + at);
+            }
+
+            String readString() {
+                expect('"');
+                StringBuilder sb = new StringBuilder();
+                while (true) {
+                    char c = next();
+                    if (c == '"') {
+                        return sb.toString();
+                    }
+                    if (c != '\\') {
+                        sb.append(c);
+                        continue;
+                    }
+                    char esc = next();
+                    switch (esc) {
+                        case 'n': sb.append('\n'); break;
+                        case 't': sb.append('\t'); break;
+                        case 'r': sb.append('\r'); break;
+                        case 'b': sb.append('\b'); break;
+                        case 'f': sb.append('\f'); break;
+                        case 'u':
+                            sb.append((char) Integer.parseInt(s.substring(at, at + 4), 16));
+                            at += 4;
+                            break;
+                        default: sb.append(esc);
+                    }
+                }
+            }
         }
     }
 }

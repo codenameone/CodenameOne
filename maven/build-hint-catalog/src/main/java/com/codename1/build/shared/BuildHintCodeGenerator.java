@@ -38,23 +38,36 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Generates the {@code com.codename1.annotations.build} annotation types from
- * {@link BuildHints}, plus the binding table the annotation processor reads
- * back.
+ * Renders the build hints that the ANNOTATIONS declare into the two forms that
+ * cannot read them directly.
  *
- * <p>The generated sources are checked in rather than produced into
- * {@code target/}. {@code CodenameOne/src} is compiled by four independent
- * front ends -- the Maven core module, the Ant/NetBeans project, IntelliJ and
- * {@code ant core} -- and generating into {@code target/} reaches exactly one
- * of them. The failure mode is not a build error but a jar-identity split,
- * where {@code mvn install} and {@code ant core} produce different
- * {@code codenameone-core.jar}s. Checked-in sources also mean {@code @Ios(}
- * autocompletes in every IDE, which is the entire point of the feature.</p>
+ * <p>It generates no code. The annotations in
+ * {@code com.codename1.annotations.buildhints} are hand-written and are the
+ * source of truth for the hints they expose; the hints with no annotation are
+ * written by hand in this module. Everything that can read bytecode -- the
+ * Maven plugin, the annotation processor -- reads the annotations themselves
+ * through {@link BuildHintAnnotationReader} and never comes here.</p>
  *
- * <p>Run through {@code scripts/gen-build-hint-annotations.sh}; CI re-runs it
- * with {@code --check} and fails on any diff.</p>
+ * <p>What it writes is data and prose:</p>
+ *
+ * <ul>
+ *   <li>{@code build-hints.json}, for the two editors that are Codename One
+ *       applications and so have no class reader: the Settings tool, through
+ *       {@link BuildHints}, and the simulator's Build Hint editor, which
+ *       carries its own copy because its module does not depend on this
+ *       one.</li>
+ *   <li>the developer guide's hint table, rendered on every guide build and
+ *       not checked in.</li>
+ * </ul>
+ *
+ * <p>Run through {@code scripts/gen-build-hint-annotations.sh}, whose
+ * {@code --check} mode is what CI uses to catch a data file that no longer
+ * matches the annotations beside it.</p>
  */
 public final class BuildHintCodeGenerator {
+
+    /** The generated data file, at the root of whichever resource tree gets it. */
+    private static final String DATA_FILE = "cn1-build-hints.json";
 
     private static final String LICENSE =
         "/*\n"
@@ -79,11 +92,6 @@ public final class BuildHintCodeGenerator {
       + " * Please contact Codename One through http://www.codenameone.com/ if you\n"
       + " * need additional information or have any questions.\n"
       + " */\n";
-
-    private static final String GENERATED_NOTE =
-        "/// Generated from com.codename1.build.shared.BuildHints by\n"
-      + "/// BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and\n"
-      + "/// re-run scripts/gen-build-hint-annotations.sh.\n";
 
     // NOT ...annotations.build: .gitignore carries a repo-wide **/build/* rule,
     // which would silently make every generated source uncommittable and leave
@@ -163,145 +171,142 @@ public final class BuildHintCodeGenerator {
         // hints they expose -- hand-written, and read back by
         // BuildHintAnnotationReader -- so nothing here writes into
         // CodenameOne/src.
-        write(new File(catalogRoot, "BuildHintsFromAnnotations.java"),
-                catalogViewSource(annotated));
+        // DATA, not code. The hints the annotations declare are rendered for the
+        // consumers that cannot read bytecode -- the Settings editor and the
+        // simulator's hint editor, both Codename One apps with no class reader.
+        // Everything that can read bytecode reads the annotations themselves.
+        // At the resource ROOT, deliberately not under com/codename1/build/.
+        // .gitignore carries a repo-wide `**/build/*` rule, so a data file in
+        // that package is silently untracked -- git add skips it, the module
+        // builds locally from the working tree, and CI fails with a file nobody
+        // can see is missing.
+        write(new File(args[1], DATA_FILE), json(annotated));
         for (int i = 2; i < args.length; i++) {
             File target = new File(args[i]);
             if (target.getName().endsWith(".adoc") || target.getName().endsWith(".asciidoc")) {
                 write(target, asciidocTable(everything(annotated)));
             } else {
-                write(new File(target, "com/codename1/impl/javase/BuildHintCatalogDefaults.java"),
-                        simulatorSchemaSource(byGroup));
+                // A second copy for the simulator, whose module does not depend
+                // on this one. Written in the same run from the same list, and
+                // both are drift-gated, so they cannot say different things.
+                write(new File(target, DATA_FILE), json(annotated));
             }
         }
         System.out.println("cn1: generated the build hint views");
     }
 
-    private static String javaType(BuildHints.Hint h) {
-        switch (h.type()) {
-            case BOOLEAN: return "boolean";
-            case INT: return "int";
-            case ENUM: return h.enumName();
-            case STRING_LIST: return "String[]";
-            default: return "String";
+    /// The annotated hints as data.
+    ///
+    /// One object per hint, values are strings or arrays of strings, and a flag
+    /// is present only when it is true. BuildHintsJson reads exactly this
+    /// subset; there is no JSON library on either side, and this module has no
+    /// dependencies beyond JUnit because the build service shares it.
+    private static String json(List<BuildHints.Hint> hints) {
+        StringBuilder sb = new StringBuilder("[\n");
+        for (int i = 0; i < hints.size(); i++) {
+            BuildHints.Hint h = hints.get(i);
+            sb.append("  {");
+            List<String> members = new ArrayList<String>();
+            members.add(member("name", h.name()));
+            members.add(member("group", h.group().name()));
+            members.add(member("attr", h.attr()));
+            if (h.enumName() != null) {
+                members.add(member("enum", h.enumName()));
+                members.add(array("values", h.values()));
+                if (!h.valueAliases().isEmpty()) {
+                    List<String> pairs = new ArrayList<String>();
+                    for (Map.Entry<String, String> e : h.valueAliases().entrySet()) {
+                        pairs.add(e.getKey());
+                        pairs.add(e.getValue());
+                    }
+                    members.add(array("valueAliases", pairs));
+                }
+                if (!h.valueLabels().isEmpty()) {
+                    members.add(array("valueLabels", h.valueLabels()));
+                }
+                if (!h.valueConstants().isEmpty()) {
+                    members.add(array("valueConstants", h.valueConstants()));
+                }
+                if (h.unsetConstant() != null) {
+                    members.add(member("unsetConstant", h.unsetConstant()));
+                }
+            }
+            members.add(member("type", h.type().name()));
+            // What the editors need and cannot work out for themselves: the
+            // widget, the label and the group heading. Derived here so the
+            // Settings and simulator loaders stay a plain application of data --
+            // neither can call into this module.
+            members.add(member("editor", BuildHints.editorWidget(h.type())));
+            members.add(member("label", humanize(h.attr())));
+            members.add(member("groupLabel", groupLabel(h.group())));
+            if (h.valuePattern() != null) {
+                members.add(member("valuePattern", h.valuePattern()));
+            }
+            if (h.separator() != null) {
+                members.add(member("separator", h.separator()));
+            }
+            if (h.platform() != null) {
+                members.add(member("platform", h.platform()));
+            }
+            if (h.aliasOf() != null) {
+                members.add(member("aliasOf", h.aliasOf()));
+            }
+            if (h.deprecated() != null) {
+                members.add(member("deprecated", h.deprecated()));
+            }
+            if (h.isExternal()) {
+                members.add("\"external\": true");
+            }
+            if (h.isEnterpriseOnly()) {
+                members.add("\"enterpriseOnly\": true");
+            }
+            if (h.link() != null && h.link().length() > 0) {
+                members.add(member("link", h.link()));
+            }
+            members.add(member("doc", h.doc()));
+            for (int m = 0; m < members.size(); m++) {
+                sb.append(m == 0 ? "" : ", ").append(members.get(m));
+            }
+            sb.append('}').append(i == hints.size() - 1 ? "\n" : ",\n");
         }
+        return sb.append("]\n").toString();
+    }
+
+    private static String member(String key, String value) {
+        return "\"" + key + "\": " + jsonString(value == null ? "" : value);
+    }
+
+    private static String array(String key, List<String> values) {
+        StringBuilder sb = new StringBuilder("\"" + key + "\": [");
+        for (int i = 0; i < values.size(); i++) {
+            sb.append(i == 0 ? "" : ", ").append(jsonString(values.get(i)));
+        }
+        return sb.append(']').toString();
+    }
+
+    private static String jsonString(String value) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20 || c > 0x7e) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.append('"').toString();
     }
 
     private static final java.util.regex.Pattern LOOKS_LIKE_IP =
             java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}|::1|[0-9a-fA-F:]*:[0-9a-fA-F:]+");
-
-    /** Wire value to Java enum constant: {@code internalOnly} to INTERNAL_ONLY. */
-    static String enumConstant(String wire) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < wire.length(); i++) {
-            char c = wire.charAt(i);
-            if (Character.isUpperCase(c) && sb.length() > 0
-                    && Character.isLowerCase(wire.charAt(i - 1))) {
-                sb.append('_');
-            }
-            sb.append(Character.isLetterOrDigit(c) ? Character.toUpperCase(c) : '_');
-        }
-        String out = sb.toString();
-        return Character.isDigit(out.charAt(0)) ? "V" + out : out;
-    }
-
-    /// The `@Hint` carrying what the attribute's signature cannot say.
-    ///
-    /// Only what differs from the convention: a name the group prefix does not
-    /// produce, a separator, a documented default, and the handful of facts the
-    /// guide's table shows. Everything javac already knows is left out.
-    private static String hintAnnotation(HintGroup group, BuildHints.Hint h, String doc) {
-        List<String> members = new ArrayList<String>();
-        String prefix = group.keyPrefix() == null ? "" : group.keyPrefix();
-        if (!(prefix + h.attr()).equals(h.name())) {
-            members.add("name = \"" + esc(h.name()) + "\"");
-        }
-        String kind = kindOf(h.type());
-        if (kind != null) {
-            members.add("kind = HintKind." + kind);
-        }
-        if (h.def() != null && h.def().length() > 0) {
-            members.add("def = \"" + esc(h.def()) + "\"");
-        }
-        if (h.separator() != null) {
-            members.add("appendable = true");
-            if (h.separator().length() > 0) {
-                members.add("separator = \"" + esc(h.separator()) + "\"");
-            }
-        }
-        if (h.platform() != null && !"general".equals(h.platform())) {
-            members.add("platform = \"" + esc(h.platform()) + "\"");
-        }
-        if (h.aliasOf() != null) {
-            members.add("aliasOf = \"" + esc(h.aliasOf()) + "\"");
-        }
-        if (h.deprecated() != null) {
-            members.add("deprecated = \"" + esc(h.deprecated()) + "\"");
-        }
-        if (h.isExternal()) {
-            members.add("external = true");
-        }
-        if (h.isEnterpriseOnly()) {
-            members.add("enterpriseOnly = true");
-        }
-        if (h.link() != null && h.link().length() > 0) {
-            members.add("link = \"" + esc(h.link()) + "\"");
-        }
-        if (doc != null && doc.length() > 0) {
-            // Through the same ASCII conversion the javadoc path uses: the doc
-            // is a string literal in a source file now, and the Ant javac step
-            // rejects an unmappable character wherever it appears.
-            members.add("doc = \"" + esc(toAscii(doc)) + "\"");
-        }
-        if (!h.consumedBy().isEmpty()) {
-            StringBuilder by = new StringBuilder("consumedBy = {");
-            for (int i = 0; i < h.consumedBy().size(); i++) {
-                by.append(i == 0 ? "" : ", ").append("\"").append(esc(h.consumedBy().get(i)))
-                  .append("\"");
-            }
-            members.add(by.append("}").toString());
-        }
-        if (members.isEmpty()) {
-            return "    @Hint\n";
-        }
-        StringBuilder sb = new StringBuilder("    @Hint(");
-        for (int i = 0; i < members.size(); i++) {
-            sb.append(i == 0 ? "" : ",\n            ").append(members.get(i));
-        }
-        return sb.append(")\n").toString();
-    }
-
-    /// The `HintKind` naming a string hint's real shape, or null where the
-    /// attribute's Java type already says everything.
-    private static String kindOf(HintType t) {
-        switch (t) {
-            case TEXT_BLOCK: return "TEXT_BLOCK";
-            case XML: return "XML";
-            case PATH: return "PATH";
-            case URL: return "URL";
-            case VERSION: return "VERSION";
-            case SECRET: return "SECRET";
-            default: return null;
-        }
-    }
-
-    /// Turns ios.NSCameraUsageDescription into "the camera", so the generated
-    /// sentence reads naturally rather than repeating the plist key.
-    private static String plistSubject(String hintName) {
-        String body = hintName.substring("ios.NS".length());
-        if (body.endsWith("UsageDescription")) {
-            body = body.substring(0, body.length() - "UsageDescription".length());
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < body.length(); i++) {
-            char c = body.charAt(i);
-            if (i > 0 && Character.isUpperCase(c) && !Character.isUpperCase(body.charAt(i - 1))) {
-                sb.append(' ');
-            }
-            sb.append(i == 0 ? Character.toLowerCase(c) : c);
-        }
-        return "the " + sb.toString().toLowerCase();
-    }
 
     private static String groupBlurb(HintGroup g) {
         switch (g) {
@@ -316,204 +321,6 @@ public final class BuildHintCodeGenerator {
             case GENERAL: return "Build hints that are not specific to one platform.";
             default: return g.annotationSimpleName() + " build hints.";
         }
-    }
-
-    /**
-     * The simulator's Build Hint editor schema for every annotated hint.
-     *
-     * <p>Emitted as a companion to the hand-written BuildHintSchemaDefaults
-     * rather than replacing it: that file carries carefully written labels and
-     * group descriptions for fifteen hints, and regenerating it would trade real
-     * prose for mechanical text. Its registrations run first and {@code set} does
-     * not overwrite, so anything it describes by hand wins and this fills in the
-     * rest.</p>
-     *
-     * <p>Generated as source rather than read from the catalog jar at runtime
-     * because Ports/JavaSE is built by Ant as well as Maven, and the Ant build
-     * has a hand-maintained classpath that a new jar would have to be added to.</p>
-     */
-    private static String simulatorSchemaSource(Map<HintGroup, List<BuildHints.Hint>> byGroup) {
-        StringBuilder sb = new StringBuilder(LICENSE);
-        sb.append("package com.codename1.impl.javase;\n\n");
-        sb.append("/**\n");
-        sb.append(" * Build Hint editor schema for every hint that has a build hint annotation.\n");
-        sb.append(" *\n");
-        sb.append(" * <p>Generated from com.codename1.build.shared.BuildHints by\n");
-        sb.append(" * BuildHintCodeGenerator. Do not edit by hand -- edit the catalog and re-run\n");
-        sb.append(" * scripts/gen-build-hint-annotations.sh.</p>\n");
-        sb.append(" *\n");
-        sb.append(" * <p>Registered after {@link BuildHintSchemaDefaults} and skipping every hint\n");
-        sb.append(" * that class already describes. Precedence cannot be left to the setter:\n");
-        sb.append(" * the group name is part of the property key, so registering harden.level\n");
-        sb.append(" * under both `hardening` and `Hardening` does not overwrite anything -- it\n");
-        sb.append(" * makes a second group, and the editor renders both, giving the user\n");
-        sb.append(" * duplicate controls for one setting.</p>\n");
-        sb.append(" */\n");
-        sb.append("final class BuildHintCatalogDefaults {\n\n");
-        sb.append("    private BuildHintCatalogDefaults() {\n    }\n\n");
-        sb.append("    static void register() {\n");
-        sb.append("        java.util.Set<String> handWritten = BuildHintSchemaDefaults.declaredHints();\n");
-        for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
-            String group = e.getKey().annotationSimpleName();
-            sb.append("\n        set(\"{{@").append(group).append("}}.label\", ")
-              .append(quote(toAscii(groupLabel(e.getKey())))).append(");\n");
-            for (BuildHints.Hint h : e.getValue()) {
-                String key = "{{#" + group + "#" + h.name() + "}}";
-                sb.append("        if (!handWritten.contains(\"").append(esc(h.name()))
-                  .append("\")) {\n");
-                sb.append("        set(\"").append(key).append(".label\", ")
-                  .append(quote(humanize(h.attr()))).append(");\n");
-                sb.append("        set(\"").append(key).append(".type\", \"")
-                  .append(BuildHints.editorWidget(h.type())).append("\");\n");
-                if (h.type() == HintType.ENUM) {
-                    StringBuilder values = new StringBuilder();
-                    for (String v : h.values()) {
-                        if (values.length() > 0) {
-                            values.append(',');
-                        }
-                        values.append(v);
-                    }
-                    sb.append("        set(\"").append(key).append(".values\", \"")
-                      .append(values).append("\");\n");
-                }
-                if (h.doc() != null && h.doc().length() > 0) {
-                    sb.append("        set(\"").append(key).append(".description\", ")
-                      .append(quote(toAscii(h.doc()))).append(");\n");
-                }
-                sb.append("        }\n");
-            }
-        }
-        sb.append("    }\n\n");
-        sb.append("    /** Idempotent setter: does not overwrite user or project-level metadata. */\n");
-        sb.append("    private static void set(String suffix, String value) {\n");
-        sb.append("        String key = \"codename1.arg.\" + suffix;\n");
-        sb.append("        if (System.getProperty(key) == null) {\n");
-        sb.append("            System.setProperty(key, value);\n        }\n    }\n}\n");
-        return sb.toString();
-    }
-
-    /**
-     * The developer guide's build hint table.
-     *
-     * <p>The hand-written table it replaces had a Name and a Description column
-     * and nothing else, so the Settings tool had to guess each hint's type by
-     * string-matching the description prose. Generating it adds the type and the
-     * default the builders actually use, and means a hint added to a builder can
-     * no longer be missing from the guide.</p>
-     */
-    /// The annotated hints as catalog entries, for the consumers that cannot run
-    /// ASM.
-    ///
-    /// The Settings editor reads the catalog, and it is a Codename One app: it
-    /// has no bytecode reader and no business gaining one. So the annotations
-    /// are rendered into the catalog the same way the binding table is -- a
-    /// generated VIEW of the source of truth, checked in and drift-gated, not a
-    /// second statement of it.
-    private static String catalogViewSource(List<BuildHints.Hint> annotated) {
-        StringBuilder sb = new StringBuilder(LICENSE);
-        sb.append("package com.codename1.build.shared;\n\n");
-        sb.append("import java.util.List;\n\n");
-        sb.append(doc("The build hints the annotations in "
-                + "`com.codename1.annotations.buildhints` expose.", ""));
-        sb.append("///\n");
-        sb.append(doc("A view, not a source: every fact here is read back out of those "
-                + "annotations, which are where it is stated. Edit the annotation and "
-                + "re-run scripts/gen-build-hint-annotations.sh.", ""));
-        sb.append("final class BuildHintsFromAnnotations {\n\n");
-        sb.append("    private BuildHintsFromAnnotations() {\n    }\n\n");
-        sb.append("    static void register(List<BuildHints.Hint> h) {\n");
-        for (BuildHints.Hint hint : annotated) {
-            sb.append(entrySource(hint));
-        }
-        sb.append("    }\n}\n");
-        return sb.toString();
-    }
-
-    private static String entrySource(BuildHints.Hint h) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("        h.add(new BuildHints.Hint(").append(quote(h.name())).append(")\n");
-        sb.append("                .annotatedAs(HintGroup.").append(h.group().name())
-          .append(", ").append(quote(h.attr())).append(")\n");
-        // A Toggle-typed hint is a BOOLEAN hint -- that is what the editor renders
-        // and what the docs say -- but it still has a constant domain, because
-        // ON sends "true" and DEFAULT sends nothing at all. Writing the type and
-        // the domain are not alternatives.
-        if (h.enumName() != null) {
-            sb.append("                .values(").append(quote(h.enumName()));
-            for (String v : h.values()) {
-                sb.append(", ").append(quote(v));
-            }
-            sb.append(")\n");
-            if (!h.valueAliases().isEmpty()) {
-                sb.append("                .valueAliases(");
-                boolean first = true;
-                for (Map.Entry<String, String> e : h.valueAliases().entrySet()) {
-                    sb.append(first ? "" : ", ").append(quote(e.getKey())).append(", ")
-                      .append(quote(e.getValue()));
-                    first = false;
-                }
-                sb.append(")\n");
-            }
-            if (!h.valueLabels().isEmpty()) {
-                sb.append("                .valueLabels(");
-                for (int i = 0; i < h.valueLabels().size(); i++) {
-                    sb.append(i == 0 ? "" : ", ").append(quote(h.valueLabels().get(i)));
-                }
-                sb.append(")\n");
-            }
-            if (!h.valueConstants().isEmpty()) {
-                sb.append("                .valueConstants(");
-                for (int i = 0; i < h.valueConstants().size(); i++) {
-                    sb.append(i == 0 ? "" : ", ").append(quote(h.valueConstants().get(i)));
-                }
-                sb.append(")\n");
-            }
-            if (h.unsetConstant() != null) {
-                sb.append("                .unsetConstant(").append(quote(h.unsetConstant()))
-                  .append(")\n");
-            }
-        }
-        // AFTER the domain: values() sets the type to ENUM, so a Toggle hint
-        // written the other way round came back as an ENUM and the round-trip
-        // gate caught it.
-        if (h.type() != HintType.ENUM) {
-            sb.append("                .type(HintType.").append(h.type().name()).append(")\n");
-        }
-        if (h.valuePattern() != null) {
-            sb.append("                .valuePattern(").append(quote(h.valuePattern()))
-              .append(")\n");
-        }
-        if (h.def() != null && h.def().length() > 0) {
-            sb.append("                .def(").append(quote(h.def())).append(")\n");
-        }
-        if (h.separator() != null) {
-            sb.append("                .separator(").append(quote(h.separator())).append(")\n");
-        }
-        if (h.aliasOf() != null) {
-            sb.append("                .aliasOf(").append(quote(h.aliasOf())).append(")\n");
-        }
-        if (h.deprecated() != null) {
-            sb.append("                .deprecated(").append(quote(h.deprecated())).append(")\n");
-        }
-        if (h.isExternal()) {
-            sb.append("                .external()\n");
-        }
-        if (h.isEnterpriseOnly()) {
-            sb.append("                .enterpriseOnly()\n");
-        }
-        if (h.link() != null && h.link().length() > 0) {
-            sb.append("                .link(").append(quote(h.link())).append(")\n");
-        }
-        if (!h.consumedBy().isEmpty()) {
-            sb.append("                .consumedBy(");
-            for (int i = 0; i < h.consumedBy().size(); i++) {
-                sb.append(i == 0 ? "" : ", ").append(quote(h.consumedBy().get(i)));
-            }
-            sb.append(")\n");
-        }
-        sb.append("                .platform(").append(quote(h.platform())).append(")\n");
-        sb.append("                .doc(").append(quote(h.doc())).append("));\n");
-        return sb.toString();
     }
 
     /// The hints the catalog still describes, plus the annotated ones read from
@@ -642,11 +449,6 @@ public final class BuildHintCodeGenerator {
             }
         }
         return sb.toString();
-    }
-
-    /** Java string literal, wrapped so the generated line stays readable. */
-    private static String quote(String s) {
-        return "\"" + esc(s) + "\"";
     }
 
 
