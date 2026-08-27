@@ -105,6 +105,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// materialized second would overwrite the first while persistentIdentifierForItem answered
     /// with the wrong id for both. The output is unambiguous because the only uppercase left in it
     /// is the hex of an escape, and "%" never survives unencoded to start a false one.
+    ///
+    /// Worked through: "cn1:Foo" encodes to "cn1%3A%46oo" and "cn1:foo" to "cn1%3Afoo", which
+    /// stay distinct when the filesystem folds them to "cn1%3a%46oo" and "cn1%3afoo".
     static func encode(_ identifier: String) -> String {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
         return identifier.addingPercentEncoding(withAllowedCharacters: allowed) ?? identifier

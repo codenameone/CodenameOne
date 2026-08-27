@@ -1243,14 +1243,28 @@ public class CertificateWizard extends Lifecycle {
     /// rather than reused.
     private boolean appGroupsJustChanged;
 
-    /// Profile types already reissued in this run, so a delete that does not take cannot loop.
-    private final java.util.Set<String> reissuedProfiles = new java.util.HashSet<String>();
+    /// Profile IDs already retired in this run, so a delete that does not take cannot loop.
+    private final java.util.Set<Long> reissuedProfiles = new java.util.HashSet<Long>();
+
+    /// True when this project will actually be given a generated document provider extension.
+    ///
+    /// Both hints decide it, exactly as they do in the builder
+    /// (`usesDocuments && ios.documentProvider.extension != false`) and in the signing preflight.
+    /// Keying on `enabled` alone would have the wizard create an App ID, an App Group and two
+    /// profiles for an extension the build then skips -- and, worse, reissue the app's own
+    /// profiles to carry a capability it does not need.
+    private boolean documentProviderRequested() {
+        return binding != null
+                && "true".equals(readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.enabled"))
+                && !"false".equals(readSetting(binding.settings(),
+                        "codename1.arg.ios.documentProvider.extension"));
+    }
 
     private void autoSetupMainAppGroups(String bundleIdentifier, String appName, Runnable next) {
         boolean widgets = binding != null
                 && ProjectIO.readSurfacesManifest(binding.projectDir()) != null;
-        boolean documents = binding != null && "true".equals(readSetting(binding.settings(),
-                "codename1.arg.ios.documentProvider.enabled"));
+        boolean documents = documentProviderRequested();
         if (!widgets && !documents) {
             next.run();
             return;
@@ -1498,12 +1512,10 @@ public class CertificateWizard extends Lifecycle {
 
     private void autoSetupDocumentProviderExtension(String bundleIdentifier, String appName,
             Runnable next) {
-        // Detected from the build hint rather than from a manifest: the document provider needs
-        // no build-time declaration of what it will publish, so the hint is the only signal that
-        // this project wants the extension at all.
-        if (binding == null
-                || !"true".equals(readSetting(binding.settings(),
-                        "codename1.arg.ios.documentProvider.enabled"))) {
+        // Detected from the build hints rather than from a manifest: the document provider needs
+        // no build-time declaration of what it will publish, so the hints are the only signal
+        // that this project wants the extension at all.
+        if (!documentProviderRequested()) {
             next.run();
             return;
         }
@@ -1599,6 +1611,27 @@ public class CertificateWizard extends Lifecycle {
     private void ensureExtensionProfile(ExtensionSigning ext, String appName, String profileType,
             com.codename1.util.OnComplete<String> onPath) {
         SigningState.Profile existing = findProfile(ext.bundleIdentifier, profileType);
+        if (existing != null && appGroupsJustChanged && existing.id() != null
+                && reissuedProfiles.add(existing.id())) {
+            // Same snapshot problem as the app's own profiles, and reached the same way: the
+            // extension's App ID was given the App Group a moment ago in
+            // enableExtensionGroupAndProfile, so a profile issued before that carries no
+            // application-groups entitlement while the generated extension declares one. Signing
+            // fails on the extension, with a message naming the extension's bundle ID and not the
+            // cause. Retire it and let the creation path below issue a current one.
+            showPageMessage("Reissuing the " + ext.label + " "
+                    + profileTypeLabel(profileType) + " profile after the App Group change...",
+                    false);
+            service.deleteProfile(existing.id(), r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                refreshForAutoSetup(() ->
+                        ensureExtensionProfile(ext, appName, profileType, onPath));
+            });
+            return;
+        }
         if (existing != null) {
             downloadExtensionProfile(ext, existing, profileType, onPath);
             return;
@@ -1769,13 +1802,21 @@ public class CertificateWizard extends Lifecycle {
         }
         SigningState.Profile existing = findProfile(bundleIdentifier, profileType);
         if (existing != null && appGroupsJustChanged && existing.id() != null
-                && reissuedProfiles.add(profileType)) {
+                && reissuedProfiles.add(existing.id())) {
             // The App ID gained an App Group a moment ago, and a provisioning profile is a
             // snapshot of the capabilities the App ID had when it was issued. Reusing one that
             // predates the change installs a profile without application-groups while the
             // builder puts that entitlement in the app, and the next device build cannot sign.
             // Deleting it here is safe: the branch below recreates it from the same certificate
             // and devices.
+            //
+            // Keyed by profile ID, not by profile type. An account can hold several development
+            // or App Store profiles for one bundle ID, and findProfile answers with one of them:
+            // stopping after the first delete would let the next re-entry find another equally
+            // stale profile and install it. Each re-entry now retires one more, and the set still
+            // ends the recursion -- a delete the service reports but does not perform returns the
+            // same ID, which is already in the set, so the flow falls through and installs it
+            // rather than deleting forever.
             showPageMessage("Reissuing " + profileTypeLabel(profileType)
                     + " after the App Group change...", false);
             service.deleteProfile(existing.id(), r -> {

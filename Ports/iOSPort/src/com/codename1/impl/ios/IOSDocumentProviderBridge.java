@@ -143,17 +143,20 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         // reaches a pre-iOS-16 provider at all (it registers no domain, so removing one is a
         // no-op there); then the domain goes, which is what removes the location itself.
         //
-        // Both deletions hold the mutation lock, so a publish in flight cannot rename its
-        // freshly written index back in behind them.
+        // The whole sequence holds the mutation lock, deletions and domain calls alike. Leaving
+        // the domain calls outside it let a publish slip between them: that publish wrote its
+        // index and registered the domain, and this thread then removed the domain it had just
+        // registered, leaving a published tree that no longer appears in Files until something
+        // publishes again.
         synchronized (WRITE_LOCK) {
             deleteTree(container + "/" + ROOT);
             // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside
             // the same group container. Deleting the published tree does not remove those, so
             // without this a logged-out user's documents stay readable through an open browser.
             deleteTree(container + "/File Provider Storage");
+            nativeInstance.documentsSignalChange();
+            nativeInstance.documentsRemoveDomain();
         }
-        nativeInstance.documentsSignalChange();
-        nativeInstance.documentsRemoveDomain();
     }
 
     /// Hand-built rather than routed through a serializer: two optional strings do not justify
@@ -305,21 +308,32 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         if (!fs.exists(path)) {
             return;
         }
-        if (fs.isDirectory(path)) {
-            String[] children = null;
-            try {
-                children = fs.listFiles(path);
-            } catch (IOException err) {
-                Log.e(err);
-            }
-            if (children != null) {
-                for (int i = 0; i < children.length; i++) {
-                    String child = children[i];
-                    if (child.endsWith("/")) {
-                        child = child.substring(0, child.length() - 1);
-                    }
-                    deleteTree(path + "/" + child);
+        // Handed to the platform rather than walked here. A walk asks isDirectory of each entry,
+        // which follows symbolic links, so a link inside the published tree pointing at the app's
+        // own storage would have this delete that storage's contents on logout. The native uses
+        // -[NSFileManager removeItemAtPath:], which removes a link instead of following it, so
+        // the deletion cannot leave the tree it was given.
+        if (nativeInstance.documentsRemoveTree(path)) {
+            return;
+        }
+        // The native is compiled out when the app does not reference com.codename1.documents, in
+        // which case nothing was ever published here -- but the simulator-shaped fallback below
+        // costs nothing and keeps the method honest if a removal fails for another reason. It
+        // never descends: only the entries it can see directly are removed, so a link is deleted
+        // rather than traversed.
+        String[] children = null;
+        try {
+            children = fs.listFiles(path);
+        } catch (IOException err) {
+            Log.e(err);
+        }
+        if (children != null) {
+            for (int i = 0; i < children.length; i++) {
+                String child = children[i];
+                if (child.endsWith("/")) {
+                    child = child.substring(0, child.length() - 1);
                 }
+                fs.delete(path + "/" + child);
             }
         }
         fs.delete(path);

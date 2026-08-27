@@ -16587,12 +16587,38 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_S
     return ok ? JAVA_TRUE : JAVA_FALSE;
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    if (path == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *target = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *err = nil;
+    // -removeItemAtPath: rather than a walk in Java. It removes a symbolic link itself instead of
+    // what the link names, so clear() cannot be steered out of the published tree and into the
+    // app's own storage. It also removes a whole directory in one call, which a Java walk cannot:
+    // FileSystemStorage.delete refuses a non-empty directory.
+    BOOL ok = [fm removeItemAtPath:target error:&err];
+    if (!ok && [fm fileExistsAtPath:target]) {
+        NSLog(@"Codename One: could not remove %@ (%@)", target, err);
+    } else {
+        // "Nothing is left there" is the contract, and a path that was never there satisfies it.
+        ok = ![fm fileExistsAtPath:target];
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
 #else
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_NULL;
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
     return JAVA_FALSE;
 }
 void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
@@ -16618,6 +16644,9 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported___R_bool
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT source, JAVA_OBJECT target) {
     return com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, source, target);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    return com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, path);
 }
 
 // --- App intents (Core Spotlight + App Intents) ------------------------------

@@ -182,8 +182,12 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // document after any publish, which for a drive of any size is the expensive wrong
         // default. DocumentNode documents the other half of that bargain -- declare them, and
         // keep them accurate.
-        if node.remoteId != nil, node.lastModified != nil || node.size != nil {
-            return "meta-\(node.lastModified ?? -1)-\(node.size ?? -1)"
+        if let remoteId = node.remoteId, node.lastModified != nil || node.size != nil {
+            // The remote id is part of the stamp, not just the declared metadata. Repointing a
+            // node at different content of the same length -- a new revision of an invoice under
+            // a new key -- moves nothing else here, and the browser would go on serving the bytes
+            // it cached for the old object.
+            return "meta-\(remoteId)-\(node.lastModified ?? -1)-\(node.size ?? -1)"
         }
         return "rev-\(revision)"
     }

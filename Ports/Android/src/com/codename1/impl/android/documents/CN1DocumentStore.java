@@ -252,6 +252,29 @@ public final class CN1DocumentStore {
         }
     }
 
+    /// True when this entry is a symbolic link rather than the thing it names.
+    ///
+    /// Android has no `isSymbolicLink` on this API level, so the test is the canonical path
+    /// against the absolute one: they differ exactly when some component of the path is a link.
+    /// The comparison is done on the parent plus the name rather than on the file itself, because
+    /// the app's own storage root is reached through links on Android ("/data/user/0" names
+    /// "/data/data"), and comparing the whole path would then call every file a link.
+    ///
+    /// An IO failure answers true: refusing to descend leaves the link in place to be deleted as
+    /// a file, which loses nothing, while guessing false is what the check exists to prevent.
+    private static boolean isLink(File file) {
+        try {
+            File parent = file.getParentFile();
+            String parentCanonical = parent == null
+                    ? "" : parent.getCanonicalPath();
+            String expected = parentCanonical + File.separator + file.getName();
+            return !expected.equals(file.getCanonicalPath());
+        } catch (IOException err) {
+            Log.w(TAG, "Could not resolve " + file + "; not descending into it", err);
+            return true;
+        }
+    }
+
     /// Depth-first delete. `File.delete` refuses a non-empty directory, so a plain delete of the
     /// root would leave every published document on disk -- which is what `clear()` exists to
     /// prevent on logout.
@@ -259,7 +282,13 @@ public final class CN1DocumentStore {
         if (file == null || !file.exists()) {
             return;
         }
-        if (file.isDirectory()) {
+        // Descends only into a real directory. `File.isDirectory` and `listFiles` both follow
+        // symbolic links, so a link inside the published tree pointing at, say, the app's
+        // databases directory would have this recursion delete that directory's contents on
+        // logout -- clear() is supposed to remove what the app published, not everything the link
+        // can reach. Deleting the link itself removes the link, never its target, which is
+        // exactly what is wanted here.
+        if (file.isDirectory() && !isLink(file)) {
             File[] children = file.listFiles();
             if (children != null) {
                 for (int i = 0; i < children.length; i++) {

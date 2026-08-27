@@ -112,8 +112,19 @@ final class CN1DocumentIndex {
     /// Standardizing first is what makes the prefix check meaningful: without it "a/../../x"
     /// still starts with the directory it escapes.
     static func resolveLocal(path: String, containerURL: URL) -> URL? {
-        let base = filesDirectory(containerURL: containerURL).standardizedFileURL
-        let candidate = base.appendingPathComponent(path).standardizedFileURL
+        // Symlinks are resolved on both sides before the prefix test. standardizedFileURL only
+        // folds ".." lexically, so a link inside the published tree -- "files/shared" pointing at
+        // the container root -- would let "shared/endpoint.json" pass a purely textual check and
+        // hand the file browser the endpoint file, bearer token included. Resolving first means
+        // the comparison is between the two real locations.
+        //
+        // The base is resolved too, not just the candidate: the container path itself runs
+        // through symlinks on both iOS and macOS ("/private/var/..."), so resolving one side
+        // alone would make every legitimate path look like an escape.
+        let base = filesDirectory(containerURL: containerURL)
+            .standardizedFileURL.resolvingSymlinksInPath()
+        let candidate = base.appendingPathComponent(path)
+            .standardizedFileURL.resolvingSymlinksInPath()
         var basePath = base.path
         if !basePath.hasSuffix("/") {
             basePath += "/"

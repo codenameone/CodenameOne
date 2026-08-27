@@ -1377,6 +1377,18 @@ public final class IOSNative {
      */
     native boolean documentsReplaceFile(String source, String target);
 
+    /**
+     * Removes {@code path} and everything under it, without following symbolic links.
+     *
+     * <p>Walking the tree from Java and deleting file by file follows links: a link inside the
+     * published tree pointing at the app's own storage would have logout's {@code clear()} delete
+     * that storage's contents. {@code -[NSFileManager removeItemAtPath:error:]} removes a link
+     * rather than what it names, so the recursion cannot leave the tree.</p>
+     *
+     * @return true when nothing is left at that path
+     */
+    native boolean documentsRemoveTree(String path);
+
     // --- App intents (Core Spotlight + App Intents) -------------------------
     // Backs com.codename1.intents. Two frameworks with different floors sit behind these:
     // Core Spotlight is Objective-C and available well below this port's minimum, while App
