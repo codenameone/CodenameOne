@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -141,6 +142,48 @@ public class BuildHintAnnotationReaderTest {
 
     /// The real annotation sources, so this tests the tree that ships rather
     /// than a fixture that resembles it.
+    /// The @Hint members no shipped attribute uses yet still work.
+    ///
+    /// aliasOf, deprecated, external, enterpriseOnly and link exist so an
+    /// annotated hint can say what the catalog entries already say, and none of
+    /// the 87 shipped attributes needs any of them -- so the reader's handling of
+    /// all five was carried by nothing. Exercised against a copy of the real
+    /// package with one extra attribute, rather than deleted: the first annotated
+    /// hint to be deprecated has to have somewhere to say so, and would otherwise
+    /// be relying on a path never once run.
+    @Test
+    public void theHintMembersNoAttributeUsesYetAreStillRead() throws Exception {
+        File dir = Files.createTempDirectory("cn1-hint-members").toFile();
+        for (File f : annotationSources().listFiles()) {
+            if (f.getName().endsWith(".java")) {
+                Files.copy(f.toPath(), new File(dir, f.getName()).toPath());
+            }
+        }
+        File ios = new File(dir, "Ios.java");
+        String text = new String(Files.readAllBytes(ios.toPath()), "UTF-8");
+        int lastBrace = text.lastIndexOf('}');
+        Files.write(ios.toPath(), (text.substring(0, lastBrace)
+                + "\n    /// A probe attribute that exists only in this test's copy.\n"
+                + "    @Hint(name = \"ios.probeAlias\", aliasOf = \"ios.pods\",\n"
+                + "          deprecated = \"Use ios.pods.\", external = true,\n"
+                + "          enterpriseOnly = true, link = \"https://example.invalid/probe\")\n"
+                + "    String probeAlias() default \"\";\n"
+                + text.substring(lastBrace)).getBytes("UTF-8"));
+
+        BuildHints.Hint probe = null;
+        for (BuildHints.Hint h : BuildHintAnnotationReader.readFromSources(dir)) {
+            if ("ios.probeAlias".equals(h.name())) {
+                probe = h;
+            }
+        }
+        assertNotNull(probe, "the probe attribute produced no hint");
+        assertEquals("ios.pods", probe.aliasOf());
+        assertEquals("Use ios.pods.", probe.deprecated());
+        assertTrue(probe.isExternal());
+        assertTrue(probe.isEnterpriseOnly());
+        assertEquals("https://example.invalid/probe", probe.link());
+    }
+
     /// Every group that names an annotation has one.
     ///
     /// The name is a CLAIM: the developer guide prints `@Name(attr)` from it and
