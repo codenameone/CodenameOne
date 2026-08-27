@@ -27,6 +27,7 @@ import com.codename1.documents.spi.DocumentProviderBridge;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -114,7 +115,13 @@ public class JavaSEDocumentProviderBridge implements DocumentProviderBridge {
         if (file == null || !file.exists()) {
             return;
         }
-        if (file.isDirectory()) {
+        // Descends into a real directory only. isDirectory and listFiles both follow symbolic
+        // links, so a link inside the published tree -- easy to create by hand on a developer
+        // machine, where this tree is an ordinary folder -- would have clear() delete the
+        // contents of whatever it names. Deleting the link removes the link, never its target.
+        // Same rule as the device ports; a simulator that eats unrelated files is worse, not
+        // better, than a device that does.
+        if (file.isDirectory() && !Files.isSymbolicLink(file.toPath())) {
             File[] children = file.listFiles();
             if (children != null) {
                 for (File child : children) {
