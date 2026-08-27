@@ -885,29 +885,21 @@ public class CodenameOneSettings extends Lifecycle {
         return remove;
     }
 
-    /// The value Add should write, or null when there is nothing safe to write.
+    /// The value Add should write, or null when there is nothing to write.
     ///
-    /// The builder's OWN default when the catalog records one: seeding a
-    /// type-wide placeholder instead writes a value the project did not have --
-    /// android.NotificationChannel.importance defaults to 2, and Add persisting 0
-    /// silences the channel before the user has typed anything. Adding a hint
-    /// should start from what the build already does.
+    /// NOT the build server's recorded default. Writing that pins a value the
+    /// server owns into the developer's project: the server may change it, and
+    /// the line now says the old answer forever, with nothing to show that it
+    /// was never a decision anybody made. That is the same stale second copy
+    /// the annotations refuse to carry, except materialised into user projects
+    /// where it outlives any release.
     ///
-    /// Null when it records none, because for those the ABSENCE of the line is
-    /// itself the configuration -- android.targetSDKVersion is computed from the
-    /// installed platforms when unset, and a placeholder overrides that
-    /// computation rather than leaving it alone. A boolean is the one exception:
-    /// its two values are the whole domain, so `true` is a real choice and is
-    /// what adding the hint means.
+    /// A boolean is the one thing worth seeding, because its two values are the
+    /// whole domain and `true` is a real choice -- which is what adding the hint
+    /// means. Everything else the developer types, and until they do, the
+    /// absence of the line IS the configuration.
     private String defaultHintValue(BuildHintMetadata meta) {
-        String catalogDefault = meta.defaultValue();
-        if (catalogDefault != null && catalogDefault.length() > 0) {
-            return catalogDefault;
-        }
-        if (meta.type() == BuildHintType.BOOLEAN) {
-            return "true";
-        }
-        return null;
+        return meta.type() == BuildHintType.BOOLEAN ? "true" : null;
     }
 
     private int descriptionRows(String text) {
@@ -3129,19 +3121,17 @@ public class CodenameOneSettings extends Lifecycle {
             pomPropertiesRead = true;
             pomProperties = new java.util.HashMap<>();
             for (String pom : pomChain()) {
-                for (String active : activeConfiguration(pom)) {
-                    // Nearest POM first, and a name already taken stays taken:
-                    // a module's own property overrides its parent's.
-                    // The plugin sections carry `<properties>` elements of
-                    // their own -- surefire's system properties, for one -- and
-                    // reading those as project properties would resolve a root
-                    // against a name the model does not define.
-                    String declarations = withoutElement(active, "plugins");
-                    declarations = withoutElement(declarations, "pluginManagement");
-                    for (String block : elementValues(declarations, "properties")) {
-                        collectProperties(block, pomProperties);
-                    }
-                }
+                // Through declaredProperties, which is where the precedence rule
+                // lives. Inlining the walk here read FIRST-wins across
+                // activeConfiguration, and that list starts with the
+                // profile-stripped document -- so a base <properties> value beat
+                // an active profile's redefinition of it, which is backwards.
+                // Nearest POM still wins, because declaredProperties only adds a
+                // name that is not taken yet.
+                //
+                // The rule was written down and tested against a method nothing
+                // in production called.
+                declaredProperties(pom, pomProperties);
             }
         }
         return pomProperties;

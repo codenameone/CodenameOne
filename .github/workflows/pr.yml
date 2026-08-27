@@ -222,6 +222,20 @@ jobs:
             rm -rf maven/target/cn1-binaries/ble
             cp -r /tmp/cn1bin-ble/ble maven/target/cn1-binaries/ble
           fi
+      - name: Run Codename One Settings tests
+        # JDK 17: the Settings tool is built with it, and its tests are OFF by
+        # default because the app build needs a Codename One project set up.
+        # Nothing ran them anywhere -- the two workflows that touch the module
+        # pass -Dmaven.test.skip=true -- so every test written for the POM
+        # reader and the hint editor was dead weight, and the bugs they cover
+        # reached review instead of CI.
+        if: ${{ matrix.java-version == 17 }}
+        working-directory: scripts/settings
+        env:
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          bash ../../scripts/ci/retry.sh mvn -B -pl common test \
+            -Dcn1.settings.skipTests=false
       - name: Run Maven plugin tests
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
