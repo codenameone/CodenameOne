@@ -31,12 +31,27 @@ import Foundation
 /// arrives as data through the container rather than as a callback.
 final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtension {
     private let containerURL: URL
+    private let domain: NSFileProviderDomain
 
     required init(domain: NSFileProviderDomain) {
         containerURL = FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: CN1DocumentConfig.appGroupId)
             ?? FileManager.default.temporaryDirectory
+        self.domain = domain
         super.init()
+    }
+
+    /// Where a file handed to `fetchContents` has to live. Apple: "The retrieved content at
+    /// `fileContents` URL must be a regular file on the same volume as the user-visible URL. A
+    /// suitable location can be retrieved using -[NSFileProviderManager
+    /// temporaryDirectoryURLWithError:]." The process temporary directory is not guaranteed to be
+    /// that volume, and the system clones and unlinks the file it is given.
+    private func handoffDirectory() -> URL {
+        if let manager = NSFileProviderManager(for: domain),
+           let url = try? manager.temporaryDirectoryURL() {
+            return url
+        }
+        return FileManager.default.temporaryDirectory
     }
 
     func invalidate() {
@@ -107,7 +122,18 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             // storage and hand it to the system picker.
             if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
                FileManager.default.fileExists(atPath: local.path) {
-                completionHandler(local, item, nil)
+                // A clone, never the published file itself. Apple: "The system clones and unlinks
+                // the received fileContents... If the extension wishes to keep a copy of the
+                // content, it must provide a clone of that content as the URL passed to the
+                // completion handler." Handing over the app's own file would unlink it out of the
+                // shared container on the first open, and every later open would find nothing.
+                let handoff = handoffDirectory().appendingPathComponent(UUID().uuidString)
+                do {
+                    try FileManager.default.copyItem(at: local, to: handoff)
+                    completionHandler(handoff, item, nil)
+                } catch {
+                    completionHandler(nil, nil, CN1DocumentRemote.providerError(error))
+                }
                 progress.completedUnitCount = 1
                 return progress
             }
@@ -117,20 +143,28 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        let task = CN1DocumentRemote.fetch(remoteId: remoteId,
-                                           containerURL: containerURL) { url, error in
+        // Guarded because two things can finish this fetch -- the download and a cancellation --
+        // and calling the system's completion handler twice is a contract violation of its own.
+        let once = CN1FetchCompletion(completionHandler)
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: containerURL,
+                                           destination: handoffDirectory()) { url, error in
             if let url = url {
-                completionHandler(url, item, nil)
+                once.call(url, item, nil)
             } else {
-                completionHandler(nil, nil, error)
+                once.call(nil, nil, CN1DocumentRemote.providerError(error))
             }
             progress.completedUnitCount = 1
         }
-        // The Progress is the only handle File Provider has on this transfer. Cancelling it has to
-        // reach the session task, or dismissing a large download leaves it running to completion.
-        // The cancelled task still calls back, with NSURLErrorCancelled, which is what the browser
-        // expects to see for a transfer it stopped.
-        progress.cancellationHandler = { task?.cancel() }
+        // The Progress is the only handle File Provider has on this transfer. Apple: "If the
+        // NSProgress returned by this method is cancelled, the extension should call the
+        // completion handler with (nil, nil, NSUserCancelledError) in the NSProgress cancellation
+        // handler" -- and the download has to actually stop, or dismissing a large file leaves it
+        // transferring to completion on the user's mobile data.
+        progress.cancellationHandler = {
+            task?.cancel()
+            once.call(nil, nil, CocoaError(.userCancelled))
+            progress.completedUnitCount = 1
+        }
         return progress
     }
 
@@ -182,4 +216,28 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         ])
     }
 
+}
+
+/// Calls one of the system's completion handlers exactly once.
+///
+/// A fetch can be finished by its download or by a cancellation, and both arrive on threads of
+/// the system's choosing. Whichever gets there first wins; the other is dropped.
+private final class CN1FetchCompletion {
+    private let lock = NSLock()
+    private var done = false
+    private let handler: (URL?, NSFileProviderItem?, Error?) -> Void
+
+    init(_ handler: @escaping (URL?, NSFileProviderItem?, Error?) -> Void) {
+        self.handler = handler
+    }
+
+    func call(_ url: URL?, _ item: NSFileProviderItem?, _ error: Error?) {
+        lock.lock()
+        let first = !done
+        done = true
+        lock.unlock()
+        if first {
+            handler(url, item, error)
+        }
+    }
 }

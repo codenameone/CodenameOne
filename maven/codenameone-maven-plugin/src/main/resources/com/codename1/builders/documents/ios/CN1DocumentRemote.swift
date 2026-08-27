@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+import FileProvider
 import Foundation
 
 /// Fetches content the shared container does not hold from the endpoint the app configured.
@@ -45,8 +46,14 @@ enum CN1DocumentRemote {
     /// dismiss to the `Progress` returned by `fetchContents`; without the task behind it, that
     /// cancel stops nothing and a large download keeps running -- on the user's mobile data, in a
     /// process the system already memory-limits harder than the app.
+    /// - Parameter destination: the directory the downloaded file is moved into. The replicated
+    ///   provider has to hand the system a file on the same volume as the user-visible URL, which
+    ///   the process temporary directory is not guaranteed to be, so it passes the directory
+    ///   `NSFileProviderManager` named. The classic provider copies the result itself and passes
+    ///   the ordinary temporary directory.
     @discardableResult
     static func fetch(remoteId: String, containerURL: URL,
+                      destination: URL = FileManager.default.temporaryDirectory,
                       completion: @escaping (URL?, Error?) -> Void) -> URLSessionTask? {
         guard let settings = settings(containerURL: containerURL),
               let base = settings.endpoint,
@@ -78,8 +85,7 @@ enum CN1DocumentRemote {
             }
             // The URL the session hands back is deleted the moment this closure returns, so the
             // bytes are moved somewhere the caller can still hand to the browser.
-            let dest = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
+            let dest = destination.appendingPathComponent(UUID().uuidString)
             do {
                 try FileManager.default.moveItem(at: location, to: dest)
                 completion(dest, nil)
@@ -89,6 +95,37 @@ enum CN1DocumentRemote {
         }
         task.resume()
         return task
+    }
+
+    /// Maps anything that can go wrong here into a domain the replicated provider is allowed to
+    /// report. Apple: "Errors must be in one of the following domains: NSCocoaErrorDomain,
+    /// NSFileProviderErrorDomain." A raw URLSession failure is NSURLErrorDomain, which is neither,
+    /// and reporting one leaves the browser with an error it does not know how to present.
+    static func providerError(_ error: Error?) -> Error {
+        guard let error = error else {
+            return NSFileProviderError(.noSuchItem)
+        }
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain || ns.domain == NSFileProviderError.errorDomain {
+            return error
+        }
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorCancelled:
+                return CocoaError(.userCancelled)
+            case NSURLErrorUserAuthenticationRequired:
+                // Distinct on purpose: the browser offers the user a way to sign the location in
+                // again, which it cannot do for a generic transport failure.
+                return NSFileProviderError(.notAuthenticated)
+            default:
+                // Everything else the network can do -- offline, DNS, TLS, timeout -- is the same
+                // thing from the browser's point of view: try again later.
+                return NSFileProviderError(.serverUnreachable)
+            }
+        }
+        return NSError(domain: NSCocoaErrorDomain, code: NSXPCConnectionReplyInvalid, userInfo: [
+            NSUnderlyingErrorKey: error
+        ])
     }
 
     private static func noEndpoint() -> NSError {

@@ -97,11 +97,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// Encodes an arbitrary node id into exactly one path component, and back.
     ///
     /// Percent-encoding with a deliberately narrow allowed set: the separator has to go, and so
-    /// does "%" itself or decoding would be ambiguous. Case is preserved, which a case-insensitive
-    /// filesystem would not do for a raw id.
+    /// does "%" itself or decoding would be ambiguous.
+    ///
+    /// Uppercase letters are encoded as well, which is what makes the mapping injective on a
+    /// case-INSENSITIVE volume. Node ids are the app's own record keys, so "Invoice" and "invoice"
+    /// are two items; leaving both unencoded would give them one directory, and whichever
+    /// materialized second would overwrite the first while persistentIdentifierForItem answered
+    /// with the wrong id for both. The output is unambiguous because the only uppercase left in it
+    /// is the hex of an escape, and "%" never survives unencoded to start a false one.
     static func encode(_ identifier: String) -> String {
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-_")
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
         return identifier.addingPercentEncoding(withAllowedCharacters: allowed) ?? identifier
     }
 

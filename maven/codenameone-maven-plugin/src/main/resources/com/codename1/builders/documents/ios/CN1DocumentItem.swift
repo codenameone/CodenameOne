@@ -116,8 +116,24 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     var contentModificationDate: Date? {
-        guard let ms = node.lastModified, ms >= 0 else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(ms) / 1000.0)
+        if let ms = node.lastModified, ms >= 0 {
+            return Date(timeIntervalSince1970: TimeInterval(ms) / 1000.0)
+        }
+        // Falls back to the file on disk when the app declared no date. The pre-iOS-16 provider
+        // has no itemVersion to tell it the bytes moved, so this date is the only change signal it
+        // gets: without the fallback a locally backed item that never declared one looks unchanged
+        // forever and the browser goes on serving the copy it materialized first.
+        //
+        // A remote node has nothing to measure and stays nil rather than borrowing the publish
+        // revision. A revision-derived date would move on every publish and re-fetch every opened
+        // remote document each time, which for a drive of any size is the expensive wrong default
+        // -- the same bargain contentStamp documents below.
+        if let path = node.path, !path.isEmpty, let container = containerURL,
+           let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
+            return attrs[.modificationDate] as? Date
+        }
+        return nil
     }
 
     @available(iOS 16.0, macOS 13.0, *)
