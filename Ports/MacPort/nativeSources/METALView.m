@@ -326,11 +326,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     cn1PendingFbWidth = pw;
     cn1PendingFbHeight = ph;
     cn1FbResizePending = YES;
-    // The layer's own geometry is AppKit's to own and is safe to set here; only
-    // the Metal objects have to wait for the render thread.
-    CAMetalLayer *sizedLayer = (CAMetalLayer *)self.layer;
-    sizedLayer.contentsScale = CN1AppKitBackingScale(self);
-    sizedLayer.drawableSize = CGSizeMake(pw, ph);
+    // drawableSize is NOT set here, deliberately. It has to change together with
+    // screenTexture and framebufferWidth/Height: setting it now would shrink the
+    // next drawable while the texture and the cached dimensions are still the
+    // old size, and presentFramebuffer's blit would then copy old dimensions
+    // into a smaller destination -- a Metal validation failure or a crash. All
+    // three move together in applyPendingFrameBufferSize.
     [self setNeedsDisplay:YES];
 }
 
@@ -362,10 +363,13 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     framebufferHeight = ph;
     projectionMatrix = CN1MacOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
 
-    // The layer's geometry was already set when the resize was requested, on
-    // whichever thread asked; repeating it here would be a second layer mutation
-    // from the render thread for no gain.
+    // The drawable's size changes HERE, with the texture and the dimensions it
+    // has to agree with, and on the thread that renders. Splitting them was what
+    // let a live shrink land between setFramebuffer and presentFramebuffer and
+    // blit an old-sized texture into a new, smaller drawable.
     CAMetalLayer *layer = (CAMetalLayer *)self.layer;
+    layer.contentsScale = CN1AppKitBackingScale(self);
+    layer.drawableSize = CGSizeMake(pw, ph);
 
     // The persistent target. Codename One only queues the operations that
     // changed since the previous frame, so it has to survive between them; a

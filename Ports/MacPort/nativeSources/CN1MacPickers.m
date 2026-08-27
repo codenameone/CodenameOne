@@ -68,6 +68,30 @@ static void cn1PickerFinish(JAVA_LONG result) {
 /// Owns the controls inside a picker popover and turns their actions into a
 /// result. A separate object because a popover's content is a view controller
 /// and the targets have to outlive the call that built them.
+/// Rounds to the nearest multiple of step, for negative values as well.
+///
+/// C division truncates toward zero, so (v + step/2) / step is nearest-rounding
+/// only for v >= 0. An instant before 1970 -- a date picker showing a historical
+/// date -- rounded the wrong way: eight minutes before the epoch with a quarter
+/// hour step moved to the epoch rather than to the quarter hour before it, and
+/// the same expression seeds the control, so merely opening the picker shifted
+/// the value it was given.
+static long long cn1RoundToStep(long long value, long long step) {
+    if (step <= 0) {
+        return value;
+    }
+    long long shifted = value + step / 2;
+    long long q = shifted / step;
+    // C truncates toward zero, so for a negative shifted value the quotient is
+    // one too high: floor is what nearest-rounding needs. -8 minutes at a
+    // quarter-hour step gives shifted = -30s, q = 0 by truncation and 0 as the
+    // answer -- the epoch, when the quarter hour BELOW it is nearer.
+    if (shifted < 0 && q * step != shifted) {
+        q--;
+    }
+    return q * step;
+}
+
 @interface CN1MacPickerController : NSViewController <NSPopoverDelegate>
 @property (nonatomic, assign) int pickerType;
 @property (nonatomic, retain) NSDatePicker *datePicker;
@@ -106,7 +130,7 @@ static void cn1PickerFinish(JAVA_LONG result) {
         long long total = hours * 3600000LL + minutes * 60000LL;
         if (self.minuteStep > 1) {
             long long stepMs = (long long)self.minuteStep * 60000LL;
-            total = ((total + stepMs / 2) / stepMs) * stepMs;
+            total = (long long)cn1RoundToStep((long long)total, (long long)stepMs);
         }
         cn1PickerFinish((JAVA_LONG)total);
         return;
@@ -139,7 +163,7 @@ static void cn1PickerFinish(JAVA_LONG result) {
         // application's configured step was simply not enforced -- a picker set
         // to quarter hours committed 07 minutes quite happily.
         JAVA_LONG stepMs = (JAVA_LONG)self.minuteStep * 60000;
-        millis = ((millis + stepMs / 2) / stepMs) * stepMs;
+        millis = (JAVA_LONG)cn1RoundToStep((long long)millis, (long long)stepMs);
     }
     cn1PickerFinish(millis);
 }
@@ -402,7 +426,7 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
         long long seeded = time;
         if (type != 1 && controller.minuteStep > 1) {
             long long stepMs = (long long)controller.minuteStep * 60000;
-            seeded = ((seeded + stepMs / 2) / stepMs) * stepMs;
+            seeded = (long long)cn1RoundToStep((long long)seeded, (long long)stepMs);
         }
         picker.dateValue = [NSDate dateWithTimeIntervalSince1970:seeded / 1000.0];
         controller.datePicker = picker;

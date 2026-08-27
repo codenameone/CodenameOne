@@ -69,6 +69,26 @@ public class MacImplementation extends IOSImplementation {
         return true;
     }
 
+    /// @inheritDoc
+    ///
+    /// Desktop layers, not the inherited iPad ones.
+    ///
+    /// IOSImplementation.isTablet() answers `isDesktop() || ...`, and this port
+    /// forces isDesktop() true, so the inherited implementation reported
+    /// `tablet`, `ios`, `ipad`. Resources.openLayered then applied an
+    /// application's iOS and iPad layers on a Mac and never its `_desktop.ovr`
+    /// -- the wrong artwork on the one platform that has a desktop layer to
+    /// apply.
+    ///
+    /// The JavaSE desktop port answers `desktop`, `tablet` for the same reason,
+    /// and matching it means one override written for the desktop covers both.
+    /// `mac` follows so a layer can name this port specifically, the way `ipad`
+    /// does on iOS.
+    @Override
+    public String[] getPlatformOverrides() {
+        return new String[] {"desktop", "tablet", "mac"};
+    }
+
     /// The natives this class needs directly. The window manager owns its own;
     /// density is asked for long before any secondary window exists.
     private final MacNative macNative = new MacNative();
