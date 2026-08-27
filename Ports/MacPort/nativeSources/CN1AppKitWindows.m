@@ -1234,6 +1234,15 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macPresentationSetOwnerWindow___int(C
     });
 }
 
+/// The modifier keys held right now, in PointerEvent's mask.
+///
+/// Display.isShiftKeyDown() and its siblings answer false from the base
+/// implementation unless a port tracks this; MacImplementation reads it here.
+JAVA_INT com_codename1_impl_mac_MacNative_macCurrentModifiers___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    extern int CN1MacCurrentModifiers(void);
+    return CN1MacCurrentModifiers();
+}
+
 JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
     cn1OnMain(^{
         extern void CN1MacTextInputSetPendingOwner(NSView *view);

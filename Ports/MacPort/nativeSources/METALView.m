@@ -727,6 +727,24 @@ static int cn1ModifiersOf(NSEvent *event) {
     return m;
 }
 
+/// The modifier keys held right now, in PointerEvent's mask.
+///
+/// Display.isShiftKeyDown() and its three siblings answer from the base
+/// implementation, which returns false on every port that does not track this.
+/// The mask reached pointer and wheel listeners but nothing else, so an
+/// application handling a key press could not tell Shift-Tab from Tab, or
+/// Command-N from N, outside the native menu and text paths.
+///
+/// Read from the event rather than polled, and updated by flagsChanged: as well
+/// as by key events: pressing Shift alone produces no keyDown at all, so without
+/// that transition the state would be stale exactly while a modifier is held on
+/// its own.
+static int cn1CurrentModifiers = 0;
+
+int CN1MacCurrentModifiers(void) {
+    return cn1CurrentModifiers;
+}
+
 /// The buttons currently HELD, which is what getButtonMask() answers.
 ///
 /// Read from AppKit rather than staged from the event that triggered the call:
@@ -1093,7 +1111,14 @@ static int CN1MacKeyCode(NSEvent *event) {
     return consumedKeys;
 }
 
+- (void)flagsChanged:(NSEvent *)event {
+    // A modifier pressed or released on its own, which produces no key event.
+    cn1CurrentModifiers = cn1ModifiersOf(event);
+    [super flagsChanged:event];
+}
+
 - (void)keyDown:(NSEvent *)event {
+    cn1CurrentModifiers = cn1ModifiersOf(event);
     if (!self.cn1InputEnabled) {
         [[self cn1ConsumedKeys] addIndex:event.keyCode];
         return;
@@ -1694,6 +1719,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 
 
 - (void)keyUp:(NSEvent *)event {
+    cn1CurrentModifiers = cn1ModifiersOf(event);
     if ([[self cn1ConsumedKeys] containsIndex:event.keyCode]) {
         [[self cn1ConsumedKeys] removeIndex:event.keyCode];
         return;
@@ -1907,7 +1933,12 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
 
 - (void)selectAll:(id)sender {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (!session.active) {
+    // Ownership, like every other Edit action. Command-A is a key equivalent and
+    // arrives here directly, so testing only "a session is active" let the key
+    // window select all the text of an editor running in a DIFFERENT window --
+    // the one case validation never sees, because a key equivalent does not ask
+    // whether the menu item is enabled.
+    if (!cn1OwnsSession(self, session)) {
         return;
     }
     session.markedRange = NSMakeRange(NSNotFound, 0);

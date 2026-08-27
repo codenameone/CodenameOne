@@ -153,6 +153,10 @@ class MacNative {
     /// Takes the framework's window id; -1 restores the default.
     native void macPresentationSetOwnerWindow(int windowId);
 
+    /// The modifier keys held right now, as PointerEvent's mask: shift 1,
+    /// control 2, alt 4, meta 8.
+    native int macCurrentModifiers();
+
     native void macTextInputSetOwnerWindow(int windowId);
 
     native int macMonitorForMainWindow();

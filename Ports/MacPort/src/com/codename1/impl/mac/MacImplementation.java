@@ -237,6 +237,46 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// From the modifier state AppKit last reported, rather than the base
+    /// implementation's unconditional false.
+    ///
+    /// These four are how application code asks what was held during a key
+    /// press, and every one of them answered false on this port: the modifier
+    /// mask reached pointer and wheel listeners but nothing else, so Shift-Tab
+    /// was indistinguishable from Tab outside the native menu and text paths.
+    /// The native side records the flags from key events AND from flagsChanged:,
+    /// because a modifier pressed on its own produces no key event at all.
+    @Override
+    public boolean isShiftKeyDown() {
+        return (macNative.macCurrentModifiers() & 1) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// See `#isShiftKeyDown()`.
+    @Override
+    public boolean isControlKeyDown() {
+        return (macNative.macCurrentModifiers() & 2) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Option is what Alt is called on a Mac keyboard. See `#isShiftKeyDown()`.
+    @Override
+    public boolean isAltKeyDown() {
+        return (macNative.macCurrentModifiers() & 4) != 0;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Command is Meta here. See `#isShiftKeyDown()`.
+    @Override
+    public boolean isMetaKeyDown() {
+        return (macNative.macCurrentModifiers() & 8) != 0;
+    }
+
+    /// @inheritDoc
+    ///
     /// False. A Mac reports one pointer, and this port only ever sends one.
     ///
     /// Every pointer path in METALView delivers a length of 1, because an NSEvent
