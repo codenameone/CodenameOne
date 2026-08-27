@@ -199,10 +199,18 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             return .rootContainer
         }
         let dir = url.deletingLastPathComponent().lastPathComponent
-        guard !dir.isEmpty, let decoded = CN1FileProviderClassic.decode(dir) else {
+        guard !dir.isEmpty else {
             return nil
         }
-        return NSFileProviderItemIdentifier(decoded)
+        if let decoded = CN1FileProviderClassic.decode(dir) {
+            return NSFileProviderItemIdentifier(decoded)
+        }
+        // A digest directory: the identifier cannot be read back out of it, so it is matched
+        // against the published ones instead.
+        guard let index = index(), let resolved = decodeDigest(dir, in: index) else {
+            return nil
+        }
+        return NSFileProviderItemIdentifier(resolved)
     }
 
     /// Encodes an arbitrary node id into exactly one path component, and back.
@@ -221,11 +229,45 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// stay distinct when the filesystem folds them to "cn1%3a%46oo" and "cn1%3afoo".
     static func encode(_ identifier: String) -> String {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_")
-        return identifier.addingPercentEncoding(withAllowedCharacters: allowed) ?? identifier
+        let escaped = identifier.addingPercentEncoding(withAllowedCharacters: allowed)
+            ?? identifier
+        if escaped.utf8.count <= maxComponentBytes {
+            return escaped
+        }
+        // Too long to be a path component. The publisher refuses ids that reach this -- it
+        // budgets the escaped, namespaced identifier against the same limit -- so this is for an
+        // index that arrived some other way, the same reason the display name and the storage
+        // leaf are sanitized here rather than trusted. A digest is bounded whatever went in, and
+        // decode resolves it by looking for the node it belongs to.
+        return digestPrefix + CN1DocumentRemote.digest(identifier)
+            .prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// 255 is where APFS, ext4 and NTFS all stop, and this is one component.
+    private static let maxComponentBytes = 255
+    /// Marks a directory name as a digest rather than an escaped identifier. Not a legal escaped
+    /// form -- "%" is always escaped to "%25" -- so the two cannot be confused.
+    private static let digestPrefix = "cn1h-"
+
     static func decode(_ component: String) -> String? {
-        component.removingPercentEncoding
+        guard !component.hasPrefix(digestPrefix) else {
+            return nil
+        }
+        return component.removingPercentEncoding
+    }
+
+    /// The identifier a digest directory belongs to, found by digesting the published ones.
+    ///
+    /// Only reached for a component encode() could not spell out, which the publisher does not
+    /// produce; the ordinary path never loads the index for this.
+    private func decodeDigest(_ component: String, in index: CN1DocumentIndex) -> String? {
+        for nodeId in index.nodes.keys {
+            let identifier = CN1DocumentIndex.identifier(for: nodeId)
+            if CN1FileProviderClassic.encode(identifier.rawValue) == component {
+                return identifier.rawValue
+            }
+        }
+        return nil
     }
 
     /// Reduces a display name to something safe as a single path component.
