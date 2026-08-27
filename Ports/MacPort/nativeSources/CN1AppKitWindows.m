@@ -478,24 +478,19 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
             return;
         }
         if (positionSet != 0) {
+            // One scale for the whole rectangle, and the desktop one -- the same
+            // cn1DesktopScale that setBounds, getBounds and the monitor
+            // rectangles use. This used to re-divide the SIZE by the window's own
+            // backing factor once it had landed, so that a window asked for on a
+            // 1x display would not come up half as wide. That trades one unit for
+            // two: getBounds still multiplies the frame by the primary scale, so
+            // a 400-pixel window placed on a 1x secondary was created 400 points
+            // wide and reported back as 800 -- and bounds saved and restored grew
+            // on every cycle. cn1WindowScale's own rule says it: the window's
+            // backing factor is for drawable sizes, never for a desktop
+            // coordinate. The drawable still gets it, through
+            // updateFrameBufferSize below.
             [w setFrame:cn1ToAppKitFrame(requested) display:NO];
-            // Position is desktop-space and converts against the primary
-            // screen's scale, but the SIZE is this window's own drawable pixels.
-            // Which display that is cannot be known until the window has
-            // landed, so the size is corrected here: a 400-pixel window asked
-            // for on a 1x secondary came up 200 points wide because it had been
-            // divided by the 2x primary's scale.
-            CGFloat destScale = w.backingScaleFactor;
-            if (destScale > 0 && destScale != scale) {
-                NSRect placed = w.frame;
-                CGFloat top = placed.origin.y + placed.size.height;
-                placed.size = NSMakeSize(MAX(width / destScale, 1), MAX(height / destScale, 1));
-                // AppKit measures from the bottom, so the origin moves to keep
-                // the top edge -- the one the caller positioned -- where it was
-                // put.
-                placed.origin.y = top - placed.size.height;
-                [w setFrame:placed display:NO];
-            }
         } else {
             // Nobody asked for a position, but the size is still the outer one,
             // so it cannot be left as the content rect the window was built with.
@@ -577,6 +572,20 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowDestroy___int(CODENAME_ONE_T
             rec.modalSession = NULL;
         }
         rec.window.delegate = nil;
+        // Anything still remembering this window as its owner has to forget it
+        // first. pendingOwner does not retain -- it cannot, the relationship is
+        // AppKit's -- and the record about to be dropped holds the last
+        // reference to the window, so a child left pointing here would message a
+        // freed NSWindow the next time it was shown.
+        for (id entry in cn1WindowTable()) {
+            if (entry == [NSNull null]) {
+                continue;
+            }
+            CN1MacWindowRecord *other = (CN1MacWindowRecord *)entry;
+            if (other.pendingOwner == rec.window) {
+                other.pendingOwner = nil;
+            }
+        }
         [rec.window orderOut:nil];
         [rec.window close];
         [cn1WindowTable() replaceObjectAtIndex:slot withObject:[NSNull null]];
@@ -592,13 +601,21 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             return;
         }
         if (visible != 0) {
-            // Attached on the first show, so the child is ordered in with its
-            // owner rather than ahead of it. Cleared afterwards: re-adding an
-            // existing child reorders it, which would jump a palette back in
-            // front every time its window is shown again.
-            if (rec.pendingOwner != nil && rec.pendingOwner != rec.window) {
+            // Attached on show, so the child is ordered in with its owner rather
+            // than ahead of it.
+            //
+            // On EVERY show, not just the first, and the owner is remembered
+            // rather than consumed. orderOut: on a child detaches it from its
+            // parent -- measured: parentWindow is nil afterwards -- so hiding an
+            // owned window and showing it again used to lose the relationship
+            // for good, leaving a palette that no longer floated above its
+            // window or closed with it. The parentWindow test is what the
+            // clearing used to be for: re-adding a child that is still attached
+            // reorders it, which would jump a palette back in front every time
+            // its window is shown again.
+            if (rec.pendingOwner != nil && rec.pendingOwner != rec.window
+                    && rec.window.parentWindow == nil) {
                 [rec.pendingOwner addChildWindow:rec.window ordered:NSWindowAbove];
-                rec.pendingOwner = nil;
             }
             [rec.window makeKeyAndOrderFront:nil];
             // The application's own decision outranks the app-hide bookkeeping:
@@ -933,16 +950,36 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         fresh.contentMinSize = minSize;
         rec.window = fresh;
         rec.utility = utility != 0;
+        // addChildWindow: ORDERS THE CHILD IN -- measured, not assumed: adding a
+        // window that was off screen puts it on screen. So ownership is only
+        // re-established here for windows that are going to be on screen anyway;
+        // one that is not keeps its owner in pendingOwner and is re-attached by
+        // the next show. Without this, converting a window while the application
+        // was hidden -- which leaves isVisible NO and parentWindow set -- put it
+        // back on screen, and the visibility block below could not take it down
+        // again because it never was visible.
+        BOOL landsOnScreen = wasVisible || wasMiniaturized;
         if (owner != nil) {
-            // Re-attached only if it was already attached; a window still
-            // waiting for its first show keeps its pendingOwner instead, so the
-            // conversion does not order it in early.
-            [owner addChildWindow:fresh ordered:NSWindowAbove];
+            // A window still waiting for its first show has no parentWindow at
+            // all and keeps whatever pendingOwner it already had.
+            if (landsOnScreen) {
+                [owner addChildWindow:fresh ordered:NSWindowAbove];
+            } else {
+                rec.pendingOwner = owner;
+            }
         }
         // Re-adopted by the replacement, so ownership survives the rebuild in
-        // both directions rather than only upwards.
+        // both directions rather than only upwards -- under the same rule, since
+        // a child can be off screen for the same reasons its owner can.
         for (NSWindow *child in ownedChildren) {
-            [fresh addChildWindow:child ordered:NSWindowAbove];
+            if (child.isVisible || child.isMiniaturized) {
+                [fresh addChildWindow:child ordered:NSWindowAbove];
+            } else {
+                CN1MacWindowRecord *childRec = cn1RecordForWindow(child);
+                if (childRec != nil) {
+                    childRec.pendingOwner = fresh;
+                }
+            }
         }
         // The view carries cn1InputEnabled across with it, but the chrome is the
         // new window's own: a window blocked by a modal dialog would otherwise
