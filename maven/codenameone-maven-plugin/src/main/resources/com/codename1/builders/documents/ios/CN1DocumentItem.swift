@@ -92,6 +92,12 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         if #available(iOS 14.0, *) {
             return CN1DocumentItem.utType(for: node).identifier
         }
+        // iOS 13 and below get public.data rather than a type derived from the extension. The
+        // lookup that would give a better answer there is MobileCoreServices'
+        // UTTypeCreatePreferredIdentifierForTag, which is deprecated on every SDK this is built
+        // with, so using it puts a deprecation warning in every customer build of the classic
+        // provider for a preview icon on a version range that is already the fallback path. The
+        // item still opens; it is the preview and the "open with" list that are generic.
         return "public.data"
     }
     #endif
@@ -111,7 +117,12 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         }
         // Falling back on the extension rather than straight to .data: the browser picks its
         // preview and its "open with" list from this, and .data offers neither.
-        let ext = (node.name as NSString?)?.pathExtension ?? ""
+        //
+        // Taken from the name the browser is actually SHOWN -- which falls back to the node id --
+        // rather than from node.name alone. A node that declared no name and no content type but
+        // carries an id like "report.pdf" is listed as report.pdf and was still typed as raw
+        // data, so it previewed as nothing and opened with everything.
+        let ext = (displayName(node.name ?? node.id) as NSString).pathExtension
         if !ext.isEmpty, let t = UTType(filenameExtension: ext) {
             return t
         }
