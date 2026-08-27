@@ -338,14 +338,29 @@ public class MacOSNativeBuilder extends Executor {
         // is the precise mismatch this define exists to prevent. Any channel that
         // resolves to push is enough: the define is written once for the build,
         // while the entitlements are written per channel.
+        // Every capability that gates a native define is resolved the same way:
+        // the class scan OR an explicit entitlement override. The override exists
+        // for exactly the application the scanner cannot read -- a reflective
+        // call, most obviously -- and it is the same hint that writes the
+        // permission into the bundle. Deciding the define from the scan alone
+        // therefore ships a bundle asking for a permission whose implementation
+        // was compiled out of it, which is the one mismatch these defines exist
+        // to prevent. Any signing channel is enough: the defines are written once
+        // per build, the entitlements once per channel.
+        java.util.List<MacOSBuildHints.EntitlementOverrides> channelOverrides =
+                new java.util.ArrayList<MacOSBuildHints.EntitlementOverrides>();
+        for (String channel : hints.getChannels()) {
+            channelOverrides.add(hints.entitlementsFor(channel));
+        }
         boolean pushEnabled = usesPush[0];
-        if (!pushEnabled) {
-            for (String channel : hints.getChannels()) {
-                if (hints.entitlementsFor(channel).push(false)) {
-                    pushEnabled = true;
-                    break;
-                }
-            }
+        boolean microphoneEnabled = usesMicrophone[0];
+        boolean bluetoothEnabled = usesBluetooth[0];
+        boolean calendarEnabled = usesCalendar[0];
+        for (MacOSBuildHints.EntitlementOverrides o : channelOverrides) {
+            pushEnabled = pushEnabled || o.push(false);
+            microphoneEnabled = microphoneEnabled || o.microphone(false);
+            bluetoothEnabled = bluetoothEnabled || o.bluetooth(false);
+            calendarEnabled = calendarEnabled || o.calendars(false);
         }
         if (usesLocalNotifications[0] || pushEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
@@ -378,7 +393,7 @@ public class MacOSNativeBuilder extends Executor {
         // CodenameOne_GLViewController.m and are never compiled here -- an
         // application would get a location manager that reports nothing at all.
         // Both report unsupported from MacImplementation instead.
-        if (usesMicrophone[0]) {
+        if (microphoneEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {
                 throw new BuildException("The application records audio but "
@@ -393,7 +408,7 @@ public class MacOSNativeBuilder extends Executor {
                         + "CodenameOne_GLViewController.h", ex);
             }
         }
-        log("Microphone " + (usesMicrophone[0] ? "enabled" : "disabled"));
+        log("Microphone " + (microphoneEnabled ? "enabled" : "disabled"));
 
         // CoreBluetooth and EventKit are the same frameworks on macOS, and their
         // natives carry no UIKit -- but each is behind a define AND a framework,
@@ -437,7 +452,7 @@ public class MacOSNativeBuilder extends Executor {
         // does not depend on modules and auto-linking staying enabled -- which
         // is a build setting, not a property of this code.
         extraFrameworks.add("LocalAuthentication.framework");
-        if (usesBluetooth[0]) {
+        if (bluetoothEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {
                 throw new BuildException("The application uses com.codename1.bluetooth but "
@@ -452,8 +467,8 @@ public class MacOSNativeBuilder extends Executor {
             }
             extraFrameworks.add("CoreBluetooth.framework");
         }
-        log("Bluetooth " + (usesBluetooth[0] ? "enabled" : "disabled"));
-        if (usesCalendar[0]) {
+        log("Bluetooth " + (bluetoothEnabled ? "enabled" : "disabled"));
+        if (calendarEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
             if (!iosNative.exists()) {
                 throw new BuildException("The application uses com.codename1.calendar but "
@@ -467,7 +482,7 @@ public class MacOSNativeBuilder extends Executor {
             }
             extraFrameworks.add("EventKit.framework");
         }
-        log("Calendar " + (usesCalendar[0] ? "enabled" : "disabled"));
+        log("Calendar " + (calendarEnabled ? "enabled" : "disabled"));
         // The same answer that enabled EventKit above has to reach the
         // entitlement and the usage strings, or a sandboxed build links the
         // framework and is refused access to it at first use, and an unsandboxed

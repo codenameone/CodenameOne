@@ -73,8 +73,15 @@ class SearchBar extends Toolbar {
         if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) { //NOPMD CompareObjectsWithEquals
             search.startEditingAsync();
         } else {
-            if (parent.getComponentForm() != null) {
-                parent.getComponentForm().setEditOnShow(search);
+            // setEditOnShow is a Form method, so a search bar inside a desktop
+            // Window has nowhere to defer to -- getComponentForm() is null
+            // there. Edit it directly instead of dropping the request, which is
+            // what the null check used to do.
+            Form parentForm = parent.getComponentForm();
+            if (parentForm != null) {
+                parentForm.setEditOnShow(search);
+            } else if (parent.getTopLevelContainer() != null) {
+                search.startEditingAsync();
             }
         }
     }

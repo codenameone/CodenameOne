@@ -1287,9 +1287,17 @@ public class Sheet extends Container {
             public void run() {
                 Container parent = cnt.getParent();
 
-                if (parent != null && parent.getComponentForm() != null) {
+                // getTopLevelContainer(), not getComponentForm(): the latter
+                // is null for a component hosted in a desktop Window, so a
+                // Sheet shown in one skipped this whole block -- never firing
+                // its close event and never releasing the bounds tracker.
+                // revalidateLater() and repaint() are Container methods that a
+                // Form inherits unchanged, so a Form behaves exactly as before.
+                TopLevelContainer parentTop = parent == null
+                        ? null : parent.getTopLevelContainer();
+                if (parentTop != null) {
                     cnt.remove();
-                    Form parentForm = parent.getComponentForm();
+                    Container parentForm = parentTop.asContainer();
                     parentForm.revalidateLater();
                     // revalidateLater() only schedules work for the next
                     // paint cycle, but cnt.remove() does not by itself wake
@@ -1350,9 +1358,13 @@ public class Sheet extends Container {
             @Override
             public void run() {
                 Container parent = cnt.getParent();
-                if (parent != null && cnt.getComponentForm() != null) {
+                // As above: a desktop Window has no Form, and this block owns
+                // the close event and the bounds tracker.
+                TopLevelContainer parentTop = parent == null
+                        ? null : parent.getTopLevelContainer();
+                if (parentTop != null) {
                     cnt.remove();
-                    Form parentForm = parent.getComponentForm();
+                    Container parentForm = parentTop.asContainer();
                     parentForm.revalidateLater();
                     // revalidateLater() only schedules work for the next
                     // paint cycle, but cnt.remove() does not by itself wake

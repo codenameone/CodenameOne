@@ -72,6 +72,11 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 @property (nonatomic, assign) BOOL hiddenByApp;
 @end
 
+/// Reports a window's visibility and that of every window it owns.
+/// Defined below the window table; declared here because the record's own
+/// delegate methods are the first callers.
+static void cn1DeliverVisibilityTree(CN1MacWindowRecord *rec, BOOL shown);
+
 @implementation CN1MacWindowRecord
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
@@ -116,11 +121,11 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
     // into a window nobody can see, and the Minimized event never fires. The
     // same callback the show/hide path uses, so the owner cascade is identical
     // whichever way the window went away.
-    CN1MacWindowDeliverVisibility(self.windowId, NO);
+    cn1DeliverVisibilityTree(self, NO);
 }
 
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
-    CN1MacWindowDeliverVisibility(self.windowId, YES);
+    cn1DeliverVisibilityTree(self, YES);
 }
 
 - (void)windowDidChangeScreen:(NSNotification *)notification {
@@ -167,6 +172,49 @@ static CN1MacWindowRecord *cn1WindowAt(int slot) {
     }
     id entry = [table objectAtIndex:slot];
     return entry == [NSNull null] ? nil : (CN1MacWindowRecord *)entry;
+}
+
+/// The record owning this AppKit window, or nil for a window we did not create.
+static CN1MacWindowRecord *cn1RecordForWindow(NSWindow *window) {
+    if (window == nil) {
+        return nil;
+    }
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (rec.window == window) {
+            return rec;
+        }
+    }
+    return nil;
+}
+
+/// Reports a window's visibility, and its owned windows' along with it.
+///
+/// AppKit takes child windows off screen with their owner and brings them back
+/// with it, but posts no notification for the child, so reporting only the owner
+/// left a child window with nativeVisible still true: painting, animating and
+/// answering isWindowShowing() while absent from the screen. The inherited
+/// cascade in MacWindowManager cannot cover this -- it walks a Catalyst peer
+/// list that AppKitWindowManager never populates -- so the cascade belongs here,
+/// where AppKit's own ownership graph is the source of truth.
+///
+/// The child list is snapshotted because delivering runs Java, which can close a
+/// window and mutate the collection being enumerated.
+static void cn1DeliverVisibilityTree(CN1MacWindowRecord *rec, BOOL shown) {
+    if (rec == nil || rec.window == nil) {
+        return;
+    }
+    CN1MacWindowDeliverVisibility(rec.windowId, shown);
+    NSArray *children = [NSArray arrayWithArray:rec.window.childWindows];
+    for (NSWindow *child in children) {
+        CN1MacWindowRecord *childRec = cn1RecordForWindow(child);
+        if (childRec != nil && !childRec.disposed) {
+            cn1DeliverVisibilityTree(childRec, shown);
+        }
+    }
 }
 
 /// Runs a block on the main thread and waits. Every AppKit call here has to be
@@ -460,7 +508,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             // whatever unhiding would have done for this window, it has just
             // been said explicitly.
             rec.hiddenByApp = NO;
-            CN1MacWindowDeliverVisibility(rec.windowId, YES);
+            cn1DeliverVisibilityTree(rec, YES);
             // AppKit hands back a usable window synchronously, so the content is
             // ready as soon as it is on screen. Catalyst has to wait for a scene
             // to activate before it can say this.
@@ -471,7 +519,7 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             // matters: hiding a window while the application itself is hidden
             // must not be undone by the later unhide.
             rec.hiddenByApp = NO;
-            CN1MacWindowDeliverVisibility(rec.windowId, NO);
+            cn1DeliverVisibilityTree(rec, NO);
         }
     });
 }
@@ -485,7 +533,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowReopen___int_R_boolean(CO
         }
         [rec.window makeKeyAndOrderFront:nil];
         rec.hiddenByApp = NO;
-        CN1MacWindowDeliverVisibility(rec.windowId, YES);
+        cn1DeliverVisibilityTree(rec, YES);
         ok = YES;
     });
     return ok ? JAVA_TRUE : JAVA_FALSE;

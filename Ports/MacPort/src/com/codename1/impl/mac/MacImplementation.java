@@ -69,6 +69,63 @@ public class MacImplementation extends IOSImplementation {
         return true;
     }
 
+    /// The natives this class needs directly. The window manager owns its own;
+    /// density is asked for long before any secondary window exists.
+    private final MacNative macNative = new MacNative();
+
+    /// @inheritDoc
+    ///
+    /// From the monitor's backing scale, not from how wide the window is.
+    ///
+    /// The inherited iOS answer reads isTablet() -- true here -- and then treats
+    /// any display at least 1100 pixels wide as a Retina iPad, so an ordinary 1x
+    /// desktop window got DENSITY_VERY_HIGH and about twice the theme scaling it
+    /// should have. A desktop's width says nothing about its density. This is the
+    /// same rule the JavaSE desktop port applies to its own retina scale, so the
+    /// two desktops agree.
+    ///
+    /// Deliberately not cached, unlike the iOS implementation: dragging a window
+    /// between a Retina and a 1x monitor changes the answer, and a cached one
+    /// would keep scaling for the display the application started on.
+    @Override
+    public int getDeviceDensity() {
+        int scaleTimes100 = macNative.macMonitorScaleTimes100(
+                Math.max(0, macNative.macMonitorForMainWindow()));
+        if (scaleTimes100 <= 0) {
+            return super.getDeviceDensity();
+        }
+        return scaleTimes100 > 150
+                ? com.codename1.ui.Display.DENSITY_VERY_HIGH
+                : com.codename1.ui.Display.DENSITY_MEDIUM;
+    }
+
+    /// @inheritDoc
+    ///
+    /// Scaled off the monitor rather than off the iPad constants.
+    ///
+    /// The inherited version picks a pixels-per-millimetre figure from the same
+    /// width heuristic getDeviceDensity() used, so an ordinary 1x desktop window
+    /// was handed the Retina-iPad constant and every millimetre-based dimension
+    /// came out roughly twice its intended size. It cannot simply defer to the
+    /// density-based mapping in CodenameOneImplementation either, because super
+    /// here is IOSImplementation, which is the implementation being corrected.
+    ///
+    /// Five pixels per millimetre at 1x is what that mapping gives DENSITY_MEDIUM
+    /// and is about right for a desktop display; a Retina Mac has twice the
+    /// pixels in the same millimetre, so the scale multiplies it directly. Note
+    /// this deliberately does NOT use macMonitorDpi(): NSDeviceResolution reports
+    /// the backing store's nominal 72 or 144, not the physical density these
+    /// units need.
+    @Override
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        int scaleTimes100 = macNative.macMonitorScaleTimes100(
+                Math.max(0, macNative.macMonitorForMainWindow()));
+        if (scaleTimes100 <= 0) {
+            return super.convertToPixels(dipCount, horizontal);
+        }
+        return (int) Math.round(((double) dipCount) * 5.0 * scaleTimes100 / 100.0);
+    }
+
     /// @inheritDoc
     ///
     /// The arrows, mapped the way every other desktop port maps them.

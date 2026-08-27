@@ -321,7 +321,7 @@ class ExecutorArchiveExtractionTest {
         IOException refused = assertThrows(IOException.class,
                 () -> Executor.extractNestedClassesForPermissions(
                         new ByteArrayInputStream(raw.toByteArray()), scratch,
-                        new Executor.PermScanBudget(), 4096L));
+                        new Executor.PermScanBudget(4096L)));
         assertTrue(refused.getMessage().contains("refusing to keep reading"),
                 "expected the stream bound to stop it, got: " + refused.getMessage());
     }
@@ -335,19 +335,71 @@ class ExecutorArchiveExtractionTest {
         byte[] payload = new byte[64];
 
         Executor.BoundedInputStream viaArray = new Executor.BoundedInputStream(
-                new ByteArrayInputStream(payload), 16L);
+                new ByteArrayInputStream(payload), new Executor.PermScanBudget(16L));
         assertThrows(IOException.class, () -> viaArray.read(new byte[64], 0, 64));
 
         Executor.BoundedInputStream viaSkip = new Executor.BoundedInputStream(
-                new ByteArrayInputStream(payload), 16L);
+                new ByteArrayInputStream(payload), new Executor.PermScanBudget(16L));
         assertThrows(IOException.class, () -> viaSkip.skip(64));
 
         Executor.BoundedInputStream viaSingle = new Executor.BoundedInputStream(
-                new ByteArrayInputStream(payload), 4L);
+                new ByteArrayInputStream(payload), new Executor.PermScanBudget(4L));
         assertThrows(IOException.class, () -> {
             for (int i = 0; i < 64; i++) {
                 viaSingle.read();
             }
         });
+    }
+
+    /**
+     * One allowance across every nested archive, not one per archive.
+     *
+     * <p>A per-stream bound resets on each nested jar, so an aar that spreads
+     * its metadata over many of them paid the limit once per jar and the total
+     * went unbounded again. The allowance here is set to the whole archive's
+     * length, which a single pass never reaches -- ZipInputStream stops at the
+     * last local header without reading the central directory -- so a per-jar
+     * bound would let this loop run forever. Only a shared one stops it.</p>
+     */
+    @Test
+    void theStreamAllowanceIsSharedAcrossNestedArchives() throws Exception {
+        byte[] archive = nestedArchiveOfDirectoryEntries(60);
+        File scratch = temporaryDirectory.resolve("shared-allowance").toFile();
+        assertTrue(scratch.mkdirs());
+
+        Executor.PermScanBudget budget = new Executor.PermScanBudget(archive.length);
+
+        int passes = 0;
+        IOException refused = null;
+        for (int i = 0; i < 50 && refused == null; i++) {
+            try {
+                Executor.extractNestedClassesForPermissions(
+                        new ByteArrayInputStream(archive), scratch, budget);
+                passes++;
+            } catch (IOException ex) {
+                refused = ex;
+            }
+        }
+
+        assertTrue(passes >= 1, "one archive alone must fit inside the allowance");
+        assertTrue(refused != null,
+                "repeated nested archives must exhaust the shared allowance");
+        assertTrue(refused.getMessage().contains("refusing to keep reading"),
+                "expected the stream allowance to stop it, got: " + refused.getMessage());
+    }
+
+    private static byte[] nestedArchiveOfDirectoryEntries(int count) throws IOException {
+        StringBuilder longName = new StringBuilder();
+        for (int i = 0; i < 500; i++) {
+            longName.append('n');
+        }
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        ZipOutputStream zos = new ZipOutputStream(raw);
+        for (int i = 0; i < count; i++) {
+            zos.putNextEntry(new ZipEntry(longName + "-" + i + "/"));
+            zos.closeEntry();
+        }
+        zos.close();
+        return raw.toByteArray();
     }
 }

@@ -4248,8 +4248,14 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
                 NSImage* image = [[NSImage alloc] initWithSize:bounds.size];
                 [image addRepresentation:rep];
                 g = [[GLUIImage alloc] initWithImage:image];
-                data[0] = (JAVA_INT)(bounds.size.width * scaleValue);
-                data[1] = (JAVA_INT)(bounds.size.height * scaleValue);
+                // The peer's own window again, not scaleValue: the same
+                // mismatch calcPreferredSize had. A peer captured on a display
+                // of a different density than the main window reported its
+                // image at the wrong size, and the caller sizes the image it
+                // just received from these two numbers.
+                CGFloat captureScale = cn1MacPeerScale(v);
+                data[0] = (JAVA_INT)(bounds.size.width * captureScale);
+                data[1] = (JAVA_INT)(bounds.size.height * captureScale);
 #ifndef CN1_USE_ARC
                 [image release];
 #endif

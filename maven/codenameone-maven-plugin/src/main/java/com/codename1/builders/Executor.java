@@ -1261,23 +1261,23 @@ public abstract class Executor {
      */
     static final class BoundedInputStream extends InputStream {
         private final InputStream delegate;
-        private final long limit;
-        private long consumed;
+        private final PermScanBudget budget;
 
-        BoundedInputStream(InputStream delegate, long limit) {
+        BoundedInputStream(InputStream delegate, PermScanBudget budget) {
             this.delegate = delegate;
-            this.limit = limit;
+            this.budget = budget;
         }
 
         private void charge(long n) throws IOException {
             if (n <= 0) {
                 return;
             }
-            consumed += n;
-            if (consumed > limit) {
-                throw new IOException("a nested archive fed more than " + limit
-                        + " bytes to the permission scan; refusing to keep reading");
-            }
+            // The BUDGET, not a counter of this stream's own. One allowance per
+            // archive scan, shared by every nested jar in it: a per-stream bound
+            // resets on each nested entry, so an aar that spreads its metadata
+            // over many nested jars paid the limit once per jar and the total
+            // was unbounded again.
+            budget.chargeStream(n);
         }
 
         @Override
@@ -1318,6 +1318,30 @@ public abstract class Executor {
         private long total;
         private int extracted;
         private int entries;
+        private final long streamLimit;
+        private long streamBytes;
+
+        PermScanBudget() {
+            this(PERM_SCAN_MAX_TOTAL_BYTES);
+        }
+
+        /// The stream allowance is a constructor argument so a test can pick one
+        /// it can actually reach; production always takes the real default.
+        PermScanBudget(long streamLimit) {
+            this.streamLimit = streamLimit;
+        }
+
+        /// Charges raw bytes pulled from a nested archive, headers included.
+        void chargeStream(long n) throws IOException {
+            if (n <= 0) {
+                return;
+            }
+            streamBytes += n;
+            if (streamBytes > streamLimit) {
+                throw new IOException("nested archives fed more than " + streamLimit
+                        + " bytes to the permission scan; refusing to keep reading");
+            }
+        }
 
         /**
          * Charges one archive entry, whatever becomes of it.
@@ -1434,17 +1458,10 @@ public abstract class Executor {
     // this loop charges it.
     static void extractNestedClassesForPermissions(InputStream nested, File tmp,
             PermScanBudget budget) throws IOException {
-        extractNestedClassesForPermissions(nested, tmp, budget, PERM_SCAN_MAX_TOTAL_BYTES);
-    }
-
-    /// The stream bound is a parameter so a test can drive this loop with a
-    /// limit it can actually reach; production always passes the real one.
-    static void extractNestedClassesForPermissions(InputStream nested, File tmp,
-            PermScanBudget budget, long streamLimit) throws IOException {
         // Bounded at the source: see BoundedInputStream. The per-entry budgets
         // below cannot see the bytes getNextEntry() spends parsing headers.
         java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
-                new BoundedInputStream(nested, streamLimit));
+                new BoundedInputStream(nested, budget));
         java.util.zip.ZipEntry inner;
         while ((inner = zis.getNextEntry()) != null) {
             // Charged before the branch, so a drained entry costs the same
