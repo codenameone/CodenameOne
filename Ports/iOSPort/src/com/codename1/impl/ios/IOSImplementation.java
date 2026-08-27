@@ -11245,13 +11245,25 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     /// Delivers every push held from before a callback existed, in order.
     private static void firePendingPush() {
-        if (pushCallback == null || pendingPushes.isEmpty()) {
-            return;
+        String[][] held;
+        // The SAME lock the queueing path takes. A push arrives on the native UI
+        // thread while the callback is installed on the EDT, so without this the
+        // two interleave: pushReceived reads a null callback, this drains an
+        // empty queue, and only then does the message go in -- stranded, with
+        // its completion grant held, though a callback is installed and nothing
+        // will drain again.
+        synchronized (pendingPushes) {
+            if (pushCallback == null || pendingPushes.isEmpty()) {
+                return;
+            }
+            // Copied and cleared inside the lock: pushReceived is re-entered
+            // below and must not see the queue it is draining.
+            held = pendingPushes.toArray(new String[pendingPushes.size()][]);
+            pendingPushes.clear();
         }
-        // Copied and cleared first: pushReceived is re-entered below, and it
-        // must not see the queue it is draining.
-        String[][] held = pendingPushes.toArray(new String[pendingPushes.size()][]);
-        pendingPushes.clear();
+        // Delivered OUTSIDE the lock: pushReceived queues serially onto the EDT
+        // and calls into the native layer, and holding a lock across that invites
+        // the deadlock this is not worth.
         for (String[] pair : held) {
             pushReceived(pair[0], pair[1]);
         }
@@ -11295,14 +11307,32 @@ public class IOSImplementation extends CodenameOneImplementation {
             // application is already misconfigured -- it asked the system for
             // pushes and has nothing to receive them -- and the alternative,
             // releasing the grant up front, breaks the case that does work.
-            if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
-                pendingPushes.remove(0);
+            boolean deliverNow = false;
+            boolean evicted = false;
+            synchronized (pendingPushes) {
+                // Rechecked under the lock. The callback may have been installed
+                // between the test above and here, in which case queueing would
+                // strand this message behind a drain that has already run.
+                if (pushCallback != null) {
+                    deliverNow = true;
+                } else {
+                    if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
+                        pendingPushes.remove(0);
+                        evicted = true;
+                    }
+                    pendingPushes.add(new String[] {message, type});
+                }
+            }
+            if (deliverNow) {
+                pushReceived(message, type);
+                return;
+            }
+            if (evicted) {
                 // The evicted one will never be delivered, so ITS grant is
-                // released here -- otherwise the queue cap would leak a
-                // background task the system is still waiting on.
+                // released -- otherwise the queue cap would leak a background
+                // task the system is still waiting on.
                 nativeInstance.firePushCompletionHandler();
             }
-            pendingPushes.add(new String[] {message, type});
             /*
             // Removing this section because the race condition shouldn't happen
             // anymore as setMainClass() is now called before initialization.
