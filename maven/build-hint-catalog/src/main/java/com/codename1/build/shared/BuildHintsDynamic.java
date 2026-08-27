@@ -80,6 +80,12 @@ final class BuildHintsDynamic {
                 "Overrides an Xcode build setting for the generated CocoaPods project.");
         family(h, "ios.home.commissioning.buildSettings.*", "ios",
                 "Overrides an Xcode build setting for the Matter commissioning extension.");
+        family(h, "ios.call.directory.buildSettings.*", "ios",
+                "Xcode build settings for the generated call directory extension target. "
+                        + "PRODUCT_BUNDLE_IDENTIFIER is read in two places -- the target's own settings and the "
+                        + "CN1CallDirectoryExtensionIdentifier the host plist carries -- so an override has to "
+                        + "reach both or the app asks the system to reload an identifier nothing installed.");
+
         family(h, "ios.surfaces.buildSettings.*", "ios",
                 "Overrides an Xcode build setting for the external-surfaces extension.");
         family(h, "ios.*.appext.*", "ios",
