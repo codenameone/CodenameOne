@@ -384,19 +384,26 @@ class AppKitWindowManager extends WindowManager {
         return out;
     }
 
+    /// @inheritDoc
+    ///
+    /// From the monitor's backing scale, the same rule
+    /// `MacImplementation.getDeviceDensity()` applies to the main window.
+    ///
+    /// Classifying getMonitorDotsPerInch() instead was wrong twice over: that
+    /// bridge returns NSDeviceResolution, which reports the backing store's
+    /// conventional 72 or 144 rather than a physical density, so every 1x
+    /// display fell to DENSITY_LOW and every Retina one only reached
+    /// DENSITY_MEDIUM -- and the same two displays were called medium and
+    /// very-high by the main-window implementation. An application picking
+    /// per-window assets off Window.getDensity() or Desktop.getMonitors() got a
+    /// different answer for the same screen depending on which it asked.
     @Override
     public int getMonitorDensity(int monitor) {
-        int dpi = getMonitorDotsPerInch(monitor);
-        if (dpi >= 280) {
-            return Display.DENSITY_VERY_HIGH;
-        }
-        if (dpi >= 200) {
-            return Display.DENSITY_HIGH;
-        }
-        if (dpi >= 140) {
+        int scaleTimes100 = nativeInstance.macMonitorScaleTimes100(monitor);
+        if (scaleTimes100 <= 0) {
             return Display.DENSITY_MEDIUM;
         }
-        return Display.DENSITY_LOW;
+        return scaleTimes100 > 150 ? Display.DENSITY_VERY_HIGH : Display.DENSITY_MEDIUM;
     }
 
     @Override
