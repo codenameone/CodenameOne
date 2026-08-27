@@ -2240,6 +2240,38 @@ public class BuildHintCatalogTest {
                 .contains("/p/common/build/generated-sources"));
     }
 
+    /// A nearer POM that binds its own compile execution wins over an ancestor
+    /// that switched `default-compile` off.
+    ///
+    /// The decision used to be returned from the first level found to disable it,
+    /// so the parent answered for a child that plainly does compile Java -- and
+    /// the child's Java roots were then withheld from the search, which is how a
+    /// Kotlin copy of the main class comes to answer for it.
+    @Test
+    public void aNearerCompileBindingBeatsAnAncestorThatDisabledDefaultCompile() {
+        String disabling = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                + "<execution><id>default-compile</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String rebinding = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                + "<execution><id>recompile</id><phase>compile</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String silent = "<project></project>";
+
+        // Nearest first, which is the order pomChain() produces.
+        assertTrue(CodenameOneSettings.compilesJava(
+                java.util.Arrays.asList(rebinding, disabling), null),
+                "the ancestor's <phase>none</phase> answered for a child that rebinds compile");
+        assertFalse(CodenameOneSettings.compilesJava(
+                java.util.Arrays.asList(silent, disabling), null),
+                "nothing binds compile anywhere, so javac never runs");
+        assertTrue(CodenameOneSettings.compilesJava(
+                java.util.Arrays.asList(silent, silent), null),
+                "a chain that says nothing compiles Java by default");
+    }
+
     /// Only `default-compile` switched off with `<phase>none</phase>` counts.
     ///
     /// Any other execution -- one that renames the id, one that binds a phase,

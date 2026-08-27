@@ -3260,20 +3260,36 @@ public class CodenameOneSettings extends Lifecycle {
     /// class files for them, which is why Kotlin's documented Maven setup adds a
     /// `java-compile` execution back.
     private boolean compilesJava() {
-        for (String pom : pomChain()) {
+        return compilesJava(pomChain(), chainPluginManagement());
+    }
+
+    /// The same, over a POM chain given directly, so it can be tested.
+    ///
+    /// Any enabled compile binding ANYWHERE in the chain settles it, and it is
+    /// looked for before the first level that switches `default-compile` off.
+    /// Answering from that level as soon as it was found meant a parent that
+    /// disables `default-compile` decided for a child that binds its own compile
+    /// execution -- a module that plainly does compile Java read as one that does
+    /// not, and its Java roots were then withheld from the search.
+    static boolean compilesJava(java.util.List<String> pomChain, String chainPluginManagement) {
+        boolean disabled = false;
+        for (String pom : pomChain) {
             for (String active : activeConfiguration(pom)) {
                 String compiler = activePluginBlock(active, "maven-compiler-plugin", "encoding",
-                        "compile", chainPluginManagement());
+                        "compile", chainPluginManagement);
                 if (compiler == null) {
                     compiler = pluginBlock(managementOnly(active), "maven-compiler-plugin");
                 }
-                if (compiler == null || !disablesDefaultCompile(compiler)) {
+                if (compiler == null) {
                     continue;
                 }
-                return bindsGoal(compiler, "compile");
+                if (bindsGoal(compiler, "compile")) {
+                    return true;
+                }
+                disabled = disabled || disablesDefaultCompile(compiler);
             }
         }
-        return true;
+        return !disabled;
     }
 
     /// Whether this compiler plugin block switches `default-compile` off.
