@@ -244,11 +244,23 @@ public final class CN1DocumentStore {
         synchronized (WRITE_LOCK) {
             // A name nobody else can be holding, even if the lock is ever relaxed.
             File tmp = File.createTempFile("index", ".tmp", parent);
-            FileOutputStream out = new FileOutputStream(tmp);
+            // The temporary file is removed if anything about writing it fails -- opening the
+            // stream, the write, or the close. The cleanup below only runs for a rename that
+            // failed, so a full volume or a transient storage error left one of these behind per
+            // attempt, in the same directory the published tree lives in and with nothing that
+            // ever reads or removes them.
             try {
-                out.write(data);
-            } finally {
-                out.close();
+                FileOutputStream out = new FileOutputStream(tmp);
+                try {
+                    out.write(data);
+                } finally {
+                    out.close();
+                }
+            } catch (IOException err) {
+                if (!tmp.delete()) {
+                    Log.w(TAG, "Could not delete the partial index " + tmp);
+                }
+                throw err;
             }
             if (tmp.renameTo(target)) {
                 return;

@@ -342,6 +342,22 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 && equalOrBothNull(credentials[1], current[1]);
     }
 
+    /// Drops a request when the picker cancels the open it belongs to.
+    ///
+    /// Named and static rather than anonymous: an anonymous listener declared inside the method
+    /// holds the provider itself, and the signal it is attached to outlives the call.
+    private static final class Disconnect implements CancellationSignal.OnCancelListener {
+        private final HttpURLConnection connection;
+
+        Disconnect(HttpURLConnection connection) {
+            this.connection = connection;
+        }
+
+        public void onCancel() {
+            connection.disconnect();
+        }
+    }
+
     private static boolean equalOrBothNull(String a, String b) {
         return a == null ? b == null : a.equals(b);
     }
@@ -360,6 +376,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         }
         HttpURLConnection connection = null;
         try {
+            if (signal != null) {
+                // Before anything is opened. The picker can cancel between choosing the document
+                // and this call, and starting the request then spends the user's data on bytes
+                // nobody will read.
+                signal.throwIfCanceled();
+            }
             // Built through Uri rather than by pasting strings: "fetch" belongs on the PATH and
             // the id has to join whatever query the endpoint already carries. Concatenation put
             // the suffix inside the query of an endpoint like
@@ -371,6 +393,18 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                     .appendQueryParameter("id", node.remoteId)
                     .build();
             connection = (HttpURLConnection) new URL(url.toString()).openConnection();
+            final HttpURLConnection cancellable = connection;
+            if (signal != null) {
+                // Polling the signal between chunks only sees a cancellation while bytes are
+                // arriving. The blocking calls are the problem: getResponseCode, getInputStream
+                // and a read from a stalled endpoint each hold this binder thread until the
+                // timeout expires, long after the user dismissed the picker -- and enough of
+                // those and the whole document location stops answering. Disconnecting from the
+                // listener is what unblocks them: the read fails, the finally below closes
+                // everything, and throwIfCanceled turns it into a cancellation rather than an
+                // error the user sees.
+                signal.setOnCancelListener(new Disconnect(cancellable));
+            }
             // Finite by necessity. This runs on a provider binder thread, and the default is no
             // timeout at all: an endpoint that accepts the connection and then stops answering
             // would block here forever, where the cancellation signal cannot reach it because
@@ -420,6 +454,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 } finally {
                     out.close();
                 }
+                if (signal != null) {
+                    // A cancellation that lands after the last chunk is read is still a
+                    // cancellation: the loop's own check cannot see it, because the read that
+                    // would have noticed returned EOF instead.
+                    signal.throwIfCanceled();
+                }
                 // A 200 is not proof that the body is the document. An endpoint answering an
                 // error page, or a login redirect rendered as a page, arrives complete and
                 // without a transport error; accepting it would hand the picker those bytes as
@@ -430,20 +470,43 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                     throw new IOException("The document endpoint answered " + partial.length()
                             + " bytes for a document the app declared as " + node.size);
                 }
+                // Closed HERE, inside the guarded region, and again in the finally below.
+                // A close that throws from the finally alone lands after this catch has been
+                // passed, so the download stayed in the cache and the caller was told the fetch
+                // failed -- a whole document per retry, which nothing reads and nothing removes.
+                // Closing twice is not a problem; closing outside the guard was.
+                in.close();
             } catch (Throwable t) {
                 if (!partial.delete()) {
                     Log.w(TAG, "Could not delete the partial download " + partial);
                 }
                 throw t instanceof IOException ? (IOException) t : new IOException(t);
             } finally {
-                in.close();
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Already reported by the close above when that is where it failed; here it
+                    // is only the second call on a stream that is closed either way.
+                }
             }
             return partial;
         } catch (IOException err) {
+            if (signal != null) {
+                // A disconnect from the listener above surfaces here as an ordinary IOException.
+                // Asking the signal first turns it back into the cancellation it was, so the
+                // picker sees a dismissed open rather than a failed document.
+                signal.throwIfCanceled();
+            }
             Log.e(TAG, "Could not fetch document " + node.id, err);
             throw new FileNotFoundException("Could not fetch document " + node.id + ": "
                     + err.getMessage());
         } finally {
+            if (signal != null) {
+                // Dropped before the connection goes: the signal outlives this call, and a
+                // listener holding a disconnected connection is a reference to an object nobody
+                // needs kept alive for as long as the picker keeps the signal.
+                signal.setOnCancelListener(null);
+            }
             if (connection != null) {
                 connection.disconnect();
             }
