@@ -122,7 +122,7 @@ public @interface Mac {
     /// matching `com.apple.security.files.user-selected.*` entitlement -- the
     /// files the user picks in an open or save panel, and nothing else.
     @Hint(name = "macos.entitlements.files.userSelected")
-    Toggle entitlementsFilesUserSelected() default Toggle.DEFAULT;
+    FileAccess entitlementsFilesUserSelected() default FileAccess.DEFAULT;
 
     /// macOS builds. `true` writes `com.apple.security.cs.allow-jit` and
     /// `com.apple.security.cs.allow-unsigned-executable-memory` into the
