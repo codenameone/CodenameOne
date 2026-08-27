@@ -8579,8 +8579,15 @@ public final class Display extends CN1Constants {
         // phases at all. So the claim exists only between an explicit begin and
         // its release; a producer that reports no begin hit-tests every update,
         // exactly as before, and is no worse off than it was.
+        // getTopLevelContainer(), not getComponentForm(). The latter returns null
+        // for a component hosted in a desktop Window -- its own javadoc says so,
+        // because a Window is not a Form -- so this attachment check was always
+        // false inside a secondary window and the claim was bypassed for exactly
+        // the case this port exists to support: every update fell through to a
+        // fresh hit test and the component that started the gesture could lose
+        // the release.
         if (pinchGestureActive && pinchGestureTarget != null
-                && pinchGestureTarget.getComponentForm() != null) {
+                && pinchGestureTarget.getTopLevelContainer() != null) {
             pinchGestureTarget.pinch(scale);
             return;
         }

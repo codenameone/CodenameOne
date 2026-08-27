@@ -71,6 +71,45 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// The arrows, mapped the way every other desktop port maps them.
+    ///
+    /// CN1MacKeyCodeForEvent already emits the JavaSE convention -- -91 up, -92
+    /// down, -93 left, -94 right -- but the inherited iOS implementation turns
+    /// any code at or below -20 into its negation, so Up arrived as 91 and no
+    /// GAME_* comparison in Form, Window or any list ever matched it. Keyboard
+    /// focus traversal and arrow navigation therefore did nothing at all on this
+    /// port. Anything else still gets the iOS answer, which is what the media
+    /// keys rely on.
+    @Override
+    public int getGameAction(int keyCode) {
+        switch (keyCode) {
+            case -91: return com.codename1.ui.Display.GAME_UP;
+            case -92: return com.codename1.ui.Display.GAME_DOWN;
+            case -93: return com.codename1.ui.Display.GAME_LEFT;
+            case -94: return com.codename1.ui.Display.GAME_RIGHT;
+            case -90: return com.codename1.ui.Display.GAME_FIRE;
+            default: return super.getGameAction(keyCode);
+        }
+    }
+
+    /// @inheritDoc
+    ///
+    /// The reverse of `#getGameAction(int)`, so code that asks which key drives
+    /// an action gets an answer rather than the inherited -1.
+    @Override
+    public int getKeyCode(int gameAction) {
+        switch (gameAction) {
+            case com.codename1.ui.Display.GAME_UP: return -91;
+            case com.codename1.ui.Display.GAME_DOWN: return -92;
+            case com.codename1.ui.Display.GAME_LEFT: return -93;
+            case com.codename1.ui.Display.GAME_RIGHT: return -94;
+            case com.codename1.ui.Display.GAME_FIRE: return -90;
+            default: return super.getKeyCode(gameAction);
+        }
+    }
+
+    /// @inheritDoc
+    ///
     /// The duration variants as well as the shared list. CN1MacPickers builds an
     /// hours-only and a minutes-only field set, but Picker asks this before it
     /// calls showNativePicker() -- so while the inherited answer named only
