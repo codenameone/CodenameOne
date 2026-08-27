@@ -229,11 +229,19 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 // had just purged. The revision is the guard rather than the path: an account
                 // switch republishing a conventional name like "documents/invoice.pdf" satisfies
                 // a path check while the bytes came from the publication before it.
-                let generation = index.revision
+                // And against a stop, exactly as the remote branch is. stopProvidingItem runs
+                // on another thread: it deletes this URL and moves the stop generation, and a
+                // copy still running then puts the file back through place(), which recreates
+                // the storage directory too -- so the evicted item is materialized again and the
+                // request completes after the system stopped asking for it. The publication
+                // check cannot see that, because nothing about the publication changed.
+                let publication = index.revision
+                let stopped = beginFetch(at: url)
                 let placed = CN1FileProviderClassic.place(local, at: url, copy: true)
-                if !CN1FileProviderClassic.stillPublished(identifier, path: path,
-                                                          generation: generation,
-                                                          containerURL: containerURL) {
+                if !stillWanted(at: url, generation: stopped)
+                    || !CN1FileProviderClassic.stillPublished(identifier, path: path,
+                                                              generation: publication,
+                                                              containerURL: containerURL) {
                     try? FileManager.default.removeItem(at: url)
                     completionHandler(NSFileProviderError(.noSuchItem))
                     return
