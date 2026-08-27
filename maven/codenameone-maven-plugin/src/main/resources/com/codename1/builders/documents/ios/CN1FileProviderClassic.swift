@@ -421,6 +421,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 // request completes after the system stopped asking for it. The publication
                 // check cannot see that, because nothing about the publication changed.
                 let publication = index.revision
+                // The source as it stands before the copy, exactly as the replicated provider
+                // takes it. An app can rewrite a published file without republishing -- the
+                // revision does not move for that -- and the version this item carries is read
+                // from the file afterwards, so the staged copy could hold the old or half-copied
+                // bytes under a version describing the new ones.
+                let sourceStamp = CN1DocumentItem.localStamp(path: path,
+                                                             containerURL: containerURL)
                 let stopped = beginFetch(at: url)
                 let sequence = beginMaterialization(at: url)
                 let container = containerURL
@@ -438,7 +445,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                         completionHandler(error)
                         return
                     }
-                    guard CN1FileProviderClassic.stillPublished(identifier, path: path,
+                    guard CN1DocumentItem.localStamp(path: path, containerURL: container)
+                            == sourceStamp,
+                          CN1FileProviderClassic.stillPublished(identifier, path: path,
                                                                 generation: publication,
                                                                 containerURL: container) else {
                         try? FileManager.default.removeItem(at: staged)
