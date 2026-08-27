@@ -41,15 +41,24 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     /// two names: whatever id the app gave it, and `.rootContainer`, which is the only one the
     /// system accepts back when it asked for the root. Answering with the app's id there is a
     /// mismatch the browser reads as "that is not the item I asked for".
+    /// - Parameter localStamp: the source snapshot this item describes, for an item handed over
+    ///   WITH a copy of that source. Without it the content version is read from the file each
+    ///   time the system asks, so an app that rewrites the source between the hand-off and the
+    ///   system's read would have the copied bytes labelled with the new file's version -- cached
+    ///   as current, and never asked for again. An item that is only being enumerated passes
+    ///   nothing and describes the file as it is.
     init(node: CN1DocumentNode, parentId: NSFileProviderItemIdentifier,
          identifier: NSFileProviderItemIdentifier? = nil, containerURL: URL? = nil,
-         revision: String = "") {
+         revision: String = "", localStamp: String? = nil) {
         self.node = node
         self.parentId = parentId
         self.identifier = identifier ?? CN1DocumentIndex.identifier(for: node.id)
         self.containerURL = containerURL
         self.revision = revision
+        self.frozenLocalStamp = localStamp
     }
+
+    private let frozenLocalStamp: String?
 
     var itemIdentifier: NSFileProviderItemIdentifier {
         identifier
@@ -257,6 +266,9 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     private var contentStamp: String {
+        if let frozen = frozenLocalStamp {
+            return frozen
+        }
         if let path = node.path, !path.isEmpty, let container = containerURL,
            let stamp = CN1DocumentItem.localStamp(path: path, containerURL: container) {
             return stamp

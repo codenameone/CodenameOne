@@ -192,6 +192,20 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
+    public void anExtensionProfileForAnotherAppIdIsRefused() throws Exception {
+        // Grants the right App Group and belongs to something else. Supplied as this extension's
+        // profile it satisfies the "has a profile of its own" check, and nothing else looked at
+        // it -- so Xcode refused it for the name, after the archive had been paid for.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Other", "ABCD1234.com.example.other", GROUP).getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("cannot sign"));
+    }
+
+    @Test
     public void aWildcardAppIdDoesNotCoverTheGeneratedDocumentProvider() throws Exception {
         // A wildcard covers the bundle ID and still cannot sign this extension: it declares the
         // App Group it resolves its container from, and Apple does not offer App Groups on a

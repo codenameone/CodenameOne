@@ -349,13 +349,14 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
 
     /// Builds the item for a node the caller has already resolved in a freshly loaded index.
     private static func item(for node: CN1DocumentNode, resolved: String,
-                             in index: CN1DocumentIndex, containerURL: URL) -> NSFileProviderItem {
+                             in index: CN1DocumentIndex, containerURL: URL,
+                             localStamp: String? = nil) -> NSFileProviderItem {
         let parentId = index.parents[resolved]
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer
             : CN1DocumentIndex.identifier(for: parentId!)
         return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
-                               revision: index.revision)
+                               revision: index.revision, localStamp: localStamp)
     }
 
     func enumerator(for containerItemIdentifier: NSFileProviderItemIdentifier,

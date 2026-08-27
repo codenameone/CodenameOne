@@ -13311,7 +13311,13 @@ public class IPhoneBuilder extends Executor {
             // registers no domain and is signalled through the default manager instead. Deciding
             // that from @available at runtime would strand a classic build on the very systems it
             // was generated for.
-            if (!inject.contains("CN1DocumentsReplicated")) {
+            // Structurally, for the reason the two keys above give -- and this one decides
+            // MORE than whether a key is written: a missing top-level value reads as YES, so a
+            // classic build whose fragment merely mentions the name anywhere would register a
+            // domain and signal through a manager that the generated NSFileProviderExtension
+            // never registers with, leaving the location inert on exactly the systems the
+            // classic provider exists for.
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsReplicated")) {
                 inject += "\n<key>CN1DocumentsReplicated</key><string>"
                         + (documentsUsesReplicatedApi ? "true" : "false") + "</string>";
             }

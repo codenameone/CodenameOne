@@ -421,6 +421,18 @@ final class IOSProvisioningPreflight {
             } catch (Exception ex) {
                 return null;
             }
+            String bundleId = trimmed(settings.getProperty("codename1.packageName")) + "." + name;
+            if (!profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
+                // A profile for a DIFFERENT App ID that happens to grant the same group. It is
+                // supplied as this extension's, so the check that an extension has a profile of
+                // its own is satisfied and nothing else looks at it -- and Xcode then refuses it
+                // for the name, after the archive.
+                return new Problem("The " + name + " provisioning profile named by " + key + " ("
+                        + profile.name + ") is for App ID "
+                        + appIdPattern(profile.applicationIdentifier) + ", which cannot sign \""
+                        + bundleId + "\". Supply the profile issued for the extension's own App "
+                        + "ID; the Certificate Wizard creates and installs it for you.", true);
+            }
             if (profile.appGroups.contains(configured)) {
                 return null;
             }
