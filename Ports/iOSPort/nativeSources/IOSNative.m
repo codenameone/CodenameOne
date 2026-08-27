@@ -16461,6 +16461,51 @@ static BOOL cn1DocumentsReplicated(void) {
     return YES;
 }
 
+/// The queue every domain operation runs on, one at a time.
+///
+/// +addDomain: and +removeDomain: return as soon as the operation has STARTED, so ordering the
+/// calls -- which is all a lock on the Java side can do -- orders nothing at all. An account
+/// switch is clear() followed by publish(): the removal and the registration then run
+/// concurrently, and a removal that completes last takes away the location the publish had just
+/// registered. The tree is on disk, the app believes it published, and nothing appears in Files
+/// until something publishes again.
+static dispatch_queue_t cn1DocumentsDomainQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("com.codename1.documents.domain", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+/// Runs one domain operation, holding the queue until its completion handler has fired.
+///
+/// Suspending from inside a block running on the queue takes effect once that block returns, so
+/// the operation is started and nothing else begins until the completion resumes the queue. That
+/// is what turns "the calls were ordered" into "the operations were ordered". No semaphore, so no
+/// thread is blocked and nothing has to outlive the callback.
+///
+/// The resume is guarded because resuming a queue that is not suspended traps. `op` is expected
+/// to call `done` exactly once, which is what NSFileProviderManager does whether or not it
+/// errors; the guard means a framework that called back twice would cost an ordering rather than
+/// crash the app.
+static void cn1DocumentsQueueDomainOp(void (^op)(void (^done)(void))) {
+    dispatch_queue_t queue = cn1DocumentsDomainQueue();
+    dispatch_async(queue, ^{
+        dispatch_suspend(queue);
+        __block BOOL resumed = NO;
+        op(^{
+            @synchronized (queue) {
+                if (resumed) {
+                    return;
+                }
+                resumed = YES;
+            }
+            dispatch_resume(queue);
+        });
+    });
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSString *path = cn1DocumentsContainerPath();
@@ -16482,11 +16527,17 @@ void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE
             // every publish instead of tracked. The error is logged rather than propagated: a
             // failure here means the location does not appear, and taking down the publish that
             // already wrote the index would help nobody.
-            [NSFileProviderManager addDomain:cn1DocumentsDomain() completionHandler:^(NSError *error) {
-                if (error != nil) {
-                    NSLog(@"Codename One: could not register the document provider domain: %@", error);
-                }
-            }];
+            NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+            cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+                [NSFileProviderManager addDomain:domain completionHandler:^(NSError *error) {
+                    if (error != nil) {
+                        NSLog(@"Codename One: could not register the document provider domain: %@",
+                              error);
+                    }
+                    [domain release];
+                    done();
+                }];
+            });
         }
         POOL_END();
     }
@@ -16498,11 +16549,19 @@ void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_M
     }
     if (@available(iOS 16.0, macOS 13.0, *)) {
         POOL_BEGIN();
-        [NSFileProviderManager removeDomain:cn1DocumentsDomain() completionHandler:^(NSError *error) {
-            if (error != nil) {
-                NSLog(@"Codename One: could not remove the document provider domain: %@", error);
-            }
-        }];
+        // Queued behind any registration still running, and holding the queue until this one
+        // finishes, so a publish that follows a clear cannot have its domain removed by this.
+        NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+        cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+            [NSFileProviderManager removeDomain:domain completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not remove the document provider domain: %@",
+                          error);
+                }
+                [domain release];
+                done();
+            }];
+        });
         POOL_END();
     }
 }
