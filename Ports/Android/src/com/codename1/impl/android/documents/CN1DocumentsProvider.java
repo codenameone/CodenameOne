@@ -290,6 +290,16 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                 || node.lastModified != requested.lastModified) {
             return false;
         }
+        // And still served remotely. A republish can give the node a local path -- the app
+        // caching what it just uploaded -- and openDocument prefers that path, so returning the
+        // download would hand back the older remote bytes for a document the app has since
+        // said is on disk.
+        if (node.path != null && node.path.length() > 0) {
+            File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
+            if (local != null && local.exists()) {
+                return false;
+            }
+        }
         String[] current = CN1DocumentStore.loadEndpoint(getContext());
         return equalOrBothNull(credentials[0], current[0])
                 && equalOrBothNull(credentials[1], current[1]);

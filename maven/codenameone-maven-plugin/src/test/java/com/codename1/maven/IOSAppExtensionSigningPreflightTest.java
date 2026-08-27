@@ -192,6 +192,27 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
+    public void anExtensionPathThatIsNotAProfileIsNotJudged() throws Exception {
+        // An ordinary plist parses perfectly well and is not a profile, so parse answers null.
+        // Reading its fields threw out of the Maven build instead of producing a provisioning
+        // problem; an unreadable file is check()'s to report, not this method's.
+        File notAProfile = tmp.newFile("Info.plist");
+        OutputStream out = new FileOutputStream(notAProfile);
+        try {
+            out.write(("<?xml version=\"1.0\"?><plist version=\"1.0\"><dict>"
+                    + "<key>CFBundleName</key><string>Demo</string></dict></plist>")
+                    .getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                notAProfile.getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
     public void anExtensionProfileForAnotherAppIdIsRefused() throws Exception {
         // Grants the right App Group and belongs to something else. Supplied as this extension's
         // profile it satisfies the "has a profile of its own" check, and nothing else looked at

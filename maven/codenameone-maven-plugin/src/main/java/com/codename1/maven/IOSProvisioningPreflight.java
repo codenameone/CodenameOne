@@ -421,6 +421,14 @@ final class IOSProvisioningPreflight {
             } catch (Exception ex) {
                 return null;
             }
+            if (profile == null) {
+                // Not a provisioning profile at all -- parse answers null for a plist that is
+                // some other kind of file, an Info.plist being the easy mistake. Reading its
+                // fields from here would have thrown out of the Maven build instead of producing
+                // the problem this method exists to report; an unreadable file is check()'s to
+                // report, not this one's.
+                return null;
+            }
             String bundleId = trimmed(settings.getProperty("codename1.packageName")) + "." + name;
             if (!profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
                 // A profile for a DIFFERENT App ID that happens to grant the same group. It is
