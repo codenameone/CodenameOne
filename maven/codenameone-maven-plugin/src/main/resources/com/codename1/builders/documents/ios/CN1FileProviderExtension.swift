@@ -191,7 +191,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                             once.call(nil, nil, NSFileProviderError(.noSuchItem))
                         } else if let current = CN1FileProviderExtension.publishedItem(
                                 for: itemIdentifier, path: path, generation: generation,
-                                containerURL: container) {
+                                containerURL: container, localStamp: sourceStamp) {
                             if !once.call(handoff, current, nil) {
                                 // A cancellation got there first, so nothing will ever collect
                                 // this copy.
@@ -312,16 +312,21 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
     /// Being this strict costs a re-copy whenever a publish lands mid-copy, which is the right
     /// trade for a local file and the wrong one for a download -- which is why the remote branch
     /// keys on the credential instead, and says so there.
+    /// - Parameter localStamp: the source snapshot the copy being handed over was taken from.
+    ///   The item's content version is frozen to it, so a rewrite between this call and the
+    ///   system's read of that version cannot label the copied bytes as the new file's.
     private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
                                       path: String, generation: String,
-                                      containerURL: URL) -> NSFileProviderItem? {
+                                      containerURL: URL,
+                                      localStamp: String?) -> NSFileProviderItem? {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               index.revision == generation,
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], node.path == path else {
             return nil
         }
-        return item(for: node, resolved: resolved, in: index, containerURL: containerURL)
+        return item(for: node, resolved: resolved, in: index, containerURL: containerURL,
+                    localStamp: localStamp)
     }
 
     private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
