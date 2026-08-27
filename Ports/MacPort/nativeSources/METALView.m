@@ -979,7 +979,26 @@ static int CN1MacKeyCode(NSEvent *event) {
                 return -1;
             }
         } else if (inserted.length > session.maxSize - remaining) {
-            inserted = [inserted substringToIndex:session.maxSize - remaining];
+            // Cut on a character boundary, not a UTF-16 one. substringToIndex:
+            // counts code units, so a limit landing inside a surrogate pair --
+            // any emoji or other non-BMP character -- kept half of it and handed
+            // the framework a malformed NSString, which then reads back as
+            // replacement text and throws off every later caret and delete
+            // offset. rangeOfComposedCharacterSequenceAtIndex: reports where the
+            // character straddling the limit begins, and dropping it whole is
+            // the only cut that stays inside maxSize.
+            NSUInteger limit = session.maxSize - remaining;
+            NSRange straddling = [inserted rangeOfComposedCharacterSequenceAtIndex:limit];
+            if (straddling.location < limit) {
+                limit = straddling.location;
+            }
+            if (limit == 0) {
+                // Not even one character fits. Rejected rather than applied as an
+                // empty replacement, which would silently delete whatever the
+                // edit was meant to replace.
+                return -1;
+            }
+            inserted = [inserted substringToIndex:limit];
         }
     }
     session.text = [session.text stringByReplacingCharactersInRange:range
