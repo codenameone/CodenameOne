@@ -524,15 +524,14 @@ public final class BuildHintAnnotationReader {
 
         Bindings(List<Annotation> groups, Map<String, EnumDomain> enums) {
             for (Annotation group : groups) {
-                HintGroup g = groupNamed(group.simpleName);
                 String descriptor = "L" + PKG_PATH + group.simpleName + ";";
                 descriptors.add(descriptor);
                 for (Attribute a : group.attributes) {
+                    // toHint resolves the group and throws when the annotation
+                    // names none, which is the loud failure for an annotation type
+                    // that HintGroup does not know about.
                     BuildHints.Hint h = a.toHint(group.simpleName, group.defaults, enums);
                     hints.put(descriptor + "#" + a.name, h.name());
-                }
-                if (g == null) {
-                    continue;
                 }
             }
             for (Map.Entry<String, EnumDomain> e : enums.entrySet()) {

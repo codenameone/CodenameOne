@@ -405,15 +405,20 @@ public final class BuildHintCodeGenerator {
 
 
     /**
-     * Folds text to ASCII.
+     * Folds text to ASCII, so catalog prose can be compared with annotation prose.
      *
-     * <p>The prose is imported from the developer guide, which uses typographic
-     * punctuation. {@code CodenameOne/src} is also compiled by an Ant javac step
-     * with ASCII encoding, where a single em dash is
-     * {@code error: unmappable character for encoding ASCII} -- a build failure,
-     * not a warning. A Unicode escape would not help: javac processes
-     * {@code \\uXXXX} before it strips comments, so the character would simply
-     * reappear.</p>
+     * <p>The catalog's prose was imported from the developer guide, which uses
+     * typographic punctuation; the annotations are Java sources, which must be
+     * pure ASCII because {@code CodenameOne/src} is also compiled by an Ant javac
+     * step with ASCII encoding, where one em dash is
+     * {@code error: unmappable character for encoding ASCII}. The two therefore
+     * cannot be compared verbatim, and BuildHintAnnotationReaderTest folds the
+     * catalog side through this before asking whether the annotation says the
+     * same thing.</p>
+     *
+     * <p>Refuses rather than drops what it cannot fold: silently deleting a
+     * character from a hint's documentation is worse than saying a mapping is
+     * missing.</p>
      */
     static String toAscii(String text) {
         if (text == null) {
@@ -438,31 +443,17 @@ public final class BuildHintCodeGenerator {
                         sb.append(c);
                         break;
                     }
-                    // Refuse rather than drop it. Silently deleting a character
-                    // from a hint's documentation is a worse outcome than telling
-                    // whoever edited the catalog to add a mapping here.
                     throw new IllegalArgumentException("Build hint documentation contains '"
                             + c + "' (U+" + Integer.toHexString(c).toUpperCase(java.util.Locale.ROOT)
-                            + "), which has no ASCII equivalent in toAscii(). The Ant javac step "
-                            + "compiles CodenameOne/src as ASCII and rejects it as unmappable. "
-                            + "Add a mapping, or reword the text.");
+                            + "), which has no ASCII equivalent in toAscii(), so it cannot be "
+                            + "compared with the annotation's ASCII prose. Add a mapping, or "
+                            + "reword the text.");
             }
         }
         return sb.toString();
     }
 
     private static void write(File f, String content) throws IOException {
-        if (f.getName().endsWith(".java")) {
-            for (int i = 0; i < content.length(); i++) {
-                if (content.charAt(i) >= 0x80) {
-                    throw new IOException(f.getName() + " would contain the non-ASCII character '"
-                            + content.charAt(i) + "' (U+"
-                            + Integer.toHexString(content.charAt(i)).toUpperCase(java.util.Locale.ROOT)
-                            + "), which the Ant javac step rejects as unmappable. Add it to "
-                            + "toAscii().");
-                }
-            }
-        }
         File parent = f.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
             throw new IOException("Could not create " + parent);
