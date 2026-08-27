@@ -146,10 +146,26 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // Guarded because two things can finish this fetch -- the download and a cancellation --
         // and calling the system's completion handler twice is a contract violation of its own.
         let once = CN1FetchCompletion(completionHandler)
-        let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: containerURL,
+        let container = containerURL
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container,
                                            destination: handoffDirectory()) { url, error in
             if let url = url {
-                once.call(url, item, nil)
+                // The publication is re-read before the bytes are handed over. A download
+                // outlives the request that started it, and the app may have cleared or
+                // republished meanwhile -- a logout, or an account switch that reuses the same
+                // node ids for another account's objects. Handing over what arrived would
+                // materialize the previous account's document after its credentials were gone.
+                //
+                // The item goes with it, rebuilt from the same fresh read: the one captured when
+                // the request began may name a file that has since been renamed or moved.
+                if let current = CN1FileProviderExtension.publishedItem(for: itemIdentifier,
+                                                                       remoteId: remoteId,
+                                                                       containerURL: container) {
+                    once.call(url, current, nil)
+                } else {
+                    try? FileManager.default.removeItem(at: url)
+                    once.call(nil, nil, NSFileProviderError(.noSuchItem))
+                }
             } else {
                 once.call(nil, nil, CN1DocumentRemote.providerError(error))
             }
@@ -171,6 +187,26 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress?.completedUnitCount = 1
         }
         return progress
+    }
+
+    /// The item as the index has it right now, provided it still names the same remote object.
+    ///
+    /// Static, and given the container rather than reading it off the instance, so the closure
+    /// that calls it after a download does not have to keep the extension alive to do so.
+    private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
+                                      remoteId: String,
+                                      containerURL: URL) -> NSFileProviderItem? {
+        guard let index = CN1DocumentIndex.load(containerURL: containerURL),
+              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved], node.remoteId == remoteId else {
+            return nil
+        }
+        let parentId = index.parents[resolved]
+        let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
+            ? .rootContainer
+            : CN1DocumentIndex.identifier(for: parentId!)
+        return CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
+                               revision: index.revision)
     }
 
     func enumerator(for containerItemIdentifier: NSFileProviderItemIdentifier,

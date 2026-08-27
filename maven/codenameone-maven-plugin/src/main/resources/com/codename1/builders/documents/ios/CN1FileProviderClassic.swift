@@ -191,13 +191,15 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // still has the folder open. Both checks are needed: the first covers a clear that
             // finished before the write, the second a clear that landed during it. A clear after
             // the second check purges the file itself.
-            guard CN1FileProviderClassic.stillPublished(identifier, containerURL: container) else {
+            guard CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                        containerURL: container) else {
                 try? FileManager.default.removeItem(at: fetched)
                 completionHandler(NSFileProviderError(.noSuchItem))
                 return
             }
             let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
-            if !CN1FileProviderClassic.stillPublished(identifier, containerURL: container) {
+            if !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                     containerURL: container) {
                 try? FileManager.default.removeItem(at: url)
                 completionHandler(NSFileProviderError(.noSuchItem))
                 return
@@ -220,18 +222,25 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 
     /// Puts the bytes where the browser expects them. The local copy is copied rather than moved:
     /// it is the app's own file, and moving it out of the container would delete the original.
-    /// Whether the identifier is still in the published index.
+    /// Whether the identifier still names the same remote object in the published index.
     ///
     /// Reads the index from disk each time rather than trusting the copy the request started
     /// with: that is the whole point -- the file is gone once the app has cleared, and an item
     /// dropped by a republish is gone from a fresh read.
+    ///
+    /// The remote id is compared, not merely the identifier's existence. Node ids are the app's
+    /// own record keys and an account switch usually reuses them -- "inbox", "invoice-1" -- while
+    /// pointing them at another account's objects. Checking only that the id is still there would
+    /// let a download started before the switch write the previous account's bytes into the new
+    /// account's file.
     private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
-                                       containerURL: URL) -> Bool {
+                                       remoteId: String, containerURL: URL) -> Bool {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
-              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index) else {
+              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved] else {
             return false
         }
-        return index.nodes[resolved] != nil
+        return node.remoteId == remoteId
     }
 
     private static func place(_ source: URL, at destination: URL, copy: Bool) -> Error? {
