@@ -1,54 +1,3402 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.settings;
 
 import com.codename1.settings.hints.BuildHintCatalog;
+import com.codename1.settings.hints.BuildHintMetadata;
 import com.codename1.settings.hints.BuildHintType;
 import org.junit.jupiter.api.Test;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * The hint catalog the Settings tool offers for editing.
+ *
+ * <p>It used to be scraped out of the developer guide's AsciiDoc table at runtime,
+ * with each hint's type guessed by string-matching its description prose. It now
+ * comes from {@code com.codename1.build.shared.BuildHints}, the same table the
+ * build hint annotations declare, and the same one the drift gate holds
+ * the builders against.</p>
+ */
 public class BuildHintCatalogTest {
+
     @Test
-    public void parsesDeveloperGuideBuildHintTable() {
-        String doc = """
-                Before
-                |===
-                |Name\t|Description
-
-                |android.debug
-                |true/false defaults to true - indicates whether to include debug.
-
-                |ios.plistInject
-                |Injects raw XML into the plist.
-
-                |windows.signing.timestampUrl
-                |RFC 3161 timestamp server URL.
-
-                |===
-                After
-                """;
-        BuildHintCatalog catalog = BuildHintCatalog.fromAsciiDoc(doc);
+    public void carriesTheHintsTheDeveloperGuideDocuments() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
         assertNotNull(catalog.get("android.debug"));
+        assertNotNull(catalog.get("ios.plistInject"));
+        assertNotNull(catalog.get("windows.signing.timestampUrl"));
+        assertTrue(catalog.all().size() > 400,
+                "expected the full catalog, got " + catalog.all().size());
+    }
+
+    @Test
+    public void knownHintsCarryTheRightType() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
         assertEquals(BuildHintType.BOOLEAN, catalog.get("android.debug").type());
         assertEquals(BuildHintType.XML, catalog.get("ios.plistInject").type());
-        assertEquals(BuildHintType.URL, catalog.get("windows.signing.timestampUrl").type());
+        assertEquals(BuildHintType.INTEGER, catalog.get("java.version").type());
+        // The floor is a closed domain now: the editor offers the API levels
+        // this framework build supports rather than a free-text number, which is
+        // the same reason ios.themeMode is not a String.
+        assertEquals(BuildHintType.ENUM, catalog.get("android.min_sdk_version").type());
+        assertTrue(catalog.get("android.min_sdk_version").values().contains("23"),
+                catalog.get("android.min_sdk_version").values().toString());
+        // The TARGET stays an integer: the build server's default for it is the
+        // highest platform it has installed, so the domain is open-ended.
+        assertEquals(BuildHintType.INTEGER, catalog.get("android.targetSDKVersion").type());
+        assertEquals(BuildHintType.BOOLEAN, catalog.get("android.useAndroidX").type());
+        assertEquals(BuildHintType.CSV, catalog.get("ios.pods").type());
+    }
+
+    /**
+     * The tool used to accept any string for every hint but an integer, a version
+     * or a URL. A hint with a closed domain is the one case where a wrong value is
+     * certainly wrong, because the builder compares against those strings and
+     * silently falls back to its default when it matches none of them.
+     */
+    @Test
+    public void hintsWithAClosedDomainExposeIt() {
+        BuildHintMetadata titleBar = BuildHintCatalog.load().get("desktop.titleBar");
+        assertNotNull(titleBar);
+        assertEquals(BuildHintType.ENUM, titleBar.type());
+        assertTrue(titleBar.values().contains("native"));
+        assertTrue(titleBar.values().contains("custom"));
+        assertTrue(titleBar.values().contains("toolbar"));
+        assertFalse(titleBar.values().contains("natvie"));
+    }
+
+    /** A hint with a checked form should say so, so the UI can point at it. */
+    @Test
+    public void annotatedHintsNameTheirAnnotation() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        assertEquals("@Ios(pods)", catalog.get("ios.pods").annotation());
+        assertEquals("@DesktopBuild(titleBar)", catalog.get("desktop.titleBar").annotation());
+        // Not every hint has one; the properties file remains the way to set those.
+        assertEquals(null, catalog.get("android.xmanifest").annotation());
+    }
+
+    /**
+     * Dynamic families such as {@code android.permission.<NAME>} are patterns, not
+     * keys, so there is nothing for the editor to set.
+     */
+    @Test
+    public void dynamicFamiliesAreNotOffered() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        for (BuildHintMetadata h : catalog.all()) {
+            assertFalse(h.name().contains("*"),
+                    h.name() + " is a pattern, not a hint the editor can set");
+        }
+    }
+
+    /**
+     * The generated project ships hints like ios.themeMode as annotations, not
+     * properties lines. The catalog has to say which hints have an annotation
+     * form so the Build Hints UI can refuse to write a second declaration --
+     * doing so would fail the very next build with a duplicate-hint error.
+     */
+    @Test
+    public void everyAnnotatedHintNamesItsAttribute() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        int annotated = 0;
+        for (BuildHintMetadata h : catalog.all()) {
+            if (h.annotation() == null) {
+                continue;
+            }
+            annotated++;
+            assertTrue(h.annotation().startsWith("@"), h.name() + " -> " + h.annotation());
+            assertTrue(h.annotation().endsWith(")"), h.name() + " -> " + h.annotation());
+        }
+        assertTrue(annotated > 50, "expected the curated set, got " + annotated);
+    }
+
+    /**
+     * The Settings field for a credential is masked from its type. The catalog
+     * that replaced the old name-matching scraper has to keep classifying these
+     * as SECRET, or a stored certificate password renders as visible text.
+     */
+    @Test
+    public void credentialHintsStayMasked() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        for (BuildHintMetadata h : catalog.all()) {
+            String n = h.name().toLowerCase();
+            if (n.contains("password") || n.contains("secret") || n.contains("token")) {
+                assertEquals(BuildHintType.SECRET, h.type(),
+                        h.name() + " holds a credential and must render masked");
+            }
+        }
+    }
+
+    /**
+     * A deprecated alias configures the same effective setting as its target, so
+     * the Build Hints UI has to treat it as annotation-owned too -- otherwise its
+     * row still offers Add and creates the duplicate the next build refuses.
+     */
+    @Test
+    public void aliasesResolveToTheirCanonicalName() {
+        assertEquals("and.themeMode",
+                com.codename1.build.shared.BuildHints.canonicalName("cn1.androidTheme"));
+        assertEquals("nativeTheme",
+                com.codename1.build.shared.BuildHints.canonicalName("cn1.nativeTheme"));
+        assertEquals("ios.pods",
+                com.codename1.build.shared.BuildHints.canonicalName("ios.pods"));
+    }
+
+    /**
+     * Right after cn1:migrate-build-hints the source declares the annotations and
+     * no build has emitted the manifest yet. Treating them as unowned there would
+     * offer Add for a hint the annotations already set, and the next build would
+     * fail on the duplicate declaration -- so the source is read directly.
+     */
+    @Test
+    public void annotationsAreFoundInSourceBeforeTheProjectIsBuilt() {
+        String src = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(pods = {\"A\", \"B\"}, teamId = \"T\")\n"
+                + "@DesktopBuild(titleBar = DesktopTitleBar.NATIVE)\n"
+                + "public class MyApp extends Lifecycle {\n}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(pods)", owned.get("ios.pods"));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertEquals("@DesktopBuild(titleBar)", owned.get("desktop.titleBar"));
+        assertTrue(owned.get("ios.objC") == null, "an attribute nobody set is not owned");
+    }
+
+    /**
+     * Attribute detection must not be fooled by a value that contains an equals
+     * sign, a comma or a bracket -- android.xpermissions is XML, and gradleDep
+     * entries carry both.
+     */
+    @Test
+    public void valuesContainingSeparatorsDoNotCreatePhantomOwnership() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Android(xpermissions = \"<uses-permission android:name=\\\"X\\\"/>\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Android(xpermissions)", owned.get("android.xpermissions"));
+        assertTrue(owned.get("android.gradleDep") == null,
+                "nothing inside a string value may register as an attribute");
+        assertTrue(owned.get("android.debug") == null);
+    }
+
+    /**
+     * A comment inside an annotation can carry an unmatched delimiter. Counting
+     * it as syntax loses the annotation's boundary, and the hint it owns stays
+     * editable -- so Add writes the duplicate the next build refuses.
+     */
+    @Test
+    public void commentsInsideAnAnnotationDoNotBreakOwnership() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(/* required for issue ( */ teamId = \"T\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
     }
 
     @Test
-    public void packagedDeveloperGuideCatalogProvidesKnownHintTypes() throws Exception {
-        try (InputStream in = CodenameOneSettings.class.getResourceAsStream(
-                "/com/codename1/settings/hints/Advanced-Topics-Under-The-Hood.asciidoc")) {
-            assertNotNull(in, "The Settings jar should carry the developer-guide build hint table.");
-            String doc = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            BuildHintCatalog catalog = BuildHintCatalog.fromAsciiDoc(doc);
-            assertEquals(BuildHintType.INTEGER, catalog.get("java.version").type());
-            assertEquals(BuildHintType.VERSION, catalog.get("build.cn1Version").type());
-            assertEquals(BuildHintType.VERSION, catalog.get("ios.bundleVersion").type());
-            assertEquals(BuildHintType.INTEGER, catalog.get("android.targetSDKVersion").type());
-            assertEquals(BuildHintType.BOOLEAN, catalog.get("android.useAndroidX").type());
+    public void lineCommentsAndCharLiteralsDoNotBreakOwnership() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(\n"
+                + "    // a stray ) in a line comment\n"
+                + "    teamId = \"T\",\n"
+                + "    urlScheme = \"x\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertEquals("@Ios(urlScheme)", owned.get("ios.urlScheme"));
+
+        String withChar = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Android(xpermissions = \"a\") // ')'\npublic class MyApp {}\n";
+        java.util.Map<String, String> owned2 = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(withChar, owned2);
+        assertEquals("@Android(xpermissions)", owned2.get("android.xpermissions"));
+    }
+
+    /**
+     * The fully qualified spelling needs no import and is equally valid. Missing
+     * it left the hint editable, and Add then wrote the duplicate declaration.
+     */
+    @Test
+    public void fullyQualifiedAnnotationsAreRecognized() {
+        String src = "@com.codename1.annotations.buildhints.Ios(teamId = \"T\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    /** `@Ios` must not match `@IosPrivacy`, which is a different annotation. */
+    @Test
+    public void aSimpleNameDoesNotMatchALongerAnnotation() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@IosPrivacy(cameraUsageDescription = \"why\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned);
+        assertEquals("@IosPrivacy(cameraUsageDescription)",
+                owned.get("ios.NSCameraUsageDescription"));
+        assertTrue(owned.get("ios.teamId") == null,
+                "@IosPrivacy must not be read as @Ios");
+    }
+
+    @Test
+    public void searchStillMatchesOnNameAndDescription() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        assertFalse(catalog.search("pods").isEmpty());
+        assertFalse(catalog.search("android").isEmpty());
+    }
+
+    /// Kotlin lets a file rename what it imports, and then the annotation's own
+    /// name appears nowhere in the source. Reading that as unowned put the hint
+    /// back on the Add list, and Add writes the properties line that makes the
+    /// next process-annotations fail on a duplicate the tool itself created.
+    @Test
+    public void aKotlinAliasedImportIsRecognized() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The alias only counts when it really is one: the import must say `as`.
+    @Test
+    public void aPlainImportIsNotReadAsAnAlias() {
+        String src = "import com.codename1.annotations.buildhints.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n";
+        assertNull(CodenameOneSettings.kotlinImportAlias(src, "Ios", true));
+    }
+
+    /// A commented-out annotation is not an annotation. Reading it as one made
+    /// Settings withhold Add and the editor for a hint the processor never
+    /// emits, which looks like the tool being broken.
+    @Test
+    public void aCommentedOutAnnotationIsNotOwnership() {
+        String src = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "// @Ios(teamId = \"OLD\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Same for a block comment and for an annotation quoted inside a string.
+    @Test
+    public void aBlockCommentOrStringIsNotOwnership() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "/* @Ios(teamId = \"OLD\") */ public class MyApp {}", out);
+        assertNull(out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "String doc = \"@Ios(teamId = x)\";", out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// And the real one is still found when a commented-out copy precedes it.
+    @Test
+    public void aLiveAnnotationAfterACommentedOneIsStillFound() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "// @Ios(teamId = \"OLD\")\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// A commented-out earlier alias must not win over the live import. It did,
+    /// and then the live `@BuildIos` was never looked for at all -- the very bug
+    /// the alias support exists to prevent.
+    @Test
+    public void aCommentedOutAliasDoesNotShadowTheLiveOne() {
+        String src = "// import com.codename1.annotations.buildhints.Ios as Old\n"
+                + "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(src, "Ios", true));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The package named somewhere that is not an import is not an alias.
+    @Test
+    public void aMentionThatIsNotAnImportIsNotAnAlias() {
+        assertNull(CodenameOneSettings.kotlinImportAlias(
+                "val doc = com.codename1.annotations.buildhints.Ios as Whatever", "Ios", true));
+    }
+
+    /// Parentheses are optional on an annotation, so searching forward for the
+    /// next `(` adopted whatever call came after it. Settings then withheld the
+    /// Add and editor controls for a hint the processor never emits.
+    @Test
+    public void aBareAnnotationDoesNotAdoptTheNextCall() {
+        String src = "@Ios\n"
+                + "class MyApp {\n"
+                + "    fun setUp() { configure(teamId = \"ABCDE12345\") }\n"
+                + "}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// A comment between the name and its own argument list is still its own.
+    @Test
+    public void anAnnotationsOwnArgumentListIsStillFoundAcrossAComment() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios /* why */ (teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// The two capture-record spellings are one setting: the builder reads the
+    /// long name and then lets the short one override it. Without the alias an
+    /// annotation and a properties line are not seen as a conflict, and the
+    /// properties line silently wins over the compile-checked annotation.
+    @Test
+    public void theShortCaptureRecordSpellingIsAnAliasOfTheLongOne() {
+        assertEquals("android.captureRecord",
+                com.codename1.build.shared.BuildHints.canonicalName("and.captureRecord"));
+        assertEquals("android.facebook_permissions",
+                com.codename1.build.shared.BuildHints.canonicalName("and.facebook_permissions"));
+    }
+
+    /// A Kotlin raw string containing a quote was read as an empty literal
+    /// followed by a new one, and that new one then swallowed the annotation
+    /// after it -- so the hint read as unowned and Add wrote the duplicate.
+    @Test
+    public void aTripleQuotedStringDoesNotSwallowTheAnnotation() {
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "val doc = \"\"\"quoted \" text\"\"\"\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// And an annotation written INSIDE a raw string is still not ownership.
+    @Test
+    public void anAnnotationInsideATripleQuotedStringIsNotOwnership() {
+        String src = "val doc = \"\"\"@Ios(teamId = \"x\")\"\"\"\nclass MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Java text blocks DO process escapes, so `\\"""` is an escaped quote and
+    /// two more -- not the closing delimiter. Reading it as one made the scanner
+    /// treat the REAL delimiter as a new text block and run past the annotation
+    /// after it.
+    @Test
+    public void anEscapedQuoteRunDoesNotCloseAJavaTextBlock() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "String doc = \"\"\"\n"
+                + "  a \\\"\"\" b\n"
+                + "  \"\"\";\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, false);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// Kotlin does NOT process escapes in a raw string, and a run of four quotes
+    /// closes at the last three -- the extra one belongs to the value. Applying
+    /// Java's rule here would keep scanning and swallow the annotation.
+    @Test
+    public void aQuoteRunClosesAKotlinRawStringAtItsLastThree() {
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "val doc = \"\"\"a\"\"\"\"\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// `@Build` and `@Android` are ordinary enough names that another library's
+    /// annotation with a matching attribute would be read as ownership -- and
+    /// Settings would then hide the editor for a hint the processor never emits.
+    /// The simple name only counts when an import makes it ours.
+    @Test
+    public void anUnrelatedAnnotationOfTheSameNameIsNotOwnership() {
+        String src = "import com.example.other.Ios;\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "public class MyApp {}\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// A wildcard import counts, and so does the fully qualified spelling, which
+    /// needs no import at all.
+    @Test
+    public void aWildcardImportAndTheQualifiedSpellingBothCount() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "import com.codename1.annotations.buildhints.*;\n"
+                        + "@Ios(teamId = \"T\")\npublic class MyApp {}\n", out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations.buildhints.Ios(teamId = \"T\")\n"
+                        + "public class MyApp {}\n", out);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// A commented-out import does not bring the name in.
+    @Test
+    public void aCommentedOutImportDoesNotCount() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "// import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+    }
+
+    /// The runtime accepts spellings the picklist does not offer:
+    /// IOSImplementation.installNativeTheme compares against `flat` and `liquid`,
+    /// AndroidImplementation against `material` and `holo`. Rejecting them told a
+    /// developer a working configuration was invalid and refused the edit.
+    @Test
+    public void documentedThemeSpellingsAreAccepted() {
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertEquals("ios7", ios.canonicalValue("flat"));
+        assertEquals("modern", ios.canonicalValue("liquid"));
+        assertEquals("legacy", ios.canonicalValue("iphone"));
+        assertEquals("modern", ios.canonicalValue("MODERN"));
+        assertNull(ios.canonicalValue("nonsense"));
+
+        com.codename1.build.shared.BuildHints.Hint and =
+                com.codename1.build.shared.BuildHints.byName("and.themeMode");
+        assertEquals("modern", and.canonicalValue("material"));
+        assertEquals("hololight", and.canonicalValue("holo"));
+        assertNull(and.canonicalValue("nonsense"));
+    }
+
+    /// An alias does not become a picklist choice or an enum constant: one
+    /// behaviour, one constant, or the annotation asks a question with no right
+    /// answer.
+    @Test
+    public void anAcceptedSpellingIsNotOfferedAsAChoice() {
+        com.codename1.build.shared.BuildHints.Hint ios =
+                com.codename1.build.shared.BuildHints.byName("ios.themeMode");
+        assertFalse(ios.values().contains("flat"));
+        assertFalse(ios.values().contains("liquid"));
+    }
+
+    /// `import ...Ios as BuildIos` puts BuildIos in scope, NOT Ios. Counting it
+    /// as a simple-name import attributed another library's @Ios to us.
+    @Test
+    public void anAliasedImportDoesNotBringTheSimpleNameIntoScope() {
+        String src = "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "import com.example.other.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", true));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// ...while the alias itself still is.
+    @Test
+    public void theAliasMarkerStillCounts() {
+        String src = "import com.codename1.annotations.buildhints.Ios as BuildIos\n"
+                + "@BuildIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// Kotlin does not require a file to be named after the class it declares, so
+    /// the declaration is what identifies the main class -- not the filename and
+    /// not the directory.
+    @Test
+    public void aClassIsIdentifiedByItsDeclarationNotItsFile() {
+        String kt = "package com.example\n\nclass Helper\n\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example"));
+        assertTrue(CodenameOneSettings.declaresClass(kt, "Helper", "com.example"));
+        assertFalse(CodenameOneSettings.declaresClass(kt, "Other", "com.example"));
+    }
+
+    /// A same-named class in another package is a different class. Accepting it
+    /// is how a moved class makes its own orphan look alive.
+    @Test
+    public void thePackageIsPartOfTheIdentity() {
+        String src = "package com.example.moved;\npublic class MyApp {}\n";
+        assertFalse(CodenameOneSettings.declaresClass(src, "MyApp", "com.example"));
+        assertTrue(CodenameOneSettings.declaresClass(src, "MyApp", "com.example.moved"));
+    }
+
+    /// A Kotlin `object` declares a type too.
+    @Test
+    public void anObjectDeclarationCounts() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nobject MyApp\n", "MyApp", "com.example"));
+    }
+
+    /// The default package is "" on both sides rather than null on one.
+    @Test
+    public void theDefaultPackageMatches() {
+        assertTrue(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", null));
+        assertTrue(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", ""));
+        assertFalse(CodenameOneSettings.declaresClass("public class MyApp {}\n", "MyApp", "com.x"));
+    }
+
+    /// A commented-out or quoted mention of a declaration is not a declaration.
+    /// An unrelated file answering for the main class reads ownership as empty,
+    /// and Settings then offers Add for a hint the real main class annotates.
+    @Test
+    public void aMentionOfADeclarationIsNotADeclaration() {
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\n// class MyApp\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\n/* class MyApp */\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nval s = \"class MyApp\"\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\n// class MyApp\nclass MyApp\n", "MyApp",
+                "com.example", true));
+    }
+
+    /// The same for a commented-out package statement, which would otherwise make
+    /// a default-package file claim to be in one.
+    @Test
+    public void aCommentedPackageStatementIsNotThePackage() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "// package com.example\nclass MyApp\n", "MyApp", "", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "// package com.example\nclass MyApp\n", "MyApp", "com.example", true));
+    }
+
+    /// `class\nMain` and `class /* why */ Main` are both legal. Stopping at a
+    /// space read the declaration as unnamed, so the file did not declare the
+    /// main class and ownership came back empty.
+    @Test
+    public void anyLegalSeparatorBeforeTheNameIsAccepted() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass\nMyApp\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass /* why */ MyApp\n", "MyApp", "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class\t MyApp {}\n", "MyApp",
+                "com.example", false));
+    }
+
+    /// An application's main class is top-level. Accepting a nested one let an
+    /// unrelated `class Outer { class Main }` end the fallback search on the
+    /// wrong file, so annotations on the real main class were never read.
+    @Test
+    public void aNestedDeclarationIsNotTheMainClass() {
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nclass Outer { class MyApp }\n", "MyApp",
+                "com.example", true));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass Outer { }\nclass MyApp\n", "MyApp",
+                "com.example", true));
+    }
+
+    /// A brace inside a char literal is not syntax; counting it loses the depth
+    /// and turns a top-level declaration into a nested one or the reverse.
+    @Test
+    public void aBraceInACharLiteralDoesNotMoveTheDepth() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class Helper { char c = '{'; }\n"
+                        + "class MyApp {}\n", "MyApp", "com.example", false));
+    }
+
+    /// A single-type import shadows an on-demand one -- the language rule, not a
+    /// preference. A file importing our package with a wildcard AND another
+    /// library's Ios by name is using theirs.
+    @Test
+    public void anExplicitImportBeatsOurWildcard() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "import com.example.other.Ios;\n"
+                + "@Ios(teamId = \"T\")\npublic class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, out, false);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Our own explicit import is not "another library's".
+    @Test
+    public void ourOwnExplicitImportStillCounts() {
+        String src = "import com.codename1.annotations.buildhints.*;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "@Ios(teamId = \"T\")\npublic class MyApp {}\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+    }
+
+    /// Nor is a Kotlin alias, which introduces its alias rather than the name.
+    @Test
+    public void anAliasedForeignImportDoesNotShadow() {
+        String src = "import com.codename1.annotations.buildhints.*\n"
+                + "import com.example.other.Ios as TheirIos\n"
+                + "@Ios(teamId = \"T\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(src, "Ios", true));
+    }
+
+    /// Only one spelling of a closed-domain value works everywhere:
+    /// AndroidGradleBuilder copies android.installLocation straight into the
+    /// case-sensitive android:installLocation manifest attribute. Accepting
+    /// `INTERNALONLY` and storing it verbatim marked it valid and then failed the
+    /// Android build.
+    @Test
+    public void aClosedDomainValueHasOneWorkingSpelling() {
+        com.codename1.build.shared.BuildHints.Hint h =
+                com.codename1.build.shared.BuildHints.byName("android.installLocation");
+        assertEquals("internalOnly", h.canonicalValue("INTERNALONLY"));
+        assertEquals("internalOnly", h.canonicalValue("internalonly"));
+        assertEquals("internalOnly", h.canonicalValue("internalOnly"));
+        assertNull(h.canonicalValue("nowhere"));
+    }
+
+    /// `import /* build hints */ com.codename1...Ios;` is legal. Backing up from
+    /// the name over spaces only missed it, so the live @Ios was read as somebody
+    /// else's and Add offered a hint that is already annotated.
+    @Test
+    public void anImportSeparatedByCommentsOrNewlinesIsRecognised() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import /* build hints */ com.codename1.annotations.buildhints.Ios;\n",
+                "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import\n    com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(
+                "import  com.codename1.annotations.buildhints.Ios  as  BuildIos\n",
+                "Ios", true));
+    }
+
+    /// ...and a mention that is not an import still does not count.
+    @Test
+    public void aNonImportMentionIsStillNotAnImport() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "val t = com.codename1.annotations.buildhints.Ios::class\n", "Ios", true));
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "// import com.codename1.annotations.buildhints.Ios;\n", "Ios", false));
+    }
+
+    /// `package /* generated */ com.example;` is legal. Taking the remainder of
+    /// the text and trimming it started the name at the comment, so the real main
+    /// source was rejected by both the conventional lookup and the fallback.
+    @Test
+    public void aCommentBetweenPackageAndItsNameIsSkipped() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package /* generated */ com.example;\npublic class MyApp {}\n",
+                "MyApp", "com.example", false));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package\n    com.example\nclass MyApp\n", "MyApp", "com.example", true));
+    }
+
+    /// Adding a hint must start from what the build already does. Seeding a
+    /// type-wide placeholder wrote a value the project did not have:
+    /// android.NotificationChannel.importance defaults to 2, and persisting 0
+    /// silences the channel before the user has typed anything.
+    @Test
+    public void theCatalogCarriesTheBuildersOwnDefault() {
+        BuildHintMetadata importance =
+                BuildHintCatalog.load().get("android.NotificationChannel.importance");
+        assertNotNull(importance);
+        assertEquals("2", importance.defaultValue());
+
+        BuildHintMetadata pods = BuildHintCatalog.load().get("ios.pods");
+        assertNotNull(pods);
+        assertTrue(pods.defaultValue() == null || pods.defaultValue().isEmpty(),
+                "a hint with no builder default must not invent one");
+    }
+
+    /// facebook.appId has no default: both builders decide whether Facebook
+    /// support is in the app by asking whether the hint is null, so seeding the
+    /// literal from the call site enabled the integration against an unrelated
+    /// shared app ID the moment Add was clicked.
+    @Test
+    public void facebookAppIdHasNoDefault() {
+        BuildHintMetadata meta = BuildHintCatalog.load().get("facebook.appId");
+        assertNotNull(meta);
+        assertTrue(meta.defaultValue() == null || meta.defaultValue().isEmpty());
+    }
+
+    /// A qualified import may carry whitespace or a comment around any dot.
+    /// Reading the name as one contiguous run stopped at the separator and
+    /// recorded only the prefix, so the import went unrecognised and the live
+    /// @Ios read as somebody else's.
+    @Test
+    public void aQualifiedImportMaySpanSeparators() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations. /* generated */ buildhints.Ios;\n",
+                "Ios", false));
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "import com.codename1\n   .annotations\n   .buildhints\n   .*;\n",
+                "Ios", false));
+        assertEquals("BuildIos", CodenameOneSettings.kotlinImportAlias(
+                "import com.codename1.annotations . buildhints . Ios as BuildIos\n",
+                "Ios", true));
+    }
+
+    /// ...and a foreign import spanning separators still shadows ours.
+    @Test
+    public void aForeignImportSpanningSeparatorsStillShadows() {
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "import com.codename1.annotations.buildhints.*;\n"
+                        + "import com.example . other . Ios;\n", "Ios", false));
+    }
+
+    /// For a hint whose value the build computes when the line is ABSENT, there
+    /// is nothing safe to seed. android.targetSDKVersion has no catalog default,
+    /// and writing 0 does not create an unset hint -- it overrides the
+    /// computation, selecting the legacy android-14 target and emitting
+    /// targetSdkVersion="0".
+    @Test
+    public void aHintWithNoDefaultHasNothingSafeToSeed() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+        BuildHintMetadata target = catalog.get("android.targetSDKVersion");
+        assertNotNull(target);
+        assertTrue(target.defaultValue() == null || target.defaultValue().isEmpty(),
+                "the catalog must not invent a default the builder computes");
+
+        BuildHintMetadata facebook = catalog.get("facebook.appId");
+        assertNotNull(facebook);
+        assertTrue(facebook.defaultValue() == null || facebook.defaultValue().isEmpty(),
+                "presence is the switch, so an empty seed would enable the feature");
+    }
+
+    /// ...while a hint the builder does have a default for is seeded with it.
+    @Test
+    public void aHintWithADefaultIsSeededWithIt() {
+        assertEquals("2",
+                BuildHintCatalog.load().get("android.NotificationChannel.importance")
+                        .defaultValue());
+    }
+
+    /// The same separator rule as imports, applied to the package name: reading
+    /// it as one contiguous run recorded `com` and rejected the real main source.
+    @Test
+    public void aPackageNameMaySpanSeparatorsInSettingsToo() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com /* generated */ . example;\npublic class MyApp {}\n",
+                "MyApp", "com.example", false));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com\n  . example\nclass MyApp\n", "MyApp", "com.example", true));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com . other;\npublic class MyApp {}\n", "MyApp", "com.example", false));
+    }
+
+    /// A fully qualified annotation may carry separators between components, and
+    /// matching a contiguous literal could not see it -- ownership read as empty
+    /// and Add wrote the duplicate.
+    @Test
+    public void aQualifiedAnnotationMaySpanSeparators() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations. /* generated */ buildhints.Ios(teamId = \"X\")\n"
+                        + "public class MyApp {}\n", out, false);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+
+        out.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.codename1.annotations\n    .buildhints\n    .Ios(teamId = \"X\")\n"
+                        + "class MyApp\n", out, true);
+        assertEquals("@Ios(teamId)", out.get("ios.teamId"));
+    }
+
+    /// Another library's qualified annotation of the same simple name is not ours
+    /// however it is spaced.
+    @Test
+    public void aQualifiedForeignAnnotationIsStillNotOurs() {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        CodenameOneSettings.collectAnnotationOwnedHints(
+                "@com.example . other . Ios(teamId = \"X\")\npublic class MyApp {}\n",
+                out, false);
+        assertNull(out.get("ios.teamId"));
+    }
+
+    /// Kotlin block comments NEST. Stopping at the first `*/` ended the comment
+    /// early, so a commented-out package declaration was read as live code.
+    @Test
+    public void aNestedKotlinBlockCommentStaysClosed() {
+        String kt = "/* docs /* sample */ package old.name */\n"
+                + "package com.example\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example", true));
+        // Java does not nest, so the same text really does end at the inner `*/`.
+        assertFalse(CodenameOneSettings.declaresClass(kt, "MyApp", "com.example", false));
+    }
+
+    /// A Kotlin main class may escape its name in backticks, and
+    /// `codename1.mainName` holds the name between them. Reading it with the
+    /// identifier rule recorded an empty name, so the real main source was
+    /// rejected, nothing knew which hints an annotation already owns, and
+    /// Settings offered Add for one of them -- the duplicate declaration that
+    /// fails the next build.
+    @Test
+    public void aKotlinEscapedMainNameIsRecognised() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass `when` {\n}\n", "when", "com.example"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.example\nclass `when` {\n}\n", "Other", "com.example"));
+
+        // A quote inside an escaped name is legal, and is not the start of a
+        // literal: reading it as one blanked the declaration that followed.
+        String quoted = "package com.example\nclass `say\"hi` { }\nclass MyApp { }\n";
+        assertTrue(CodenameOneSettings.declaresClass(quoted, "MyApp", "com.example"));
+    }
+
+    /// A Kotlin package may escape a COMPONENT -- `package com.`when`` is legal
+    /// and the class belongs to com.when. Reading only identifier characters
+    /// recorded `com.`, so the real main source was rejected: nothing knew which
+    /// hints an annotation already owns, and Settings could write the duplicate
+    /// properties declaration that the next build rejects.
+    @Test
+    public void aKotlinPackageMayEscapeAComponent() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.`when`\nclass MyApp {\n}\n", "MyApp", "com.when"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.`when`\nclass MyApp {\n}\n", "MyApp", "com"));
+        // The first component too, and an ordinary name is unchanged.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package `in`.example\nclass MyApp {\n}\n", "MyApp", "in.example"));
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example\nclass MyApp {\n}\n", "MyApp", "com.example"));
+    }
+
+    /// An import may escape a component too -- `import
+    /// com.codename1.annotations.`buildhints`.Ios` is legal Kotlin. Reading only
+    /// identifier characters recorded `com.codename1.annotations.`, so the
+    /// import went unrecognised, a live @Ios was read as somebody else's, and
+    /// Settings could write the duplicate the next build refuses.
+    @Test
+    public void aKotlinImportMayEscapeAComponent() {
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.codename1.annotations.`buildhints`.Ios\n"
+                        + "class MyApp\n", "Ios", true));
+        // The type name itself, and the on-demand form.
+        assertTrue(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.codename1.annotations.buildhints.`Ios`\n"
+                        + "class MyApp\n", "Ios", true));
+        // An escaped ALIAS is the name the file then uses -- read through the
+        // reader for aliases, which is what an aliased import belongs to.
+        assertEquals("when", CodenameOneSettings.kotlinImportAlias(
+                "package com.example\n"
+                        + "import com.codename1.annotations.buildhints.Ios as `when`\n"
+                        + "class MyApp\n", "Ios", true));
+        // Somebody else's package is still somebody else's.
+        assertFalse(CodenameOneSettings.importsAnnotation(
+                "package com.example\n"
+                        + "import com.other.`buildhints`.Ios\n"
+                        + "class MyApp\n", "Ios", true));
+    }
+
+    /// Kotlin can rename a type in the FILE, with no import involved:
+    /// `typealias AppIos = Ios` and then `@AppIos(...)`. The compiled
+    /// annotation is still ours, so missing it left the hint editable and Add
+    /// wrote the duplicate declaration the next build refuses.
+    @Test
+    public void aKotlinTypeAliasStillOwnsTheHint() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The fully qualified right-hand side needs no import.
+        String qualified = "package com.example\n"
+                + "typealias AppIos = com.codename1.annotations.buildhints.Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(qualified, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Somebody else's annotation renamed to the same alias is not ours.
+        String theirs = "package com.example\n"
+                + "typealias AppIos = com.other.Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(theirs, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // Java has no typealias, so the same text owns nothing there.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, false);
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// A file may name the same annotation twice. Answering with the first
+    /// alias left the one actually used unrecognised, so the hint read as
+    /// unowned and Add wrote the duplicate the next build refuses.
+    @Test
+    public void everyKotlinAliasCounts() {
+        String twoTypeAliases = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias First = Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(twoTypeAliases, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        String twoImportAliases = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as First\n"
+                + "import com.codename1.annotations.buildhints.Ios as AppIos\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(twoImportAliases, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    /// A `typealias` is a top-level declaration, not a file-scoped one, so it
+    /// may be written in another file and used on the main class. Looking only
+    /// at the main source read the hint as unowned, and Add wrote the duplicate
+    /// the next build refuses.
+    @Test
+    public void aTypeAliasFromAnotherFileStillOwnsTheHint() {
+        String main = "package com.example\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String sibling = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(sibling));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Without the sibling there is nothing to resolve the name to.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true, null);
+        assertNull(owned.get("ios.teamId"));
+
+        // An IMPORT alias is file-scoped, so another file's does not apply.
+        String importAliasElsewhere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as AppIos\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(importAliasElsewhere));
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// Both languages allow a non-ASCII identifier. Stopping at the first such
+    /// character read a short name, so the real main source was rejected and
+    /// Settings could offer a hint an annotation already owns.
+    @Test
+    public void aNonAsciiNameIsStillAName() {
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.\u5e94\u7528;\npublic class MyApp {}\n", "MyApp", "com.\u5e94\u7528"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                "package com.\u5e94\u7528;\npublic class MyApp {}\n", "MyApp", "com"));
+        // The class name too.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class \u5e94\u7528 {}\n", "\u5e94\u7528",
+                "com.example"));
+        // An ASCII name is unchanged, and a separator still separates.
+        assertTrue(CodenameOneSettings.declaresClass(
+                "package com.example;\npublic class MyApp {}\n", "MyApp", "com.example"));
+    }
+
+    /// javac translates a unicode escape before it tokenizes anything, so
+    /// `package com.ex` + an escaped `a` + `mple;` really declares com.example.
+    /// Reading the text literally recorded `com.ex`, so the real main source was
+    /// rejected and Settings could offer a hint an annotation already owns.
+    @Test
+    public void javaUnicodeEscapesAreTranslatedBeforeTheSourceIsRead() {
+        String escaped = "package com.ex" + "\\u0061" + "mple;\npublic class MyApp {}\n";
+        assertTrue(CodenameOneSettings.declaresClass(
+                CodenameOneSettings.decodeUnicodeEscapes(escaped), "MyApp", "com.example"));
+
+        // A doubled backslash is not an escape, which is what keeps a string
+        // literal spelling one.
+        String literal = "String s = \"" + "\\\\u0041" + "\";";
+        assertEquals(literal, CodenameOneSettings.decodeUnicodeEscapes(literal));
+
+        // Any number of u's is one escape, and a malformed one is left alone.
+        assertEquals("A", CodenameOneSettings.decodeUnicodeEscapes("\\uuu0041"));
+        assertEquals("\\uZZZZ", CodenameOneSettings.decodeUnicodeEscapes("\\uZZZZ"));
+        assertEquals("\\n", CodenameOneSettings.decodeUnicodeEscapes("\\n"));
+    }
+
+    /// `typealias AppIos = Ios` then `typealias CustomIos = AppIos` is legal,
+    /// and `@CustomIos(...)` still compiles to our annotation. Accepting only a
+    /// right-hand side that names the annotation directly left the hint reading
+    /// as unowned, so Add wrote the duplicate the next build refuses.
+    @Test
+    public void aChainOfTypeAliasesIsFollowed() {
+        String main = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "typealias CustomIos = AppIos\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The chain may cross files: the link naming our annotation in one, the
+        // link the main class writes in another.
+        String usesIt = "package com.example\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String declaresIt = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n"
+                + "typealias CustomIos = AppIos\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(usesIt, owned, true,
+                java.util.Collections.singletonList(declaresIt));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A chain that never reaches our annotation is not ours, and a cycle
+        // must not hang the reader.
+        String theirs = "package com.example\n"
+                + "typealias AppIos = com.other.Ios\n"
+                + "typealias CustomIos = AppIos\n"
+                + "typealias A = B\n"
+                + "typealias B = A\n"
+                + "@CustomIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(theirs, owned, true);
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// Inside a Kotlin template expression the first quote starts a NEW literal
+    /// rather than closing the outer one, so `"${"@Ios(teamId = x)"}"` ended the
+    /// string early and exposed its contents as live code -- an annotation
+    /// nobody wrote, which hid the editor for a hint nothing owns.
+    @Test
+    public void aStringInsideATemplateIsStillAString() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"@Ios(teamId = fake)\"}\"\n"
+                + "}\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // A real annotation in the same file is still found.
+        String real = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"@Ios(pods = fake)\"}\"\n"
+                + "}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(real, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+        assertNull(owned.get("ios.pods"));
+
+        // The expression is ordinary code, so it holds ordinary comments and
+        // char literals, and a quote inside one of those is not a nested string.
+        String commented = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class Helper {\n"
+                + "    val note = \"${ /* \\\" */ 1 }\"\n"
+                + "}\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(commented, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A brace inside the nested literal must not close the expression early.
+        String braced = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class MyApp {\n"
+                + "    val note = \"${\"} @Ios(teamId = fake)\"}\"\n"
+                + "}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(braced, owned, true);
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// `import ...Ios as Base` then `typealias AppIos = Base` is legal, and the
+    /// compiled annotation is still ours. Collecting the two kinds of alias into
+    /// one list left the typealias unresolved, because its right-hand side names
+    /// the IMPORT alias rather than the annotation.
+    @Test
+    public void aTypeAliasOfAnImportAliasIsFollowed() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Base\n"
+                + "typealias AppIos = Base\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // An import alias applies only to the file that writes it, so a
+        // typealias in ANOTHER file naming the same word is not this one.
+        String usesIt = "package com.example\n"
+                + "typealias AppIos = Base\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        String importsIt = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Base\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(usesIt, owned, true,
+                java.util.Collections.singletonList(importsIt));
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// An escaped identifier inside a template expression is a NAME: a quote in
+    /// it does not open a string and a brace does not close the expression.
+    @Test
+    public void anEscapedIdentifierInsideATemplateIsNotAString() {
+        String src = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "class Helper {\n"
+                + "    val note = \"${ `\\\"` }\"\n"
+                + "}\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    /// A `typealias` is top-level but not global, and visibility is per SYMBOL
+    /// rather than per package: `import com.other.Unrelated` exposes nothing
+    /// else from `com.other`, and `import com.other.AppIos as Custom` exposes
+    /// that one under `Custom`. A package-level answer was wrong both ways --
+    /// it let an unrelated import expose an alias, hiding the editor for a hint
+    /// nothing owns, and it lost the renamed name so a real annotation went
+    /// unrecognised and Add wrote the duplicate.
+    @Test
+    public void aliasVisibilityIsPerSymbol() {
+        String elsewhere = "package com.other\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+        java.util.List<String> others = java.util.Collections.singletonList(elsewhere);
+
+        // Not imported at all: invisible.
+        String plain = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(plain, others), "Ios", true).isEmpty());
+
+        // Another symbol from the same package: still invisible.
+        String unrelated = "package com.example\n"
+                + "import com.other.Unrelated\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(unrelated, others), "Ios", true).isEmpty());
+
+        // Named: visible under its own name.
+        String named = "package com.example\n"
+                + "import com.other.AppIos\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(named, others), "Ios", true));
+
+        // Renamed: visible under the NEW name, and not under the old one.
+        String renamed = "package com.example\n"
+                + "import com.other.AppIos as Custom\n"
+                + "@Custom(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("Custom"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(renamed, others), "Ios", true));
+
+        // On demand: visible under its own name.
+        String wildcard = "package com.example\n"
+                + "import com.other.*\n"
+                + "@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(wildcard, others), "Ios", true));
+
+        // Same package needs no import.
+        String samePackage = "package com.other\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(samePackage, others), "Ios", true));
+    }
+
+    /// A chain resolves in the package it is written in, and only its visible
+    /// end reaches the main file -- under whatever name the import gives it.
+    @Test
+    public void aChainResolvesInItsOwnScope() {
+        String elsewhere = "package com.other\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias Base = Ios\n"
+                + "typealias AppIos = Base\n";
+        String main = "package com.example\n"
+                + "import com.other.AppIos as Custom\n"
+                + "@Custom(teamId = \"ABCDE12345\")\nclass MyApp\n";
+
+        // Custom resolves; Base, which the main file cannot name, does not leak.
+        assertEquals(java.util.Collections.singletonList("Custom"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(elsewhere)),
+                        "Ios", true));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true,
+                java.util.Collections.singletonList(elsewhere));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+    }
+
+    /// A chain link may cross a package boundary: `a` declares
+    /// `typealias Base = Ios`, `b` imports `a.Base` and declares
+    /// `typealias AppIos = Base`. Looking only in the declaring file's own
+    /// package stopped the chain there, so the hint read as unowned and Add
+    /// wrote the duplicate the next build refuses.
+    @Test
+    public void aChainLinkMayBeImportedFromAnotherPackage() {
+        String a = "package a\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias Base = Ios\n";
+        String b = "package b\n"
+                + "import a.Base\n"
+                + "typealias AppIos = Base\n";
+        String main = "package com.example\n"
+                + "import b.AppIos\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.List<String> others = java.util.Arrays.asList(a, b);
+
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main, others), "Ios", true));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, true, others);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // The renamed form of the link, and the qualified spelling.
+        String renamedLink = "package b\n"
+                + "import a.Base as Root\n"
+                + "typealias AppIos = Root\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Arrays.asList(a, renamedLink)), "Ios", true));
+
+        String qualifiedLink = "package b\ntypealias AppIos = a.Base\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Arrays.asList(a, qualifiedLink)), "Ios", true));
+
+        // A link that names nothing reachable is still not ours.
+        String broken = "package b\ntypealias AppIos = Base\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main,
+                        java.util.Arrays.asList(a, broken)), "Ios", true).isEmpty());
+    }
+
+    /// On a top-level Kotlin declaration `private` means this FILE only, not
+    /// this package. Exposing another file's private alias let it vouch for an
+    /// unrelated annotation of the same name, hiding the editor for a hint
+    /// nothing owns.
+    @Test
+    public void aPrivateAliasBelongsToItsFile() {
+        String sibling = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private typealias AppIos = Ios\n";
+        String main = "package com.example\n@AppIos(teamId = \"X\")\nclass MyApp\n";
+        java.util.List<String> others = java.util.Collections.singletonList(sibling);
+
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main, others), "Ios", true).isEmpty());
+
+        // Without the modifier the same declaration is visible in the package.
+        String shared = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(shared)), "Ios", true));
+
+        // A private alias in the MAIN file is the file it belongs to.
+        String privateHere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private typealias AppIos = Ios\n"
+                + "@AppIos(teamId = \"ABCDE12345\")\nclass MyApp\n";
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(privateHere, owned, true);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A comment between the modifier and the keyword is legal, and the
+        // backward walk skips only whitespace -- so it is read over blanked
+        // code, where the comment is spaces.
+        String commented = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private /* note */ typealias AppIos = Ios\n";
+        assertTrue(CodenameOneSettings.kotlinTypeAliases(
+                CodenameOneSettings.visibleTypeAliases(main,
+                        java.util.Collections.singletonList(commented)), "Ios", true).isEmpty());
+
+        // `internal` is module-wide, so it is not this file's alone.
+        String internal = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "internal typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(internal)), "Ios", true));
+
+        // A `private` belonging to whatever came before is not this one's.
+        String before = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios\n"
+                + "private val x = 1\n"
+                + "typealias AppIos = Ios\n";
+        assertEquals(java.util.Collections.singletonList("AppIos"),
+                CodenameOneSettings.kotlinTypeAliases(
+                        CodenameOneSettings.visibleTypeAliases(main,
+                                java.util.Collections.singletonList(before)), "Ios", true));
+    }
+
+    /// A same-package type beats an ON-DEMAND import in both languages, so a
+    /// project with its own `Ios` and a wildcard import of ours writes its own.
+    /// Reading that as ours hid the editor for a hint the processor never emits.
+    @Test
+    public void aSamePackageTypeBeatsAWildcardImport() {
+        String ownAnnotation = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@interface Ios { String teamId(); }\n";
+        String main = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false,
+                java.util.Collections.singletonList(ownAnnotation));
+        assertNull(owned.get("ios.teamId"));
+
+        // Declared in the main file itself, which is the same rule one step in.
+        String declaresItHere = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@interface Ios { String teamId(); }\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp {}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(declaresItHere, owned, false);
+        assertNull(owned.get("ios.teamId"));
+
+        // With no such type the wildcard import is ours, as before.
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false);
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A NAMED import is the more specific statement and still wins.
+        String named = "package com.example;\n"
+                + "import com.codename1.annotations.buildhints.Ios;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(named, owned, false,
+                java.util.Collections.singletonList(ownAnnotation));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A Kotlin main class with a Java peer, which a mixed project has. The
+        // peer is read in ITS language, and the languages genuinely disagree:
+        // a block comment nests in Kotlin and does not in Java, so `/* /* */`
+        // ends here and leaves the package declaration live -- read by Kotlin's
+        // rules the comment never closes and the peer lands in the default
+        // package, shadowing nothing.
+        String javaPeer = "/* /* */\n"
+                + "package com.example;\n"
+                + "@interface Ios { String teamId(); }\n";
+        String kotlinMainWithJavaPeer = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(kotlinMainWithJavaPeer, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(javaPeer, false)));
+        assertNull(owned.get("ios.teamId"));
+
+        // The same peer read as Kotlin is the bug, stated as a test.
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(kotlinMainWithJavaPeer, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(javaPeer, true)));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // A file-private Kotlin type in a PEER shadows nothing either: on a
+        // top-level declaration `private` means that file only.
+        String privatePeer = "package com.example\n"
+                + "private annotation class Ios(val teamId: String)\n";
+        String ktMain = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(ktMain, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(privatePeer, true)));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Without the modifier the same peer shadows.
+        String sharedPeer = "package com.example\n"
+                + "annotation class Ios(val teamId: String)\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(ktMain, owned, true,
+                java.util.Collections.singletonList(
+                        new CodenameOneSettings.PeerSource(sharedPeer, true)));
+        assertNull(owned.get("ios.teamId"));
+
+        // A private type in the MAIN file is in the file it belongs to.
+        String privateHere = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "private annotation class Ios(val teamId: String)\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectOwnedHints(privateHere, owned, true, null);
+        assertNull(owned.get("ios.teamId"));
+
+        // A peer in ANOTHER package shadows nothing.
+        String elsewherePeer = "package com.other;\n@interface Ios { String teamId(); }\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(main, owned, false,
+                java.util.Collections.singletonList(elsewherePeer));
+        assertEquals("@Ios(teamId)", owned.get("ios.teamId"));
+
+        // Kotlin declares an annotation with `annotation class`.
+        String kotlinOwn = "package com.example\n"
+                + "annotation class Ios(val teamId: String)\n";
+        String kotlinMain = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        owned.clear();
+        CodenameOneSettings.collectAnnotationOwnedHints(kotlinMain, owned, true,
+                java.util.Collections.singletonList(kotlinOwn));
+        assertNull(owned.get("ios.teamId"));
+    }
+
+    /// Where the peer sweep looks. An allow-list of roots, not a walk of the
+    /// whole project with exclusions -- those were never going to be complete:
+    /// `src/test` was followed by `src/testFixtures`, then `src/main/resources`,
+    /// then `src/main/templates` and `src/main/proto`, because "not a source
+    /// root" is not a property of a directory's name.
+    @Test
+    public void thePeerSweepLooksInTheSourceRootsOnly() {
+        java.util.List<String> maven =
+                CodenameOneSettings.candidateSourceRoots("/p/common", true);
+        assertTrue(maven.contains("/p/common/src/main/java"));
+        assertTrue(maven.contains("/p/common/src/main/kotlin"));
+        // Generated sources are a compile root that plugins add.
+        assertTrue(maven.contains("/p/common/target/generated-sources"));
+
+        // Everything the exclusion list used to chase is simply not a root.
+        for (String notARoot : new String[] {"/p/common/src/test", "/p/common/src/testFixtures",
+                "/p/common/src/integrationTest", "/p/common/src/main/resources",
+                "/p/common/src/main/templates", "/p/common/src/main/proto",
+                "/p/common/target", "/p/common/build"}) {
+            assertFalse(maven.contains(notARoot), maven.toString());
+        }
+
+        // The flat layout keeps its own root, and only there: under a Maven
+        // layout `src` would drag the test sets back in.
+        assertFalse(maven.contains("/p/common/src"));
+        java.util.List<String> flat =
+                CodenameOneSettings.candidateSourceRoots("/p/common", false);
+        assertTrue(flat.contains("/p/common/src"));
+
+        assertTrue(CodenameOneSettings.candidateSourceRoots(null, false).isEmpty());
+    }
+
+    /// The compiler's source encoding is a project setting this tool does not
+    /// have, and decoding a single-byte source as UTF-8 produced replacement
+    /// characters -- so a non-ASCII package or class name never matched
+    /// `codename1.packageName` and the real main source was rejected.
+    @Test
+    public void aSourceIsReadInTheEncodingItIsWrittenIn() throws Exception {
+        String text = "package com.caf\u00e9;\npublic class MyApp {}\n";
+
+        // A UTF-8 source decodes as UTF-8...
+        byte[] utf8 = text.getBytes("UTF-8");
+        assertTrue(CodenameOneSettings.isValidUtf8(utf8));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(utf8, "UTF-8"), "MyApp", "com.caf\u00e9"));
+
+        // ...and a single-byte one does not, so it is read as ISO-8859-1, which
+        // is what it is.
+        byte[] latin1 = text.getBytes("ISO-8859-1");
+        assertFalse(CodenameOneSettings.isValidUtf8(latin1));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(latin1, "ISO-8859-1"), "MyApp", "com.caf\u00e9"));
+        // Read as UTF-8 instead it is mojibake, which is the bug.
+        assertFalse(CodenameOneSettings.declaresClass(
+                new String(latin1, "UTF-8"), "MyApp", "com.caf\u00e9"));
+
+        // Plain ASCII decodes either way, so nothing about the common case moves.
+        assertTrue(CodenameOneSettings.isValidUtf8("package com.example;\n".getBytes("UTF-8")));
+
+        // The shapes the validity check exists to reject.
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xC3}));
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xC0, (byte) 0xAF}));
+        assertFalse(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xED, (byte) 0xA0,
+                (byte) 0x80}));
+        assertTrue(CodenameOneSettings.isValidUtf8(new byte[] {(byte) 0xF0, (byte) 0x9F,
+                (byte) 0x98, (byte) 0x80}));
+    }
+
+    /// `static` is a modifier, not the imported name. Reading it as the name
+    /// recorded an import called `static`, so
+    /// `import static com.example.Types.Ios;` never registered as giving `Ios`
+    /// away -- a wildcard import of ours was trusted instead and the editor was
+    /// hidden for a hint the processor never emits.
+    @Test
+    public void aSingleStaticImportTakesTheNameToo() {
+        String src = "package com.example;\n"
+                + "import static com.example.Types.Ios;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(src, "Ios", false));
+
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(src, owned, false);
+        assertNull(owned.get("ios.teamId"));
+
+        // A static import of something else leaves our wildcard alone.
+        String other = "package com.example;\n"
+                + "import static com.example.Types.OTHER;\n"
+                + "import com.codename1.annotations.buildhints.*;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(other, "Ios", false));
+
+        // A name that merely starts with `static` is a name.
+        String staticky = "package com.example;\n"
+                + "import staticky.Ios;\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "public class MyApp {}\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(staticky, "Ios", false));
+        assertEquals("staticky.Ios", CodenameOneSettings.importsIn(staticky, false).get(0).name);
+    }
+
+    /// `import com.example.Other as Ios` makes `@Ios` mean Other, so it shadows
+    /// a wildcard import of ours. Ignoring every aliased import let the wildcard
+    /// be trusted, hiding the editor for a hint the processor never emits.
+    @Test
+    public void anImportAliasedToOurNameShadowsTheWildcard() {
+        String shadowed = "package com.example\n"
+                + "import com.example.other.Other as Ios\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        assertFalse(CodenameOneSettings.importsAnnotation(shadowed, "Ios", true));
+        java.util.Map<String, String> owned = new java.util.HashMap<>();
+        CodenameOneSettings.collectAnnotationOwnedHints(shadowed, owned, true);
+        assertNull(owned.get("ios.teamId"));
+
+        // OUR annotation aliased to its own name is still ours.
+        String ours = "package com.example\n"
+                + "import com.codename1.annotations.buildhints.Ios as Ios\n"
+                + "@Ios(teamId = \"ABCDE12345\")\n"
+                + "class MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(ours, "Ios", true));
+
+        // An alias to some OTHER name shadows nothing.
+        String elsewhere = "package com.example\n"
+                + "import com.example.other.Other as Something\n"
+                + "import com.codename1.annotations.buildhints.*\n"
+                + "@Ios(teamId = \"X\")\n"
+                + "class MyApp\n";
+        assertTrue(CodenameOneSettings.importsAnnotation(elsewhere, "Ios", true));
+    }
+
+    /// The guess can only tell UTF-8 from a single-byte encoding, so a
+    /// multibyte one such as Shift_JIS came back as mojibake and its non-ASCII
+    /// names never matched. What the project SAYS it is written in settles it,
+    /// when it says.
+    @Test
+    public void thePomsDeclaredSourceEncodingIsUsed() throws Exception {
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties>"
+                        + "<project.build.sourceEncoding>Shift_JIS</project.build.sourceEncoding>"
+                        + "</properties></project>"));
+        // The compiler plugin's own setting counts too -- and only that
+        // plugin's; see theEncodingIsTheCompilerPluginsOwn.
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><build><plugins><plugin>"
+                        + "<artifactId>maven-compiler-plugin</artifactId>"
+                        + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                        + "</plugin></plugins></build></project>"));
+        // Nothing declared is nothing to use, and the guess stays.
+        assertNull(CodenameOneSettings.declaredSourceEncoding("<project></project>"));
+        assertNull(CodenameOneSettings.declaredSourceEncoding(null));
+        // An unresolved property is not an encoding: this reader has no model to
+        // resolve it against, and passing it on would throw on every file.
+        assertNull(CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties><project.build.sourceEncoding>${enc}"
+                        + "</project.build.sourceEncoding></properties></project>"));
+
+        // And it decodes what the guess could not: a multibyte source whose
+        // package name is only readable in its own encoding.
+        String text = "package com.\u30a2\u30d7\u30ea;\npublic class MyApp {}\n";
+        byte[] sjis = text.getBytes("Shift_JIS");
+        assertFalse(CodenameOneSettings.isValidUtf8(sjis));
+        assertTrue(CodenameOneSettings.declaresClass(
+                new String(sjis, "Shift_JIS"), "MyApp", "com.\u30a2\u30d7\u30ea"));
+        assertFalse(CodenameOneSettings.declaresClass(
+                new String(sjis, "ISO-8859-1"), "MyApp", "com.\u30a2\u30d7\u30ea"));
+    }
+
+    /// A module may put its sources somewhere else entirely, and the main class
+    /// is the one file the root list cannot afford to miss: without it nothing
+    /// knows which hints an annotation owns, and Add writes the duplicate the
+    /// next build refuses.
+    @Test
+    public void theRootsThePomDeclaresAreSearchedToo() {
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build>"
+                        + "<sourceDirectory>appsrc</sourceDirectory>"
+                        + "<plugins>"
+                        + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                        + "<executions><execution><goals><goal>add-source</goal></goals>"
+                        + "<configuration><sources>"
+                        + "<source>src/generated/java</source>"
+                        + "</sources></configuration></execution></executions></plugin>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs>"
+                        + "<sourceDir>src/main/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        // Bound, because plugin-level configuration is dormant
+                        // without one -- Maven never runs the goal that reads it.
+                        + "<executions><execution><goals><goal>compile</goal></goals>"
+                        + "</execution></executions></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(roots.contains("appsrc"), roots.toString());
+        assertTrue(roots.contains("src/generated/java"), roots.toString());
+        assertTrue(roots.contains("src/main/kt"), roots.toString());
+
+        // A declared TEST root is dropped -- by the ELEMENT and the GOAL that
+        // declare it, never by how the path is spelled. Maven compiles
+        // src/integrationTest/java as main code when an add-source execution
+        // says so, and guessing from the name dropped that root along with the
+        // annotated main class in it.
+        java.util.List<String> withTests = CodenameOneSettings.declaredSourceRoots(
+                "<project><build>"
+                        + "<sourceDirectory>appsrc</sourceDirectory>"
+                        + "<testSourceDirectory>src/test/java</testSourceDirectory>"
+                        + "<plugins><plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                        + "<executions><execution><goals><goal>add-source</goal></goals>"
+                        + "<configuration><sources>"
+                        + "<source>src/integrationTest/java</source>"
+                        + "</sources></configuration></execution></executions></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(withTests.contains("appsrc"), withTests.toString());
+        // <testSourceDirectory> is not read at all.
+        assertFalse(withTests.contains("src/test/java"), withTests.toString());
+        // ...but add-source means main code, whatever the directory is called.
+        assertTrue(withTests.contains("src/integrationTest/java"), withTests.toString());
+
+        // `<source>` and `<sourceDir>` are ordinary words: another plugin naming
+        // a directory in one is not saying it is compiled.
+        java.util.List<String> unrelated = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>some-other-plugin</artifactId>"
+                        + "<configuration><sources><source>src/main/templates</source>"
+                        + "</sources></configuration></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(unrelated.isEmpty(), unrelated.toString());
+
+        // build-helper's add-test-source uses the same element as add-source.
+        java.util.List<String> helper = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                        + "<execution><goals><goal>add-source</goal></goals><configuration>"
+                        + "<sources><source>gen/main</source></sources></configuration></execution>"
+                        + "<execution><goals><goal>add-test-source</goal></goals><configuration>"
+                        + "<sources><source>gen/fixtures</source></sources></configuration>"
+                        + "</execution>"
+                        + "</executions></plugin>"
+                        + "</plugins></build></project>");
+        assertTrue(helper.contains("gen/main"), helper.toString());
+        assertFalse(helper.contains("gen/fixtures"), helper.toString());
+
+        // The Kotlin plugin's test-compile execution uses the same element, and
+        // a test directory whose NAME does not look like one is otherwise read
+        // as production code.
+        java.util.List<String> kotlin = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "<execution><goals><goal>test-compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>fixtures</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(kotlin.contains("src/main/kt"), kotlin.toString());
+        assertFalse(kotlin.contains("fixtures"), kotlin.toString());
+
+        // Maven merges by element, so the execution's <sourceDirs> REPLACES the
+        // plugin-level list. This used to assert that both count, which is the
+        // rule the plugin's own reader had already rejected: scanning a
+        // directory the build does not compile lets a dormant copy of the main
+        // class be picked before the real one, and then its annotation-owned
+        // hints look editable and Add writes the duplicate the next build
+        // refuses.
+        java.util.List<String> replaced = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "<execution><goals><goal>test-compile</goal></goals><configuration>"
+                        + "<sourceDirs><sourceDir>fixtures</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(replaced.contains("src/main/kt"), replaced.toString());
+        assertFalse(replaced.contains("src/shared/kt"), replaced.toString());
+        assertFalse(replaced.contains("fixtures"), replaced.toString());
+
+        // `combine.children="append"` is how a POM asks for both lists, and then
+        // both are in effect.
+        java.util.List<String> appended = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals><configuration>"
+                        + "<sourceDirs combine.children=\"append\">"
+                        + "<sourceDir>src/main/kt</sourceDir></sourceDirs>"
+                        + "</configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(appended.contains("src/main/kt"), appended.toString());
+        assertTrue(appended.contains("src/shared/kt"), appended.toString());
+
+        // An execution that says nothing about sources still inherits the
+        // plugin-level list...
+        java.util.List<String> inherited = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals>"
+                        + "<configuration><jvmTarget>17</jvmTarget></configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(inherited.contains("src/shared/kt"), inherited.toString());
+
+        // ...unless it says combine.self="override", which discards it.
+        java.util.List<String> overridden = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals>"
+                        + "<configuration combine.self=\"override\">"
+                        + "<jvmTarget>17</jvmTarget></configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertFalse(overridden.contains("src/shared/kt"), overridden.toString());
+
+        // A project-directory expression is deterministic, so it is resolved
+        // rather than discarded.
+        java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${project.basedir}/appsrc</sourceDirectory>"
+                        + "</build></project>");
+        assertTrue(expression.contains("${project.basedir}/appsrc"), expression.toString());
+        assertEquals("/p/common/appsrc",
+                CodenameOneSettings.expandProjectPaths("${project.basedir}/appsrc", "/p/common"));
+        assertEquals("/p/common/target/generated",
+                CodenameOneSettings.expandProjectPaths("${project.build.directory}/generated",
+                        "/p/common"));
+
+        // What it still cannot resolve it leaves alone rather than guessing.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${custom.dir}/x</sourceDirectory></build>"
+                        + "</project>").isEmpty());
+        assertNull(CodenameOneSettings.expandProjectPaths("${custom.dir}/x", "/p/common"));
+        assertTrue(CodenameOneSettings.declaredSourceRoots(null).isEmpty());
+    }
+
+    /// A root or an encoding written as an ordinary `${property}` is one Maven
+    /// resolves from the POM's own `<properties>`, so this reader resolves it
+    /// too.
+    ///
+    /// Dropping such a root is a main class this tool cannot find, and then Add
+    /// offers that class's annotation-owned hints as properties to set a second
+    /// time -- the duplicate declaration the next build refuses.
+    @Test
+    public void anOrdinaryPropertyIsResolvedFromThePom() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties>"
+                        + "<generated.sources>gen/from-pom</generated.sources>"
+                        + "<shared.root>${generated.sources}/nested</shared.root>"
+                        + "<source.charset>Shift_JIS</source.charset>"
+                        + "</properties>"
+                        // A plugin's own <properties> is not a project property.
+                        + "<build><plugins><plugin>"
+                        + "<artifactId>maven-surefire-plugin</artifactId>"
+                        + "<configuration><properties><forked>yes</forked></properties>"
+                        + "</configuration></plugin></plugins></build>"
+                        + "</project>", properties);
+        assertEquals("gen/from-pom", properties.get("generated.sources"));
+        assertNull(properties.get("forked"), properties.toString());
+
+        // Relative as written: the caller resolves it against the project
+        // directory, the same as any other relative root.
+        assertEquals("gen/from-pom", CodenameOneSettings.expandProjectPaths(
+                "${generated.sources}", "/p/common", "/p/common/target", properties));
+        // A property written in terms of another resolves too.
+        assertEquals("gen/from-pom/nested", CodenameOneSettings.expandProjectPaths(
+                "${shared.root}", "/p/common", "/p/common/target", properties));
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                        + "<configuration><encoding>${source.charset}</encoding>"
+                        + "</configuration></plugin></plugins></build></project>", properties));
+
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>${generated.sources}</sourceDirectory>"
+                        + "</build></project>", properties);
+        assertTrue(roots.contains("${generated.sources}"), roots.toString());
+
+        // A name nothing declares is still left alone rather than guessed at.
+        assertNull(CodenameOneSettings.expandProjectPaths(
+                "${nobody.declares.this}/x", "/p/common", null, properties));
+        assertNull(CodenameOneSettings.declaredSourceEncoding(
+                "<project><properties>"
+                        + "<project.build.sourceEncoding>${nobody.declares.this}"
+                        + "</project.build.sourceEncoding></properties></project>", properties));
+    }
+
+    /// A nearer POM's property wins, which is how a module overrides its
+    /// parent's value.
+    @Test
+    public void theNearerPomsPropertyWins() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties><gen>module</gen></properties></project>", properties);
+        CodenameOneSettings.declaredProperties(
+                "<project><properties><gen>parent</gen>"
+                        + "<only.parent>p</only.parent></properties></project>", properties);
+        assertEquals("module", properties.get("gen"));
+        assertEquals("p", properties.get("only.parent"));
+    }
+
+    /// A plugin declared only in `<pluginManagement>` is not one the module runs.
+    ///
+    /// Maven executes a managed plugin only where the module also lists it under
+    /// `<plugins>`, so reading the managed block added `add-source` directories
+    /// the build does not compile. A dormant source in one of those can declare
+    /// a same-package `Ios` or `Android` type, which shadows the real annotation
+    /// and puts an annotation-owned hint back in the editor for Add to declare a
+    /// second time.
+    @Test
+    public void aManagedOnlyPluginIsNotActive() {
+        String managed = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(managed).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(managed).toString());
+
+        // ...and the same plugin listed under <plugins> IS active. The managed
+        // block usually comes first in the file, so the first match in the text
+        // is the wrong one.
+        String activated = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>real/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(activated);
+        assertTrue(roots.contains("real/gen"), roots.toString());
+        assertFalse(roots.contains("managed/gen"), roots.toString());
+    }
+
+    /// A bare `<plugin>` under `<plugins>` turns a managed declaration ON, and
+    /// Maven merges the managed configuration into it.
+    ///
+    /// That is the ordinary idiom -- the executions live in
+    /// `<pluginManagement>`, often in the parent, and the module lists the
+    /// plugin to activate it. Reading only the active block lost the roots the
+    /// module really compiles, which is the same missed-main-class ending as
+    /// reading the managed block when nothing activates it.
+    @Test
+    public void aManagedDeclarationActivatedByABarePluginStillCounts() {
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>managed/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("managed/gen"), roots.toString());
+    }
+
+    /// ...and the same for an inherited compiler encoding.
+    @Test
+    public void aManagedEncodingActivatedByABarePluginStillCounts() {
+        String pom = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><release>17</release></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(pom));
+    }
+
+    /// A parent's managed execution, activated by a bare `<plugin>` in the
+    /// module, still counts.
+    ///
+    /// This is the ordinary multi-module shape, and neither POM answers on its
+    /// own: the child has the activation and no configuration, the parent has
+    /// the configuration and no activation. Reading them independently lost the
+    /// root, and a main class living there then looked absent -- which is what
+    /// puts an annotation-owned hint back in the editor for Add to declare a
+    /// second time.
+    @Test
+    public void aParentsManagedExecutionIsInheritedByTheActivatingModule() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>inherited/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId></plugin>"
+                + "</plugins></build></project>";
+
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("inherited/gen"), roots.toString());
+
+        // The parent on its own still activates nothing.
+        String parent = "<project><build>" + parentManaged + "</build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(parent, null, parentManaged).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(parent, null, parentManaged).toString());
+    }
+
+    /// ...and the same for a compiler encoding pinned in the parent.
+    @Test
+    public void aParentsManagedEncodingIsInherited() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><release>17</release></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS",
+                CodenameOneSettings.declaredSourceEncoding(child, null, parentManaged));
+
+        // The compiler plugin is lifecycle-bound, so it does not even need the
+        // <plugins> entry.
+        String bare = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties></project>";
+        assertEquals("Shift_JIS",
+                CodenameOneSettings.declaredSourceEncoding(bare, null, parentManaged));
+    }
+
+    /// The compiler plugin is the exception: it runs from the default lifecycle,
+    /// so a `<pluginManagement>` configuration for it IS in effect -- and an
+    /// explicit `<plugins>` entry still overrides that.
+    @Test
+    public void theManagedCompilerEncodingStillCounts() {
+        String managed = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(managed));
+
+        String both = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("ISO-8859-1", CodenameOneSettings.declaredSourceEncoding(both));
+    }
+
+    /// The compiler plugin's own `<encoding>` beats the property.
+    ///
+    /// The parameter DEFAULTS to `${project.build.sourceEncoding}`, so an
+    /// explicit one overrides the property. Reading the property first decoded a
+    /// module's sources with the value it overrides, and a non-ASCII package or
+    /// main-class name read that way is not found -- so its annotation-owned
+    /// hints look editable and Add writes the duplicate the next build refuses.
+    @Test
+    public void theCompilerPluginsEncodingBeatsTheProperty() {
+        String pom = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(pom));
+
+        // ...and an execution bound to compile beats the plugin-level value.
+        String execution = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration>"
+                + "<executions><execution><goals><goal>compile</goal></goals>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(execution));
+
+        // A testCompile execution's encoding is not this one.
+        String testOnly = "<project><properties>"
+                + "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+                + "</properties><build><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<executions><execution><goals><goal>testCompile</goal></goals>"
+                + "<configuration><encoding>Shift_JIS</encoding></configuration>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("UTF-8", CodenameOneSettings.declaredSourceEncoding(testOnly));
+    }
+
+    /// `<phase>none</phase>` switches an inherited execution off here too.
+    @Test
+    public void aDisabledExecutionDeclaresNoRoots() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-compile</id><phase>none</phase>"
+                + "<goals><goal>add-source</goal></goals><configuration>"
+                + "<sources><source>gen/disabled</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
+    /// The conventional Kotlin root is offered only where the build compiles it.
+    ///
+    /// It used to be in the list unconditionally, and searched BEFORE anything
+    /// the POM declares. A module with no Kotlin plugin, or one that replaces
+    /// the root with its own `<sourceDirs>`, can still have a dormant copy of
+    /// the main class sitting there -- and picking that over the compiled source
+    /// is what makes an annotation-owned hint look editable, so Add writes the
+    /// duplicate the next build refuses.
+    @Test
+    public void theConventionalKotlinRootIsOfferedOnlyWhenCompiled() {
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, true)
+                .contains("/p/common/src/main/kotlin"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, false)
+                .contains("/p/common/src/main/kotlin"));
+        // The Java root is not conditional on it.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false)
+                .contains("/p/common/src/main/java"));
+    }
+
+    /// The conventional JAVA root is offered only where the build compiles it.
+    ///
+    /// `annotationOwnedHintsFromSource()` searches every `.java` candidate
+    /// before any `.kt`, so in a module that compiles its app from Kotlin and
+    /// switched `default-compile` off, a dormant `.java` copy of the main class
+    /// was selected ahead of the compiled source. Its annotations are whatever
+    /// they were when it stopped being built, which makes an annotation-owned
+    /// hint look editable.
+    @Test
+    public void theConventionalJavaRootIsOfferedOnlyWhenCompiled() {
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false, true)
+                .contains("/p/common/src/main/java"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/src/main/java"));
+        // The Kotlin root is not conditional on it.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/src/main/kotlin"));
+
+        // The generated trees are Java trees, so the same gate applies. A
+        // disabled generator's leftover copy of the main class under one of them
+        // was otherwise searched -- and searched BEFORE every .kt candidate --
+        // in a module whose application is compiled from Kotlin.
+        assertTrue(CodenameOneSettings.candidateSourceRoots("/p/common", true, false, true)
+                .contains("/p/common/target/generated-sources"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/target/generated-sources"));
+        assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
+                .contains("/p/common/build/generated-sources"));
+    }
+
+    /// Only `default-compile` switched off with `<phase>none</phase>` counts.
+    ///
+    /// Any other execution -- one that renames the id, one that binds a phase,
+    /// `default-testCompile` -- leaves javac running, and reading it as a
+    /// shutdown would drop the roots of an ordinary build.
+    @Test
+    public void onlyDefaultCompileAtPhaseNoneReadsAsDisabled() {
+        assertTrue(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-compile</id><phase>none</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-compile</id><phase>compile</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
+                        + "<execution><id>default-testCompile</id><phase>none</phase></execution>"
+                        + "</executions></plugin>"));
+        assertFalse(CodenameOneSettings.disablesDefaultCompile(
+                "<plugin><artifactId>maven-compiler-plugin</artifactId></plugin>"));
+    }
+
+    /// An ancestor's managed binding survives a nearer managed declaration.
+    ///
+    /// Maven MERGES `pluginManagement` down the chain, so a parent that binds
+    /// `compile` and a child that manages only the version -- or only an
+    /// unrelated execution -- still leaves the parent's binding in force. Taking
+    /// the nearest managed block that has any execution at all dropped it, the
+    /// goal read as unbound, and the source root it configures vanished from the
+    /// scan; a dormant copy of the main class could then answer for the compiled
+    /// one, and its annotation-owned hints looked editable.
+    @Test
+    public void anAncestorsManagedBindingSurvivesANearerManagedDeclaration() {
+        String parent = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+
+        // The nearer POM manages the same plugin, with only a version.
+        String versionOnly = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(versionOnly, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(versionOnly) + parent);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "compile"),
+                "version-only managed block hid the ancestor binding");
+
+        // ...and with only an execution that binds something else.
+        String otherExecution = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>test-compile</id><phase>test-compile</phase>"
+                + "<goals><goal>test-compile</goal></goals></execution>"
+                + "</executions></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String second = CodenameOneSettings.activePluginBlock(otherExecution,
+                "kotlin-maven-plugin", "sourceDirs", "compile",
+                managementOf(otherExecution) + parent);
+        assertTrue(CodenameOneSettings.bindsGoal(second, "compile"),
+                "an unrelated managed execution hid the ancestor binding");
+    }
+
+    /// A nearer managed declaration still SWITCHES OFF the ancestor's execution.
+    ///
+    /// The merge is by execution id, not a union. A child that re-declares the
+    /// parent's id with `<phase>none</phase>` turns it off, and a union would
+    /// still see the parent's goal and call the plugin bound -- which is the
+    /// mirror-image bug, and the one that keeps a root the build does not
+    /// compile.
+    @Test
+    public void aNearerPhaseNoneStillDisablesTheAncestorsExecution() {
+        String parent = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String child = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>none</phase></execution>"
+                + "</executions></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(child, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(child) + parent);
+        assertFalse(CodenameOneSettings.bindsGoal(block, "compile"),
+                "a disabled execution still read as a binding");
+    }
+
+    /// Every managed block for the plugin is returned, not just the first.
+    ///
+    /// The management chain is the POMs' `<pluginManagement>` sections
+    /// concatenated, so each one contributes its own block. Reading only the
+    /// first is what made an ancestor's binding invisible.
+    @Test
+    public void everyManagedBlockForThePluginIsRead() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><goals><goal>compile</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        assertEquals(2, CodenameOneSettings.pluginBlocks(chain, "kotlin-maven-plugin").size());
+        assertTrue(CodenameOneSettings.pluginBlocks(chain, "maven-compiler-plugin").isEmpty());
+    }
+
+    /// The `<pluginManagement>` sections of `pom`, as the chain reader sees them.
+    private static String managementOf(String pom) {
+        StringBuilder out = new StringBuilder();
+        int at = pom.indexOf("<pluginManagement>");
+        while (at >= 0) {
+            int close = pom.indexOf("</pluginManagement>", at);
+            if (close < 0) {
+                break;
+            }
+            out.append(pom, at, close + "</pluginManagement>".length());
+            at = pom.indexOf("<pluginManagement>", close);
+        }
+        return out.toString();
+    }
+
+    /// An ancestor's managed CONFIGURATION survives a version-only parent.
+    ///
+    /// The executions were merged across the whole chain while the configuration
+    /// lookup still stopped at the first managed block. A nearer POM managing
+    /// only the version therefore hid an ancestor's `<sourceDirs>`, the element
+    /// read as absent, and the root it declares never reached the scan.
+    @Test
+    public void anAncestorsManagedConfigurationSurvivesAVersionOnlyParent() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>";
+        // The module declares the plugin but configures nothing.
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom, "kotlin-maven-plugin",
+                "sourceDirs", null, chain);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/kt"),
+                "the version-only managed block hid the ancestor's sourceDirs: " + block);
+    }
+
+    /// The same for the compiler's `<encoding>`, read through its own helper.
+    @Test
+    public void anAncestorsManagedEncodingSurvivesAVersionOnlyParent() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<version>3.11.0</version></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>windows-1251</encoding></configuration>"
+                + "</plugin></plugins></pluginManagement>";
+        String pom = "<project><build></build></project>";
+        String block = CodenameOneSettings.compilerPluginBlock(pom, chain);
+        assertNotNull(block);
+        assertTrue(block.contains("windows-1251"),
+                "the version-only managed block hid the ancestor's encoding: " + block);
+    }
+
+    /// A caller asking for no particular element still gets the declaration.
+    ///
+    /// The search prefers a block declaring the element; with none asked for,
+    /// returning null would drop a plugin the chain really does manage.
+    @Test
+    public void aManagedBlockIsStillReturnedWhenNoElementIsWanted() {
+        String chain = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<version>1.9.0</version></plugin>"
+                + "</plugins></pluginManagement>";
+        assertNotNull(CodenameOneSettings.managedBlockDeclaring(chain, "kotlin-maven-plugin",
+                "sourceDirs"));
+        assertNull(CodenameOneSettings.managedBlockDeclaring(chain, "maven-surefire-plugin",
+                null));
+    }
+
+    /// Configuration from one POM and the binding from another still combine.
+    ///
+    /// A bare `<plugin>` in the module, `<sourceDirs>` in a nearer
+    /// `<pluginManagement>`, and the `compile` execution in an ancestor is an
+    /// ordinary shape, and Maven merges all three. The execution merge used to
+    /// hang off the branch where the ACTIVE block carried the configuration, so
+    /// this path returned a block with no bound goal and the caller dropped a
+    /// real source root.
+    @Test
+    public void inheritedConfigurationAndInheritedBindingCombine() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId><executions>"
+                + "<execution><id>compile</id><phase>process-sources</phase>"
+                + "<goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><source>gen/kt</source></sourceDirs>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom, "kotlin-maven-plugin",
+                "sourceDirs", "compile", managementOf(pom) + ancestor);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/kt"), "lost the inherited configuration: " + block);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "compile"),
+                "lost the ancestor's binding: " + block);
+    }
+
+    /// A plugin's `<sourceDirectory>` is not a compile root.
+    ///
+    /// Checkstyle and PMD both take `<sourceDirectories><sourceDirectory>` to
+    /// say what to ANALYSE. The element was read across the whole POM, so such a
+    /// path became a compile root, and a dormant copy of the main class under it
+    /// was searched ahead of the compiled source -- the same mistake the
+    /// `<source>` and `<sourceDir>` lookups were already scoped to avoid.
+    @Test
+    public void aPluginsSourceDirectoryIsNotACompileRoot() {
+        String pom = "<project><build>"
+                + "<sourceDirectory>src/main/java</sourceDirectory>"
+                + "<plugins><plugin><artifactId>maven-checkstyle-plugin</artifactId>"
+                + "<configuration><sourceDirectories>"
+                + "<sourceDirectory>analysis/only</sourceDirectory>"
+                + "</sourceDirectories></configuration></plugin></plugins>"
+                + "</build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("src/main/java"), roots.toString());
+        assertFalse(roots.contains("analysis/only"),
+                "an analysis-only directory became a compile root: " + roots);
+    }
+
+    /// ...and the same for a reporting section.
+    @Test
+    public void aReportingSourceDirectoryIsNotACompileRoot() {
+        String pom = "<project><reporting><plugins><plugin>"
+                + "<artifactId>maven-pmd-plugin</artifactId><configuration>"
+                + "<sourceDirectories><sourceDirectory>reports/only</sourceDirectory>"
+                + "</sourceDirectories></configuration></plugin></plugins></reporting>"
+                + "</project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
+    /// Both element-name readers exclude the same sections.
+    ///
+    /// They were written from one rule and drifted: `<directory>` was taken as a
+    /// direct child with the plugin and resource sections stripped, while
+    /// `<sourceDirectory>` was read across the whole POM. They share the list
+    /// now, and this is what says so -- an element added to one reader's
+    /// exclusions cannot silently miss the other.
+    @Test
+    public void bothElementNameReadersExcludeTheSameSections() {
+        String pom = "<project><build>"
+                + "<sourceDirectory>src/main/java</sourceDirectory>"
+                + "<directory>target</directory>"
+                + "<resources><resource><directory>res/only</directory>"
+                + "<sourceDirectory>res/only</sourceDirectory></resource></resources>"
+                + "<filters><filter><sourceDirectory>filter/only</sourceDirectory></filter>"
+                + "</filters>"
+                + "<extensions><extension><sourceDirectory>ext/only</sourceDirectory>"
+                + "</extension></extensions>"
+                + "<plugins><plugin><configuration>"
+                + "<sourceDirectory>plugin/only</sourceDirectory>"
+                + "<directory>plugin/dir</directory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertEquals("target", CodenameOneSettings.configuredBuildDirectory(pom));
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("src/main/java"), roots.toString());
+        for (String leaked : new String[]{"res/only", "filter/only", "ext/only", "plugin/only"}) {
+            assertFalse(roots.contains(leaked), leaked + " became a compile root: " + roots);
         }
     }
+
+    /// Maven trims these values, and so must every read of them.
+    ///
+    /// Three reads matched a serialized substring while the rest of this POM
+    /// handling goes through the trimming helpers. A POM that pretty-prints is
+    /// still a valid POM, and Maven activates the profile, resolves the plugin
+    /// and disables the parent lookup exactly as a compact one -- so each of
+    /// these silently dropped a compile root the build really has.
+    @Test
+    public void pomValuesAreReadTheWayMavenTrimsThem() {
+        // The profile is active; its build section is real.
+        String profile = "<project><profiles><profile>"
+                + "<activation><activeByDefault>\n    true\n  </activeByDefault></activation>"
+                + "<build><sourceDirectory>gen/from-profile</sourceDirectory></build>"
+                + "</profile></profiles></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(profile).contains("gen/from-profile"),
+                CodenameOneSettings.declaredSourceRoots(profile).toString());
+
+        // The plugin is active; its artifactId is simply not on one line.
+        String wrapped = "<project><build><plugins><plugin>"
+                + "<artifactId>\n    kotlin-maven-plugin\n  </artifactId>"
+                + "<executions><execution><id>compile</id>"
+                + "<goals><goal>compile</goal></goals></execution></executions>"
+                + "<configuration><sourceDirs><sourceDir>gen/kt</sourceDir></sourceDirs>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertNotNull(CodenameOneSettings.pluginBlock(wrapped, "kotlin-maven-plugin"));
+        assertEquals(1, CodenameOneSettings.pluginBlocks(wrapped, "kotlin-maven-plugin").size());
+        assertTrue(CodenameOneSettings.declaredSourceRoots(wrapped).contains("gen/kt"),
+                CodenameOneSettings.declaredSourceRoots(wrapped).toString());
+    }
+
+    /// `<relativePath/>` means there is no local parent.
+    ///
+    /// Present-and-empty is a statement in Maven and a different one from
+    /// absent. Reading it as absent walked up to ../pom.xml and inherited
+    /// properties, a build directory and managed roots from a POM the project
+    /// does not inherit from.
+    @Test
+    public void aSelfClosingRelativePathDisablesTheParentLookup() {
+        String selfClosing = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version><relativePath/></parent>"
+                + "</project>";
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", selfClosing));
+
+        String spaced = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version><relativePath /></parent>"
+                + "</project>";
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", spaced));
+
+        // An ABSENT relativePath still means Maven's default of ../pom.xml.
+        String absent = "<project><parent><groupId>g</groupId>"
+                + "<artifactId>a</artifactId><version>1</version></parent></project>";
+        assertNotNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", absent));
+    }
+
+    /// An inherited CONFIGURATION does not discard the active BINDING.
+    ///
+    /// A module that declares the add-source execution itself and inherits
+    /// `<sources>` from plugin management ended up with configuration and no
+    /// binding: taking the managed block for its configuration dropped the
+    /// active block's own executions, so the goal read as unbound and the root
+    /// went missing.
+    @Test
+    public void anInheritedConfigurationKeepsTheActiveBinding() {
+        String pom = "<project><build><pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/managed</source></sources>"
+                + "</configuration></plugin>"
+                + "</plugins></pluginManagement>"
+                + "<plugins><plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        String block = CodenameOneSettings.activePluginBlock(pom,
+                "build-helper-maven-plugin", "sources", "add-source", null);
+        assertNotNull(block);
+        assertTrue(block.contains("gen/managed"), "lost the inherited sources: " + block);
+        assertTrue(CodenameOneSettings.bindsGoal(block, "add-source"),
+                "lost the module's own execution: " + block);
+    }
+
+    /// A parent's non-inherited plugin is not part of the child's build.
+    ///
+    /// `<inherited>false</inherited>` says the declaration applies to the POM
+    /// that wrote it and not to its children, so a root it configures is one the
+    /// child never compiles -- and a dormant copy of the child's main class
+    /// there shadows the live annotated source.
+    @Test
+    public void aParentsNonInheritedPluginIsNotTheChildsBuild() {
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<inherited>false</inherited>"
+                + "<executions><execution><id>add</id>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>parent/only</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(parent)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutNonInheritedPlugins(parent)).toString());
+
+        // The same parent WITHOUT the flag does contribute.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(
+                        parent.replace("<inherited>false</inherited>", "")))
+                .contains("parent/only"));
+
+        // And a single non-inherited EXECUTION goes while the plugin stays.
+        String perExecution = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions>"
+                + "<execution><id>skip</id><inherited>false</inherited>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>not/inherited</source></sources>"
+                + "</configuration></execution>"
+                + "<execution><id>keep</id><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>is/inherited</source></sources>"
+                + "</configuration></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutNonInheritedPlugins(perExecution));
+        assertTrue(roots.contains("is/inherited"), roots.toString());
+        assertFalse(roots.contains("not/inherited"), roots.toString());
+    }
+
+    /// A child that switches an inherited execution off keeps it off.
+    ///
+    /// Maven merges executions by id, so redeclaring the parent's id with
+    /// `<phase>none</phase>` disables it. The managed set was appended
+    /// unfiltered, leaving the disabled child copy and the enabled ancestor copy
+    /// both present, and `bindsGoal` answered from whichever came first -- so a
+    /// root the build does not compile went into the scan, where a dormant copy
+    /// of the main class can shadow the compiled source.
+    @Test
+    public void aChildDisablingAnInheritedExecutionKeepsItDisabled() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>inherited/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        String block = CodenameOneSettings.activePluginBlock(child,
+                "build-helper-maven-plugin", "sources", "add-source", ancestor);
+        assertFalse(CodenameOneSettings.bindsGoal(block, "add-source"),
+                "a disabled execution was re-enabled by its ancestor: " + block);
+        assertFalse(CodenameOneSettings.declaredSourceRoots(child, null, ancestor)
+                        .contains("inherited/gen"),
+                CodenameOneSettings.declaredSourceRoots(child, null, ancestor).toString());
+
+        // A DIFFERENT id is untouched: disabling `add` does not disable `other`.
+        String otherId = child.replace("<id>add</id><phase>none</phase>",
+                "<id>other</id><phase>none</phase>");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(otherId, null, ancestor)
+                        .contains("inherited/gen"),
+                CodenameOneSettings.declaredSourceRoots(otherId, null, ancestor).toString());
+    }
+
+    /// A merged execution keeps the configuration as well as the binding.
+    ///
+    /// Redeclaring an inherited id with only `<configuration><sources>` is how
+    /// Maven says "same execution, different directory". Merging phase and goals
+    /// alone left the goal on one execution and the root on another, and
+    /// `compileGoalConfiguration` looks for the source ON the bound execution --
+    /// so it found none and dropped a directory Maven really compiles.
+    @Test
+    public void aMergedExecutionKeepsItsConfiguration() {
+        String ancestor = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals></execution>"
+                + "</executions></plugin></plugins></pluginManagement>"
+                + "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id>"
+                + "<configuration><sources><source>gen/merged</source></sources>"
+                + "</configuration></execution>"
+                + "</executions></plugin></plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, ancestor);
+        assertTrue(roots.contains("gen/merged"), roots.toString());
+    }
+
+    /// The manifest is looked for where the classes actually land.
+    ///
+    /// `target/classes` was hardcoded. A project configuring
+    /// `<build><outputDirectory>` compiles somewhere else and
+    /// process-annotations writes the manifest there, so the lookup found
+    /// nothing, every annotation-owned hint looked editable, and Add wrote the
+    /// duplicate the next build refuses -- the exact failure the manifest exists
+    /// to prevent, reached by reading the wrong directory.
+    @Test
+    public void theConfiguredOutputDirectoryIsWhereTheManifestLives() {
+        String configured = "<project><build>"
+                + "<outputDirectory>out/classes</outputDirectory>"
+                + "</build></project>";
+        assertEquals("out/classes", CodenameOneSettings.configuredOutputDirectory(configured));
+
+        // A plugin's own <outputDirectory> is not the build's.
+        String pluginOwned = "<project><build>"
+                + "<outputDirectory>out/classes</outputDirectory>"
+                + "<plugins><plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><outputDirectory>plugin/only</outputDirectory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertEquals("out/classes", CodenameOneSettings.configuredOutputDirectory(pluginOwned));
+
+        // ...and with the build declaring none, the plugin's is not adopted.
+        String pluginOnly = "<project><build>"
+                + "<plugins><plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><outputDirectory>plugin/only</outputDirectory>"
+                + "</configuration></plugin></plugins>"
+                + "</build></project>";
+        assertNull(CodenameOneSettings.configuredOutputDirectory(pluginOnly));
+    }
+
+    /// A child disables an inherited ACTIVE execution, not only a managed one.
+    ///
+    /// Maven merges the active `<plugins>` of a parent and a child by plugin and
+    /// then by execution id; this reader parses each POM independently, so the
+    /// parent's enabled copy survived the child's `<phase>none</phase>` and a
+    /// root the build does not compile went into the scan.
+    @Test
+    public void aChildDisablesAnInheritedActiveExecution() {
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>parent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, child)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(parent, child)).toString());
+
+        // A different id, and a different PLUGIN, are both untouched.
+        String otherId = child.replace("<id>add</id>", "<id>other</id>");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, otherId))
+                .contains("parent/gen"));
+        String otherPlugin = child.replace("build-helper-maven-plugin", "some-other-plugin");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(parent, otherPlugin))
+                .contains("parent/gen"));
+    }
+
+    /// An explicitly written unset constant does not claim ownership.
+    ///
+    /// `@Android(appBundle = Toggle.DEFAULT)` emits no hint -- the processor
+    /// treats it exactly as an omitted attribute -- so a properties line for it
+    /// is legal. Marking it owned on the attribute NAME alone hid the editor,
+    /// refused Add, and called a value the build accepts a duplicate.
+    @Test
+    public void anExplicitUnsetConstantIsNotOwnership() {
+        com.codename1.build.shared.BuildHints.Hint appBundle =
+                com.codename1.build.shared.BuildHints.byName("android.appBundle");
+        assertNotNull(appBundle.unsetConstant());
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.DEFAULT"));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "DEFAULT"));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.ON"));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.OFF"));
+
+        // A hint with no unset constant is never read as unset.
+        com.codename1.build.shared.BuildHints.Hint teamId =
+                com.codename1.build.shared.BuildHints.byName("ios.teamId");
+        assertFalse(CodenameOneSettings.isUnsetValue(teamId, "DEFAULT"));
+
+        assertEquals("Toggle.DEFAULT",
+                CodenameOneSettings.attributeValue("appBundle = Toggle.DEFAULT, teamId = \"T\"",
+                        "appBundle", false));
+        assertEquals("\"T\"",
+                CodenameOneSettings.attributeValue("appBundle = Toggle.DEFAULT, teamId = \"T\"",
+                        "teamId", false));
+    }
+
+    /// An intermediate parent's override reaches the grandparent.
+    ///
+    /// Inheritance is applied one level at a time: a parent that disables the
+    /// grandparent's execution disables it for the leaf too, and the leaf never
+    /// mentions it. Filtering every ancestor against the leaf alone let the
+    /// grandparent's enabled copy through with its root.
+    @Test
+    public void anIntermediateParentsOverrideReachesTheGrandparent() {
+        String grandparent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>grandparent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String parent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String leaf = "<project><build></build></project>";
+
+        // The leaf says nothing about it; the parent is what switched it off.
+        java.util.List<String> nearer = java.util.Arrays.asList(leaf, parent);
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer)).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                        .toString());
+
+        // With the leaf alone -- which is what was compared before -- it stands.
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                        java.util.Arrays.asList(leaf))).contains("grandparent/gen"));
+    }
+
+    /// The unset constant is matched as a TOKEN, not as text after a dot.
+    ///
+    /// `Toggle./* default */DEFAULT` is an ordinary way to write it and the
+    /// processor emits nothing for it, so a properties line stays legal -- while
+    /// a raw suffix comparison saw `/* default */DEFAULT` and claimed ownership.
+    @Test
+    public void theUnsetConstantIsMatchedAsAToken() {
+        com.codename1.build.shared.BuildHints.Hint appBundle =
+                com.codename1.build.shared.BuildHints.byName("android.appBundle");
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle,
+                "Toggle./* default */DEFAULT", false));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle . DEFAULT", false));
+        assertTrue(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.DEFAULT // keep", false));
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "Toggle.ON", false));
+        // A string that merely CONTAINS the word is not the constant.
+        assertFalse(CodenameOneSettings.isUnsetValue(appBundle, "\"DEFAULT\"", false));
+
+        assertEquals("DEFAULT", CodenameOneSettings.lastIdentifier("Toggle./*x*/DEFAULT", false));
+        assertNull(CodenameOneSettings.lastIdentifier("\"DEFAULT\"", false));
+    }
+
+    /// A leaf can turn an inherited execution back ON.
+    ///
+    /// Maven takes the NEAREST declaration that names a phase, so a leaf that
+    /// redeclares the id its parent disabled re-enables it -- keeping the
+    /// inherited goal and configuration. Unioning every level that says
+    /// `<phase>none</phase>` kept the parent's veto and dropped a root the build
+    /// really compiles.
+    @Test
+    public void aLeafCanReEnableAnInheritedExecution() {
+        String grandparent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>grandparent/gen</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        String parentDisables = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>none</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        String leafReEnables = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId><executions>"
+                + "<execution><id>add</id><phase>generate-sources</phase></execution>"
+                + "</executions></plugin></plugins></build></project>";
+
+        // Nearest first: leaf, then the parent that disabled it.
+        java.util.List<String> nearer = java.util.Arrays.asList(leafReEnables, parentDisables);
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                .contains("grandparent/gen"),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent, nearer))
+                        .toString());
+
+        // A leaf that says nothing about the phase decides nothing, so the
+        // parent's veto still stands.
+        String leafSilent = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>leaf/gen</source></sources>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(
+                CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                        java.util.Arrays.asList(leafSilent, parentDisables))).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(
+                        CodenameOneSettings.withoutExecutionsDisabledBy(grandparent,
+                                java.util.Arrays.asList(leafSilent, parentDisables))).toString());
+    }
+
+    /// A collection is read by POSITION, not by the child's tag name.
+    ///
+    /// Maven maps `<sourceDirs>` to a list and ignores what the children are
+    /// called, which is why AbstractCN1Mojo iterates them. Requiring the one
+    /// spelling `<sourceDir>` dropped a root Maven really compiles -- and the
+    /// same is true of build-helper's `<sources>`.
+    @Test
+    public void aCollectionIsReadByPositionNotByChildName() {
+        String kotlin = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>compile</goal></goals>"
+                + "<configuration><sourceDirs>"
+                + "<source>gen/kt-a</source>"
+                + "<sourceDir>gen/kt-b</sourceDir>"
+                + "<dir>gen/kt-c</dir>"
+                + "</sourceDirs></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(kotlin);
+        for (String expected : new String[]{"gen/kt-a", "gen/kt-b", "gen/kt-c"}) {
+            assertTrue(roots.contains(expected), expected + " missing from " + roots);
+        }
+
+        String helper = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources>"
+                + "<path>gen/helper-a</path><source>gen/helper-b</source>"
+                + "</sources></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        java.util.List<String> helperRoots = CodenameOneSettings.declaredSourceRoots(helper);
+        assertTrue(helperRoots.contains("gen/helper-a"), helperRoots.toString());
+        assertTrue(helperRoots.contains("gen/helper-b"), helperRoots.toString());
+    }
+
+    /// A production root keeps its meaning however it is spelled.
+    ///
+    /// Maven compiles `src/integrationTest/java` as MAIN code when an
+    /// add-source execution says so. Guessing test scope from a path segment
+    /// dropped that root, and the annotated main class in it went with it --
+    /// which is the failure the root list exists to prevent. Test roots are
+    /// excluded by the element and the goal that declare them.
+    @Test
+    public void aProductionRootIsNotJudgedByItsName() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>src/integrationTest/java</source>"
+                + "</sources></configuration></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom)
+                .contains("src/integrationTest/java"),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+
+        // add-test-source with the same directory is still excluded, by GOAL.
+        String tests = pom.replace("add-source", "add-test-source");
+        assertTrue(CodenameOneSettings.declaredSourceRoots(tests).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(tests).toString());
+    }
+
+    /// Plugin-level configuration with no execution is dormant here too.
+    ///
+    /// `add-source` and the Kotlin `compile` goal run only where an execution
+    /// says so. This fallback searches POM-declared roots BEFORE the
+    /// conventions, so a directory the build never compiles was being consulted
+    /// first -- and a dormant copy of the main class there hides the compiled
+    /// source, which is what makes an annotation-owned hint look editable.
+    @Test
+    public void pluginLevelRootsNeedABoundGoalHereToo() {
+        String helper = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/dormant</source></sources>"
+                + "</configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(helper).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(helper).toString());
+
+        String kotlin = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><sourceDir>src/dormant/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(kotlin).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(kotlin).toString());
+
+        // ...but <extensions>true</extensions> binds compile with no execution,
+        // so that list IS in effect.
+        String extensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(extensions).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(extensions).toString());
+
+        // ...unless the POM switches that binding off.
+        String disabled = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration>"
+                + "<executions><execution><id>default-compile</id><phase>none</phase>"
+                + "</execution></executions></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(disabled).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(disabled).toString());
+    }
+
+    /// ...and disabling a differently named compile execution leaves the
+    /// extension lifecycle alone here too.
+    @Test
+    public void aDisabledCustomExecutionLeavesTheExtensionAlone() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration>"
+                + "<executions><execution><id>extra-compile</id><phase>none</phase>"
+                + "<goals><goal>compile</goal></goals></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
+    /// A commented-out plugin is not a plugin.
+    ///
+    /// This reader is a string search, so a block someone parked inside
+    /// `<!-- -->` matched exactly like a live one and contributed source roots
+    /// the build does not compile -- where a dormant copy of the main class
+    /// hides the compiled source and its annotation-owned hints look editable.
+    @Test
+    public void aCommentedOutPluginContributesNothing() {
+        String pom = "<project><build><plugins>"
+                + "<!--"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/commented</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "-->"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/real</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("gen/real"), roots.toString());
+        assertFalse(roots.contains("gen/commented"), roots.toString());
+
+        // ...and a commented-out <sourceDirectory> is not one either.
+        String sourceDirectory = "<project><build>"
+                + "<!-- <sourceDirectory>commented</sourceDirectory> -->"
+                + "<sourceDirectory>appsrc</sourceDirectory>"
+                + "</build></project>";
+        java.util.List<String> declared = CodenameOneSettings.declaredSourceRoots(sourceDirectory);
+        assertTrue(declared.contains("appsrc"), declared.toString());
+        assertFalse(declared.contains("commented"), declared.toString());
+
+        // An unterminated comment swallows the rest, which is what an XML parser
+        // does with it too.
+        assertEquals("<project>", CodenameOneSettings.withoutComments("<project><!-- oops"));
+    }
+
+    /// `default-add-source` is not a binding here either.
+    @Test
+    public void anIdAloneDoesNotBindAnUninjectedGoal() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-add-source</id><configuration>"
+                + "<sources><source>gen/not-really-bound</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(pom).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(pom).toString());
+    }
+
+    /// The conventional Kotlin root needs a real binding, not just the id.
+    ///
+    /// Without `<extensions>true</extensions>` Maven injects no execution for
+    /// the Kotlin plugin, so `<id>default-compile</id>` with no `<goal>` binds
+    /// nothing -- and scanning `src/main/kotlin` for a module that compiles no
+    /// Kotlin lets a dormant peer there shadow the real annotation.
+    @Test
+    public void theConventionalKotlinRootNeedsARealBinding() {
+        String byIdAlone = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><id>default-compile</id></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertFalse(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(byIdAlone, "kotlin-maven-plugin",
+                        "sourceDir")));
+
+        // ...and with the extension lifecycle the same execution IS the binding.
+        String withExtensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>true</extensions>"
+                + "<executions><execution><id>default-compile</id></execution></executions>"
+                + "</plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(withExtensions, "kotlin-maven-plugin",
+                        "sourceDir")));
+
+        // A named goal binds it either way.
+        String named = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.bindsKotlinCompile(
+                CodenameOneSettings.activePluginBlock(named, "kotlin-maven-plugin",
+                        "sourceDir")));
+    }
+
+    /// The child supplies the configuration, the parent still supplies the
+    /// binding.
+    ///
+    /// That is the ordinary shape when a module customizes a plugin its parent
+    /// set up: plugin-level `<sources>` in the child, the `<execution>` in the
+    /// managed block. Taking the child's block alone left the goal looking
+    /// unbound and dropped the root it configures.
+    @Test
+    public void aChildsConfigurationKeepsTheManagedBinding() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/from-child</source></sources>"
+                + "</configuration></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("gen/from-child"), roots.toString());
+    }
+
+    /// An unrelated child execution does not replace the managed binding.
+    ///
+    /// The child supplies the configuration and adds a `test-compile` of its
+    /// own; the execution that binds the PRODUCTION goal is still the managed
+    /// one. Treating any child execution as a complete replacement dropped it,
+    /// and the root the child configures went with it.
+    @Test
+    public void anUnrelatedChildExecutionKeepsTheManagedBinding() {
+        String parentManaged = "<pluginManagement><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></pluginManagement>";
+        String child = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<configuration><sources><source>gen/from-child</source></sources>"
+                + "</configuration>"
+                + "<executions><execution><goals><goal>add-test-source</goal></goals>"
+                + "</execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots =
+                CodenameOneSettings.declaredSourceRoots(child, null, parentManaged);
+        assertTrue(roots.contains("gen/from-child"), roots.toString());
+
+        // ...and a child that DOES bind the goal replaces it, as before.
+        String replaces = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/child-owned</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> owned =
+                CodenameOneSettings.declaredSourceRoots(replaces, null, parentManaged);
+        assertTrue(owned.contains("gen/child-owned"), owned.toString());
+    }
+
+    /// Pretty-printed XML binds the goal just as well.
+    ///
+    /// `<goal>\n  add-source\n</goal>` is ordinary formatting and Maven trims it
+    /// before running the goal. Matching the serialized string left the
+    /// execution looking unbound, so the root it configures was dropped and a
+    /// main class living there could not be found.
+    @Test
+    public void aPrettyPrintedGoalStillBinds() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><goals>\n    <goal>\n      add-source\n    </goal>\n"
+                + "</goals><configuration><sources><source>gen/pretty</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("gen/pretty"), roots.toString());
+
+        // ...and a pretty-printed <phase>none</phase> still switches it off.
+        String disabled = "<project><build><plugins>"
+                + "<plugin><artifactId>build-helper-maven-plugin</artifactId>"
+                + "<executions><execution><phase>\n  none\n</phase>"
+                + "<goals><goal>add-source</goal></goals>"
+                + "<configuration><sources><source>gen/off</source></sources>"
+                + "</configuration></execution></executions></plugin>"
+                + "</plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(disabled).isEmpty(),
+                CodenameOneSettings.declaredSourceRoots(disabled).toString());
+
+        // ...and a pretty-printed <extensions>true</extensions> still binds
+        // Kotlin's compile.
+        String extensions = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<extensions>\n  true\n</extensions>"
+                + "<configuration><sourceDirs><sourceDir>src/app/kt</sourceDir>"
+                + "</sourceDirs></configuration></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(extensions).contains("src/app/kt"),
+                CodenameOneSettings.declaredSourceRoots(extensions).toString());
+    }
+
+    /// A deprecated alias is not a second thing to set.
+    ///
+    /// The builder reads `android.captureRecord` and then lets
+    /// `and.captureRecord` override it -- one effective setting, two spellings.
+    /// Offering both in the browse list gave it two independent controls, and a
+    /// project that filled in both got whichever the builder happens to prefer.
+    /// The alias is still DESCRIBED, so a project that already declares one gets
+    /// a properly typed row instead of being told it is a custom hint.
+    @Test
+    public void aDeprecatedAliasIsDescribedButNotOffered() {
+        BuildHintCatalog catalog = BuildHintCatalog.load();
+
+        BuildHintMetadata alias = catalog.get("and.captureRecord");
+        assertNotNull(alias, "the alias must still be described");
+        assertEquals("android.captureRecord", alias.aliasOf());
+        assertNull(catalog.get("android.captureRecord").aliasOf(),
+                "the canonical name is not an alias of anything");
+
+        for (BuildHintMetadata found : catalog.search("captureRecord")) {
+            assertNull(found.aliasOf(),
+                    "the browse list offered the alias " + found.name()
+                            + ", which is the same setting as " + found.aliasOf());
+        }
+        // ...and the canonical one is still there to find.
+        boolean canonical = false;
+        for (BuildHintMetadata found : catalog.search("captureRecord")) {
+            canonical |= "android.captureRecord".equals(found.name());
+        }
+        assertTrue(canonical, "the canonical hint must still be offered");
+
+        // Every alias in the catalog, not just this one.
+        for (BuildHintMetadata found : catalog.search("")) {
+            assertNull(found.aliasOf(), found.name() + " is an alias and must not be offered");
+        }
+    }
+
+    /// An `activeByDefault` profile redefining a base property is the whole
+    /// point of writing it there, so within one POM the profile's value wins.
+    ///
+    /// Reading the base value resolved a root or an encoding to something the
+    /// build is not using -- and then the annotated main source is missed and
+    /// its hints are offered as duplicate properties.
+    @Test
+    public void anActiveProfileOverridesTheBaseProperty() {
+        java.util.Map<String, String> properties = new java.util.HashMap<>();
+        CodenameOneSettings.declaredProperties(
+                "<project><properties>"
+                        + "<gen>base</gen><only.base>b</only.base>"
+                        + "</properties><profiles>"
+                        + "<profile><activation><activeByDefault>true</activeByDefault>"
+                        + "</activation><properties><gen>profile</gen></properties></profile>"
+                        // An inactive profile contributes nothing, the same rule
+                        // the rest of this reader applies.
+                        + "<profile><id>never</id>"
+                        + "<properties><gen>inactive</gen></properties></profile>"
+                        + "</profiles></project>", properties);
+        assertEquals("profile", properties.get("gen"));
+        assertEquals("b", properties.get("only.base"));
+
+        // ...but a PARENT's active profile still loses to the module's own
+        // value: the nearer POM wins across the chain.
+        CodenameOneSettings.declaredProperties(
+                "<project><profiles><profile>"
+                        + "<activation><activeByDefault>true</activeByDefault></activation>"
+                        + "<properties><gen>parent</gen></properties>"
+                        + "</profile></profiles></project>", properties);
+        assertEquals("profile", properties.get("gen"));
+    }
+
+    /// A `$` that opens nothing is an ordinary character in a path -- dropping
+    /// such a root lost a real source directory.
+    @Test
+    public void aDollarThatOpensNothingIsPartOfThePath() {
+        assertEquals("gen/dollar$dir",
+                CodenameOneSettings.expandProjectPaths("gen/dollar$dir", "/p/common"));
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><sourceDirectory>gen/dollar$dir</sourceDirectory>"
+                        + "</build></project>");
+        assertTrue(roots.contains("gen/dollar$dir"), roots.toString());
+    }
+
+    /// maven-resources-plugin declares an `<encoding>` of its own, and taking
+    /// the first one in the file adopted the resource charset for every source.
+    @Test
+    public void theEncodingIsTheCompilerPluginsOwn() {
+        String pom = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "<plugin><artifactId>maven-compiler-plugin</artifactId>"
+                + "<configuration><encoding>UTF-8</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertEquals("UTF-8", CodenameOneSettings.declaredSourceEncoding(pom));
+
+        // With no compiler encoding at all, another plugin's is not adopted.
+        String resourcesOnly = "<project><build><plugins>"
+                + "<plugin><artifactId>maven-resources-plugin</artifactId>"
+                + "<configuration><encoding>ISO-8859-1</encoding></configuration></plugin>"
+                + "</plugins></build></project>";
+        assertNull(CodenameOneSettings.declaredSourceEncoding(resourcesOnly));
+
+        // The property still wins, since that is what the convention is.
+        String property = "<project><properties>"
+                + "<project.build.sourceEncoding>Shift_JIS</project.build.sourceEncoding>"
+                + "</properties>" + resourcesOnly.substring("<project>".length());
+        assertEquals("Shift_JIS", CodenameOneSettings.declaredSourceEncoding(property));
+    }
+
+    /// `project.build.sourceEncoding` is normally declared once in the parent,
+    /// which is where a multi-module Codename One project puts it -- so looking
+    /// only at the bound module POM found nothing in the standard layout.
+    @Test
+    public void theParentPomIsPartOfTheChain() {
+        // Maven's own default when a parent is declared without a relativePath.
+        assertEquals("/p/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><artifactId>root</artifactId></parent></project>"));
+
+        // An explicit relativePath, to a file or to a directory.
+        assertEquals("/p/build/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><relativePath>../build/pom.xml</relativePath>"
+                                + "</parent></project>"));
+        assertEquals("/p/build/pom.xml",
+                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                        "<project><parent><relativePath>../build</relativePath>"
+                                + "</parent></project>"));
+
+        // No parent is the end of the chain, and an empty relativePath means
+        // "from the repository", which this reader cannot follow.
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", "<project></project>"));
+        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
+                "<project><parent><relativePath></relativePath></parent></project>"));
+
+        // The path arithmetic the walk depends on.
+        assertEquals("/p/pom.xml", CodenameOneSettings.normalizePath("/p/common/../pom.xml"));
+        assertEquals("/p/a/pom.xml",
+                CodenameOneSettings.normalizePath("/p/common/./../a/pom.xml"));
+        assertEquals("a/pom.xml", CodenameOneSettings.normalizePath("b/../a/pom.xml"));
+    }
+
+    /// `${project.build.directory}` is `target` by default and whatever
+    /// `<build><directory>` says otherwise -- hard-coding `target` sent the
+    /// search to a directory a project that overrides it does not compile from.
+    @Test
+    public void theConfiguredBuildDirectoryIsUsed() {
+        assertEquals("out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><directory>out</directory></build></project>"));
+        assertEquals("/p/common/out/generated-sources",
+                CodenameOneSettings.expandProjectPaths(
+                        "${project.build.directory}/generated-sources", "/p/common", "out"));
+
+        // The default when nothing configures one.
+        assertNull(CodenameOneSettings.configuredBuildDirectory("<project><build/></project>"));
+        assertEquals("/p/common/target/generated-sources",
+                CodenameOneSettings.expandProjectPaths(
+                        "${project.build.directory}/generated-sources", "/p/common", null));
+
+        // A DIRECT child: resources and the plugin sections carry `<directory>`
+        // elements of their own, and taking the first would read a resource
+        // directory as the output directory.
+        assertNull(CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><resources><resource>"
+                        + "<directory>src/main/resources</directory>"
+                        + "</resource></resources></build></project>"));
+        assertEquals("out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><resources><resource>"
+                        + "<directory>src/main/resources</directory></resource></resources>"
+                        + "<directory>out</directory></build></project>"));
+
+        // An absolute one is taken as it stands.
+        assertEquals("/elsewhere/gen", CodenameOneSettings.expandProjectPaths(
+                "${project.build.directory}/gen", "/p/common", "/elsewhere"));
+    }
+
+    /// A profile this reader cannot evaluate is left out rather than merged in.
+    /// An inactive `<sourceDirectory>src/preview</sourceDirectory>` was read as
+    /// a production root, so a type kept there shadowed the real annotation --
+    /// and activation depends on properties, files, the JDK and the OS, none of
+    /// which this tool has a model for.
+    @Test
+    public void anInactiveProfileIsNotTheBuild() {
+        String pom = "<project><build><sourceDirectory>appsrc</sourceDirectory></build>"
+                + "<profiles>"
+                + "<profile><id>preview</id><activation><property><name>preview</name>"
+                + "</property></activation>"
+                + "<build><sourceDirectory>src/preview</sourceDirectory></build></profile>"
+                + "<profile><id>always</id>"
+                + "<activation><activeByDefault>true</activeByDefault></activation>"
+                + "<build><sourceDirectory>src/always</sourceDirectory></build></profile>"
+                + "</profiles></project>";
+        java.util.List<String> roots = CodenameOneSettings.declaredSourceRoots(pom);
+        assertTrue(roots.contains("appsrc"), roots.toString());
+        // Active by default is knowable, so it counts.
+        assertTrue(roots.contains("src/always"), roots.toString());
+        // Conditionally active is not, so it does not.
+        assertFalse(roots.contains("src/preview"), roots.toString());
+    }
+
+    /// `<directory>${project.basedir}/out</directory>` is legal and resolvable;
+    /// discarding it sent the search to `target` for a project that compiles
+    /// somewhere else.
+    @Test
+    public void theBuildDirectoryMayUseAnExpression() {
+        assertEquals("${project.basedir}/out", CodenameOneSettings.configuredBuildDirectory(
+                "<project><build><directory>${project.basedir}/out</directory></build></project>"));
+        assertEquals("/p/common/out/gen", CodenameOneSettings.expandProjectPaths(
+                "${project.build.directory}/gen", "/p/common", "/p/common/out"));
+
+        // The expansion the build directory itself gets: the basedir family.
+        assertEquals("/p/common/out",
+                CodenameOneSettings.expandBasedir("${project.basedir}/out", "/p/common"));
+        assertEquals("/p/common/out",
+                CodenameOneSettings.expandBasedir("${basedir}/out", "/p/common"));
+        assertEquals("out", CodenameOneSettings.expandBasedir("out", "/p/common"));
+
+        // NOT a reference to itself: the general expander resolves that one to
+        // `target`, which would quietly make a self-reference mean the default.
+        assertNull(CodenameOneSettings.expandBasedir("${project.build.directory}/x", "/p/common"));
+        assertNull(CodenameOneSettings.expandBasedir("${custom.dir}/x", "/p/common"));
+    }
+
 }

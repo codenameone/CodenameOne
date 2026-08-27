@@ -68,6 +68,11 @@
                 <artifactId>codenameone-javase</artifactId>
                 <version>${cn1.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.codenameone</groupId>
+                <artifactId>codenameone-build-hint-catalog</artifactId>
+                <version>${cn1.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

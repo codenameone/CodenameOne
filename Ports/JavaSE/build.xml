@@ -184,6 +184,14 @@
         <!--copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" / -->
+        <!-- The build hint data file is rendered during the Maven build of
+             maven/javase rather than committed, so take it from there when that
+             build has run. Absent, the simulator keeps the hints
+             BuildHintSchemaDefaults compiles in and BuildHintCatalogDefaults
+             says on stderr that the annotated ones are missing, which is what
+             this build did before the data file existed at all. -->
+        <copy file="../../maven/javase/target/classes/cn1-build-hints.json"
+              todir="build/classes" failonerror="false" quiet="true"/>
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="../../../cn1-binaries/javase/sqlite-jdbc-3.46.1.0.jar" dest="build/classes" />
         <unjar src="../../../cn1-binaries/javase/Filters.jar" dest="build/classes" /> 

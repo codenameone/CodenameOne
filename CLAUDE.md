@@ -149,6 +149,38 @@ removing one can make a previously-used private method dead.
 
 Findings land in each module's `target/spotbugsXml.xml`.
 
+### Build hints
+
+A build hint is a `codename1.arg.<name>=<value>` line the builders read as
+`request.getArg(name, default)`. An undeclared name is accepted, never read, and
+silently does nothing, so every hint must be declared in exactly one place:
+
+- **`CodenameOne/src/com/codename1/annotations/buildhints`** if it has an
+  annotation. Hand-written, and the source of truth -- see its
+  `package-info.java`.
+- **`maven/build-hint-catalog`** otherwise: dynamic families, build-service-only
+  hints, the long tail.
+
+Nothing is generated into the tree. `BuildHintCodeGenerator` renders the
+annotated hints into `cn1-build-hints.json` for the editors that cannot read
+bytecode, and into the developer guide's table -- both during a build, neither
+committed. Every module that needs the data file renders it into its own
+`target/classes`: `maven/javase`, `maven/codenameone-maven-plugin` and
+`scripts/settings/common`. The catalog cannot render its own, because the
+generator lives in `build-hint-tools`, which depends on it.
+
+Adding a hint to a builder means declaring it in the same change:
+
+```bash
+source tools/env.sh
+scripts/gen-build-hint-annotations.sh --check  # the render still works (CI)
+scripts/check-build-hint-catalog.sh            # every hint the code reads is declared
+```
+
+`scripts/build-hint-catalog-baseline.txt` is an **empty** ratchet: a new entry
+means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
+seeded the catalog once and would overwrite hand edits.
+
 ### Never rely on ClassCastException
 
 **ParparVM's `CHECKCAST` is unchecked.** `BC_CHECKCAST` expands to nothing and the

@@ -182,6 +182,9 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("Container".equals(simpleName)) {
             return com.codename1.ui.Container.class;
         }
+        if ("Desktop".equals(simpleName)) {
+            return com.codename1.ui.Desktop.class;
+        }
         if ("DevicePosture".equals(simpleName)) {
             return com.codename1.ui.DevicePosture.class;
         }
@@ -245,13 +248,13 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("Label".equals(simpleName)) {
             return com.codename1.ui.Label.class;
         }
-        if ("LinearGradient".equals(simpleName)) {
-            return com.codename1.ui.LinearGradient.class;
-        }
         return null;
     }
 
     private static Class<?> findClassChunk1(String simpleName) {
+        if ("LinearGradient".equals(simpleName)) {
+            return com.codename1.ui.LinearGradient.class;
+        }
         if ("LinearGradientPaint".equals(simpleName)) {
             return com.codename1.ui.LinearGradientPaint.class;
         }
@@ -260,6 +263,9 @@ public final class GeneratedAccess_com_codename1_ui {
         }
         if ("MenuBar".equals(simpleName)) {
             return com.codename1.ui.MenuBar.class;
+        }
+        if ("Monitor".equals(simpleName)) {
+            return com.codename1.ui.Monitor.class;
         }
         if ("MultipleGradientPaint".equals(simpleName)) {
             return com.codename1.ui.MultipleGradientPaint.class;
@@ -378,6 +384,9 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("TooltipManager".equals(simpleName)) {
             return com.codename1.ui.TooltipManager.class;
         }
+        if ("TopLevelContainer".equals(simpleName)) {
+            return com.codename1.ui.TopLevelContainer.class;
+        }
         if ("Transform".equals(simpleName)) {
             return com.codename1.ui.Transform.class;
         }
@@ -407,6 +416,9 @@ public final class GeneratedAccess_com_codename1_ui {
         }
         if ("VirtualInputDevice".equals(simpleName)) {
             return com.codename1.ui.VirtualInputDevice.class;
+        }
+        if ("Window".equals(simpleName)) {
+            return com.codename1.ui.Window.class;
         }
         return null;
     }
@@ -1142,6 +1154,24 @@ public final class GeneratedAccess_com_codename1_ui {
                 return new com.codename1.ui.UIFragment.DefaultComponentFactory();
             }
         }
+        if (type == com.codename1.ui.Window.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.Window();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.layouts.Layout.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.layouts.Layout.class}, false);
+                return new com.codename1.ui.Window((com.codename1.ui.layouts.Layout) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.ui.Window((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.layouts.Layout.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.layouts.Layout.class}, false);
+                return new com.codename1.ui.Window((java.lang.String) adaptedArgs[0], (com.codename1.ui.layouts.Layout) adaptedArgs[1]);
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
@@ -1164,35 +1194,36 @@ public final class GeneratedAccess_com_codename1_ui {
         if (type == com.codename1.ui.ComponentGroup.class) return invokeStatic14(name, safeArgs);
         if (type == com.codename1.ui.ComponentSelector.class) return invokeStatic15(name, safeArgs);
         if (type == com.codename1.ui.Container.class) return invokeStatic16(name, safeArgs);
-        if (type == com.codename1.ui.DevicePosture.class) return invokeStatic17(name, safeArgs);
-        if (type == com.codename1.ui.Dialog.class) return invokeStatic18(name, safeArgs);
-        if (type == com.codename1.ui.Display.class) return invokeStatic19(name, safeArgs);
-        if (type == com.codename1.ui.DynamicImage.class) return invokeStatic20(name, safeArgs);
-        if (type == com.codename1.ui.EncodedImage.class) return invokeStatic21(name, safeArgs);
-        if (type == com.codename1.ui.Font.class) return invokeStatic22(name, safeArgs);
-        if (type == com.codename1.ui.FontImage.class) return invokeStatic23(name, safeArgs);
-        if (type == com.codename1.ui.GeneratedSVGImage.class) return invokeStatic24(name, safeArgs);
-        if (type == com.codename1.ui.Gradient.class) return invokeStatic25(name, safeArgs);
-        if (type == com.codename1.ui.Image.class) return invokeStatic26(name, safeArgs);
-        if (type == com.codename1.ui.ImageFactory.class) return invokeStatic27(name, safeArgs);
-        if (type == com.codename1.ui.InputComponent.class) return invokeStatic28(name, safeArgs);
-        if (type == com.codename1.ui.InterFormContainer.class) return invokeStatic29(name, safeArgs);
-        if (type == com.codename1.ui.Label.class) return invokeStatic30(name, safeArgs);
-        if (type == com.codename1.ui.List.class) return invokeStatic31(name, safeArgs);
-        if (type == com.codename1.ui.PeerComponent.class) return invokeStatic32(name, safeArgs);
-        if (type == com.codename1.ui.PickerComponent.class) return invokeStatic33(name, safeArgs);
-        if (type == com.codename1.ui.RadioButton.class) return invokeStatic34(name, safeArgs);
-        if (type == com.codename1.ui.Sheet.class) return invokeStatic35(name, safeArgs);
-        if (type == com.codename1.ui.SideMenuBar.class) return invokeStatic36(name, safeArgs);
-        if (type == com.codename1.ui.Slider.class) return invokeStatic37(name, safeArgs);
-        if (type == com.codename1.ui.TextArea.class) return invokeStatic38(name, safeArgs);
-        if (type == com.codename1.ui.TextField.class) return invokeStatic39(name, safeArgs);
-        if (type == com.codename1.ui.TextSelection.class) return invokeStatic40(name, safeArgs);
-        if (type == com.codename1.ui.Toolbar.class) return invokeStatic41(name, safeArgs);
-        if (type == com.codename1.ui.TooltipManager.class) return invokeStatic42(name, safeArgs);
-        if (type == com.codename1.ui.Transform.class) return invokeStatic43(name, safeArgs);
-        if (type == com.codename1.ui.UIFragment.class) return invokeStatic44(name, safeArgs);
-        if (type == com.codename1.ui.URLImage.class) return invokeStatic45(name, safeArgs);
+        if (type == com.codename1.ui.Desktop.class) return invokeStatic17(name, safeArgs);
+        if (type == com.codename1.ui.DevicePosture.class) return invokeStatic18(name, safeArgs);
+        if (type == com.codename1.ui.Dialog.class) return invokeStatic19(name, safeArgs);
+        if (type == com.codename1.ui.Display.class) return invokeStatic20(name, safeArgs);
+        if (type == com.codename1.ui.DynamicImage.class) return invokeStatic21(name, safeArgs);
+        if (type == com.codename1.ui.EncodedImage.class) return invokeStatic22(name, safeArgs);
+        if (type == com.codename1.ui.Font.class) return invokeStatic23(name, safeArgs);
+        if (type == com.codename1.ui.FontImage.class) return invokeStatic24(name, safeArgs);
+        if (type == com.codename1.ui.GeneratedSVGImage.class) return invokeStatic25(name, safeArgs);
+        if (type == com.codename1.ui.Gradient.class) return invokeStatic26(name, safeArgs);
+        if (type == com.codename1.ui.Image.class) return invokeStatic27(name, safeArgs);
+        if (type == com.codename1.ui.ImageFactory.class) return invokeStatic28(name, safeArgs);
+        if (type == com.codename1.ui.InputComponent.class) return invokeStatic29(name, safeArgs);
+        if (type == com.codename1.ui.InterFormContainer.class) return invokeStatic30(name, safeArgs);
+        if (type == com.codename1.ui.Label.class) return invokeStatic31(name, safeArgs);
+        if (type == com.codename1.ui.List.class) return invokeStatic32(name, safeArgs);
+        if (type == com.codename1.ui.PeerComponent.class) return invokeStatic33(name, safeArgs);
+        if (type == com.codename1.ui.PickerComponent.class) return invokeStatic34(name, safeArgs);
+        if (type == com.codename1.ui.RadioButton.class) return invokeStatic35(name, safeArgs);
+        if (type == com.codename1.ui.Sheet.class) return invokeStatic36(name, safeArgs);
+        if (type == com.codename1.ui.SideMenuBar.class) return invokeStatic37(name, safeArgs);
+        if (type == com.codename1.ui.Slider.class) return invokeStatic38(name, safeArgs);
+        if (type == com.codename1.ui.TextArea.class) return invokeStatic39(name, safeArgs);
+        if (type == com.codename1.ui.TextField.class) return invokeStatic40(name, safeArgs);
+        if (type == com.codename1.ui.TextSelection.class) return invokeStatic41(name, safeArgs);
+        if (type == com.codename1.ui.Toolbar.class) return invokeStatic42(name, safeArgs);
+        if (type == com.codename1.ui.TooltipManager.class) return invokeStatic43(name, safeArgs);
+        if (type == com.codename1.ui.Transform.class) return invokeStatic44(name, safeArgs);
+        if (type == com.codename1.ui.UIFragment.class) return invokeStatic45(name, safeArgs);
+        if (type == com.codename1.ui.URLImage.class) return invokeStatic46(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -1772,6 +1803,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("isMinimized".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.CN.isMinimized();
+            }
+        }
+        if ("isMultiWindowSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ui.CN.isMultiWindowSupported();
             }
         }
         if ("isNativeInAppReviewSupported".equals(name)) {
@@ -2470,13 +2506,27 @@ public final class GeneratedAccess_com_codename1_ui {
     private static Object invokeStatic17(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (safeArgs.length == 0) {
+                return com.codename1.ui.Desktop.getInstance();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ui.Desktop.isSupported();
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.Desktop.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic18(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
                 return com.codename1.ui.DevicePosture.getInstance();
             }
         }
         throw unsupportedStatic(com.codename1.ui.DevicePosture.class, name, safeArgs);
     }
 
-    private static Object invokeStatic18(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic19(String name, Object[] safeArgs) throws Exception {
         if ("getDefaultBlurBackgroundRadius".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.Dialog.getDefaultBlurBackgroundRadius();
@@ -2641,7 +2691,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Dialog.class, name, safeArgs);
     }
 
-    private static Object invokeStatic19(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic20(String name, Object[] safeArgs) throws Exception {
         if ("deinitialize".equals(name)) {
             if (safeArgs.length == 0) {
                 com.codename1.ui.Display.deinitialize(); return null;
@@ -2666,7 +2716,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Display.class, name, safeArgs);
     }
 
-    private static Object invokeStatic20(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic21(String name, Object[] safeArgs) throws Exception {
         if ("setIcon".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Label.class, com.codename1.ui.DynamicImage.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Label.class, com.codename1.ui.DynamicImage.class}, false);
@@ -2676,7 +2726,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.DynamicImage.class, name, safeArgs);
     }
 
-    private static Object invokeStatic21(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic22(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -2712,7 +2762,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.EncodedImage.class, name, safeArgs);
     }
 
-    private static Object invokeStatic22(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic23(String name, Object[] safeArgs) throws Exception {
         if ("clearBitmapCache".equals(name)) {
             if (safeArgs.length == 0) {
                 com.codename1.ui.Font.clearBitmapCache(); return null;
@@ -2809,7 +2859,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Font.class, name, safeArgs);
     }
 
-    private static Object invokeStatic23(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic24(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false);
@@ -2990,7 +3040,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.FontImage.class, name, safeArgs);
     }
 
-    private static Object invokeStatic24(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic25(String name, Object[] safeArgs) throws Exception {
         if ("lerp".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
@@ -3036,7 +3086,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.GeneratedSVGImage.class, name, safeArgs);
     }
 
-    private static Object invokeStatic25(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic26(String name, Object[] safeArgs) throws Exception {
         if ("parseCss".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3046,7 +3096,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Gradient.class, name, safeArgs);
     }
 
-    private static Object invokeStatic26(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic27(String name, Object[] safeArgs) throws Exception {
         if ("createImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3134,7 +3184,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Image.class, name, safeArgs);
     }
 
-    private static Object invokeStatic27(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic28(String name, Object[] safeArgs) throws Exception {
         if ("createImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -3156,7 +3206,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.ImageFactory.class, name, safeArgs);
     }
 
-    private static Object invokeStatic28(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic29(String name, Object[] safeArgs) throws Exception {
         if ("group".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true);
@@ -3181,7 +3231,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.InputComponent.class, name, safeArgs);
     }
 
-    private static Object invokeStatic29(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic30(String name, Object[] safeArgs) throws Exception {
         if ("findCommonContainers".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class}, false);
@@ -3197,7 +3247,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.InterFormContainer.class, name, safeArgs);
     }
 
-    private static Object invokeStatic30(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic31(String name, Object[] safeArgs) throws Exception {
         if ("getDefaultGap".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.Label.getDefaultGap();
@@ -3223,7 +3273,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Label.class, name, safeArgs);
     }
 
-    private static Object invokeStatic31(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic32(String name, Object[] safeArgs) throws Exception {
         if ("isDefaultFireOnClick".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.List.isDefaultFireOnClick();
@@ -3249,7 +3299,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.List.class, name, safeArgs);
     }
 
-    private static Object invokeStatic32(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic33(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -3259,7 +3309,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.PeerComponent.class, name, safeArgs);
     }
 
-    private static Object invokeStatic33(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic34(String name, Object[] safeArgs) throws Exception {
         if ("createDate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Date.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Date.class}, false);
@@ -3303,7 +3353,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.PickerComponent.class, name, safeArgs);
     }
 
-    private static Object invokeStatic34(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic35(String name, Object[] safeArgs) throws Exception {
         if ("createToggle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.ButtonGroup.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.ButtonGroup.class}, false);
@@ -3325,7 +3375,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.RadioButton.class, name, safeArgs);
     }
 
-    private static Object invokeStatic35(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic36(String name, Object[] safeArgs) throws Exception {
         if ("findContainingSheet".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -3346,7 +3396,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Sheet.class, name, safeArgs);
     }
 
-    private static Object invokeStatic36(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic37(String name, Object[] safeArgs) throws Exception {
         if ("closeCurrentMenu".equals(name)) {
             if (safeArgs.length == 0) {
                 com.codename1.ui.SideMenuBar.closeCurrentMenu(); return null;
@@ -3364,7 +3414,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.SideMenuBar.class, name, safeArgs);
     }
 
-    private static Object invokeStatic37(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic38(String name, Object[] safeArgs) throws Exception {
         if ("createInfinite".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.Slider.createInfinite();
@@ -3373,7 +3423,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Slider.class, name, safeArgs);
     }
 
-    private static Object invokeStatic38(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic39(String name, Object[] safeArgs) throws Exception {
         if ("autoDetectWidestChar".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3433,7 +3483,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.TextArea.class, name, safeArgs);
     }
 
-    private static Object invokeStatic39(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic40(String name, Object[] safeArgs) throws Exception {
         if ("addInputMode".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Hashtable.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Hashtable.class, java.lang.Boolean.class}, false);
@@ -3560,7 +3610,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.TextField.class, name, safeArgs);
     }
 
-    private static Object invokeStatic40(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic41(String name, Object[] safeArgs) throws Exception {
         if ("findSelectionRoot".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -3575,7 +3625,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.TextSelection.class, name, safeArgs);
     }
 
-    private static Object invokeStatic41(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic42(String name, Object[] safeArgs) throws Exception {
         if ("isCenteredDefault".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.Toolbar.isCenteredDefault();
@@ -3634,7 +3684,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Toolbar.class, name, safeArgs);
     }
 
-    private static Object invokeStatic42(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic43(String name, Object[] safeArgs) throws Exception {
         if ("enableTooltips".equals(name)) {
             if (safeArgs.length == 0) {
                 com.codename1.ui.TooltipManager.enableTooltips(); return null;
@@ -3652,7 +3702,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.TooltipManager.class, name, safeArgs);
     }
 
-    private static Object invokeStatic43(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic44(String name, Object[] safeArgs) throws Exception {
         if ("IDENTITY".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.Transform.IDENTITY();
@@ -3735,7 +3785,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.Transform.class, name, safeArgs);
     }
 
-    private static Object invokeStatic44(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic45(String name, Object[] safeArgs) throws Exception {
         if ("parseJSON".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -3751,7 +3801,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedStatic(com.codename1.ui.UIFragment.class, name, safeArgs);
     }
 
-    private static Object invokeStatic45(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic46(String name, Object[] safeArgs) throws Exception {
         if ("createCachedImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, com.codename1.ui.Image.class, java.lang.Integer.class}, false);
@@ -4053,478 +4103,506 @@ public final class GeneratedAccess_com_codename1_ui {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.Window) {
+            try {
+                return invoke33((com.codename1.ui.Window) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.CommonProgressAnimations.ProgressAnimation) {
             try {
-                return invoke33((com.codename1.ui.CommonProgressAnimations.ProgressAnimation) target, name, safeArgs);
+                return invoke34((com.codename1.ui.CommonProgressAnimations.ProgressAnimation) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ComponentImage) {
             try {
-                return invoke34((com.codename1.ui.ComponentImage) target, name, safeArgs);
+                return invoke35((com.codename1.ui.ComponentImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ConicGradient) {
             try {
-                return invoke35((com.codename1.ui.ConicGradient) target, name, safeArgs);
+                return invoke36((com.codename1.ui.ConicGradient) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Container) {
             try {
-                return invoke36((com.codename1.ui.Container) target, name, safeArgs);
+                return invoke37((com.codename1.ui.Container) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Display) {
             try {
-                return invoke37((com.codename1.ui.Display) target, name, safeArgs);
+                return invoke38((com.codename1.ui.Display) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.DynamicImage) {
             try {
-                return invoke38((com.codename1.ui.DynamicImage) target, name, safeArgs);
+                return invoke39((com.codename1.ui.DynamicImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.EncodedImage) {
             try {
-                return invoke39((com.codename1.ui.EncodedImage) target, name, safeArgs);
+                return invoke40((com.codename1.ui.EncodedImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.FontImage) {
             try {
-                return invoke40((com.codename1.ui.FontImage) target, name, safeArgs);
+                return invoke41((com.codename1.ui.FontImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.GeneratedSVGImage) {
             try {
-                return invoke41((com.codename1.ui.GeneratedSVGImage) target, name, safeArgs);
+                return invoke42((com.codename1.ui.GeneratedSVGImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Label) {
             try {
-                return invoke42((com.codename1.ui.Label) target, name, safeArgs);
+                return invoke43((com.codename1.ui.Label) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.LinearGradient) {
             try {
-                return invoke43((com.codename1.ui.LinearGradient) target, name, safeArgs);
+                return invoke44((com.codename1.ui.LinearGradient) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.LinearGradientPaint) {
             try {
-                return invoke44((com.codename1.ui.LinearGradientPaint) target, name, safeArgs);
+                return invoke45((com.codename1.ui.LinearGradientPaint) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.List) {
             try {
-                return invoke45((com.codename1.ui.List) target, name, safeArgs);
+                return invoke46((com.codename1.ui.List) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.NavigationCommand) {
             try {
-                return invoke46((com.codename1.ui.NavigationCommand) target, name, safeArgs);
+                return invoke47((com.codename1.ui.NavigationCommand) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.PeerComponent) {
             try {
-                return invoke47((com.codename1.ui.PeerComponent) target, name, safeArgs);
+                return invoke48((com.codename1.ui.PeerComponent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.RGBImage) {
             try {
-                return invoke48((com.codename1.ui.RGBImage) target, name, safeArgs);
+                return invoke49((com.codename1.ui.RGBImage) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.RadialGradient) {
             try {
-                return invoke49((com.codename1.ui.RadialGradient) target, name, safeArgs);
+                return invoke50((com.codename1.ui.RadialGradient) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.RichTextClipboardData) {
             try {
-                return invoke50((com.codename1.ui.RichTextClipboardData) target, name, safeArgs);
+                return invoke51((com.codename1.ui.RichTextClipboardData) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.RichTextComponent) {
             try {
-                return invoke51((com.codename1.ui.RichTextComponent) target, name, safeArgs);
+                return invoke52((com.codename1.ui.RichTextComponent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextArea) {
             try {
-                return invoke52((com.codename1.ui.TextArea) target, name, safeArgs);
+                return invoke53((com.codename1.ui.TextArea) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.AnimationManager) {
             try {
-                return invoke53((com.codename1.ui.AnimationManager) target, name, safeArgs);
+                return invoke54((com.codename1.ui.AnimationManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.BrowserComponent.JSExpression) {
             try {
-                return invoke54((com.codename1.ui.BrowserComponent.JSExpression) target, name, safeArgs);
+                return invoke55((com.codename1.ui.BrowserComponent.JSExpression) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.BrowserComponent.JSRef) {
             try {
-                return invoke55((com.codename1.ui.BrowserComponent.JSRef) target, name, safeArgs);
+                return invoke56((com.codename1.ui.BrowserComponent.JSRef) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.BrowserWindow) {
             try {
-                return invoke56((com.codename1.ui.BrowserWindow) target, name, safeArgs);
+                return invoke57((com.codename1.ui.BrowserWindow) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.BrowserWindow.EvalRequest) {
             try {
-                return invoke57((com.codename1.ui.BrowserWindow.EvalRequest) target, name, safeArgs);
+                return invoke58((com.codename1.ui.BrowserWindow.EvalRequest) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ButtonGroup) {
             try {
-                return invoke58((com.codename1.ui.ButtonGroup) target, name, safeArgs);
+                return invoke59((com.codename1.ui.ButtonGroup) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ClipboardContent) {
             try {
-                return invoke59((com.codename1.ui.ClipboardContent) target, name, safeArgs);
+                return invoke60((com.codename1.ui.ClipboardContent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.CodeCompletion) {
             try {
-                return invoke60((com.codename1.ui.CodeCompletion) target, name, safeArgs);
+                return invoke61((com.codename1.ui.CodeCompletion) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.CodeDiagnostic) {
             try {
-                return invoke61((com.codename1.ui.CodeDiagnostic) target, name, safeArgs);
+                return invoke62((com.codename1.ui.CodeDiagnostic) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Command) {
             try {
-                return invoke62((com.codename1.ui.Command) target, name, safeArgs);
+                return invoke63((com.codename1.ui.Command) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Component) {
             try {
-                return invoke63((com.codename1.ui.Component) target, name, safeArgs);
+                return invoke64((com.codename1.ui.Component) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ComponentSelector) {
             try {
-                return invoke64((com.codename1.ui.ComponentSelector) target, name, safeArgs);
+                return invoke65((com.codename1.ui.ComponentSelector) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ui.Desktop) {
+            try {
+                return invoke66((com.codename1.ui.Desktop) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.DevicePosture) {
             try {
-                return invoke65((com.codename1.ui.DevicePosture) target, name, safeArgs);
+                return invoke67((com.codename1.ui.DevicePosture) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.EditField) {
             try {
-                return invoke66((com.codename1.ui.EditField) target, name, safeArgs);
+                return invoke68((com.codename1.ui.EditField) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Form.TabIterator) {
             try {
-                return invoke67((com.codename1.ui.Form.TabIterator) target, name, safeArgs);
+                return invoke69((com.codename1.ui.Form.TabIterator) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Gradient) {
             try {
-                return invoke68((com.codename1.ui.Gradient) target, name, safeArgs);
+                return invoke70((com.codename1.ui.Gradient) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Graphics) {
             try {
-                return invoke69((com.codename1.ui.Graphics) target, name, safeArgs);
+                return invoke71((com.codename1.ui.Graphics) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Image) {
             try {
-                return invoke70((com.codename1.ui.Image) target, name, safeArgs);
+                return invoke72((com.codename1.ui.Image) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ImageFactory) {
             try {
-                return invoke71((com.codename1.ui.ImageFactory) target, name, safeArgs);
+                return invoke73((com.codename1.ui.ImageFactory) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ui.Monitor) {
+            try {
+                return invoke74((com.codename1.ui.Monitor) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.MultipleGradientPaint) {
             try {
-                return invoke72((com.codename1.ui.MultipleGradientPaint) target, name, safeArgs);
+                return invoke75((com.codename1.ui.MultipleGradientPaint) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Stroke) {
             try {
-                return invoke73((com.codename1.ui.Stroke) target, name, safeArgs);
+                return invoke76((com.codename1.ui.Stroke) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextInputConfig) {
             try {
-                return invoke74((com.codename1.ui.TextInputConfig) target, name, safeArgs);
+                return invoke77((com.codename1.ui.TextInputConfig) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextInputState) {
             try {
-                return invoke75((com.codename1.ui.TextInputState) target, name, safeArgs);
+                return invoke78((com.codename1.ui.TextInputState) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextSelection) {
             try {
-                return invoke76((com.codename1.ui.TextSelection) target, name, safeArgs);
+                return invoke79((com.codename1.ui.TextSelection) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TooltipManager) {
             try {
-                return invoke77((com.codename1.ui.TooltipManager) target, name, safeArgs);
+                return invoke80((com.codename1.ui.TooltipManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Transform) {
             try {
-                return invoke78((com.codename1.ui.Transform) target, name, safeArgs);
+                return invoke81((com.codename1.ui.Transform) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.UIFragment) {
             try {
-                return invoke79((com.codename1.ui.UIFragment) target, name, safeArgs);
+                return invoke82((com.codename1.ui.UIFragment) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.UIFragment.DefaultComponentFactory) {
             try {
-                return invoke80((com.codename1.ui.UIFragment.DefaultComponentFactory) target, name, safeArgs);
+                return invoke83((com.codename1.ui.UIFragment.DefaultComponentFactory) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.AbstractDialog) {
             try {
-                return invoke81((com.codename1.ui.AbstractDialog) target, name, safeArgs);
+                return invoke84((com.codename1.ui.AbstractDialog) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.AutoCompleteTextComponent.AutoCompleteFilter) {
             try {
-                return invoke82((com.codename1.ui.AutoCompleteTextComponent.AutoCompleteFilter) target, name, safeArgs);
+                return invoke85((com.codename1.ui.AutoCompleteTextComponent.AutoCompleteFilter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.CodeCompletionProvider) {
             try {
-                return invoke83((com.codename1.ui.CodeCompletionProvider) target, name, safeArgs);
+                return invoke86((com.codename1.ui.CodeCompletionProvider) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ComponentSelector.ComponentClosure) {
             try {
-                return invoke84((com.codename1.ui.ComponentSelector.ComponentClosure) target, name, safeArgs);
+                return invoke87((com.codename1.ui.ComponentSelector.ComponentClosure) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ComponentSelector.ComponentMapper) {
             try {
-                return invoke85((com.codename1.ui.ComponentSelector.ComponentMapper) target, name, safeArgs);
+                return invoke88((com.codename1.ui.ComponentSelector.ComponentMapper) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ComponentSelector.Filter) {
             try {
-                return invoke86((com.codename1.ui.ComponentSelector.Filter) target, name, safeArgs);
+                return invoke89((com.codename1.ui.ComponentSelector.Filter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Editable) {
             try {
-                return invoke87((com.codename1.ui.Editable) target, name, safeArgs);
+                return invoke90((com.codename1.ui.Editable) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.IconHolder) {
             try {
-                return invoke88((com.codename1.ui.IconHolder) target, name, safeArgs);
+                return invoke91((com.codename1.ui.IconHolder) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Paint) {
             try {
-                return invoke89((com.codename1.ui.Paint) target, name, safeArgs);
+                return invoke92((com.codename1.ui.Paint) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.Painter) {
             try {
-                return invoke90((com.codename1.ui.Painter) target, name, safeArgs);
+                return invoke93((com.codename1.ui.Painter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.ReleasableComponent) {
             try {
-                return invoke91((com.codename1.ui.ReleasableComponent) target, name, safeArgs);
+                return invoke94((com.codename1.ui.ReleasableComponent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.RichTextComponent.ImageResolver) {
             try {
-                return invoke92((com.codename1.ui.RichTextComponent.ImageResolver) target, name, safeArgs);
+                return invoke95((com.codename1.ui.RichTextComponent.ImageResolver) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.SelectableIconHolder) {
             try {
-                return invoke93((com.codename1.ui.SelectableIconHolder) target, name, safeArgs);
+                return invoke96((com.codename1.ui.SelectableIconHolder) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextHolder) {
             try {
-                return invoke94((com.codename1.ui.TextHolder) target, name, safeArgs);
+                return invoke97((com.codename1.ui.TextHolder) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextInputClient) {
             try {
-                return invoke95((com.codename1.ui.TextInputClient) target, name, safeArgs);
+                return invoke98((com.codename1.ui.TextInputClient) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.TextSelection.TextSelectionSupport) {
             try {
-                return invoke96((com.codename1.ui.TextSelection.TextSelectionSupport) target, name, safeArgs);
+                return invoke99((com.codename1.ui.TextSelection.TextSelectionSupport) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ui.TopLevelContainer) {
+            try {
+                return invoke100((com.codename1.ui.TopLevelContainer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.UIFragment.ComponentFactory) {
             try {
-                return invoke97((com.codename1.ui.UIFragment.ComponentFactory) target, name, safeArgs);
+                return invoke101((com.codename1.ui.UIFragment.ComponentFactory) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.URLImage.ErrorCallback) {
             try {
-                return invoke98((com.codename1.ui.URLImage.ErrorCallback) target, name, safeArgs);
+                return invoke102((com.codename1.ui.URLImage.ErrorCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.URLImage.ImageAdapter) {
             try {
-                return invoke99((com.codename1.ui.URLImage.ImageAdapter) target, name, safeArgs);
+                return invoke103((com.codename1.ui.URLImage.ImageAdapter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.URLImage.RequestDecorator) {
             try {
-                return invoke100((com.codename1.ui.URLImage.RequestDecorator) target, name, safeArgs);
+                return invoke104((com.codename1.ui.URLImage.RequestDecorator) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -5445,6 +5523,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -7573,6 +7656,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -9564,6 +9652,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -11671,6 +11764,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -13139,6 +13237,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.addPointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("addProtectedEditListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addProtectedEditListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("addPullToRefresh".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
@@ -13895,6 +13999,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -14437,6 +14546,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.removePointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
+        if ("removeProtectedEditListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeProtectedEditListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
         if ("removeReadyListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -14589,6 +14704,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 typedTarget.setCursor(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setCursorPosition".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCursorPosition(toIntValue(adaptedArgs[0])); return null;
             }
         }
         if ("setDiagnostics".equals(name)) {
@@ -14869,6 +14990,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
                 return typedTarget.setPropertyValue((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("setProtectedRegionMarkers".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setProtectedRegionMarkers((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("setPullToRefresh".equals(name)) {
@@ -15451,6 +15578,11 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.applyRTL(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("asContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asContainer();
             }
         }
         if ("bindProperty".equals(name)) {
@@ -16314,6 +16446,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getTransitionInAnimator".equals(name)) {
@@ -18872,6 +19009,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -20804,6 +20946,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -23059,6 +23206,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -25334,6 +25486,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -27484,6 +27641,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -29551,6 +29713,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -31724,6 +31891,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -33772,6 +33944,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -35985,6 +36162,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -37967,6 +38149,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -39736,6 +39923,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -41284,6 +41476,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -42843,6 +43040,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -44671,6 +44873,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -46253,6 +46460,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.applyRTL(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
+        if ("asContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asContainer();
+            }
+        }
         if ("bindProperty".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false);
@@ -47063,6 +47275,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getTransitionInAnimator".equals(name)) {
@@ -49389,6 +49606,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -51431,6 +51653,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -53432,6 +53659,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -55466,6 +55698,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -57574,6 +57811,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -59562,6 +59804,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -61714,6 +61961,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -63844,6 +64096,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -65936,6 +66193,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -68308,6 +68570,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -69858,7 +70125,2487 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke33(com.codename1.ui.CommonProgressAnimations.ProgressAnimation typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke33(com.codename1.ui.Window typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("add".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.add((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                return typedTarget.add((com.codename1.ui.Image) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.add((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.String.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Image.class}, false);
+                return typedTarget.add((java.lang.Object) adaptedArgs[0], (com.codename1.ui.Image) adaptedArgs[1]);
+            }
+        }
+        if ("addAll".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component[].class}, true);
+                com.codename1.ui.Component[] varArgs = new com.codename1.ui.Component[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (com.codename1.ui.Component) adaptedArgs[i];
+                }
+                return typedTarget.addAll(varArgs);
+            }
+        }
+        if ("addCloseListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addCloseListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false);
+                typedTarget.addCommand((com.codename1.ui.Command) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addCommandListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addCommandListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.addComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.Component.class}, false);
+                typedTarget.addComponent(toIntValue(adaptedArgs[0]), (com.codename1.ui.Component) adaptedArgs[1]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Object.class, com.codename1.ui.Component.class}, false);
+                typedTarget.addComponent(toIntValue(adaptedArgs[0]), (java.lang.Object) adaptedArgs[1], (com.codename1.ui.Component) adaptedArgs[2]); return null;
+            }
+        }
+        if ("addComponentAwaitingRelease".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.addComponentAwaitingRelease((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addContextMenuListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addContextMenuListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addDragFinishedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addDragFinishedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addDragOverListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addDragOverListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addDropListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addDropListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addFocusListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false);
+                typedTarget.addFocusListener((com.codename1.ui.events.FocusListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addKeyListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addKeyListener(toIntValue(adaptedArgs[0]), (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("addLongPressListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addLongPressListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addMouseWheelListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addMouseWheelListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addPointerDraggedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addPointerDraggedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addPointerPressedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addPointerPressedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addPointerReleasedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addPointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addPullToRefresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.addPullToRefresh((java.lang.Runnable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addScrollListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ScrollListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ScrollListener.class}, false);
+                typedTarget.addScrollListener((com.codename1.ui.events.ScrollListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addShowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addShowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addSizeChangedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addSizeChangedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addStateChangeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addStateChangeListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addStylusListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addStylusListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addWindowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addWindowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("animate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.animate();
+            }
+        }
+        if ("animateHierarchy".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.animateHierarchy(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("animateHierarchyAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.animateHierarchyAndWait(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("animateHierarchyFade".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.animateHierarchyFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("animateHierarchyFadeAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.animateHierarchyFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("animateLayout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.animateLayout(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("animateLayoutAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.animateLayoutAndWait(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("animateLayoutFade".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.animateLayoutFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("animateLayoutFadeAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.animateLayoutFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("animateUnlayout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
+                typedTarget.animateUnlayout(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.Runnable) adaptedArgs[2]); return null;
+            }
+        }
+        if ("animateUnlayoutAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.animateUnlayoutAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("announceForAccessibility".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.announceForAccessibility((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("applyRTL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.applyRTL(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("asContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asContainer();
+            }
+        }
+        if ("bindProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false);
+                typedTarget.bindProperty((java.lang.String) adaptedArgs[0], (com.codename1.cloud.BindTarget) adaptedArgs[1]); return null;
+            }
+        }
+        if ("blocksSideSwipe".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.blocksSideSwipe();
+            }
+        }
+        if ("capture".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.capture();
+            }
+        }
+        if ("centerOn".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false);
+                typedTarget.centerOn((com.codename1.ui.TopLevelContainer) adaptedArgs[0]); return null;
+            }
+        }
+        if ("centerOnDesktop".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.centerOnDesktop(); return null;
+            }
+        }
+        if ("clearClientProperties".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clearClientProperties(); return null;
+            }
+        }
+        if ("clearComponentsAwaitingRelease".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clearComponentsAwaitingRelease(); return null;
+            }
+        }
+        if ("contains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.contains((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.contains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("containsOrOwns".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.containsOrOwns(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("createAnimateHierarchy".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.createAnimateHierarchy(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("createAnimateHierarchyFade".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.createAnimateHierarchyFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("createAnimateLayout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.createAnimateLayout(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("createAnimateLayoutFade".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.createAnimateLayoutFade(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("createAnimateLayoutFadeAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.createAnimateLayoutFadeAndWait(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("createAnimateUnlayout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
+                return typedTarget.createAnimateUnlayout(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), (java.lang.Runnable) adaptedArgs[2]);
+            }
+        }
+        if ("createReplaceTransition".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
+                return typedTarget.createReplaceTransition((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]);
+            }
+        }
+        if ("createStyleAnimation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("deregisterAnimated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false);
+                typedTarget.deregisterAnimated((com.codename1.ui.animations.Animation) adaptedArgs[0]); return null;
+            }
+        }
+        if ("dispatchCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.dispatchCommand((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.events.ActionEvent) adaptedArgs[1]); return null;
+            }
+        }
+        if ("dispose".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.dispose(); return null;
+            }
+        }
+        if ("drop".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.drop((com.codename1.ui.Component) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("findCurrentlyEditingComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.findCurrentlyEditingComponent();
+            }
+        }
+        if ("findDropTargetAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.findDropTargetAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("findFirstFocusable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.findFirstFocusable();
+            }
+        }
+        if ("flushReplace".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.flushReplace(); return null;
+            }
+        }
+        if ("forceRevalidate".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.forceRevalidate(); return null;
+            }
+        }
+        if ("getAbsoluteX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAbsoluteX();
+            }
+        }
+        if ("getAbsoluteY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
+            }
+        }
+        if ("getAccessibilityText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityText();
+            }
+        }
+        if ("getAllStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAllStyles();
+            }
+        }
+        if ("getAnimationManager".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAnimationManager();
+            }
+        }
+        if ("getBaseline".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getBaseline(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getBaselineResizeBehavior".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBaselineResizeBehavior();
+            }
+        }
+        if ("getBindablePropertyNames".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBindablePropertyNames();
+            }
+        }
+        if ("getBindablePropertyTypes".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBindablePropertyTypes();
+            }
+        }
+        if ("getBottomGap".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBottomGap();
+            }
+        }
+        if ("getBoundPropertyValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getBoundPropertyValue((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
+                return typedTarget.getBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
+            }
+        }
+        if ("getChildrenAsList".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.getChildrenAsList(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("getClientProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getClientProperty((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getCloseOperation".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCloseOperation();
+            }
+        }
+        if ("getClosestComponentTo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getClosestComponentTo(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getCloudBoundProperty".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCloudBoundProperty();
+            }
+        }
+        if ("getCloudDestinationProperty".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCloudDestinationProperty();
+            }
+        }
+        if ("getCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCommand(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getCommandCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCommandCount();
+            }
+        }
+        if ("getComponentAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getComponentAt(toIntValue(adaptedArgs[0]));
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getComponentAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getComponentCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getComponentCount();
+            }
+        }
+        if ("getComponentForm".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getComponentForm();
+            }
+        }
+        if ("getComponentIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.getComponentIndex((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("getComponentState".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getComponentState();
+            }
+        }
+        if ("getContentPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getContentPane();
+            }
+        }
+        if ("getCurrentInputDevice".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentInputDevice();
+            }
+        }
+        if ("getCursor".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCursor();
+            }
+        }
+        if ("getDensity".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDensity();
+            }
+        }
+        if ("getDirtyRegion".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDirtyRegion();
+            }
+        }
+        if ("getDisabledStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDisabledStyle();
+            }
+        }
+        if ("getDragRegionStatus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getDragRegionStatus(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getDragTransparency".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDragTransparency();
+            }
+        }
+        if ("getDraggedx".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDraggedx();
+            }
+        }
+        if ("getDraggedy".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDraggedy();
+            }
+        }
+        if ("getEditingDelegate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEditingDelegate();
+            }
+        }
+        if ("getFocused".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFocused();
+            }
+        }
+        if ("getFormLayeredPane".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false);
+                return typedTarget.getFormLayeredPane((java.lang.Class) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+        }
+        if ("getGlassPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getGlassPane();
+            }
+        }
+        if ("getHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeight();
+            }
+        }
+        if ("getInlineAllStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlineAllStyles();
+            }
+        }
+        if ("getInlineDisabledStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlineDisabledStyles();
+            }
+        }
+        if ("getInlinePressedStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlinePressedStyles();
+            }
+        }
+        if ("getInlineSelectedStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlineSelectedStyles();
+            }
+        }
+        if ("getInlineStylesTheme".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlineStylesTheme();
+            }
+        }
+        if ("getInlineUnselectedStyles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInlineUnselectedStyles();
+            }
+        }
+        if ("getInnerHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerHeight();
+            }
+        }
+        if ("getInnerPreferredH".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerPreferredH();
+            }
+        }
+        if ("getInnerPreferredW".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerPreferredW();
+            }
+        }
+        if ("getInnerWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerWidth();
+            }
+        }
+        if ("getInnerX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerX();
+            }
+        }
+        if ("getInnerY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInnerY();
+            }
+        }
+        if ("getInvisibleAreaUnderVKB".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInvisibleAreaUnderVKB();
+            }
+        }
+        if ("getLabelForComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLabelForComponent();
+            }
+        }
+        if ("getLayeredPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLayeredPane();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false);
+                return typedTarget.getLayeredPane((java.lang.Class) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false);
+                return typedTarget.getLayeredPane((java.lang.Class) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getLayout".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLayout();
+            }
+        }
+        if ("getLayoutHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLayoutHeight();
+            }
+        }
+        if ("getLayoutWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLayoutWidth();
+            }
+        }
+        if ("getLeadComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLeadComponent();
+            }
+        }
+        if ("getLeadParent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLeadParent();
+            }
+        }
+        if ("getMinimumWindowSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMinimumWindowSize();
+            }
+        }
+        if ("getModalityType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getModalityType();
+            }
+        }
+        if ("getMonitor".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMonitor();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getNativeOverlay".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNativeOverlay();
+            }
+        }
+        if ("getNextFocusDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNextFocusDown();
+            }
+        }
+        if ("getNextFocusLeft".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNextFocusLeft();
+            }
+        }
+        if ("getNextFocusRight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNextFocusRight();
+            }
+        }
+        if ("getNextFocusUp".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNextFocusUp();
+            }
+        }
+        if ("getOuterHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterHeight();
+            }
+        }
+        if ("getOuterPreferredH".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterPreferredH();
+            }
+        }
+        if ("getOuterPreferredW".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterPreferredW();
+            }
+        }
+        if ("getOuterWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterWidth();
+            }
+        }
+        if ("getOuterX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterX();
+            }
+        }
+        if ("getOuterY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOuterY();
+            }
+        }
+        if ("getOwner".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOwner();
+            }
+        }
+        if ("getOwnerWindow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOwnerWindow();
+            }
+        }
+        if ("getParent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getParent();
+            }
+        }
+        if ("getPreferredH".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPreferredH();
+            }
+        }
+        if ("getPreferredSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPreferredSize();
+            }
+        }
+        if ("getPreferredSizeStr".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPreferredSizeStr();
+            }
+        }
+        if ("getPreferredTabIndex".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPreferredTabIndex();
+            }
+        }
+        if ("getPreferredW".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPreferredW();
+            }
+        }
+        if ("getPressedStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPressedStyle();
+            }
+        }
+        if ("getPropertyNames".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPropertyNames();
+            }
+        }
+        if ("getPropertyTypeNames".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPropertyTypeNames();
+            }
+        }
+        if ("getPropertyTypes".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPropertyTypes();
+            }
+        }
+        if ("getPropertyValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getPropertyValue((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getResponderAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getResponderAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getSafeArea".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSafeArea();
+            }
+        }
+        if ("getSafeAreaRoot".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSafeAreaRoot();
+            }
+        }
+        if ("getSameHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSameHeight();
+            }
+        }
+        if ("getSameWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSameWidth();
+            }
+        }
+        if ("getScale".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScale();
+            }
+        }
+        if ("getScrollAnimationSpeed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollAnimationSpeed();
+            }
+        }
+        if ("getScrollDimension".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollDimension();
+            }
+        }
+        if ("getScrollIncrement".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollIncrement();
+            }
+        }
+        if ("getScrollOpacity".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollOpacity();
+            }
+        }
+        if ("getScrollOpacityChangeSpeed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollOpacityChangeSpeed();
+            }
+        }
+        if ("getScrollX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollX();
+            }
+        }
+        if ("getScrollY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollY();
+            }
+        }
+        if ("getScrollable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScrollable();
+            }
+        }
+        if ("getSelectCommandText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSelectCommandText();
+            }
+        }
+        if ("getSelectedRect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSelectedRect();
+            }
+        }
+        if ("getSelectedStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
+            }
+        }
+        if ("getSideGap".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSideGap();
+            }
+        }
+        if ("getStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStyle();
+            }
+        }
+        if ("getTabIndex".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTabIndex();
+            }
+        }
+        if ("getTabIterator".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.getTabIterator((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("getTensileLength".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTensileLength();
+            }
+        }
+        if ("getTextSelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTextSelection();
+            }
+        }
+        if ("getTextSelectionSupport".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTextSelectionSupport();
+            }
+        }
+        if ("getTitle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTitle();
+            }
+        }
+        if ("getTooltip".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
+        if ("getUIID".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUIID();
+            }
+        }
+        if ("getUIManager".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUIManager();
+            }
+        }
+        if ("getUnselectedStyle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUnselectedStyle();
+            }
+        }
+        if ("getVisibleBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
+                return typedTarget.getVisibleBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]);
+            }
+        }
+        if ("getWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidth();
+            }
+        }
+        if ("getWindowBounds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWindowBounds();
+            }
+        }
+        if ("getWindowIcon".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWindowIcon();
+            }
+        }
+        if ("getWindowId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWindowId();
+            }
+        }
+        if ("getX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getX();
+            }
+        }
+        if ("getY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getY();
+            }
+        }
+        if ("grabAnimationLock".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.grabAnimationLock();
+            }
+        }
+        if ("growShrink".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.growShrink(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("handlesInput".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.handlesInput();
+            }
+        }
+        if ("hasFixedPreferredSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasFixedPreferredSize();
+            }
+        }
+        if ("hasFocus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasFocus();
+            }
+        }
+        if ("hasPaintedOnce".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasPaintedOnce();
+            }
+        }
+        if ("hide".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.hide(); return null;
+            }
+        }
+        if ("invalidate".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.invalidate(); return null;
+            }
+        }
+        if ("isAlwaysOnTop".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isAlwaysOnTop();
+            }
+        }
+        if ("isAlwaysTensile".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isAlwaysTensile();
+            }
+        }
+        if ("isBlockLead".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isBlockLead();
+            }
+        }
+        if ("isCellRenderer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCellRenderer();
+            }
+        }
+        if ("isChildOf".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Container.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Container.class}, false);
+                return typedTarget.isChildOf((com.codename1.ui.Container) adaptedArgs[0]);
+            }
+        }
+        if ("isCyclicFocus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCyclicFocus();
+            }
+        }
+        if ("isDecorated".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDecorated();
+            }
+        }
+        if ("isDraggable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDraggable();
+            }
+        }
+        if ("isDropTarget".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDropTarget();
+            }
+        }
+        if ("isEditable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEditable();
+            }
+        }
+        if ("isEditing".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEditing();
+            }
+        }
+        if ("isEnableCursors".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEnableCursors();
+            }
+        }
+        if ("isEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEnabled();
+            }
+        }
+        if ("isFlatten".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isFlatten();
+            }
+        }
+        if ("isFocusable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isFocusable();
+            }
+        }
+        if ("isGrabsPointerEvents".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isGrabsPointerEvents();
+            }
+        }
+        if ("isHScrollThumbGrabbed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHScrollThumbGrabbed();
+            }
+        }
+        if ("isHScrollThumbHover".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHScrollThumbHover();
+            }
+        }
+        if ("isHidden".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHidden();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.isHidden(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("isHideInLandscape".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHideInLandscape();
+            }
+        }
+        if ("isHideInPortrait".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHideInPortrait();
+            }
+        }
+        if ("isIgnorePointerEvents".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isIgnorePointerEvents();
+            }
+        }
+        if ("isOpaque".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isOpaque();
+            }
+        }
+        if ("isOwnedBy".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.isOwnedBy((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("isPinchBlocksDragAndDrop".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPinchBlocksDragAndDrop();
+            }
+        }
+        if ("isRTL".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRTL();
+            }
+        }
+        if ("isResizable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isResizable();
+            }
+        }
+        if ("isRippleEffect".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRippleEffect();
+            }
+        }
+        if ("isSafeArea".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSafeArea();
+            }
+        }
+        if ("isSafeAreaRoot".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSafeAreaRoot();
+            }
+        }
+        if ("isScrollVisible".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScrollVisible();
+            }
+        }
+        if ("isScrollable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScrollable();
+            }
+        }
+        if ("isScrollableX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScrollableX();
+            }
+        }
+        if ("isScrollableY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScrollableY();
+            }
+        }
+        if ("isSingleFocusMode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSingleFocusMode();
+            }
+        }
+        if ("isSmoothScrolling".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSmoothScrolling();
+            }
+        }
+        if ("isSnapToGrid".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSnapToGrid();
+            }
+        }
+        if ("isSurface".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSurface();
+            }
+        }
+        if ("isTactileTouch".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isTactileTouch();
+            }
+        }
+        if ("isTensileDragEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isTensileDragEnabled();
+            }
+        }
+        if ("isTraversable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isTraversable();
+            }
+        }
+        if ("isUtilityWindow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isUtilityWindow();
+            }
+        }
+        if ("isVScrollThumbGrabbed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVScrollThumbGrabbed();
+            }
+        }
+        if ("isVScrollThumbHover".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVScrollThumbHover();
+            }
+        }
+        if ("isVisible".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVisible();
+            }
+        }
+        if ("isWindowDisposed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isWindowDisposed();
+            }
+        }
+        if ("isWindowFocused".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isWindowFocused();
+            }
+        }
+        if ("isWindowShowing".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isWindowShowing();
+            }
+        }
+        if ("iterator".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.iterator();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.iterator(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("keyPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.keyPressed(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("keyReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.keyReleased(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("keyRepeated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.keyRepeated(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("layoutContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.layoutContainer(); return null;
+            }
+        }
+        if ("longPointerPress".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.longPointerPress(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("minimize".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.minimize(); return null;
+            }
+        }
+        if ("morph".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class, java.lang.Runnable.class}, false);
+                typedTarget.morph((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Runnable) adaptedArgs[3]); return null;
+            }
+        }
+        if ("morphAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, java.lang.Integer.class}, false);
+                typedTarget.morphAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("paint".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("paintBackgrounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paintBackgrounds((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("paintComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paintComponent((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Boolean.class}, false);
+                typedTarget.paintComponent((com.codename1.ui.Graphics) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("paintComponentBackground".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paintComponentBackground((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("paintIntersectingComponentsAbove".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
+                typedTarget.paintIntersectingComponentsAbove((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("paintLock".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.paintLock(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("paintLockRelease".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.paintLockRelease(); return null;
+            }
+        }
+        if ("paintRippleOverlay".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.paintRippleOverlay((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
+            }
+        }
+        if ("paintShadows".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("pointerDragged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.pointerDragged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerDragged((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("pointerHover".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerHover((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("pointerHoverPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerHoverPressed((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("pointerHoverReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerHoverReleased((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("pointerPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.pointerPressed(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerPressed((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("pointerReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.pointerReleased(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, int[].class}, false);
+                typedTarget.pointerReleased((int[]) adaptedArgs[0], (int[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("putClientProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.putClientProperty((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
+            }
+        }
+        if ("refreshTheme".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.refreshTheme(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.refreshTheme(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("registerAnimated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false);
+                typedTarget.registerAnimated((com.codename1.ui.animations.Animation) adaptedArgs[0]); return null;
+            }
+        }
+        if ("releaseAnimationLock".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.releaseAnimationLock(); return null;
+            }
+        }
+        if ("remove".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.remove(); return null;
+            }
+        }
+        if ("removeAll".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.removeAll(); return null;
+            }
+        }
+        if ("removeAllCommands".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.removeAllCommands(); return null;
+            }
+        }
+        if ("removeCloseListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeCloseListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false);
+                typedTarget.removeCommand((com.codename1.ui.Command) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeCommandListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeCommandListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.removeComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeComponentAwaitingRelease".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.removeComponentAwaitingRelease((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeContextMenuListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeContextMenuListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeDragFinishedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeDragFinishedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeDragOverListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeDragOverListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeDropListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeDropListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeFocusListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.FocusListener.class}, false);
+                typedTarget.removeFocusListener((com.codename1.ui.events.FocusListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeKeyListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeKeyListener(toIntValue(adaptedArgs[0]), (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("removeLongPressListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeLongPressListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeMouseWheelListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeMouseWheelListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removePointerDraggedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removePointerDraggedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removePointerPressedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removePointerPressedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removePointerReleasedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removePointerReleasedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeScrollListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ScrollListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ScrollListener.class}, false);
+                typedTarget.removeScrollListener((com.codename1.ui.events.ScrollListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeShowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeShowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeSizeChangedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeSizeChangedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeStateChangeListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeStateChangeListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeStylusListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeStylusListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeWindowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeWindowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("repaint".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.repaint(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.repaint(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3])); return null;
+            }
+        }
+        if ("replace".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
+                typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Runnable.class, java.lang.Integer.class}, false);
+                typedTarget.replace((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3], toIntValue(adaptedArgs[4])); return null;
+            }
+        }
+        if ("replaceAndWait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class}, false);
+                typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Integer.class}, false);
+                typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], toIntValue(adaptedArgs[3])); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class, com.codename1.ui.Component.class, com.codename1.ui.animations.Transition.class, java.lang.Boolean.class}, false);
+                typedTarget.replaceAndWait((com.codename1.ui.Component) adaptedArgs[0], (com.codename1.ui.Component) adaptedArgs[1], (com.codename1.ui.animations.Transition) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue()); return null;
+            }
+        }
+        if ("requestFocus".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.requestFocus(); return null;
+            }
+        }
+        if ("requestWindowFocus".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.requestWindowFocus(); return null;
+            }
+        }
+        if ("respondsToPointerEvents".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.respondsToPointerEvents();
+            }
+        }
+        if ("restore".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.restore(); return null;
+            }
+        }
+        if ("revalidate".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.revalidate(); return null;
+            }
+        }
+        if ("revalidateLater".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.revalidateLater(); return null;
+            }
+        }
+        if ("revalidateWithAnimationSafety".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.revalidateWithAnimationSafety(); return null;
+            }
+        }
+        if ("scrollComponentToVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.scrollComponentToVisible((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("scrollRectToVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, com.codename1.ui.Component.class}, false);
+                typedTarget.scrollRectToVisible(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), (com.codename1.ui.Component) adaptedArgs[4]); return null;
+            }
+        }
+        if ("setAccessibilityText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setAccessibilityText((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setAlwaysOnTop".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAlwaysOnTop(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setAlwaysTensile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setAlwaysTensile(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setBlockLead".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setBlockLead(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setBoundPropertyValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                typedTarget.setBoundPropertyValue((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]); return null;
+            }
+        }
+        if ("setCellRenderer".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setCellRenderer(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setCloseOperation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCloseOperation(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setCloudBoundProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCloudBoundProperty((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCloudDestinationProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setCloudDestinationProperty((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setComponentState".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                typedTarget.setComponentState((java.lang.Object) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCurrentInputDevice".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.VirtualInputDevice.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.VirtualInputDevice.class}, false);
+                typedTarget.setCurrentInputDevice((com.codename1.ui.VirtualInputDevice) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCursor".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setCursor(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setCyclicFocus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setCyclicFocus(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setDecorated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDecorated(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setDirtyRegion".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
+                typedTarget.setDirtyRegion((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDisabledStyle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
+                typedTarget.setDisabledStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setDragTransparency".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Byte.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Byte.class}, false);
+                typedTarget.setDragTransparency((byte) toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setDraggable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDraggable(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setDropTarget".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setDropTarget(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setEditingDelegate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Editable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Editable.class}, false);
+                typedTarget.setEditingDelegate((com.codename1.ui.Editable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setEnableCursors".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnableCursors(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setEnabled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setFlatten".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setFlatten(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setFocus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setFocus(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setFocusable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setFocusable(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setFocused".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setFocused((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setGlassPane".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Painter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Painter.class}, false);
+                typedTarget.setGlassPane((com.codename1.ui.Painter) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setGrabsPointerEvents".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setGrabsPointerEvents(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setHandlesInput".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHandlesInput(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setHeight".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setHeight(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setHidden".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHidden(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class, java.lang.Boolean.class}, false);
+                typedTarget.setHidden(((Boolean) adaptedArgs[0]).booleanValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("setHideInLandscape".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHideInLandscape(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setHideInPortrait".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHideInPortrait(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setHorizontalScrollBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setHorizontalScrollBounds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6]), toIntValue(adaptedArgs[7])); return null;
+            }
+        }
+        if ("setIgnorePointerEvents".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setIgnorePointerEvents(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setInlineAllStyles".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setInlineAllStyles((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setInlineDisabledStyles".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setInlineDisabledStyles((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setInlinePressedStyles".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setInlinePressedStyles((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setInlineSelectedStyles".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setInlineSelectedStyles((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setInlineStylesTheme".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.util.Resources.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.util.Resources.class}, false);
+                typedTarget.setInlineStylesTheme((com.codename1.ui.util.Resources) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setInlineUnselectedStyles".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setInlineUnselectedStyles((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setIsScrollVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setIsScrollVisible(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setLabelForComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Label.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Label.class}, false);
+                typedTarget.setLabelForComponent((com.codename1.ui.Label) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setLayout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.layouts.Layout.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.layouts.Layout.class}, false);
+                typedTarget.setLayout((com.codename1.ui.layouts.Layout) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setLeadComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setLeadComponent((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setMinimumWindowSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.setMinimumWindowSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setModalityType".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setModalityType(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setName((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setNextFocusDown".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setNextFocusDown((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setNextFocusLeft".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setNextFocusLeft((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setNextFocusRight".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setNextFocusRight((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setNextFocusUp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setNextFocusUp((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOpaque".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setOpaque(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setOwner".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setOwner((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setOwnerWindow".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false);
+                typedTarget.setOwnerWindow((com.codename1.ui.TopLevelContainer) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPinchBlocksDragAndDrop".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPinchBlocksDragAndDrop(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setPreferredH".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setPreferredH(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setPreferredSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.setPreferredSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferredSizeStr".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setPreferredSizeStr((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPreferredTabIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setPreferredTabIndex(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setPreferredW".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setPreferredW(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setPressedStyle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
+                typedTarget.setPressedStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPropertyValue".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                return typedTarget.setPropertyValue((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("setPullToRefresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.setPullToRefresh((java.lang.Runnable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setRTL".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setRTL(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setResizable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setResizable(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setRippleEffect".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setRippleEffect(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setSafeArea".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setSafeArea(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setSafeAreaRoot".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setSafeAreaRoot(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setScrollAnimationSpeed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setScrollAnimationSpeed(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setScrollIncrement".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setScrollIncrement(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setScrollOpacityChangeSpeed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setScrollOpacityChangeSpeed(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setScrollSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.setScrollSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setScrollVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setScrollVisible(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setScrollable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setScrollable(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setScrollableX".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setScrollableX(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setScrollableY".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setScrollableY(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setSelectCommandText".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setSelectCommandText((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setSelectedStyle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
+                typedTarget.setSelectedStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setShouldCalcPreferredSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setShouldCalcPreferredSize(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
+                typedTarget.setSize((com.codename1.ui.geom.Dimension) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setSmoothScrolling".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setSmoothScrolling(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setSnapToGrid".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setSnapToGrid(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTabIndex".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setTabIndex(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setTactileTouch".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setTactileTouch(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTensileDragEnabled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setTensileDragEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTensileLength".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setTensileLength(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setTitle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setTooltip".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTooltip((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setTraversable".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setTraversable(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setUIID".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setUIID((java.lang.String) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                typedTarget.setUIID((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
+            }
+        }
+        if ("setUIManager".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class}, false);
+                typedTarget.setUIManager((com.codename1.ui.plaf.UIManager) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setUnselectedStyle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
+                typedTarget.setUnselectedStyle((com.codename1.ui.plaf.Style) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setUtilityWindow".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setUtilityWindow(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setVerticalScrollBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setVerticalScrollBounds(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6]), toIntValue(adaptedArgs[7])); return null;
+            }
+        }
+        if ("setVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setVisible(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setWidth".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setWidth(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setWindowBounds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
+                typedTarget.setWindowBounds((com.codename1.ui.geom.Rectangle) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setWindowIcon".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                typedTarget.setWindowIcon((com.codename1.ui.Image) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setWindowLocation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setWindowLocation(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("setWindowSize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.setWindowSize(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("setX".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setX(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setY".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setY(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("show".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.show(); return null;
+            }
+        }
+        if ("showModal".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.showModal(); return null;
+            }
+        }
+        if ("startEditingAsync".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.startEditingAsync(); return null;
+            }
+        }
+        if ("stopEditing".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.stopEditing((java.lang.Runnable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("stripMarginAndPadding".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.stripMarginAndPadding();
+            }
+        }
+        if ("styleChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false);
+                typedTarget.styleChanged((java.lang.String) adaptedArgs[0], (com.codename1.ui.plaf.Style) adaptedArgs[1]); return null;
+            }
+        }
+        if ("toImage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toImage();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        if ("toggleMaximize".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.toggleMaximize(); return null;
+            }
+        }
+        if ("unbindProperty".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.cloud.BindTarget.class}, false);
+                typedTarget.unbindProperty((java.lang.String) adaptedArgs[0], (com.codename1.cloud.BindTarget) adaptedArgs[1]); return null;
+            }
+        }
+        if ("updateTabIndices".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.updateTabIndices(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("visibleBoundsContains".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.visibleBoundsContains(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke34(com.codename1.ui.CommonProgressAnimations.ProgressAnimation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -70416,6 +73163,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -71408,7 +74160,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke34(com.codename1.ui.ComponentImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke35(com.codename1.ui.ComponentImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -71694,7 +74446,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke35(com.codename1.ui.ConicGradient typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke36(com.codename1.ui.ConicGradient typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("copy".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.copy();
@@ -71784,7 +74536,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke36(com.codename1.ui.Container typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke37(com.codename1.ui.Container typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -72599,6 +75351,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -73759,7 +76516,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke37(com.codename1.ui.Display typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke38(com.codename1.ui.Display typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityTreeChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -73788,6 +76545,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.addPostureListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
         if ("addVirtualKeyboardListener".equals(name)) {
@@ -74028,6 +76791,24 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class, java.lang.String.class}, false);
                 return typedTarget.createThread((java.lang.Runnable) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("databaseIdentityForEngineFile".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseIdentityForEngineFile((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("databaseManagedKeyIdentity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseManagedKeyIdentity((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("databaseRegistryIdentity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.databaseRegistryIdentity((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("delete".equals(name)) {
@@ -74336,6 +77117,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getHealth();
             }
         }
+        if ("getHomeBridge".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHomeBridge();
+            }
+        }
         if ("getImageIO".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getImageIO();
@@ -74353,6 +77139,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getInitialWindowSizeHintPercent".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getInitialWindowSizeHintPercent();
+            }
+        }
+        if ("getIntentBridge".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getIntentBridge();
             }
         }
         if ("getInvisibleAreaUnderVKB".equals(name)) {
@@ -74425,6 +77216,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getNativeLogSnapshot".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getNativeLogSnapshot();
+            }
+        }
+        if ("getNearbyBridge".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNearbyBridge();
             }
         }
         if ("getNetworkTypePlatform".equals(name)) {
@@ -74543,6 +77339,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getSurfaceBridge".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSurfaceBridge();
+            }
+        }
+        if ("getTapjackingPolicy".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTapjackingPolicy();
             }
         }
         if ("getUdid".equals(name)) {
@@ -74709,6 +77510,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.isBidiAlgorithm();
             }
         }
+        if ("isBlobQueryParameterSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isBlobQueryParameterSupported();
+            }
+        }
         if ("isBoldTextEnabled".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isBoldTextEnabled();
@@ -74758,6 +77564,22 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("isDatabaseCustomPathSupported".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isDatabaseCustomPathSupported();
+            }
+        }
+        if ("isDatabaseEncryptionSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDatabaseEncryptionSupported();
+            }
+        }
+        if ("isDatabaseFileEncrypted".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isDatabaseFileEncrypted((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isDatabaseManagedKeyHardwareBacked".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDatabaseManagedKeyHardwareBacked();
             }
         }
         if ("isDebuggableBuild".equals(name)) {
@@ -74839,6 +77661,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("isGrayscaleEnabled".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isGrayscaleEnabled();
+            }
+        }
+        if ("isHideOverlayWindowsSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHideOverlayWindowsSupported();
             }
         }
         if ("isHighContrastEnabled".equals(name)) {
@@ -74988,9 +77815,19 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.isReduceTransparencyEnabled();
             }
         }
+        if ("isRelativeAttachmentNameResolvable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRelativeAttachmentNameResolvable();
+            }
+        }
         if ("isRightMouseButtonDown".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isRightMouseButtonDown();
+            }
+        }
+        if ("isScreenObscured".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScreenObscured();
             }
         }
         if ("isScreenReaderEnabled".equals(name)) {
@@ -75133,6 +77970,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.onEditingComplete((com.codename1.ui.Component) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
+        if ("openDatabaseConnections".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.openDatabaseConnections((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("openFileChooser".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class, java.lang.String.class}, false);
@@ -75165,6 +78008,16 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.openOrCreate((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.db.DatabaseConfig.class}, false);
+                return typedTarget.openOrCreate((java.lang.String) adaptedArgs[0], (com.codename1.db.DatabaseConfig) adaptedArgs[1]);
+            }
+        }
+        if ("openOrCreateForRekey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.openOrCreateForRekey((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("platformUsesInputMode".equals(name)) {
@@ -75287,6 +78140,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
                 typedTarget.removePostureListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeTapjackingListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeTapjackingListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
             }
         }
         if ("removeVirtualKeyboardListener".equals(name)) {
@@ -75461,6 +78320,12 @@ public final class GeneratedAccess_com_codename1_ui {
                 typedTarget.setFramerate(toIntValue(adaptedArgs[0])); return null;
             }
         }
+        if ("setHideOverlayWindows".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setHideOverlayWindows(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
         if ("setInitialWindowSizeHintPercent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Dimension.class}, false);
@@ -75549,6 +78414,12 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
                 typedTarget.setShowVirtualKeyboard(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setTapjackingProtection".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.security.TapjackingPolicy.class}, false);
+                typedTarget.setTapjackingProtection((com.codename1.security.TapjackingPolicy) adaptedArgs[0]); return null;
             }
         }
         if ("setThirdSoftButton".equals(name)) {
@@ -75757,7 +78628,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke38(com.codename1.ui.DynamicImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke39(com.codename1.ui.DynamicImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -76022,7 +78893,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke39(com.codename1.ui.EncodedImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke40(com.codename1.ui.EncodedImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -76292,7 +79163,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke40(com.codename1.ui.FontImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke41(com.codename1.ui.FontImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -76594,7 +79465,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke41(com.codename1.ui.GeneratedSVGImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke42(com.codename1.ui.GeneratedSVGImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -76868,7 +79739,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke42(com.codename1.ui.Label typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke43(com.codename1.ui.Label typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -77542,6 +80413,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -78758,7 +81634,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke43(com.codename1.ui.LinearGradient typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke44(com.codename1.ui.LinearGradient typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("computeEndpoints".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false);
@@ -78843,7 +81719,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke44(com.codename1.ui.LinearGradientPaint typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke45(com.codename1.ui.LinearGradientPaint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getColorSpace".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getColorSpace();
@@ -78923,7 +81799,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke45(com.codename1.ui.List typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke46(com.codename1.ui.List typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -79596,6 +82472,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -80780,7 +83661,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke46(com.codename1.ui.NavigationCommand typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke47(com.codename1.ui.NavigationCommand typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -80986,7 +83867,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke47(com.codename1.ui.PeerComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke48(com.codename1.ui.PeerComponent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -81549,6 +84430,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -82546,7 +85432,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke48(com.codename1.ui.RGBImage typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke49(com.codename1.ui.RGBImage typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -82806,7 +85692,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke49(com.codename1.ui.RadialGradient typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke50(com.codename1.ui.RadialGradient typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("computeRadii".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, float[].class}, false);
@@ -82946,7 +85832,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke50(com.codename1.ui.RichTextClipboardData typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke51(com.codename1.ui.RichTextClipboardData typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("findPreferredMimeType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
@@ -83062,7 +85948,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke51(com.codename1.ui.RichTextComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke52(com.codename1.ui.RichTextComponent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -83651,6 +86537,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -84703,7 +87594,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke52(com.codename1.ui.TextArea typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke53(com.codename1.ui.TextArea typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -85429,6 +88320,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -86632,7 +89528,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke53(com.codename1.ui.AnimationManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke54(com.codename1.ui.AnimationManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.ComponentAnimation.class}, false);
@@ -86691,7 +89587,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke54(com.codename1.ui.BrowserComponent.JSExpression typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke55(com.codename1.ui.BrowserComponent.JSExpression typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("toString".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.toString();
@@ -86700,7 +89596,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke55(com.codename1.ui.BrowserComponent.JSRef typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke56(com.codename1.ui.BrowserComponent.JSRef typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getBoolean".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getBoolean();
@@ -86739,7 +89635,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke56(com.codename1.ui.BrowserWindow typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke57(com.codename1.ui.BrowserWindow typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addCloseListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -86789,7 +89685,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke57(com.codename1.ui.BrowserWindow.EvalRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke58(com.codename1.ui.BrowserWindow.EvalRequest typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false);
@@ -86923,7 +89819,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke58(com.codename1.ui.ButtonGroup typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke59(com.codename1.ui.ButtonGroup typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.RadioButton.class}, false);
@@ -87002,7 +89898,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke59(com.codename1.ui.ClipboardContent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke60(com.codename1.ui.ClipboardContent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("findPreferredMimeType".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, false);
@@ -87047,7 +89943,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke60(com.codename1.ui.CodeCompletion typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke61(com.codename1.ui.CodeCompletion typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDetail".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDetail();
@@ -87083,7 +89979,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke61(com.codename1.ui.CodeDiagnostic typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke62(com.codename1.ui.CodeDiagnostic typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getColumn".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getColumn();
@@ -87123,7 +90019,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke62(com.codename1.ui.Command typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke63(com.codename1.ui.Command typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -87318,7 +90214,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke63(com.codename1.ui.Component typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke64(com.codename1.ui.Component typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -87876,6 +90772,11 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("getTooltip".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTooltip();
+            }
+        }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
             }
         }
         if ("getUIID".equals(name)) {
@@ -88868,7 +91769,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke64(com.codename1.ui.ComponentSelector typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke65(com.codename1.ui.ComponentSelector typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -90363,7 +93264,233 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke65(com.codename1.ui.DevicePosture typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke66(com.codename1.ui.Desktop typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addMonitorListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addMonitorListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addWindowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addWindowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getDesktopBounds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDesktopBounds();
+            }
+        }
+        if ("getFocusedWindow".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFocusedWindow();
+            }
+        }
+        if ("getMonitorAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getMonitorAt(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getMonitorFor".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TopLevelContainer.class}, false);
+                return typedTarget.getMonitorFor((com.codename1.ui.TopLevelContainer) adaptedArgs[0]);
+            }
+        }
+        if ("getMonitors".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMonitors();
+            }
+        }
+        if ("getPrimaryMonitor".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPrimaryMonitor();
+            }
+        }
+        if ("getWindowPeerForComponent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.getWindowPeerForComponent((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("getWindows".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWindows();
+            }
+        }
+        if ("isWindowInputBlocked".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.isWindowInputBlocked(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("monitorsChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.monitorsChanged(); return null;
+            }
+        }
+        if ("removeMonitorListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeMonitorListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeWindowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeWindowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("windowActivationFailed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowActivationFailed(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowById".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.windowById(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("windowCloseRequested".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowCloseRequested(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowClosedNatively".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowClosedNatively(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowDragRegionStatus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.windowDragRegionStatus(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]));
+            }
+        }
+        if ("windowFocusChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class}, false);
+                typedTarget.windowFocusChanged(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
+        if ("windowHeight".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.windowHeight(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("windowHideNotify".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowHideNotify(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowKeyPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.windowKeyPressed(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("windowKeyReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.windowKeyReleased(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1])); return null;
+            }
+        }
+        if ("windowMagnifyGesture".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false);
+                typedTarget.windowMagnifyGesture(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).floatValue()); return null;
+            }
+        }
+        if ("windowMonitorChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowMonitorChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowMouseWheelEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return typedTarget.windowMouseWheelEvent(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), ((Boolean) adaptedArgs[5]).booleanValue(), toIntValue(adaptedArgs[6]));
+            }
+        }
+        if ("windowMoved".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowMoved(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowPointerDragged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerDragged(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowPointerHover".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerHover(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowPointerHoverPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerHoverPressed(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowPointerHoverReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerHoverReleased(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowPointerPressed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerPressed(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowPointerReleased".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, int[].class, int[].class}, false);
+                typedTarget.windowPointerReleased(toIntValue(adaptedArgs[0]), (int[]) adaptedArgs[1], (int[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("windowRotationGesture".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false);
+                typedTarget.windowRotationGesture(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).floatValue()); return null;
+            }
+        }
+        if ("windowShowNotify".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.windowShowNotify(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("windowSizeChanged".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                typedTarget.windowSizeChanged(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("windowWidth".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.windowWidth(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke67(com.codename1.ui.DevicePosture typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getFoldBounds".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.geom.Rectangle.class}, false);
@@ -90403,7 +93530,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke66(com.codename1.ui.EditField typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke68(com.codename1.ui.EditField typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("accessibilityChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.accessibilityChanged(); return null;
@@ -90559,10 +93686,25 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.containsOrOwns(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
+        if ("copySelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.copySelection(); return null;
+            }
+        }
         if ("createStyleAnimation".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
                 return typedTarget.createStyleAnimation((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("cutSelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.cutSelection(); return null;
+            }
+        }
+        if ("deleteBackward".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.deleteBackward(); return null;
             }
         }
         if ("deleteSurroundingText".equals(name)) {
@@ -91079,6 +94221,11 @@ public final class GeneratedAccess_com_codename1_ui {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
@@ -91450,6 +94597,11 @@ public final class GeneratedAccess_com_codename1_ui {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.Integer.class, java.lang.Integer.class}, false);
                 typedTarget.paintShadows((com.codename1.ui.Graphics) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2])); return null;
+            }
+        }
+        if ("pasteClipboard".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.pasteClipboard(); return null;
             }
         }
         if ("performRedo".equals(name)) {
@@ -92287,7 +95439,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke67(com.codename1.ui.Form.TabIterator typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke69(com.codename1.ui.Form.TabIterator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -92359,7 +95511,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke68(com.codename1.ui.Gradient typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke70(com.codename1.ui.Gradient typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("copy".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.copy();
@@ -92416,7 +95568,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke69(com.codename1.ui.Graphics typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke71(com.codename1.ui.Graphics typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("beginNativeGraphicsAccess".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.beginNativeGraphicsAccess();
@@ -92934,7 +96086,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke70(com.codename1.ui.Image typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke72(com.codename1.ui.Image typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -93188,7 +96340,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke71(com.codename1.ui.ImageFactory typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke73(com.codename1.ui.ImageFactory typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -93198,7 +96350,62 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke72(com.codename1.ui.MultipleGradientPaint typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke74(com.codename1.ui.Monitor typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("equals".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
+                return typedTarget.equals((java.lang.Object) adaptedArgs[0]);
+            }
+        }
+        if ("getBounds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBounds();
+            }
+        }
+        if ("getDensity".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDensity();
+            }
+        }
+        if ("getDotsPerInch".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDotsPerInch();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getScale".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScale();
+            }
+        }
+        if ("getWorkArea".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWorkArea();
+            }
+        }
+        if ("hashCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hashCode();
+            }
+        }
+        if ("isPrimary".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPrimary();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke75(com.codename1.ui.MultipleGradientPaint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getColorSpace".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getColorSpace();
@@ -93278,7 +96485,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke73(com.codename1.ui.Stroke typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke76(com.codename1.ui.Stroke typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -93348,7 +96555,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke74(com.codename1.ui.TextInputConfig typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke77(com.codename1.ui.TextInputConfig typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getActionType".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getActionType();
@@ -93407,7 +96614,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke75(com.codename1.ui.TextInputState typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke78(com.codename1.ui.TextInputState typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getComposingEnd".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getComposingEnd();
@@ -93446,7 +96653,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke76(com.codename1.ui.TextSelection typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke79(com.codename1.ui.TextSelection typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addTextSelectionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -93536,7 +96743,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke77(com.codename1.ui.TooltipManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke80(com.codename1.ui.TooltipManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDialogUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDialogUIID();
@@ -93573,7 +96780,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke78(com.codename1.ui.Transform typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke81(com.codename1.ui.Transform typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("concatenate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Transform.class}, false);
@@ -93779,7 +96986,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke79(com.codename1.ui.UIFragment typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke82(com.codename1.ui.UIFragment typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("findById".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -93811,7 +97018,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke80(com.codename1.ui.UIFragment.DefaultComponentFactory typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke83(com.codename1.ui.UIFragment.DefaultComponentFactory typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("newComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
@@ -93827,7 +97034,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke81(com.codename1.ui.AbstractDialog typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke84(com.codename1.ui.AbstractDialog typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.Component.class}, false);
@@ -93883,7 +97090,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke82(com.codename1.ui.AutoCompleteTextComponent.AutoCompleteFilter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke85(com.codename1.ui.AutoCompleteTextComponent.AutoCompleteFilter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("filter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -93893,7 +97100,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke83(com.codename1.ui.CodeCompletionProvider typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke86(com.codename1.ui.CodeCompletionProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getCompletions".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.CodeEditor.class, java.lang.String.class, java.lang.Integer.class, com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.CodeEditor.class, java.lang.String.class, java.lang.Integer.class, com.codename1.util.SuccessCallback.class}, false);
@@ -93903,7 +97110,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke84(com.codename1.ui.ComponentSelector.ComponentClosure typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke87(com.codename1.ui.ComponentSelector.ComponentClosure typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("call".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -93913,7 +97120,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke85(com.codename1.ui.ComponentSelector.ComponentMapper typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke88(com.codename1.ui.ComponentSelector.ComponentMapper typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("map".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -93923,7 +97130,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke86(com.codename1.ui.ComponentSelector.Filter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke89(com.codename1.ui.ComponentSelector.Filter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("filter".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -93933,7 +97140,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke87(com.codename1.ui.Editable typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke90(com.codename1.ui.Editable typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("isEditable".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isEditable();
@@ -93958,7 +97165,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke88(com.codename1.ui.IconHolder typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke91(com.codename1.ui.IconHolder typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getGap".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getGap();
@@ -94023,7 +97230,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke89(com.codename1.ui.Paint typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke92(com.codename1.ui.Paint typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle2D.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle2D.class}, false);
@@ -94037,7 +97244,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke90(com.codename1.ui.Painter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke93(com.codename1.ui.Painter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, com.codename1.ui.geom.Rectangle.class}, false);
@@ -94047,7 +97254,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke91(com.codename1.ui.ReleasableComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke94(com.codename1.ui.ReleasableComponent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getReleaseRadius".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getReleaseRadius();
@@ -94078,7 +97285,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke92(com.codename1.ui.RichTextComponent.ImageResolver typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke95(com.codename1.ui.RichTextComponent.ImageResolver typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("resolve".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -94088,7 +97295,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke93(com.codename1.ui.SelectableIconHolder typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke96(com.codename1.ui.SelectableIconHolder typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDisabledIcon".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDisabledIcon();
@@ -94202,7 +97409,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke94(com.codename1.ui.TextHolder typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke97(com.codename1.ui.TextHolder typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getText".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getText();
@@ -94217,7 +97424,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke95(com.codename1.ui.TextInputClient typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke98(com.codename1.ui.TextInputClient typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("commitText".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -94322,7 +97529,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke96(com.codename1.ui.TextSelection.TextSelectionSupport typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke99(com.codename1.ui.TextSelection.TextSelectionSupport typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getTextForSpan".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.TextSelection.class, com.codename1.ui.TextSelection.Span.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.TextSelection.class, com.codename1.ui.TextSelection.Span.class}, false);
@@ -94356,7 +97563,302 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke97(com.codename1.ui.UIFragment.ComponentFactory typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke100(com.codename1.ui.TopLevelContainer typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false);
+                typedTarget.addCommand((com.codename1.ui.Command) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addCommandListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addCommandListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addComponentAwaitingRelease".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.addComponentAwaitingRelease((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addKeyListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addKeyListener(toIntValue(adaptedArgs[0]), (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("addShowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addShowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("addSizeChangedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.addSizeChangedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("asContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.asContainer();
+            }
+        }
+        if ("clearComponentsAwaitingRelease".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clearComponentsAwaitingRelease(); return null;
+            }
+        }
+        if ("deregisterAnimated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false);
+                typedTarget.deregisterAnimated((com.codename1.ui.animations.Animation) adaptedArgs[0]); return null;
+            }
+        }
+        if ("dispatchCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class, com.codename1.ui.events.ActionEvent.class}, false);
+                typedTarget.dispatchCommand((com.codename1.ui.Command) adaptedArgs[0], (com.codename1.ui.events.ActionEvent) adaptedArgs[1]); return null;
+            }
+        }
+        if ("findCurrentlyEditingComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.findCurrentlyEditingComponent();
+            }
+        }
+        if ("getAnimationManager".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAnimationManager();
+            }
+        }
+        if ("getCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.getCommand(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("getCommandCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCommandCount();
+            }
+        }
+        if ("getContentPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getContentPane();
+            }
+        }
+        if ("getCurrentInputDevice".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentInputDevice();
+            }
+        }
+        if ("getDragRegionStatus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.getDragRegionStatus(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getFocused".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFocused();
+            }
+        }
+        if ("getFormLayeredPane".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false);
+                return typedTarget.getFormLayeredPane((java.lang.Class) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+        }
+        if ("getGlassPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getGlassPane();
+            }
+        }
+        if ("getInvisibleAreaUnderVKB".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInvisibleAreaUnderVKB();
+            }
+        }
+        if ("getLayeredPane".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLayeredPane();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Boolean.class}, false);
+                return typedTarget.getLayeredPane((java.lang.Class) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Class.class, java.lang.Integer.class}, false);
+                return typedTarget.getLayeredPane((java.lang.Class) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("getSafeArea".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSafeArea();
+            }
+        }
+        if ("getTabIterator".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return typedTarget.getTabIterator((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+        }
+        if ("getTextSelection".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTextSelection();
+            }
+        }
+        if ("getTitle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTitle();
+            }
+        }
+        if ("getUIManager".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getUIManager();
+            }
+        }
+        if ("grabAnimationLock".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.grabAnimationLock();
+            }
+        }
+        if ("isCyclicFocus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCyclicFocus();
+            }
+        }
+        if ("isEditing".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEditing();
+            }
+        }
+        if ("isEnableCursors".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEnableCursors();
+            }
+        }
+        if ("isSingleFocusMode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSingleFocusMode();
+            }
+        }
+        if ("registerAnimated".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.Animation.class}, false);
+                typedTarget.registerAnimated((com.codename1.ui.animations.Animation) adaptedArgs[0]); return null;
+            }
+        }
+        if ("releaseAnimationLock".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.releaseAnimationLock(); return null;
+            }
+        }
+        if ("removeAllCommands".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.removeAllCommands(); return null;
+            }
+        }
+        if ("removeCommand".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Command.class}, false);
+                typedTarget.removeCommand((com.codename1.ui.Command) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeCommandListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeCommandListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeComponentAwaitingRelease".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.removeComponentAwaitingRelease((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeKeyListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeKeyListener(toIntValue(adaptedArgs[0]), (com.codename1.ui.events.ActionListener) adaptedArgs[1]); return null;
+            }
+        }
+        if ("removeShowListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeShowListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("removeSizeChangedListener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
+                typedTarget.removeSizeChangedListener((com.codename1.ui.events.ActionListener) adaptedArgs[0]); return null;
+            }
+        }
+        if ("scrollComponentToVisible".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.scrollComponentToVisible((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCurrentInputDevice".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.VirtualInputDevice.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.VirtualInputDevice.class}, false);
+                typedTarget.setCurrentInputDevice((com.codename1.ui.VirtualInputDevice) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setCyclicFocus".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setCyclicFocus(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setEnableCursors".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setEnableCursors(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        if ("setFocused".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                typedTarget.setFocused((com.codename1.ui.Component) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setGlassPane".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Painter.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Painter.class}, false);
+                typedTarget.setGlassPane((com.codename1.ui.Painter) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setTitle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setTitle((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setUIManager".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class}, false);
+                typedTarget.setUIManager((com.codename1.ui.plaf.UIManager) adaptedArgs[0]); return null;
+            }
+        }
+        if ("show".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.show(); return null;
+            }
+        }
+        if ("stopEditing".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
+                typedTarget.stopEditing((java.lang.Runnable) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke101(com.codename1.ui.UIFragment.ComponentFactory typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("newComponent".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.xml.Element.class}, false);
@@ -94372,7 +97874,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke98(com.codename1.ui.URLImage.ErrorCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke102(com.codename1.ui.URLImage.ErrorCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.URLImage.class, java.lang.Exception.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.URLImage.class, java.lang.Exception.class}, false);
@@ -94382,7 +97884,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke99(com.codename1.ui.URLImage.ImageAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke103(com.codename1.ui.URLImage.ImageAdapter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("adaptImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.EncodedImage.class, com.codename1.ui.EncodedImage.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.EncodedImage.class, com.codename1.ui.EncodedImage.class}, false);
@@ -94397,7 +97899,7 @@ public final class GeneratedAccess_com_codename1_ui {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke100(com.codename1.ui.URLImage.RequestDecorator typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke104(com.codename1.ui.URLImage.RequestDecorator typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("decorate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.io.ConnectionRequest.class}, false);
@@ -94478,6 +97980,7 @@ public final class GeneratedAccess_com_codename1_ui {
         if (type == com.codename1.ui.Toolbar.BackCommandPolicy.class) return getStaticField67(name);
         if (type == com.codename1.ui.Transform.class) return getStaticField68(name);
         if (type == com.codename1.ui.URLImage.class) return getStaticField69(name);
+        if (type == com.codename1.ui.Window.class) return getStaticField70(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -98846,6 +102349,50 @@ public final class GeneratedAccess_com_codename1_ui {
         if ("RESIZE_SCALE".equals(name)) return com.codename1.ui.URLImage.RESIZE_SCALE;
         if ("RESIZE_SCALE_TO_FILL".equals(name)) return com.codename1.ui.URLImage.RESIZE_SCALE_TO_FILL;
         throw unsupportedStaticField(com.codename1.ui.URLImage.class, name);
+    }
+
+    private static Object getStaticField70(String name) throws Exception {
+        if ("BASELINE".equals(name)) return com.codename1.ui.Window.BASELINE;
+        if ("BOTTOM".equals(name)) return com.codename1.ui.Window.BOTTOM;
+        if ("BRB_CENTER_OFFSET".equals(name)) return com.codename1.ui.Window.BRB_CENTER_OFFSET;
+        if ("BRB_CONSTANT_ASCENT".equals(name)) return com.codename1.ui.Window.BRB_CONSTANT_ASCENT;
+        if ("BRB_CONSTANT_DESCENT".equals(name)) return com.codename1.ui.Window.BRB_CONSTANT_DESCENT;
+        if ("BRB_OTHER".equals(name)) return com.codename1.ui.Window.BRB_OTHER;
+        if ("CENTER".equals(name)) return com.codename1.ui.Window.CENTER;
+        if ("CROSSHAIR_CURSOR".equals(name)) return com.codename1.ui.Window.CROSSHAIR_CURSOR;
+        if ("DEFAULT_CURSOR".equals(name)) return com.codename1.ui.Window.DEFAULT_CURSOR;
+        if ("DISPOSE_ON_CLOSE".equals(name)) return com.codename1.ui.Window.DISPOSE_ON_CLOSE;
+        if ("DO_NOTHING_ON_CLOSE".equals(name)) return com.codename1.ui.Window.DO_NOTHING_ON_CLOSE;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_X".equals(name)) return com.codename1.ui.Window.DRAG_REGION_IMMEDIATELY_DRAG_X;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_XY".equals(name)) return com.codename1.ui.Window.DRAG_REGION_IMMEDIATELY_DRAG_XY;
+        if ("DRAG_REGION_IMMEDIATELY_DRAG_Y".equals(name)) return com.codename1.ui.Window.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+        if ("DRAG_REGION_LIKELY_DRAG_X".equals(name)) return com.codename1.ui.Window.DRAG_REGION_LIKELY_DRAG_X;
+        if ("DRAG_REGION_LIKELY_DRAG_XY".equals(name)) return com.codename1.ui.Window.DRAG_REGION_LIKELY_DRAG_XY;
+        if ("DRAG_REGION_LIKELY_DRAG_Y".equals(name)) return com.codename1.ui.Window.DRAG_REGION_LIKELY_DRAG_Y;
+        if ("DRAG_REGION_NOT_DRAGGABLE".equals(name)) return com.codename1.ui.Window.DRAG_REGION_NOT_DRAGGABLE;
+        if ("DRAG_REGION_POSSIBLE_DRAG_X".equals(name)) return com.codename1.ui.Window.DRAG_REGION_POSSIBLE_DRAG_X;
+        if ("DRAG_REGION_POSSIBLE_DRAG_XY".equals(name)) return com.codename1.ui.Window.DRAG_REGION_POSSIBLE_DRAG_XY;
+        if ("DRAG_REGION_POSSIBLE_DRAG_Y".equals(name)) return com.codename1.ui.Window.DRAG_REGION_POSSIBLE_DRAG_Y;
+        if ("E_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.E_RESIZE_CURSOR;
+        if ("HAND_CURSOR".equals(name)) return com.codename1.ui.Window.HAND_CURSOR;
+        if ("HIDE_ON_CLOSE".equals(name)) return com.codename1.ui.Window.HIDE_ON_CLOSE;
+        if ("LEFT".equals(name)) return com.codename1.ui.Window.LEFT;
+        if ("MODALITY_APPLICATION".equals(name)) return com.codename1.ui.Window.MODALITY_APPLICATION;
+        if ("MODALITY_NONE".equals(name)) return com.codename1.ui.Window.MODALITY_NONE;
+        if ("MODALITY_WINDOW".equals(name)) return com.codename1.ui.Window.MODALITY_WINDOW;
+        if ("MOVE_CURSOR".equals(name)) return com.codename1.ui.Window.MOVE_CURSOR;
+        if ("NE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.NE_RESIZE_CURSOR;
+        if ("NW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.NW_RESIZE_CURSOR;
+        if ("N_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.N_RESIZE_CURSOR;
+        if ("RIGHT".equals(name)) return com.codename1.ui.Window.RIGHT;
+        if ("SE_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.SE_RESIZE_CURSOR;
+        if ("SW_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.SW_RESIZE_CURSOR;
+        if ("S_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.S_RESIZE_CURSOR;
+        if ("TEXT_CURSOR".equals(name)) return com.codename1.ui.Window.TEXT_CURSOR;
+        if ("TOP".equals(name)) return com.codename1.ui.Window.TOP;
+        if ("WAIT_CURSOR".equals(name)) return com.codename1.ui.Window.WAIT_CURSOR;
+        if ("W_RESIZE_CURSOR".equals(name)) return com.codename1.ui.Window.W_RESIZE_CURSOR;
+        throw unsupportedStaticField(com.codename1.ui.Window.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

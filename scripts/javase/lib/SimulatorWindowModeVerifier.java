@@ -153,13 +153,20 @@ public class SimulatorWindowModeVerifier {
                 Thread.sleep(500);
                 image = captureDesktop();
             }
-            validateScreenshotContent(parsed, image);
+            // Keep the capture whichever way validation goes. A failure used to
+            // throw before the write, so the one artifact that could explain it
+            // -- what was actually on screen -- was discarded, and the run left
+            // only a pixel count to reason from. Written under a .rejected.png
+            // name so it cannot be mistaken for a baseline.
+            try {
+                validateScreenshotContent(parsed, image);
+            } catch (Throwable failure) {
+                writeCapture(image, Path.of(parsed.screenshotPath + ".rejected.png"));
+                throw failure;
+            }
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
-            Files.createDirectories(screenshotPath.getParent());
-            if (!ImageIO.write(image, "png", screenshotPath.toFile())) {
-                throw new AssertionError("No PNG writer available; screenshot was not written");
-            }
+            writeCapture(image, screenshotPath);
             System.out.println("[javase-verifier] screenshot=" + screenshotPath
                     + " mode=" + parsed.mode + " scenario=" + parsed.scenario
                     + (parsed.nativeTheme != null ? " nativeTheme=" + parsed.nativeTheme : ""));
@@ -193,6 +200,16 @@ public class SimulatorWindowModeVerifier {
         Instant until = Instant.now().plus(duration);
         while (Instant.now().isBefore(until)) {
             Thread.sleep(200);
+        }
+    }
+
+    /** Writes a capture, creating its directory. */
+    private static void writeCapture(BufferedImage image, Path to) throws Exception {
+        if (to.getParent() != null) {
+            Files.createDirectories(to.getParent());
+        }
+        if (!ImageIO.write(image, "png", to.toFile())) {
+            throw new AssertionError("No PNG writer available; screenshot was not written");
         }
     }
 

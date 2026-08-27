@@ -10,11 +10,12 @@ set -uo pipefail
 #
 # Usage: bash scripts/ci/retry.sh mvn -B -f vm/JavaAPI/pom.xml package
 #
-# RETRY_ATTEMPTS (default 3) and RETRY_DELAY_SECONDS (default 30) override the
-# bounds; the command is always attempted at least once and the last attempt's
-# exit status is what this script returns.
+# RETRY_ATTEMPTS (default 4), RETRY_DELAY_SECONDS (default 30) and
+# RETRY_MAX_DELAY_SECONDS (default 300) override the bounds; the command is
+# always attempted at least once and the last attempt's exit status is what this
+# script returns.
 #
-# The delay DOUBLES after each failure (30s, 60s, 120s ...). A 403 from Central is
+# The delay GROWS after each failure (30s, 2m, 5m). A 403 from Central is
 # a rate-limit response, not a blip: it keeps rejecting the runner's IP for as long
 # as the throttle holds, so a flat delay just spends every attempt inside the same
 # outage window. The errorprone job burned all three 30s-apart attempts that way.
@@ -36,8 +37,17 @@ set -uo pipefail
 # definition, so the next failure mode is added once.
 TRANSIENT_RESOLUTION_FAILURE='status: (403|429|50[0-9])|Could not transfer artifact|Could not resolve dependencies|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|or one of its dependencies could not be resolved|authorization failed for https://repo\.maven\.apache\.org|Connection reset|Premature end of Content-Length'
 
-attempts="${RETRY_ATTEMPTS:-3}"
+# Four, not three. With the growing wait below that is 30s, 2m and 5m of
+# coverage -- the same 30/120/300 the Windows cross-compile workflow settled on.
+# Three attempts spanned four minutes and still lost to a 429 window.
+attempts="${RETRY_ATTEMPTS:-4}"
 delay="${RETRY_DELAY_SECONDS:-30}"
+# The wait GROWS. A flat retry spends all its attempts inside the same window
+# Central is still refusing in -- observed as three 403s in sixty seconds, which
+# failed the branch for a reason that had nothing to do with it. Quadrupling
+# from the first delay gives 30s, 2m, 5m, which is the same shape the Windows
+# cross-compile workflow settled on for the same reason.
+max_delay="${RETRY_MAX_DELAY_SECONDS:-300}"
 only_matching="${RETRY_ONLY_MATCHING:-}"
 if [ "$only_matching" = "transient" ]; then
   only_matching="$TRANSIENT_RESOLUTION_FAILURE"
@@ -57,6 +67,13 @@ esac
 case "$delay" in
   ''|*[!0-9]*) echo "retry.sh: RETRY_DELAY_SECONDS must be a non-negative integer, got '${delay}'" >&2; exit 2 ;;
 esac
+case "$max_delay" in
+  ''|*[!0-9]*) echo "retry.sh: RETRY_MAX_DELAY_SECONDS must be a non-negative integer, got '${max_delay}'" >&2; exit 2 ;;
+esac
+if [ "$max_delay" -lt "$delay" ]; then
+  max_delay="$delay"
+fi
+wait_seconds="$delay"
 
 # Counted with arithmetic rather than `seq`: BSD and GNU seq disagree on
 # degenerate ranges, and this loop body must run exactly `attempts` times.
@@ -88,9 +105,12 @@ while [ "$attempt" -le "$attempts" ]; do
   fi
   if [ "$attempt" -lt "$attempts" ]; then
     echo "retry.sh: attempt ${attempt}/${attempts} failed with status ${status};" \
-      "retrying in ${delay}s (possible transient Maven Central 403/429/5xx)" >&2
-    sleep "$delay"
-    delay=$((delay * 2))
+      "retrying in ${wait_seconds}s (possible transient Maven Central 403/429/5xx)" >&2
+    sleep "$wait_seconds"
+    wait_seconds=$((wait_seconds * 4))
+    if [ "$wait_seconds" -gt "$max_delay" ]; then
+      wait_seconds="$max_delay"
+    fi
   fi
   attempt=$((attempt + 1))
 done

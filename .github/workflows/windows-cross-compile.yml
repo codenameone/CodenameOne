@@ -121,7 +121,7 @@ jobs:
           # retries reuse the previous attempt's target directories, so a partial output
           # can decide the result. Matching the output keeps a real failure terminal on
           # its first occurrence, and the retry starts from clean.
-          resolution='status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
+          resolution='status: (403|429|50[0-9])|Could not transfer artifact|Failed to read artifact descriptor|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           goal=install
           for delay in 30 120 300 0; do
             # PIPESTATUS, not the pipeline's status: tee succeeds even when mvn does not,
