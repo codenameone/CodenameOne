@@ -118,12 +118,23 @@ enum CN1DocumentRemote {
                       completion: @escaping (URL?, Error?) -> Void) -> URLSessionTask? {
         guard let settings = settings(containerURL: containerURL),
               let base = settings.endpoint,
-              var components = URLComponents(string: base.hasSuffix("/") ? base + "fetch"
-                                                                         : base + "/fetch") else {
+              var components = URLComponents(string: base) else {
             completion(nil, CN1DocumentRemote.noEndpoint())
             return nil
         }
-        components.queryItems = [URLQueryItem(name: "id", value: remoteId)]
+        // Appended to the PATH, and the id added to whatever query the endpoint already carries.
+        // Pasting "/fetch" onto the raw string put it inside the query of an endpoint like
+        // "https://api.example.com/documents?tenant=42", and replacing queryItems then threw the
+        // tenant away -- the request went to "/documents?id=..." with the suffix gone and the
+        // caller's own parameter lost.
+        var path = components.path
+        if !path.hasSuffix("/") {
+            path += "/"
+        }
+        components.path = path + "fetch"
+        var items = components.queryItems ?? []
+        items.append(URLQueryItem(name: "id", value: remoteId))
+        components.queryItems = items
         guard let url = components.url else {
             completion(nil, CN1DocumentRemote.noEndpoint())
             return nil

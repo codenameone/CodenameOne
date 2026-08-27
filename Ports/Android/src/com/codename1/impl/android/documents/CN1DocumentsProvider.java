@@ -24,6 +24,7 @@ package com.codename1.impl.android.documents;
 
 import android.database.Cursor;
 import android.database.MatrixCursor;
+import android.net.Uri;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
@@ -38,7 +39,6 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -267,10 +267,17 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         }
         HttpURLConnection connection = null;
         try {
-            String base = endpoint[0];
-            String url = (base.endsWith("/") ? base + "fetch" : base + "/fetch")
-                    + "?id=" + URLEncoder.encode(node.remoteId, "UTF-8");
-            connection = (HttpURLConnection) new URL(url).openConnection();
+            // Built through Uri rather than by pasting strings: "fetch" belongs on the PATH and
+            // the id has to join whatever query the endpoint already carries. Concatenation put
+            // the suffix inside the query of an endpoint like
+            // "https://api.example.com/documents?tenant=42" and then added a second "?", so the
+            // request went somewhere the server does not serve and the caller's own parameter was
+            // lost. appendPath and appendQueryParameter also do the escaping.
+            Uri url = Uri.parse(endpoint[0]).buildUpon()
+                    .appendPath("fetch")
+                    .appendQueryParameter("id", node.remoteId)
+                    .build();
+            connection = (HttpURLConnection) new URL(url.toString()).openConnection();
             // Finite by necessity. This runs on a provider binder thread, and the default is no
             // timeout at all: an endpoint that accepts the connection and then stops answering
             // would block here forever, where the cancellation signal cannot reach it because
