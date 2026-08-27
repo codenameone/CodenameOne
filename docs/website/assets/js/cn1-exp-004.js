@@ -3,12 +3,24 @@
   const EXPERIMENT_ID = "EXP-004";
   const OWNERSHIP = "ownership";
   const REACH = "reach";
-  const CONSENT_KEY = "cn1-crisp-consent-v1";
-  const CONSENT_COOKIE = "cn1_crisp_consent=accepted";
+  const CONSENT_KEY = "cn1-crisp-consent-v2";
+  const CONSENT_COOKIE = "cn1_crisp_consent_v2=accepted";
   const hostname = window.location && window.location.hostname;
   const localPreview = hostname === "localhost" || hostname === "127.0.0.1";
+  const deployedPreview = /\.pages\.dev$/i.test(hostname || "");
   const previewArm = localPreview
     ? new URLSearchParams(window.location.search || "").get("cn1_exp004") : null;
+
+  if (deployedPreview) {
+    document.documentElement.dataset.cn1Exp004Arm = OWNERSHIP;
+    window.cn1Exp004 = Object.freeze({
+      id: EXPERIMENT_ID,
+      arm: OWNERSHIP,
+      persist: () => false,
+      telemetryEnabled: false
+    });
+    return;
+  }
 
   const consentAccepted = () => {
     if ((document.cookie || "").split(";").some((part) => part.trim() === CONSENT_COOKIE)) {
@@ -63,5 +75,10 @@
   };
 
   document.documentElement.dataset.cn1Exp004Arm = arm;
-  window.cn1Exp004 = Object.freeze({ id: EXPERIMENT_ID, arm, persist });
+  window.cn1Exp004 = Object.freeze({
+    id: EXPERIMENT_ID,
+    arm,
+    persist,
+    telemetryEnabled: !localPreview
+  });
 })();

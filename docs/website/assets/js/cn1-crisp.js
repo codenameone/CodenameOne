@@ -1,12 +1,15 @@
 (() => {
-  const CONSENT_KEY = "cn1-crisp-consent-v1";
-  const CONSENT_COOKIE = "cn1_crisp_consent";
+  const CONSENT_KEY = "cn1-crisp-consent-v2";
+  const CONSENT_COOKIE = "cn1_crisp_consent_v2";
   const WEBSITE_ID = "e0201fca-1e59-4f30-9d00-8c37aa18293e";
   const CONSENT_TTL_DAYS = 365;
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
   const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
   const EXP004_ID = "EXP-004";
+  const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
+  const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||
+    EXP004_HOSTNAME === "127.0.0.1" || /\.pages\.dev$/i.test(EXP004_HOSTNAME);
   const OSS_VALUE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
   const readCookie = (name) => {
@@ -107,7 +110,14 @@
   };
 
   const readExp004Assignment = () => {
-    let arm = window.cn1Exp004 && window.cn1Exp004.arm;
+    if (EXP004_PREVIEW_HOST) {
+      return null;
+    }
+    const experiment = window.cn1Exp004;
+    if (experiment && experiment.telemetryEnabled === false) {
+      return null;
+    }
+    let arm = experiment && experiment.arm;
     if (arm !== "ownership" && arm !== "reach") {
       try {
         arm = localStorage.getItem(EXP004_STORAGE_KEY);
@@ -354,6 +364,7 @@
     loadCrisp();
     reportOssArrival();
     flushPendingEvents();
+    reportExp004Exposure();
   };
 
   const declineConsent = () => {
@@ -388,7 +399,7 @@
   document.querySelectorAll("[data-cn1-enable-chat]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      acceptConsent();
+      openBanner();
     });
   });
 

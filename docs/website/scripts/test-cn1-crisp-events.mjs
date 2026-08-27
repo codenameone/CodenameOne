@@ -30,7 +30,15 @@ function control() {
   };
 }
 
-function load(consent, search = "", pathname = "/playground/", experimentArm = null) {
+function load(
+  consent,
+  search = "",
+  pathname = "/playground/",
+  experimentArm = null,
+  experimentTelemetryEnabled = true,
+  hostname = "www.codenameone.com",
+  legacyConsent = null
+) {
   const timers = [];
   const documentListeners = {};
   const banner = control();
@@ -38,7 +46,10 @@ function load(consent, search = "", pathname = "/playground/", experimentArm = n
   const decline = control();
   const cookies = new Map();
   if (consent) {
-    cookies.set("cn1_crisp_consent", consent);
+    cookies.set("cn1_crisp_consent_v2", consent);
+  }
+  if (legacyConsent) {
+    cookies.set("cn1_crisp_consent", legacyConsent);
   }
 
   const document = {
@@ -75,6 +86,7 @@ function load(consent, search = "", pathname = "/playground/", experimentArm = n
 
   const window = {
     location: {
+      hostname,
       pathname,
       search,
     },
@@ -83,6 +95,14 @@ function load(consent, search = "", pathname = "/playground/", experimentArm = n
       return timers.length;
     },
   };
+  if (experimentArm) {
+    window.cn1Exp004 = {
+      id: "EXP-004",
+      arm: experimentArm,
+      telemetryEnabled: experimentTelemetryEnabled,
+      persist() { return true; },
+    };
+  }
   window.window = window;
 
   const context = vm.createContext({
@@ -149,6 +169,14 @@ function events(state) {
 }
 
 {
+  const state = load(null, "", "/", "ownership", true, "www.codenameone.com", "accepted");
+  assert.equal(eventCommands(state).length, 0,
+    "old chat-only consent must not authorize experiment telemetry");
+  assert.equal(state.window.CRISP_WEBSITE_ID, undefined,
+    "old chat-only consent must not load Crisp before the new opt-in");
+}
+
+{
   const state = load("accepted", "", "/", "ownership");
   const recorded = events(state);
   assert.equal(recorded.length, 1, "an eligible homepage view should record one arm exposure");
@@ -164,6 +192,36 @@ function events(state) {
   const recorded = events(state);
   assert.equal(recorded.length, 1);
   assert.equal(recorded[0][0], "Exp004ReachExposure");
+}
+
+{
+  const state = load("declined", "", "/", "ownership");
+  assert.equal(eventCommands(state).length, 0,
+    "a declined homepage view must not be recorded");
+  state.accept.click();
+  const recorded = events(state);
+  assert.equal(recorded.length, 1,
+    "opting in after a prior decline must record the exposure denominator");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+}
+
+{
+  const state = load("accepted", "", "/", "reach", false);
+  assert.equal(eventCommands(state).length, 0,
+    "a preview assignment must never emit production experiment telemetry");
+}
+
+{
+  const state = load(
+    "accepted",
+    "",
+    "/",
+    "reach",
+    true,
+    "exp-004-homepage-positioning.codenameone.pages.dev"
+  );
+  assert.equal(eventCommands(state).length, 0,
+    "a Cloudflare preview host must never emit production experiment telemetry");
 }
 
 {

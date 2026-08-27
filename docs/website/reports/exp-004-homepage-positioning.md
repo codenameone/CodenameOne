@@ -17,14 +17,14 @@ Completed Initializr downloads divided by homepage exposures for each arm:
 - `Exp004OwnershipDownload / Exp004OwnershipExposure`
 - `Exp004ReachDownload / Exp004ReachExposure`
 
-Crisp records these events only for visitors who enable chat consent. The result therefore describes that consented subset, not every website visitor.
+Crisp records these events only for visitors who enable Crisp chat and analytics consent. The result therefore describes that consented subset, not every website visitor.
 
 ## Variants
 
 - **Ownership:** `Native, and you own the UI` / `Native apps in Java — A UI you control`.
 - **Reach:** `One Java project across every screen` / `Ship one feature once — Reach every target`.
 
-The CTA, product proof, layout, and remaining homepage stay identical. After chat consent is enabled, a first-party browser assignment is persisted under `cn1-exp-004-arm-v1` so returning eligible visitors do not switch messages. Visitors who decline or have not chosen consent receive a page variant but no assignment is stored and no experiment event is sent.
+The CTA, product proof, layout, and remaining homepage stay identical. After Crisp chat and analytics consent is enabled, a first-party browser assignment is persisted under `cn1-exp-004-arm-v1` so returning eligible visitors do not switch messages. Visitors who decline or have not chosen consent receive a page variant but no assignment is stored and no experiment event is sent. Local QA and Cloudflare Pages previews do not emit experiment telemetry; deployed previews show the ownership control.
 
 ## Expected effect
 
