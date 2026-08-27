@@ -29,6 +29,8 @@ import com.codename1.util.AsyncResult;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -75,6 +77,25 @@ final class GattOperationQueue {
             @Override
             public void onReady(Object value, Throwable err) {
                 advance(op);
+            }
+        });
+        // AND an observer, because AsyncResource.cancel() marks itself done
+        // and notifies observers WITHOUT running the callback chain. An
+        // operation cancelled while it was still in flight therefore never
+        // advanced the queue: the listener above did not fire, and the
+        // timeout declines to advance a result that is already done. The
+        // queue then waited on a platform callback for an operation nobody
+        // was waiting for -- and for ever, if that callback never came.
+        //
+        // advance() is keyed on the operation still being current, so the
+        // two paths cannot double-advance: whichever arrives second finds
+        // itself no longer current and returns.
+        op.result.addObserver(new Observer() {
+            @Override
+            public void update(Observable o, Object arg) {
+                if (op.result.isCancelled()) {
+                    advance(op);
+                }
             }
         });
         boolean startNow;

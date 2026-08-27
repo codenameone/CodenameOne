@@ -66,6 +66,26 @@ final class CN1CallNotifications {
             "com.codename1.call.NOTIFICATION_DECLINE";
     private static final String EXTRA_CALL = "com.codename1.call.NOTIFICATION_ID";
 
+    /// The secret every action broadcast has to carry.
+    private static final String EXTRA_TOKEN = "com.codename1.call.TOKEN";
+
+    /// A value only this process knows, minted once per launch.
+    ///
+    /// A dynamically registered receiver is EXPORTED before Android 13 --
+    /// RECEIVER_NOT_EXPORTED does not exist there and no permission can be
+    /// declared at registration time -- so any installed app can send our
+    /// fixed action. setPackage() on the PendingIntent constrains where OUR
+    /// broadcast goes; it does nothing about one somebody else constructs.
+    /// An app that learned a live call id could therefore answer or reject
+    /// that call.
+    ///
+    /// The id is not a secret -- it travels through Telecom -- so the
+    /// broadcast carries one that is. SecureRandom rather than Math.random:
+    /// this is the whole check.
+    private static final String TOKEN =
+            new java.math.BigInteger(130, new java.security.SecureRandom())
+                    .toString(32);
+
     /// Notification ids by call, so the right one is cancelled.
     private static final Map<String, Integer> SHOWN =
             new HashMap<String, Integer>();
@@ -176,6 +196,11 @@ final class CN1CallNotifications {
         i.setPackage(ctx.getPackageName());
         i.putExtra(CN1ConnectionService.EXTRA_CALL_ID, callId);
         i.putExtra(EXTRA_CALL, notificationId);
+        // See TOKEN: on Android 12 and earlier this is what distinguishes our
+        // own broadcast from one another app built. The PendingIntent is
+        // immutable, so the token cannot be stripped or altered by whoever
+        // holds it -- the notification shade included.
+        i.putExtra(EXTRA_TOKEN, TOKEN);
         return PendingIntent.getBroadcast(ctx, notificationId + action.hashCode(),
                 i, pendingFlags());
     }
@@ -221,6 +246,12 @@ final class CN1CallNotifications {
                     if (intent == null) {
                         return;
                     }
+                    // Ours, or nobody's. Checked before the call is even
+                    // looked up, so a broadcast from another app cannot so
+                    // much as dismiss a notification.
+                    if (!TOKEN.equals(intent.getStringExtra(EXTRA_TOKEN))) {
+                        return;
+                    }
                     String callId = intent.getStringExtra(
                             CN1ConnectionService.EXTRA_CALL_ID);
                     CN1Connection c = CN1ConnectionService.find(callId);
@@ -252,6 +283,12 @@ final class CN1CallNotifications {
     /// `Context.RECEIVER_NOT_EXPORTED` is required from Android 14 and is not
     /// in this port's android.jar, hence the reflective four-argument call
     /// with the two-argument one as the older path.
+    ///
+    /// Below 33 that older path leaves the receiver EXPORTED and there is no
+    /// way to say otherwise at registration time -- which is why every action
+    /// broadcast carries [#TOKEN] and the receiver rejects one that does
+    /// not. The flag is the better mechanism where it exists; the token is
+    /// what protects the versions where it does not.
     private static void registerNotExported(Context ctx, BroadcastReceiver r,
             IntentFilter f) {
         if (Build.VERSION.SDK_INT >= 33) {
@@ -261,8 +298,7 @@ final class CN1CallNotifications {
                         .invoke(ctx, r, f, Integer.valueOf(4));
                 return;
             } catch (Exception fallThrough) {
-                // Older behaviour below; an exported receiver for an intent
-                // that names this package is not a leak worth failing over.
+                // Older behaviour below.
             }
         }
         ctx.registerReceiver(r, f);

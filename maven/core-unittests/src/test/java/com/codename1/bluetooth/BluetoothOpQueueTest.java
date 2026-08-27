@@ -99,6 +99,36 @@ class BluetoothOpQueueTest extends UITestBase {
     }
 
     @Test
+    void cancellingAnInFlightOperationAdvancesTheQueue() {
+        // The other half of the cancel, and the one the earlier test missed:
+        // a QUEUED operation is skipped by startOp, but an IN-FLIGHT one has
+        // to advance the queue itself. AsyncResource.cancel() marks itself
+        // done and notifies observers without running the callback chain, so
+        // the queue's advancement listener never fired and the timeout
+        // declines to advance a result that is already done -- leaving the
+        // queue waiting on a platform callback for an operation nobody wants,
+        // for ever if that callback never comes.
+        AsyncResource<Integer> inFlight = p.requestMtu(185);
+        AsyncResource<byte[]> behind = p.readCharacteristic(c1);
+        assertEquals(FakeBlePeripheral.OpKind.REQUEST_MTU, p.peekNext().kind);
+        assertEquals(1, p.pendingCount(), "the read is queued behind it");
+
+        inFlight.cancel(true);
+
+        assertEquals(2, p.pendingCount(),
+                "cancelling the in-flight operation must start the next one");
+        // The platform still holds the cancelled request -- nothing answered
+        // it, which is the whole point -- so it stays at the head of the
+        // fake's list and the read sits behind it.
+        p.takeNext();
+        assertSame(c1, p.peekNext().characteristic);
+        p.completeNext(bytes(7, 8));
+        assertArrayEquals(bytes(7, 8), behind.get());
+        assertEquals(23, p.getMtu(),
+                "a cancelled request must not publish an MTU");
+    }
+
+    @Test
     void aThrowingCallbackDoesNotWedgeTheQueue() {
         // requestMtu, not readCharacteristic. Only the operations that
         // publish state before completing -- requestMtu and discoverServices
