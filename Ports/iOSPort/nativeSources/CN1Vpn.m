@@ -91,6 +91,14 @@ static void cn1vpAck(int requestId, BOOL ok, int error, NSString *message) {
 
 #ifdef CN1_VPN_HAS_NE
 
+/// Whether Java has a status listener installed.
+///
+/// Guarded by cn1vpInstallLock, like cn1vpLoaded. Java writes it from the
+/// EDT while the preferences-load completion and the status notification both
+/// read it on their own platform queues, so an unsynchronized read could see
+/// the old NO and swallow the only baseline delivery a listener added during
+/// startup ever gets -- leaving it unaware that an installed VPN is already
+/// connected until something else happens to change.
 static BOOL cn1vpListening = NO;
 static id cn1vpObserver = nil;
 
@@ -226,6 +234,22 @@ static void cn1vpEnsureInstallLock(void) {
 /// Whether the shared manager's saved configuration has been read.
 static BOOL cn1vpLoaded = NO;
 
+/// Reads cn1vpListening under the lock that publishes it.
+static BOOL cn1vpIsListening(void) {
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        return cn1vpListening;
+    }
+}
+
+/// Reads cn1vpLoaded under the lock that publishes it.
+static BOOL cn1vpIsLoaded(void) {
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        return cn1vpLoaded;
+    }
+}
+
 /// Whether a read is in flight, so a failure can be retried without two
 /// loads racing.
 static BOOL cn1vpLoading = NO;
@@ -341,7 +365,7 @@ static void cn1vpRetireOldSecrets(void) {
 
 @implementation CN1VpnStatusWatcher
 - (void)statusChanged:(NSNotification *)note {
-    if (!cn1vpListening) {
+    if (!cn1vpIsListening()) {
         return;
     }
     com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
@@ -424,7 +448,7 @@ static void cn1vpEnsureLoaded(void) {
             }
             cn1vpLoaded = YES;
         }
-        if (cn1vpListening) {
+        if (cn1vpIsListening()) {
             com_codename1_impl_ios_IOSCallCallbacks_vpnStatusChanged___int(
                     getThreadLocalData(), cn1vpStatusOrdinal(
                             [[NEVPNManager sharedManager] connection].status));
@@ -438,7 +462,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_vpnStatus___R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
 #ifdef CN1_VPN_HAS_NE
     cn1vpEnsureLoaded();
-    if (!cn1vpLoaded) {
+    if (!cn1vpIsLoaded()) {
         // The load is asynchronous and this is not. Until it lands the shared
         // manager reports NEVPNStatusInvalid, which reads as NOT_CONFIGURED
         // -- an ACTIVE claim that no VPN exists, for a device that may have a
@@ -855,20 +879,25 @@ void com_codename1_impl_ios_IOSNative_vpnSetStatusListening___boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_BOOLEAN listening) {
 #ifdef CN1_VPN_HAS_NE
-    cn1vpListening = listening != JAVA_FALSE;
-    if (cn1vpListening) {
+    BOOL wanted = listening != JAVA_FALSE;
+    cn1vpEnsureInstallLock();
+    @synchronized (cn1vpInstallLock) {
+        // Published under the lock the two callback queues read it through.
+        cn1vpListening = wanted;
+    }
+    if (wanted) {
         // Before the observer, so the load's own notification finds a
         // listening app: the baseline a new listener sees has to be the
         // profile iOS actually holds, not the unloaded manager's Invalid.
         cn1vpEnsureLoaded();
     }
-    if (cn1vpListening && cn1vpObserver == nil) {
+    if (wanted && cn1vpObserver == nil) {
         cn1vpWatcher = [[CN1VpnStatusWatcher alloc] init];
         [[NSNotificationCenter defaultCenter] addObserver:cn1vpWatcher
                 selector:@selector(statusChanged:)
                 name:NEVPNStatusDidChangeNotification object:nil];
         cn1vpObserver = cn1vpWatcher;
-    } else if (!cn1vpListening && cn1vpObserver != nil) {
+    } else if (!wanted && cn1vpObserver != nil) {
         [[NSNotificationCenter defaultCenter] removeObserver:cn1vpObserver];
         cn1vpObserver = nil;
         cn1vpWatcher = nil;
