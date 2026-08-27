@@ -265,6 +265,20 @@ public final class DocumentIndexSerializer {
     /// happens. Refusing the publish says which node is at fault instead.
     private static final int MAX_COMPONENT_BYTES = 255;
 
+    /// The Hangul jamo that compose into syllables.
+    ///
+    /// Hangul is the other decomposition Unicode does without a combining mark: U+1100 U+1161 is
+    /// the same filename as U+AC00, composed by an algorithm rather than from a table, so a
+    /// combining-mark test and a singleton table both miss it. The conjoining jamo blocks are
+    /// only ever the decomposed spelling -- the syllables at U+AC00-U+D7A3 are the composed one,
+    /// and the COMPATIBILITY jamo at U+3130-U+318F, which is what a name meaning the letter
+    /// itself uses, are a different range and stay allowed.
+    private static boolean isConjoiningJamo(int c) {
+        return (c >= 0x1100 && c <= 0x11FF)
+                || (c >= 0xA960 && c <= 0xA97F)
+                || (c >= 0xD7B0 && c <= 0xD7FF);
+    }
+
     /// Every code point Unicode canonically decomposes to exactly one OTHER code point.
     ///
     /// A closed set, not a selection: these are the characters that are a different character
@@ -384,6 +398,7 @@ public final class DocumentIndexSerializer {
             if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
                     || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
                     || (c >= 0xFE20 && c <= 0xFE2F)
+                    || isConjoiningJamo(c)
                     || isCanonicalSingleton(c)) {
                 return i;
             }

@@ -111,6 +111,27 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
+        #if os(macOS)
+        // The system may ask for a specific revision, and this provider serves one publication:
+        // whatever the app has published now. Handing over the current bytes labelled as the
+        // requested version would be a silent substitution, so an ask for anything else is
+        // refused with the error the system defines for it.
+        //
+        // macOS only, and both halves of that are the SDK's: NSFileProviderErrorVersionNoLongerAvailable
+        // is API_UNAVAILABLE(ios), and the header says of this parameter that "requestedVersion
+        // is currently always set to nil" -- so on iOS there is nothing to compare and no error
+        // to report it with.
+        if let requestedVersion = requestedVersion,
+           requestedVersion.contentVersion
+               != CN1DocumentItem(node: node, parentId: .rootContainer,
+                                  containerURL: containerURL,
+                                  revision: index.revision).itemVersion.contentVersion {
+            completionHandler(nil, nil, NSFileProviderError(.versionNoLongerAvailable))
+            progress.completedUnitCount = 1
+            return progress
+        }
+        #endif
+
         // No item is built here on purpose. Both branches below hand the system one read after
         // the bytes are in hand, from a fresh index, because the publication can change while a
         // copy or a download is running -- and an item captured now would describe the file as it

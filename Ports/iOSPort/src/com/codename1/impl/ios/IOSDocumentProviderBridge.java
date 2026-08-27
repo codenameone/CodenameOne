@@ -262,17 +262,38 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
             if (nativeInstance.documentsReplaceFile(tmp, target)) {
                 return;
             }
-            // The native is a no-op in a build that did not link the document natives at all --
-            // the simulator, or an app that never referenced the API. Nothing is enumerating
-            // there, so the two-step fallback is safe.
-            if (fs.exists(target)) {
-                fs.delete(target);
-            }
-            // a relative new name renames within the same directory
+            // A false answer is not proof that the natives are absent. It is also what a real
+            // rename(2) failure looks like -- a full volume, a read-only mount -- so the fallback
+            // has to be one that cannot destroy the publication that is already there. Deleting
+            // the target first and then failing the second rename for the same reason left the
+            // app with no index at all, which is worse than a publish that did not happen.
+            //
+            // A plain rename first: on every filesystem this runs on it replaces, and then there
+            // is nothing to clean up.
             fs.rename(tmp, name);
-            if (!fs.exists(target)) {
-                throw new IOException("Failed to rename " + tmp + " to " + target);
+            if (!fs.exists(tmp)) {
+                return;
             }
+            // Refused, most likely because the name is taken. The old file is moved aside rather
+            // than deleted, so it can be put back.
+            String asideName = name + ".previous";
+            String aside = dir + "/" + asideName;
+            boolean hadTarget = fs.exists(target);
+            if (hadTarget) {
+                fs.delete(aside);
+                fs.rename(target, asideName);
+            }
+            fs.rename(tmp, name);
+            if (!fs.exists(tmp)) {
+                fs.delete(aside);
+                return;
+            }
+            if (hadTarget && fs.exists(aside)) {
+                fs.rename(aside, name);
+            }
+            fs.delete(tmp);
+            throw new IOException("Failed to rename " + tmp + " to " + target
+                    + "; the previous publication was left in place");
         }
     }
 

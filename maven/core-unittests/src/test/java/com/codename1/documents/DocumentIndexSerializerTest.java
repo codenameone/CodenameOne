@@ -305,6 +305,23 @@ class DocumentIndexSerializerTest {
         tonos.add(DocumentNode.file("a", "\u03ac.txt"));
         assertNotNull(DocumentIndexSerializer.serialize(tonos));
 
+        // Hangul composes by algorithm rather than from a table, so neither a combining-mark
+        // test nor a singleton list sees it: U+1100 U+1161 is the same filename as U+AC00.
+        DocumentNode jamo = DocumentNode.folder("root", "Root");
+        jamo.add(DocumentNode.file("a", "\u1100\u1161.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(jamo));
+
+        DocumentNode syllable = DocumentNode.folder("root", "Root");
+        syllable.add(DocumentNode.file("a", "\uac00.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(syllable));
+
+        // The COMPATIBILITY jamo are a different range and stay allowed: that is what a name
+        // meaning the letter itself uses.
+        DocumentNode letter = DocumentNode.folder("root", "Root");
+        letter.add(DocumentNode.file("a", "\u3131.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(letter));
+
         // A script whose marks have no precomposed form is untouched -- refusing decomposed
         // spellings must not amount to refusing whole writing systems.
         DocumentNode devanagari = DocumentNode.folder("root", "Root");
