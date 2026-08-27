@@ -112,6 +112,10 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // copy or a download is running -- and an item captured now would describe the file as it
         // was when the request arrived, not as it is when it is handed over.
 
+        // Guarded because two things can finish this fetch -- the work and a cancellation -- and
+        // calling the system's completion handler twice is a contract violation of its own.
+        let once = CN1FetchCompletion(completionHandler)
+
         // A local copy always wins, which is what makes a cached remote document open without a
         // round trip.
         if let path = node.path, !path.isEmpty {
@@ -126,25 +130,46 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 // completion handler." Handing over the app's own file would unlink it out of the
                 // shared container on the first open, and every later open would find nothing.
                 let handoff = handoffDirectory().appendingPathComponent(UUID().uuidString)
-                do {
-                    try FileManager.default.copyItem(at: local, to: handoff)
-                    // Re-read afterwards, exactly as the remote branch does. A large file takes
-                    // long enough to copy that a clear() or an account-switch republish can land
-                    // during it, and the copy finishes from the source handle either way -- so
-                    // without this the previous publication's bytes are handed over after the
-                    // logout that was supposed to remove them.
-                    if let current = CN1FileProviderExtension.publishedItem(
-                            for: itemIdentifier, path: path, generation: index.revision,
-                            containerURL: containerURL) {
-                        completionHandler(handoff, current, nil)
-                    } else {
-                        try? FileManager.default.removeItem(at: handoff)
-                        completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
+                let container = containerURL
+                let generation = index.revision
+                // Off the request thread. fetchContents is expected to return its Progress
+                // promptly, and copying a large document takes long enough that doing it here
+                // holds the reply until it finishes -- which the system reads as a provider that
+                // has stopped responding.
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        try FileManager.default.copyItem(at: local, to: handoff)
+                        // Re-read afterwards, exactly as the remote branch does. A large file
+                        // takes long enough to copy that a clear() or an account-switch republish
+                        // can land during it, and the copy finishes from the source handle either
+                        // way -- so without this the previous publication's bytes are handed over
+                        // after the logout that was supposed to remove them.
+                        if let current = CN1FileProviderExtension.publishedItem(
+                                for: itemIdentifier, path: path, generation: generation,
+                                containerURL: container) {
+                            if !once.call(handoff, current, nil) {
+                                // A cancellation got there first, so nothing will ever collect
+                                // this copy.
+                                try? FileManager.default.removeItem(at: handoff)
+                            }
+                        } else {
+                            try? FileManager.default.removeItem(at: handoff)
+                            once.call(nil, nil, NSFileProviderError(.noSuchItem))
+                        }
+                    } catch {
+                        once.call(nil, nil, CN1DocumentRemote.providerError(error))
                     }
-                } catch {
-                    completionHandler(nil, nil, CN1DocumentRemote.providerError(error))
+                    progress.completedUnitCount = 1
+                    progress.cancellationHandler = nil
                 }
-                progress.completedUnitCount = 1
+                // Cancelling answers the system at once and drops the copy when it lands. The
+                // copy itself is not interrupted: FileManager cannot be stopped mid-file, and
+                // chunking a local disk copy to gain that would cost more than it saves -- there
+                // is no network here, and the bytes are deleted rather than kept.
+                progress.cancellationHandler = { [weak progress] in
+                    once.call(nil, nil, CocoaError(.userCancelled))
+                    progress?.completedUnitCount = 1
+                }
                 return progress
             }
         }
@@ -153,9 +178,6 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        // Guarded because two things can finish this fetch -- the download and a cancellation --
-        // and calling the system's completion handler twice is a contract violation of its own.
-        let once = CN1FetchCompletion(completionHandler)
         let container = containerURL
         // Captured before the download starts, so what comes back is checked against what was
         // asked for rather than against whatever happens to be current when it arrives.
@@ -177,7 +199,13 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                                                                        version: requested,
                                                                        credentials: credentials,
                                                                        containerURL: container) {
-                    once.call(url, current, nil)
+                    if !once.call(url, current, nil) {
+                        // A cancellation got there first, so File Provider will never collect
+                        // this file -- and nothing else would ever delete it. Repeatedly
+                        // cancelling near the end of a download would otherwise fill the
+                        // extension's temporary directory with whole documents.
+                        try? FileManager.default.removeItem(at: url)
+                    }
                 } else {
                     try? FileManager.default.removeItem(at: url)
                     once.call(nil, nil, NSFileProviderError(.noSuchItem))
@@ -329,7 +357,10 @@ private final class CN1FetchCompletion {
         self.handler = handler
     }
 
-    func call(_ url: URL?, _ item: NSFileProviderItem?, _ error: Error?) {
+    /// - Returns: true when this call is the one that answered the system. A loser has to clean
+    ///   up whatever it was about to hand over, since nothing downstream will ever see it.
+    @discardableResult
+    func call(_ url: URL?, _ item: NSFileProviderItem?, _ error: Error?) -> Bool {
         lock.lock()
         let first = !done
         done = true
@@ -337,5 +368,6 @@ private final class CN1FetchCompletion {
         if first {
             handler(url, item, error)
         }
+        return first
     }
 }
