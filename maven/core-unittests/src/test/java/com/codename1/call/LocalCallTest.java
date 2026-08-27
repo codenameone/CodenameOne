@@ -31,6 +31,7 @@ import com.codename1.call.session.CallConfiguration;
 import com.codename1.call.session.CallSession;
 import com.codename1.call.session.Calls;
 import com.codename1.call.voip.PushedCall;
+import com.codename1.impl.call.CallWire;
 import com.codename1.call.voip.VoipPush;
 import com.codename1.call.voip.VoipPushListener;
 import com.codename1.impl.call.CallRequests;
@@ -497,6 +498,27 @@ public class LocalCallTest {
         assertEquals(id, got.get(0).getSession().getCallId());
         assertEquals("room-7", got.get(0).getData());
         assertFalse(got.get(0).isStale());
+    }
+
+    @Test
+    public void aPushedCallDeliveredTooEarlyIsHeldRatherThanDropped() {
+        // The port's readiness flag is the UNION of the two listener kinds,
+        // so an app that registers a Calls ACTION listener and no VoipPush
+        // one makes the native side think it can drain. The call was then
+        // handed to a facade with no push listener and dropped for good --
+        // and the drain had already claimed it, so the platform's own
+        // unanswered-call watchdog would not retire it either. The system
+        // went on ringing a call the app was never told about.
+        VoipPush.deliverPushedCall(CallId.random(),
+                CallWire.encodeHandle(CallHandle.phone("+14155551212")),
+                "Ada", false, false, false, "room-9",
+                System.currentTimeMillis());
+
+        final List<PushedCall> got = new ArrayList<PushedCall>();
+        VoipPush.setListener(new Collector(got));
+        waitFor(got, 1);
+        assertEquals("room-9", got.get(0).getData(),
+                "a call delivered before the listener existed must survive");
     }
 
     @Test

@@ -879,6 +879,18 @@ public final class Calls {
                     break;
                 }
                 case AUDIO_ON: {
+                    if (session == null) {
+                        // The call ended while this was in flight. Native
+                        // callbacks arrive off the EDT and are queued onto
+                        // it, so an activation can land after the end that
+                        // followed it -- and audioSessionActivated tells the
+                        // app to START media. On Android the deactivation is
+                        // delivered synchronously as the call ends, so it
+                        // would already have gone by, leaving this late
+                        // activation with no stop event behind it and media
+                        // running after the call was over.
+                        break;
+                    }
                     CallAudioSession s = new CallAudioSession(callId, route(ordinal));
                     for (CallActionListener l : ls) {
                         tellAudioOn(l, s);

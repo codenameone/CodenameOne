@@ -129,11 +129,39 @@ public final class VoipPush {
         if (b != null) {
             drainIfWanted(b);
         }
+        // Anything that arrived before this listener existed. Taken out under
+        // the monitor and delivered outside it, so a listener that installs
+        // another one from callReceived does not deadlock.
+        Delivery[] held;
+        synchronized (LISTENERS) {
+            if (l == null || HELD.isEmpty()) {
+                return;
+            }
+            held = HELD.toArray(new Delivery[HELD.size()]);
+            HELD.clear();
+        }
+        for (Delivery d : held) {
+            post(d);
+        }
     }
 
     /// Whether a listener is waiting for the calls the port already has.
     /// Guarded by LISTENERS, like the listener it belongs to.
     private static boolean drainWanted;
+
+    /// Calls delivered while no push listener was installed.
+    ///
+    /// The port's readiness flag is the UNION of the two listener kinds --
+    /// an app that registers a Calls action listener makes it true without
+    /// touching VoipPush -- so a pushed call can be drained before any push
+    /// listener exists. Dropping it there lost the call for good: the drain
+    /// had already claimed it, so the platform's own unanswered-call
+    /// watchdog would not retire it either, and the system went on ringing a
+    /// call the app was never told about.
+    ///
+    /// Held here instead, and replayed by [#setListener]. Guarded by
+    /// LISTENERS, because whether to hold is decided by whether one exists.
+    private static final List<Delivery> HELD = new ArrayList<Delivery>();
 
     /// Drains once, when there is somewhere to drain from.
     ///
@@ -277,6 +305,18 @@ public final class VoipPush {
     }
 
     private static void post(Delivery d) {
+        // A CALL with nobody to hand it to is held, not dropped; see HELD.
+        // A token is not: it is re-read from getToken() by whoever asks, and
+        // replaying a stale one at a listener that registers later would say
+        // "your token just changed" about a token that did not.
+        if (d.call != null) {
+            synchronized (LISTENERS) {
+                if (LISTENERS.isEmpty()) {
+                    HELD.add(d);
+                    return;
+                }
+            }
+        }
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(d);
         } else {
@@ -320,6 +360,7 @@ public final class VoipPush {
     public static void resetForTest() {
         synchronized (LISTENERS) {
             LISTENERS.clear();
+            HELD.clear();
         }
         synchronized (VoipPush.class) {
             token = null;
