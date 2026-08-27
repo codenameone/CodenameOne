@@ -223,6 +223,22 @@ public class ByteCodeTranslator {
         return "true".equals(System.getProperty("cn1.sqlcipher", "false"));
     }
 
+    /**
+     * True when CHECKCAST should actually verify the cast and throw ClassCastException
+     * instead of expanding to nothing (issue #5531). Opt-in, because enforcing it changes
+     * the outcome of app builds that succeed today: a cast that silently produced the wrong
+     * object now throws where nothing threw before. Server-side (clean-target) builds handle
+     * untrusted input and should always enable it.
+     *
+     * <p>This one flag drives both halves and they must stay in agreement: it makes
+     * TypeInstruction emit BC_CHECKCAST_CHECKED, and it makes ByteCodeClass retain
+     * java.lang.ClassCastException. Emitting the check without retaining the class would
+     * leave an unresolved symbol at link time.
+     */
+    public static boolean isCheckedCastsEnabled() {
+        return "true".equalsIgnoreCase(System.getProperty("cn1.checkedCasts", "false"));
+    }
+
     /// Writes the bundled SQLite engine into a source root, or takes it back out.
     ///
     /// Emitted only for an application that uses `com.codename1.db`, and its ciphers only for one

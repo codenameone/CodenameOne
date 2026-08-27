@@ -4263,7 +4263,15 @@ public class BytecodeMethod implements SignatureSet {
             int currentOpcode = current.getOpcode();
             switch(currentOpcode) {
                 case Opcodes.CHECKCAST: {
-                    // Remove the check cast for now as it gets in the way of other optimizations
+                    // Remove the check cast for now as it gets in the way of other optimizations.
+                    // This removal is WHY a failed cast never throws (issue #5531): dropping the
+                    // instruction here means TypeInstruction never gets to emit anything for it,
+                    // so implementing the BC_CHECKCAST macro alone would have had no effect.
+                    // Under -Dcn1.checkedCasts=true the instruction is kept, at the cost of the
+                    // optimizations this removal was protecting.
+                    if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+                        break;
+                    }
                     instructions.remove(iter);
                     iter--;
                     instructionCount--;
@@ -4641,6 +4649,11 @@ public class BytecodeMethod implements SignatureSet {
                                         "        JAVA_OBJECT __cn1ArrayTmp = " + arrayLiteral + ";\n" +
                                         "        JAVA_INT __cn1IndexTmp = " + indexLiteral + ";\n" +
                                         "        " + valueType + " __cn1ValueTmp = " + valueLiteral + ";\n" +
+                                        // The macro's own comment used to claim it covariance-checks
+                                        // OBJECT stores; it never did. Under -Dcn1.checkedCasts the
+                                        // check is emitted here, ahead of the store.
+                                        ("OBJECT".equals(elementType) && ByteCodeTranslator.isCheckedCastsEnabled()
+                                                ? "        CN1_ARRAY_STORE_CHECK(__cn1ArrayTmp, __cn1ValueTmp);\n" : "") +
                                         "        CN1_SET_ARRAY_ELEMENT_"+elementType+"(__cn1ArrayTmp, __cn1IndexTmp, __cn1ValueTmp);\n" +
                                         "    }\n";
                             }

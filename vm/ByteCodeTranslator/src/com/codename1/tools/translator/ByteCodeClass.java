@@ -464,6 +464,13 @@ public class ByteCodeClass {
         dependsClassesInterfaces.clear();
         exportsClassesInterfaces.clear();
         dependsClassesInterfaces.add("java_lang_NullPointerException");
+        if(ByteCodeTranslator.isCheckedCastsEnabled()) {
+            // Kept alive for BC_CHECKCAST_CHECKED, which is emitted under the same
+            // flag. Retaining it only when the check is emitted keeps the class out
+            // of every build that does not enforce casts.
+            dependsClassesInterfaces.add("java_lang_ClassCastException");
+            dependsClassesInterfaces.add("java_lang_ArrayStoreException");
+        }
         setBaseClass(baseClass);
         if (isAnnotation) {
             dependsClassesInterfaces.add("java_lang_annotation_Annotation");
@@ -1258,9 +1265,14 @@ public class ByteCodeClass {
                                 + "        getThreadLocalData()->lightweightThread = JAVA_TRUE;\n"
                                 + "        getThreadLocalData()->threadActive = JAVA_TRUE;\n"
                                 + "#endif\n");
+                        // Hand main() the real command line. This used to pass
+                        // JAVA_NULL, so a translated program could not read its own
+                        // arguments at all and every knob had to come in through the
+                        // environment (see vm/benchmarks). cn1MainArgs skips argv[0] --
+                        // Java's args array excludes the program name.
                         b.append("        ");
                         b.append(clsName);
-                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n");
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), cn1MainArgs(getThreadLocalData(), argc, argv));\n");
                         // main returning does not end the process here -- AppKit
                         // owns the main thread and keeps running -- so leaving
                         // the worker registered would leave the collector
@@ -1279,7 +1291,7 @@ public class ByteCodeClass {
                     } else {
                         b.append("    ");
                         b.append(clsName);
-                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
+                        b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), cn1MainArgs(getThreadLocalData(), argc, argv));\n}\n\n");
                     }
                 }
             }

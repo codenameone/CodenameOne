@@ -11666,6 +11666,31 @@ void cn1GcProbeInit(void) {
 }
 #endif /* CN1_GC_CONFORM */
 
+// Builds the String[] that main(String[]) receives, from the process argv.
+// Java's args array does NOT include the program name -- argv[0] is the
+// executable path and main()'s first element is the first real argument -- so
+// the copy starts at argv[1] and the array is argc-1 long. A clean-target
+// binary previously passed JAVA_NULL here, so every translated program was
+// unable to read its own command line.
+//
+// CN1_WRITE_BARRIER is required on each store (the array may already be
+// tenured by the time a later element is written); no CN1_SATB_DELETE is
+// needed because the array is freshly allocated and every slot is still NULL,
+// and the deletion barrier is a no-op on a NULL previous value.
+JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]) {
+    int count = argc > 1 ? argc - 1 : 0;
+    enteringNativeAllocations();
+    JAVA_OBJECT arrObj = allocArray(threadStateData, count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    JAVA_ARRAY_OBJECT* dest = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)arrObj)->data;
+    for(int iter = 0 ; iter < count ; iter++) {
+        JAVA_OBJECT str = newStringFromCString(threadStateData, argv[iter + 1]);
+        CN1_WRITE_BARRIER(arrObj, str);
+        dest[iter] = str;
+    }
+    finishedNativeAllocations();
+    return arrObj;
+}
+
 void initConstantPool() {
     cn1StartupPhase("main");
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
@@ -11895,6 +11920,40 @@ JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionAr
 JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     throwException(threadStateData, exceptionArg);
     return JAVA_FALSE;
+}
+
+// Thrown by BC_CHECKCAST_CHECKED. The exception carries no detail message: the
+// no-arg constructor is the shape proven to survive dead-code elimination (it is
+// how NullPointerException is thrown from here), whereas a String-argument
+// constructor reachable only from this file would depend on native-use retention.
+// The class names are printed instead, so a failure is still diagnosable, and
+// attaching a real message is a follow-up once the constructor's retention is
+// pinned. Only reached on an actual bad cast, so the fprintf costs nothing on the
+// success path.
+// Shared failure path for BC_CHECKCAST_CHECKED and CN1_ARRAY_STORE_CHECK.
+//
+// The exception object is constructed BY THE CALLER and passed in, deliberately:
+// if this function named __NEW_INSTANCE_java_lang_ClassCastException itself, the
+// runtime would reference that symbol in every build, while the class is only
+// retained when -Dcn1.checkedCasts is on -- an unresolved symbol at link time for
+// everyone else. Keeping the reference in generated code, which only exists under
+// the same flag that retains the class, makes the two impossible to desynchronize.
+// (That is exactly how the first cut of this broke FileClassIntegrationTest.)
+//
+// No detail message on the exception: the no-arg constructor is the shape proven
+// to survive dead-code elimination (it is how NullPointerException is thrown from
+// here), whereas a String constructor reachable only from this file would depend
+// on native-use retention. The names are printed instead, so a failure is still
+// diagnosable. Only reached on an actual bad cast or store, so the fprintf costs
+// nothing on the success path.
+void cn1ThrowTypeError(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exception, const char* fromClass, const char* toClass) {
+    if(toClass == NULL) {
+        fprintf(stderr, "ArrayStoreException: %s\n", fromClass == NULL ? "?" : fromClass);
+    } else {
+        fprintf(stderr, "ClassCastException: %s cannot be cast to %s\n",
+                fromClass == NULL ? "?" : fromClass, toClass);
+    }
+    throwException(threadStateData, exception);
 }
 
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {

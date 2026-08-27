@@ -47,6 +47,12 @@ public final class System {
     public static final java.io.PrintStream out = new PrintStream(new NSLogOutputStream());
 
     /**
+     * The standard input stream. Reads from the process's stdin, so a translated
+     * program can be driven by a pipe the way any other command-line program is.
+     */
+    public static final java.io.InputStream in = new java.io.StandardInputStream();
+
+    /**
      * Copies an array from the specified source array, beginning at the specified position, to the specified position of the destination array. A subsequence of array components are copied from the source array referenced by src to the destination array referenced by dst. The number of components copied is equal to the length argument. The components at positions srcOffset through srcOffset+length-1 in the source array are copied into positions dstOffset through dstOffset+length-1, respectively, of the destination array.
      * If the src and dst arguments refer to the same array object, then the copying is performed as if the components at positions srcOffset through srcOffset+length-1 were first copied to a temporary array with length components and then the contents of the temporary array were copied into positions dstOffset through dstOffset+length-1 of the destination array.
      * If dst is null, then a NullPointerException is thrown.
@@ -182,6 +188,15 @@ public final class System {
     public static java.lang.String getProperty(java.lang.String key){
         return null; 
     }
+
+    /**
+     * Returns the value of the named environment variable, or null when it is
+     * not set. Environment variables are the only configuration channel a
+     * process gets before it parses its own arguments, so a server-side
+     * translated binary needs this to find, for example, the endpoint its host
+     * runtime published to it.
+     */
+    public static native java.lang.String getenv(java.lang.String name);
 
     /**
      * Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.

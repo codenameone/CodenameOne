@@ -27,6 +27,7 @@
 
 #include "cn1_globals.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <ctype.h>
 #include <assert.h>
 #include <errno.h>
@@ -1028,6 +1029,167 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     if(cn1__satbReg) {
         cn1SatbBulkEnd();
     }
+}
+
+// getenv returns a pointer into the process environment, which is owned by the
+// C runtime and must not be freed. stringToUTF8 hands back the calling thread's
+// scratch buffer, so the lookup must finish with it before anything else on this
+// thread converts another string -- newStringFromCString copies, so building the
+// result here is safe.
+JAVA_OBJECT java_lang_System_getenv___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+    if(name == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    const char* key = stringToUTF8(threadStateData, name);
+    if(key == NULL) {
+        return JAVA_NULL;
+    }
+    const char* value = getenv(key);
+    if(value == NULL) {
+        return JAVA_NULL;
+    }
+    return newStringFromCString(threadStateData, value);
+}
+
+// ---------------------------------------------------------------------------
+// java.io file streams and standard input.
+//
+// Backed by C stdio (not POSIX fds) so the same code serves the Windows clean
+// target, which has no unistd.h. The Java side stores the FILE* as a long; 0 is
+// the "not open" value, which is why every open returns 0 rather than -1 on
+// failure. Negative returns below -1 mean "error" as opposed to -1's "end of
+// file", and the Java side turns those into IOException.
+//
+// The byte[] is only touched between entry and return, so it needs no GC
+// bracket: under conservative roots the argument is a scanned native local, and
+// nothing here allocates.
+// ---------------------------------------------------------------------------
+
+JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name) {
+    if(name == JAVA_NULL) {
+        return 0;
+    }
+    const char* path = stringToUTF8(threadStateData, name);
+    if(path == NULL) {
+        return 0;
+    }
+    FILE* f = fopen(path, "rb");
+    return (JAVA_LONG)(intptr_t)f;
+}
+
+JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL || buffer == JAVA_NULL) {
+        return -2;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    size_t n = fread(&data[offset], 1, (size_t)length, f);
+    if(n == 0) {
+        return feof(f) ? -1 : -2;
+    }
+    return (JAVA_INT)n;
+}
+
+JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_LONG count) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    // Clamped to the real end so the return value is bytes actually skipped, which
+    // is what InputStream.skip promises -- seeking past EOF succeeds in C and would
+    // otherwise report a skip that did not happen.
+    long start = ftell(f);
+    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+        return -1;
+    }
+    long end = ftell(f);
+    long target = start + (long)count;
+    if(target > end) {
+        target = end;
+    }
+    if(fseek(f, target, SEEK_SET) != 0) {
+        return -1;
+    }
+    return (JAVA_LONG)(target - start);
+}
+
+JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    long start = ftell(f);
+    if(start < 0 || fseek(f, 0, SEEK_END) != 0) {
+        return -1;
+    }
+    long end = ftell(f);
+    if(fseek(f, start, SEEK_SET) != 0) {
+        return -1;
+    }
+    long remaining = end - start;
+    if(remaining < 0) {
+        return -1;
+    }
+    return remaining > 0x7fffffffL ? 0x7fffffff : (JAVA_INT)remaining;
+}
+
+JAVA_INT java_io_FileInputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return 0;
+    }
+    return fclose(f) == 0 ? 0 : -1;
+}
+
+JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_BOOLEAN append) {
+    if(name == JAVA_NULL) {
+        return 0;
+    }
+    const char* path = stringToUTF8(threadStateData, name);
+    if(path == NULL) {
+        return 0;
+    }
+    FILE* f = fopen(path, append ? "ab" : "wb");
+    return (JAVA_LONG)(intptr_t)f;
+}
+
+JAVA_INT java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL || buffer == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    return (JAVA_INT)fwrite(&data[offset], 1, (size_t)length, f);
+}
+
+JAVA_INT java_io_FileOutputStream_flushImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return -1;
+    }
+    return fflush(f) == 0 ? 0 : -1;
+}
+
+JAVA_INT java_io_FileOutputStream_closeImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
+    FILE* f = (FILE*)(intptr_t)handle;
+    if(f == NULL) {
+        return 0;
+    }
+    return fclose(f) == 0 ? 0 : -1;
+}
+
+// Standard input. Separate from FileInputStream because stdin is not seekable, so
+// skip/available cannot be implemented by the ftell dance above.
+JAVA_INT java_io_StandardInputStream_readImpl___byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT length) {
+    if(buffer == JAVA_NULL) {
+        return -2;
+    }
+    JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)buffer)->data;
+    size_t n = fread(&data[offset], 1, (size_t)length, stdin);
+    if(n == 0) {
+        return feof(stdin) ? -1 : -2;
+    }
+    return (JAVA_INT)n;
 }
 
 JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {

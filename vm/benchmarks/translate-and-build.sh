@@ -11,6 +11,8 @@
 #
 # Environment knobs:
 #   CN1_BENCH_CFLAGS  extra clang flags (e.g. -flto=thin for the release shape)
+#   CN1_BENCH_TRANSLATOR_OPTS  extra -D properties for the translator JVM
+#                     (e.g. -Dcn1.checkedCasts=true)
 #   CN1_BENCH_CC      compiler (default clang)
 set -e
 cd "$(dirname "$0")"
@@ -84,7 +86,7 @@ fi
 
 # 5. translate to C
 mkdir -p "$WORK/out"
-"$J8/bin/java" -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
+"$J8/bin/java" $CN1_BENCH_TRANSLATOR_OPTS -cp "$TRANSLATOR:$ASM_CP" com.codename1.tools.translator.ByteCodeTranslator \
     clean "$JAVAAPI;$WORK/classes" "$WORK/out" "$MAIN" com.bench "$MAIN" 1.0 clean none \
     > "$WORK/translate.log" 2>&1 || { echo "TRANSLATE FAILED"; tail -30 "$WORK/translate.log"; exit 1; }
 

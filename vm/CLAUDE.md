@@ -29,10 +29,11 @@ unset = off, so probe-on and probe-off are the same binary). Two emitters:
 
 `vm/benchmarks/src/com/bench/GcSteadyState.java` is the churn workload, parameterised
 through the environment (`CN1_WL_SECONDS`, `CN1_WL_THREADS`, `CN1_WL_DEPTH`,
-`CN1_WL_BRANCH`, `CN1_WL_SLEEP_MS`, ...) because the clean target's generated `main()`
-passes `JAVA_NULL` for args. Sweeping `CN1_WL_SLEEP_MS` over `{0,1,10,100,1000}` is the
-cheapest discriminator between a rate problem and a retention problem, and needs no
-rebuild.
+`CN1_WL_BRANCH`, `CN1_WL_SLEEP_MS`, ...). It predates `main(String[])` receiving the real
+command line -- the clean target's generated `main()` used to pass `JAVA_NULL` for args --
+and stays environment-driven because every A/B script already sets it up that way.
+Sweeping `CN1_WL_SLEEP_MS` over `{0,1,10,100,1000}` is the cheapest discriminator between a
+rate problem and a retention problem, and needs no rebuild.
 
 Every GC ablation is a **compile-time** macro, so each A/B arm is a rebuild; use
 `vm/benchmarks/translate-and-build.sh` with `CN1_BENCH_CFLAGS` (see `ab-adopt.sh`), which

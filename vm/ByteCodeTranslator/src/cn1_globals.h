@@ -446,7 +446,46 @@ typedef struct clazz*       JAVA_CLASS;
     }
 
 // todo map instanceof and throw typecast exception
+// CHECKCAST is a no-op by default: ParparVM has always let a failed cast through,
+// so the wrong object reaches the next instruction and the target type's fields
+// get read out of it (issue #5531). That is a native crash no Java catch can see.
+//
+// BC_CHECKCAST_CHECKED is the enforcing form. The translator emits it in place of
+// BC_CHECKCAST only when -Dcn1.checkedCasts=true, and that same flag is what makes
+// the translator retain java.lang.ClassCastException -- so the emission and the
+// class's survival can never disagree and leave an unresolved symbol. Enforcement
+// is opt-in rather than the default because turning it on changes the outcome of
+// app builds that succeed today; server-side (clean-target) builds, which parse
+// untrusted input, should always turn it on.
+//
+// The cost is one instanceofFunction call, the same check INSTANCEOF already pays.
 #define BC_CHECKCAST(type)
+// AASTORE's companion hole: the array store is only bounds-checked, never
+// covariance-checked, so `Object[] o = new String[1]; o[0] = anInteger;` silently
+// stores the wrong type and the next reader gets an Integer where it expects a
+// String. Emitted by BasicInstruction under the same -Dcn1.checkedCasts flag that
+// drives BC_CHECKCAST_CHECKED, so ArrayStoreException's retention and the check's
+// emission cannot disagree.
+//
+// arrayType is the component class (0 for a non-array, which cannot happen here
+// after CHECK_ARRAY_ACCESS, but is tolerated rather than dereferenced).
+#define CN1_ARRAY_STORE_CHECK(arrayObj, value) { \
+    if((value) != JAVA_NULL) { \
+        struct clazz* cn1__comp = CN1_CLASS_OF(arrayObj)->arrayType; \
+        if(cn1__comp != NULL && !instanceofFunction(cn1__comp->classId, GET_CLASS_ID(value))) { \
+            cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ArrayStoreException(threadStateData), CN1_CLASS_OF(value)->clsName, NULL); \
+        } \
+    } \
+}
+
+#define BC_CHECKCAST_CHECKED(typeOfCheckCast, targetName) { \
+    if(SP[-1].data.o != JAVA_NULL) { \
+        int tmpCheckCastId = GET_CLASS_ID(SP[-1].data.o); \
+        if(!instanceofFunction(typeOfCheckCast, tmpCheckCastId)) { \
+            cn1ThrowTypeError(threadStateData, __NEW_INSTANCE_java_lang_ClassCastException(threadStateData), CN1_CLASS_OF(SP[-1].data.o)->clsName, targetName); \
+        } \
+    } \
+}
 
 #define BC_SWAP() swapStack(SP)
 
@@ -1956,6 +1995,9 @@ extern JAVA_INT  throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exc
 extern JAVA_BOOLEAN  throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_OBJECT __NEW_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_ClassCastException(CODENAME_ONE_THREAD_STATE);
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_ArrayStoreException(CODENAME_ONE_THREAD_STATE);
+extern void cn1ThrowTypeError(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exception, const char* fromClass, const char* toClass);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_StackOverflowError(CODENAME_ONE_THREAD_STATE);
 // Throws the PREALLOCATED StackOverflowError (pre-filled trace, no allocation,
 // no trace building) -- safe to call at stack exhaustion. See cn1_globals.m.
@@ -2454,6 +2496,7 @@ extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_
 // set the real count LAST, after every byte is written, so a concurrent GC never sees count>0 over
 // an unfinished value. Single word store.
 #define cn1FusedLatin1End(so, n) (((struct obj__java_lang_String*)(so))->java_lang_String_count = (n))
+extern JAVA_OBJECT cn1MainArgs(CODENAME_ONE_THREAD_STATE, int argc, char* argv[]);
 extern void initConstantPool();
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);
