@@ -64,6 +64,14 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 
     override func urlForItem(withPersistentIdentifier identifier: NSFileProviderItemIdentifier)
             -> URL? {
+        // The root IS documentStorageURL in this API -- that is what the storage URL means -- so
+        // it cannot be given a directory of its own like every other node. Treating it as an
+        // ordinary item put the root at "<storage>/<encoded-root-id>/<root-name>", which nothing
+        // else in the API agrees with, and left persistentIdentifierForItem unable to answer for
+        // the storage URL at all.
+        if identifier == .rootContainer {
+            return storageURL
+        }
         guard let item = try? item(for: identifier) else {
             return nil
         }
@@ -87,6 +95,12 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     }
 
     override func persistentIdentifierForItem(at url: URL) -> NSFileProviderItemIdentifier? {
+        // The other half of the root mapping above: the storage URL is the root container, and
+        // reading a per-item directory out of it would answer with whatever the last path
+        // component of the storage directory happens to be called.
+        if url.standardizedFileURL == storageURL.standardizedFileURL {
+            return .rootContainer
+        }
         let dir = url.deletingLastPathComponent().lastPathComponent
         guard !dir.isEmpty, let decoded = CN1FileProviderClassic.decode(dir) else {
             return nil

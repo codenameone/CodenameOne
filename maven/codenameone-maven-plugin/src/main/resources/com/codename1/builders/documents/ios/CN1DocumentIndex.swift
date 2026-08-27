@@ -134,16 +134,39 @@ final class CN1DocumentIndex {
 
     static func load(containerURL: URL) -> CN1DocumentIndex? {
         let url = containerURL.appendingPathComponent("cn1documents/index.json")
-        guard let data = try? Data(contentsOf: url) else {
-            return nil
+        // Stat, read, stat again, and only trust the pair when the file did not move under it.
+        //
+        // The app replaces this file whole, by rename, while the extension is reading: a stat
+        // taken after the read can belong to a publication the bytes in hand are not from, and
+        // the tree would then be served -- names, parents, the lot -- stamped with a revision
+        // that says it is the newer one. Everything downstream believes that stamp: it is the
+        // metadata version, the guard on an in-flight copy, and the fallback content version.
+        //
+        // Bounded rather than a loop: the writer is not adversarial, it is an app publishing, so
+        // a couple of retries covers a republish landing mid-read. The last attempt is returned
+        // whatever it says -- a stale revision is better than an empty browser, and the next
+        // publish signals again.
+        for attempt in 0..<3 {
+            let before = modificationStamp(of: url)
+            guard let data = try? Data(contentsOf: url) else {
+                return nil
+            }
+            guard let doc = try? JSONDecoder().decode(CN1DocumentIndexDocument.self,
+                                                      from: data) else {
+                return nil
+            }
+            let after = modificationStamp(of: url)
+            if before == after || attempt == 2 {
+                return CN1DocumentIndex(root: doc.root, revision: after)
+            }
         }
-        guard let doc = try? JSONDecoder().decode(CN1DocumentIndexDocument.self, from: data) else {
-            return nil
-        }
-        let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate])
-                .flatMap { $0 as? Date }
-                .map { String($0.timeIntervalSince1970) } ?? ""
-        return CN1DocumentIndex(root: doc.root, revision: stamp)
+        return nil
+    }
+
+    private static func modificationStamp(of url: URL) -> String {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate])
+            .flatMap { $0 as? Date }
+            .map { String($0.timeIntervalSince1970) } ?? ""
     }
 }
 
