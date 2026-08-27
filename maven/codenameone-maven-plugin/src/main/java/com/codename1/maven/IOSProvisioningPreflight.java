@@ -260,7 +260,7 @@ final class IOSProvisioningPreflight {
             if (name == null) {
                 continue;
             }
-            if (hasOwnProfile(settings, extension, name)) {
+            if (hasOwnProfile(settings, extension, name, release)) {
                 continue;
             }
             String bundleId = extensionBundleId(extension, packageName + "." + name);
@@ -311,7 +311,7 @@ final class IOSProvisioningPreflight {
             return problems;
         }
         String name = "CN1Documents";
-        if (hasOwnProfileSetting(settings, name)) {
+        if (hasOwnProfileSetting(settings, name, release)) {
             return problems;
         }
         Profile appProfile = appProfile(settings, release);
@@ -376,14 +376,17 @@ final class IOSProvisioningPreflight {
      * build server accepts: a {@code .mobileprovision} travelling inside the extension, the
      * {@code codename1.ios.appext.<Name>.provision} project setting (which the build
      * base64-encodes into {@code provisioningData}), or the hosted-URL build hint. The
-     * build-type qualified forms count too -- the mojo collapses those into the plain ones
-     * before submitting.
+     * build-type qualified form counts too, but only the one matching THIS build: the mojo
+     * collapses that one into the plain key and deletes the other without promoting it, so a
+     * release build holding only the debug-qualified setting reaches the server with no profile
+     * at all -- which is the failure this check exists to catch, not to wave through.
      */
-    private static boolean hasOwnProfile(Properties settings, File extension, String name) {
+    private static boolean hasOwnProfile(Properties settings, File extension, String name,
+            boolean release) {
         if (containsProfileFile(extension)) {
             return true;
         }
-        return hasOwnProfileSetting(settings, name);
+        return hasOwnProfileSetting(settings, name, release);
     }
 
     /**
@@ -391,15 +394,21 @@ final class IOSProvisioningPreflight {
      * There is no folder on disk to carry a {@code .mobileprovision}, so the project settings and
      * the build hints are the only carriers.
      */
-    private static boolean hasOwnProfileSetting(Properties settings, String name) {
+    private static boolean hasOwnProfileSetting(Properties settings, String name,
+            boolean release) {
+        // Only this build's qualifier, never both. CN1BuildMojo's
+        // resolveAppExtensionBuildTypeQualifiers promotes the matching qualifier to the plain key
+        // and REMOVES the other one, so counting the opposite build type's setting would pass a
+        // release build that has only a debug profile configured -- and it would then fail
+        // signing on the server, with a message about the extension's bundle ID rather than about
+        // the profile nobody supplied.
+        String qualifier = release ? "release" : "debug";
         String[] keys = {
             "codename1.ios.appext." + name + ".provision",
-            "codename1.ios.debug.appext." + name + ".provision",
-            "codename1.ios.release.appext." + name + ".provision",
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
             "codename1.arg.ios.appext." + name + ".provisioningData",
             "codename1.arg.ios.appext." + name + ".provisioningURL",
-            "codename1.arg.ios.debug.appext." + name + ".provisioningURL",
-            "codename1.arg.ios.release.appext." + name + ".provisioningURL"
+            "codename1.arg.ios." + qualifier + ".appext." + name + ".provisioningURL"
         };
         for (String key : keys) {
             String value = settings.getProperty(key);

@@ -240,6 +240,37 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
+    public void oppositeBuildTypeProfileDoesNotSatisfyIt() throws Exception {
+        // A release build holding only the DEBUG-qualified profile. CN1BuildMojo's
+        // resolveAppExtensionBuildTypeQualifiers promotes the matching qualifier to the plain key
+        // and removes the other one without promoting it, so this build would reach the server
+        // with no extension profile at all. Passing it here would move the failure to signing.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        Properties p = settings(profile("Dist", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.ios.debug.appext.MyExtension.provision", "/certs/ext.mobileprovision");
+        assertEquals(1, check(p, ios).size());
+    }
+
+    @Test
+    public void generatedExtensionOppositeBuildTypeProfileDoesNotSatisfyIt() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.debug.appext.CN1Documents.provisioningURL",
+                "https://example.com/ext");
+        assertEquals(1, checkGenerated(p).size());
+    }
+
+    @Test
+    public void generatedExtensionMatchingBuildTypeProfileSatisfiesIt() throws Exception {
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.release.appext.CN1Documents.provisioningURL",
+                "https://example.com/ext");
+        assertTrue(checkGenerated(p).isEmpty());
+    }
+
+    @Test
     public void provisioningUrlHintSatisfiesIt() throws Exception {
         File ios = iosDir();
         extensionFolder(ios, "MyExtension");
