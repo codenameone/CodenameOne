@@ -74,12 +74,19 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 /// owner's restore brings back exactly those and not a child the
 /// application had already hidden itself.
 @property (nonatomic, assign) BOOL hiddenByOwner;
+/// The minimum size as the framework asked for it, in this window's pixels.
+/// contentMinSize is points, and AppKit keeps the point value across a move
+/// to a display of another scale -- so the pixel minimum the application set
+/// silently halved or doubled. Kept so it can be recomputed. Zero means none.
+@property (nonatomic, assign) int minWidthPixels;
+@property (nonatomic, assign) int minHeightPixels;
 @end
 
 /// Reports a window's visibility and that of every window it owns.
 /// Defined below the window table; declared here because the record's own
 /// delegate methods are the first callers.
 static void cn1DeliverHiddenWithOwner(CN1MacWindowRecord *rec);
+static void cn1ApplyMinimumSize(CN1MacWindowRecord *rec);
 static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
 
 @implementation CN1MacWindowRecord
@@ -146,6 +153,10 @@ static void cn1DeliverShownWithOwner(CN1MacWindowRecord *rec);
 }
 
 - (void)windowDidChangeBackingProperties:(NSNotification *)notification {
+    // The minimum first: it is stored in points and the scale that produced it
+    // has just changed, so leaving it alone turns a 400-pixel minimum set on a
+    // 2x display into 200 on a 1x one.
+    cn1ApplyMinimumSize(self);
     [self windowDidResize:notification];
     CN1MacWindowDeliverWindowMonitorChanged(self.windowId);
 }
@@ -757,16 +768,17 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetMinimumSize___int_int_int
         // was not lifted, and AppKit is entitled to reject a negative one, so a
         // window that dropped its minimum kept the previous one.
         if (width <= 0 || height <= 0) {
+            // The retained request is cleared too, not just the live constraint.
+            // Leaving it set would let the next backing-scale change reapply a
+            // minimum the application had just lifted.
+            rec.minWidthPixels = 0;
+            rec.minHeightPixels = 0;
             rec.window.contentMinSize = NSZeroSize;
             return;
         }
-        // The WINDOW's own scale, not the desktop one. A minimum size is compared
-        // against what getWidth/getHeight report, and those are this window's
-        // drawable pixels -- so on a 1x secondary window under a 2x primary, a
-        // 400-pixel minimum divided by the desktop scale became 200. Position is
-        // desktop-space and size is drawable-space; this is a size.
-        CGFloat scale = cn1WindowScale(rec);
-        rec.window.contentMinSize = NSMakeSize(width / scale, height / scale);
+        rec.minWidthPixels = (int)width;
+        rec.minHeightPixels = (int)height;
+        cn1ApplyMinimumSize(rec);
     });
 }
 
@@ -1064,6 +1076,29 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_
     // Desktop-Windows.asciidoc rather than left for someone to discover.
     return [rec.view readbackInto:(unsigned int *)arr->data width:width height:height]
         ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/// Converts the retained pixel minimum into the points AppKit wants.
+///
+/// The WINDOW's own scale, not the desktop one. A minimum size is compared
+/// against what getWidth/getHeight report, and those are this window's drawable
+/// pixels -- so on a 1x secondary window under a 2x primary, a 400-pixel minimum
+/// divided by the desktop scale became 200. Position is desktop-space and size
+/// is drawable-space; this is a size.
+///
+/// Called again whenever the backing scale changes, because contentMinSize holds
+/// points and AppKit carries that value unchanged onto the new display.
+static void cn1ApplyMinimumSize(CN1MacWindowRecord *rec) {
+    if (rec == nil || rec.window == nil) {
+        return;
+    }
+    if (rec.minWidthPixels <= 0 && rec.minHeightPixels <= 0) {
+        rec.window.contentMinSize = NSZeroSize;
+        return;
+    }
+    CGFloat scale = cn1WindowScale(rec);
+    rec.window.contentMinSize = NSMakeSize(rec.minWidthPixels / scale,
+                                           rec.minHeightPixels / scale);
 }
 
 /// Whether any window this port created is still on screen.

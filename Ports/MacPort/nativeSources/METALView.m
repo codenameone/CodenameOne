@@ -1922,7 +1922,15 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
     if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
         return;
     }
-    CGFloat s = CN1AppKitBackingScale(self);
+    // The same CN1-logical -> framebuffer-pixel ratio the glass and lens paths
+    // derive, and for the same reason: the host reports its size in backing
+    // pixels, so scaleValue already carries the display's scale and the incoming
+    // coordinates are device pixels. Multiplying by the backing scale on top of
+    // that sampled a region at twice the requested position and size, which put
+    // anything in the right or bottom half of the window outside the texture
+    // entirely and clipped it away.
+    float sv = scaleValue > 0.0f ? scaleValue : 1.0f;
+    CGFloat s = CN1AppKitBackingScale(self) / sv;
     int texW = (int)self.screenTexture.width, texH = (int)self.screenTexture.height;
     int fx = (int)(x * s), fy = (int)(y * s), fw = (int)(w * s), fh = (int)(h * s);
     if (fx < 0) { fw += fx; fx = 0; }
