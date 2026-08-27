@@ -99,6 +99,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '8'
+          # Restored once for the whole job, and saved with whatever the later Java 25 steps
+          # pulled as well -- both use the same ~/.m2. Without it every run of this workflow
+          # re-fetched the world from Maven Central, which answered one of them with HTTP 429
+          # and failed the build on the pom rather than on anything in the change. Every other
+          # Java workflow here already caches this way.
+          cache: 'maven'
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
