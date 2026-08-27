@@ -11413,6 +11413,11 @@ public class IPhoneBuilder extends Executor {
                         request.getArg(key, ""));
             }
         }
+        // No export-options bookkeeping here, unlike the daemon's copy of this method: this
+        // builder produces the Xcode project for a local build and the developer archives it in
+        // Xcode, so there is no generated exportOptions.plist to name each embedded bundle by
+        // identifier. An overridden PRODUCT_BUNDLE_IDENTIFIER therefore needs nothing recorded --
+        // it is already in the build settings the target is generated with.
         // CRITICAL ordering note: this fragment rides in appExtensionsBuilder, which the schemes
         // script appends AFTER the global deployment-target pass (deploymentTargetStr stomps
         // IPHONEOS_DEPLOYMENT_TARGET on every existing target). Because this target is created
