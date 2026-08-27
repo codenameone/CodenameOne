@@ -1844,6 +1844,27 @@ public class BuildHintCatalogTest {
                         + "</executions></plugin></plugins></build></project>");
         assertFalse(overridden.contains("src/shared/kt"), overridden.toString());
 
+        // <sourceDirectory> is maven-compiler-plugin's root, so a chain that
+        // switches default-compile off does not compile it -- the same gate the
+        // conventional src/main/java already had, which this element did not.
+        String customRoot = "<project><build><sourceDirectory>appsrc</sourceDirectory>"
+                + "</build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(customRoot, null, null, true)
+                .contains("appsrc"));
+        assertFalse(CodenameOneSettings.declaredSourceRoots(customRoot, null, null, false)
+                .contains("appsrc"));
+
+        // ...and it is a per-element gate: a Kotlin root is still compiled when
+        // javac never runs, which is the whole point of a Kotlin-only module.
+        String kotlinOnly = "<project><build><plugins>"
+                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                + "<configuration><sourceDirs><sourceDir>src/main/kt</sourceDir>"
+                + "</sourceDirs></configuration>"
+                + "<executions><execution><goals><goal>compile</goal></goals></execution>"
+                + "</executions></plugin></plugins></build></project>";
+        assertTrue(CodenameOneSettings.declaredSourceRoots(kotlinOnly, null, null, false)
+                .contains("src/main/kt"));
+
         // Both attributes are read off the element Maven reads them off, not
         // found anywhere in the execution. combine.self on a nested element says
         // nothing about the configuration as a whole, and a whole-block search

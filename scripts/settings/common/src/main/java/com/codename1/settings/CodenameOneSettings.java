@@ -2505,9 +2505,24 @@ public class CodenameOneSettings extends Lifecycle {
     static java.util.List<String> declaredSourceRoots(String pomText,
                                                       java.util.Map<String, String> properties,
                                                       String managedFromChain) {
+        return declaredSourceRoots(pomText, properties, managedFromChain, true);
+    }
+
+    /// The same, with `javaCompiled` saying whether javac runs at all.
+    ///
+    /// `<sourceDirectory>` is maven-compiler-plugin's root, so a chain that
+    /// switches `default-compile` off with `<phase>none</phase>` and binds
+    /// nothing in its place does not compile it -- the same reason the
+    /// conventional `src/main/java` is withheld, applied to the declared root
+    /// too. The Kotlin and build-helper roots are unaffected, which is why this
+    /// is a per-element gate rather than one on the whole list.
+    static java.util.List<String> declaredSourceRoots(String pomText,
+                                                      java.util.Map<String, String> properties,
+                                                      String managedFromChain,
+                                                      boolean javaCompiled) {
         java.util.List<String> out = new java.util.ArrayList<>();
         for (String active : activeConfiguration(pomText)) {
-            collectDeclaredRoots(active, properties, managedFromChain, out);
+            collectDeclaredRoots(active, properties, managedFromChain, javaCompiled, out);
         }
         return out;
     }
@@ -2588,6 +2603,7 @@ public class CodenameOneSettings extends Lifecycle {
     private static void collectDeclaredRoots(String pomText,
                                              java.util.Map<String, String> properties,
                                              String managedFromChain,
+                                             boolean javaCompiled,
                                              java.util.List<String> out) {
         // Scoped to the elements that actually declare a compile root.
         // `<source>` and `<sourceDir>` are ordinary words: another plugin
@@ -2599,7 +2615,10 @@ public class CodenameOneSettings extends Lifecycle {
         // <build>. Checkstyle's <sourceDirectories><sourceDirectory> names a
         // directory to ANALYSE, PMD's does the same, and reading the whole POM
         // for the element made an analysis-only path a compile root.
-        collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"), properties, out);
+        if (javaCompiled) {
+            collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"),
+                    properties, out);
+        }
         String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
                 "compile", managedFromChain);
         collectContainerRoots(compileGoalConfiguration(kotlin, "compile", "sourceDirs",
@@ -3087,7 +3106,7 @@ public class CodenameOneSettings extends Lifecycle {
         java.util.List<String> candidates = new java.util.ArrayList<>();
         for (String pom : pomChain()) {
             for (String declared : declaredSourceRoots(pom, pomProperties(),
-                    chainPluginManagement())) {
+                    chainPluginManagement(), compilesJava())) {
                 String expanded = expandProjectPaths(declared, projectDir,
                         buildDirectory(projectDir), pomProperties());
                 if (expanded == null) {
