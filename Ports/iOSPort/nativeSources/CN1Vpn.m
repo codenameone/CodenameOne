@@ -568,8 +568,16 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         // the reference saved a profile with no credential in it: the install
         // reported success and the next connection could not authenticate --
         // having already replaced a profile that worked.
+        // Keyed off the USER, not the password length, because that is what
+        // the branch above keys off: a non-empty user turns extended
+        // authentication on and tries to store a password, so "the password
+        // could not be stored" has to be an error for exactly those
+        // profiles. Testing the password length instead made an empty
+        // password the one case that configured extended authentication with
+        // no credential and still reported success. The facade rejects that
+        // profile now; this is the same rule stated where the branch is.
         if (([psk length] > 0 && ipsecSecretMissing)
-                || ([pass length] > 0 && passwordMissing)) {
+                || ([user length] > 0 && passwordMissing)) {
             cn1vpDiscardStagedSecrets();
             @synchronized (cn1vpInstallLock) {
                 cn1vpInstalling = NO;

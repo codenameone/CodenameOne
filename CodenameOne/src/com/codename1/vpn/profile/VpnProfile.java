@@ -91,7 +91,14 @@ public final class VpnProfile {
     public VpnProfile usernamePassword(String user, String pass) {
         this.username = user;
         this.password = pass;
-        this.passwordKnown = pass != null;
+        // An EMPTY password is not a password. Treated as known, it passed
+        // install()'s "username but no password" gate, and the iOS native
+        // then turned extended authentication on -- that branch keys off the
+        // username -- while its missing-secret check keys off the password
+        // length, so a profile with no usable credential was stored and
+        // acknowledged as a success. The failure only appeared later, as a
+        // connection that would not authenticate.
+        this.passwordKnown = pass != null && pass.length() > 0;
         // Supplying a credential is what makes a loaded description
         // installable again; see markSecretsWithheld.
         this.secretsWithheld = false;

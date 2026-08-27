@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -147,6 +148,26 @@ public class LocalVpnTest {
         // whole point of refusing rather than silently reusing the old one.
         back.usernamePassword("alice", "hunter2");
         assertEquals(Boolean.TRUE, VpnAwait.value(Vpn.install(back)));
+    }
+
+    @Test
+    public void aUsernameWithAnEmptyPasswordIsRefused() {
+        // An empty password is not a password, and it was the one credential
+        // that got all the way through. install()'s gate asked whether the
+        // password was KNOWN, which "" was, so the profile was stored and
+        // acknowledged as a success -- and on iOS the branch that turns
+        // extended authentication on keys off the USERNAME while the
+        // missing-secret check keyed off the password length, so the
+        // configuration was saved with extended authentication and no
+        // credential behind it. The app learned about it as a connection
+        // that would not authenticate, long after the successful install.
+        VpnProfile empty = new VpnProfile("vpn.example.com")
+                .protocol(VpnProtocol.IKEV2)
+                .usernamePassword("alice", "");
+        assertFalse(empty.isPasswordKnown(),
+                "an empty password must not count as a known one");
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(empty));
     }
 
     @Test

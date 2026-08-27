@@ -1106,7 +1106,14 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
 
 - (void)pushRegistry:(PKPushRegistry *)registry
         didInvalidatePushTokenForType:(PKPushType)type {
-    cn1clVoipToken = nil;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        // Under the lock a registration reads it under. Cleared outside it,
+        // this raced the read at callRegisterVoipPush with no ordering at
+        // all -- two writers (this and callUnregisterVoipPush, which runs on
+        // a Java thread) against one locked reader.
+        cn1clVoipToken = nil;
+    }
     // Told, not just forgotten. Clearing the native cache alone left
     // VoipPush.getToken() answering with the dead token and tokenChanged
     // never firing, so the app went on believing its server could still
@@ -2008,20 +2015,45 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
     // that would ever have answered it. An AsyncResource that never settles
     // is the failure this SPI exists to prevent.
     cn1clEnsureState();
-    NSString *known = nil;
-    @synchronized (cn1clLock) {
-        known = cn1clVoipToken;
-        if (known == nil) {
-            [cn1clTokenRequests addObject:[NSNumber numberWithInt:requestId]];
+    // Answered on the REGISTRY'S OWN QUEUE, which is where didUpdate and
+    // didInvalidate run, so every token Java is told about is decided in one
+    // order. Reading here and delivering from this thread let an
+    // invalidation land in between: this copy then answered with the token
+    // it had read, AFTER the invalidation had already told Java the token
+    // was gone. Java's last word was the dead value, and an app that
+    // registers its token with its server in the callback re-registered the
+    // one PushKit had just retired -- so every call sent to it was lost,
+    // which is the failure the invalidation delivery exists to prevent.
+    //
+    // The value is re-read inside the block rather than carried into it, so
+    // a token that stopped being current between the request and the reply
+    // is never the one delivered. Still outside the lock at the VM call: it
+    // reaches application code, which may call back in here.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSString *known = nil;
+        BOOL wanted = cn1clRegistry == nil
+                || [cn1clRegistry.desiredPushTypes count] > 0;
+        @synchronized (cn1clLock) {
+            known = cn1clVoipToken;
+            if (known == nil && wanted) {
+                [cn1clTokenRequests addObject:
+                        [NSNumber numberWithInt:(int)requestId]];
+            }
         }
-    }
-    if (known != nil) {
-        // Answered OUTSIDE the lock: this calls into the VM, and the lock is
-        // one the delegate takes.
-        com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
-                threadStateData, requestId, cn1clJString(known));
-        return;
-    }
+        if (known != nil) {
+            com_codename1_impl_ios_IOSCallCallbacks_voipToken___int_java_lang_String(
+                    getThreadLocalData(), requestId, cn1clJString(known));
+        } else if (!wanted) {
+            // Parking here would never be answered: unregister drains the
+            // waiters as it runs, so one added afterwards has no callback
+            // left that could settle it.
+            com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
+                    getThreadLocalData(), requestId,
+                    CN1_CALL_ERR_PUSH_UNAVAILABLE,
+                    cn1clJString(@"VoIP push delivery is switched off"));
+        }
+    });
+    return;
 #else
     com_codename1_impl_ios_IOSCallCallbacks_voipRegistrationFailed___int_int_java_lang_String(
             threadStateData, requestId, CN1_CALL_ERR_NOT_SUPPORTED,
@@ -2036,7 +2068,6 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
     if (cn1clRegistry != nil) {
         cn1clRegistry.desiredPushTypes = [NSSet set];
     }
-    cn1clVoipToken = nil;
     // Anything still waiting for credentials is failed rather than left
     // parked: with delivery switched off no callback can settle it, and the
     // invalidation path uses -1 and settles nothing. An AsyncResource that
@@ -2044,6 +2075,9 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
     NSArray *waiting = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        // The clear belongs in here with the drain, not above it: this runs
+        // on a Java thread, and the token is read under this lock.
+        cn1clVoipToken = nil;
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
         [cn1clTokenRequests removeAllObjects];
     }
