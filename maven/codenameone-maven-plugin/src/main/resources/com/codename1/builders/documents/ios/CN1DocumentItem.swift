@@ -212,9 +212,19 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     private var metadataStamp: String {
-        let parent = parentId.rawValue
-        let type = node.contentType ?? ""
-        return "\(node.name ?? "")|\(parent)|\(type)|\(node.size ?? -1)|\(node.lastModified ?? -1)|\(revision)"
+        // Length-prefixed, because three of these are free-form text and "|" is a character a
+        // name or an id may contain. Joined plainly, a rename from "a" to "a|cn1:b" alongside a
+        // move from parent "b|cn1:c" to "c" produced the same string -- the same metadata
+        // version for different metadata, so the browser kept showing the old name in the old
+        // place. The remote content stamp is prefixed for the same reason.
+        return field(node.name ?? "") + field(parentId.rawValue) + field(node.contentType ?? "")
+            + field(String(node.size ?? -1)) + field(String(node.lastModified ?? -1))
+            + field(revision)
+    }
+
+    /// One field of a stamp, written so no value can be mistaken for a boundary.
+    private func field(_ value: String) -> String {
+        "\(value.utf8.count):\(value)"
     }
 
     private var contentStamp: String {

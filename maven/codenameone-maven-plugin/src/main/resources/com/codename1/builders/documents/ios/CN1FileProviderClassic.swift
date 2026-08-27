@@ -39,7 +39,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// not: a download completing after a stop RECREATES the file the system had just evicted,
     /// and answers a request nobody is waiting for any more.
     private let inFlightLock = NSLock()
-    private var inFlight: [URL: URLSessionTask] = [:]
+    private var inFlight: [URL: [URLSessionTask]] = [:]
     /// Bumped whenever a URL is stopped, so a fetch that had already finished downloading when
     /// the stop arrived can still tell that it is no longer wanted.
     private var stopGeneration: [URL: Int] = [:]
@@ -139,7 +139,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             inFlightLock.unlock()
             return false
         }
-        inFlight[url] = task
+        // Appended rather than assigned. Two opens of one URL can overlap with no stop between
+        // them, and a single-valued map lost the older task -- so a stop cancelled the newer one
+        // and the older kept downloading the whole document, on the user's data, for a URL that
+        // had already been evicted.
+        inFlight[url, default: []].append(task)
         inFlightLock.unlock()
         return true
     }
@@ -153,8 +157,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// for this: two opens with no stop between them share one.
     private func clearFetch(_ task: URLSessionTask?, at url: URL) {
         inFlightLock.lock()
-        if let task = task, inFlight[url] === task {
-            inFlight.removeValue(forKey: url)
+        if let task = task, var tasks = inFlight[url] {
+            tasks.removeAll { $0 === task }
+            if tasks.isEmpty {
+                inFlight.removeValue(forKey: url)
+            } else {
+                inFlight[url] = tasks
+            }
         }
         inFlightLock.unlock()
     }
@@ -346,7 +355,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     }
 
     override func startProvidingItem(at url: URL,
-                                     completionHandler: @escaping (Error?) -> Void) {
+                                     completionHandler rawCompletion: @escaping (Error?) -> Void) {
+        // Every answer goes through the guard. This method has more than one way to finish --
+        // a synchronous setup failure inside fetch calls back before fetch has even returned,
+        // and the registration below then refuses the same request -- and the system's handler
+        // must be called exactly once.
+        let answer = CN1ClassicCompletion(rawCompletion)
+        let completionHandler: (Error?) -> Void = { answer.call($0) }
         guard let identifier = persistentIdentifierForItem(at: url),
               let index = index() else {
             completionHandler(NSFileProviderError(.noSuchItem))
@@ -438,9 +453,6 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         let box = CN1FetchBox()
         let task = CN1DocumentRemote.fetch(remoteId: remoteId,
                                            settings: settings) { fetched, error in
-            guard !box.rejected else {
-                return
-            }
             self.clearFetch(box.task, at: url)
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
@@ -495,9 +507,8 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             task?.resume()
         } else {
             // Answered here rather than through the task: it was never resumed, so nothing else
-            // will call back for it. The flag stops the fetch's own completion from answering a
-            // second time if cancelling a suspended task delivers one.
-            box.rejected = true
+            // will call back for it. Answering twice is not a risk -- every answer goes through
+            // the guard at the top -- so cancelling is left to say what happened.
             task?.cancel()
             completionHandler(NSFileProviderError(.noSuchItem))
         }
@@ -511,7 +522,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         let lock = gate(for: url)
         lock.lock()
         inFlightLock.lock()
-        let task = inFlight.removeValue(forKey: url)
+        let tasks = inFlight.removeValue(forKey: url) ?? []
         stopGeneration[url] = (stopGeneration[url] ?? 0) + 1
         inFlightLock.unlock()
 
@@ -522,7 +533,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // writes anything.
         try? FileManager.default.removeItem(at: url)
         lock.unlock()
-        task?.cancel()
+        // All of them: overlapping opens of one URL each have a task, and every one of them is
+        // downloading something this eviction says nobody wants.
+        for task in tasks {
+            task.cancel()
+        }
         providePlaceholder(at: url) { _ in }
     }
 
@@ -608,9 +623,32 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 /// run and no synchronisation is needed on top of that ordering.
 private final class CN1FetchBox {
     var task: URLSessionTask?
-    /// Set when the request was answered without ever starting the task, so its completion --
-    /// if a cancelled suspended task delivers one -- does not answer a second time.
-    var rejected = false
+}
+
+/// Calls the system's completion handler exactly once.
+///
+/// startProvidingItem can finish more than one way for a single request: fetch reports a setup
+/// failure synchronously, before it has returned the task the registration then refuses. Both
+/// paths used to answer, and a File Provider completion handler is called once or the request is
+/// left in a state the system cannot reason about.
+private final class CN1ClassicCompletion {
+    private let lock = NSLock()
+    private var done = false
+    private let handler: (Error?) -> Void
+
+    init(_ handler: @escaping (Error?) -> Void) {
+        self.handler = handler
+    }
+
+    func call(_ error: Error?) {
+        lock.lock()
+        let first = !done
+        done = true
+        lock.unlock()
+        if first {
+            handler(error)
+        }
+    }
 }
 
 /// What became of a staged file when it was offered to the shared URL.
