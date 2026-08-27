@@ -1602,7 +1602,15 @@ void com_codename1_impl_ios_IOSNative_callRequestPermissions___int_int(
                         getThreadLocalData(), JAVA_NULL));
     };
     void (^askCamera)(void) = ^{
-        if (!wantsCamera) {
+        // The BUILD decides, before the API is touched at all. IPhoneBuilder
+        // writes NSCameraUsageDescription only for a video build, and iOS
+        // terminates an app that reaches a protected resource without its
+        // purpose string -- so asking here on an audio-only build killed the
+        // app rather than answering it. getCapabilities already refuses to
+        // advertise VIDEO on such a build; this is the same question asked
+        // where the request is actually made, because an app may pass the
+        // bit without consulting the capability first.
+        if (!wantsCamera || !cn1clPlistBool(@"CN1CallSupportsVideo", NO)) {
             answer();
             return;
         }

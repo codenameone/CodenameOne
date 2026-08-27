@@ -43,6 +43,7 @@ import com.codename1.call.session.Calls;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -440,8 +441,35 @@ public class CN1ConnectionService extends ConnectionService {
 
     /// Forgets a connection.
     static void forget(String callId) {
+        CN1Connection gone;
         synchronized (CONNECTIONS) {
-            CONNECTIONS.remove(callId);
+            gone = CONNECTIONS.remove(callId);
+        }
+        // And every action still outstanding ON that connection. A deferred
+        // answer whose call the far end ended kept its token in PENDING, so
+        // the safety timer reached completeAction, found the entry, treated
+        // a destroyed connection as live and ran failAnswer -- delivering
+        // callEnded(FAILED) for a call that had already ended for another
+        // reason, after the app had been told about the real one.
+        //
+        // Dropped under the same monitor completeAction takes, so a timer
+        // that gets there first finds nothing rather than half a teardown.
+        //
+        // Nothing is answered here: these are actions the SYSTEM asked for,
+        // and the facade's own safety net fails the CallAction it handed the
+        // app. Only the native bookkeeping is dropped, so completeAction
+        // reports the action as no longer held -- which is exactly what it
+        // is -- instead of acting on a destroyed connection.
+        if (gone != null) {
+            synchronized (PENDING) {
+                Iterator<Map.Entry<Long, PendingAction>> it =
+                        PENDING.entrySet().iterator();
+                while (it.hasNext()) {
+                    if (it.next().getValue().connection == gone) { //NOPMD CompareObjectsWithEquals
+                        it.remove();
+                    }
+                }
+            }
         }
         // A system-started call the app never reported back is gone too;
         // leaving its id here would have a later report with the same id
