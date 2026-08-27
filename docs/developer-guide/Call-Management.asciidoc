@@ -267,7 +267,18 @@ Every item is also callable from a test with `CN.execute("call:itemN")`.
 | `android.call.answerLabel` | `Answer` | The Android answer button.
 | `android.call.declineLabel` | `Decline` | The Android decline button.
 | `android.call.channelName` | `Incoming calls` | The notification channel the user sees in Settings.
+| `call.video` | `false` | Whether video calls are offered, on both platforms. Overridden per platform by `ios.call.video` and `android.call.video`.
+| `android.call.video` | `false` | Whether the Android manifest declares `CAMERA`. Required for video calls.
 |===
+
+`videoSupported(true)` on `CallConfiguration` isn't enough on its own for a
+video call. The camera permission has to be in the manifest, and a manifest is
+written at build time, so the build has to be told: set `call.video` (or
+`android.call.video`) as well. Without it Android refuses to grant `CAMERA` --
+a permission the manifest never asked for can't be granted, and the request
+resolves denied every time. `Calls.getCapabilities()` won't report
+`CAPABILITY_VIDEO` on such a build, so branch on that rather than assuming the
+configuration was enough.
 
 The `ios.call.*` hints are baked into `Info.plist` rather than set from code
 because native code needs them during launch, before any of your code has run.

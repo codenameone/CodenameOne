@@ -47,5 +47,16 @@ public enum CallAvailability {
     NOT_PERMITTED,
 
     /// The platform has no system call integration at all.
-    UNSUPPORTED
+    UNSUPPORTED,
+
+    /// [Calls#configure] has not run, so a report would be refused.
+    ///
+    /// Appended rather than inserted: the ordinals cross the SPI boundary.
+    ///
+    /// Android registers a Telecom `PhoneAccount` from the configuration and
+    /// ignores calls from an account it does not know, so a report made
+    /// before configuring is refused whatever the permissions say. This
+    /// exists because answering AVAILABLE and then refusing the very next
+    /// report is precisely what the check above is documented to prevent.
+    NOT_CONFIGURED
 }

@@ -119,7 +119,18 @@ public class AndroidCallBridge implements CallBridge {
             return 0;
         }
         int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
-                | CAPABILITY_MUTE | CAPABILITY_DTMF | CAPABILITY_VIDEO;
+                | CAPABILITY_MUTE | CAPABILITY_DTMF;
+        // VIDEO only when the build can actually reach a camera. The manifest
+        // permission comes from the call.video build hint at build time,
+        // while videoSupported(true) is a RUNTIME decision the scanner cannot
+        // see -- so an app that set the configuration and not the hint
+        // advertised video, and requestPermissions(PERMISSION_CAMERA) then
+        // resolved denied for ever because Android will not grant a
+        // permission the manifest does not declare. Reporting the capability
+        // honestly is what turns that into something the app can branch on.
+        if (declaresPermission(Manifest.permission.CAMERA)) {
+            caps |= CAPABILITY_VIDEO;
+        }
         if (isDirectorySupported()) {
             // SCREENING only, not DIRECTORY. A CallScreeningService may allow,
             // reject or silence a call; Android offers a third-party app no
@@ -141,6 +152,14 @@ public class AndroidCallBridge implements CallBridge {
     public int getCallAvailability() {
         if (!isCallSupported()) {
             return CallAvailability.UNSUPPORTED.ordinal();
+        }
+        if (!configured || handle == null) {
+            // The SAME predicate ready() refuses on, in the same order, so
+            // the answer here and the outcome of the report cannot disagree.
+            // Answering AVAILABLE while ready() was about to refuse with
+            // CALL_REFUSED defeated the one thing this call is documented
+            // for: deciding whether to tell the far end to stop retrying.
+            return CallAvailability.NOT_CONFIGURED.ordinal();
         }
         int granted = getGrantedPermissions();
         if ((granted & PERMISSION_MANAGE_CALLS) == 0) {
@@ -468,6 +487,31 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     /// Whether a report can proceed, answering the request when it cannot.
+    /// Whether the MANIFEST declares a permission, granted or not.
+    ///
+    /// Different question from checkSelfPermission, which answers whether the
+    /// user has granted one: Android refuses to grant a permission the
+    /// manifest never asked for, and does it silently.
+    private boolean declaresPermission(String permission) {
+        try {
+            String[] declared = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(),
+                            PackageManager.GET_PERMISSIONS)
+                    .requestedPermissions;
+            if (declared == null) {
+                return false;
+            }
+            for (String d : declared) {
+                if (permission.equals(d)) {
+                    return true;
+                }
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            // The app asking about its own package; cannot happen in practice.
+        }
+        return false;
+    }
+
     private boolean ready(int requestId) {
         if (!isCallSupported()) {
             Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),

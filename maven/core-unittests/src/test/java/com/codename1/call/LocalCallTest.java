@@ -79,6 +79,9 @@ public class LocalCallTest {
     public void everythingWorksAndSaysItIsSupported() {
         assertTrue(Calls.isSupported());
         assertTrue(VoipPush.isSupported());
+        // AFTER configuring, because an unconfigured provider now reports
+        // NOT_CONFIGURED -- which is the state this asserted through.
+        CallAwait.value(Calls.configure(new CallConfiguration()));
         assertSame(CallAvailability.AVAILABLE, Calls.getAvailability());
     }
 
@@ -138,9 +141,12 @@ public class LocalCallTest {
 
     @Test
     public void anEmergencyCallRefusesTheReportRatherThanRingingSilently() {
+        // Configured FIRST: the assertion below used to pass through an
+        // unconfigured provider, so it never reached the emergency state it
+        // is named for.
+        CallAwait.value(Calls.configure(new CallConfiguration()));
         bridge.setAvailability(CallAvailability.EMERGENCY_CALL_IN_PROGRESS.ordinal());
         assertSame(CallAvailability.EMERGENCY_CALL_IN_PROGRESS, Calls.getAvailability());
-        CallAwait.value(Calls.configure(new CallConfiguration()));
         CallAwait.assertFailedWith(CallError.CALL_REFUSED,
                 Calls.reportIncoming(CallId.random(),
                         CallHandle.phone("+1"), "Ada", false));
@@ -547,6 +553,26 @@ public class LocalCallTest {
                 "a call the system refused to end is still a call");
         assertFalse(s.getState() == CallState.ENDED,
                 "a refused end must not leave the session claiming ENDED");
+    }
+
+    @Test
+    public void availabilityBeforeConfigureAgreesWithTheRefusal() {
+        // getAvailability() exists so an app can tell the far end to stop
+        // retrying INSTEAD of finding out from a failed report -- its own
+        // javadoc says so. It answered AVAILABLE before configure() while the
+        // very next report was refused unconditionally, which is the one
+        // outcome that makes the check worthless: the app tells the caller
+        // everything is fine and then cannot ring.
+        assertEquals(CallAvailability.NOT_CONFIGURED, Calls.getAvailability(),
+                "an unconfigured provider cannot accept a call");
+        CallAwait.assertFailedWith(CallError.CALL_REFUSED,
+                Calls.reportIncoming(CallId.random(),
+                        CallHandle.phone("+14155551212"), "Ada", false));
+
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        assertEquals(CallAvailability.AVAILABLE, Calls.getAvailability(),
+                "configuring is what makes a report possible");
     }
 
     @Test

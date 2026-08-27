@@ -23,6 +23,7 @@
 package com.codename1.impl.call;
 
 import com.codename1.call.CallEndReason;
+import com.codename1.call.CallAvailability;
 import com.codename1.call.CallError;
 import com.codename1.call.CallHandle;
 import com.codename1.call.CallId;
@@ -430,7 +431,18 @@ public class LocalCallBridge implements CallBridge {
 
     @Override
     public int getCallAvailability() {
-        return supported ? availability : 4;
+        if (!supported) {
+            return CallAvailability.UNSUPPORTED.ordinal();
+        }
+        if (!configured) {
+            // Modelled, because the simulation ALREADY refuses a report from
+            // an unconfigured provider (see report) and answering AVAILABLE
+            // anyway would let a test watch the two agree when on a device
+            // they do not. A test that cannot see the disagreement is how it
+            // survived.
+            return CallAvailability.NOT_CONFIGURED.ordinal();
+        }
+        return availability;
     }
 
     @Override
