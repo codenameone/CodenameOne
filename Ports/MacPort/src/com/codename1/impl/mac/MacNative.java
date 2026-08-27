@@ -137,6 +137,16 @@ class MacNative {
 
     native int macMonitorForWindow(int slot);
 
+    /// Names the window whose field is about to be edited, so the text session
+    /// binds to it rather than to whichever window happens to be key.
+    ///
+    /// startEditingAsync() can open an editor in a window that is visible but not
+    /// key, and inferring the owner from NSApp.keyWindow then attached the
+    /// session to the wrong one: the intended field received the callbacks while
+    /// keyboard and input-method ownership sat elsewhere. -1 means the main
+    /// window.
+    native void macTextInputSetOwnerWindow(int slot);
+
     native int macMonitorForMainWindow();
 
     native String macMonitorName(int monitor);

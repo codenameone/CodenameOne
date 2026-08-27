@@ -4913,6 +4913,27 @@ public final class Display extends CN1Constants {
     /// - `key`: key the key of the property
     ///
     /// - `value`: the value of the property
+    /// The PORT's answer for a property, ignoring anything the application set
+    /// with `#setProperty(String, String)`.
+    ///
+    /// `#getProperty(String, String)` lets an application override any key,
+    /// which is right for configuration and wrong for a capability. Two
+    /// decisions in the framework are answered by port-supplied properties --
+    /// which transport a device's push subscription is created for, and whether
+    /// a model download has to be digest-pinned -- and an application that set
+    /// either key for its own reasons silently changed a routing or a security
+    /// decision it had no intention of making. Those two ask through here.
+    ///
+    /// Use `#getProperty(String, String)` for anything an application is
+    /// entitled to override, which is almost everything.
+    ///
+    /// #### Returns
+    ///
+    /// the implementation's value, or `defaultValue` when it has none
+    public String getImplementationProperty(String key, String defaultValue) {
+        return impl.getProperty(key, defaultValue);
+    }
+
     public void setProperty(String key, String value) {
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);

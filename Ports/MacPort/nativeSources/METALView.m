@@ -48,6 +48,36 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     return m;
 }
 
+/// A transparent view that swallows every mouse event reaching it.
+///
+/// cn1InputEnabled stops THIS view dispatching input to the framework, which is
+/// enough while everything is drawn by Metal. A native peer is not: a
+/// BrowserComponent, a video player or a map is a real NSView under
+/// peerComponentsLayer and AppKit delivers to it directly, so a modal dialog
+/// left the content behind it clickable and typable. Covering the peers with a
+/// view that answers hitTest: with itself is what blocks them -- the
+/// application-modal session cannot, because this port begins a session and
+/// never pumps it with runModalSession:.
+@interface CN1InputBlockingView : NSView
+@end
+
+@implementation CN1InputBlockingView
+- (NSView *)hitTest:(NSPoint)point {
+    return self;
+}
+- (BOOL)acceptsFirstResponder {
+    return NO;
+}
+- (void)mouseDown:(NSEvent *)event {
+}
+- (void)rightMouseDown:(NSEvent *)event {
+}
+- (void)otherMouseDown:(NSEvent *)event {
+}
+- (void)scrollWheel:(NSEvent *)event {
+}
+@end
+
 @implementation METALView {
     NSTrackingArea *cn1TrackingArea;
     NSMutableIndexSet *consumedKeys;
@@ -59,6 +89,17 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// Whether a magnify gesture has been reported to the framework and not yet
     /// released, so its termination can be delivered even once input is off.
     BOOL cn1PinchActive;
+    /// Covers the native peers while input is disabled; nil when it is enabled.
+    NSView *cn1InputBlocker;
+    /// Sub-pixel scroll left over from previous events.
+    ///
+    /// The wheel callback takes integers, and a precise trackpad delta scaled
+    /// below one pixel truncated to zero -- independently per event, so slow
+    /// two-finger scrolling emitted an unbounded run of zero-delta events and
+    /// moved nothing at all. The remainder is carried instead, so those events
+    /// accumulate into the first whole pixel and the content creeps as it should.
+    double cn1WheelRemainderX;
+    double cn1WheelRemainderY;
 }
 
 @synthesize commandQueue;
@@ -73,6 +114,34 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 @synthesize projectionMatrix;
 @synthesize cn1WindowId;
 @synthesize cn1InputEnabled;
+
+/// Custom setter so the peer blocker follows the flag wherever it is set from.
+- (void)setCn1InputEnabled:(BOOL)enabled {
+    cn1InputEnabled = enabled;
+    [self cn1UpdateInputBlocker];
+}
+
+/// Adds or removes the blocker so it always sits above every peer.
+- (void)cn1UpdateInputBlocker {
+    if (cn1InputEnabled) {
+        if (cn1InputBlocker != nil) {
+            [cn1InputBlocker removeFromSuperview];
+#ifndef CN1_USE_ARC
+            [cn1InputBlocker release];
+#endif
+            cn1InputBlocker = nil;
+        }
+        return;
+    }
+    if (cn1InputBlocker == nil) {
+        cn1InputBlocker = [[CN1InputBlockingView alloc] initWithFrame:self.bounds];
+        cn1InputBlocker.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    }
+    // Re-added rather than left where it is: a peer added while input was
+    // already disabled would otherwise sit above the blocker and stay live.
+    [cn1InputBlocker removeFromSuperview];
+    [self addSubview:cn1InputBlocker positioned:NSWindowAbove relativeTo:nil];
+}
 
 // ---- view configuration -------------------------------------------------
 
@@ -501,6 +570,8 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 #endif
     }
     [self.peerComponentsLayer addSubview:view];
+    // Keeps the blocker above whatever was just added.
+    [self cn1UpdateInputBlocker];
 }
 
 // ---- input --------------------------------------------------------------
@@ -819,12 +890,28 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
     // listener on this port could ever see a held key.
     int precise = event.hasPreciseScrollingDeltas ? 1 : 0;
     int modifiers = cn1ModifiersOf(event);
-    if (self.cn1WindowId >= 0) {
-        CN1MacWindowDeliverWheel(self.cn1WindowId, (int)p.x, (int)p.y,
-                                 (int)(-dx * s), (int)(-dy * s), precise, modifiers);
+    // Truncation with the remainder carried, rather than per event. trunc()
+    // rather than a cast so the two directions round the same way: a cast toward
+    // zero and a remainder that keeps its sign together lose nothing, while
+    // rounding here would make an event and its leftover disagree.
+    double wantX = cn1WheelRemainderX + (-dx * s);
+    double wantY = cn1WheelRemainderY + (-dy * s);
+    double sendX = trunc(wantX);
+    double sendY = trunc(wantY);
+    cn1WheelRemainderX = wantX - sendX;
+    cn1WheelRemainderY = wantY - sendY;
+    if (sendX == 0.0 && sendY == 0.0) {
+        // Nothing whole yet. Swallowed rather than sent, because a zero-delta
+        // wheel event is not information the framework can use and the scroll it
+        // belongs to is still accumulating.
         return;
     }
-    pointerWheelMovedCallback((int)p.x, (int)p.y, (int)(-dx * s), (int)(-dy * s),
+    if (self.cn1WindowId >= 0) {
+        CN1MacWindowDeliverWheel(self.cn1WindowId, (int)p.x, (int)p.y,
+                                 (int)sendX, (int)sendY, precise, modifiers);
+        return;
+    }
+    pointerWheelMovedCallback((int)p.x, (int)p.y, (int)sendX, (int)sendY,
                               precise, modifiers);
 }
 

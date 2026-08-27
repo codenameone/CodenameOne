@@ -125,6 +125,14 @@ void CN1MacTextInputNotifyEditorAction(void) {
     return self;
 }
 
+/// The owner named by the Java side for the session about to start, or nil when
+/// nothing named one and the key window is the best guess available.
+static NSView *cn1PendingTextOwner = nil;
+
+void CN1MacTextInputSetPendingOwner(NSView *view) {
+    cn1PendingTextOwner = view;
+}
+
 - (void)startWithText:(NSString *)initialText
              selStart:(NSInteger)selStart
                selEnd:(NSInteger)selEnd
@@ -134,9 +142,16 @@ void CN1MacTextInputNotifyEditorAction(void) {
     // to reach it, so that window is key. Recorded rather than inferred later,
     // since making another window key is exactly the event that used to steal
     // the session.
-    NSWindow *keyWindow = [NSApp keyWindow];
-    self.ownerView = keyWindow != nil ? keyWindow.contentView
-                                      : [CN1MacHost sharedHost].renderingView;
+    if (cn1PendingTextOwner != nil) {
+        // Named by the caller, which is the only thing that knows the answer when
+        // the editor was opened programmatically on a window that is not key.
+        self.ownerView = cn1PendingTextOwner;
+        cn1PendingTextOwner = nil;
+    } else {
+        NSWindow *keyWindow = [NSApp keyWindow];
+        self.ownerView = keyWindow != nil ? keyWindow.contentView
+                                          : [CN1MacHost sharedHost].renderingView;
+    }
     self.text = initialText != nil ? initialText : @"";
     NSInteger len = (NSInteger)self.text.length;
     // The framework can hand over a selection recorded against text it has since

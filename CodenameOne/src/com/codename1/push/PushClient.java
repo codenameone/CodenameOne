@@ -492,7 +492,14 @@ public final class PushClient {
         // delivered. The prefix is answered by the Apple ParparVM ports and the
         // macOS one inherits it, which is exactly the set that registers.
         // Mac Catalyst is unaffected either way -- it reports "ios".
-        if ("ios".equals(Display.getInstance().getProperty("cn1_push_prefix", ""))) {
+        // getImplementationProperty, not getProperty: cn1_push_prefix is a key an
+        // application may legitimately set -- Push.getPushKey() reads it -- and an
+        // override made getProperty answer the app's value here, sending provider
+        // "native" for a device that registers with APNs so no deliverable
+        // subscription was ever created. The port's own answer is the capability;
+        // the application's is not a vote on it.
+        if ("ios".equals(Display.getInstance()
+                .getImplementationProperty("cn1_push_prefix", ""))) {
             return "apns";
         }
         if ("win".equals(platform)) {

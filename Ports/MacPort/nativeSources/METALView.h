@@ -115,6 +115,12 @@
 /// than being delivered and then discarded further up.
 @property (nonatomic, assign) BOOL cn1InputEnabled;
 
+/// Keeps the peer input blocker above every peer subview.
+///
+/// Called when input is toggled and whenever a peer is added: a peer added
+/// while a modal is up would otherwise sit above the blocker and stay live.
+- (void)cn1UpdateInputBlocker;
+
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
 - (void)deleteFramebuffer;

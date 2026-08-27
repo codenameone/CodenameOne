@@ -155,6 +155,53 @@ public class MacImplementation extends IOSImplementation {
         }
     }
 
+    /// Names the window a component lives in, so a text session binds to it.
+    ///
+    /// The native side records the session's owner when it starts, and without
+    /// this it would take the key window -- right when the user clicked into the
+    /// field, wrong when the application called startEditingAsync() on a field
+    /// in a window that is visible but not key. Only this class can answer it:
+    /// the shared editing entry points take no window, and the component knows
+    /// its own top level.
+    private void nameEditingWindow(com.codename1.ui.Component cmp) {
+        int slot = -1;
+        if (cmp != null) {
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top instanceof com.codename1.ui.Window) {
+                slot = ((com.codename1.ui.Window) top).getWindowId();
+            }
+        }
+        macNative.macTextInputSetOwnerWindow(slot);
+    }
+
+    /// @inheritDoc
+    ///
+    /// Names the editing component's window before the shared path starts the
+    /// session, which is what keeps a programmatic edit in a non-key window from
+    /// binding the session to whichever window happens to be key.
+    @Override
+    public void editString(com.codename1.ui.Component cmp, int maxSize, int constraint,
+            String text, int initiatingKeycode) {
+        nameEditingWindow(cmp);
+        super.editString(cmp, maxSize, constraint, text, initiatingKeycode);
+    }
+
+    /// @inheritDoc
+    ///
+    /// As `#editString(com.codename1.ui.Component, int, int, String, int)`: the
+    /// pure editor reaches the same session and needs the same owner.
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client,
+            com.codename1.ui.TextInputConfig config) {
+        // TextInputClient declares no component accessor, but every client the
+        // pure editor uses IS one -- EditField, CodeEditor, RichTextArea. A
+        // client that is not leaves the owner unnamed and the native side falls
+        // back to the key window, which is the old behaviour and no worse.
+        nameEditingWindow(client instanceof com.codename1.ui.Component
+                ? (com.codename1.ui.Component) client : null);
+        return super.startTextInput(client, config);
+    }
+
     /// @inheritDoc
     ///
     /// False. A Mac reports one pointer, and this port only ever sends one.

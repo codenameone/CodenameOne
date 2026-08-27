@@ -814,6 +814,13 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         // the view that is already rendering into it.
         NSWindow *old = rec.window;
         BOOL wasVisible = old.isVisible;
+        // Miniaturization is part of the state being carried over, and it is not
+        // implied by visibility: a miniaturized window reports isVisible NO. Lost
+        // here, the rebuilt window either came back on screen while the framework
+        // still believed it hidden, or stayed ordered out with macWindowRestore()
+        // unable to bring it back, because that path checks isMiniaturized and
+        // would have found NO.
+        BOOL wasMiniaturized = old.isMiniaturized;
         BOOL decorated = (old.styleMask & NSWindowStyleMaskTitled) != 0;
         BOOL resizable = (old.styleMask & NSWindowStyleMaskResizable) != 0;
         NSRect content = [old contentRectForFrameRect:old.frame];
@@ -882,6 +889,13 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         cn1SetWindowChromeEnabled(fresh, rec.inputEnabled);
         if (wasVisible) {
             [fresh makeKeyAndOrderFront:nil];
+        }
+        if (wasMiniaturized) {
+            // Ordered in first: AppKit miniaturizes a window that is on screen,
+            // and miniaturizing one that never appeared leaves nothing in the
+            // Dock to click.
+            [fresh orderFront:nil];
+            [fresh miniaturize:nil];
         }
         [fresh makeFirstResponder:view];
         if (wasModal) {
@@ -1171,6 +1185,27 @@ void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
 }
 
 // ---- monitors ------------------------------------------------------------
+
+/// Binds the next text session to a named window rather than to the key window.
+///
+/// The session records its owner when it starts, and it took that from
+/// NSApp.keyWindow -- correct when the user clicked into the field, wrong when
+/// the application called startEditingAsync() on a field in a visible window
+/// that is not key. The Java side knows which Window the component is in, so it
+/// says so here first and startWithText: uses this instead of guessing. Cleared
+/// after one use: an owner named for one session must not silently apply to the
+/// next, which may well be the user clicking somewhere else entirely.
+JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+    cn1OnMain(^{
+        extern void CN1MacTextInputSetPendingOwner(NSView *view);
+        if (slot < 0) {
+            CN1MacTextInputSetPendingOwner([CN1MacHost sharedHost].renderingView);
+            return;
+        }
+        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        CN1MacTextInputSetPendingOwner(rec != nil ? rec.view : nil);
+    });
+}
 
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowWatchScreens__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     cn1OnMain(^{
