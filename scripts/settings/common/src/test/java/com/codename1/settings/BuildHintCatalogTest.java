@@ -1844,74 +1844,6 @@ public class BuildHintCatalogTest {
                         + "</executions></plugin></plugins></build></project>");
         assertFalse(overridden.contains("src/shared/kt"), overridden.toString());
 
-        // <sourceDirectory> is maven-compiler-plugin's root, so a chain that
-        // switches default-compile off does not compile it -- the same gate the
-        // conventional src/main/java already had, which this element did not.
-        String customRoot = "<project><build><sourceDirectory>appsrc</sourceDirectory>"
-                + "</build></project>";
-        assertTrue(CodenameOneSettings.declaredSourceRoots(customRoot, null, null, true)
-                .contains("appsrc"));
-        assertFalse(CodenameOneSettings.declaredSourceRoots(customRoot, null, null, false)
-                .contains("appsrc"));
-
-        // ...and it is a per-element gate: a Kotlin root is still compiled when
-        // javac never runs, which is the whole point of a Kotlin-only module.
-        String kotlinOnly = "<project><build><plugins>"
-                + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
-                + "<configuration><sourceDirs><sourceDir>src/main/kt</sourceDir>"
-                + "</sourceDirs></configuration>"
-                + "<executions><execution><goals><goal>compile</goal></goals></execution>"
-                + "</executions></plugin></plugins></build></project>";
-        assertTrue(CodenameOneSettings.declaredSourceRoots(kotlinOnly, null, null, false)
-                .contains("src/main/kt"));
-
-        // Both attributes are read off the element Maven reads them off, not
-        // found anywhere in the execution. combine.self on a nested element says
-        // nothing about the configuration as a whole, and a whole-block search
-        // discarded an inherited list because of it.
-        java.util.List<String> nested = CodenameOneSettings.declaredSourceRoots(
-                "<project><build><plugins>"
-                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
-                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
-                        + "</sourceDirs></configuration>"
-                        + "<executions>"
-                        + "<execution><goals><goal>compile</goal></goals><configuration>"
-                        + "<compilerPlugins combine.self=\"override\">"
-                        + "<plugin>spring</plugin></compilerPlugins></configuration>"
-                        + "</execution>"
-                        + "</executions></plugin></plugins></build></project>");
-        assertTrue(nested.contains("src/shared/kt"), nested.toString());
-
-        // Single quotes and spaces around = are legal XML; a literal search for
-        // combine.children="append" saw neither.
-        java.util.List<String> quoted = CodenameOneSettings.declaredSourceRoots(
-                "<project><build><plugins>"
-                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
-                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
-                        + "</sourceDirs></configuration>"
-                        + "<executions>"
-                        + "<execution><goals><goal>compile</goal></goals><configuration>"
-                        + "<sourceDirs combine.children = 'append'>"
-                        + "<sourceDir>src/main/kt</sourceDir></sourceDirs>"
-                        + "</configuration></execution>"
-                        + "</executions></plugin></plugins></build></project>");
-        assertTrue(quoted.contains("src/main/kt"), quoted.toString());
-        assertTrue(quoted.contains("src/shared/kt"), quoted.toString());
-
-        // An attribute whose name merely ENDS with the one being looked for is a
-        // different attribute -- the same substring match attributeOf replaced.
-        java.util.List<String> lookalike = CodenameOneSettings.declaredSourceRoots(
-                "<project><build><plugins>"
-                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
-                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
-                        + "</sourceDirs></configuration>"
-                        + "<executions>"
-                        + "<execution><goals><goal>compile</goal></goals>"
-                        + "<configuration xcombine.self=\"override\">"
-                        + "<jvmTarget>17</jvmTarget></configuration></execution>"
-                        + "</executions></plugin></plugins></build></project>");
-        assertTrue(lookalike.contains("src/shared/kt"), lookalike.toString());
-
         // A project-directory expression is deterministic, so it is resolved
         // rather than discarded.
         java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
@@ -2252,38 +2184,6 @@ public class BuildHintCatalogTest {
                 .contains("/p/common/target/generated-sources"));
         assertFalse(CodenameOneSettings.candidateSourceRoots("/p/common", true, true, false)
                 .contains("/p/common/build/generated-sources"));
-    }
-
-    /// A nearer POM that binds its own compile execution wins over an ancestor
-    /// that switched `default-compile` off.
-    ///
-    /// The decision used to be returned from the first level found to disable it,
-    /// so the parent answered for a child that plainly does compile Java -- and
-    /// the child's Java roots were then withheld from the search, which is how a
-    /// Kotlin copy of the main class comes to answer for it.
-    @Test
-    public void aNearerCompileBindingBeatsAnAncestorThatDisabledDefaultCompile() {
-        String disabling = "<project><build><plugins>"
-                + "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
-                + "<execution><id>default-compile</id><phase>none</phase></execution>"
-                + "</executions></plugin></plugins></build></project>";
-        String rebinding = "<project><build><plugins>"
-                + "<plugin><artifactId>maven-compiler-plugin</artifactId><executions>"
-                + "<execution><id>recompile</id><phase>compile</phase>"
-                + "<goals><goal>compile</goal></goals></execution>"
-                + "</executions></plugin></plugins></build></project>";
-        String silent = "<project></project>";
-
-        // Nearest first, which is the order pomChain() produces.
-        assertTrue(CodenameOneSettings.compilesJava(
-                java.util.Arrays.asList(rebinding, disabling), null),
-                "the ancestor's <phase>none</phase> answered for a child that rebinds compile");
-        assertFalse(CodenameOneSettings.compilesJava(
-                java.util.Arrays.asList(silent, disabling), null),
-                "nothing binds compile anywhere, so javac never runs");
-        assertTrue(CodenameOneSettings.compilesJava(
-                java.util.Arrays.asList(silent, silent), null),
-                "a chain that says nothing compiles Java by default");
     }
 
     /// Only `default-compile` switched off with `<phase>none</phase>` counts.
@@ -3410,19 +3310,6 @@ public class BuildHintCatalogTest {
         assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml", "<project></project>"));
         assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
                 "<project><parent><relativePath></relativePath></parent></project>"));
-
-        // Commented out is not declared. Every other rule in this reader strips
-        // comments first; this one did not, so a <parent> someone parked inside
-        // <!-- --> chose the POM whose properties and managed roots the module
-        // then inherited.
-        assertNull(CodenameOneSettings.parentPomPath("/p/common/pom.xml",
-                "<project><!-- <parent><relativePath>../old</relativePath></parent> -->"
-                        + "</project>"));
-        assertEquals("/p/pom.xml",
-                CodenameOneSettings.parentPomPath("/p/common/pom.xml",
-                        "<project><parent>"
-                                + "<!-- <relativePath>../old/pom.xml</relativePath> -->"
-                                + "</parent></project>"));
 
         // The path arithmetic the walk depends on.
         assertEquals("/p/pom.xml", CodenameOneSettings.normalizePath("/p/common/../pom.xml"));

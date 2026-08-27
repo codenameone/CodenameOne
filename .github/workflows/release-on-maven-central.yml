@@ -30,18 +30,6 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET: ${{ vars.R2_BUCKET }}
       R2_BASE_URL: https://repo.codenameone.com/maven2
-      # The reactor artifacts a release has to publish for the next one to
-      # resolve, named ONCE: the Central recovery poll and the R2 confirmation
-      # below both walk this list, and when each carried its own copy they
-      # disagreed -- Central's omitted codenameone-core.
-      RELEASE_ARTIFACTS: >-
-        codenameone-core
-        codenameone-maven-plugin
-        codenameone-platform-feature-catalog
-        codenameone-build-hint-catalog
-        codenameone-build-hint-tools
-        cn1app-archetype
-        cn1lib-archetype
 
     steps:
       - uses: actions/checkout@v6
@@ -124,35 +112,37 @@ jobs:
           # central-publishing-maven-plugin occasionally reports
           # "Deployment failed while publishing" even when the bundle was
           # actually accepted and published. As a safety net for that
-          # false-positive case, poll Maven Central for RELEASE_ARTIFACTS --
-          # every reactor artifact the next release has to be able to resolve,
-          # so a green release cannot leave a published plugin whose own
-          # dependency is missing.
+          # false-positive case, poll Maven Central for the key artifacts:
+          # the codenameone-maven-plugin (proxy for the core release), the two
+          # catalogs it depends on at runtime, and both archetypes. Each catalog
+          # is a separate reactor artifact -- platform-feature-catalog for
+          # built-in platform dependency selection, build-hint-catalog and
+          # build-hint-tools (a compile dependency of the plugin) for the
+          # build hint table the plugin reads -- so confirming only the plugin
+          # could leave a released plugin whose own dependency will not resolve.
           # Skipped when the deploy already reported success (the
           # artifacts may still be propagating from Sonatype Central to repo1;
           # that propagation can take 30+ minutes and isn't worth blocking on).
-          # An empty list would make the loop below check nothing and report
-          # success, which is the one outcome this safety net must never produce.
-          test -n "${RELEASE_ARTIFACTS}" || { echo "RELEASE_ARTIFACTS is empty" >&2; exit 1; }
           set +e
           for i in $(seq 1 90); do
-            missing=""
-            for artifact in ${RELEASE_ARTIFACTS}; do
-              # One URL per curl. Two URLs share the single -o, so the second
-              # body lands on stdout with both status codes appended -- the
-              # captured value can then never equal 200, and the poll burned all
-              # 90 attempts and failed a release Central had already accepted.
-              code=$(curl -s -o /dev/null -w "%{http_code}" \
-                "https://repo1.maven.org/maven2/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom")
-              if [ "$code" != "200" ]; then
-                missing="${missing} ${artifact}=${code}"
-              fi
-            done
-            if [ -z "$missing" ]; then
-              echo "Confirmed ${RELEASE_ARTIFACTS} ${GITHUB_REF_NAME} on Maven Central"
+            plugin_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
+            catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-platform-feature-catalog/${GITHUB_REF_NAME}/codenameone-platform-feature-catalog-${GITHUB_REF_NAME}.pom")
+            hints_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom"
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-tools/${GITHUB_REF_NAME}/codenameone-build-hint-tools-${GITHUB_REF_NAME}.pom")
+            app_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
+            lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/cn1lib-archetype/${GITHUB_REF_NAME}/cn1lib-archetype-${GITHUB_REF_NAME}.pom")
+            if [ "$plugin_code" = "200" ] && [ "$catalog_code" = "200" ] && \
+               [ "$hints_code" = "200" ] && \
+               [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
+              echo "Confirmed plugin + platform-feature-catalog + build-hint-{catalog,tools} + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/90] Waiting on Maven Central:${missing}"
+            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, hints=$hints_code, cn1app=$app_code, cn1lib=$lib_code)"
             sleep 20
           done
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
@@ -168,8 +158,9 @@ jobs:
           # and keep seeing it. A Cache Rule sets Status Code TTL 400-599 to no-store, but
           # this keeps the release green even if that rule is ever removed.
           set -e
-          test -n "${RELEASE_ARTIFACTS}" || { echo "RELEASE_ARTIFACTS is empty" >&2; exit 1; }
-          for artifact in ${RELEASE_ARTIFACTS}; do
+          for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
+                          codenameone-build-hint-catalog codenameone-build-hint-tools \
+                          cn1app-archetype cn1lib-archetype; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
             if [ "$code" != "200" ]; then
