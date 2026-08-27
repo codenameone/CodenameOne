@@ -1034,6 +1034,43 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * <p>An App Group identifier: {@code group.} followed by dot-separated segments of letters,
+     * digits and hyphens.</p>
+     *
+     * <p>A positive pattern rather than a list of characters to reject, for the reason the Ruby
+     * escaping beside it gives: the failure being prevented is "someone thought of a character I
+     * did not". This value reaches an Info.plist, an entitlements file and the generated Ruby, so
+     * the cost of a character nobody anticipated is a malformed file rather than a clear error.</p>
+     */
+    private static boolean isAppGroupIdentifier(String value) {
+        if (value == null || !value.startsWith("group.") || value.length() <= "group.".length()) {
+            return false;
+        }
+        boolean segmentHasContent = false;
+        for (int i = "group.".length(); i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '.') {
+                if (!segmentHasContent) {
+                    return false;
+                }
+                segmentHasContent = false;
+            } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-') {
+                segmentHasContent = true;
+            } else {
+                return false;
+            }
+        }
+        return segmentHasContent;
+    }
+
+    /** Escapes the five characters that cannot appear literally in plist text. */
+    private static String xmlEscape(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
     private static String escapeRuby(String input) {
         return input.replace("\\", "\\\\").replace("'", "\\'");
     }
@@ -11284,11 +11321,15 @@ public class IPhoneBuilder extends Executor {
         String hintAppGroup = request.getArg("ios.documentProvider.appGroup", null);
         documentsAppGroup = hintAppGroup != null && hintAppGroup.length() > 0
                 ? hintAppGroup : "group." + request.getPackageName();
-        if (!documentsAppGroup.startsWith("group.")) {
+        if (!isAppGroupIdentifier(documentsAppGroup)) {
             // Apple rejects the entitlement rather than the build, so this would otherwise
-            // surface as a signing failure naming neither the hint nor the value.
-            throw new BuildException("ios.documentProvider.appGroup must start with 'group.' "
-                    + "(an Apple requirement); found '" + documentsAppGroup + "'");
+            // surface as a signing failure naming neither the hint nor the value. The whole
+            // syntax is checked, not just the prefix: this value is written into the app plist,
+            // the extension's plist and its entitlements, so a character that is significant in
+            // XML produces a malformed file long before anything gets as far as signing.
+            throw new BuildException("ios.documentProvider.appGroup must be an App Group "
+                    + "identifier -- 'group.' followed by dot-separated alphanumeric segments, "
+                    + "hyphens allowed (an Apple requirement); found '" + documentsAppGroup + "'");
         }
         // Decided here rather than when the target is generated, so the plist key below cannot
         // depend on which of the two runs first. It is the same comparison
@@ -13236,7 +13277,8 @@ public class IPhoneBuilder extends Executor {
         // group in its generated Info.plist. See the ios.documentProvider.* build hints.
         if (documentProviderEnabled) {
             if (!inject.contains("CN1DocumentsAppGroup")) {
-                inject += "\n<key>CN1DocumentsAppGroup</key><string>" + documentsAppGroup + "</string>";
+                inject += "\n<key>CN1DocumentsAppGroup</key><string>"
+                        + xmlEscape(documentsAppGroup) + "</string>";
             }
             if (!inject.contains("CN1DocumentsDisplayName")) {
                 inject += "\n<key>CN1DocumentsDisplayName</key><string>"

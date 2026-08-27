@@ -219,6 +219,25 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesADecomposedName() {
+        // Apple's filesystems compare names after canonical normalization, so "e" + U+0301 and
+        // the precomposed letter are one file there and two strings here -- the sibling check
+        // would pass and the browser would hide one of them. There is no normalizer to call: the
+        // iOS runtime has no java.text.Normalizer and this class is translated for it, so the
+        // rule is that names arrive precomposed.
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        root.add(DocumentNode.file("a", "expos\u0065\u0301.pdf"));
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(root));
+        assertTrue(err.getMessage().contains("combining mark"), err.getMessage());
+
+        // The precomposed spelling of the same name is accepted, and is the one to use.
+        DocumentNode composed = DocumentNode.folder("root", "Root");
+        composed.add(DocumentNode.file("a", "expos\u00e9.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(composed));
+    }
+
+    @Test
     void refusesComponentsTooLongForAFilesystem() {
         // 255 bytes is where every filesystem the tree lands on stops. Past it the pre-iOS-16
         // provider's createDirectory fails with ENAMETOOLONG, and it fails at OPEN time: the item

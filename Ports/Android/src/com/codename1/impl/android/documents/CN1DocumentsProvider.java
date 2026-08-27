@@ -446,7 +446,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         int dot = name.lastIndexOf('.');
         if (dot > 0 && dot < name.length() - 1) {
             String guessed = android.webkit.MimeTypeMap.getSingleton()
-                    .getMimeTypeFromExtension(name.substring(dot + 1).toLowerCase());
+                    // Locale.ROOT, because this folds an ASCII extension for a lookup table of
+                    // ASCII keys. A Turkish device lowercases "GIF" to a dotless i and
+                    // MimeTypeMap then misses it, so every .GIF and .TIFF in the tree is served as
+                    // octet-stream -- which the picker filters out.
+                    .getMimeTypeFromExtension(
+                            name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT));
             if (guessed != null) {
                 return guessed;
             }
