@@ -134,7 +134,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                     // without this the previous publication's bytes are handed over after the
                     // logout that was supposed to remove them.
                     if let current = CN1FileProviderExtension.publishedItem(
-                            for: itemIdentifier, path: path, containerURL: containerURL) {
+                            for: itemIdentifier, path: path, generation: index.revision,
+                            containerURL: containerURL) {
                         completionHandler(handoff, current, nil)
                     } else {
                         try? FileManager.default.removeItem(at: handoff)
@@ -204,12 +205,22 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
     ///
     /// Static, and given the container rather than reading it off the instance, so the closure
     /// that calls it after a download does not have to keep the extension alive to do so.
-    /// The same, for a node served from the shared directory: no credential is involved, and the
-    /// path is what identifies the bytes rather than a remote key.
+    /// The same, for a node served from the shared directory.
+    ///
+    /// No credential is involved here, so the guard is the publication itself: the revision the
+    /// copy started from has to be the revision still on disk. The path cannot stand in for it --
+    /// an account switch that clears and republishes a conventional name like
+    /// "documents/invoice.pdf" satisfies a path check while the bytes in hand came from the
+    /// publication before it, read from a source that is by then unlinked.
+    ///
+    /// Being this strict costs a re-copy whenever a publish lands mid-copy, which is the right
+    /// trade for a local file and the wrong one for a download -- which is why the remote branch
+    /// keys on the credential instead, and says so there.
     private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
-                                      path: String,
+                                      path: String, generation: String,
                                       containerURL: URL) -> NSFileProviderItem? {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
+              index.revision == generation,
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], node.path == path else {
             return nil

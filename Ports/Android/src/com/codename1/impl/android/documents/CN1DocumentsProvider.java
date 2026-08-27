@@ -182,7 +182,9 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("No published document " + documentId);
         }
         // A local copy always wins, which is what makes a cached remote document open without a
-        // round trip.
+        // round trip. It is opened directly, with no window to guard: the descriptor is taken
+        // from the file the index named, and a clear() that follows removes the file rather than
+        // changing what this descriptor already refers to.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
             if (local != null && local.exists()) {
@@ -193,8 +195,43 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("Published document " + documentId
                     + " names neither a local path nor a remote id");
         }
+        String[] credentials = CN1DocumentStore.loadEndpoint(getContext());
         File cached = fetch(node, signal);
+        // The download runs outside the publication lock and takes as long as the network takes,
+        // so the app may have cleared -- a logout -- or switched accounts meanwhile. Handing the
+        // descriptor over regardless would give the picker the departed user's document, and
+        // leave its bytes in a cache directory clear() does not walk.
+        //
+        // Node ids are the app's own record keys and a switch reuses them, so the check is the
+        // remote id AND the credential the download was authorized with, which is the thing a
+        // switch always changes.
+        if (!stillPublished(documentId, node.remoteId, credentials)) {
+            if (!cached.delete()) {
+                Log.w(TAG, "Could not delete the withdrawn download " + cached);
+            }
+            throw new FileNotFoundException("Published document " + documentId
+                    + " was withdrawn while it was being fetched");
+        }
         return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+    }
+
+    /// Whether the document still names the same remote object, under the same credential.
+    ///
+    /// Re-read from disk rather than taken from the copy the request started with: the point is
+    /// to see what the app has done since.
+    private boolean stillPublished(String documentId, String remoteId, String[] credentials) {
+        CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
+        CN1DocumentStore.Node node = index == null ? null : index.nodes.get(documentId);
+        if (node == null || !remoteId.equals(node.remoteId)) {
+            return false;
+        }
+        String[] current = CN1DocumentStore.loadEndpoint(getContext());
+        return equalOrBothNull(credentials[0], current[0])
+                && equalOrBothNull(credentials[1], current[1]);
+    }
+
+    private static boolean equalOrBothNull(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     /// Downloads a remote item into the cache directory.

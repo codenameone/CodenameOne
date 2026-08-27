@@ -164,7 +164,23 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // storage and hand it to the system picker.
             if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
                FileManager.default.fileExists(atPath: local.path) {
-                completionHandler(CN1FileProviderClassic.place(local, at: url, copy: true))
+                // Copied, then checked against the publication it was copied from. The copy is
+                // synchronous but a large file takes long enough for a clear() to finish during
+                // it, and place() CREATES the storage directory -- so without this a logout would
+                // be followed by the departed user's bytes being written back into the storage it
+                // had just purged. The revision is the guard rather than the path: an account
+                // switch republishing a conventional name like "documents/invoice.pdf" satisfies
+                // a path check while the bytes came from the publication before it.
+                let generation = index.revision
+                let placed = CN1FileProviderClassic.place(local, at: url, copy: true)
+                if !CN1FileProviderClassic.stillPublished(identifier, path: path,
+                                                          generation: generation,
+                                                          containerURL: containerURL) {
+                    try? FileManager.default.removeItem(at: url)
+                    completionHandler(NSFileProviderError(.noSuchItem))
+                    return
+                }
+                completionHandler(placed)
                 return
             }
         }
@@ -236,6 +252,19 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// pointing them at another account's objects. Checking only that the id is still there would
     /// let a download started before the switch write the previous account's bytes into the new
     /// account's file.
+    /// The local equivalent: same node, same path, and the same publication the copy came from.
+    private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
+                                       path: String, generation: String,
+                                       containerURL: URL) -> Bool {
+        guard let index = CN1DocumentIndex.load(containerURL: containerURL),
+              index.revision == generation,
+              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved] else {
+            return false
+        }
+        return node.path == path
+    }
+
     private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
                                        remoteId: String, credentials: String,
                                        containerURL: URL) -> Bool {

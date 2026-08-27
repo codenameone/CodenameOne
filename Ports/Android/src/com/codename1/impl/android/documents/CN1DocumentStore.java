@@ -116,6 +116,13 @@ public final class CN1DocumentStore {
     public static final class Index {
         public final Map<String, Node> nodes = new HashMap<String, Node>();
         public String rootId;
+
+        /// Identifies the publication this index IS, so a reader that started work against it can
+        /// tell whether the app has published or cleared since. The index file is replaced whole
+        /// on every publish and deleted by clear(), so its modification time answers that without
+        /// the format having to grow a field. Zero when there is no file, which is itself a
+        /// distinct state: nothing is published.
+        public long revision;
     }
 
     /// Reads the index the app last published, or null when it has published nothing yet -- which
@@ -134,6 +141,7 @@ public final class CN1DocumentStore {
             Index index = new Index();
             Node rootNode = read(root, null, index);
             index.rootId = rootNode.id;
+            index.revision = file.lastModified();
             return index;
         } catch (JSONException err) {
             return null;
