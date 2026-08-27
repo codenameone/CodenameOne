@@ -46,12 +46,16 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
     /// suitable location can be retrieved using -[NSFileProviderManager
     /// temporaryDirectoryURLWithError:]." The process temporary directory is not guaranteed to be
     /// that volume, and the system clones and unlinks the file it is given.
-    private func handoffDirectory() -> URL {
-        if let manager = NSFileProviderManager(for: domain),
-           let url = try? manager.temporaryDirectoryURL() {
-            return url
+    private func handoffDirectory() throws -> URL {
+        guard let manager = NSFileProviderManager(for: domain) else {
+            throw NSFileProviderError(.providerNotFound)
         }
-        return FileManager.default.temporaryDirectory
+        // Thrown rather than fallen back on. The process temporary directory is not promised to
+        // be on the volume the user-visible file lives on, and the requirement quoted above is
+        // not advisory -- a file handed over from the wrong volume is one the system cannot
+        // clone into place, so the transfer "succeeds" and the open fails anyway. Failing here
+        // says which step went wrong instead.
+        return try manager.temporaryDirectoryURL()
     }
 
     func invalidate() {
@@ -129,7 +133,14 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 // content, it must provide a clone of that content as the URL passed to the
                 // completion handler." Handing over the app's own file would unlink it out of the
                 // shared container on the first open, and every later open would find nothing.
-                let handoff = handoffDirectory().appendingPathComponent(UUID().uuidString)
+                let handoff: URL
+                do {
+                    handoff = try handoffDirectory().appendingPathComponent(UUID().uuidString)
+                } catch {
+                    completionHandler(nil, nil, CN1DocumentRemote.providerError(error))
+                    progress.completedUnitCount = 1
+                    return progress
+                }
                 let container = containerURL
                 let generation = index.revision
                 // Off the request thread. fetchContents is expected to return its Progress
@@ -186,8 +197,16 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // is sent with are the same pair, which two separate reads could not promise.
         let settings = CN1DocumentRemote.settings(containerURL: container)
         let credentials = CN1DocumentRemote.stamp(settings)
+        let destination: URL
+        do {
+            destination = try handoffDirectory()
+        } catch {
+            completionHandler(nil, nil, CN1DocumentRemote.providerError(error))
+            progress.completedUnitCount = 1
+            return progress
+        }
         let task = CN1DocumentRemote.fetch(remoteId: remoteId, settings: settings,
-                                           destination: handoffDirectory()) { url, error in
+                                           destination: destination) { url, error in
             if let url = url {
                 // The publication is re-read before the bytes are handed over. A download
                 // outlives the request that started it, and the app may have cleared or

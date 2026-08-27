@@ -60,33 +60,38 @@ enum CN1DocumentRemote {
     /// and hands around: the bearer token must not travel in it. Truncated to 128 bits, which
     /// nothing accidental collides.
     ///
-    /// Memoized against the settings file's modification date so a large enumeration does not
-    /// re-read and re-hash it per item -- a stat each, which is what the local branch already
-    /// costs.
+    /// The settings are READ every time; only the hashing is memoized, and against the settings
+    /// themselves. Keying the memo on the file's modification date instead meant two credentials
+    /// written inside one filesystem tick shared a key, and the second account was handed the
+    /// first one's generation -- an unchanged content version, so the browser kept serving what
+    /// it had materialized under the old token. Reading a hundred bytes per item is cheap; the
+    /// digest is what was worth keeping.
     static func credentialGeneration(containerURL: URL) -> String {
-        let url = containerURL.appendingPathComponent("cn1documents/endpoint.json")
-        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
-        let key = "\(url.path)|\(modified?.timeIntervalSince1970 ?? -1)"
+        let stamp = credentialStamp(containerURL: containerURL)
         return generationLock.withLock {
-            if let cached = generationCache[key] {
-                return cached
+            if stamp == lastStamp {
+                return lastGeneration
             }
             // CommonCrypto rather than CryptoKit: this file is also compiled into the
             // pre-iOS-16 provider, whose deployment target can be iOS 11 or 12, and CryptoKit
             // starts at 13. Swift checks availability at compile time whether or not the call is
             // reachable, so importing it there fails the build outright.
-            let bytes = Array(credentialStamp(containerURL: containerURL).utf8)
+            let bytes = Array(stamp.utf8)
             var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
             CC_SHA256(bytes, CC_LONG(bytes.count), &digest)
             let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
-            // One entry per settings file per revision; a handful over a process lifetime.
-            generationCache[key] = hex
+            lastStamp = stamp
+            lastGeneration = hex
             return hex
         }
     }
 
     private static let generationLock = NSLock()
-    private static var generationCache: [String: String] = [:]
+    /// The credential the memoized generation belongs to. One entry, not a map: an enumeration
+    /// asks about one credential over and over, and a changed one replaces it.
+    private static var lastStamp: String?
+    private static var lastGeneration = ""
+
 
     static func credentialStamp(containerURL: URL) -> String {
         stamp(settings(containerURL: containerURL))
