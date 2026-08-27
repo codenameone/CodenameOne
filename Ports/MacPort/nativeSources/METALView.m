@@ -1580,9 +1580,38 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     return sel;
 }
 
+/// The process-wide clipboard blocks, set through Display.setProperty.
+extern BOOL CN1_blockPaste;
+extern BOOL CN1_blockCut;
+extern BOOL CN1_blockCopy;
+
+/// Either door closed is a block: the global switch or the field's own argument.
+static BOOL cn1CopyBlocked(CN1MacTextInputSession *session) {
+    return CN1_blockCopy || (session != nil && session.active && session.blockCopyPaste);
+}
+
+static BOOL cn1CutBlocked(CN1MacTextInputSession *session) {
+    return CN1_blockCut || (session != nil && session.active && session.blockCopyPaste);
+}
+
+static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
+    return CN1_blockPaste || (session != nil && session.active && session.blockCopyPaste);
+}
+
 - (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item {
     SEL action = [item action];
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    // Clipboard blocking, which reaches this view through two doors: the
+    // process-wide flags behind Display.setProperty("blockCopyPaste") and the
+    // per-field argument editStringAt carries. Neither was consulted here, so
+    // Command-C, Command-X, Command-V and the Edit menu stayed live in a field
+    // that had explicitly refused them -- the shortcuts go through the responder
+    // chain and never touch the portable menu that was doing the blocking.
+    if ((action == @selector(copy:) && cn1CopyBlocked(session))
+            || (action == @selector(cut:) && cn1CutBlocked(session))
+            || (action == @selector(paste:) && cn1PasteBlocked(session))) {
+        return NO;
+    }
     if (action == @selector(undo:) || action == @selector(redo:)) {
         // Disabled honestly rather than shown enabled and doing nothing: the
         // input session keeps no undo stack, and the pure Codename One editor
@@ -1620,6 +1649,12 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)copy:(id)sender {
+    // Checked here as well as in validation: a key equivalent reaches the
+    // responder chain directly and never asks whether the menu item is
+    // enabled, so validation alone leaves Command-C working.
+    if (cn1CopyBlocked([CN1MacTextInputSession sharedSession])) {
+        return;
+    }
     if (![CN1MacTextInputSession sharedSession].active) {
         // The form's own selection, copied on the event dispatch thread where
         // the hierarchy can be walked safely.
@@ -1637,6 +1672,9 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 }
 
 - (void)cut:(id)sender {
+    if (cn1CutBlocked([CN1MacTextInputSession sharedSession])) {
+        return;
+    }
     NSRange sel = [self cn1SelectionForEditing];
     if (sel.length == 0) {
         return;
@@ -1667,6 +1705,9 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
 
 - (void)paste:(id)sender {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
+    if (cn1PasteBlocked(session)) {
+        return;
+    }
     if (!session.active) {
         return;
     }

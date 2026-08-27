@@ -1270,7 +1270,8 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     NSString *initial = n10 != JAVA_NULL
         ? toNSString(CN1_THREAD_STATE_PASS_ARG n10)
         : @"";
-    extern void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize);
+    extern void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize,
+                                     BOOL blockCopyPaste);
     // n6 is "single line", so a multi-line field is its negation; n8 is the
     // field's maxSize, which the session enforces because TextArea.setText()
     // raises the limit to fit rather than refusing an over-long value.
@@ -1278,7 +1279,12 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                          CGRectMake(n1 + padLeft, n2 + padTop,
                                     n3 - padLeft - padRight,
                                     n4 - padTop - padBottom),
-                         n8);
+                         n8,
+                         // Carried through at last: the macOS branch used to
+                         // drop this argument, so a field opened with clipboard
+                         // access disabled still copied and pasted through the
+                         // Edit menu and its shortcuts.
+                         blockCopyPaste != JAVA_FALSE);
     POOL_END();
 #else
     POOL_BEGIN();

@@ -291,10 +291,12 @@ void CN1MacTextInputSetText(NSString *text) {
 /// pure editor engine drives with an explicit selection, this one is handed only
 /// the text -- so the caret goes to the end, which is where a Mac puts it when a
 /// field takes focus by being clicked into rather than tabbed into.
-void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize) {
+void CN1MacTextInputBegin(NSString *text, BOOL multiline, CGRect bounds, int maxSize,
+                          BOOL blockCopyPaste) {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
     NSString *initial = text != nil ? text : @"";
     session.pureEditor = NO;
+    session.blockCopyPaste = blockCopyPaste;
     // Carried into the session because nothing downstream enforces it: an
     // over-long value reaches TextArea.setText(), which raises maxSize to fit
     // rather than refusing, so the configured limit is gone for good.

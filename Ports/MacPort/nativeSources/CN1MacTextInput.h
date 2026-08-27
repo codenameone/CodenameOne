@@ -78,6 +78,16 @@ void CN1MacTextInputNotifyEditorAction(void);
 /// silently dropped, which is a text field that types nothing.
 @property (nonatomic) BOOL pureEditor;
 
+/// YES when this field was opened with clipboard access disabled.
+///
+/// Set from the blockCopyPaste argument editStringAt already carries -- the
+/// macOS branch used to drop it -- and OR-ed with the process-wide CN1_block*
+/// flags that Display.setProperty("blockCopyPaste") sets. The AppKit editor has
+/// to consult it itself: Command-C, Command-X, Command-V and the Edit menu
+/// reach the responder chain directly, so a field that refused the portable
+/// menu still copied and pasted freely through them.
+@property (nonatomic) BOOL blockCopyPaste;
+
 /// Monotonic edit generation. Every edit reported to the pure editor carries
 /// one, and Java echoes the last generation it APPLIED back with each state
 /// push, so a slow round trip cannot regress the shadow under fast typing.
