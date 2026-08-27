@@ -157,6 +157,21 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// False. A Mac reports one pointer, and this port only ever sends one.
+    ///
+    /// Every pointer path in METALView delivers a length of 1, because an NSEvent
+    /// carries a single cursor location -- the trackpad's extra fingers arrive as
+    /// gestures such as magnify, not as additional pointers. The inherited answer
+    /// is an unconditional true earned by a touchscreen, so an application that
+    /// asks before enabling a multi-touch interaction enabled one that can never
+    /// be driven here.
+    @Override
+    public boolean isMultiTouch() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
     /// False, because this port has no call detector to speak for.
     ///
     /// The inherited answer is an unconditional true, and it is earned there by
