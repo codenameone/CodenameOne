@@ -257,6 +257,51 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         NSFileProviderManager.default.documentStorageURL
     }
 
+    /// Where a copy is written before it is claimed.
+    ///
+    /// A subdirectory rather than the storage root, for two reasons. The root is the published
+    /// tree as this API sees it -- persistentIdentifierForItem reads an identifier out of a path
+    /// under it -- so a staging file there is an item-shaped thing that is not an item. And a
+    /// staging file has no owner once the process dies: every path that removes one is Swift
+    /// code in this process, and an extension is killed, not asked to exit, so a copy
+    /// interrupted that way stays in PERSISTENT provider storage with nothing that ever looks at
+    /// it again. Gathered in one directory, it can be swept.
+    private var stagingURL: URL {
+        storageURL.appendingPathComponent(".cn1staging", isDirectory: true)
+    }
+
+    /// How old a staged file has to be before a sweep may take it.
+    ///
+    /// Generous on purpose: the system can hold more than one instance of this extension at a
+    /// time, and a copy in flight in one of them must not be deleted by another starting up.
+    /// Nothing legitimate is still called "staged" an hour later -- a materialization that slow
+    /// has long since been abandoned by the browser that asked for it.
+    private static let stagingLifetime: TimeInterval = 3600
+
+    override init() {
+        super.init()
+        sweepAbandonedStaging()
+    }
+
+    private func sweepAbandonedStaging() {
+        let manager = FileManager.default
+        guard let staged = try? manager.contentsOfDirectory(
+                at: stagingURL, includingPropertiesForKeys: [.contentModificationDateKey],
+                options: [.skipsHiddenFiles]) else {
+            return
+        }
+        for file in staged {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate
+            guard let modified = modified,
+                  Date().timeIntervalSince(modified)
+                      > CN1FileProviderClassic.stagingLifetime else {
+                continue
+            }
+            try? manager.removeItem(at: file)
+        }
+    }
+
     private func index() -> CN1DocumentIndex? {
         CN1DocumentIndex.load(containerURL: containerURL)
     }
@@ -500,7 +545,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                     // only then claimed. The shared URL is never written by a request that has
                     // been superseded, which is what stopped a stale copy from overwriting a
                     // newer one and then deleting it as its own cleanup.
-                    let staged = self.storageURL.appendingPathComponent(UUID().uuidString)
+                    // Staged in the staging directory -- same volume as the destination, which
+                    // is what a later move needs -- and swept there if this process dies first.
+                    try? FileManager.default.createDirectory(at: self.stagingURL,
+                                                             withIntermediateDirectories: true)
+                    let staged = self.stagingURL.appendingPathComponent(UUID().uuidString)
                     if let error = CN1FileProviderClassic.place(local, at: staged, copy: true) {
                         completionHandler(error)
                         return

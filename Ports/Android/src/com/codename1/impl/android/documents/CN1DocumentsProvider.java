@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
 
 /// Exposes the tree the app published through `com.codename1.documents.DocumentProvider` as a
 /// source in the Android storage picker and the Files app.
@@ -126,13 +128,17 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         }
         CN1DocumentStore.Node root = index.nodes.get(index.rootId);
         MatrixCursor.RowBuilder row = result.newRow();
-        row.add(DocumentsContract.Root.COLUMN_ROOT_ID, index.rootId);
-        row.add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, index.rootId);
-        row.add(DocumentsContract.Root.COLUMN_TITLE,
+        // Only the columns this cursor carries; see columnsOf. A roots query with a narrower
+        // projection is rarer than a document one, but it is answered the same way rather than
+        // by a rule that holds in one method and not the other.
+        Set<String> columns = columnsOf(result);
+        add(row, columns, DocumentsContract.Root.COLUMN_ROOT_ID, index.rootId);
+        add(row, columns, DocumentsContract.Root.COLUMN_DOCUMENT_ID, index.rootId);
+        add(row, columns, DocumentsContract.Root.COLUMN_TITLE,
                 root == null || root.name == null ? applicationLabel() : root.name);
-        row.add(DocumentsContract.Root.COLUMN_FLAGS,
-                DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD);
-        row.add(DocumentsContract.Root.COLUMN_ICON, applicationIcon());
+        add(row, columns, DocumentsContract.Root.COLUMN_FLAGS,
+                Integer.valueOf(DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD));
+        add(row, columns, DocumentsContract.Root.COLUMN_ICON, applicationIcon());
         return result;
     }
 
@@ -551,16 +557,40 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     }
     private void addRow(MatrixCursor result, CN1DocumentStore.Node node) {
         MatrixCursor.RowBuilder row = result.newRow();
-        row.add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, node.id);
-        row.add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, node.name);
-        row.add(DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType(node));
-        row.add(DocumentsContract.Document.COLUMN_FLAGS, 0);
+        Set<String> columns = columnsOf(result);
+        add(row, columns, DocumentsContract.Document.COLUMN_DOCUMENT_ID, node.id);
+        add(row, columns, DocumentsContract.Document.COLUMN_DISPLAY_NAME, node.name);
+        add(row, columns, DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType(node));
+        add(row, columns, DocumentsContract.Document.COLUMN_FLAGS, Integer.valueOf(0));
         if (node.size >= 0) {
-            row.add(DocumentsContract.Document.COLUMN_SIZE, Long.valueOf(node.size));
+            add(row, columns, DocumentsContract.Document.COLUMN_SIZE, Long.valueOf(node.size));
         }
         if (node.lastModified >= 0) {
-            row.add(DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            add(row, columns, DocumentsContract.Document.COLUMN_LAST_MODIFIED,
                     Long.valueOf(node.lastModified));
+        }
+    }
+
+    /// The columns a cursor was built with.
+    ///
+    /// A caller names the columns it wants, and it is allowed to want fewer than the default set:
+    /// the ordinary way to read a document's name after the picker returns a URI is a query for
+    /// OpenableColumns.DISPLAY_NAME and SIZE alone. MatrixCursor.RowBuilder.add THROWS for a
+    /// column the cursor does not carry, so filling a row unconditionally turned that query into
+    /// an IllegalArgumentException out of the provider rather than the two fields it asked for.
+    private static Set<String> columnsOf(MatrixCursor cursor) {
+        Set<String> columns = new HashSet<String>();
+        String[] names = cursor.getColumnNames();
+        for (int i = 0; i < names.length; i++) {
+            columns.add(names[i]);
+        }
+        return columns;
+    }
+
+    private static void add(MatrixCursor.RowBuilder row, Set<String> columns, String column,
+            Object value) {
+        if (columns.contains(column)) {
+            row.add(column, value);
         }
     }
 
