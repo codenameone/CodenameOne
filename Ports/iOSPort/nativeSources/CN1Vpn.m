@@ -756,8 +756,19 @@ void com_codename1_impl_ios_IOSNative_vpnLoadProfile___int(
                 cn1vpEscape(remoteId),
                 cn1vpEscape(localId),
                 cfg.username == nil ? @"" : cn1vpEscape(cfg.username),
-                @"", @"", @"",
-                manager.onDemandEnabled ? @"1" : @"0",
+                // 5 and 6 are the password and the shared secret, which iOS
+                // keeps in the keychain and never hands back; 7 and 8 are the
+                // reserved slots VpnWire.encodeProfile documents. Four
+                // empties, then on-demand at 9 and the description at 10 --
+                // which is what decodeProfile reads.
+                //
+                // This used to emit three empties and the on-demand flag
+                // TWICE, at 8 and 9. The indices came out right, since 8 is
+                // ignored, but the only way to see that was to notice the
+                // duplication -- and a review counting the empties read it as
+                // an off-by-one and filed it as a bug. Same bytes on the
+                // wire, one obvious reading.
+                @"", @"", @"", @"",
                 manager.onDemandEnabled ? @"1" : @"0",
                 manager.localizedDescription == nil ? @""
                         : cn1vpEscape(manager.localizedDescription), nil];

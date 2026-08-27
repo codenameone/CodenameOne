@@ -27,6 +27,7 @@ import com.codename1.vpn.profile.VpnProfile;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,6 +43,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * had been altered.</p>
  */
 public class VpnWireTest {
+
+    @Test
+    public void theLoadedRecordLayoutIsPinnedToItsFieldIndices() {
+        // The iOS load path builds this record in Objective-C, where nothing
+        // checks it against decodeProfile. The indices are the contract
+        // between them, so they are pinned here: server, protocol, remote id,
+        // local id, username, then the password and shared secret iOS never
+        // returns, then the two reserved slots, then on-demand and the
+        // display name.
+        String record = "vpn.example.com\t0\tremote\tlocal\talice"
+                + "\t\t\t\t\t1\tWork VPN";
+        VpnProfile p = VpnWire.decodeProfile(record);
+        assertNotNull(p);
+        assertEquals("vpn.example.com", p.getServerAddress());
+        assertEquals("remote", p.getRemoteIdentifier());
+        assertEquals("local", p.getLocalIdentifier());
+        assertEquals("alice", p.getUsername());
+        assertTrue(p.isOnDemand(), "on-demand is field 9");
+        assertEquals("Work VPN", p.getDisplayName(), "the name is field 10");
+    }
 
     @Test
     public void aSecretSurvivesTheRoundTripUnchanged() {
