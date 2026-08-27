@@ -176,12 +176,33 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // per-request cancellation handle -- `stopProvidingItem` is told about a URL, not about a
         // transfer -- so there is nothing to hang a cancel on without keeping a URL-to-task map
         // alive in the extension. The replicated path, which every supported OS uses, does cancel.
-        CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: containerURL) { fetched, error in
+        let container = containerURL
+        CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container) { fetched, error in
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
                 return
             }
-            completionHandler(CN1FileProviderClassic.place(fetched, at: url, copy: false))
+            // The publication is checked again before the bytes are written, and once more after.
+            //
+            // A download outlives the request that started it, and the app may have called
+            // clear() meanwhile -- a logout. place() creates the destination directory, so
+            // without this the download would rebuild the storage the clear had just purged and
+            // leave the departed user's document sitting in it, readable through a browser that
+            // still has the folder open. Both checks are needed: the first covers a clear that
+            // finished before the write, the second a clear that landed during it. A clear after
+            // the second check purges the file itself.
+            guard CN1FileProviderClassic.stillPublished(identifier, containerURL: container) else {
+                try? FileManager.default.removeItem(at: fetched)
+                completionHandler(NSFileProviderError(.noSuchItem))
+                return
+            }
+            let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
+            if !CN1FileProviderClassic.stillPublished(identifier, containerURL: container) {
+                try? FileManager.default.removeItem(at: url)
+                completionHandler(NSFileProviderError(.noSuchItem))
+                return
+            }
+            completionHandler(placed)
         }
     }
 
@@ -199,6 +220,20 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
 
     /// Puts the bytes where the browser expects them. The local copy is copied rather than moved:
     /// it is the app's own file, and moving it out of the container would delete the original.
+    /// Whether the identifier is still in the published index.
+    ///
+    /// Reads the index from disk each time rather than trusting the copy the request started
+    /// with: that is the whole point -- the file is gone once the app has cleared, and an item
+    /// dropped by a republish is gone from a fresh read.
+    private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
+                                       containerURL: URL) -> Bool {
+        guard let index = CN1DocumentIndex.load(containerURL: containerURL),
+              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index) else {
+            return false
+        }
+        return index.nodes[resolved] != nil
+    }
+
     private static func place(_ source: URL, at destination: URL, copy: Bool) -> Error? {
         do {
             try FileManager.default.createDirectory(

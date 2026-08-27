@@ -154,16 +154,21 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 once.call(nil, nil, CN1DocumentRemote.providerError(error))
             }
             progress.completedUnitCount = 1
+            progress.cancellationHandler = nil
         }
         // The Progress is the only handle File Provider has on this transfer. Apple: "If the
         // NSProgress returned by this method is cancelled, the extension should call the
         // completion handler with (nil, nil, NSUserCancelledError) in the NSProgress cancellation
         // handler" -- and the download has to actually stop, or dismissing a large file leaves it
         // transferring to completion on the user's mobile data.
-        progress.cancellationHandler = {
+        // Weakly, or the handler and the Progress that stores it hold each other and neither is
+        // ever freed -- one leaked fetch per remote document opened, in a process the system
+        // memory-limits harder than the app. The completion clears the handler for the same
+        // reason, which also releases the task and the guard it captures.
+        progress.cancellationHandler = { [weak progress] in
             task?.cancel()
             once.call(nil, nil, CocoaError(.userCancelled))
-            progress.completedUnitCount = 1
+            progress?.completedUnitCount = 1
         }
         return progress
     }

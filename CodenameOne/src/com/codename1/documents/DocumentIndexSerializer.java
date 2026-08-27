@@ -133,9 +133,69 @@ public final class DocumentIndexSerializer {
         if (".".equals(effective) || "..".equals(effective)) {
             throw new IllegalArgumentException("\"" + effective + "\" is not a usable file name.");
         }
+        if (utf8Length(effective) > MAX_COMPONENT_BYTES) {
+            throw new IllegalArgumentException("\"" + effective + "\" is too long to be a file "
+                    + "name (" + utf8Length(effective) + " bytes; the limit is "
+                    + MAX_COMPONENT_BYTES + ").");
+        }
+        if (storagePathLength(node.getId()) > MAX_COMPONENT_BYTES) {
+            throw new IllegalArgumentException("The document id \"" + node.getId() + "\" is too "
+                    + "long to name a directory once escaped (" + storagePathLength(node.getId())
+                    + " bytes; the limit is " + MAX_COMPONENT_BYTES + "). Shorten the id, or put "
+                    + "the long part in the name.");
+        }
         for (DocumentNode child : node.getChildren()) {
             validate(child);
         }
+    }
+
+    /// The most bytes a single path component may take.
+    ///
+    /// 255 is what every filesystem the published tree lands on allows -- APFS, ext4 on Android
+    /// and NTFS all stop there. Beyond it the pre-iOS-16 provider's `createDirectory` fails with
+    /// ENAMETOOLONG, and it fails at open time: the item is listed, the user taps it, and nothing
+    /// happens. Refusing the publish says which node is at fault instead.
+    private static final int MAX_COMPONENT_BYTES = 255;
+
+    private static int utf8Length(String value) {
+        int total = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x80) {
+                total++;
+            } else if (c < 0x800) {
+                total += 2;
+            } else if (Character.isHighSurrogate(c) && i + 1 < value.length()
+                    && Character.isLowSurrogate(value.charAt(i + 1))) {
+                total += 4;
+                i++;
+            } else {
+                total += 3;
+            }
+        }
+        return total;
+    }
+
+    /// How many bytes the id takes as a directory name in the pre-iOS-16 provider's storage.
+    ///
+    /// That provider gives each item a directory of its own so two items may share a file name,
+    /// and it percent-escapes the id to keep it a single component -- everything outside
+    /// lowercase alphanumerics, "-" and "_" becomes three characters, uppercase included, which
+    /// is what keeps ids that differ only in case apart on a case-insensitive volume. So the
+    /// budget is spent on the ESCAPED form, and an id of plain ASCII digits costs one byte each
+    /// while one of accented text costs six.
+    private static int storagePathLength(String id) {
+        int unreserved = 0;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+                unreserved++;
+            }
+        }
+        // An unreserved character survives as its own byte; every other BYTE becomes "%XX".
+        // Counted in bytes rather than characters so a surrogate pair costs the twelve it really
+        // costs, not the six a per-character count would guess.
+        return unreserved + 3 * (utf8Length(id) - unreserved);
     }
 
     private static String findDuplicateId(DocumentNode node, Set<String> seen) {

@@ -24,6 +24,7 @@ package com.codename1.documents;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -172,6 +173,44 @@ class DocumentIndexSerializerTest {
         IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(DocumentNode.file("root", "a.txt")));
         assertTrue(err.getMessage().contains("must be a folder"), err.getMessage());
+    }
+
+    @Test
+    void refusesComponentsTooLongForAFilesystem() {
+        // 255 bytes is where every filesystem the tree lands on stops. Past it the pre-iOS-16
+        // provider's createDirectory fails with ENAMETOOLONG, and it fails at OPEN time: the item
+        // is listed, the user taps it, nothing happens. Refusing the publish names the node.
+        StringBuilder name = new StringBuilder();
+        for (int i = 0; i < 256; i++) {
+            name.append('a');
+        }
+        DocumentNode longName = DocumentNode.folder("root", "Root");
+        longName.add(DocumentNode.file("f", name.toString()));
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(longName));
+        assertTrue(err.getMessage().contains("too long"), err.getMessage());
+
+        // One byte under the limit is fine, so the check is a limit rather than a fence.
+        DocumentNode allowed = DocumentNode.folder("root", "Root");
+        allowed.add(DocumentNode.file("f", name.substring(0, 255)));
+        assertNotNull(DocumentIndexSerializer.serialize(allowed));
+
+        // The id is budgeted on its ESCAPED length, not its raw one: the classic provider gives
+        // each item a directory named after the percent-escaped id, and uppercase escapes too --
+        // 100 capitals are 300 bytes there while 100 lowercase are 100.
+        StringBuilder shouting = new StringBuilder();
+        for (int i = 0; i < 100; i++) {
+            shouting.append('A');
+        }
+        DocumentNode longId = DocumentNode.folder("root", "Root");
+        longId.add(DocumentNode.file(shouting.toString(), "fine.pdf"));
+        IllegalArgumentException idErr = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(longId));
+        assertTrue(idErr.getMessage().contains("once escaped"), idErr.getMessage());
+
+        DocumentNode quietId = DocumentNode.folder("root", "Root");
+        quietId.add(DocumentNode.file(shouting.toString().toLowerCase(), "fine.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(quietId));
     }
 
     @Test
