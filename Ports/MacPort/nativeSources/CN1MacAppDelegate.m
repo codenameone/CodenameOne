@@ -113,6 +113,8 @@ static NSMutableArray<NSDictionary *> *cn1MacPendingDeliveries = nil;
 static NSString * const CN1MacDeliveryKind = @"cn1Kind";
 static NSString * const CN1MacDeliveryPayload = @"cn1Payload";
 static NSString * const CN1MacDeliveryPush = @"push";
+static NSString * const CN1MacDeliveryActionId = @"cn1ActionId";
+static NSString * const CN1MacDeliveryText = @"cn1TextResponse";
 
 /// Decodes one APNs payload the way the shared iOS router does and hands each
 /// part to the application.
@@ -154,7 +156,7 @@ static NSString *cn1AlertString(NSDictionary *alert, NSString *literalKey,
                                                               ? (NSArray *)args : nil];
 }
 
-static void cn1MacDeliverPush(NSDictionary *userInfo) {
+static void cn1MacDeliverPush(NSDictionary *userInfo, NSString *actionId, NSString *textResponse) {
     if (userInfo == nil) {
         return;
     }
@@ -190,6 +192,18 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
     // PushCallback.push() saw exists() false, or fields left from the previous
     // push, even though the callback itself arrived.
     com_codename1_push_PushContent_reset__(threadStateData);
+    // What the user did with the notification, when this push arrived because
+    // they did something. Carried from the response rather than read off the
+    // payload: only the delegate callback has it, and by the time the pacing
+    // queue hands the push over the response is long gone.
+    if (actionId != nil) {
+        com_codename1_push_PushContent_setActionId___java_lang_String(
+            threadStateData, fromNSString(threadStateData, actionId));
+    }
+    if (textResponse != nil) {
+        com_codename1_push_PushContent_setTextResponse___java_lang_String(
+            threadStateData, fromNSString(threadStateData, textResponse));
+    }
     id mediaUrl = [userInfo objectForKey:@"media-url"];
     if ([mediaUrl isKindOfClass:[NSString class]]) {
         com_codename1_push_PushContent_setImageUrl___java_lang_String(
@@ -282,7 +296,9 @@ static void cn1MacPumpDeliveryQueue(void) {
             // Ends the loop: nothing else may write PushContent until the
             // barrier reports this push's callback has read it.
             cn1MacPushInFlight = YES;
-            cn1MacDeliverPush(payload);
+            cn1MacDeliverPush(payload,
+                              [entry objectForKey:CN1MacDeliveryActionId],
+                              [entry objectForKey:CN1MacDeliveryText]);
             struct ThreadLocalData* threadStateData = getThreadLocalData();
             com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
         } else {
@@ -294,17 +310,27 @@ static void cn1MacPumpDeliveryQueue(void) {
     }
 }
 
-/// Adds one delivery to the queue and pumps it.
-static void cn1MacEnqueueDelivery(NSString *kind, NSDictionary *payload) {
+/// Adds one delivery to the queue and pumps it. `actionId` and `textResponse`
+/// are what the user did with a notification, and are nil for one that simply
+/// arrived.
+static void cn1MacEnqueueDelivery(NSString *kind, NSDictionary *payload,
+                                  NSString *actionId, NSString *textResponse) {
     if (payload == nil) {
         return;
     }
     if (cn1MacPendingDeliveries == nil) {
         cn1MacPendingDeliveries = [[NSMutableArray alloc] init];
     }
-    [cn1MacPendingDeliveries addObject:
-            [NSDictionary dictionaryWithObjectsAndKeys:
-                    kind, CN1MacDeliveryKind, payload, CN1MacDeliveryPayload, nil]];
+    NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+    [entry setObject:kind forKey:CN1MacDeliveryKind];
+    [entry setObject:payload forKey:CN1MacDeliveryPayload];
+    if (actionId != nil) {
+        [entry setObject:actionId forKey:CN1MacDeliveryActionId];
+    }
+    if (textResponse != nil) {
+        [entry setObject:textResponse forKey:CN1MacDeliveryText];
+    }
+    [cn1MacPendingDeliveries addObject:entry];
     cn1MacPumpDeliveryQueue();
 }
 
@@ -321,7 +347,8 @@ static void cn1MacEnqueueDelivery(NSString *kind, NSDictionary *payload) {
 ///
 /// Shared by the remote-notification hook and by both notification-center
 /// delegate methods, so none of them can be the one that forgets to wait.
-static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
+static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo, NSString *actionId,
+                                     NSString *textResponse) {
     if (userInfo == nil) {
         return;
     }
@@ -329,7 +356,7 @@ static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
     // as a replayed one because the operating system can deliver two in quick
     // succession just as a launch can accumulate two, and the PushContent race
     // does not care which produced them.
-    cn1MacEnqueueDelivery(CN1MacDeliveryPush, userInfo);
+    cn1MacEnqueueDelivery(CN1MacDeliveryPush, userInfo, actionId, textResponse);
 }
 
 /// Reports a local notification, filling in what the user did with it.
@@ -381,7 +408,7 @@ static void cn1MacQueueOrDeliverLocalNotification(NSDictionary *delivery) {
     if (delivery == nil) {
         return;
     }
-    cn1MacEnqueueDelivery(@"local", delivery);
+    cn1MacEnqueueDelivery(@"local", delivery, nil, nil);
 }
 
 static void cn1MacDeliverURL(NSString *url) {
@@ -597,10 +624,36 @@ void CN1MacDeliverWindowMiniaturized(BOOL miniaturized) {
         }
         return;
     }
-    cn1MacQueueOrDeliverPush(info);
+    cn1MacQueueOrDeliverPush(info, nil, nil);
     if (completionHandler != nil) {
         completionHandler(UNNotificationPresentationOptionAlert);
     }
+}
+
+/// The action the user chose, or nil when they simply opened or dismissed it.
+///
+/// The default and dismiss identifiers mean "opened" and "swiped away", not an
+/// action the application declared, so they are not reported as one --
+/// getActionId() would otherwise answer a UN* constant that no
+/// LocalNotification.addAction or push category ever named. The UIKit router
+/// passes them through; an application asking "did the user choose an action"
+/// gets the honest answer here.
+static NSString *cn1MacChosenAction(UNNotificationResponse *response) {
+    NSString *actionId = response.actionIdentifier;
+    if (actionId == nil
+            || [actionId isEqualToString:UNNotificationDefaultActionIdentifier]
+            || [actionId isEqualToString:UNNotificationDismissActionIdentifier]) {
+        return nil;
+    }
+    return actionId;
+}
+
+/// What the user typed into a text-input action, or nil for every other kind.
+static NSString *cn1MacResponseText(UNNotificationResponse *response) {
+    if (![response isKindOfClass:[UNTextInputNotificationResponse class]]) {
+        return nil;
+    }
+    return ((UNTextInputNotificationResponse *)response).userText;
 }
 
 /// The user acted on a notification -- opened it, or chose one of its actions.
@@ -618,25 +671,23 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
         if (response.notification.request.content.body != nil) {
             [delivery setObject:response.notification.request.content.body forKey:@"body"];
         }
-        // The default and dismiss identifiers mean "opened" and "swiped away",
-        // not an action the application declared, so they are not reported as
-        // one -- getActionId() would otherwise answer a UN* constant no
-        // LocalNotification.addAction ever used.
-        NSString *actionId = response.actionIdentifier;
-        if (actionId != nil
-                && ![actionId isEqualToString:UNNotificationDefaultActionIdentifier]
-                && ![actionId isEqualToString:UNNotificationDismissActionIdentifier]) {
+        NSString *actionId = cn1MacChosenAction(response);
+        if (actionId != nil) {
             [delivery setObject:actionId forKey:@"actionId"];
         }
-        if ([response isKindOfClass:[UNTextInputNotificationResponse class]]) {
-            NSString *userText = ((UNTextInputNotificationResponse *)response).userText;
-            if (userText != nil) {
-                [delivery setObject:userText forKey:@"textResponse"];
-            }
+        NSString *userText = cn1MacResponseText(response);
+        if (userText != nil) {
+            [delivery setObject:userText forKey:@"textResponse"];
         }
         cn1MacQueueOrDeliverLocalNotification(delivery);
     } else {
-        cn1MacQueueOrDeliverPush(info);
+        // A REMOTE notification the user acted on. The same two values as the
+        // local branch above, and for the same reason: PushContent.getActionId()
+        // and getTextResponse() are how a push callback learns which action was
+        // chosen and what was typed into it, and dropping them here left every
+        // actionable push looking like a plain open.
+        cn1MacQueueOrDeliverPush(info, cn1MacChosenAction(response),
+                                 cn1MacResponseText(response));
     }
     if (completionHandler != nil) {
         completionHandler();
@@ -769,7 +820,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 
 - (void)application:(NSApplication *)application
         didReceiveRemoteNotification:(NSDictionary *)userInfo {
-    cn1MacQueueOrDeliverPush(userInfo);
+    cn1MacQueueOrDeliverPush(userInfo, nil, nil);
 }
 
 @end
