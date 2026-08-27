@@ -1055,11 +1055,43 @@ struct TryBlock {
     JAVA_OBJECT monitor;
 };
 
+/*
+ * Per-thread sizing. These three are what a thread costs before it runs a single
+ * instruction, so they are the numbers that decide whether a server-side binary
+ * can afford a thread per connection. #ifndef-guarded so an A/B can override them
+ * with -D without editing this file -- an unconditional #define silently ignores
+ * the -D (the redefinition warning is suppressed by the generated code's -w).
+ */
+#ifndef CN1_MAX_STACK_CALL_DEPTH
 #define CN1_MAX_STACK_CALL_DEPTH 1024
+#endif
 #define CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT CN1_MAX_STACK_CALL_DEPTH
+#ifndef CN1_MAX_OBJECT_STACK_DEPTH
 #define CN1_MAX_OBJECT_STACK_DEPTH 16536
+#endif
 
+#ifndef PER_THREAD_ALLOCATION_COUNT
 #define PER_THREAD_ALLOCATION_COUNT 4096
+#endif
+
+/*
+ * Try-block depth. Each entry carries a jmp_buf (~200 bytes on arm64 macOS,
+ * ~320 on arm64 musl), so 500 of them is 100-160KB per thread -- comparable to
+ * the shadow stack and much less obvious.
+ */
+#ifndef CN1_MAX_TRY_BLOCKS
+#define CN1_MAX_TRY_BLOCKS 500
+#endif
+
+/*
+ * Native stack per spawned thread on Linux. musl defaults to 128KB, which the
+ * recursive generated C overflows on a deep call chain, so it is pinned to a
+ * JVM-sized reservation. Reserved, not committed -- but it is the largest single
+ * number attached to a thread, so it is a knob rather than a literal.
+ */
+#ifndef CN1_THREAD_STACK_BYTES
+#define CN1_THREAD_STACK_BYTES (16 * 1024 * 1024)
+#endif
 
 #ifdef CN1_NURSERY
 // Tunables (override with -D). Block size and arena size trade footprint against
