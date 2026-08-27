@@ -102,8 +102,25 @@ public class CN1ConnectionService extends ConnectionService {
     /// to recover -- the first callback was then attributed to the second
     /// report, and the next one looked like a system-placed call while the
     /// first report waited for an answer that never came.
-    private static final Map<String, List<String>> PENDING_ADDRESSES =
-            new HashMap<String, List<String>>();
+    private static final Map<String, List<Parked>> PENDING_ADDRESSES =
+            new HashMap<String, List<Parked>>();
+
+    /// A report parked against an address, with the direction it was made in.
+    ///
+    /// The direction is stored because the address alone does not identify a
+    /// report: an app that reports an incoming call from a number while
+    /// placing one TO it has two reports under one key, and the fallback
+    /// would hand a callback whichever came first. Both ends know the
+    /// direction, so there is no reason to guess.
+    private static final class Parked {
+        private final String callId;
+        private final boolean incoming;
+
+        Parked(String callId, boolean incoming) {
+            this.callId = callId;
+            this.incoming = incoming;
+        }
+    }
 
     private static final Map<String, Integer> PENDING_REPORTS =
             new HashMap<String, Integer>();
@@ -146,13 +163,13 @@ public class CN1ConnectionService extends ConnectionService {
     @Override
     public void onCreateIncomingConnectionFailed(PhoneAccountHandle handle,
             ConnectionRequest request) {
-        refuse(request);
+        refuse(request, true);
     }
 
     @Override
     public void onCreateOutgoingConnectionFailed(PhoneAccountHandle handle,
             ConnectionRequest request) {
-        refuse(request);
+        refuse(request, false);
     }
 
     private Connection adopt(ConnectionRequest request, boolean incoming) {
@@ -167,7 +184,7 @@ public class CN1ConnectionService extends ConnectionService {
         // all. The discriminator is a report actually being in flight:
         // without one there is nothing for a dropped extra to belong to.
         boolean external = false;
-        if (id == null && !incoming) {
+        if (id == null) {
             // Matched on the ADDRESS, not on "is any report pending". A call
             // the system placed while an unrelated report happened to be in
             // flight was classified as that report: it adopted the other
@@ -176,11 +193,24 @@ public class CN1ConnectionService extends ConnectionService {
             // callback then built a second connection under the same id.
             //
             // Only a report to the same address can be this request.
+            // BOTH directions. The recovery was gated on the callback being
+            // outgoing, so an OEM that dropped the extra from an INCOMING
+            // callback left the id null and the call was refused -- a real
+            // ringing call rejected, while the address had been recorded by
+            // reportIncomingCall for exactly this purpose and refuse() was
+            // already consulting it on the failure path. Recorded for the
+            // fallback, used only by half of it.
             String matched = pendingReportFor(
-                    request == null ? null : request.getAddress());
+                    request == null ? null : request.getAddress(), incoming);
             if (matched != null) {
                 id = matched;
-            } else {
+            } else if (!incoming) {
+                // Only an OUTGOING callback with nothing waiting can be a
+                // call the SYSTEM asked this app to place. Telecom raises an
+                // incoming connection for a self-managed account only because
+                // this app called addNewIncomingCall, so an unmatched one is
+                // not a new call to invent an id for -- it is a report whose
+                // identity is genuinely lost, and refusing stays correct.
                 external = true;
             }
         }
@@ -191,7 +221,7 @@ public class CN1ConnectionService extends ConnectionService {
             // Nothing can be routed to a call with no identifier, so refusing
             // is the honest answer rather than creating an orphan Telecom
             // knows about and this app cannot address.
-            refuse(request);
+            refuse(request, incoming);
             return null;
         }
         CN1Connection c = new CN1Connection(this, id);
@@ -249,7 +279,7 @@ public class CN1ConnectionService extends ConnectionService {
         return CallWire.encodeHandle(new CallHandle(type, part));
     }
 
-    private void refuse(ConnectionRequest request) {
+    private void refuse(ConnectionRequest request, boolean incoming) {
         String id = request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(EXTRA_CALL_ID);
         if (id == null) {
@@ -259,7 +289,7 @@ public class CN1ConnectionService extends ConnectionService {
             // callback could then still arrive and build a connection for a
             // CallSession Java had already failed and forgotten.
             id = pendingReportFor(request == null ? null
-                    : request.getAddress());
+                    : request.getAddress(), incoming);
         }
         if (id == null) {
             // A system-placed call Telecom refused. Nothing of this app's was
@@ -324,16 +354,17 @@ public class CN1ConnectionService extends ConnectionService {
     /// The address is parked with it so an incoming request that lost this
     /// bridge's extras can still be recognised as THIS report rather than as
     /// a call the system placed on its own; see adopt().
-    static void expectReport(int requestId, String callId, String address) {
+    static void expectReport(int requestId, String callId, String address,
+            boolean incoming) {
         synchronized (PENDING_REPORTS) {
             PENDING_REPORTS.put(callId, Integer.valueOf(requestId));
             if (address != null) {
-                List<String> waiting = PENDING_ADDRESSES.get(address);
+                List<Parked> waiting = PENDING_ADDRESSES.get(address);
                 if (waiting == null) {
-                    waiting = new ArrayList<String>();
+                    waiting = new ArrayList<Parked>();
                     PENDING_ADDRESSES.put(address, waiting);
                 }
-                waiting.add(callId);
+                waiting.add(new Parked(callId, incoming));
             }
         }
     }
@@ -342,14 +373,21 @@ public class CN1ConnectionService extends ConnectionService {
     ///
     /// Oldest first because Telecom answers in the order it was asked, so the
     /// first callback for an address belongs to the first report made to it.
-    private static String pendingReportFor(Uri address) {
+    private static String pendingReportFor(Uri address, boolean incoming) {
         if (address == null) {
             return null;
         }
         synchronized (PENDING_REPORTS) {
-            List<String> waiting = PENDING_ADDRESSES.get(address.toString());
-            return waiting == null || waiting.isEmpty() ? null
-                    : waiting.get(0);
+            List<Parked> waiting = PENDING_ADDRESSES.get(address.toString());
+            if (waiting == null) {
+                return null;
+            }
+            for (Parked p : waiting) {
+                if (p.incoming == incoming) {
+                    return p.callId;
+                }
+            }
+            return null;
         }
     }
 
@@ -369,8 +407,16 @@ public class CN1ConnectionService extends ConnectionService {
         if (callId == null) {
             return null;
         }
-        for (Map.Entry<String, List<String>> e : PENDING_ADDRESSES.entrySet()) {
-            if (e.getValue().remove(callId)) {
+        for (Map.Entry<String, List<Parked>> e : PENDING_ADDRESSES.entrySet()) {
+            boolean removed = false;
+            for (Parked p : e.getValue()) {
+                if (p.callId.equals(callId)) {
+                    e.getValue().remove(p);
+                    removed = true;
+                    break;
+                }
+            }
+            if (removed) {
                 if (e.getValue().isEmpty()) {
                     PENDING_ADDRESSES.remove(e.getKey());
                 }
