@@ -8214,8 +8214,15 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(
             threadStateData,
+            // path, not absoluteString. fileChooserResult prefixes "file:" and
+            // unfile() strips it again WITHOUT percent decoding, so an encoded
+            // URL reached FileSystemStorage.openInputStream() as a literal
+            // "My%20File.txt" and the documented workflow simply failed on any
+            // name with a space, a '#' or a non-ASCII character. A single path
+            // needs no encoding: unlike the multi-select gallery beside it,
+            // there is no separator here for a filename to collide with.
             picked == nil ? JAVA_NULL
-                          : fromNSString(threadStateData, [picked absoluteString]));
+                          : fromNSString(threadStateData, [picked path]));
         POOL_END();
 #ifndef CN1_USE_ARC
         [documentTypes release];
