@@ -103,7 +103,6 @@ public class BuildHintAnnotationReaderTest {
         check(out, at + "external", expected.isExternal(), actual.isExternal());
         check(out, at + "enterpriseOnly", expected.isEnterpriseOnly(), actual.isEnterpriseOnly());
         check(out, at + "link", expected.link(), actual.link());
-        check(out, at + "consumedBy", expected.consumedBy(), actual.consumedBy());
         // The annotation may say MORE than the catalog did, and for the iOS
         // privacy keys it does: the catalog left their doc empty and the
         // generator synthesised a sentence per key on its way out. Saying less

@@ -246,7 +246,7 @@ def main():
             if sep is not None:
                 parts.append('                .separator("%s")' % jesc(sep))
             parts.append('                .platform("%s")' % platform_of(n))
-            parts.append('                .consumedBy(%s)' % ", ".join('"%s"' % s for s in sites))
+
             if doc:
                 parts.append('                .doc(%s)' % wrap(doc, 24))
             body.append("\n".join(parts) + ");")

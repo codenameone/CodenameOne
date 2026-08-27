@@ -48,22 +48,19 @@ final class BuildHintsDesktop {
         h.add(new Hint("desktop.title")
                 .group(HintGroup.DESKTOP)
                 .type(HintType.STRING)
-                .platform("desktop")
-                .consumedBy("GenerateDesktopAppWrapperMojo"));
+                .platform("desktop"));
 
         h.add(new Hint("javascript.includeVideoJS")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("javascript")
-                .consumedBy("JavaScriptBuilder"));
+                .platform("javascript"));
 
         h.add(new Hint("javascript.inject_proxy")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.BOOLEAN)
                 .def("true")
                 .platform("javascript")
-                .consumedBy("JavaScriptProxyPackager")
                 .doc("true/false (defaults to `true`). The ParparVM builder generates a same-origin proxy "
                         + "bundle and configures the app to use it. Setting this to `false` disables both proxy "
                         + "generation and proxy URL injection."));
@@ -71,14 +68,12 @@ final class BuildHintsDesktop {
         h.add(new Hint("javascript.portSources")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
-                .platform("javascript")
-                .consumedBy("JavaScriptBuilder"));
+                .platform("javascript"));
 
         h.add(new Hint("javascript.proxy.allowedTargets")
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
                 .platform("javascript")
-                .consumedBy("JavaScriptProxyPackager")
                 .doc("Comma-separated target origins, host names, or wildcard subdomains that a generated "
                         + "proxy may access, for example `https://api.example.com,*.services.example.org`. If "
                         + "omitted, the proxy accepts any HTTP or HTTPS target and the build emits a warning."));
@@ -88,7 +83,6 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("jakarta-servlet")
                 .platform("javascript")
-                .consumedBy("CN1BuildMojo", "JavaScriptProxyPackager")
                 .doc("The generated ParparVM proxy deployment platform. Supported values are `jakarta-servlet` "
                         + "(default), `javax-servlet`, `node`, `php`, `aws-lambda`, `google-cloud-functions`, "
                         + "`cloudflare-workers`, and `none`."));
@@ -97,7 +91,6 @@ final class BuildHintsDesktop {
                 .group(HintGroup.JAVASCRIPT)
                 .type(HintType.STRING)
                 .platform("javascript")
-                .consumedBy("JavaScriptProxyPackager")
                 .doc("The URL of an existing proxy to use for network requests. Setting it suppresses "
                         + "generated proxy packaging unless `javascript.proxy.target` is also set. If "
                         + "`javascript.inject_proxy` is `false`, this build hint is ignored."));
@@ -105,61 +98,52 @@ final class BuildHintsDesktop {
         h.add(new Hint("linux.arch")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.nativeVerify")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
                 .platform("linux")
-                .consumedBy("LinuxNativeBuilder")
                 .doc("`nativeVerify` for the native Linux translation alone."));
 
         h.add(new Hint("linux.cc")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.debug")
                 .group(HintGroup.LINUX)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.libc")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
                 .def("glibc")
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.musl")
                 .group(HintGroup.LINUX)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.muslNativeCc")
                 .group(HintGroup.LINUX)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("linux.toolchain")
                 .group(HintGroup.LINUX)
                 .type(HintType.STRING)
-                .platform("linux")
-                .consumedBy("LinuxNativeBuilder"));
+                .platform("linux"));
 
         h.add(new Hint("windows.arch")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only (the `windows-native` build target -- not the JVM `win.*` "
                         + "desktop hints above). Target CPU architecture for the standalone `.exe`: `x64` (the "
                         + "default) or `arm64`. Accepts the usual synonyms (`x86_64`/`amd64`, `aarch64`). clang-cl "
@@ -171,14 +155,12 @@ final class BuildHintsDesktop {
                 .group(HintGroup.WINDOWS)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.nativeVerify")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("`nativeVerify` for the native Windows translation alone."));
 
         h.add(new Hint("windows.debug")
@@ -186,7 +168,6 @@ final class BuildHintsDesktop {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only. true/false (defaults to false). When `false` the `.exe` is "
                         + "built optimized and *stripped* -- no PDB, dead-stripped unreferenced code (`/OPT:REF`) "
                         + "and folded identical functions (`/OPT:ICF`) -- which is the shipping default. Set `true` "
@@ -198,44 +179,37 @@ final class BuildHintsDesktop {
                 .group(HintGroup.WINDOWS)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.msix.identityName")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.msix.password")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.SECRET)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.msix.pfx")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.msix.publisher")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.msix.version")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.sdkRoot")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only; used when building on a *non-Windows* host (for example a "
                         + "Linux build server). Path to a Windows SDK laid out by "
                         + "https://github.com/Jake-Shadle/xwin[`xwin splat`] (a directory containing `crt/include` "
@@ -249,7 +223,6 @@ final class BuildHintsDesktop {
                 .type(HintType.BOOLEAN)
                 .def("true")
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only. `true`/`false` (default `true`). Set `false` to force an "
                         + "unsigned build even when a certificate is available."));
 
@@ -258,33 +231,28 @@ final class BuildHintsDesktop {
                 .type(HintType.STRING)
                 .def("sha256")
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only. Signature digest algorithm. Default `sha256`."));
 
         h.add(new Hint("windows.signing.name")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.signing.password")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.SECRET)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.signing.pkcs12")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
 
         h.add(new Hint("windows.signing.timestampUrl")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
                 .def("http://timestamp.digicert.com")
                 .platform("windows")
-                .consumedBy("WindowsNativeBuilder")
                 .doc("Native Windows port only. RFC&#160;3161 timestamp server used when signing, so the "
                         + "signature stays valid after the certificate expires. Default "
                         + "`http://timestamp.digicert.com`; set empty to disable timestamping."));
@@ -292,7 +260,6 @@ final class BuildHintsDesktop {
         h.add(new Hint("windows.signing.url")
                 .group(HintGroup.WINDOWS)
                 .type(HintType.STRING)
-                .platform("windows")
-                .consumedBy("WindowsNativeBuilder"));
+                .platform("windows"));
     }
 }

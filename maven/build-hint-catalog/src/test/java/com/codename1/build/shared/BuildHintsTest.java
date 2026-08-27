@@ -300,27 +300,6 @@ class BuildHintsTest {
         }
     }
 
-    @Test
-    void everyHintNamesTheCodeThatReadsIt() {
-        for (BuildHints.Hint h : BuildHints.entries()) {
-            if (h.group() != null) {
-                // An ANNOTATED hint deliberately names no consumer. The
-                // annotation ships to applications, and the classes that read a
-                // hint -- AndroidGradleBuilder, IPhoneBuilder -- are the build
-                // service's business, not part of any contract a client has. How
-                // the service is organised behind a hint name may change without
-                // an app noticing, and a client-side note about it can only go
-                // stale. This bookkeeping stays for the hints the CATALOG
-                // describes, which is build-side code describing build-side code.
-                continue;
-            }
-            List<String> by = h.consumedBy();
-            assertTrue(!by.isEmpty() || h.isExternal(),
-                    h.name() + " names no consumer and is not marked external(); either it is "
-                            + "read somewhere this catalog does not record, or it is dead");
-        }
-    }
-
     private static String quote(String s) {
         if (s == null) {
             return "null";

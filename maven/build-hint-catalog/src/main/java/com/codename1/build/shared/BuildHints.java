@@ -230,7 +230,6 @@ public final class BuildHints {
         private String platform = "general";
         private boolean dynamic;
         private String pattern;
-        private final List<String> consumedBy = new ArrayList<String>();
         private boolean external;
         private boolean enterpriseOnly;
         private String link;
@@ -385,12 +384,6 @@ public final class BuildHints {
             return this;
         }
 
-        /** Names the builders or mojos that read this hint. */
-        public Hint consumedBy(String... classSimpleNames) {
-            Collections.addAll(this.consumedBy, classSimpleNames);
-            return this;
-        }
-
         /**
          * Marks a hint that is read outside this repository, by a build-daemon
          * lane whose source is not mirrored here. Such a hint has no in-repo
@@ -474,7 +467,6 @@ public final class BuildHints {
         public String platform() { return platform; }
         public boolean isDynamic() { return dynamic; }
         public String pattern() { return pattern; }
-        public List<String> consumedBy() { return Collections.unmodifiableList(consumedBy); }
         public boolean isExternal() { return external; }
         public boolean isEnterpriseOnly() { return enterpriseOnly; }
         public String link() { return link; }

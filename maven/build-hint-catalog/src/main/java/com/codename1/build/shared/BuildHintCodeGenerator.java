@@ -69,20 +69,17 @@ public final class BuildHintCodeGenerator {
     /** The generated data file, at the root of whichever resource tree gets it. */
     private static final String DATA_FILE = "cn1-build-hints.json";
 
-    // NOT ...annotations.build: .gitignore carries a repo-wide **/build/* rule,
-    // which would silently make every generated source uncommittable and leave
-    // the CI drift gate with nothing to compare.
-    private static final String PKG = "com.codename1.annotations.buildhints";
+    /** Where the hand-written annotations live, read but never written. */
     private static final String PKG_PATH = "com/codename1/annotations/buildhints";
 
     private BuildHintCodeGenerator() {
     }
 
     /**
-     * @param args annotation source root, the catalog source root for the
-     *             generated binding table, then any number of further outputs:
-     *             a directory receives the simulator schema, an {@code .adoc}
-     *             file receives the developer guide's table
+     * @param args the annotation source root, the resource root for the data
+     *             file, then any number of further outputs: a directory
+     *             receives its own copy of the data file, an {@code .adoc} file
+     *             receives the developer guide's table
      */
     public static void main(String[] args) throws IOException {
         // The developer guide's table is not checked in: it is rendered from the
@@ -123,17 +120,8 @@ public final class BuildHintCodeGenerator {
             }
             list.add(h);
         }
-        // Two hints MAY share an enum and accept different parts of it -- one
-        // ThemeMode, narrowed per hint by @Hint(valuePattern). What used to be
-        // collected here was the wire table for a generated binding, and that
-        // table required one domain per enum; the processor reads the annotations
-        // themselves now, so neither the table nor the restriction survives.
-
-        // Sorted by attribute, so every view below is byte-stable whatever order
-        // the catalog happens to list a group's hints in. This used to sit
-        // inside the annotation writer, and removing that took the ordering
-        // with it -- the binding table's entries stayed the same and simply
-        // moved, which is drift with no meaning.
+        // Sorted by attribute, so the outputs are byte-stable whatever order a
+        // group's hints happen to be listed in.
         for (Map.Entry<HintGroup, List<BuildHints.Hint>> e : byGroup.entrySet()) {
             Collections.sort(e.getValue(), new Comparator<BuildHints.Hint>() {
                 public int compare(BuildHints.Hint a, BuildHints.Hint b) {

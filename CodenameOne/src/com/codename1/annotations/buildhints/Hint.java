@@ -107,13 +107,6 @@ public @interface Hint {
     /// wrong. An attribute states it only to disagree -- `@OnDeviceDebug` spans
     /// two platforms and each of its attributes says which.
     String platform() default "";
-    // There is deliberately no `consumedBy`. It named the SERVER classes that
-    // read a hint -- "AndroidGradleBuilder", "IPhoneBuilder" -- inside an
-    // annotation that ships to clients, and those classes are not part of any
-    // contract a client has. A hint is a name and a value; how the build service
-    // is organised behind that is its own business and may change without any
-    // app noticing. The catalog still records it for the hints it describes,
-    // because that is a build-side note about build-side code.
 
     /// The hint this one is a deprecated second spelling of.
     ///

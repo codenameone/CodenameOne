@@ -49,7 +49,6 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .def("public.app-category.utilities")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `LSApplicationCategoryType` in the generated Info.plist. Default "
                         + "`public.app-category.utilities`. See "
                         + "https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype[Apple's "
@@ -59,7 +58,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Used only when `macNative.deriveBundleId=false`. Default: "
                         + "`<packageName>.mac`."));
 
@@ -67,7 +65,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `NSHumanReadableCopyright` in the Info.plist. Defaults to "
                         + "`Copyright (c) <year> <vendor>`."));
 
@@ -76,7 +73,6 @@ final class BuildHintsApple {
                 .type(HintType.BOOLEAN)
                 .def("true")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `true` (default) maps to Xcode's "
                         + "`DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER=YES` (Xcode appends `.maccatalyst` to the "
                         + "iOS bundle ID). Set to `false` to take the bundle ID verbatim from `macNative.bundleId`."));
@@ -86,7 +82,6 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .def("appStore")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `appStore` (default), `developerID`, or `both`. Selects which "
                         + "entitlements + ExportOptions plist + signing certificate to emit. `both` emits parallel "
                         + "`*-AppStore.entitlements` / `*-DeveloperID.entitlements` and matching "
@@ -96,14 +91,12 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("mac")
-                .consumedBy("CN1BuildMojo", "IPhoneBuilder", "MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.entitlements.device.camera")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Sandboxed Mac Native builds only. Toggles "
                         + "`com.apple.security.device.camera`. Defaults to whether the app sets "
                         + "`ios.NSCameraUsageDescription`, so an app that asks for the camera gets "
@@ -113,7 +106,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Sandboxed Mac Native builds only. Toggles "
                         + "`com.apple.security.device.microphone`. Defaults to whether the app sets "
                         + "`ios.NSMicrophoneUsageDescription`."));
@@ -122,7 +114,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Sandboxed Mac Native builds only. Toggles "
                         + "`com.apple.security.personal-information.calendars`, which gates all "
                         + "EventKit access. Defaults to whether the app sets any calendar or "
@@ -133,7 +124,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Free-form XML inserted verbatim inside the `<dict>…</dict>` of "
                         + "the generated entitlements plist. Use for entitlements Codename One doesn't expose "
                         + "individually."));
@@ -143,7 +133,6 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .def("readwrite")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `readwrite` (default), `readonly`, or `none`. Sets the matching "
                         + "`com.apple.security.files.user-selected.*` entitlement."));
 
@@ -151,7 +140,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Opt-in. Format `<width>x<height>` — for example `1024x685`. When "
                         + "set, the Catalyst window's `UISceneSession.sizeRestrictions` minimum and maximum are "
                         + "pinned to the requested size so every launch produces a byte-identical window. Default "
@@ -163,7 +151,6 @@ final class BuildHintsApple {
                 .type(HintType.VERSION)
                 .def("13.1")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. iOS deployment-target floor for the Catalyst slice "
                         + "(`IPHONEOS_DEPLOYMENT_TARGET`). Default `13.1`. The plugin coerces the iOS slice's "
                         + "minimum upward when set."));
@@ -173,7 +160,6 @@ final class BuildHintsApple {
                 .type(HintType.VERSION)
                 .def("10.15")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default "
                         + "`10.15` — earlier versions don't support Mac Catalyst."));
 
@@ -182,7 +168,6 @@ final class BuildHintsApple {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("mac")
-                .consumedBy("IPhoneBuilder", "MacNativeBuilder")
                 .doc("Mac Native builds only. Declares that the app uses `com.codename1.ui.Window`, which "
                         + "needs multiple UIScenes and exists only on the Mac Catalyst slice. Writes "
                         + "`UIApplicationSupportsMultipleScenes` and a scene configuration into the Mac "
@@ -196,39 +181,33 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("mac")
-                .consumedBy("MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.notarize.appleId")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
-                .platform("mac")
-                .consumedBy("MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.notarize.keychainProfile")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
-                .platform("mac")
-                .consumedBy("MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.notarize.password")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.SECRET)
-                .platform("mac")
-                .consumedBy("MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.notarize.teamId")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
-                .platform("mac")
-                .consumedBy("MacNativeBuilder"));
+                .platform("mac"));
 
         h.add(new Hint("macNative.signing.style")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .def("automatic")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. `automatic` (default) lets Xcode pick the signing certificate; "
                         + "`manual` forces the certificate identity hints below to be respected verbatim."));
 
@@ -237,7 +216,6 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .def("Apple Distribution")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Signing certificate identity for the App Store channel. Default "
                         + "`Apple Distribution`."));
 
@@ -246,7 +224,6 @@ final class BuildHintsApple {
                 .type(HintType.STRING)
                 .def("Developer ID Application")
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Signing certificate identity for the Developer ID channel. "
                         + "Default `Developer ID Application`."));
 
@@ -254,7 +231,6 @@ final class BuildHintsApple {
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
                 .platform("mac")
-                .consumedBy("MacNativeBuilder")
                 .doc("Mac Native builds only. Apple Developer Team ID (alphanumeric). Falls back to "
                         + "`ios.release.teamId` → `ios.teamId` → `ios.debug.teamId` since most apps share a single "
                         + "Apple Developer Team for iOS and Mac."));
@@ -263,14 +239,12 @@ final class BuildHintsApple {
                 .group(HintGroup.TV_NATIVE)
                 .type(HintType.STRING)
                 .platform("tv")
-                .consumedBy("TvNativeBuilder")
                 .doc("Bundle identifier of the tvOS app. Defaults to `<packageName>.tvos`."));
 
         h.add(new Hint("tvNative.displayName")
                 .group(HintGroup.TV_NATIVE)
                 .type(HintType.STRING)
                 .platform("tv")
-                .consumedBy("TvNativeBuilder")
                 .doc("The tvOS app name shown on Apple TV. Defaults to the app's display name."));
 
         h.add(new Hint("tvNative.enabled")
@@ -278,7 +252,6 @@ final class BuildHintsApple {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("tv")
-                .consumedBy("IPhoneBuilder", "TvNativeBuilder")
                 .doc("true/false (defaults to false). Adds an Apple TV (tvOS) application target to the iOS "
                         + "build. The tvOS app is a separate `appletvos` target built from the same Java/Kotlin "
                         + "sources through ParparVM (UIKit + Metal; tvOS has no OpenGL ES). Enabling it doesn't "
@@ -288,22 +261,19 @@ final class BuildHintsApple {
         h.add(new Hint("tvNative.mainClass")
                 .group(HintGroup.TV_NATIVE)
                 .type(HintType.STRING)
-                .platform("tv")
-                .consumedBy("IPhoneBuilder", "TvNativeBuilder"));
+                .platform("tv"));
 
         h.add(new Hint("tvNative.minDeploymentTarget")
                 .group(HintGroup.TV_NATIVE)
                 .type(HintType.VERSION)
                 .def("13.0")
                 .platform("tv")
-                .consumedBy("TvNativeBuilder")
                 .doc("`TVOS_DEPLOYMENT_TARGET` for the tvOS target. Defaults to `13.0`."));
 
         h.add(new Hint("tvNative.teamId")
                 .group(HintGroup.TV_NATIVE)
                 .type(HintType.STRING)
                 .platform("tv")
-                .consumedBy("TvNativeBuilder")
                 .doc("Apple Developer Team ID used to sign the tvOS target. Falls back to the iOS team id "
                         + "(`ios.release.teamId` / `ios.teamId` / `ios.debug.teamId`)."));
 
@@ -311,28 +281,24 @@ final class BuildHintsApple {
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("watch")
-                .consumedBy("IPhoneBuilder"));
+                .platform("watch"));
 
         h.add(new Hint("watchNative.health")
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.STRING)
-                .platform("watch")
-                .consumedBy("WatchNativeBuilder"));
+                .platform("watch"));
 
         h.add(new Hint("watchNative.health.workoutProcessing")
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("watch")
-                .consumedBy("WatchNativeBuilder"));
+                .platform("watch"));
 
         h.add(new Hint("watchNative.surfaces.deploymentTarget")
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.STRING)
                 .def("10.0")
                 .platform("watch")
-                .consumedBy("IPhoneBuilder")
                 .doc("Deployment target of the WidgetKit extension that carries the watch complication. This "
                         + "is the WATCH APP's floor rather than the extension's own: WidgetKit reaches back to "
                         + "watchOS 9, but the extension is embedded in the watch app, so advertising a version "
@@ -341,7 +307,6 @@ final class BuildHintsApple {
         h.add(new Hint("watchNative.mainClass")
                 .group(HintGroup.WATCH_NATIVE)
                 .type(HintType.STRING)
-                .platform("watch")
-                .consumedBy("IPhoneBuilder"));
+                .platform("watch"));
     }
 }

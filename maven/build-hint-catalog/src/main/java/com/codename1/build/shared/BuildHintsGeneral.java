@@ -48,32 +48,27 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder"));
+                .platform("general"));
 
         h.add(new Hint("androidx.appcompat.version")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder"));
+                .platform("general"));
 
         h.add(new Hint("build.incSources")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("build.testReporter")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("build.unitTest")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("cn1.androidTheme")
                 .aliasOf("and.themeMode")
@@ -81,7 +76,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder")
                 .doc("Deprecated alias for and.themeMode (AndroidGradleBuilder.java:4097). "
                         + "Both names configure one setting, so declaring this alongside "
                         + "@Android(themeMode) is a conflict."));
@@ -89,47 +83,40 @@ final class BuildHintsGeneral {
         h.add(new Hint("cn1.buildKey")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.entitled")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.harden.forceOff")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.hardenLevel")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .def("off")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.hardened")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.hardening.libraryJars")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.mappingId")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("cn1.nativeTheme")
                 .aliasOf("nativeTheme")
@@ -137,7 +124,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder")
                 .doc("Deprecated alias for nativeTheme (AndroidGradleBuilder.java:4099, "
                         + "IPhoneBuilder.java:947). Both names configure one setting, so "
                         + "declaring this alongside @Build(nativeTheme) is a conflict."));
@@ -145,15 +131,13 @@ final class BuildHintsGeneral {
         h.add(new Hint("db.legacy")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor", "GenerateDesktopAppWrapperMojo"));
+                .platform("general"));
 
         h.add(new Hint("delayPushCompletion")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder"));
+                .platform("general"));
 
         // NO default, whatever the literal at the call site says. Both builders
         // decide whether Facebook support is in the app at all by asking whether
@@ -166,7 +150,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.SECRET)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder")
                 .doc("The client token for an app that requires native Facebook login integration, this is "
                         + "required if the facebook.appId is set."));
 
@@ -174,7 +157,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder")
                 .doc("Allows integrating Admob/Google Play ads into the application see "
                         + "link:https://www.codenameone.com/blog/adding-google-play-ads.html[this]"));
 
@@ -182,43 +164,37 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING_LIST)
                 .separator("\n")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "MapsProviderInjector"));
+                .platform("general"));
 
         h.add(new Hint("harden.ios.enabled")
                 .group(HintGroup.HARDENING)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("harden.mac.enabled")
                 .group(HintGroup.HARDENING)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("harden.tv.enabled")
                 .group(HintGroup.HARDENING)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("harden.watch.enabled")
                 .group(HintGroup.HARDENING)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("CN1BuildMojo"));
+                .platform("general"));
 
         h.add(new Hint("java.version")
                 .group(HintGroup.GENERAL)
                 .type(HintType.INT)
                 .def("8")
                 .platform("general")
-                .consumedBy("AndroidGradleBuilder", "CN1BuildMojo", "CreateGameSceneMojo", "InstallCn1libsMojo", "OpenGameBuilderMojo")
                 .doc("Valid values include 5 or 8. Indicates the JVM version that should be used for server "
                         + "compilation, this is defined by default for newly created apps based on the Java 8 mode "
                         + "selection"));
@@ -227,7 +203,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("MapsProviderInjector")
                 .doc("Selects the native map provider. `android.maps.provider` and "
                         + "`ios.maps.provider` override it for one platform."));
 
@@ -235,7 +210,6 @@ final class BuildHintsGeneral {
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .platform("general")
-                .consumedBy("IPhoneBuilder", "LinuxNativeBuilder", "WindowsNativeBuilder")
                 .doc("`strict` or `warn` turns on ParparVM's native signature check for this build; "
                         + "anything else leaves it off, which is the default. ParparVM encodes the whole "
                         + "Java signature in the C function name, so a native spelled even slightly "
@@ -248,81 +222,69 @@ final class BuildHintsGeneral {
         h.add(new Hint("requireKotlinStdlib")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder"));
+                .platform("general"));
 
         h.add(new Hint("tvMain")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("IPhoneBuilder", "TvNativeBuilder"));
+                .platform("general"));
 
         h.add(new Hint("vserv.allowSkipping")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("true")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.category")
                 .group(HintGroup.GENERAL)
                 .type(HintType.INT)
                 .def("29")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.countryCode")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .def("null")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.locale")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .def("en_US")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.networkCode")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
                 .def("null")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.scaleMode")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.transition")
                 .group(HintGroup.GENERAL)
                 .type(HintType.INT)
                 .def("300000")
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("vserv.zone")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("Executor"));
+                .platform("general"));
 
         h.add(new Hint("watchMain")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING)
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "IPhoneBuilder", "WatchNativeBuilder"));
+                .platform("general"));
 
         h.add(new Hint("watchStandalone")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)
                 .def("false")
-                .platform("general")
-                .consumedBy("AndroidGradleBuilder", "WatchNativeBuilder"));
+                .platform("general"));
     }
 }

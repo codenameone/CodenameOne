@@ -213,43 +213,22 @@ removing one can make a previously-used private method dead.
 
 Findings land in each module's `target/spotbugsXml.xml`.
 
-### Build hints are a catalog, not free-form strings
+### Build hints
 
-A build hint is a `codename1.arg.<name>=<value>` line that reaches a builder as
-`request.getArg(name, default)`. Nothing used to check the name, so a misspelled
-hint was accepted, never read, and silently did nothing -- a green build with the
-setting simply not applied. Our own agent reference shipped
-`android.xPermissions`, `android.minSdkVersion` and `android.sdkVersion` for
-years; the builders read `android.xpermissions`, `android.min_sdk_version`, and
-nothing at all.
+A build hint is a `codename1.arg.<name>=<value>` line the builders read as
+`request.getArg(name, default)`. An undeclared name is accepted, never read, and
+silently does nothing, so every hint must be declared in exactly one place:
 
-**A hint is described in exactly one place, and which place depends on whether
-it has an annotation.**
+- **`CodenameOne/src/com/codename1/annotations/buildhints`** if it has an
+  annotation. Hand-written, and the source of truth -- see its
+  `package-info.java`.
+- **`maven/build-hint-catalog`** otherwise: dynamic families, build-service-only
+  hints, the long tail.
 
-A hint is declared in exactly one of two places:
-
-- **With an annotation** -- `CodenameOne/src/com/codename1/annotations/buildhints`,
-  hand-written and the source of truth. The attribute's Java type IS the hint's
-  type, an enum's constants ARE its value domain, and `@Hint` carries only what
-  javac cannot infer. See that package's `package-info.java`.
-- **Without one** -- the dynamic families, build-service-only hints and the long
-  tail, in `maven/build-hint-catalog`.
-
-Nothing else states a hint. `BuildHintCodeGenerator` generates no code: it
-renders the annotated hints into `cn1-build-hints.json` for the two editors that
-are Codename One apps and have no bytecode reader (Settings, and the simulator's
-hint editor, which keeps its own copy because its module does not depend on the
-catalog), plus the developer guide's table, which is not checked in. Anything
-that CAN read bytecode -- the Maven plugin, the annotation processor -- reads the
-annotations through `BuildHintAnnotationReader` instead.
-
-Two things worth knowing before editing: `@Hint` has CLASS retention, so
-reflection cannot see it and everything reads it with ASM; and the annotations
-never state what the build server does when a hint is not set, because that is
-the server's to change (see `HintUnset`).
-
-Adding a hint to a builder means declaring it in the same change. Regenerate and
-check with:
+Nothing generates code. `BuildHintCodeGenerator` renders the annotated hints
+into `cn1-build-hints.json` for the editors that cannot read bytecode, and the
+developer guide's table. Adding a hint to a builder means declaring it in the
+same change:
 
 ```bash
 source tools/env.sh
@@ -259,11 +238,8 @@ scripts/check-build-hint-catalog.sh            # every hint the code reads is de
 ```
 
 `scripts/build-hint-catalog-baseline.txt` is an **empty** ratchet: a new entry
-means a hint went in undeclared. The same gate refuses a `codename1.arg.*` key in
-our docs and templates that no builder reads.
-
-Do not re-run `tools/build-hint-bootstrap/` -- it seeded the catalog once and
-would overwrite hand edits.
+means a hint went in undeclared. Do not re-run `tools/build-hint-bootstrap/`; it
+seeded the catalog once and would overwrite hand edits.
 
 ### Never rely on ClassCastException
 
