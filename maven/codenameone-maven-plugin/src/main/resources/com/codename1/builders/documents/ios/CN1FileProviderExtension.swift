@@ -107,12 +107,10 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        let parentId = index.parents[resolved]
-        let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
-            ? .rootContainer
-            : CN1DocumentIndex.identifier(for: parentId!)
-        let item = CN1DocumentItem(node: node, parentId: parent, containerURL: containerURL,
-                                   revision: index.revision)
+        // No item is built here on purpose. Both branches below hand the system one read after
+        // the bytes are in hand, from a fresh index, because the publication can change while a
+        // copy or a download is running -- and an item captured now would describe the file as it
+        // was when the request arrived, not as it is when it is handed over.
 
         // A local copy always wins, which is what makes a cached remote document open without a
         // round trip.
@@ -130,7 +128,18 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 let handoff = handoffDirectory().appendingPathComponent(UUID().uuidString)
                 do {
                     try FileManager.default.copyItem(at: local, to: handoff)
-                    completionHandler(handoff, item, nil)
+                    // Re-read afterwards, exactly as the remote branch does. A large file takes
+                    // long enough to copy that a clear() or an account-switch republish can land
+                    // during it, and the copy finishes from the source handle either way -- so
+                    // without this the previous publication's bytes are handed over after the
+                    // logout that was supposed to remove them.
+                    if let current = CN1FileProviderExtension.publishedItem(
+                            for: itemIdentifier, path: path, containerURL: containerURL) {
+                        completionHandler(handoff, current, nil)
+                    } else {
+                        try? FileManager.default.removeItem(at: handoff)
+                        completionHandler(nil, nil, NSFileProviderError(.noSuchItem))
+                    }
                 } catch {
                     completionHandler(nil, nil, CN1DocumentRemote.providerError(error))
                 }
@@ -147,6 +156,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // and calling the system's completion handler twice is a contract violation of its own.
         let once = CN1FetchCompletion(completionHandler)
         let container = containerURL
+        let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
         let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container,
                                            destination: handoffDirectory()) { url, error in
             if let url = url {
@@ -160,6 +170,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 // the request began may name a file that has since been renamed or moved.
                 if let current = CN1FileProviderExtension.publishedItem(for: itemIdentifier,
                                                                        remoteId: remoteId,
+                                                                       credentials: credentials,
                                                                        containerURL: container) {
                     once.call(url, current, nil)
                 } else {
@@ -193,14 +204,37 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
     ///
     /// Static, and given the container rather than reading it off the instance, so the closure
     /// that calls it after a download does not have to keep the extension alive to do so.
+    /// The same, for a node served from the shared directory: no credential is involved, and the
+    /// path is what identifies the bytes rather than a remote key.
     private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
-                                      remoteId: String,
+                                      path: String,
                                       containerURL: URL) -> NSFileProviderItem? {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
-              let node = index.nodes[resolved], node.remoteId == remoteId else {
+              let node = index.nodes[resolved], node.path == path else {
             return nil
         }
+        return item(for: node, resolved: resolved, in: index, containerURL: containerURL)
+    }
+
+    private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
+                                      remoteId: String, credentials: String,
+                                      containerURL: URL) -> NSFileProviderItem? {
+        guard let index = CN1DocumentIndex.load(containerURL: containerURL),
+              let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
+              let node = index.nodes[resolved], node.remoteId == remoteId,
+              CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
+            // The credential is compared as well as the node and the remote object: an account
+            // switch reuses node ids, and can reuse the server's keys for them, so those two
+            // alone would let the previous account's bytes through.
+            return nil
+        }
+        return item(for: node, resolved: resolved, in: index, containerURL: containerURL)
+    }
+
+    /// Builds the item for a node the caller has already resolved in a freshly loaded index.
+    private static func item(for node: CN1DocumentNode, resolved: String,
+                             in index: CN1DocumentIndex, containerURL: URL) -> NSFileProviderItem {
         let parentId = index.parents[resolved]
         let parent: NSFileProviderItemIdentifier = (parentId == nil || parentId == index.rootId)
             ? .rootContainer

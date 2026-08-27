@@ -3733,7 +3733,15 @@ public class AndroidGradleBuilder extends Executor {
             documentsProviderEntry =
                     "        <provider\n"
                     + "            android:name=\"" + xclass("com.codename1.impl.android.documents.CN1DocumentsProvider") + "\"\n"
-                    + "            android:authorities=\"" + request.getPackageName() + ".documents\"\n"
+                    // ${applicationId}, not the request's package, and for the same reason the
+                    // FileProvider declaration above uses it: a build that changes the
+                    // application id -- an applicationIdSuffix for a variant, or an
+                    // xgradle_default_config that replaces it outright -- would otherwise
+                    // declare an authority belonging to the other variant. A provider authority
+                    // is globally unique on the device, so installing both variants side by side
+                    // fails on the second. It also keeps the manifest in step with the runtime,
+                    // which builds the authority from getPackageName().
+                    + "            android:authorities=\"${applicationId}.documents\"\n"
                     + "            android:exported=\"true\"\n"
                     + "            android:grantUriPermissions=\"true\"\n"
                     + "            android:permission=\"android.permission.MANAGE_DOCUMENTS\">\n"
@@ -3742,7 +3750,8 @@ public class AndroidGradleBuilder extends Executor {
                     + "            </intent-filter>\n"
                     + "        </provider>\n";
             debug("Declaring the CN1Documents provider with authority "
-                    + request.getPackageName() + ".documents");
+                    + "${applicationId}.documents (resolved by manifest merging; "
+                    + request.getPackageName() + ".documents unless a variant changes it)");
         }
 
         String surfacesManifestEntries = "";

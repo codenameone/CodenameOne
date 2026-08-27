@@ -16579,12 +16579,23 @@ void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_M
 #if !TARGET_OS_OSX
         POOL_BEGIN();
         NSFileProviderManager *mgr = [NSFileProviderManager defaultManager];
-        [mgr signalEnumeratorForContainerItemIdentifier:NSFileProviderRootContainerItemIdentifier
-                                      completionHandler:^(NSError *error) {
-            if (error != nil) {
-                NSLog(@"Codename One: could not signal the document provider: %@", error);
-            }
-        }];
+        // The root AND the working set. This provider hands out a separate enumerator per folder
+        // identifier, so signalling the root alone leaves a nested folder the user already has
+        // open showing the previous publication until something makes Files re-enumerate it. The
+        // working set is the container that stands for the whole published tree -- CN1's
+        // enumerator answers it by walking every node -- so the pair covers what the root cannot.
+        NSString *containers[] = {
+            NSFileProviderRootContainerItemIdentifier,
+            NSFileProviderWorkingSetContainerItemIdentifier
+        };
+        for (int i = 0; i < 2; i++) {
+            [mgr signalEnumeratorForContainerItemIdentifier:containers[i]
+                                          completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not signal the document provider: %@", error);
+                }
+            }];
+        }
         POOL_END();
 #endif
         return;

@@ -195,9 +195,10 @@ class DocumentIndexSerializerTest {
         allowed.add(DocumentNode.file("f", name.substring(0, 255)));
         assertNotNull(DocumentIndexSerializer.serialize(allowed));
 
-        // The id is budgeted on its ESCAPED length, not its raw one: the classic provider gives
-        // each item a directory named after the percent-escaped id, and uppercase escapes too --
-        // 100 capitals are 300 bytes there while 100 lowercase are 100.
+        // The id is budgeted on its ESCAPED, NAMESPACED length, not its raw one: the classic
+        // provider gives each item a directory named after the percent-escaped identifier, the
+        // "cn1:" prefix included, and uppercase escapes too -- 100 capitals are 300 bytes there
+        // plus 6 for the prefix, while 100 lowercase are 106.
         StringBuilder shouting = new StringBuilder();
         for (int i = 0; i < 100; i++) {
             shouting.append('A');
@@ -211,6 +212,22 @@ class DocumentIndexSerializerTest {
         DocumentNode quietId = DocumentNode.folder("root", "Root");
         quietId.add(DocumentNode.file(shouting.toString().toLowerCase(), "fine.pdf"));
         assertNotNull(DocumentIndexSerializer.serialize(quietId));
+
+        // The prefix counts. 250 lowercase characters cost 250 bytes on their own and 256 once
+        // namespaced, which is one past the limit -- the case that made measuring the bare id
+        // wrong.
+        StringBuilder wide = new StringBuilder();
+        for (int i = 0; i < 250; i++) {
+            wide.append('b');
+        }
+        DocumentNode namespaced = DocumentNode.folder("root", "Root");
+        namespaced.add(DocumentNode.file(wide.toString(), "fine.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(namespaced));
+
+        DocumentNode fits = DocumentNode.folder("root", "Root");
+        fits.add(DocumentNode.file(wide.substring(0, 249), "fine.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(fits));
     }
 
     @Test

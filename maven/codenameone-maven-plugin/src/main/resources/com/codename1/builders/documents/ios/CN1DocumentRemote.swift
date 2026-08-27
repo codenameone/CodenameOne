@@ -34,6 +34,26 @@ enum CN1DocumentRemote {
         let authToken: String?
     }
 
+    /// Identifies the credentials a fetch was authorized with.
+    ///
+    /// A download outlives the request that started it, and the guard that it still names the
+    /// same node and the same remote object is not enough on its own: an account switch reuses
+    /// node ids -- "inbox", "invoice-1" -- and can reuse the server's keys for them too, at which
+    /// point the previous account's bytes would pass both checks and land in the new account's
+    /// file. What always changes across a switch is the credential this stamp names.
+    ///
+    /// The index revision was the obvious alternative and is the wrong one: it moves on every
+    /// publish, so an app that syncs while a large file downloads would throw that download away
+    /// and start again, over and over.
+    ///
+    /// The token is not returned, only compared, and it never leaves the extension.
+    static func credentialStamp(containerURL: URL) -> String {
+        guard let settings = settings(containerURL: containerURL) else {
+            return ""
+        }
+        return (settings.endpoint ?? "") + "\u{0}" + (settings.authToken ?? "")
+    }
+
     static func settings(containerURL: URL) -> Settings? {
         let url = containerURL.appendingPathComponent("cn1documents/endpoint.json")
         guard let data = try? Data(contentsOf: url) else { return nil }

@@ -185,9 +185,15 @@ public final class DocumentIndexSerializer {
     /// budget is spent on the ESCAPED form, and an id of plain ASCII digits costs one byte each
     /// while one of accented text costs six.
     private static int storagePathLength(String id) {
+        // The PREFIXED identifier, because that is what the provider encodes. Ids are namespaced
+        // before they become NSFileProviderItemIdentifiers -- see validate() -- and the ":" is
+        // not unreserved, so the four characters cost six bytes in the directory name. Measuring
+        // the bare id let a 250-character one through and produced a 256-byte component, which
+        // is one past what the filesystem takes.
+        String component = IDENTIFIER_NAMESPACE + id;
         int unreserved = 0;
-        for (int i = 0; i < id.length(); i++) {
-            char c = id.charAt(i);
+        for (int i = 0; i < component.length(); i++) {
+            char c = component.charAt(i);
             if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
                 unreserved++;
             }
@@ -195,8 +201,15 @@ public final class DocumentIndexSerializer {
         // An unreserved character survives as its own byte; every other BYTE becomes "%XX".
         // Counted in bytes rather than characters so a surrogate pair costs the twelve it really
         // costs, not the six a per-character count would guess.
-        return unreserved + 3 * (utf8Length(id) - unreserved);
+        return unreserved + 3 * (utf8Length(component) - unreserved);
     }
+
+    /// The prefix the Apple providers put in front of every application id.
+    ///
+    /// Kept here so the length budget measures what actually becomes a path component. It is not
+    /// this class's job to produce the namespaced identifier -- the provider does that -- but it
+    /// is this class's job to refuse an id that cannot be stored.
+    private static final String IDENTIFIER_NAMESPACE = "cn1:";
 
     private static String findDuplicateId(DocumentNode node, Set<String> seen) {
         if (!seen.add(node.getId())) {

@@ -296,14 +296,31 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// documents would then share one cache file. The id's hash is appended so distinct ids stay
     /// distinct while the readable part is kept for anyone looking at the cache directory.
     private static String cacheName(String id) {
-        StringBuilder sb = new StringBuilder(id.length() + 12);
-        for (int i = 0; i < id.length(); i++) {
+        String hash = Integer.toHexString(id.hashCode());
+        // The readable part is bounded so the whole name fits a path component. A node id may be
+        // long -- the publisher allows up to what a component takes -- and appending the hash to
+        // all of it overran the limit: the download then succeeded, renameTo failed with
+        // ENAMETOOLONG, and the fallback served the temporary file without removing it, so every
+        // open of that document downloaded it again and left another full copy in the cache.
+        //
+        // Truncating cannot collide two different ids into one file: the hash is derived from the
+        // WHOLE id and is appended after the truncation, so two ids sharing a prefix still differ
+        // here unless they also share a hash, which is the same collision the untruncated name
+        // always had.
+        int budget = MAX_CACHE_NAME_BYTES - hash.length() - 1;
+        StringBuilder sb = new StringBuilder(Math.min(id.length(), budget) + hash.length() + 1);
+        for (int i = 0; i < id.length() && sb.length() < budget; i++) {
             char c = id.charAt(i);
             sb.append(Character.isLetterOrDigit(c) || c == '.' || c == '-' ? c : '_');
         }
-        sb.append('-').append(Integer.toHexString(id.hashCode()));
+        sb.append('-').append(hash);
         return sb.toString();
     }
+
+    /// The most bytes a cache file name may take. 255 is where APFS, ext4 and NTFS all stop, and
+    /// this name is one path component. Every character the loop above emits is ASCII -- anything
+    /// else becomes "_" -- so counting characters is counting bytes.
+    private static final int MAX_CACHE_NAME_BYTES = 255;
 
     private void addRow(MatrixCursor result, CN1DocumentStore.Node node) {
         MatrixCursor.RowBuilder row = result.newRow();

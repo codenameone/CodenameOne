@@ -271,6 +271,27 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
+    public void anExplicitlyBlankQualifierBeatsTheUnqualifiedFallback() throws Exception {
+        // What the wizard writes when it could not produce a development profile: the unqualified
+        // key keeps the DISTRIBUTION profile for older tooling, and the debug key is blanked. A
+        // debug build that accepted the fallback would sign the extension with a distribution
+        // profile and fail on the server, so the blank has to win here.
+        File ios = iosDir();
+        extensionFolder(ios, "MyExtension");
+        File appProfile = profile("Dist", "ABCD1234.com.example.app");
+        Properties p = settings(appProfile);
+        // The debug build needs an app profile of its own, or the check returns before it looks
+        // at any extension.
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(false),
+                appProfile.getAbsolutePath());
+        p.setProperty("codename1.ios.appext.MyExtension.provision", "/certs/dist.mobileprovision");
+        p.setProperty("codename1.ios.debug.appext.MyExtension.provision", "");
+        assertEquals(1, IOSProvisioningPreflight.checkAppExtensions(p, false, ios).size());
+        // The release build is unaffected: its own profile is there.
+        assertTrue(IOSProvisioningPreflight.checkAppExtensions(p, true, ios).isEmpty());
+    }
+
+    @Test
     public void provisioningUrlHintSatisfiesIt() throws Exception {
         File ios = iosDir();
         extensionFolder(ios, "MyExtension");

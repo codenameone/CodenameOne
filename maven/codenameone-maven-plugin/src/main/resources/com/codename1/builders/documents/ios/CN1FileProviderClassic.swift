@@ -177,6 +177,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // transfer -- so there is nothing to hang a cancel on without keeping a URL-to-task map
         // alive in the extension. The replicated path, which every supported OS uses, does cancel.
         let container = containerURL
+        let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
         CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container) { fetched, error in
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
@@ -192,6 +193,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // finished before the write, the second a clear that landed during it. A clear after
             // the second check purges the file itself.
             guard CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                        credentials: credentials,
                                                         containerURL: container) else {
                 try? FileManager.default.removeItem(at: fetched)
                 completionHandler(NSFileProviderError(.noSuchItem))
@@ -199,6 +201,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
             if !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                     credentials: credentials,
                                                      containerURL: container) {
                 try? FileManager.default.removeItem(at: url)
                 completionHandler(NSFileProviderError(.noSuchItem))
@@ -234,13 +237,17 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// let a download started before the switch write the previous account's bytes into the new
     /// account's file.
     private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
-                                       remoteId: String, containerURL: URL) -> Bool {
+                                       remoteId: String, credentials: String,
+                                       containerURL: URL) -> Bool {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
-              let node = index.nodes[resolved] else {
+              let node = index.nodes[resolved], node.remoteId == remoteId else {
             return false
         }
-        return node.remoteId == remoteId
+        // And the same credential the download was authorized with. An account switch that reuses
+        // both the node id and the server's key for it would otherwise pass everything above,
+        // and the previous account's bytes would be written into the new account's file.
+        return CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials
     }
 
     private static func place(_ source: URL, at destination: URL, copy: Bool) -> Error? {

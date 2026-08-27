@@ -403,6 +403,29 @@ final class IOSProvisioningPreflight {
         // signing on the server, with a message about the extension's bundle ID rather than about
         // the profile nobody supplied.
         String qualifier = release ? "release" : "debug";
+        // An explicitly BLANK key for this build type means "no profile for this build", and it
+        // has to beat the unqualified fallback rather than be ignored. The wizard writes one when
+        // automatic setup could not produce a development profile, while leaving the unqualified
+        // key holding the DISTRIBUTION profile for older tooling; the build then sends that
+        // profile for the extension and signing fails on the server, naming the extension's
+        // bundle ID rather than the missing development profile.
+        //
+        // Caught here rather than in CN1BuildMojo.resolveAppExtensionBuildTypeQualifiers, which
+        // deliberately keeps the unqualified fallback when a qualified value is blank -- shipped
+        // widget-extension projects rely on that, and a signing preflight is the right place to
+        // refuse a build the resolution cannot fix. A blank value is written by the wizard and by
+        // nothing else: it is not something a developer types by hand, so reading it as "this
+        // build type has no profile" cannot misfire on a hand-configured project.
+        String[] blanking = {
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.arg.ios." + qualifier + ".appext." + name + ".provisioningURL"
+        };
+        for (String key : blanking) {
+            String value = settings.getProperty(key);
+            if (value != null && value.trim().isEmpty()) {
+                return false;
+            }
+        }
         String[] keys = {
             "codename1.ios.appext." + name + ".provision",
             "codename1.ios." + qualifier + ".appext." + name + ".provision",
