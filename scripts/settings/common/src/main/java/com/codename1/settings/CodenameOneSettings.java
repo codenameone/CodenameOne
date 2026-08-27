@@ -4415,6 +4415,14 @@ public class CodenameOneSettings extends Lifecycle {
     private static String attributeIn(String tag, String attribute) {
         int at = tag.indexOf(attribute);
         while (at >= 0) {
+            // At an attribute BOUNDARY. Searching for the name anywhere in the
+            // tag is the same substring match this helper exists to replace:
+            // xcombine.self would answer for combine.self.
+            char before = at == 0 ? ' ' : tag.charAt(at - 1);
+            if (before != ' ' && before != '\t' && before != '\n' && before != '\r') {
+                at = tag.indexOf(attribute, at + 1);
+                continue;
+            }
             int i = at + attribute.length();
             while (i < tag.length() && (tag.charAt(i) == ' ' || tag.charAt(i) == '\t')) {
                 i++;

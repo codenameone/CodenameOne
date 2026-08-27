@@ -1898,6 +1898,20 @@ public class BuildHintCatalogTest {
         assertTrue(quoted.contains("src/main/kt"), quoted.toString());
         assertTrue(quoted.contains("src/shared/kt"), quoted.toString());
 
+        // An attribute whose name merely ENDS with the one being looked for is a
+        // different attribute -- the same substring match attributeOf replaced.
+        java.util.List<String> lookalike = CodenameOneSettings.declaredSourceRoots(
+                "<project><build><plugins>"
+                        + "<plugin><artifactId>kotlin-maven-plugin</artifactId>"
+                        + "<configuration><sourceDirs><sourceDir>src/shared/kt</sourceDir>"
+                        + "</sourceDirs></configuration>"
+                        + "<executions>"
+                        + "<execution><goals><goal>compile</goal></goals>"
+                        + "<configuration xcombine.self=\"override\">"
+                        + "<jvmTarget>17</jvmTarget></configuration></execution>"
+                        + "</executions></plugin></plugins></build></project>");
+        assertTrue(lookalike.contains("src/shared/kt"), lookalike.toString());
+
         // A project-directory expression is deterministic, so it is resolved
         // rather than discarded.
         java.util.List<String> expression = CodenameOneSettings.declaredSourceRoots(
