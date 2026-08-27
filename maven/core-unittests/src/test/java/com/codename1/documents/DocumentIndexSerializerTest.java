@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -354,6 +356,58 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesMarksInNonCanonicalOrder() {
+        // Normalization sorts a run of marks by combining class, so two spellings that differ
+        // only in the order of two marks with different classes are ONE name in the readers and
+        // two ids here -- and neither pair composes, so nothing else in the check sees them.
+        // Swept over every pair of marks the JDK knows, which is what proves the class table is
+        // not merely plausible: for each pair, refused exactly when normalization reorders it.
+        List<Integer> marks = new ArrayList<>();
+        for (int c = Character.MIN_CODE_POINT; c <= Character.MAX_CODE_POINT; c++) {
+            if (c >= 0xD800 && c <= 0xDFFF) {
+                continue;
+            }
+            if (isMark(c)) {
+                marks.add(Integer.valueOf(c));
+            }
+        }
+        assertTrue(marks.size() > 500, "the JDK should know hundreds of marks, found "
+                + marks.size());
+        int reordering = 0;
+        for (int first : marks) {
+            for (int second : marks) {
+                String pair = "q" + new String(Character.toChars(first))
+                        + new String(Character.toChars(second));
+                String normalized = java.text.Normalizer.normalize(pair,
+                        java.text.Normalizer.Form.NFC);
+                boolean reorders = !normalized.equals(pair)
+                        && normalized.length() == pair.length();
+                if (!reorders) {
+                    continue;
+                }
+                reordering++;
+                assertTrue(DocumentIndexSerializer.combiningMarkAt(pair) >= 0,
+                        "U+" + Integer.toHexString(first).toUpperCase() + " before U+"
+                                + Integer.toHexString(second).toUpperCase() + " is reordered by "
+                                + "normalization and is accepted, so both orders would pass");
+            }
+        }
+        assertTrue(reordering > 100, "the sweep should have found many reordering pairs, found "
+                + reordering);
+
+        // And the canonical order of the same two marks is accepted: U+0327 (class 202) sorts
+        // before U+0301 (class 230), so that spelling is the normalized one.
+        DocumentNode ordered = DocumentNode.folder("root", "Root");
+        ordered.add(DocumentNode.file("a", "q\u0327\u0301.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(ordered));
+
+        DocumentNode reversed = DocumentNode.folder("root", "Root");
+        reversed.add(DocumentNode.file("a", "q\u0301\u0327.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(reversed));
+    }
+
+    @Test
     void acceptsAMarkThatComposesWithNothing() {
         // A mark is only wrong where it composes. There is no precomposed q with acute, so
         // "q" followed by U+0301 is its own normalized spelling and has no twin to collide with
@@ -487,9 +541,18 @@ class DocumentIndexSerializerTest {
         devanagari.add(DocumentNode.file("a", "\u0915\u094d\u0937.txt"));
         assertNotNull(DocumentIndexSerializer.serialize(devanagari));
 
+        // Hebrew points are accepted -- in the order normalization puts them. U+05B8 QAMATS has
+        // combining class 18 and U+05C1 SHIN DOT has 24, so the qamats comes first; the reverse
+        // spelling is the same name after normalization and is refused as such. This assertion
+        // used to hold for the reversed spelling, back when the check could not see mark order.
         DocumentNode hebrew = DocumentNode.folder("root", "Root");
-        hebrew.add(DocumentNode.file("a", "\u05e9\u05c1\u05b8.txt"));
+        hebrew.add(DocumentNode.file("a", "\u05e9\u05b8\u05c1.txt"));
         assertNotNull(DocumentIndexSerializer.serialize(hebrew));
+
+        DocumentNode reorderedHebrew = DocumentNode.folder("root", "Root");
+        reorderedHebrew.add(DocumentNode.file("a", "\u05e9\u05c1\u05b8.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(reorderedHebrew));
 
         // The supplementary compatibility block too, which a char-by-char scan cannot see: it
         // arrives as a surrogate pair. U+2F800 normalizes to U+4E3D.

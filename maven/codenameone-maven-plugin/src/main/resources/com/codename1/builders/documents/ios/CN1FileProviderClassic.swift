@@ -38,11 +38,24 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// the map. Doing without looked defensible while the cost was counted as wasted data. It is
     /// not: a download completing after a stop RECREATES the file the system had just evicted,
     /// and answers a request nobody is waiting for any more.
-    private let inFlightLock = NSLock()
-    private var inFlight: [URL: [URLSessionTask]] = [:]
+    ///
+    /// Process-wide, not per instance. The system can hold more than one instance of this class
+    /// at a time, and they answer for the SAME storage URLs: with the state on the instance, a
+    /// stop delivered to one left the other's generation untouched, so its download installed
+    /// into a URL the system had evicted, and two requests in different instances took two
+    /// different locks for one path and wrote over each other. One set of maps behind one lock
+    /// is what makes the ordering rules mean anything.
+    ///
+    /// A second PROCESS is not covered, and is not worth the machinery: an install is a
+    /// filesystem replace, so the worst it can do is decide which of two complete materializations
+    /// wins, and every request re-reads the publication after installing anyway. Coordinating
+    /// that would mean NSFileCoordinator around every claim, in an extension whose deadlocks are
+    /// the system's to notice.
+    private static let inFlightLock = NSLock()
+    private static var inFlight: [URL: [URLSessionTask]] = [:]
     /// Bumped whenever a URL is stopped, so a fetch that had already finished downloading when
     /// the stop arrived can still tell that it is no longer wanted.
-    private var stopGeneration: [URL: Int] = [:]
+    private static var stopGeneration: [URL: Int] = [:]
 
     /// One lock per materialization URL, held only while the shared path is touched.
     ///
@@ -54,16 +67,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// The long part of the work never holds this. A copy or a download goes to a private file
     /// first; the lock covers the moment it is claimed and moved into place, and the moment a
     /// stop takes the URL away, so those cannot interleave.
-    private var urlGates: [URL: NSLock] = [:]
+    private static var urlGates: [URL: NSLock] = [:]
 
     private func gate(for url: URL) -> NSLock {
-        inFlightLock.lock()
-        defer { inFlightLock.unlock() }
-        if let existing = urlGates[url] {
+        CN1FileProviderClassic.inFlightLock.lock()
+        defer { CN1FileProviderClassic.inFlightLock.unlock() }
+        if let existing = CN1FileProviderClassic.urlGates[url] {
             return existing
         }
         let created = NSLock()
-        urlGates[url] = created
+        CN1FileProviderClassic.urlGates[url] = created
         return created
     }
 
@@ -76,28 +89,28 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// none of them can be dropped while a request still holds the generation or the sequence it
     /// was given, because the numbers restart at zero and a stale request would compare equal to
     /// a fresh one and write bytes into a URL the system had evicted.
-    private var urlUsers: [URL: Int] = [:]
+    private static var urlUsers: [URL: Int] = [:]
 
     private func retainURL(_ url: URL) {
-        inFlightLock.lock()
-        urlUsers[url] = (urlUsers[url] ?? 0) + 1
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.lock()
+        CN1FileProviderClassic.urlUsers[url] = (CN1FileProviderClassic.urlUsers[url] ?? 0) + 1
+        CN1FileProviderClassic.inFlightLock.unlock()
     }
 
     private func releaseURL(_ url: URL) {
-        inFlightLock.lock()
-        let remaining = (urlUsers[url] ?? 1) - 1
+        CN1FileProviderClassic.inFlightLock.lock()
+        let remaining = (CN1FileProviderClassic.urlUsers[url] ?? 1) - 1
         if remaining > 0 {
-            urlUsers[url] = remaining
+            CN1FileProviderClassic.urlUsers[url] = remaining
         } else {
-            urlUsers.removeValue(forKey: url)
-            urlGates.removeValue(forKey: url)
-            inFlight.removeValue(forKey: url)
-            stopGeneration.removeValue(forKey: url)
-            materializationSequence.removeValue(forKey: url)
-            installedSequence.removeValue(forKey: url)
+            CN1FileProviderClassic.urlUsers.removeValue(forKey: url)
+            CN1FileProviderClassic.urlGates.removeValue(forKey: url)
+            CN1FileProviderClassic.inFlight.removeValue(forKey: url)
+            CN1FileProviderClassic.stopGeneration.removeValue(forKey: url)
+            CN1FileProviderClassic.materializationSequence.removeValue(forKey: url)
+            CN1FileProviderClassic.installedSequence.removeValue(forKey: url)
         }
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.unlock()
     }
 
     /// A number for this materialization, rising per URL.
@@ -113,14 +126,14 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// install that HAPPENED stops a later one, which is why both are kept: a request that has
     /// merely started has put nothing anywhere, and treating it as though it had would answer
     /// requests with bytes nobody wrote for them.
-    private var materializationSequence: [URL: Int] = [:]
-    private var installedSequence: [URL: Int] = [:]
+    private static var materializationSequence: [URL: Int] = [:]
+    private static var installedSequence: [URL: Int] = [:]
 
     private func beginMaterialization(at url: URL) -> Int {
-        inFlightLock.lock()
-        defer { inFlightLock.unlock() }
-        let next = (materializationSequence[url] ?? 0) + 1
-        materializationSequence[url] = next
+        CN1FileProviderClassic.inFlightLock.lock()
+        defer { CN1FileProviderClassic.inFlightLock.unlock() }
+        let next = (CN1FileProviderClassic.materializationSequence[url] ?? 0) + 1
+        CN1FileProviderClassic.materializationSequence[url] = next
         return next
     }
 
@@ -142,9 +155,9 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             try? FileManager.default.removeItem(at: staged)
             return .stopped
         }
-        inFlightLock.lock()
-        let alreadyInstalled = installedSequence[url] ?? 0
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.lock()
+        let alreadyInstalled = CN1FileProviderClassic.installedSequence[url] ?? 0
+        CN1FileProviderClassic.inFlightLock.unlock()
         if alreadyInstalled > sequence {
             // A materialization that started after this one has already put its bytes there.
             // They are this item's bytes too -- a newer read of the same path -- so this request
@@ -170,21 +183,21 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             try? FileManager.default.removeItem(at: url)
             // The URL is left unclaimed, so a request that started earlier and is still holding
             // its own copy installs it rather than standing back for bytes that are gone.
-            inFlightLock.lock()
-            installedSequence[url] = 0
-            inFlightLock.unlock()
+            CN1FileProviderClassic.inFlightLock.lock()
+            CN1FileProviderClassic.installedSequence[url] = 0
+            CN1FileProviderClassic.inFlightLock.unlock()
             return .withdrawn
         }
-        inFlightLock.lock()
-        installedSequence[url] = sequence
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.lock()
+        CN1FileProviderClassic.installedSequence[url] = sequence
+        CN1FileProviderClassic.inFlightLock.unlock()
         return .installed
     }
 
     private func beginFetch(at url: URL) -> Int {
-        inFlightLock.lock()
-        defer { inFlightLock.unlock() }
-        return stopGeneration[url] ?? 0
+        CN1FileProviderClassic.inFlightLock.lock()
+        defer { CN1FileProviderClassic.inFlightLock.unlock() }
+        return CN1FileProviderClassic.stopGeneration[url] ?? 0
     }
 
     /// Registers a suspended task, unless a stop has already overtaken it.
@@ -200,17 +213,17 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         guard let task = task else {
             return false
         }
-        inFlightLock.lock()
-        if (stopGeneration[url] ?? 0) != generation {
-            inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.lock()
+        if (CN1FileProviderClassic.stopGeneration[url] ?? 0) != generation {
+            CN1FileProviderClassic.inFlightLock.unlock()
             return false
         }
         // Appended rather than assigned. Two opens of one URL can overlap with no stop between
         // them, and a single-valued map lost the older task -- so a stop cancelled the newer one
         // and the older kept downloading the whole document, on the user's data, for a URL that
         // had already been evicted.
-        inFlight[url, default: []].append(task)
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlight[url, default: []].append(task)
+        CN1FileProviderClassic.inFlightLock.unlock()
         return true
     }
 
@@ -222,31 +235,31 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// a large download went on using the network after its eviction. Generations cannot stand in
     /// for this: two opens with no stop between them share one.
     private func clearFetch(_ task: URLSessionTask?, at url: URL) {
-        inFlightLock.lock()
-        if let task = task, var tasks = inFlight[url] {
+        CN1FileProviderClassic.inFlightLock.lock()
+        if let task = task, var tasks = CN1FileProviderClassic.inFlight[url] {
             tasks.removeAll { $0 === task }
             if tasks.isEmpty {
-                inFlight.removeValue(forKey: url)
+                CN1FileProviderClassic.inFlight.removeValue(forKey: url)
             } else {
-                inFlight[url] = tasks
+                CN1FileProviderClassic.inFlight[url] = tasks
             }
         }
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.unlock()
     }
 
     /// Whether a stop has arrived for `url` since `generation` was taken. Read-only: the
     /// in-flight entry is claimed by finishFetch, so this is the after-the-write check.
     private func stillWanted(at url: URL, generation: Int) -> Bool {
-        inFlightLock.lock()
-        defer { inFlightLock.unlock() }
-        return (stopGeneration[url] ?? 0) == generation
+        CN1FileProviderClassic.inFlightLock.lock()
+        defer { CN1FileProviderClassic.inFlightLock.unlock() }
+        return (CN1FileProviderClassic.stopGeneration[url] ?? 0) == generation
     }
 
     /// Whether the fetch that started at `generation` may still write to `url`.
     private func finishFetch(at url: URL, generation: Int) -> Bool {
-        inFlightLock.lock()
-        defer { inFlightLock.unlock() }
-        return (stopGeneration[url] ?? 0) == generation
+        CN1FileProviderClassic.inFlightLock.lock()
+        defer { CN1FileProviderClassic.inFlightLock.unlock() }
+        return (CN1FileProviderClassic.stopGeneration[url] ?? 0) == generation
     }
 
     private lazy var containerURL: URL = FileManager.default
@@ -707,10 +720,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // removed, and hands the system a document it stopped asking for.
         let lock = gate(for: url)
         lock.lock()
-        inFlightLock.lock()
-        let tasks = inFlight.removeValue(forKey: url) ?? []
-        stopGeneration[url] = (stopGeneration[url] ?? 0) + 1
-        inFlightLock.unlock()
+        CN1FileProviderClassic.inFlightLock.lock()
+        let tasks = CN1FileProviderClassic.inFlight.removeValue(forKey: url) ?? []
+        CN1FileProviderClassic.stopGeneration[url] = (CN1FileProviderClassic.stopGeneration[url] ?? 0) + 1
+        CN1FileProviderClassic.inFlightLock.unlock()
 
         // The materialized copy is a cache of content the app owns, so dropping it loses nothing
         // and keeps the working directory from growing without bound. Under the URL's gate, so a
