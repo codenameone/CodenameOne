@@ -347,8 +347,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             // The rename is what makes it safe rather than merely rarer: a descriptor already
             // opened on the old file keeps that inode, and any open after the rename sees a file
             // that was complete before it was ever linked to this name.
-            File partial = File.createTempFile("fetch", ".part", cacheDir);
+            // The stream first, then the file. getInputStream can fail after a 200 -- a peer
+            // that disconnects once the headers are out -- and creating the file first left an
+            // empty one behind on every such attempt, since the cleanup that removes it lives
+            // inside the block below. Cache files nothing will ever read, accumulating per retry.
             InputStream in = connection.getInputStream();
+            File partial = File.createTempFile("fetch", ".part", cacheDir);
             try {
                 FileOutputStream out = new FileOutputStream(partial);
                 try {
