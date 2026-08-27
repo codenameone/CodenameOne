@@ -184,19 +184,38 @@ public class MacImplementation extends IOSImplementation {
     /// the shared editing entry points take no window, and the component knows
     /// its own top level.
     private void nameEditingWindow(com.codename1.ui.Component cmp) {
-        // The framework's window id, which is what the native side looks up. It
-        // is NOT the native slot: a slot is an index into the window table and is
-        // reused once a window is disposed, while an id belongs to the Window and
-        // starts at 1. Handing one where the other was expected named a different
-        // window, or none, and the ownership check then refused the field's keys.
-        int windowId = -1;
-        if (cmp != null) {
-            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
-            if (top instanceof com.codename1.ui.Window) {
-                windowId = ((com.codename1.ui.Window) top).getWindowId();
-            }
+        macNative.macTextInputSetOwnerWindow(ownerWindowId(cmp));
+    }
+
+    /// Which surface the native side should treat as the owner of the next
+    /// presentation or editing session.
+    ///
+    /// Three answers, not two. A component in a secondary Window gives that
+    /// window's framework id. A component on the main Form gives -2, the main
+    /// rendering surface: it has no Window and therefore no id, and answering
+    /// "unknown" for it let the pending owner be cleared, which fell back to
+    /// whichever window was key -- the wrong one in exactly the case worth
+    /// naming, a picker opened for the main Form while a secondary window has
+    /// focus. -1 is the only genuinely unknown case, a null source, and is the
+    /// one entitled to fall back.
+    ///
+    /// -2 for the main window and -1 for none are the values createWindow()
+    /// already uses for ownership, rather than a second convention.
+    ///
+    /// The value is the framework's window id, NOT the native slot: a slot is an
+    /// index into the window table and is reused once a window is disposed,
+    /// while an id belongs to the Window and starts at 1. Handing one where the
+    /// other was expected named a different window, or none, and the ownership
+    /// check then refused the field's keys.
+    private static int ownerWindowId(com.codename1.ui.Component cmp) {
+        if (cmp == null) {
+            return -1;
         }
-        macNative.macTextInputSetOwnerWindow(windowId);
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top instanceof com.codename1.ui.Window) {
+            return ((com.codename1.ui.Window) top).getWindowId();
+        }
+        return -2;
     }
 
     /// @inheritDoc
@@ -215,16 +234,9 @@ public class MacImplementation extends IOSImplementation {
         return super.showNativePicker(type, source, currentValue, data);
     }
 
-    /// Names the window a component lives in for the next popover presentation.
+    /// Names the surface a component lives on for the next popover presentation.
     private void nameNextPresentationWindow(com.codename1.ui.Component cmp) {
-        int windowId = -1;
-        if (cmp != null) {
-            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
-            if (top instanceof com.codename1.ui.Window) {
-                windowId = ((com.codename1.ui.Window) top).getWindowId();
-            }
-        }
-        macNative.macPresentationSetOwnerWindow(windowId);
+        macNative.macPresentationSetOwnerWindow(ownerWindowId(cmp));
     }
 
     /// @inheritDoc

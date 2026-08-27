@@ -1316,8 +1316,18 @@ void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
 JAVA_VOID com_codename1_impl_mac_MacNative_macPresentationSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
     cn1OnMain(^{
         extern void CN1MacSetPendingHostView(NSView *view);
-        if (windowId < 0) {
+        if (windowId == -1) {
+            // No source component at all. Nothing can be named, so the key
+            // window stays the answer.
             CN1MacSetPendingHostView(nil);
+            return;
+        }
+        if (windowId < 0) {
+            // -2: the main Form's surface, which has no Window and so no id.
+            // Named rather than left to the fallback, which would anchor the
+            // popover in a secondary key window using coordinates measured
+            // against this one.
+            CN1MacSetPendingHostView([CN1MacHost sharedHost].renderingView);
             return;
         }
         CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
@@ -1338,6 +1348,10 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODE
     cn1OnMain(^{
         extern void CN1MacTextInputSetPendingOwner(NSView *view);
         if (windowId < 0) {
+            // -2 is the main Form's surface and -1 is no source at all; both
+            // land on the main rendering view, because an editing session with
+            // nothing to bind it to belongs to the main surface rather than to
+            // whichever window happens to be key.
             CN1MacTextInputSetPendingOwner([CN1MacHost sharedHost].renderingView);
             return;
         }
