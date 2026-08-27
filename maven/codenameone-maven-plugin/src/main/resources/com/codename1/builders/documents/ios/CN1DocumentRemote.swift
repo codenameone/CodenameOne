@@ -66,6 +66,17 @@ enum CN1DocumentRemote {
     /// first one's generation -- an unchanged content version, so the browser kept serving what
     /// it had materialized under the old token. Reading a hundred bytes per item is cheap; the
     /// digest is what was worth keeping.
+    /// A fixed-width digest of a string, for anywhere a stamp has to fit a budget.
+    ///
+    /// CommonCrypto rather than CryptoKit, for the reason given below: this file is compiled
+    /// into the pre-iOS-16 provider too, whose deployment target can be iOS 11.
+    static func digest(_ value: String) -> Data {
+        let bytes = Array(value.utf8)
+        var out = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        CC_SHA256(bytes, CC_LONG(bytes.count), &out)
+        return Data(out)
+    }
+
     static func credentialGeneration(containerURL: URL) -> String {
         let stamp = credentialStamp(containerURL: containerURL)
         return generationLock.withLock {

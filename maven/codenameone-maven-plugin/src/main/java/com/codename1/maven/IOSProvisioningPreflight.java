@@ -91,11 +91,16 @@ final class IOSProvisioningPreflight {
          */
         String applicationIdentifier;
         /**
-         * The {@code com.apple.security.application-groups} entitlement, or null when the
-         * profile carries none. A generated document provider always declares an App Group, so a
-         * profile without it cannot sign that target however well its bundle id matches.
+         * The {@code com.apple.security.application-groups} entitlement -- EMPTY when the
+         * profile grants none, never null once the profile has been parsed.
+         *
+         * <p>The difference matters: a generated document provider always declares an App Group,
+         * so a profile that grants none cannot sign it, and that is precisely what a profile
+         * issued before the capability was enabled looks like. Reading the absence as "cannot
+         * tell" would have accepted exactly the profiles this exists to catch. A file that could
+         * not be parsed at all produces no Profile, which is where "cannot tell" still lives.</p>
          */
-        List<String> appGroups;
+        List<String> appGroups = new ArrayList<String>();
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -387,10 +392,10 @@ final class IOSProvisioningPreflight {
     /// Whether the extension profile supplied as a local path grants the App Group the
     /// generated target declares, or null when there is nothing to say.
     ///
-    /// Silent when the profile cannot be read or carries no App Groups entitlement at all: this
-    /// gates a hard refusal, and neither is evidence that signing will fail -- an unreadable
-    /// file is reported by check() itself, and a profile whose entitlements this cannot parse is
-    /// not a profile this should judge.
+    /// Silent when the profile cannot be READ -- an unreadable file is reported by check()
+    /// itself, and a file this cannot parse is not one to judge. A profile that parses and grants
+    /// no App Groups is a different thing entirely: that is what a profile issued before the
+    /// capability was enabled looks like, and it is the case this exists to catch.
     private static Problem appGroupProblem(Properties settings, String name, boolean release) {
         String configured = configuredAppGroup(settings);
         if (configured == null) {
@@ -416,7 +421,7 @@ final class IOSProvisioningPreflight {
             } catch (Exception ex) {
                 return null;
             }
-            if (profile.appGroups == null || profile.appGroups.contains(configured)) {
+            if (profile.appGroups.contains(configured)) {
                 return null;
             }
             return new Problem("The " + name + " provisioning profile named by " + key + " ("
@@ -436,8 +441,7 @@ final class IOSProvisioningPreflight {
     private static Problem hostAppGroupProblem(Properties settings, boolean release) {
         String configured = configuredAppGroup(settings);
         Profile profile = appProfile(settings, release);
-        if (configured == null || profile == null || profile.appGroups == null
-                || profile.appGroups.contains(configured)) {
+        if (configured == null || profile == null || profile.appGroups.contains(configured)) {
             return null;
         }
         return new Problem("The app's own provisioning profile (" + profile.name + ") does not "
@@ -950,15 +954,13 @@ final class IOSProvisioningPreflight {
         // that declares an App Group, which every generated document provider does.
         Element groups = valueForKey(doc, "com.apple.security.application-groups");
         if (groups != null && "array".equals(groups.getTagName())) {
-            List<String> found = new ArrayList<String>();
             NodeList values = groups.getElementsByTagName("string");
             for (int i = 0; i < values.getLength(); i++) {
                 String value = values.item(i).getTextContent().trim();
                 if (!value.isEmpty()) {
-                    found.add(value);
+                    profile.appGroups.add(value);
                 }
             }
-            profile.appGroups = found;
         }
         profile.type = deriveType(doc);
         return profile;

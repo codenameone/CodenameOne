@@ -61,6 +61,9 @@ public class IOSAppExtensionSigningPreflightTest {
             + "<plist version=\"1.0\"><dict>\n";
 
     /** A profile of the shape the parser insists on, covering one App ID. */
+    /// The App Group a default-configured project asks for: "group." plus the package name.
+    private static final String GROUP = "group.com.example.app";
+
     private File profile(String name, String appIdentifier) throws Exception {
         return profile(name, appIdentifier, null);
     }
@@ -150,10 +153,12 @@ public class IOSAppExtensionSigningPreflightTest {
 
     @Test
     public void generatedDocumentProviderWithItsOwnProfileIsAccepted() throws Exception {
-        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        // Both profiles grant the App Group: the extension declares it, and the app carries it
+        // too, since the two meet in the container it names.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
-                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
         assertTrue(checkGenerated(p).isEmpty());
     }
 
@@ -162,14 +167,17 @@ public class IOSAppExtensionSigningPreflightTest {
         // A profile is a snapshot of the capabilities its App ID had when it was issued, so one
         // made before App Groups was enabled matches the bundle id and still cannot sign a target
         // that declares the group -- and the failure lands in Xcode, talking about an entitlement.
-        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        // Grants NO group at all, which is what a profile issued before the capability was
+        // enabled looks like: the case this exists to catch, not an inconclusive one.
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
                 profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
         List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
-        assertEquals(0, problems.size());
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Group"));
 
-        // Grants some OTHER group: that is a profile this can judge, and it cannot sign.
+        // Grants some OTHER group: judged the same way and for the same reason.
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
                 profile("Other", "ABCD1234.com.example.app.CN1Documents",
                         "group.com.example.other").getAbsolutePath());
@@ -179,8 +187,7 @@ public class IOSAppExtensionSigningPreflightTest {
 
         // Grants the group the build will ask for: accepted.
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
-                profile("Right", "ABCD1234.com.example.app.CN1Documents",
-                        "group.com.example.app").getAbsolutePath());
+                profile("Right", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
         assertTrue(checkGenerated(p).isEmpty());
     }
 
@@ -196,10 +203,16 @@ public class IOSAppExtensionSigningPreflightTest {
         assertEquals(1, problems.size());
         assertTrue(problems.get(0).message, problems.get(0).message.contains("App Groups"));
 
-        // A profile of its own settles it, wildcard app profile or not.
+        // Giving the extension a profile of its own does not settle it, because the app's own
+        // wildcard profile cannot carry the App Group either -- the builder puts that group in
+        // the app's entitlements too. The refusal moves to the app's profile, which is the one
+        // that then has to change.
         p.setProperty("codename1.ios.appext.CN1Documents.provision",
-                profile("Ext", "ABCD1234.com.example.app.CN1Documents").getAbsolutePath());
-        assertTrue(checkGenerated(p).isEmpty());
+                profile("Ext", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("app's own provisioning profile"));
     }
 
     @Test
@@ -313,7 +326,7 @@ public class IOSAppExtensionSigningPreflightTest {
 
     @Test
     public void generatedExtensionMatchingBuildTypeProfileSatisfiesIt() throws Exception {
-        Properties p = settings(profile("PROD", "ABCD1234.com.example.app"));
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
         p.setProperty("codename1.arg.ios.release.appext.CN1Documents.provisioningURL",
                 "https://example.com/ext");

@@ -96,7 +96,7 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     ///
     /// iOS only, as the SDK marks it: the macOS provider is always the replicated one.
     var versionIdentifier: Data? {
-        Data(contentStamp.utf8)
+        CN1DocumentRemote.digest(contentStamp)
     }
 
     var typeIdentifier: String {
@@ -202,8 +202,13 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // place. Metadata comes from the index, which is rewritten on every publish, so the
         // revision belongs in this half: re-reading a name is cheap in a way re-fetching a file
         // is not.
-        return NSFileProviderItemVersion(contentVersion: Data(contentStamp.utf8),
-                                         metadataVersion: Data(metadataStamp.utf8))
+        // Hashed, not handed over as text. Apple: "Components are limited to 128 bytes in
+        // size", and these stamps carry a name, a parent id, a content type, a remote id and a
+        // revision -- a long name alone can pass that on its own, and an over-long component is
+        // a version the system rejects, which is a document that will not enumerate. A digest is
+        // 32 bytes whatever went into it, and equality is all a version is compared for.
+        return NSFileProviderItemVersion(contentVersion: CN1DocumentRemote.digest(contentStamp),
+                                         metadataVersion: CN1DocumentRemote.digest(metadataStamp))
     }
 
     private var metadataStamp: String {
