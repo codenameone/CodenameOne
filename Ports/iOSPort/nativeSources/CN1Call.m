@@ -200,6 +200,11 @@ static NSMutableArray *cn1clPending = nil;
 static NSMutableSet *cn1clUnclaimed = nil;
 
 /// Calls reported to CallKit whose completion has not come back yet.
+/// Bumped by every provider reset, so a report that was in flight across one
+/// can tell that the tables it is about to touch are no longer its own.
+/// Guarded by cn1clLock.
+static int cn1clProviderGeneration = 0;
+
 static NSMutableSet *cn1clReporting = nil;
 
 /// Java requests waiting on somebody else's in-flight report, by uuid.
@@ -473,6 +478,7 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // Every call is gone. Java is told so it can drop media WITHOUT ending
     // calls that no longer exist.
     cn1clEnsureState();
+    NSMutableArray *abandoned = [NSMutableArray array];
     @synchronized (cn1clLock) {
         [cn1clCalls removeAllObjects];
         [cn1clActions removeAllObjects];
@@ -485,6 +491,14 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [cn1clQueuedActions removeAllObjects];
         cn1clAudioCall = nil;
         cn1clAudioRetiring = nil;
+        // Every report in flight belongs to the provider that has just gone,
+        // so their completions must not touch what comes after them.
+        cn1clProviderGeneration++;
+        [cn1clReporting removeAllObjects];
+        for (NSArray *perCall in [cn1clReportWaiters allValues]) {
+            [abandoned addObjectsFromArray:perCall];
+        }
+        [cn1clReportWaiters removeAllObjects];
         // cn1clPending is deliberately NOT cleared here. A queued pushed call
         // the reset destroyed still has to reach the app, as a MISSED call --
         // dropping the record would leave the user with no trace of a call
@@ -492,6 +506,12 @@ static int64_t cn1clTrackAction(CXAction *action) {
         // non-stale is delivered stale unless its uuid is still in
         // cn1clCalls, and that table has just been emptied above. Clearing
         // the queue here would lose the notification, not protect anything.
+    }
+    // Answered rather than dropped: their report is being abandoned and no
+    // completion will reach them now that the generation has moved on.
+    for (NSNumber *waiter in abandoned) {
+        cn1clAck([waiter intValue], NO, CN1_CALL_ERR_CALL_REFUSED,
+                @"The call provider reset while the call was being reported");
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
 }
@@ -827,6 +847,7 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
     // update on it answered INVALID_ID.
     BOOL known = NO;
     BOOL stillPending = NO;
+    int reportGeneration = 0;
     @synchronized (cn1clLock) {
         known = [cn1clCalls objectForKey:uuidString] != nil;
         stillPending = [cn1clReporting containsObject:uuidString];
@@ -850,6 +871,7 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
             [cn1clCalls setObject:uuidString forKey:uuidString];
             [cn1clReporting addObject:uuidString];
         }
+        reportGeneration = cn1clProviderGeneration;
     }
     if (known) {
         // Already ringing -- the other origin got here first.
@@ -862,10 +884,33 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
     [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid update:update
             completion:^(NSError *error) {
         NSArray *waiters = nil;
+        BOOL stale = NO;
         @synchronized (cn1clLock) {
-            [cn1clReporting removeObject:uuidString];
-            waiters = [cn1clReportWaiters objectForKey:uuidString];
-            [cn1clReportWaiters removeObjectForKey:uuidString];
+            // A provider RESET while this report was in flight takes every
+            // call with it, and the app may already have reported the same
+            // uuid again against the new provider. This completion belongs to
+            // the old one: removing the uuid from cn1clReporting would strip
+            // the NEW report's pending marker, taking the waiters would settle
+            // the new report's callers with this outcome, and on error it
+            // would drop the new call from cn1clCalls and tell Java it had
+            // ended. None of that state is ours any more.
+            stale = reportGeneration != cn1clProviderGeneration;
+            if (!stale) {
+                [cn1clReporting removeObject:uuidString];
+                waiters = [cn1clReportWaiters objectForKey:uuidString];
+                [cn1clReportWaiters removeObjectForKey:uuidString];
+            }
+        }
+        if (stale) {
+            // Its OWN request is still answered -- the reset failed the
+            // waiters, but nothing else knows about this one, and a request
+            // that never answers is what this SPI calls the worst outcome.
+            if (requestId >= 0) {
+                cn1clAck(requestId, NO, CN1_CALL_ERR_CALL_REFUSED,
+                        @"The call provider reset while the call was being"
+                        @" reported");
+            }
+            return;
         }
         if (error != nil) {
             @synchronized (cn1clLock) {

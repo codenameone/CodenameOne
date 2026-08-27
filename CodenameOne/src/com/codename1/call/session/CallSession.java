@@ -83,7 +83,9 @@ public final class CallSession {
 
     /// Where the call is in its life.
     public CallState getState() {
-        return state;
+        synchronized (this) {
+            return state;
+        }
     }
 
     /// Whether the call is muted, as far as the system is concerned.
@@ -95,16 +97,16 @@ public final class CallSession {
     /// is being rung. Ignored for an incoming call.
     public void reportStartedConnecting() {
         CallBridge b = CallRequests.bridge();
-        if (isOver()) {
+        if (b == null || direction != CallDirection.OUTGOING) {
             return;
         }
-        if (b != null && direction == CallDirection.OUTGOING) {
-            state = CallState.DIALING;
-            b.reportOutgoingStartedConnecting(callId, System.currentTimeMillis());
+        if (!moveUnlessOver(CallState.DIALING)) {
+            return;
         }
+        b.reportOutgoingStartedConnecting(callId, System.currentTimeMillis());
     }
 
-    /// Whether this call has reached its terminal state.
+    /// Moves to `next` unless the call is already over, as ONE step.
     ///
     /// ENDED is terminal in [CallState], and signalling is asynchronous: a
     /// media-connected callback that was already in flight when the call
@@ -112,18 +114,33 @@ public final class CallSession {
     /// report -- the platform call is gone -- so the Java object was left
     /// contradicting both the system and its own contract, and anything
     /// watching it could render or restart media for a call that is over.
-    private boolean isOver() {
-        return state == CallState.ENDED;
+    ///
+    /// The check and the assignment used to straddle a window an end event
+    /// fits through: signalling calls reportConnected off the EDT while an
+    /// end or a provider reset is being delivered ON it, so the end could
+    /// land after the check and this would then move the retained session
+    /// back to ACTIVE -- reporting a connection for a native call that was
+    /// already gone, and contradicting the terminal-state guarantee ENDED is
+    /// documented to give. A separate terminal-state test before the
+    /// assignment only narrows that window; it cannot close it, which is why
+    /// the predicate it used to call is gone rather than merely unused.
+    private boolean moveUnlessOver(CallState next) {
+        synchronized (this) {
+            if (state == CallState.ENDED) {
+                return false;
+            }
+            state = next;
+            return true;
+        }
     }
 
     /// Tells the system the call is connected. Call this when media is
     /// actually flowing, because it starts the duration the user sees.
     public void reportConnected() {
         CallBridge b = CallRequests.bridge();
-        if (b == null || isOver()) {
+        if (b == null || !moveUnlessOver(CallState.ACTIVE)) {
             return;
         }
-        state = CallState.ACTIVE;
         long now = System.currentTimeMillis();
         if (direction == CallDirection.OUTGOING) {
             b.reportOutgoingConnected(callId, now);
@@ -175,7 +192,9 @@ public final class CallSession {
     /// call log says what happened.
     public void reportEndedRemotely(CallEndReason reason) {
         CallBridge b = CallRequests.bridge();
-        state = CallState.ENDED;
+        synchronized (this) {
+            state = CallState.ENDED;
+        }
         // Unconditional here, unlike end(): this is the app telling the
         // framework the call is already over, not asking for it to be. Still
         // identity-checked, because the id can already name a newer call.
@@ -277,7 +296,9 @@ public final class CallSession {
                 // addressable through Calls.getSession.
                 return;
             }
-            session.state = CallState.ENDED;
+            synchronized (session) {
+                session.state = CallState.ENDED;
+            }
             Calls.forget(session.getCallId(), session);
         }
     }
@@ -309,8 +330,8 @@ public final class CallSession {
             // settles an acknowledgement before end() can run, so the
             // simulation cannot produce the ordering this defends against.
             // The late-reportConnected half IS covered, in LocalCallTest.
-            if (error == null && !session.isOver()) {
-                session.state = target;
+            if (error == null) {
+                session.moveUnlessOver(target);
             }
         }
     }
@@ -337,7 +358,12 @@ public final class CallSession {
     /// Sets the state without telling the system, for events coming the other
     /// way.
     void setStateInternal(CallState value) {
-        state = value;
+        // Under the monitor every other transition uses. This is how the
+        // PORT reports a change, including the end that moveUnlessOver has
+        // to see, so it cannot be the one write that races.
+        synchronized (this) {
+            state = value;
+        }
     }
 
     /// Sets the mute flag without telling the system.

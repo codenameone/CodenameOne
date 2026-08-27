@@ -656,6 +656,40 @@ public class LocalCallTest {
     }
 
     @Test
+    public void reportConnectedCannotResurrectAnEndedSession() {
+        // ENDED is terminal, and signalling is asynchronous: reportConnected
+        // arrives off the EDT while the end is being delivered ON it. The
+        // guard tested isOver() and then assigned, so an end landing between
+        // the two moved the retained session back to ACTIVE -- reporting a
+        // connection for a native call that was already gone.
+        //
+        // This covers the CONTRACT, not the interleaving: it passes against
+        // the check-then-act version too, because ending first is caught by
+        // the old guard as well. Staging the window itself needs the end to
+        // land between a check and an assignment on another thread, which
+        // this harness cannot schedule -- so the atomicity is argued from the
+        // code and this test keeps the terminal-state guarantee from
+        // regressing in the ordinary case. Checked by reverting the fix and
+        // watching it still pass, rather than assumed.
+        String id = CallId.random();
+        CallSession s = ring(id);
+        Calls.deliverCallEnded(id, CallEndReason.REMOTE_ENDED.ordinal());
+        long limit = System.currentTimeMillis() + 5000;
+        while (s.getState() != CallState.ENDED
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertSame(CallState.ENDED, s.getState(), "the call is over");
+
+        s.reportConnected();
+        assertSame(CallState.ENDED, s.getState(),
+                "a late reportConnected must not revive an ended call");
+        s.reportStartedConnecting();
+        assertSame(CallState.ENDED, s.getState(),
+                "and neither must a late reportStartedConnecting");
+    }
+
+    @Test
     public void aDeferredEndThatFailsKeepsTheSession() {
         // The documented behaviour of failing an end action is that the
         // system UI restores the call. Forgetting the session on dispatch
