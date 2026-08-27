@@ -91,6 +91,15 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     BOOL cn1PinchActive;
     /// Covers the native peers while input is disabled; nil when it is enabled.
     NSView *cn1InputBlocker;
+    /// Whether a pointer press was delivered and its release has not been.
+    ///
+    /// A modal opened from a press handler or a timer disables this view between
+    /// the press and the release, and dropping that release left Form and Window
+    /// holding a pressed component and an unfinished drag for good -- the paths
+    /// that clear them are pointerReleased(). The release that closes an open
+    /// press is delivered even once input is off, exactly as a magnify gesture's
+    /// termination is.
+    BOOL cn1PointerPressActive;
     /// Sub-pixel scroll left over from previous events.
     ///
     /// The wheel callback takes integers, and a precise trackpad delta scaled
@@ -623,8 +632,17 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 #define CN1_POINTER_DRAGGED  3
 
 - (void)cn1Deliver:(NSEvent *)event to:(void (*)(int *, int *, int))fn type:(int)type {
-    if (!self.cn1InputEnabled) {
+    // A release closing a press this view already delivered goes through even
+    // with input disabled. Everything else -- a new press, a drag, anything
+    // while no press is open -- stays blocked.
+    BOOL closingOpenPress = type == CN1_POINTER_RELEASED && cn1PointerPressActive;
+    if (!self.cn1InputEnabled && !closingOpenPress) {
         return;
+    }
+    if (type == CN1_POINTER_PRESSED) {
+        cn1PointerPressActive = YES;
+    } else if (type == CN1_POINTER_RELEASED) {
+        cn1PointerPressActive = NO;
     }
     CGPoint p = [self cn1PointFromEvent:event];
     int x = (int)p.x, y = (int)p.y;
@@ -843,10 +861,20 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
 #endif
         cn1TrackingArea = nil;
     }
+    // ActiveInActiveApp, not ActiveInKeyWindow. Only one window is key, so the
+    // key-window option switched hover off in every other window this
+    // application has on screen: moving the pointer over a second Window updated
+    // no hover state, no tooltip and no hover listener until the user clicked to
+    // make it key. Every visible window of an active application should track,
+    // which is what ActiveInActiveApp means.
+    //
+    // Input gating is unaffected: mouseMoved:, mouseEntered: and mouseExited:
+    // each check cn1InputEnabled themselves, so a window a modal has disabled
+    // still dispatches no hover.
     cn1TrackingArea = [[NSTrackingArea alloc]
         initWithRect:NSZeroRect
              options:NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited
-                     | NSTrackingActiveInKeyWindow | NSTrackingInVisibleRect
+                     | NSTrackingActiveInActiveApp | NSTrackingInVisibleRect
                owner:self
             userInfo:nil];
     [self addTrackingArea:cn1TrackingArea];
