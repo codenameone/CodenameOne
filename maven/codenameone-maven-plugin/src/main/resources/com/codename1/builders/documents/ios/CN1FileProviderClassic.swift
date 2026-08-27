@@ -151,6 +151,19 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         try? FileManager.default.removeItem(at: url)
     }
 
+    /// Whether the shared URL currently holds bytes, asked under its gate.
+    ///
+    /// The gate is what makes the answer meaningful: install and discardInstalled both hold it,
+    /// so this cannot see the moment between a newer request's install and its validation. A
+    /// discard AFTER this returns is not a wrong answer -- the file was there when the answer was
+    /// made -- and the system asks again the next time it wants the item.
+    private func materialized(at url: URL) -> Bool {
+        let lock = gate(for: url)
+        lock.lock()
+        defer { lock.unlock() }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
     private func beginFetch(at url: URL) -> Int {
         inFlightLock.lock()
         defer { inFlightLock.unlock() }
@@ -500,8 +513,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                         completionHandler(nil)
                     case .superseded:
                         // Someone else's newer bytes are there, and that request runs this same
-                        // check for itself.
-                        completionHandler(nil)
+                        // check for itself -- which can also REMOVE them, so this answers on what
+                        // is at the URL rather than assuming. Under the gate, so it cannot land
+                        // between that request's install and its own validation.
+                        completionHandler(self.materialized(at: url)
+                                          ? nil : NSFileProviderError(.noSuchItem))
                     case .stopped:
                         completionHandler(NSFileProviderError(.noSuchItem))
                     case .failed(let error):
@@ -589,8 +605,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 completionHandler(nil)
             case .superseded:
                 // Someone else's newer bytes are there, and that request runs this same check
-                // for itself.
-                completionHandler(nil)
+                // for itself -- which can also REMOVE them, so this answers on what is at the
+                // URL rather than assuming.
+                completionHandler(self.materialized(at: url)
+                                  ? nil : NSFileProviderError(.noSuchItem))
             case .stopped:
                 completionHandler(NSFileProviderError(.noSuchItem))
             case .failed(let error):

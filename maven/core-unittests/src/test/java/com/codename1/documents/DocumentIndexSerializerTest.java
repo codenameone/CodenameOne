@@ -277,7 +277,6 @@ class DocumentIndexSerializerTest {
         // this proves them complete up to what the JDK knows and leaves their extra entries as a
         // superset, which is the safe direction.
         java.util.Set<Integer> performed = new java.util.HashSet<>();
-        java.util.Set<Integer> normalizedSpelling = new java.util.HashSet<>();
         for (int c = Character.MIN_CODE_POINT; c <= Character.MAX_CODE_POINT; c++) {
             if (c >= 0xD800 && c <= 0xDFFF) {
                 continue;
@@ -317,24 +316,34 @@ class DocumentIndexSerializerTest {
                 for (int i = 1; i < parts.length; i++) {
                     performed.add(parts[i]);
                 }
-            } else if (!isMark(parts[0])) {
-                for (int i = 1; i < parts.length; i++) {
-                    normalizedSpelling.add(parts[i]);
-                }
             }
         }
 
-        // Completeness, second half: the marks a decomposed spelling is made of, for every
-        // composition the normalizer performs. Minus the ones that also carry a normalized
-        // spelling of their own -- U+093C is the nukta in both U+0929, which composes, and
-        // U+0958, which does not -- because refusing those would refuse correct text.
-        performed.removeAll(normalizedSpelling);
+        // Completeness, second half, and soundness with it: a base followed by a mark is
+        // refused exactly when normalization would join them. Every mark that takes part in any
+        // composition, against every ASCII letter -- which is where the two answers differ for
+        // one and the same mark: "e" followed by U+0301 is the decomposed spelling of a letter
+        // that exists, and "q" followed by U+0301 is a normalized name of its own, because no
+        // precomposed q with acute was ever encoded.
         for (int mark : performed) {
-            assertTrue(DocumentIndexSerializer.combiningMarkAt(new String(Character.toChars(mark)))
-                            >= 0,
-                    "U+" + Integer.toHexString(mark).toUpperCase() + " only ever appears in a "
-                            + "decomposed spelling and is accepted, so that spelling and its "
-                            + "composed twin would both pass");
+            for (int base = 'A'; base <= 'z'; base++) {
+                if (base > 'Z' && base < 'a') {
+                    continue;
+                }
+                String pair = new String(Character.toChars(base)) + new String(Character.toChars(mark));
+                boolean composes = !java.text.Normalizer.normalize(pair,
+                        java.text.Normalizer.Form.NFC).equals(pair);
+                String name = (char) base + " + U+" + Integer.toHexString(mark).toUpperCase();
+                if (composes) {
+                    assertTrue(DocumentIndexSerializer.combiningMarkAt(pair) >= 0,
+                            name + " is a decomposed spelling and is accepted, so it and its "
+                                    + "composed twin would both pass");
+                } else {
+                    assertTrue(DocumentIndexSerializer.combiningMarkAt(pair) < 0,
+                            name + " is already normalized and is refused, so a legitimate name "
+                                    + "cannot be published");
+                }
+            }
         }
     }
 
@@ -342,6 +351,24 @@ class DocumentIndexSerializerTest {
         int type = Character.getType(codePoint);
         return type == Character.NON_SPACING_MARK || type == Character.COMBINING_SPACING_MARK
                 || type == Character.ENCLOSING_MARK;
+    }
+
+    @Test
+    void acceptsAMarkThatComposesWithNothing() {
+        // A mark is only wrong where it composes. There is no precomposed q with acute, so
+        // "q" followed by U+0301 is its own normalized spelling and has no twin to collide with
+        // -- refusing it because the same mark composes onto "e" would refuse a legitimate name,
+        // and publish() swallows that exception, so the app would see its tree silently stop
+        // updating.
+        DocumentNode standalone = DocumentNode.folder("root", "Root");
+        standalone.add(DocumentNode.file("a", "q\u0301.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(standalone));
+
+        // The same mark on a base that DOES compose is still refused.
+        DocumentNode composing = DocumentNode.folder("root", "Root");
+        composing.add(DocumentNode.file("a", "e\u0301.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(composing));
     }
 
     @Test
