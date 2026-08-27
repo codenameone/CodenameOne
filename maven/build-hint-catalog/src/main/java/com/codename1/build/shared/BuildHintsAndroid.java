@@ -51,8 +51,8 @@ final class BuildHintsAndroid {
                 .platform("android")
                 .doc("Whether the manifest declares `CAMERA`, which video calls need. Overrides `call.video` on "
                         + "Android. `CallConfiguration.videoSupported(true)` is a runtime decision no scanner can "
-                        + "see, so the build has to be told separately; without it `Calls.getCapabilities()` does "
-                        + "not report `CAPABILITY_VIDEO`."));
+                        + "see, so the build has to be told here as well; without it `Calls.getCapabilities()` "
+                        + "omits `CAPABILITY_VIDEO`."));
 
         // Not an abbreviation: the builder reads android.captureRecord and then
         // lets and.captureRecord override it, so the two name ONE setting.

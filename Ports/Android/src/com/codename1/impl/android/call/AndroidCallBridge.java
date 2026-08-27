@@ -805,11 +805,27 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void registerVoipPush(int requestId) {
-        // The wake-up is an ordinary high-priority FCM message, so the token
-        // is the app's existing push registration and there is nothing
-        // separate to register for. Answering with an empty token rather than
-        // failing keeps portable code from treating this as an error.
-        com.codename1.call.voip.VoipPush.deliverToken(requestId, "");
+        // Refused, because isVoipPushSupported() says false and an operation
+        // may not contradict its own capability query.
+        //
+        // This used to answer with an empty token on the reasoning that a
+        // non-failure keeps portable code simple. It does the opposite. The
+        // wake-up here is an ordinary high-priority FCM message, so there is
+        // no VoIP token to hand back and "" is not one: an app that shares its
+        // registration code across platforms took the success, sent "" to its
+        // server as this device's push address, and only found out that no
+        // call could ever be delivered when none was. A refusal names the
+        // problem at the point the app can still do something about it.
+        //
+        // The capability query is the supported way to branch, but it cannot
+        // be the ONLY guard -- a shared code path that registers first, or one
+        // written against the iOS behaviour, still arrives here.
+        com.codename1.call.voip.VoipPush.deliverRegistrationFailed(requestId,
+                CallError.NOT_SUPPORTED.ordinal(),
+                "Android has no separate VoIP push registration. Wake the app"
+                + " with a high-priority FCM message and call"
+                + " Calls.reportIncoming from the push callback; see"
+                + " CallBridge.isVoipPushSupported.");
     }
 
     @Override

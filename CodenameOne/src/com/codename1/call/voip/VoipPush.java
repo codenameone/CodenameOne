@@ -226,6 +226,10 @@ public final class VoipPush {
 
     /// Registers for VoIP pushes, resolving with the token to give the
     /// application's server.
+    ///
+    /// Errors with [com.codename1.call.CallError#NOT_SUPPORTED] where
+    /// [#isSupported()] is false, rather than resolving with a token that
+    /// could never receive anything.
     public static AsyncResource<String> register() {
         CallBridge b = CallRequests.bridge();
         if (b == null) {

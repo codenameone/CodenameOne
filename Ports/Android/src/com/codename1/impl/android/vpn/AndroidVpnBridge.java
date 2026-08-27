@@ -102,6 +102,21 @@ public class AndroidVpnBridge implements VpnBridge {
     /// Whether this app has asked for its tunnel to be up.
     private volatile boolean startRequested;
 
+    /// Whether this app has asked for its tunnel to come DOWN and has yet to
+    /// see it go.
+    ///
+    /// startRequested cannot answer this. It records that THIS PROCESS
+    /// started the tunnel, and a stop is exactly the case where that need not
+    /// be true: Android keeps a provisioned profile running across a restart
+    /// of the app that installed it, so a fresh process can own a live tunnel
+    /// with startRequested false. Gating the teardown on it left stopVpn
+    /// publishing DISCONNECTING with nothing that could ever move it -- the
+    /// transport loss arrived and onTunnelTransport discarded it as some
+    /// other app's, so getStatus() said the tunnel was going down for the
+    /// life of the process. This flag is what makes the stop path observe the
+    /// teardown on its own account.
+    private volatile boolean stopRequested;
+
     /// Whether an install or removal owns the profile right now.
     ///
     /// Covers the WHOLE operation rather than just the consent dialog: the
@@ -175,13 +190,84 @@ public class AndroidVpnBridge implements VpnBridge {
     /// because Android gives an app no way to tell its own tunnel from
     /// another app's -- the reason onTunnelTransport is gated the way it is.
     private VpnStatus reconciledStatus() {
+        boolean settle;
         synchronized (this) {
             // storedWire() takes this same monitor; it is reentrant.
             if (status == VpnStatus.NOT_CONFIGURED && storedWire() != null) {
                 status = VpnStatus.DISCONNECTED;
             }
-            return status;
+            settle = status == VpnStatus.DISCONNECTING && stopRequested;
+            if (!settle) {
+                return status;
+            }
         }
+        // A pending teardown with no VPN transport left is a teardown that
+        // has finished. The transport callback is the usual way this is
+        // learned, but it cannot be the only one: stopping a profile that was
+        // provisioned and NOT running produces no loss to hear, and a stop
+        // issued before any listener registered may have had nothing watching
+        // when the loss went past. Both left DISCONNECTING permanent.
+        //
+        // Deliberately outside the monitor -- ConnectivityManager is asked
+        // here, and setStatus below reaches application code.
+        if (vpnTransportPresent()) {
+            synchronized (this) {
+                return status;
+            }
+        }
+        synchronized (this) {
+            // Re-checked: a transport loss may have settled it already while
+            // the query above was in flight, and re-announcing an end that
+            // was announced is a status change the app never had.
+            if (status != VpnStatus.DISCONNECTING || !stopRequested) {
+                return status;
+            }
+        }
+        stopRequested = false;
+        startRequested = false;
+        setStatus(VpnStatus.DISCONNECTED);
+        return VpnStatus.DISCONNECTED;
+    }
+
+    /// Whether the platform has ANY VPN transport up right now.
+    ///
+    /// Android offers no way to ask whether a PARTICULAR profile's tunnel is
+    /// up, so this answers the weaker question, and the weakness is bounded:
+    /// it is consulted only while this app is waiting for its own teardown,
+    /// where the sole cost of another app's VPN being up is that the settle
+    /// waits for the next call rather than happening on this one.
+    private boolean vpnTransportPresent() {
+        if (Build.VERSION.SDK_INT < 21) {
+            return false;
+        }
+        ConnectivityManager cm = (ConnectivityManager)
+                context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) {
+            return false;
+        }
+        try {
+            Network[] networks = cm.getAllNetworks();
+            if (networks == null) {
+                return false;
+            }
+            for (int i = 0; i < networks.length; i++) {
+                NetworkCapabilities caps =
+                        cm.getNetworkCapabilities(networks[i]);
+                if (caps != null && caps.hasTransport(
+                        NetworkCapabilities.TRANSPORT_VPN)) {
+                    return true;
+                }
+            }
+        } catch (RuntimeException e) {
+            // A device that refuses the query has told us nothing, and the
+            // two ways of reading nothing are not equally bad: "still up"
+            // strands the status in DISCONNECTING for ever, which is the
+            // exact failure this method exists to end, while "gone" settles a
+            // teardown that had in fact been asked for. Take the recoverable
+            // one.
+            return false;
+        }
+        return false;
     }
 
     @Override
@@ -574,6 +660,10 @@ public class AndroidVpnBridge implements VpnBridge {
         }
         try {
             startRequested = true;
+            // A start supersedes a teardown this app was still waiting on;
+            // left set, the first loss after the new tunnel came up would be
+            // read as the OLD stop completing.
+            stopRequested = false;
             setStatus(VpnStatus.CONNECTING);
             Reflect.START.invoke(Reflect.manager(context));
             // Watching starts HERE as well as in setStatusListening. The
@@ -693,7 +783,20 @@ public class AndroidVpnBridge implements VpnBridge {
             // startRequested is cleared by onTunnelTransport when the
             // transport goes, or by the failure path below if the platform
             // refuses.
+            //
+            // Set AFTER the platform accepted: a refusal must not leave a
+            // teardown pending for a tunnel that is still up.
+            stopRequested = true;
+            // And something has to be WATCHING. startVpn arms the watcher,
+            // but a process that did not start this tunnel never ran it --
+            // the restart case -- so a stop issued there had no callback
+            // registered and no way to learn the teardown had happened.
+            startWatchingTheTunnel();
             endOperation(mine);
+            // Settles now when there is no tunnel left to lose, which is what
+            // stopping an already-idle profile looks like; otherwise this
+            // leaves DISCONNECTING for the transport loss to finish.
+            reconciledStatus();
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             // DISCONNECTING was set before the platform was asked, so a
@@ -734,7 +837,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // is the profile Android actually holds.
             reconciledStatus();
             startWatchingTheTunnel();
-        } else if (!startRequested) {
+        } else if (!startRequested && !stopRequested) {
             // Only when this app has no tunnel of its own up. The transport
             // callback is the sole signal Android gives that a tunnel went
             // away, so unregistering it because the last LISTENER left meant
@@ -841,10 +944,17 @@ public class AndroidVpnBridge implements VpnBridge {
     /// indistinguishable) but it removes the case that matters: an app that
     /// never started a tunnel never hears that one is up.
     void onTunnelTransport(boolean available) {
-        if (!startRequested) {
+        if (!startRequested && !stopRequested) {
+            return;
+        }
+        if (available && !startRequested) {
+            // A tunnel COMING UP while this app is tearing its own down is
+            // not this app's; reporting CONNECTED there would undo the stop
+            // the caller just asked for.
             return;
         }
         if (!available) {
+            stopRequested = false;
             // The tunnel is actually gone, which is the point at which this
             // app stops owning one -- whether it asked to stop or the user
             // did it from Settings. stopVpn used to clear this itself and
