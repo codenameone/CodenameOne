@@ -16489,6 +16489,12 @@ static dispatch_queue_t cn1DocumentsDomainQueue(void) {
 /// to call `done` exactly once, which is what NSFileProviderManager does whether or not it
 /// errors; the guard means a framework that called back twice would cost an ordering rather than
 /// crash the app.
+/// How long clear() waits for the system to take the domain away before giving up on it.
+///
+/// Long enough that a removal queued behind a registration still lands inside it, short enough
+/// that a provider daemon in trouble cannot hold up a logout.
+#define CN1_DOCUMENTS_DOMAIN_TIMEOUT 5.0
+
 static void cn1DocumentsQueueDomainOp(void (^op)(void (^done)(void))) {
     dispatch_queue_t queue = cn1DocumentsDomainQueue();
     dispatch_async(queue, ^{
@@ -16552,6 +16558,18 @@ void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_M
         // Queued behind any registration still running, and holding the queue until this one
         // finishes, so a publish that follows a clear cannot have its domain removed by this.
         NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+        // And WAITED for, unlike every other domain call here. This one is the last step of
+        // clear(), which an app calls to log a user out: queueing it and returning would let the
+        // app finish logging out while the domain -- and the copies the system materialized
+        // under it, which live in its own store rather than in the container the tree was just
+        // deleted from -- are still there to be browsed. The wait can also be a real one, since
+        // the operation may be sitting behind a registration that has not finished.
+        //
+        // Bounded, because a wedged provider daemon must not take the app with it: past the
+        // deadline the removal is still queued and still runs, it simply is not waited for, and
+        // the log says the location may linger until it does.
+        NSCondition *finished = [[NSCondition alloc] init];
+        __block BOOL removed = NO;
         cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
             [NSFileProviderManager removeDomain:domain completionHandler:^(NSError *error) {
                 if (error != nil) {
@@ -16559,9 +16577,29 @@ void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_M
                           error);
                 }
                 [domain release];
+                [finished lock];
+                removed = YES;
+                [finished signal];
+                [finished unlock];
                 done();
             }];
         });
+        // The block owns its own reference to the condition -- dispatch_async copies it to the
+        // heap, which retains what it captured -- so releasing this one after the wait is safe
+        // whether the completion has run or not.
+        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:CN1_DOCUMENTS_DOMAIN_TIMEOUT];
+        [finished lock];
+        while (!removed && [finished waitUntilDate:deadline]) {
+            // waitUntilDate returns on a signal OR a spurious wake; the flag is the condition.
+        }
+        BOOL timedOut = !removed;
+        [finished unlock];
+        [finished release];
+        if (timedOut) {
+            NSLog(@"Codename One: removing the document provider domain did not finish within "
+                  @"%g seconds; the published location may remain visible until it does",
+                  (double) CN1_DOCUMENTS_DOMAIN_TIMEOUT);
+        }
         POOL_END();
     }
 }

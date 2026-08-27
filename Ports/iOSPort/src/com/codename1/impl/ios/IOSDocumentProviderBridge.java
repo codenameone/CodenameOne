@@ -153,6 +153,11 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         // index and registered the domain, and this thread then removed the domain it had just
         // registered, leaving a published tree that no longer appears in Files until something
         // publishes again.
+        //
+        // The last call WAITS for the system to take the domain away, which is why this can hold
+        // the lock for as long as a logout takes rather than as long as a few deletions take.
+        // That is the point: clear() returning has to mean the location is gone, or an app can
+        // finish logging a user out while their documents are still browsable.
         synchronized (WRITE_LOCK) {
             deleteTree(container + "/" + ROOT);
             // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside

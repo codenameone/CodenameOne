@@ -32,9 +32,40 @@ struct CN1DocumentNode: Decodable {
     let contentType: String?
     let path: String?
     let remoteId: String?
-    let size: Int64?
-    let lastModified: Int64?
     let children: [CN1DocumentNode]?
+
+    /// The declared size, or nil when the app declared none.
+    ///
+    /// Normalized HERE rather than at each reader. The publisher omits the field for a node with
+    /// no size, but a negative value spells the same thing everywhere else in the format --
+    /// DocumentNode carries -1 for "unknown" and the Android provider tests for it -- and a
+    /// reader that took it literally would report a document of negative length, version it by
+    /// that number, and refuse every download whose length did not match it. One boundary, so
+    /// there is no next reader to forget.
+    var size: Int64? { declaredSize.flatMap { $0 >= 0 ? $0 : nil } }
+
+    /// The declared modification date in milliseconds, or nil when the app declared none.
+    ///
+    /// Same sentinel, and it decides more than a displayed date: a node with no date has no
+    /// per-item change signal, so its version falls back to the publication's revision. Read
+    /// literally, a negative date would look like a real one and freeze the content stamp of a
+    /// document whose bytes change without changing length.
+    var lastModified: Int64? { declaredLastModified.flatMap { $0 >= 0 ? $0 : nil } }
+
+    private let declaredSize: Int64?
+    private let declaredLastModified: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case folder
+        case contentType
+        case path
+        case remoteId
+        case children
+        case declaredSize = "size"
+        case declaredLastModified = "lastModified"
+    }
 }
 
 struct CN1DocumentIndexDocument: Decodable {

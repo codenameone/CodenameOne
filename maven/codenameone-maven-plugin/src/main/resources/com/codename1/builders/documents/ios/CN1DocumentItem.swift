@@ -173,12 +173,13 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     var documentSize: NSNumber? {
-        guard let size = node.size, size >= 0 else { return nil }
+        // A negative size never gets here: CN1DocumentNode normalizes the sentinel away.
+        guard let size = node.size else { return nil }
         return NSNumber(value: size)
     }
 
     var contentModificationDate: Date? {
-        if let ms = node.lastModified, ms >= 0 {
+        if let ms = node.lastModified {
             return Date(timeIntervalSince1970: TimeInterval(ms) / 1000.0)
         }
         // Falls back to the file on disk when the app declared no date. The pre-iOS-16 provider
