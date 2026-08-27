@@ -348,7 +348,7 @@ final class IOSProvisioningPreflight {
             // neither is something to refuse a build over here.
             return problems;
         }
-        String bundleId = packageName + "." + name;
+        String bundleId = generatedExtensionBundleId(settings, packageName, name);
         if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
             // No wildcard exemption here, unlike the folder-driven check above. A wildcard App ID
             // does cover the bundle id, but this extension always declares
@@ -429,7 +429,8 @@ final class IOSProvisioningPreflight {
                 // report, not this one's.
                 return null;
             }
-            String bundleId = trimmed(settings.getProperty("codename1.packageName")) + "." + name;
+            String bundleId = generatedExtensionBundleId(settings,
+                    trimmed(settings.getProperty("codename1.packageName")), name);
             if (!profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
                 // A profile for a DIFFERENT App ID that happens to grant the same group. It is
                 // supplied as this extension's, so the check that an extension has a profile of
@@ -455,6 +456,28 @@ final class IOSProvisioningPreflight {
                     true);
         }
         return null;
+    }
+
+    /// The bundle id the generated extension is actually built with.
+    ///
+    /// "<package>.CN1Documents" unless the project overrides PRODUCT_BUNDLE_IDENTIFIER through
+    /// the extension's build settings, which the builder applies to the generated target. Judging
+    /// the profile against the default would reject the profile issued for the real identifier
+    /// and accept one issued for a target that is not being built -- the failure moving to Xcode,
+    /// after the archive, which is what this whole class exists to prevent.
+    private static String generatedExtensionBundleId(Properties settings, String packageName,
+                                                     String name) {
+        String override = settings.getProperty("codename1.arg.ios.documentProvider.buildSettings."
+                + "PRODUCT_BUNDLE_IDENTIFIER");
+        if (override != null) {
+            String resolved = resolvePlaceholders(override.trim(), settings);
+            // A value that still names an unresolved property is not an identifier; the default
+            // is the better guess and check() reports the unresolved reference itself.
+            if (!resolved.isEmpty() && resolved.indexOf("${") < 0) {
+                return resolved;
+            }
+        }
+        return packageName + "." + name;
     }
 
     /// The same check against the app's own profile.

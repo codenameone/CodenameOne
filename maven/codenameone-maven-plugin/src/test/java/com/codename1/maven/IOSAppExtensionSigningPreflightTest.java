@@ -163,6 +163,30 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
+    public void anOverriddenBundleIdIsWhatTheProfileIsJudgedAgainst() throws Exception {
+        // The project can rename the generated target through its build settings, and the builder
+        // applies that override. Judged against the default name, the profile issued for the real
+        // identifier is refused here and one issued for a target nobody is building passes --
+        // moving the failure into Xcode, after the archive, which is what this class exists to
+        // prevent.
+        Properties p = settings(profile("PROD", "ABCD1234.com.example.app", GROUP));
+        p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        p.setProperty("codename1.arg.ios.documentProvider.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                "com.example.app.files");
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Ext", "ABCD1234.com.example.app.files", GROUP).getAbsolutePath());
+        assertTrue(checkGenerated(p).isEmpty());
+
+        // And the profile for the DEFAULT name, which is now the wrong one, is refused.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision",
+                profile("Stale", "ABCD1234.com.example.app.CN1Documents", GROUP).getAbsolutePath());
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message,
+                problems.get(0).message.contains("com.example.app.files"));
+    }
+
+    @Test
     public void anExtensionProfileWithoutTheAppGroupIsRefused() throws Exception {
         // A profile is a snapshot of the capabilities its App ID had when it was issued, so one
         // made before App Groups was enabled matches the bundle id and still cannot sign a target

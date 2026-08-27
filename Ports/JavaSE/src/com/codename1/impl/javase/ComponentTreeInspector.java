@@ -96,10 +96,24 @@ public class ComponentTreeInspector extends JPanel {
     
     public JFrame showInFrame() {
         if (frame == null) {
+            // Whatever held this panel loses it: adding a component to a container removes it
+            // from its previous one, and in single-window mode that previous one is the app
+            // frame's docked "Component Details" panel. Swing does not repaint the container a
+            // component left -- removal marks no damage on it -- so the vacated strip kept
+            // showing this panel's last pixels until something else happened to repaint it.
+            // On a headless CI display nothing else does, and the simulator screenshot test
+            // read those stale labels as an inspector that had never settled.
+            //
+            // Read BEFORE the add, which is what performs the removal.
+            java.awt.Container previous = getParent();
             frame = new JFrame("Component Inspector");
             frame.getContentPane().setLayout(new BorderLayout());
             
             frame.getContentPane().add(this, BorderLayout.CENTER);
+            if (previous != null) {
+                previous.revalidate();
+                previous.repaint();
+            }
             frame.pack();
             frame.setLocationByPlatform(true);
             
