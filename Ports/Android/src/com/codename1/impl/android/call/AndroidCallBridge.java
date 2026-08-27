@@ -180,8 +180,11 @@ public class AndroidCallBridge implements CallBridge {
             return CallAvailability.NOT_PERMITTED.ordinal();
         }
         TelecomManager tm = telecom();
-        if (tm != null && Build.VERSION.SDK_INT >= 26 && tm.isInCall()
-                && !CN1ConnectionService.hasOwnCalls()) {
+        // hasOwnCalls() FIRST: it costs nothing and needs no permission,
+        // and when one of ours is up the answer does not depend on Telecom.
+        if (tm != null && Build.VERSION.SDK_INT >= 26
+                && !CN1ConnectionService.hasOwnCalls()
+                && systemSaysInCall(tm)) {
             // isInCall() is true for THIS app's own self-managed call too,
             // and OTHER_APP_IN_CALL means another application -- so reporting
             // it while the app was in its own call told that app not to
@@ -497,6 +500,31 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     /// Whether a report can proceed, answering the request when it cannot.
+    /// Whether Telecom says a call is up, or false when it cannot be asked.
+    ///
+    /// TelecomManager.isInCall() is annotated READ_PHONE_STATE, and
+    /// CallManifestFragments deliberately does not declare it: that is a
+    /// DANGEROUS permission, a self-managed calling app has no business
+    /// asking for the right to read phone state, and Play scrutinises apps
+    /// that do. Calling it regardless threw SecurityException straight out of
+    /// getAvailability() -- a crash in a public query that an app is told to
+    /// call before every incoming call.
+    ///
+    /// False when the question cannot be asked, which is the honest
+    /// degradation: a foreign call goes unnoticed and the report that follows
+    /// fails on its own terms, which beats throwing. Checked AND caught,
+    /// because the permission can also be revoked between the two.
+    private boolean systemSaysInCall(TelecomManager tm) {
+        if (!granted("android.permission.READ_PHONE_STATE")) {
+            return false;
+        }
+        try {
+            return tm.isInCall();
+        } catch (SecurityException notAllowed) {
+            return false;
+        }
+    }
+
     /// Whether the MANIFEST declares a permission, granted or not.
     ///
     /// Different question from checkSelfPermission, which answers whether the

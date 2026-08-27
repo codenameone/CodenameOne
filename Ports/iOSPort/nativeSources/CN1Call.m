@@ -739,6 +739,22 @@ static CN1CallProviderDelegate *cn1clDelegate = nil;
 /// reported before application code has run, so the name the user sees has to
 /// come from the bundle. IPhoneBuilder writes these keys from the ios.call.*
 /// build hints.
+/// The capacity the provider is CONFIGURED with, mirrored here because
+/// CXProviderConfiguration does not hand it back and availability has to
+/// compare against it. Guarded by cn1clLock.
+static int cn1clMaxGroups = 1;
+static int cn1clMaxPerGroup = 1;
+
+/// How many live calls this app may hold at once, under the current
+/// configuration.
+static int cn1clCapacity(void) {
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        int total = cn1clMaxGroups * cn1clMaxPerGroup;
+        return total > 0 ? total : 1;
+    }
+}
+
 static CXProviderConfiguration *cn1clConfiguration(void) {
     NSString *name = cn1clPlistString(@"CN1CallProviderName",
             cn1clPlistString(@"CFBundleDisplayName",
@@ -757,6 +773,10 @@ static CXProviderConfiguration *cn1clConfiguration(void) {
     cfg.includesCallsInRecents = cn1clPlistBool(@"CN1CallIncludesCallsInRecents", YES);
     cfg.maximumCallGroups = 1;
     cfg.maximumCallsPerCallGroup = 1;
+    @synchronized (cn1clLock) {
+        cn1clMaxGroups = 1;
+        cn1clMaxPerGroup = 1;
+    }
     cfg.supportedHandleTypes = [NSSet setWithObjects:
             [NSNumber numberWithInteger:CXHandleTypeGeneric],
             [NSNumber numberWithInteger:CXHandleTypePhoneNumber],
@@ -1473,7 +1493,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
     // refuse the next report, which is worth knowing BEFORE telling a caller
     // their call is ringing.
     CXCallObserver *observer = [[CXCallObserver alloc] init];
-    BOOL mineLive = NO;
+    int mineLive = 0;
     for (CXCall *c in observer.calls) {
         if (c.hasEnded) {
             continue;
@@ -1486,13 +1506,16 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
         if (!mine) {
             return CN1_CALL_AVAIL_OTHER_APP;
         }
-        mineLive = YES;
+        mineLive++;
     }
-    if (mineLive) {
-        // OUR OWN call still blocks the next one here. cn1clConfiguration
-        // sets maximumCallGroups and maximumCallsPerCallGroup to 1, so
-        // CallKit refuses a second reportNewIncomingCall while this app holds
-        // a live call -- and answering AVAILABLE would be the same broken
+    if (mineLive >= cn1clCapacity()) {
+        // OUR OWN calls fill the provider. cn1clConfiguration defaults to
+        // one group of one call, so by default a single live call is enough;
+        // an app that raised the limits through CallConfiguration gets room
+        // for as many as it asked for, which is why this compares a COUNT
+        // against the configured capacity rather than testing for any call at
+        // all. CallKit refuses the report once the provider is full -- and
+        // answering AVAILABLE then would be the same broken
         // promise as answering it before the provider was configured: the
         // caller is told to stop retrying only when it CANNOT ring, and it is
         // told it can ring when the report is about to be refused.
@@ -1609,6 +1632,15 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
     NSInteger perGroup = [cn1clField(cfgFields, 4) integerValue];
     cfg.maximumCallGroups = groups > 0 ? groups : 1;
     cfg.maximumCallsPerCallGroup = perGroup > 0 ? perGroup : 1;
+    // Mirrored, because availability has to answer against the limits the
+    // provider is ACTUALLY running with. Reporting "this app is in a call"
+    // as soon as one existed was right for the one-call default and wrong
+    // the moment CallConfiguration raised it: callers were told to reject a
+    // call the configured provider had room to ring.
+    @synchronized (cn1clLock) {
+        cn1clMaxGroups = (int) cfg.maximumCallGroups;
+        cn1clMaxPerGroup = (int) cfg.maximumCallsPerCallGroup;
+    }
     NSString *types = cn1clField(cfgFields, 5);
     if ([types length] > 0) {
         NSMutableSet *set = [NSMutableSet set];

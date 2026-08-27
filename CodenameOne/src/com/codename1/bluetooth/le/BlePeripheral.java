@@ -293,6 +293,29 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// A caller doing the natural `discoverServices().await()` followed by
     /// `getService(...)` could therefore read the previous operation's cache
     /// -- which is exactly how a passing test turned intermittent under load.
+    /// The resource the platform should settle for an operation with no
+    /// cache to publish.
+    ///
+    /// The wrapper is not only about ordering. The queue watches what it is
+    /// given, and its TIMEOUT settles that -- so an operation handed the
+    /// caller's own resource had two writers with nothing between them: the
+    /// platform callback could complete it after the timeout task read
+    /// isDone() as false and before the task called error(), and
+    /// AsyncResource accepts both, so one operation ran the caller's success
+    /// AND failure callbacks. Discovery and MTU already avoided that by
+    /// giving the queue an inner resource and publishing once, under a claim;
+    /// every other queued operation now does the same.
+    private static <T> AsyncResource<T> publishOnly(AsyncResource<T> out) {
+        return publishBeforeDone(out, new NoApply<T>());
+    }
+
+    /// Publishes nothing of its own; see [#publishOnly].
+    private static final class NoApply<T> implements AsyncResult<T> {
+        @Override
+        public void onReady(T value, Throwable err) {
+        }
+    }
+
     private static <T> AsyncResource<T> publishBeforeDone(
             final AsyncResource<T> out, final AsyncResult<T> apply) {
         final AsyncResource<T> inner = new AsyncResource<T>();
@@ -422,10 +445,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<byte[]> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadCharacteristic(c, out);
+                doReadCharacteristic(c, inner);
             }
         });
         return out;
@@ -441,10 +465,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doWriteCharacteristic(c, value, withResponse, out);
+                doWriteCharacteristic(c, value, withResponse, inner);
             }
         });
         return out;
@@ -457,10 +482,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<byte[]> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadDescriptor(d, out);
+                doReadDescriptor(d, inner);
             }
         });
         return out;
@@ -474,10 +500,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doWriteDescriptor(d, value, out);
+                doWriteDescriptor(d, value, inner);
             }
         });
         return out;
@@ -540,10 +567,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
                 }
             });
             final boolean indication = !c.canNotify() && c.canIndicate();
-            queue.enqueue(new GattOperationQueue.Op(armRes) {
+            final AsyncResource<Boolean> armInner = publishOnly(armRes);
+            queue.enqueue(new GattOperationQueue.Op(armInner) {
                 @Override
                 void start() {
-                    doSetNotifications(c, true, indication, armRes);
+                    doSetNotifications(c, true, indication, armInner);
                 }
             });
         }
@@ -595,10 +623,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         final boolean indication = !c.canNotify() && c.canIndicate();
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doSetNotifications(c, false, indication, out);
+                doSetNotifications(c, false, indication, inner);
             }
         });
         return out;
@@ -610,10 +639,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Integer> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doReadRssi(out);
+                doReadRssi(inner);
             }
         });
         return out;
@@ -660,10 +690,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (failIfNotConnected(out)) {
             return out;
         }
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doRequestConnectionPriority(priority, out);
+                doRequestConnectionPriority(priority, inner);
             }
         });
         return out;
@@ -674,10 +705,11 @@ public abstract class BlePeripheral extends BluetoothDevice {
     /// without user interaction.
     public final AsyncResource<Boolean> createBond() {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
-        queue.enqueue(new GattOperationQueue.Op(out) {
+        final AsyncResource<Boolean> inner = publishOnly(out);
+        queue.enqueue(new GattOperationQueue.Op(inner) {
             @Override
             void start() {
-                doCreateBond(out);
+                doCreateBond(inner);
             }
         });
         return out;
