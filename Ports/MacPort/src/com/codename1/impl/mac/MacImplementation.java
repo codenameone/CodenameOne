@@ -100,6 +100,25 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// False, because this port has no call detector to speak for.
+    ///
+    /// The inherited answer is an unconditional true, and it is earned there by
+    /// applicationWillResignActive() setting the flag isInCall() returns -- on
+    /// iOS, resigning active is how a call announces itself. This port routes
+    /// that transition to macApplicationWillResignActive() instead, deliberately,
+    /// because on a Mac it only means another application came to the front. So
+    /// nothing ever sets the flag and isInCall() is permanently false. Claiming
+    /// the capability while always answering "no call" is worse than declining
+    /// it: a caller that checks first cannot tell the difference between a quiet
+    /// line and a detector that never fires. Flip this when a macOS backend
+    /// exists to set the flag.
+    @Override
+    public boolean isCallDetectionSupported() {
+        return false;
+    }
+
+    /// @inheritDoc
+    ///
     /// The reverse of `#getGameAction(int)`, so code that asks which key drives
     /// an action gets an answer rather than the inherited -1.
     @Override
