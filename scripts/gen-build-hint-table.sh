@@ -15,9 +15,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc}"
 
 echo "gen-build-hint-table: building the catalog" >&2
-(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
+(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package -DskipTests)
 
-CLASSES="$REPO_ROOT/maven/build-hint-catalog/target/classes"
+CLASSES="$REPO_ROOT/maven/build-hint-tools/target/classes"
+CATALOG_CLASSES="$REPO_ROOT/maven/build-hint-catalog/target/classes"
 
 # The generator reads the annotations out of their compiled classes, so ASM has
 # to be on ITS classpath. Provided scope keeps it off the Settings tool's, which
@@ -25,13 +26,13 @@ CLASSES="$REPO_ROOT/maven/build-hint-catalog/target/classes"
 asm_cp() {
   local out
   out="$(mktemp)"
-  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog dependency:build-classpath \
-      -Dmdep.includeScope=provided -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
+  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools dependency:build-classpath \
+      -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
   if [ -s "$out" ]; then
     printf '%s' ":$(cat "$out")"
   fi
   rm -f "$out"
 }
 
-java -cp "$CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator --table-only "$REPO_ROOT/CodenameOne/src" "$OUT"
+java -cp "$CLASSES:$CATALOG_CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator --table-only "$REPO_ROOT/CodenameOne/src" "$OUT"
 echo "gen-build-hint-table: wrote $OUT" >&2

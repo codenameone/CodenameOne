@@ -18,7 +18,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 CATALOG="$REPO_ROOT/maven/build-hint-catalog"
-CLASSES="$CATALOG/target/classes"
+TOOLS="$REPO_ROOT/maven/build-hint-tools"
+CLASSES="$TOOLS/target/classes"
+CATALOG_CLASSES="$CATALOG/target/classes"
 
 # The generator reads the annotations out of their compiled classes, so ASM has
 # to be on ITS classpath. Provided scope keeps it off the Settings tool's, which
@@ -26,8 +28,8 @@ CLASSES="$CATALOG/target/classes"
 asm_cp() {
   local out
   out="$(mktemp)"
-  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog dependency:build-classpath \
-      -Dmdep.includeScope=provided -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
+  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools dependency:build-classpath \
+      -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
   if [ -s "$out" ]; then
     printf '%s' ":$(cat "$out")"
   fi
@@ -45,7 +47,7 @@ check=0
 # the previous build's bytecode -- reporting success while silently ignoring the
 # edit, and in --check mode passing a tree that is genuinely out of date.
 echo "gen-build-hint-annotations: building the catalog" >&2
-(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-catalog package -DskipTests)
+(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package -DskipTests)
 
 # The simulator's copy of the data file. maven/javase does not depend on the
 # catalog module, so it carries its own resource; both copies are written in
@@ -53,7 +55,7 @@ echo "gen-build-hint-annotations: building the catalog" >&2
 JAVASE_DATA="$REPO_ROOT/maven/javase/src/main/resources"
 GUIDE_TABLE="$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc"
 
-java -cp "$CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator \
+java -cp "$CLASSES:$CATALOG_CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator \
      "$ANN_ROOT" "$CATALOG_DATA" "$JAVASE_DATA" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then

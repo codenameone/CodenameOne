@@ -82,6 +82,7 @@
         <module>cn1-binaries</module>
         <module>platform-feature-catalog</module>
         <module>build-hint-catalog</module>
+        <module>build-hint-tools</module>
         <module>java-runtime</module>
         <module>core</module>
         <module>factory</module>

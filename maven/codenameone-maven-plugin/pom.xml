@@ -44,6 +44,12 @@
             <artifactId>codenameone-build-hint-catalog</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Reads the annotations with ASM. Build-time only; never inside an app. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-build-hint-tools</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.jdom</groupId>
             <artifactId>jdom2</artifactId>

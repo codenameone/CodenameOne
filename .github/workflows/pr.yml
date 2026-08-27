@@ -563,7 +563,7 @@ jobs:
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -692,11 +692,11 @@ jobs:
       - name: Generate quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
