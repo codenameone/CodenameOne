@@ -1066,6 +1066,25 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_
         ? JAVA_TRUE : JAVA_FALSE;
 }
 
+/// Whether any window this port created is still on screen.
+///
+/// The global "surface hidden" state drives applicationDidEnterBackground, and
+/// deriving it from the main window alone told the framework the application had
+/// gone to the background while a secondary window was still visible and being
+/// used -- so timers stopped and resources were released under a live window.
+BOOL CN1MacAnyWindowVisible(void) {
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (!rec.disposed && rec.window != nil && rec.window.isVisible) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 /// Report every on-screen window hidden when the application is hidden, and
 /// restore them when it is unhidden.
 ///

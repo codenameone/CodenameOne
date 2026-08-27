@@ -341,6 +341,9 @@ BOOL cn1MacRuntimeIsJavaReady(void) {
 /// Set when the application is hidden or its last window closes, mirroring the
 /// UIKit flag the shared code reads to decide whether it may paint.
 extern BOOL isAppSuspended;
+/// Declared here rather than beside the other window externs below: the
+/// surface-state refresh above them is its first caller.
+extern BOOL CN1MacAnyWindowVisible(void);
 
 /// The two independent reasons the main surface can be out of view, and what
 /// was last reported for their combination.
@@ -356,7 +359,14 @@ static BOOL cn1MacSurfaceReportedHidden = NO;
 
 /// Reports the combined visibility, if it changed.
 static void cn1MacRefreshSurfaceHidden(void) {
-    BOOL hidden = cn1MacAppHidden || cn1MacWindowMiniaturized;
+    // A window still on screen keeps the application in the foreground, whatever
+    // the main one is doing. Minimizing the main window while an unowned Window
+    // stays visible used to report applicationDidEnterBackground, so timers
+    // stopped and resources were released under a window the user was still
+    // working in. Hiding the application takes every window off screen, so that
+    // path reaches the same answer through this test rather than around it.
+    BOOL hidden = (cn1MacAppHidden || cn1MacWindowMiniaturized)
+            && !CN1MacAnyWindowVisible();
     if (cn1MacSurfaceReportedHidden == hidden) {
         return;
     }

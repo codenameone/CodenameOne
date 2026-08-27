@@ -56,6 +56,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     /// The magnify gesture's factor since it began. AppKit reports increments;
     /// pinch() wants the total, so it is accumulated across the phase.
     double cn1PinchScale;
+    /// Whether a magnify gesture has been reported to the framework and not yet
+    /// released, so its termination can be delivered even once input is off.
+    BOOL cn1PinchActive;
 }
 
 @synthesize commandQueue;
@@ -831,7 +834,16 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
     // rotated, which is content the user is not supposed to be able to
     // touch -- and unlike a click there is no framework-side filter
     // behind this one.
-    if (!self.cn1InputEnabled) {
+    //
+    // The END of a gesture already in flight is the exception. Showing a modal
+    // mid-pinch disables this window's input, and dropping the Ended that
+    // follows left the component pinching for good -- ImageViewer never gets
+    // pinchReleased() and never commits the zoom the user just performed. New
+    // and continuing updates stay suppressed; only the release closing an
+    // already-open gesture is let through.
+    BOOL terminating = event.phase == NSEventPhaseEnded
+            || event.phase == NSEventPhaseCancelled;
+    if (!self.cn1InputEnabled && !(terminating && cn1PinchActive)) {
         return;
     }
     CGPoint p = [self cn1PointFromEvent:event];
@@ -845,15 +857,17 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
         // Reported so the framework can keep the whole gesture on one component
         // instead of resolving it from the coordinates on every update, and so a
         // previous gesture whose end never arrived cannot strand this one.
+        cn1PinchActive = YES;
         CN1MacPinchBegin();
     }
     cn1PinchScale *= (1.0 + event.magnification);
     float scale = (float)cn1PinchScale;
-    if (event.phase == NSEventPhaseEnded || event.phase == NSEventPhaseCancelled) {
+    if (terminating) {
         // A trackpad gesture produces no pointer events, so the two-pointer path
         // that normally ends a pinch never runs here and the component would
         // stay in its pinching state after the user's fingers left.
         cn1PinchScale = 1.0;
+        cn1PinchActive = NO;
         CN1MacPinchRelease((int)p.x, (int)p.y);
         return;
     }
