@@ -258,7 +258,18 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
             String target = dir + "/" + name;
             String tmpName = name + "." + (tempCounter++) + ".tmp";
             String tmp = dir + "/" + tmpName;
-            write(tmp, data);
+            // Removed if anything about writing it fails -- opening the stream, the write, or
+            // the close. The cleanup further down only runs for a replace that failed, so a full
+            // container or a transient error left one of these in the shared directory per
+            // attempt, under a name that changes every time, and nothing ever reads or removes
+            // them. They also carry what was being published: an index, or the endpoint file
+            // with its bearer token.
+            try {
+                write(tmp, data);
+            } catch (IOException err) {
+                fs.delete(tmp);
+                throw err;
+            }
             // One step, because the reader is a different process. The lock above orders writers
             // inside this app and can do nothing about the extension, which may enumerate at any
             // instant: deleting the target first would leave a window with no index in it, and an

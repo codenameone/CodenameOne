@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.android.documents;
 
+import android.content.Context;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
@@ -76,7 +77,35 @@ public class CN1DocumentsProvider extends DocumentsProvider {
 
     @Override
     public boolean onCreate() {
+        deleteAbandonedDownloads();
         return true;
+    }
+
+    /// Removes downloads a previous run of this process did not finish.
+    ///
+    /// Every cleanup path in fetch() is Java code, so none of it runs when the process is killed
+    /// -- which is the ordinary end of a content provider's life, not an exceptional one. A
+    /// download interrupted that way leaves a document-sized file in the cache under a name
+    /// nothing reads again, and enough interrupted opens fill the app's cache with them.
+    ///
+    /// Safe here and nowhere else: this runs before the provider answers anything, so no request
+    /// of this process can be writing one of these yet.
+    private void deleteAbandonedDownloads() {
+        Context ctx = getContext();
+        if (ctx == null) {
+            return;
+        }
+        File cacheDir = new File(ctx.getCacheDir(), "cn1documents");
+        File[] partials = cacheDir.listFiles();
+        if (partials == null) {
+            return;
+        }
+        for (int i = 0; i < partials.length; i++) {
+            String name = partials[i].getName();
+            if (name.startsWith("fetch") && name.endsWith(".part") && !partials[i].delete()) {
+                Log.w(TAG, "Could not delete the abandoned download " + partials[i]);
+            }
+        }
     }
 
     @Override
