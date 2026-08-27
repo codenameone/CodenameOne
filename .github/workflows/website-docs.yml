@@ -20,6 +20,15 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # The developer guide this site renders includes a build hint table that is
+      # generated rather than committed, so a change to the catalog or to the
+      # renderer changes the published page without touching docs/. The
+      # annotations it is also rendered from are covered by CodenameOne/src/**
+      # above. Same gap codex reported on developer-guide-docs.yml; this is the
+      # other workflow that renders the table.
+      - 'maven/build-hint-catalog/**'
+      - 'maven/build-hint-tools/**'
+      - 'scripts/gen-build-hint-table.sh'
       # The Hugo build embeds JavaDocs produced by this script, so a change
       # to how the docs are generated must redeploy the website too.
       - '.github/scripts/build_javadocs.sh'
@@ -37,6 +46,10 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
+      # As above: the build hint table is generated, not committed.
+      - 'maven/build-hint-catalog/**'
+      - 'maven/build-hint-tools/**'
+      - 'scripts/gen-build-hint-table.sh'
       # The Hugo build embeds JavaDocs produced by this script, so a change
       # to how the docs are generated must redeploy the website too.
       - '.github/scripts/build_javadocs.sh'
@@ -191,6 +204,12 @@ jobs:
           grep -Fq 'cn1-initializr-project-downloaded' docs/website/public/initializr/index.html
           node docs/website/scripts/test-initializr-download-bridge.mjs \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
+
+      - name: Validate website experiment telemetry
+        run: |
+          set -euo pipefail
+          node docs/website/scripts/test-cn1-exp-004.mjs
+          node docs/website/scripts/test-cn1-crisp-events.mjs
 
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html

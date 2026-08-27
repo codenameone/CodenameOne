@@ -40,6 +40,17 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-build-hint-catalog</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Reads the annotations with ASM. Build-time only; never inside an app. -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>codenameone-build-hint-tools</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.jdom</groupId>
             <artifactId>jdom2</artifactId>
             <version>2.0.6.1</version>
@@ -396,6 +407,44 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <!-- The build hint data file, rendered from the annotations in
+                 CodenameOne/src into this module's own classes. Generated rather
+                 than checked in, because a committed generated file conflicts on
+                 every merge and there is nothing for a hand edit to survive in.
+                 classpathScope=compile so that build-hint-tools resolves from the
+                 reactor: a plugin level dependency would have to come from the
+                 repository, which is a chicken and egg on a clean checkout. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>cn1-generate-build-hint-data</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <!-- combine.self=override so a plugin level
+                                 configuration cannot merge into this one. The
+                                 Settings module's javase profile declares this
+                                 same plugin with its own <arguments> holding a
+                                 <classpath/> element, and Maven merged that
+                                 Object into this String array: "can not cast one
+                                 of the elements of java.lang.Object[]". Only
+                                 with -Dcodename1.platform=javase, which is why a
+                                 plain local build never saw it. -->
+                            <arguments combine.self="override">
+                                <argument>${project.basedir}/../../CodenameOne/src</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

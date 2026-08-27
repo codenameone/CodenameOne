@@ -199,13 +199,11 @@ codename1.packageName=com.example.myapp
 codename1.mainName=MyAppName
 codename1.displayName=My App Name
 codename1.arg.java.version=17                 # Required: routes the build to the Java 17 build server
-codename1.arg.android.googlePlayVersion=true
 codename1.arg.ios.includePush=false
 codename1.kotlin=false
-codename1.arg.android.xPermissions=...
+codename1.arg.android.xpermissions=...
 codename1.arg.ios.deployment_target=14.0
 codename1.arg.ios.teamId=ABCDEF1234
-codename1.arg.build.compile=true              # ahead-of-time compile (recommended for iOS)
 ```
 
 Anything prefixed `codename1.arg.<platform>.<key>` is forwarded to the build server. See [`build-hints.md`](build-hints.md) for the curated index of build hints. The complete reference is in the Codename One Developer Guide at <https://www.codenameone.com/developer-guide/>.

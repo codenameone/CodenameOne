@@ -192,6 +192,10 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Display.class, com.codename1.ui.events.WindowEvent.Type.class, com.codename1.ui.geom.Rectangle.class}, false);
                 return new com.codename1.ui.events.WindowEvent((com.codename1.ui.Display) adaptedArgs[0], (com.codename1.ui.events.WindowEvent.Type) adaptedArgs[1], (com.codename1.ui.geom.Rectangle) adaptedArgs[2]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.WindowEvent.Type.class, com.codename1.ui.geom.Rectangle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, com.codename1.ui.events.WindowEvent.Type.class, com.codename1.ui.geom.Rectangle.class}, false);
+                return new com.codename1.ui.events.WindowEvent((java.lang.Object) adaptedArgs[0], (com.codename1.ui.events.WindowEvent.Type) adaptedArgs[1], (com.codename1.ui.geom.Rectangle) adaptedArgs[2]);
+            }
         }
         throw unsupportedConstruct(type, safeArgs);
     }
@@ -1282,6 +1286,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
     }
 
     private static Object getStaticField3(String name) throws Exception {
+        if ("Disposed".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Disposed;
         if ("Hidden".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Hidden;
         if ("Minimized".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Minimized;
         if ("Moved".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Moved;

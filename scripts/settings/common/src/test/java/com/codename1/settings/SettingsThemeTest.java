@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.settings;
 
 import com.codename1.ui.css.CSSThemeCompiler;
@@ -111,7 +133,10 @@ public class SettingsThemeTest {
         String source = Files.readString(APP_SOURCE, StandardCharsets.UTF_8);
         assertTrue(source.contains("widthPercentage(72), new Container()"));
         assertTrue(source.contains("widthPercentage(28), controls"));
-        assertTrue(source.contains("controls.add(BorderLayout.EAST, remove)"));
+        // The delete control is EAST of the editor. The button itself moved into
+        // removeHintButton so the conflict row can reuse it -- what this asserts
+        // is where it sits, which is unchanged.
+        assertTrue(source.contains("controls.add(BorderLayout.EAST, removeHintButton(meta))"));
     }
 
     @Test
@@ -125,7 +150,12 @@ public class SettingsThemeTest {
                 "Theme font sizes must use physical mm units so Retina density does not create miniature text.");
         assertTrue(source.contains("new TableLayout(1, 2)"),
                 "The main content width should be responsive through TableLayout percentages.");
-        assertTrue(source.contains("new GridLayout(3, 2)"),
+        // Match the column count, not the row count. This asserted GridLayout(3, 2)
+        // and the Basic form has grown to five rows since; because this module's
+        // tests are skipped by default nothing reported the drift. The two columns
+        // are what makes the form responsive -- the row count is just how many
+        // fields there happen to be.
+        assertTrue(Pattern.compile("new GridLayout\\(\\d+, 2\\)").matcher(source).find(),
                 "The Basic form should use a responsive two-column GridLayout.");
         assertTrue(source.contains("private Container configureToolbar()"),
                 "Native desktop chrome should use a stable top-bar container, not a second Toolbar instance.");

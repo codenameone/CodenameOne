@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>codenameone-build-hint-tools</artifactId>
+    <name>Codename One Build Hint Tools</name>
+    <description>Build-time readers and renderers for the build hint catalog. Never shipped inside an application</description>
+
+    <!--
+        Split from codenameone-build-hint-catalog, which the Settings tool
+        depends on. Settings is a Codename One application, so everything in
+        that artifact is translated for the device; these classes read bytecode
+        with ASM and compile sources with javax.tools, and a class referencing
+        types the device build has never heard of is a problem whether or not
+        anything calls it. Giving ASM `provided` scope kept the ASM JAR out of
+        the app and left the class that imports it inside.
+    -->
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-catalog</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- The data file, rendered into this module's TEST classes. It is
+                 generated rather than committed, and this is the only module that
+                 can render it for its own tests: the generator lives here and
+                 depends on the catalog, so the catalog cannot render its own.
+                 That is why the invariants over the complete hint set are
+                 asserted here rather than beside the catalog, which on its own
+                 classpath only has the hand written half. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>cn1-generate-build-hint-data-for-tests</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <!-- combine.self=override: see the note in the
+                                 Settings module's pom. A plugin level
+                                 configuration elsewhere in the build must not
+                                 merge its own arguments into this array. -->
+                            <arguments combine.self="override">
+                                <argument>${project.basedir}/../../CodenameOne/src</argument>
+                                <argument>${project.build.testOutputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>4.7.3.4</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Low</threshold>
+                    <failOnError>false</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>spotbugs</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

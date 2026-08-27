@@ -40,6 +40,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.project.MavenProject;
 import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -231,18 +234,116 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
 
     void writeBinding(File inputFile, File projectDir) throws MojoExecutionException {
         File root = multimoduleRoot(projectDir);
-        File buildHints = new File(root, "docs/developer-guide/Advanced-Topics-Under-The-Hood.asciidoc");
+        // No buildHintsDoc: the Settings tool used to scrape the developer guide's
+        // AsciiDoc table at runtime and guess each hint's type from its description
+        // prose. It now reads com.codename1.build.shared.BuildHints, which carries
+        // the catalog's hints and the ones the annotations declare.
         String content = "# Codename One Settings project binding\n"
                 + "projectDir=" + projectDir.getAbsolutePath() + "\n"
                 + "settings=" + new File(projectDir, "codenameone_settings.properties").getAbsolutePath() + "\n"
                 + "pom=" + new File(projectDir, "pom.xml").getAbsolutePath() + "\n"
                 + "multimoduleRoot=" + root.getAbsolutePath() + "\n"
-                + (buildHints.isFile() ? "buildHintsDoc=" + buildHints.getAbsolutePath() + "\n" : "");
+                // What Maven RESOLVED, so the tool does not have to infer it
+                // from POM text. It has no model: it cannot evaluate a profile
+                // activation, follow an inherited <sourceDirectory> or expand a
+                // property, and every one of those has been a way for it to miss
+                // the main class and then offer an annotation-owned hint for
+                // editing. Its own reading stays as the fallback for a Settings
+                // launched without these -- an older plugin, or the standalone
+                // app.
+                + bindingLines("sourceRoot",
+                        compileSourceRoots(moduleAt(projectDir), userProperties()))
+                + bindingValue("sourceEncoding",
+                        sourceEncodingOf(moduleAt(projectDir), userProperties()))
+                // The EFFECTIVE entry point, which is what process-annotations
+                // stamps the manifest with and what the build hint merge expects.
+                // `properties` carries any -Dcodename1.mainName; the settings
+                // file does not, so a tool reading the file looked at a different
+                // class than the build and reported the annotations on the
+                // selected one as absent.
+                + bindingValue("mainName", effective("codename1.mainName"))
+                + bindingValue("packageName", effective("codename1.packageName"));
         try {
             FileUtils.write(inputFile, content, StandardCharsets.UTF_8);
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to write Settings binding", ex);
         }
+    }
+
+    /// The reactor module whose directory is `projectDir`, or the project being
+    /// built when the reactor has no such module.
+    ///
+    /// `cn1:settings` is normally run from the root of a multi-module project
+    /// while the module being EDITED is common, so the project in scope is not
+    /// the one whose sources matter.
+    private MavenProject moduleAt(File projectDir) {
+        if (projectDir == null) {
+            return null;
+        }
+        MavenSession session = getSession();
+        List<MavenProject> projects = session == null ? null : session.getProjects();
+        if (projects != null) {
+            for (MavenProject candidate : projects) {
+                if (isAt(candidate, projectDir)) {
+                    return candidate;
+                }
+            }
+        }
+        // The project being built, but only when it IS this directory. Falling
+        // back to it regardless published the platform module's compile roots as
+        // the common module's -- `cn1:settings` run from javase or android
+        // resolves the sibling common directory, which the reactor need not
+        // contain -- and Settings takes resolved roots as authoritative, so it
+        // never looked at the real POM and missed the annotated main source.
+        // Saying nothing sends it back to its own reading, which is right.
+        return isAt(project, projectDir) ? project : null;
+    }
+
+    /// Canonical, not merely absolute. `getCN1ProjectDir()` hands back paths
+    /// shaped like `javase/../common`, which an absolute-path comparison never
+    /// matches against a reactor module's own basedir -- so the module WAS in
+    /// the session and the binding still said nothing about it, sending the tool
+    /// back to a POM reading that cannot see an activated profile.
+    private static boolean isAt(MavenProject candidate, File dir) {
+        return candidate != null && candidate.getBasedir() != null
+                && canonical(candidate.getBasedir()).equals(canonical(dir));
+    }
+
+    private static String canonical(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException ex) {
+            return f.getAbsolutePath();
+        }
+    }
+
+    /// One key of the settings Maven resolved, or null before `execute()` has
+    /// loaded them -- which is how the tests drive `writeBinding` directly.
+    private String effective(String key) {
+        return properties == null ? null : properties.getProperty(key);
+    }
+
+    private static String bindingValue(String key, String value) {
+        return value == null ? "" : key + "=" + value + "\n";
+    }
+
+    /// One line per value.
+    ///
+    /// Not a delimited list: every delimiter is legal in a path -- a colon in a
+    /// Unix directory name, a semicolon in either -- so joining them means
+    /// choosing an escaping scheme, and a path that happened to contain the
+    /// separator would have been split into two roots that exist nowhere.
+    private static String bindingLines(String key, List<String> values) {
+        if (values == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                out.append(key).append('=').append(value.trim()).append('\n');
+            }
+        }
+        return out.toString();
     }
 
     File multimoduleRoot(File projectDir) {

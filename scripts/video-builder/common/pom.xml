@@ -38,7 +38,13 @@
                     <execution>
                         <id>compile-css</id>
                         <phase>process-classes</phase>
-                        <goals><goal>css</goal></goals>
+                        <goals>
+                            <goal>css</goal>
+                            <!-- Turns the build hint annotations on the main class into the
+                                 codename1.arg.* pairs the builders read. Without it the
+                                 annotations compile and are silently never applied. -->
+                            <goal>process-annotations</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

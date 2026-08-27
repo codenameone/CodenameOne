@@ -22,10 +22,11 @@
  */
 package com.codename1.maven;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.codename1.build.shared.BuildHints;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static com.codename1.build.shared.BuildHints.ARG_PREFIX;
 
 /**
  * Joins a build hint contributed by a cn1lib's {@code codenameone_library_appended.properties}
@@ -53,55 +54,17 @@ import java.util.regex.Pattern;
  */
 public class LibraryHintMerger {
 
-    /** Prefix every build hint carries inside a settings/library properties file. */
-    private static final String ARG_PREFIX = "codename1.arg.";
-
-    /**
-     * Separator per hint, keyed by the name with {@link #ARG_PREFIX} stripped.
-     *
-     * <p>Read off how the builders themselves split or append each value, not invented here:
-     * {@code IPhoneBuilder} splits {@code ios.pods} and {@code ios.applicationQueriesSchemes}
-     * on {@code ","} and joins {@code ios.add_libs} with {@code ";"}, while every
-     * {@code AndroidGradleBuilder} injection into a Gradle text hint appends a newline-wrapped
-     * statement. A hint absent from this map keeps the historical bare concatenation, which is
-     * what the XML-fragment hints want.</p>
-     */
-    private static final Map<String, String> SEPARATORS = new HashMap<String, String>();
-    static {
-        // A Gradle dependency list. ';' rather than a newline because this is the hint
-        // users hand-edit most, every existing project and cn1lib already writes it that
-        // way, and keeping the value on one line survives any line-oriented tooling that
-        // rewrites codenameone_settings.properties.
-        SEPARATORS.put("android.gradleDep", ";");
-        // Block structured Gradle text, where a statement per line is the only thing that
-        // reads correctly -- and what our own builder injections already append.
-        SEPARATORS.put("gradleDependencies", "\n");
-        SEPARATORS.put("android.topDependency", "\n");
-        SEPARATORS.put("android.repositories", "\n");
-        SEPARATORS.put("android.xgradle", "\n");
-        SEPARATORS.put("android.gradle.androidx", "\n");
-        SEPARATORS.put("android.xgradle_default_config", "\n");
-        SEPARATORS.put("android.gradlePlugin", "\n");
-        SEPARATORS.put("android.supportv4Dep", "\n");
-        // ProGuard/R8 directives are line oriented.
-        SEPARATORS.put("android.proguardKeep", "\n");
-        // Comma-delimited lists.
-        SEPARATORS.put("ios.pods", ",");
-        SEPARATORS.put("ios.applicationQueriesSchemes", ",");
-        // Semicolon-delimited lists.
-        SEPARATORS.put("ios.add_libs", ";");
-        // Attributes spliced into a single XML tag, so they abut with a space rather than
-        // directly -- android:allowBackup="false"android:hardwareAccelerated="true" is not
-        // a well formed tag.
-        SEPARATORS.put("android.xapplication_attr", " ");
-    }
-
     private LibraryHintMerger() {
     }
 
     /**
      * The separator two values of this hint must be joined with, or an empty string when the
      * hint's values abut directly (the XML-fragment hints).
+     *
+     * <p>The table lives in {@link BuildHints}, which carries the catalog's hints and the
+     * ones the annotations declare. Keeping one copy is what stops a {@code String[]}
+     * attribute being joined with one delimiter here and split with another by the
+     * builder.</p>
      *
      * @param propertyName hint name, with or without the {@code codename1.arg.} prefix
      * @return the separator, never null
@@ -113,8 +76,7 @@ public class LibraryHintMerger {
         String name = propertyName.startsWith(ARG_PREFIX)
                 ? propertyName.substring(ARG_PREFIX.length())
                 : propertyName;
-        String separator = SEPARATORS.get(name);
-        return separator == null ? "" : separator;
+        return BuildHints.separatorFor(name);
     }
 
     /**
