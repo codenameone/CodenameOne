@@ -179,6 +179,28 @@ public class LocalVpnTest {
     }
 
     @Test
+    public void aProfileWithNoCredentialsAtAllIsRefused() {
+        // There is no third way to authenticate: this API deliberately
+        // exposes no certificate credential, so a profile with neither a
+        // username/password pair nor a shared secret cannot authenticate at
+        // all. iOS chose NEVPNIKEAuthenticationMethodNone, disabled extended
+        // authentication, and saved and acknowledged it; Android reached the
+        // username/password builder with a pair of nulls. Neither existing
+        // guard caught it -- the withheld marker only fires for a loaded
+        // description, and the password check only when a username is there.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(new VpnProfile("vpn.example.com")
+                        .protocol(VpnProtocol.IKEV2)));
+
+        // A password with no username is just as unusable: the iOS branch
+        // that stores it keys off the username, so it is never applied.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Vpn.install(new VpnProfile("vpn.example.com")
+                        .protocol(VpnProtocol.IKEV2)
+                        .usernamePassword(null, "hunter2")));
+    }
+
+    @Test
     public void aUsernameWithAnEmptyPasswordIsRefused() {
         // An empty password is not a password, and it was the one credential
         // that got all the way through. install()'s gate asked whether the

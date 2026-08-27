@@ -230,6 +230,18 @@ public final class CallDirectory {
             // another process.
             fs.delete(path);
             fs.rename(staging, "cn1calldirectory.tsv");
+            if (fs.exists(staging) || !fs.exists(path)) {
+                // CHECKED, because this branch has already deleted the live
+                // list. A rename that fails here leaves no directory at all,
+                // and returning the path regardless had the bridge
+                // acknowledge success and drop its cache -- after which every
+                // screened call consulted an empty list and numbers the app
+                // had blocked were allowed straight through, silently and for
+                // as long as the app kept running. Failing is the only honest
+                // answer; setEntries reports it and the app can retry.
+                throw new IOException("The call directory could not be"
+                        + " published: the replacement is still at " + staging);
+            }
         }
         return path;
     }

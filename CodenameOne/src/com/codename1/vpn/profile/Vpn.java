@@ -143,6 +143,30 @@ public final class Vpn {
             return failed(VpnError.INVALID_CONFIGURATION,
                     "This profile has a username but no password.");
         }
+        // And a profile carrying NEITHER credential, which the two checks
+        // above both let through: the first only fires for a description
+        // that came from load(), the second only when a username is present.
+        //
+        // There is no third way to authenticate. This API deliberately
+        // exposes no certificate credential -- see the note in VpnProfile --
+        // so a profile with no usable username/password pair and no shared
+        // secret cannot authenticate at all. iOS selected
+        // NEVPNIKEAuthenticationMethodNone, disabled extended authentication,
+        // and saved and acknowledged it; Android reached the
+        // username/password builder with a pair of nulls. The pair is
+        // required together because a password without a username is ignored
+        // just as completely: the iOS branch that stores it keys off the
+        // username.
+        String psk = profile.getSharedSecret();
+        boolean pair = profile.getUsername() != null
+                && profile.getUsername().length() > 0
+                && profile.isPasswordKnown();
+        if (!pair && (psk == null || psk.length() == 0)) {
+            return failed(VpnError.INVALID_CONFIGURATION,
+                    "This profile has no credentials: call usernamePassword()"
+                    + " with both a username and a password, or"
+                    + " sharedSecret(), before installing it.");
+        }
         int id = VpnRequests.nextId();
         EdtResult<Boolean> r = VpnRequests.openAck(id);
         b.installProfile(id, VpnWire.encodeProfile(profile));

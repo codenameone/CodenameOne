@@ -3219,6 +3219,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return 1024 * 512;
     }
 
+    /// Makes every rename a silent no-op, as a filesystem that cannot
+    /// rename does. Test-only.
+    private boolean renameDisabled;
+
+    /// Switches renaming off, so a caller's fallback path can be exercised.
+    public void setRenameDisabled(boolean value) {
+        this.renameDisabled = value;
+    }
+
     @Override
     public String getAppHomePath() {
         return appHomePath;
@@ -3285,6 +3294,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void rename(String file, String newName) {
+        if (renameDisabled) {
+            // A platform whose rename cannot replace, or a filesystem error.
+            // Silent, because that is how the real one fails: File.renameTo
+            // answers false and CodenameOneImplementation.rename returns
+            // void, so the only evidence is that the source is still there.
+            return;
+        }
         TestFile f = fileSystem.remove(file);
         if (f != null) {
             String target = newName;
