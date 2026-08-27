@@ -181,6 +181,30 @@ public class MacOSXcodeProjectTest {
     }
 
     @Test
+    public void pushRegistrationEarnsTheApnsEntitlementOnBothChannels() {
+        MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
+        caps.usesPush = true;
+
+        // Both channels, because aps-environment is not a sandbox permission:
+        // macOS refuses registerForRemoteNotifications for any signed executable
+        // that does not carry it, and this build hands codesign an explicit
+        // entitlements file -- so what is missing from the file is missing from
+        // the signature however the provisioning profile is configured.
+        assertEquals("production", MacOSXcodeProject.entitlements(true, true, caps, false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+        assertEquals("production", MacOSXcodeProject.entitlements(false, false, caps, false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+
+        // And not for an app that never registers -- an unused APNs entitlement
+        // on an App Store build is a submission the reviewer asks about.
+        assertNull(MacOSXcodeProject.entitlements(true, true,
+                new MacOSXcodeProject.MacOSCapabilities(), false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+        assertNull(MacOSXcodeProject.entitlements(true, true, null, false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+    }
+
+    @Test
     public void unsandboxedChannelHasNoSandboxEntitlements() {
         Map<String, Object> ent = MacOSXcodeProject.entitlements(false, false, null, false);
         assertNull(ent.get(MacOSXcodeProject.ENT_SANDBOX));
@@ -222,6 +246,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET);
         Map<String, Object> withJit = MacOSXcodeProject.entitlements(false, jit, null, false);
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_JIT));
@@ -231,6 +256,7 @@ public class MacOSXcodeProjectTest {
         MacOSBuildHints.EntitlementOverrides off = new MacOSBuildHints.EntitlementOverrides(
                 false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
                 false, false, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
@@ -261,7 +287,8 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                MacOSBuildHints.EntitlementOverrides.ON);
+                MacOSBuildHints.EntitlementOverrides.ON,
+                MacOSBuildHints.EntitlementOverrides.UNSET);
         assertEquals(Boolean.TRUE, MacOSXcodeProject.entitlements(true, on, null, false)
                 .get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
     }

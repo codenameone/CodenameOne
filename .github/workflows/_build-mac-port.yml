@@ -93,10 +93,32 @@ jobs:
           #
           # target/ is pruned so a local build cannot change the key; CI checks
           # out clean, but this hash has to mean the same thing in both places.
+          # The whole of maven/, not two hand-picked modules of it. The rule is
+          # that this hash must cover at least what the CALLER's path filter
+          # triggers on, and scripts-macos.yml triggers on maven/** -- so naming
+          # codenameone-maven-plugin and svg-transcoder left every other module
+          # able to start this job and then hit an exact cache. build-mac-port.sh
+          # runs `-pl designer -am` and `-pl mac -am`, so the modules it actually
+          # rebuilds are the transitive dependencies of those two: core,
+          # css-compiler, javase, factory and the rest. A CSS compiler change is
+          # the concrete case -- the script rebuilds designer precisely so it
+          # reaches the test app, and the cache key was cancelling that rebuild.
+          # Listing them would be the same mistake one module later, so the
+          # subtree is hashed and the list is gone.
+          #
+          # core-unittests is excluded to match the caller's own exclusion; it
+          # builds nothing this port consumes. Over-invalidating costs a rebuild,
+          # under-invalidating costs a green run against code that was never
+          # compiled, so where the two disagree this errs at the former.
+          # CodenameOneDesigner/src is here because maven/designer is a pom and
+          # nothing else -- it sets <sourceDirectory>../../CodenameOneDesigner/src,
+          # so the module the build script rebuilds by name compiles a tree that
+          # lives outside maven/ entirely. Hashing maven/ alone would have looked
+          # complete and still missed it.
           SRC_HASH=$(find CodenameOne/src Ports/MacPort Ports/iOSPort vm/JavaAPI vm/ByteCodeTranslator Themes native-themes \
-              maven/codenameone-maven-plugin/src/main \
-              maven/svg-transcoder/src/main \
-              \( -name target -o -name .git \) -prune -o -type f -print 2>/dev/null \
+              CodenameOneDesigner/src \
+              maven \
+              \( -name target -o -name .git -o -path 'maven/core-unittests' \) -prune -o -type f -print 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')

@@ -552,7 +552,14 @@ public class MacOSBuildHints {
                 entTri(source, "device.bluetooth"),
                 entTri(source, "personalInformation.location"),
                 calendars,
-                entTri(source, "files.downloads"));
+                entTri(source, "files.downloads"),
+                // Spelled apsEnvironment rather than aps-environment: the hint
+                // namespace is dotted, so a dash in the key reads as part of a
+                // path segment. The VALUE it selects is the aps-environment
+                // string, chosen from the channel rather than asked for, because
+                // "development" is only correct for an Xcode-signed local build
+                // and neither channel here is one.
+                entTri(source, "apsEnvironment"));
     }
 
     /**
@@ -614,11 +621,12 @@ public class MacOSBuildHints {
         private final int location;
         private final int calendars;
         private final int filesDownloads;
+        private final int push;
 
         EntitlementOverrides(boolean sandbox, boolean networkClient, int networkServer,
                 String filesUserSelected, boolean hardenedRuntime, boolean allowJit, String extra,
                 int camera, int microphone, int bluetooth, int location, int calendars,
-                int filesDownloads) {
+                int filesDownloads, int push) {
             this.sandbox = sandbox;
             this.networkClient = networkClient;
             this.networkServer = networkServer;
@@ -632,12 +640,13 @@ public class MacOSBuildHints {
             this.location = location;
             this.calendars = calendars;
             this.filesDownloads = filesDownloads;
+            this.push = push;
         }
 
         /** The defaults, for a caller that has no hints to resolve against. */
         public static EntitlementOverrides defaults(boolean appStore, boolean sandboxed) {
             return new EntitlementOverrides(sandboxed, true, UNSET, "readwrite", !appStore, false,
-                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
+                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
         }
 
         public boolean isSandbox() {
@@ -680,6 +689,16 @@ public class MacOSBuildHints {
 
         public boolean camera(boolean detected) {
             return resolve(camera, detected);
+        }
+
+        /// Whether the build declares the APNs entitlement.
+        ///
+        /// Unlike the sandbox entitlements around it this one is not a sandbox
+        /// permission, so it is emitted for a Developer ID build too: it is what
+        /// makes registerForRemoteNotifications succeed at all, and macOS
+        /// refuses registration for a signed executable that does not carry it.
+        public boolean push(boolean detected) {
+            return resolve(push, detected);
         }
 
         public boolean microphone(boolean detected) {

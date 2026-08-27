@@ -1103,6 +1103,25 @@ public class MacOSNativeBuilder extends Executor {
     }
 
     /**
+     * Whether an invoked method registers for push.
+     *
+     * <p>Matched on the entry points an application actually calls --
+     * {@code Push.registerPush} and {@code Display.registerPush} -- rather than
+     * on the push package, because naming {@code com.codename1.push.PushContent}
+     * in a callback is what a RECEIVER does and a receiver needs no entitlement
+     * of its own; it is registration that macOS refuses without one.</p>
+     */
+    static boolean usesPushRegistration(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        if (method.indexOf("registerPush") < 0) {
+            return false;
+        }
+        return cls.equals("com/codename1/push/Push") || isDisplay(cls);
+    }
+
+    /**
      * Whether an invoked method reaches the local calendar.
      *
      * <p>The same entry points IPhoneBuilder matches, so a project that gets
@@ -1224,6 +1243,9 @@ public class MacOSNativeBuilder extends Executor {
             // hasCamera(), declared both while opening nothing.
             if (opensCamera(cls, method)) {
                 caps.usesCamera = true;
+            }
+            if (usesPushRegistration(cls, method)) {
+                caps.usesPush = true;
             }
         }
     }

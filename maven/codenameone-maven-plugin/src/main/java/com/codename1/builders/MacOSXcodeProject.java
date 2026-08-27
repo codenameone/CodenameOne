@@ -56,6 +56,7 @@ public class MacOSXcodeProject {
     static final String ENT_NETWORK_SERVER = "com.apple.security.network.server";
     static final String ENT_FILES_USER_SELECTED = "com.apple.security.files.user-selected.read-write";
     static final String ENT_CAMERA = "com.apple.security.device.camera";
+    static final String ENT_APS_ENVIRONMENT = "aps-environment";
     static final String ENT_MICROPHONE = "com.apple.security.device.audio-input";
     static final String ENT_BLUETOOTH = "com.apple.security.device.bluetooth";
     static final String ENT_LOCATION = "com.apple.security.personal-information.location";
@@ -331,6 +332,16 @@ public class MacOSXcodeProject {
                 ent.put(ENT_CALENDARS, Boolean.TRUE);
             }
         }
+        // Outside the sandbox block for the same reason as the JIT exception
+        // below: APNs is not a sandbox permission, and a Developer ID build --
+        // hardened, unsandboxed -- needs it just as much as an App Store one.
+        // "production" for both, because the development environment is for a
+        // locally Xcode-signed build and neither channel here is that; a project
+        // that genuinely wants the sandbox environment sets
+        // macos.entitlements.apsEnvironment and gets it through the extra hint.
+        if (overrides.push(c.usesPush)) {
+            ent.put(ENT_APS_ENVIRONMENT, "production");
+        }
         // JIT is a hardened-runtime exception, not a sandbox one, so it is
         // outside the block above: a Developer ID build is hardened and not
         // sandboxed, and that is exactly the build that needs it.
@@ -449,6 +460,16 @@ public class MacOSXcodeProject {
         /// have to follow it -- otherwise a sandboxed build links the framework
         /// and is refused access to it.
         public boolean usesCalendar;
+        /// Set when the class scan finds a push registration entry point.
+        ///
+        /// This one is not about the sandbox. macOS refuses
+        /// registerForRemoteNotifications for a signed executable that carries no
+        /// aps-environment entitlement, and this build supplies its entitlements
+        /// as an explicit file -- so an entitlement absent from that file is
+        /// absent from the signature, whatever the provisioning profile grants.
+        /// Without it the AppKit backend registers, is refused, and no token ever
+        /// reaches PushClient.
+        public boolean usesPush;
     }
 
     /** The ExportOptions plist for one channel. */
