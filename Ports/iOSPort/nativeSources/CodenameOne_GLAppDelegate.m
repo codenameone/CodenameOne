@@ -1163,7 +1163,10 @@ static NSString *cn1MenuIdentifierForHint(NSString *hint, BOOL *placeAtStart) AP
             if (shortcutModifiers & 1) { flags |= UIKeyModifierCommand; }
             if (shortcutModifiers & 2) { flags |= UIKeyModifierShift; }
             if (shortcutModifiers & 4) { flags |= UIKeyModifierAlternate; }
-            NSString *input = [[NSString stringWithFormat:@"%c", (char)shortcutKeyChar] lowercaseString];
+            // %C and unichar: the column carries a Java char, so narrowing it to
+            // a byte rewrites any accelerator outside Latin-1 into an unrelated
+            // control character. See cn1MakeCommandItem in CN1MacChrome.m.
+            NSString *input = [[NSString stringWithFormat:@"%C", (unichar)shortcutKeyChar] lowercaseString];
             cmd = [UIKeyCommand commandWithTitle:label
                                            image:nil
                                           action:@selector(cn1MenuAction:)

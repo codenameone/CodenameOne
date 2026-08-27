@@ -182,7 +182,14 @@ static NSMenuItem *cn1MakeCommandItem(NSString *label, int keyChar, int modifier
         if (modifiers & 4) { flags |= NSEventModifierFlagOption; }
         // AppKit reads an uppercase key equivalent as implying Shift, so the
         // character is lowered and Shift left to the modifier mask.
-        equivalent = [[NSString stringWithFormat:@"%c", (char)keyChar] lowercaseString];
+        //
+        // %C and unichar, not %c and char. The column carries a Java char, which
+        // is a UTF-16 code unit and reaches 0xFFFF, so narrowing it to a byte
+        // silently rewrote every accelerator outside Latin-1 into whatever the
+        // low eight bits happened to spell -- Cyrillic ZHE (U+0416) became 0x16,
+        // a control character AppKit shows as no accelerator at all and no key
+        // press produces.
+        equivalent = [[NSString stringWithFormat:@"%C", (unichar)keyChar] lowercaseString];
     }
     NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:label
                                                   action:@selector(cn1MenuAction:)
