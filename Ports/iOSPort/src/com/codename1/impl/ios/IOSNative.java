@@ -2110,7 +2110,7 @@ public final class IOSNative {
     native void callShowRoutePicker(int requestId, String callId);
 
     /** Answers a CXAction delivered with this token. */
-    native void callCompleteAction(long actionToken, boolean fulfilled);
+    native boolean callCompleteAction(long actionToken, boolean fulfilled);
 
     /** Registers for VoIP pushes. */
     native void callRegisterVoipPush(int requestId);

@@ -641,7 +641,7 @@ public class LocalCallBridge implements CallBridge {
     }
 
     @Override
-    public void completeAction(long actionToken, boolean fulfilled) {
+    public boolean completeAction(long actionToken, boolean fulfilled) {
         // Nothing to time out against here; the simulation's purpose is to
         // let the facade's own answer-exactly-once logic be exercised. The
         // outcome is recorded so a test can tell fulfilled from failed --
@@ -653,11 +653,13 @@ public class LocalCallBridge implements CallBridge {
             done = simActions.remove(Long.valueOf(actionToken));
         }
         if (done == null) {
-            return;
+            // Not held any more: the simulated platform has already timed
+            // this action out, exactly as CallKit does after ~5s.
+            return false;
         }
         SimCall c = find(done.callId);
         if (c == null) {
-            return;
+            return true;
         }
         if (done.kind == SIM_ANSWER) {
             if (fulfilled) {
@@ -672,7 +674,7 @@ public class LocalCallBridge implements CallBridge {
                 c.state = CallState.ENDED;
                 forgetSimCall(done.callId);
             }
-            return;
+            return true;
         }
         if (done.kind == SIM_END) {
             if (fulfilled) {
@@ -682,12 +684,27 @@ public class LocalCallBridge implements CallBridge {
             // A failed end leaves the call up, which is what CallKit and
             // Telecom both do -- the app said it could not hang up.
         }
+        return true;
     }
 
     /// Drops a call from the simulated platform's own book.
     private void forgetSimCall(String callId) {
         synchronized (calls) {
             calls.remove(callId);
+        }
+    }
+
+    /// Drops every outstanding action, as the platform does on a timeout.
+    ///
+    /// CallKit gives an action about five seconds and then abandons it; a
+    /// Telecom connection can be torn down under one just as abruptly. This
+    /// makes that reachable without waiting, so the facade's behaviour when
+    /// it answers an action the platform no longer holds can be tested.
+    ///
+    /// @hidden not part of the public API; test-only.
+    public void expireOutstandingActions() {
+        synchronized (this) {
+            simActions.clear();
         }
     }
 

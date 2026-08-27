@@ -571,6 +571,33 @@ public class LocalCallTest {
     }
 
     @Test
+    public void answeringAnActionThePlatformGaveUpOnHasNoLocalEffect() {
+        // CallKit abandons an action after about five seconds. If the EDT was
+        // blocked past that deadline the queued event still runs afterwards,
+        // and the app's fulfil then removed the Java session while the system
+        // call UI went on showing the call -- the two disagreeing silently,
+        // which is the failure the whole action contract exists to prevent.
+        // completeAction now reports that the platform no longer held the
+        // action and the local effect is skipped.
+        final List<CallAction> seen = new ArrayList<CallAction>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void endRequested(String callId, CallAction action) {
+                action.defer();
+                seen.add(action);
+            }
+        });
+        String id = CallId.random();
+        ring(id);
+        bridge.simulateEndRequest(id);
+        waitFor(seen, 1);
+        bridge.expireOutstandingActions();
+        seen.get(0).fulfill();
+        sleepFor(200);
+        assertNotNull(Calls.getSession(id),
+                "an end the platform timed out must not forget the session");
+    }
+
+    @Test
     public void aDeferredEndThatSucceedsLaterStillForgetsTheCall() {
         // The gap the first fix left: checking isAnswered() straight after
         // dispatch saw false for a deferred action, and a later fulfil had

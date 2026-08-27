@@ -439,13 +439,16 @@ public class CN1ConnectionService extends ConnectionService {
     /// an error: the facade's safety net and a slow application may both
     /// answer, and the race between them is not worth making anyone think
     /// about.
-    static void completeAction(long token, boolean fulfilled) {
+    static boolean completeAction(long token, boolean fulfilled) {
         PendingAction a;
         synchronized (PENDING) {
             a = PENDING.remove(Long.valueOf(token));
         }
         if (a == null) {
-            return;
+            // Telecom no longer has this action -- the connection was torn
+            // down while the request sat in Java. Saying so keeps the caller
+            // from applying a local effect the system will not match.
+            return false;
         }
         if (fulfilled) {
             if (a.kind == CN1Connection.ACTION_ANSWER) {
@@ -467,7 +470,7 @@ public class CN1ConnectionService extends ConnectionService {
                 a.connection.finish(CallEndReason.LOCAL_ENDED);
                 forget(a.connection.getCallId());
             }
-            return;
+            return true;
         }
         // Telecom has no "this action failed" channel, so the only honest way
         // to report that the app could not do what was asked is to end the
@@ -495,6 +498,7 @@ public class CN1ConnectionService extends ConnectionService {
             a.connection.finish(CallEndReason.FAILED);
             forget(a.connection.getCallId());
         }
+        return true;
     }
 
     /// The current audio route ordinal.

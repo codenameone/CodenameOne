@@ -620,6 +620,18 @@ static int64_t cn1clTrackAction(CXAction *action) {
     // cn1clActions -- and when the EDT resumed, cn1clCompleteAction fetched
     // a CXAction CallKit had already timed out and answered it.
     cn1clForgetTrackedAction(action);
+    if ([action isKindOfClass:[CXStartCallAction class]]) {
+        // And the ADOPTION marker, which outlives both queues. Only
+        // callCompleteAction cleared it, so a start the app was still
+        // deferring stayed adoptable: when the EDT resumed, reportOutgoing()
+        // matched the uuid, adopted an action CallKit had already abandoned
+        // and answered the application with success for a call the system
+        // call UI was never going to show.
+        NSString *startUuid = [[(CXCallAction *)action callUUID] UUIDString];
+        @synchronized (cn1clLock) {
+            [cn1clSystemStarts removeObject:startUuid];
+        }
+    }
 }
 
 - (void)provider:(CXProvider *)provider performStartCallAction:(CXStartCallAction *)action {
@@ -1909,7 +1921,7 @@ void com_codename1_impl_ios_IOSNative_callShowRoutePicker___int_java_lang_String
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_LONG actionToken, JAVA_BOOLEAN fulfilled) {
 #ifdef CN1_CALL_HAS_CALLKIT
@@ -1923,8 +1935,15 @@ void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
     // A second answer for the same token finds nothing and does nothing. The
     // facade's safety net and a slow application may both answer, and that
     // race is not worth making anyone think about.
+    // Answering an action CallKit no longer holds is not a no-op for the
+    // CALLER: the Java event was queued before the deadline passed, so its
+    // local effect -- ending the session, moving it to HELD or ACTIVE -- would
+    // still run and leave Java in a state the system call UI is not in.
+    // Reporting the miss is what lets the facade skip it, and it costs no
+    // extra native symbol, which is the point: a separate expiry callback is
+    // one more mangled name that can be wrong in silence.
     if (action == nil) {
-        return;
+        return JAVA_FALSE;
     }
     if ([action isKindOfClass:[CXStartCallAction class]]) {
         // The adopt window is over either way: the app has answered the
@@ -1951,6 +1970,12 @@ void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
     } else {
         [action fail];
     }
+    return JAVA_TRUE;
+#else
+    // No CallKit in this build, so nothing can have expired. Saying TRUE
+    // keeps the facade's local effects running rather than silently
+    // suppressing them.
+    return JAVA_TRUE;
 #endif
 }
 
@@ -2355,9 +2380,10 @@ void com_codename1_impl_ios_IOSNative_callShowRoutePicker___int_java_lang_String
     cn1clOffAck(requestId);
 }
 
-void com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_callCompleteAction___long_boolean_R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_LONG actionToken, JAVA_BOOLEAN fulfilled) {
+    return JAVA_TRUE;
 }
 
 void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(

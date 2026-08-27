@@ -90,6 +90,10 @@ public final class VoipPush {
 
     private static String token;
 
+    /// Bumped by every token delivery, so a replay can tell whether the
+    /// value it captured is still the current one. Guarded by VoipPush.class.
+    private static int tokenVersion;
+
     private VoipPush() {
     }
 
@@ -146,11 +150,25 @@ public final class VoipPush {
         // wrong for one that has not -- which is this case, and which is why
         // the question is asked per listener rather than per token.
         String known;
+        int knownVersion;
         synchronized (VoipPush.class) {
             known = token;
+            knownVersion = tokenVersion;
         }
         if (l != null && known != null) {
-            post(new Delivery(null, known));
+            // VERSIONED, because setListener can run off the EDT and a
+            // rotation landing between this snapshot and the delivery would
+            // queue the NEW token first and this stale one after it. A
+            // listener that updates its server in the callback would finish
+            // registered under a token that is no longer valid and stop
+            // receiving calls -- the exact failure the replay exists to
+            // prevent, arrived at from the other side.
+            //
+            // Not covered by a unit test on purpose: core-unittests never
+            // initialises Display, so post() runs every delivery inline on
+            // the calling thread and nothing can overtake anything. A test
+            // there would assert the harness, not this.
+            post(new Delivery(null, known, knownVersion));
         }
         // Anything that arrived before this listener existed. Taken out under
         // the monitor and delivered outside it, so a listener that installs
@@ -281,7 +299,7 @@ public final class VoipPush {
                     CallState.RINGING);
         }
         post(new Delivery(new PushedCall(session, data, stale, synthesizedId,
-                receivedAt), null));
+                receivedAt)));
     }
 
     /// Answers the drain with how many calls it produced.
@@ -302,6 +320,7 @@ public final class VoipPush {
         synchronized (VoipPush.class) {
             changed = value == null ? token != null : !value.equals(token);
             token = value;
+            tokenVersion++;
         }
         EdtResult<String> r = CallRequests.takeString(requestId);
         if (r != null) {
@@ -312,7 +331,11 @@ public final class VoipPush {
             // waiting settles them one at a time through here, and a
             // rotation that produces the same token is not a rotation --
             // neither is a reason to tell the app its token changed.
-            post(new Delivery(null, value));
+            int version;
+            synchronized (VoipPush.class) {
+                version = tokenVersion;
+            }
+            post(new Delivery(null, value, version));
         }
     }
 
@@ -358,14 +381,36 @@ public final class VoipPush {
     private static final class Delivery implements Runnable {
         private final PushedCall call;
         private final String newToken;
+        /// The token version this delivery was made for, or 0 for a call.
+        private final int version;
 
-        Delivery(PushedCall call, String newToken) {
+        Delivery(PushedCall call) {
+            this(call, null, 0);
+        }
+
+        Delivery(PushedCall call, String newToken, int version) {
             this.call = call;
             this.newToken = newToken;
+            this.version = version;
+        }
+
+        /// Whether a later delivery has already superseded this one.
+        private boolean superseded() {
+            if (call != null) {
+                return false;
+            }
+            synchronized (VoipPush.class) {
+                return tokenVersion != version;
+            }
         }
 
         @Override
         public void run() {
+            if (superseded()) {
+                // A rotation overtook this one; the listener has been told
+                // the newer value and must not now be told an older one.
+                return;
+            }
             VoipPushListener[] ls = listeners();
             if (ls.length == 0) {
                 // The listener went away between post() deciding there was

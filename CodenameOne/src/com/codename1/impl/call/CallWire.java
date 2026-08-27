@@ -235,10 +235,9 @@ public final class CallWire {
     /// #### Returns
     ///
     /// the types, never null
-    public static java.util.List<CallHandleType> handleTypes(String[] fields,
+    public static List<CallHandleType> handleTypes(String[] fields,
             int index) {
-        java.util.List<CallHandleType> out =
-                new java.util.ArrayList<CallHandleType>();
+        List<CallHandleType> out = new ArrayList<CallHandleType>();
         String raw = field(fields, index);
         if (raw.length() == 0) {
             return out;

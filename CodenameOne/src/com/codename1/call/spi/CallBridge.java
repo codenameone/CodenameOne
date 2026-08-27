@@ -241,7 +241,13 @@ public interface CallBridge {
     /// token; a second is ignored rather than treated as an error, because
     /// the facade's safety net and the application may both answer and the
     /// race between them is not worth making the application think about.
-    void completeAction(long actionToken, boolean fulfilled);
+    /// #### Returns
+    ///
+    /// whether the platform still held this action. A `false` says the
+    /// platform gave up on it -- a CallKit timeout, a Telecom connection torn
+    /// down underneath it -- and the caller must not apply the local effect,
+    /// because the system is no longer going to carry the action out.
+    boolean completeAction(long actionToken, boolean fulfilled);
 
     // ---------------------------------------------------------------
     // VoIP push.

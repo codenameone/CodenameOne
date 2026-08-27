@@ -717,8 +717,8 @@ public class AndroidCallBridge implements CallBridge {
     }
 
     @Override
-    public void completeAction(long actionToken, boolean fulfilled) {
-        CN1ConnectionService.completeAction(actionToken, fulfilled);
+    public boolean completeAction(long actionToken, boolean fulfilled) {
+        return CN1ConnectionService.completeAction(actionToken, fulfilled);
     }
 
     @Override

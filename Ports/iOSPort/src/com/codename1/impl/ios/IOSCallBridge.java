@@ -175,8 +175,8 @@ class IOSCallBridge implements CallBridge {
     }
 
     @Override
-    public void completeAction(long actionToken, boolean fulfilled) {
-        nativeInstance.callCompleteAction(actionToken, fulfilled);
+    public boolean completeAction(long actionToken, boolean fulfilled) {
+        return nativeInstance.callCompleteAction(actionToken, fulfilled);
     }
 
     @Override

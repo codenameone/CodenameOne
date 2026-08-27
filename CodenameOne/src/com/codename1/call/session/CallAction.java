@@ -22,6 +22,7 @@
  */
 package com.codename1.call.session;
 
+import com.codename1.call.spi.CallBridge;
 import com.codename1.impl.call.CallRequests;
 
 import java.util.Timer;
@@ -219,19 +220,27 @@ public final class CallAction {
             onFulfilled = null;
         }
         cancelSafetyNet();
-        if (hook != null) {
+        // The PLATFORM IS ASKED FIRST, and its answer decides whether the
+        // local effect happens at all.
+        //
+        // Running the hook first and telling the platform afterwards made the
+        // two disagree whenever the platform had already given up: with the
+        // EDT blocked past CallKit's ~5s deadline the action is timed out
+        // natively, yet the queued event still ran, so a delayed end removed
+        // the session and a delayed answer or hold moved it -- to a state the
+        // system call UI was never in. `token == NONE` is the case where
+        // nothing was ever pending (the platform reported what it had already
+        // done rather than asking), so there is nothing to be refused by.
+        boolean stillHeld = true;
+        if (token != NONE) {
+            CallBridge b = CallRequests.bridge();
+            if (b != null) {
+                stillHeld = b.completeAction(token, fulfilled);
+            }
+        }
+        if (hook != null && stillHeld) {
             // Outside the lock: the hook ends up in Calls, which takes its own.
             hook.run();
-        }
-        if (token == NONE) {
-            // Nothing to answer: the platform told the app what it had
-            // already done rather than asking permission, so there is no
-            // pending action to fulfil or fail.
-            return;
-        }
-        com.codename1.call.spi.CallBridge b = CallRequests.bridge();
-        if (b != null) {
-            b.completeAction(token, fulfilled);
         }
     }
 }
