@@ -202,3 +202,16 @@ struct CN1RemoteVersion: Equatable {
         self.revision = (size == nil && lastModified == nil) ? revision : nil
     }
 }
+
+/// Whether two opaque keys are the same key.
+///
+/// By UTF-8 bytes, not by Swift's ==, which compares canonically: "e" followed by U+0301 and the
+/// precomposed letter are one string to Swift and two different query values to an endpoint that
+/// reads bytes. A response fetched for one would otherwise be accepted as the other. The
+/// publisher refuses decomposed remote ids, so this is for an index that arrived some other way.
+func cn1SameOpaqueKey(_ a: String?, _ b: String?) -> Bool {
+    guard let a = a, let b = b else {
+        return a == nil && b == nil
+    }
+    return Array(a.utf8) == Array(b.utf8)
+}

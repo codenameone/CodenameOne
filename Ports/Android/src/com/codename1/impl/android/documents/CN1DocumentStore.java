@@ -240,23 +240,44 @@ public final class CN1DocumentStore {
             } finally {
                 out.close();
             }
-            if (!tmp.renameTo(target)) {
-                // Some filesystems refuse a rename onto an existing name. Deleting first opens a
-                // window where the index is absent, which is why it is the fallback rather than
-                // the path always taken.
-                if (target.exists() && !target.delete()) {
-                    if (!tmp.delete()) {
-                        Log.w(TAG, "Could not delete " + tmp);
-                    }
-                    throw new IOException("Could not replace " + target);
+            if (tmp.renameTo(target)) {
+                return;
+            }
+            // Refused. Some filesystems will not rename onto an existing name, which is what
+            // this fallback is for -- but a rename also fails for reasons that will not go away,
+            // a full volume or a read-only mount among them, and deleting the target first meant
+            // the retry then failed with the old publication already destroyed. An app left with
+            // no index at all is worse off than one whose publish did not happen.
+            //
+            // So the old file is moved aside rather than deleted, and put back when the retry
+            // fails too.
+            File aside = new File(parent, target.getName() + ".previous");
+            boolean hadTarget = target.exists();
+            if (hadTarget) {
+                if (aside.exists() && !aside.delete()) {
+                    Log.w(TAG, "Could not delete " + aside);
                 }
-                if (!tmp.renameTo(target)) {
+                if (!target.renameTo(aside)) {
                     if (!tmp.delete()) {
                         Log.w(TAG, "Could not delete " + tmp);
                     }
-                    throw new IOException("Could not rename " + tmp + " to " + target);
+                    throw new IOException("Could not move " + target + " aside to replace it");
                 }
             }
+            if (tmp.renameTo(target)) {
+                if (aside.exists() && !aside.delete()) {
+                    Log.w(TAG, "Could not delete " + aside);
+                }
+                return;
+            }
+            if (hadTarget && aside.exists() && !aside.renameTo(target)) {
+                Log.e(TAG, "Could not restore " + target + " from " + aside);
+            }
+            if (!tmp.delete()) {
+                Log.w(TAG, "Could not delete " + tmp);
+            }
+            throw new IOException("Could not rename " + tmp + " to " + target
+                    + "; the previous publication was left in place");
         }
     }
 

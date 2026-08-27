@@ -619,7 +619,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                                        credentials: String, containerURL: URL) -> Bool {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
-              let node = index.nodes[resolved], node.remoteId == remoteId,
+              let node = index.nodes[resolved], cn1SameOpaqueKey(node.remoteId, remoteId),
               // The declared version too: the remote id is the app's key for the object and a
               // server-side revision keeps it, so an id match alone would move the previous
               // revision's bytes into storage after the newer publication is already current.

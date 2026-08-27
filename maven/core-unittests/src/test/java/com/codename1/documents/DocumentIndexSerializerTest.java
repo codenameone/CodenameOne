@@ -273,7 +273,22 @@ class DocumentIndexSerializerTest {
         root.add(DocumentNode.file("a", "expos\u0065\u0301.pdf"));
         IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(root));
-        assertTrue(err.getMessage().contains("U+301"), err.getMessage());
+        assertTrue(err.getMessage().contains("normalize"), err.getMessage());
+
+        // The ID is checked with the same rule, even when a name of its own hides it: two ids
+        // that are canonically equivalent are one key in the readers, so the duplicate-id check
+        // passes and one node then overwrites the other.
+        DocumentNode decomposedId = DocumentNode.folder("root", "Root");
+        decomposedId.add(DocumentNode.file("expos\u0065\u0301", "Shown.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(decomposedId));
+
+        // And the remote id, which is the key sent to the endpoint.
+        DocumentNode decomposedRemote = DocumentNode.folder("root", "Root");
+        decomposedRemote.add(DocumentNode.file("a", "Shown.pdf")
+                .setRemoteId("key\u0065\u0301"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(decomposedRemote));
 
         // The precomposed spelling of the same name is accepted, and is the one to use.
         DocumentNode composed = DocumentNode.folder("root", "Root");

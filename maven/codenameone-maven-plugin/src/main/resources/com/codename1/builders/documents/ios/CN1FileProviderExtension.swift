@@ -330,7 +330,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                                       containerURL: URL) -> NSFileProviderItem? {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
-              let node = index.nodes[resolved], node.remoteId == remoteId,
+              let node = index.nodes[resolved], cn1SameOpaqueKey(node.remoteId, remoteId),
               CN1RemoteVersion(node, revision: index.revision) == version,
               CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
             // The credential is compared as well as the node and the remote object: an account

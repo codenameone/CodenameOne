@@ -199,11 +199,23 @@ public final class DocumentIndexSerializer {
                     + "a duplicate -- so the location disappears rather than one document going "
                     + "missing.");
         }
+        // The ids as well as the shown name. Two ids that are canonically equivalent are two
+        // strings here and ONE key in the readers -- Swift dictionaries and Apple filesystems
+        // both compare that way -- so the duplicate-id check above passes and one node then
+        // overwrites the other, which enumerates the same document twice. The remote id is
+        // checked with them: it is the key sent to the endpoint, which compares bytes, while the
+        // reader that matches a response against it compares canonically.
         int mark = combiningMarkAt(effective);
+        if (mark < 0) {
+            mark = combiningMarkAt(node.getId());
+        }
+        if (mark < 0 && node.getRemoteId() != null) {
+            mark = combiningMarkAt(node.getRemoteId());
+        }
         if (mark >= 0) {
-            throw new IllegalArgumentException("\"" + effective + "\" contains U+"
-                    + Integer.toHexString(effective.charAt(mark)).toUpperCase() + " at index "
-                    + mark + ", which Apple's filesystems normalize to something else. They "
+            throw new IllegalArgumentException("The node shown as \"" + effective + "\" has an "
+                    + "id, name or remote id containing a character at index " + mark
+                    + " that Apple's filesystems normalize to something else. They "
                     + "compare names after canonical normalization, so a name spelled this way "
                     + "and its normalized twin are one file there while they are two strings "
                     + "here -- and the browser hides one of the pair. Use the normalized "
