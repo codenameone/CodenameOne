@@ -6326,7 +6326,18 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponentNSData___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
-#if TARGET_OS_MACCATALYST
+// The native macOS port takes the AV helper directly, alongside Catalyst.
+// This is the ONE wrapper of the four whose useAVKit() branches are inverted
+// -- the other three send AVKit to the AV helper and this one sends it to MP
+// -- so macOS, where useAVKit() is always true, landed on
+// createNativeVideoComponentNSDataMP, whose macOS arm returns 0. IOSMedia then
+// reported the media as Playing with no player behind it: data-backed video
+// was silently dead while the URL-backed overload beside it worked.
+//
+// The inversion itself is left alone for iOS. It predates this port and the
+// comment below records why; correcting it there would change which backend an
+// existing iOS app gets, which is not this port's business.
+#if TARGET_OS_MACCATALYST || TARGET_OS_OSX
     return createNativeVideoComponentNSDataAV(nsData, onCompletionCallbackId);
 #else
     if (useAVKit()) {
@@ -10894,9 +10905,13 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_M
         if(![recorder record]) {
             CN1Log(@"Error in recording record returned false for some reason?");
         }
-#ifndef CN1_USE_ARC
-        [recorder retain];
-#endif
+        // No retain here. createAudioRecorder hands back an alloc/init recorder,
+        // so its +1 is already the reference held on Java's behalf until
+        // cleanupAudioRecord releases it; retaining again made that release
+        // leave the recorder alive and leaked one per recording. Balancing it in
+        // cleanup instead would over-release a recorder that was created and
+        // cleaned up without ever being started, which is why the extra claim
+        // goes rather than a second release arriving.
         POOL_END();
     });
 #endif

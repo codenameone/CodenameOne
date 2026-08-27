@@ -708,6 +708,14 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         NSWindowLevel level = old.level;
         NSSize minSize = old.contentMinSize;
         NSWindow *owner = old.parentWindow;
+        // The windows this one OWNS, snapshotted before the close below detaches
+        // them. Only the parent link was carried across, so a rebuild left every
+        // child attached to a closed window: they stopped floating above their
+        // owner, and stopped hiding, minimizing and closing with it. The Java
+        // ownership graph still said they were children, so nothing on that side
+        // ever re-established the link. Copied rather than held, because
+        // childWindows is a live array that the detaching below mutates.
+        NSArray *ownedChildren = [NSArray arrayWithArray:old.childWindows];
         // A modal session belongs to the window it was begun for, so it cannot
         // outlive this one: left alone it would keep the CLOSED window modal and
         // leave the visible replacement ordinary. Ended here, restarted below.
@@ -721,6 +729,9 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
         old.delegate = nil;
         if (owner != nil) {
             [owner removeChildWindow:old];
+        }
+        for (NSWindow *child in ownedChildren) {
+            [old removeChildWindow:child];
         }
         [old orderOut:nil];
         [old close];
@@ -739,6 +750,11 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetUtility___int_boolean(COD
             // waiting for its first show keeps its pendingOwner instead, so the
             // conversion does not order it in early.
             [owner addChildWindow:fresh ordered:NSWindowAbove];
+        }
+        // Re-adopted by the replacement, so ownership survives the rebuild in
+        // both directions rather than only upwards.
+        for (NSWindow *child in ownedChildren) {
+            [fresh addChildWindow:child ordered:NSWindowAbove];
         }
         // The view carries cn1InputEnabled across with it, but the chrome is the
         // new window's own: a window blocked by a modal dialog would otherwise
