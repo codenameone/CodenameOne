@@ -67,7 +67,7 @@ public enum HintGroup {
         this.keyPrefix = keyPrefix;
     }
 
-    /** Simple name of the generated annotation type, or null for {@link #NONE}. */
+    /** Simple name of the annotation type, or null for {@link #NONE}. */
     public String annotationSimpleName() {
         return annotationSimpleName;
     }

@@ -265,9 +265,6 @@ public final class BuildHintCodeGenerator {
         return sb.append('"').toString();
     }
 
-    private static final java.util.regex.Pattern LOOKS_LIKE_IP =
-            java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}|::1|[0-9a-fA-F:]*:[0-9a-fA-F:]+");
-
     /// The hints the catalog still describes, plus the annotated ones read from
     /// source.
     ///

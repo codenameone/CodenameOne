@@ -3262,12 +3262,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    /**
-     * Reads the emitted hints out of a classpath element, which is either the
-     * module's output directory or a jar.
-     *
-     * @return the properties, or null when this element carries none
-     */
     /// The build hint annotation types, read off the classpath they live on.
     ///
     /// The package is enumerated rather than listed: a generated table naming
@@ -3284,6 +3278,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
+    /**
+     * Reads the emitted hints out of a classpath element, which is either the
+     * module's output directory or a jar.
+     *
+     * @return the properties, or null when this element carries none
+     */
     private Properties readAnnotationHints(File element) {
         if (element == null || !element.exists()) {
             return null;

@@ -236,8 +236,8 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         File root = multimoduleRoot(projectDir);
         // No buildHintsDoc: the Settings tool used to scrape the developer guide's
         // AsciiDoc table at runtime and guess each hint's type from its description
-        // prose. It now reads com.codename1.build.shared.BuildHints, the same table
-        // the build hint annotations are generated from.
+        // prose. It now reads com.codename1.build.shared.BuildHints, which carries
+        // the catalog's hints and the ones the annotations declare.
         String content = "# Codename One Settings project binding\n"
                 + "projectDir=" + projectDir.getAbsolutePath() + "\n"
                 + "settings=" + new File(projectDir, "codenameone_settings.properties").getAbsolutePath() + "\n"

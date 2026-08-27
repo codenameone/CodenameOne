@@ -254,14 +254,41 @@ final class BuildHintSchemaDefaults {
      */
     private static final java.util.Set<String> DECLARED = new java.util.HashSet<String>();
 
+    /** The group keys this class registered, recorded as they are registered. */
+    private static final java.util.Set<String> DECLARED_GROUPS = new java.util.HashSet<String>();
+
     /** Hint names {@link #register} describes, for the generated companion to skip. */
     static java.util.Set<String> declaredHints() {
         return java.util.Collections.unmodifiableSet(DECLARED);
     }
 
+    /**
+     * The group key this class already uses for {@code annotation}, or null.
+     *
+     * <p>The group name is part of the property key, so a catalog hint whose group
+     * differs from a hand-written one only in case lands in a second group beside
+     * it -- which is how harden.rename came to sit alone under "App Hardening"
+     * next to the five hints under "App Hardening (Enterprise)". Matching on case
+     * is a convention rather than a table, so there is nothing here to drift.</p>
+     */
+    static String declaredGroupFor(String annotation) {
+        for (String g : DECLARED_GROUPS) {
+            if (g.equalsIgnoreCase(annotation)) {
+                return g;
+            }
+        }
+        return null;
+    }
+
     /** Idempotent setter: does not overwrite user / project-level hint metadata. */
     private static void set(String suffix, String value) {
         int hash = suffix.indexOf('#');
+        if (suffix.startsWith("{{@")) {
+            int close = suffix.indexOf("}}", 3);
+            if (close > 3) {
+                DECLARED_GROUPS.add(suffix.substring(3, close));
+            }
+        }
         if (suffix.startsWith("{{#") && hash >= 0) {
             int second = suffix.indexOf('#', hash + 1);
             int close = suffix.indexOf("}}", second + 1);

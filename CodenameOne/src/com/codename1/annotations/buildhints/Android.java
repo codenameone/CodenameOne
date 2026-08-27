@@ -31,13 +31,13 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies. Each attribute's `@Hint(def)` records what
-/// that default is; the `default` clause below it is a neutral placeholder with
-/// no meaning at runtime.
+/// the build server's own default applies. The `default` clause below each
+/// attribute names a constant that says nothing -- see [HintUnset] -- and this
+/// package deliberately does not record what the server would do instead,
+/// because that is the server's to change.
 ///
-/// The platform and the builders that read these hints are stated once on the
-/// annotation, not on every attribute. An attribute repeats one only to
-/// disagree with it.
+/// The platform is stated once on the annotation, not on every attribute. An
+/// attribute repeats it only to disagree with it.
 @Hint(platform = "android")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
@@ -66,12 +66,10 @@ public @interface Android {
     /// `enabled` or any other value to disable this option
     String captureRecord() default "";
 
-    /// Whether to include the debug version in the build. This hint has NO single
-    /// default, which is why none is recorded: `AndroidGradleBuilder` reads it
-    /// with a default of `"false"` under `android.release` and `"true"`
-    /// otherwise, so a build that selects neither still produces something
-    /// installable (AndroidGradleBuilder.java:447-451, :530-531).
-    @Hint
+    /// Whether to include the debug version in the build.
+    ///
+    /// Left alone, this follows [#release] rather than a fixed value, so a build
+    /// that selects neither still produces something installable.
     Toggle debug() default Toggle.DEFAULT;
 
     /// Turns off R8, falling back to the older shrinker. Note that hardening
@@ -105,9 +103,9 @@ public @interface Android {
     AndroidMinSdk minSdkVersion() default AndroidMinSdk.DEFAULT;
 
     /// Multidex lets an Android binary reference more than 65536 methods.
-    /// Defaults to TRUE: `AndroidGradleBuilder` reads this hint with a default
-    /// of `"true"`, so a build that says nothing gets multidex. Set it to false
-    /// to opt out, which builds a little faster and reinstates the limit.
+    ///
+    /// Set [Toggle#OFF] to opt out, which builds a little faster and reinstates
+    /// the limit.
     Toggle multidex() default Toggle.DEFAULT;
 
     /// Uses the current Firebase Cloud Messaging integration. Requires AndroidX

@@ -561,7 +561,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
     }
 
-    /** The reactor module whose basedir is {@code dir}, or null when none is. */    /** The reactor module whose basedir is {@code dir}, or null when none is. */
+    /** The reactor module whose basedir is {@code dir}, or null when none is. */
     /// The nearest reactor module a file belongs to, walking up from it, or
     /// null when it is under none.
     ///
@@ -616,7 +616,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         }
     }
 
-    /** Name of the resource the annotation processor emits into target/classes. */    /** Name of the resource the annotation processor emits into target/classes. */
+    /** Name of the resource the annotation processor emits into target/classes. */
     private static final String ANNOTATION_HINTS_RESOURCE =
             "META-INF/codenameone/build-hints.properties";
 
@@ -1016,9 +1016,9 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     /// The source is read byte for byte -- see [#read(File)] -- while
     /// `codename1.packageName` and `codename1.mainName` come from a properties
     /// file, which is real Unicode. For an ASCII name the two are identical, but
-    /// `package com.应用` in a UTF-8 file reads as its individual bytes, so the
-    /// comparison failed and the goal refused a valid migration saying it could
-    /// not find the main source.
+    /// a package name with a non-ASCII letter reads, in a UTF-8 file, as that
+    /// letter's individual bytes, so the comparison failed and the goal refused a
+    /// valid migration saying it could not find the main source.
     ///
     /// Compared as an ALTERNATIVE rather than a replacement, so nothing is
     /// assumed about the file's encoding: an ASCII file matches either way, a
@@ -1320,7 +1320,7 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return out;
     }
 
-    /** The package the generated annotations live in. */
+    /** The package the build hint annotations live in. */
     private static final String ANNOTATION_PACKAGE = "com.codename1.annotations.buildhints";
 
     /** The import statement for one of them, in the right language. */
@@ -1468,17 +1468,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
         return stop > alias ? blanked.substring(alias, stop) : last;
     }
 
-    /**
-     * Index of the start of the line declaring the top-level type.
-     *
-     * <p>Matched by pattern rather than against a list of prefixes: a declaration
-     * can carry any combination of modifiers -- {@code public final class},
-     * {@code internal data class} -- and a missing combination would abort the
-     * migration on a perfectly ordinary file. Anchored to column zero so a
-     * nested type or a mention inside an indented doc comment cannot match, and
-     * the type named by {@code codename1.mainName} is preferred over whatever
-     * happens to appear first.</p>
-     */
     /// Whether blanked `code` contains a live import of the build hint package.
     /// The end of the declaration that has been read up to `i`: its terminating
     /// semicolon if it has one, then the rest of that line.
@@ -1936,10 +1925,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Deletes the migrated lines, leaving every other line -- comments,
-     * ordering, unrelated settings -- byte for byte as it was.
-     */
-    /**
      * Deletes the migrated declarations, leaving every other line -- comments,
      * ordering, unrelated settings -- byte for byte as it was.
      *
@@ -2214,11 +2199,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
             r.close();
         }
         return sb.toString();
-    }
-
-    /** Restores a source file after a failed migration. */
-    private static void writeSource(File f, String content) throws IOException {
-        write(f, content);
     }
 
     private static void write(File f, String content) throws IOException {

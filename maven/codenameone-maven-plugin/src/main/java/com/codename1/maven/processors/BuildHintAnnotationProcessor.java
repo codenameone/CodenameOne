@@ -40,7 +40,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -1594,7 +1593,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return "";
     }
 
-    /// Build hints configure the application, so they belong on the class the    /// Build hints configure the application, so they belong on the class the
+    /// Build hints configure the application, so they belong on the class the
     /// project already names as its entry point.
     ///
     /// Accepting them anywhere would mean two classes could set the same hint
@@ -1710,9 +1709,6 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return out;
     }
 
-    /// Converts one annotation member value to the string the build receives.
-    ///
-    /// Returns null when the value could not be converted, having reported it.
     /// Why `value` does not match the hint's declared pattern, or null.
     ///
     /// The type of an attribute cannot express every hint's shape. `String` says
@@ -1766,6 +1762,9 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     private BuildHintAnnotationReader.Bindings bindings;
 
+    /// Converts one annotation member value to the string the build receives.
+    ///
+    /// Returns null when the value could not be converted, having reported it.
     private String wireValue(AnnotatedClass cls, String descriptor, String member, Object raw,
                              String hint, ProcessorContext ctx) {
         if (raw instanceof Boolean || raw instanceof Number || raw instanceof Character) {
@@ -1834,11 +1833,6 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return null;
     }
 
-    /// Serializes deterministically.
-    ///
-    /// Not `Properties.store`: it writes a timestamp comment, so the bytes would
-    /// differ on every build. That churns the resource in every incremental
-    /// build and defeats the staged-jar staleness comparison in `CN1BuildMojo`.
     /// Every name that denotes the same setting as `hint`, itself included.
     ///
     /// An alias and its target are one setting -- the builder reads
@@ -1855,7 +1849,7 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         return names;
     }
 
-    /// A stable fingerprint of every build hint annotation on `cls`.    /// A stable fingerprint of every build hint annotation on `cls`.
+    /// A stable fingerprint of every build hint annotation on `cls`.
     ///
     /// Taken over the raw annotation members rather than over the hints they
     /// convert into, so it changes for anything the developer can change: a

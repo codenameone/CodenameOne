@@ -4144,21 +4144,6 @@ public class CodenameOneSettings extends Lifecycle {
     }
 
 
-    /// The name a Kotlin `typealias Alias = Ios` gives an annotation, or null.
-    ///
-    /// Unlike an import alias this renames the type in the file itself, so the
-    /// annotation never appears under its own name and no import mentions the
-    /// alias at all. The right-hand side may be the simple name -- which only
-    /// counts when an import makes it ours -- or the fully qualified one, which
-    /// needs no import.
-    ///
-    /// One level: an alias of an alias is not followed, because the first is
-    /// what a file that renames our annotation actually writes.
-    static String kotlinTypeAlias(String source, String simple, boolean kotlin) {
-        java.util.List<String> all = kotlinTypeAliases(source, simple, kotlin);
-        return all.isEmpty() ? null : all.get(0);
-    }
-
     /// EVERY such name, for the same reason the import form collects them all:
     /// a file may declare `typealias First = Ios` and `typealias AppIos = Ios`
     /// and use only the second.
@@ -5877,10 +5862,10 @@ public class CodenameOneSettings extends Lifecycle {
                 || (c >= '0' && c <= '9') || c == '_' || c == '$') {
             return true;
         }
-        // Both languages allow a non-ASCII identifier -- `package com.应用` is
-        // valid Java and Kotlin -- and stopping at the first such character read
-        // a short name, so the real main source was rejected and Settings could
-        // offer a hint an annotation already owns.
+        // Both languages allow a non-ASCII identifier -- a package name whose
+        // letters are outside ASCII is valid Java and Kotlin -- and stopping at
+        // the first such character read a short name, so the real main source
+        // was rejected and Settings could offer a hint an annotation already owns.
         //
         // Everything outside ASCII that is not whitespace counts, since
         // Character.isJavaIdentifierPart is outside the Codename One API subset

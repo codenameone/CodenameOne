@@ -63,9 +63,10 @@ public class LibraryHintMerger {
      * The separator two values of this hint must be joined with, or an empty string when the
      * hint's values abut directly (the XML-fragment hints).
      *
-     * <p>The table lives in {@link BuildHints}, which is also what the build hint annotations
-     * are generated from. Keeping one copy is what stops a {@code String[]} attribute being
-     * joined with one delimiter here and split with another by the builder.</p>
+     * <p>The table lives in {@link BuildHints}, which carries the catalog's hints and the
+     * ones the annotations declare. Keeping one copy is what stops a {@code String[]}
+     * attribute being joined with one delimiter here and split with another by the
+     * builder.</p>
      *
      * @param propertyName hint name, with or without the {@code codename1.arg.} prefix
      * @return the separator, never null

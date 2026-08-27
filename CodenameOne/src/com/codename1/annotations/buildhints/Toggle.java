@@ -27,11 +27,10 @@ package com.codename1.annotations.buildhints;
 ///
 /// Not `boolean`, which cannot express the third state. `boolean x() default
 /// false` is read by anyone looking at it -- and by IDE completion -- as "off
-/// unless you turn it on", and for many hints that is simply untrue:
-/// `android.appBundle` defaults to ON at the server. The old declaration was
+/// unless you turn it on", which for many hints is simply untrue. It was
 /// harmless on the wire, because an attribute nobody writes is not written into
-/// the request either way, but it stated something about the server that the
-/// client does not get to decide and cannot keep true.
+/// the request either way, but it stated something about the build server that
+/// the client does not get to decide and cannot keep true.
 ///
 /// So the third state is named instead of guessed. [#DEFAULT] sends nothing and
 /// lets the server decide; [#ON] and [#OFF] are the developer overriding it.

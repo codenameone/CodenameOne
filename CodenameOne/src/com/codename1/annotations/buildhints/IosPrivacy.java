@@ -33,13 +33,13 @@ import java.lang.annotation.Target;
 ///
 /// Place this on your application's main class -- the class named by
 /// `codename1.mainName`. An attribute you do not set is not written at all, so
-/// the builder's own default applies. Each attribute's `@Hint(def)` records what
-/// that default is; the `default` clause below it is a neutral placeholder with
-/// no meaning at runtime.
+/// the build server's own default applies. The `default` clause below each
+/// attribute names a constant that says nothing -- see [HintUnset] -- and this
+/// package deliberately does not record what the server would do instead,
+/// because that is the server's to change.
 ///
-/// The platform and the builders that read these hints are stated once on the
-/// annotation, not on every attribute. An attribute repeats one only to
-/// disagree with it.
+/// The platform is stated once on the annotation, not on every attribute. An
+/// attribute repeats it only to disagree with it.
 @Hint(platform = "ios")
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)

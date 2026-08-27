@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>It used to be scraped out of the developer guide's AsciiDoc table at runtime,
  * with each hint's type guessed by string-matching its description prose. It now
  * comes from {@code com.codename1.build.shared.BuildHints}, the same table the
- * build hint annotations are generated from and the same one the drift gate holds
+ * build hint annotations declare, and the same one the drift gate holds
  * the builders against.</p>
  */
 public class BuildHintCatalogTest {

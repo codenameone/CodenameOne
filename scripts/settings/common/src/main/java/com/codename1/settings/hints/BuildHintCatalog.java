@@ -35,8 +35,9 @@ import java.util.Map;
 /**
  * The build hints the Settings tool offers for editing.
  *
- * <p>Built from {@link BuildHints}, the same table the {@code @Ios} / {@code @Android}
- * annotations are generated from and the same one the builders' drift gate checks. It
+ * <p>Built from {@link BuildHints}, which holds the hints declared in the catalog and
+ * the ones the {@code @Ios} / {@code @Android} annotations declare, and is the same one
+ * the builders' drift gate checks. It
  * used to be scraped out of the developer guide's AsciiDoc table at runtime, with the
  * type guessed by string-matching the description prose -- so a hint the guide did not
  * mention was invisible here, and one whose wording changed silently changed type.</p>

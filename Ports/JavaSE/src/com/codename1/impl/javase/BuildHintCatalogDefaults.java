@@ -33,17 +33,15 @@ import java.util.Set;
 /**
  * Build Hint editor schema for every hint that has a build hint annotation.
  *
- * <p>Loaded from the generated data file rather than generated as Java. The
- * annotations are where these hints are declared; this reads the rendering of
- * them that scripts/gen-build-hint-annotations.sh writes, because the simulator
- * has no bytecode reader and this module does not depend on the catalog.</p>
+ * <p>Read from the one data file the annotations are rendered into, rather than
+ * generated as Java: the simulator has no bytecode reader, so it cannot read the
+ * annotations themselves.</p>
  *
- * <p>Registered after {@link BuildHintSchemaDefaults} and skipping every hint
- * that class already describes. Precedence cannot be left to the setter: the
- * group name is part of the property key, so registering harden.level under
- * both `hardening` and `Hardening` does not overwrite anything -- it makes a
- * second group, and the editor renders both, giving the user duplicate controls
- * for one setting.</p>
+ * <p>Registered after {@link BuildHintSchemaDefaults}, skipping every hint that
+ * class already describes and joining its group where it declared one. Neither
+ * can be left to the setter, because both the hint name and the group name are
+ * part of the property key: a second registration overwrites nothing, it adds a
+ * second control, or a second group beside the first.</p>
  */
 final class BuildHintCatalogDefaults {
 
@@ -65,10 +63,17 @@ final class BuildHintCatalogDefaults {
             if (name == null || group == null) {
                 continue;
             }
-            String annotation = str(h, "attr") == null ? group : groupAnnotation(group);
-            set("{{@" + annotation + "}}.label", str(h, "groupLabel"));
             if (handWritten.contains(name)) {
                 continue;
+            }
+            // Join the hand-written group when there is one, and leave its label
+            // alone: it carries a description this file has no equivalent for.
+            String annotation = groupAnnotation(group);
+            String existing = BuildHintSchemaDefaults.declaredGroupFor(annotation);
+            if (existing != null) {
+                annotation = existing;
+            } else {
+                set("{{@" + annotation + "}}.label", str(h, "groupLabel"));
             }
             String key = "{{#" + annotation + "#" + name + "}}";
             set(key + ".label", str(h, "label"));
@@ -110,6 +115,13 @@ final class BuildHintCatalogDefaults {
     private static List<Map<String, Object>> load() {
         InputStream in = BuildHintCatalogDefaults.class.getResourceAsStream(RESOURCE);
         if (in == null) {
+            // Say so rather than coming up with an empty editor. The Maven build gets
+            // this file from the catalog artifact and the Ant build copies it in
+            // (Ports/JavaSE/build.xml), so absence means a build front end that does
+            // neither -- which used to leave the editor silently empty.
+            System.err.println("Warning: " + RESOURCE + " is not on the classpath, so the "
+                    + "build hint editor has no catalog. The JavaSE port needs "
+                    + "codenameone-build-hint-catalog on its classpath.");
             return java.util.Collections.emptyList();
         }
         try {

@@ -958,13 +958,6 @@ public class Simulator {
     }
 
     /**
-     * The compiled main class when it is newer than the manifest, or null.
-     *
-     * <p>Null whenever the question cannot be answered -- no main class recorded,
-     * no class file for it, no readable timestamps -- so the manifest is taken at
-     * face value rather than discarded on a guess.</p>
-     */
-    /**
      * Why the manifest was left behind by an earlier build, or null when it is
      * current.
      *
@@ -999,7 +992,6 @@ public class Simulator {
         return older == null ? null : "is older than " + older;
     }
 
-    /** The compiled main class in the output directory the manifest sits in. */
     /// Whether the class the manifest was generated FROM sits in the same place.
     ///
     /// The processor writes the resource into the very directory it scanned, so a

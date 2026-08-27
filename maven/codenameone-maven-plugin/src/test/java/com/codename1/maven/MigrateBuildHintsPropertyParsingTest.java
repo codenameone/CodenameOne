@@ -858,7 +858,7 @@ public class MigrateBuildHintsPropertyParsingTest {
     }
 
     /// An enum-valued hint renders as `ThemeMode.MODERN`, which is a second
-    /// type to account for: without its own import the generated annotation does
+    /// type to account for: without its own import the annotation does
     /// not compile, so every enum-valued migration was rolled back by its own
     /// verification build.
     @Test

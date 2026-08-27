@@ -5,9 +5,11 @@ created. They mined every `getArg` call site in the builders for a hint's name
 and default, imported the prose from the developer guide's hand-written build
 hint table, and emitted the `BuildHints*.java` registration classes.
 
-**They are not part of any build and should not be re-run.** The catalog is the
-source of truth now and is edited directly; `scripts/gen-build-hint-annotations.sh`
-generates the annotations, the docs and the Settings schema *from* it.
+**They are not part of any build and should not be re-run.** A hint is declared
+either by an annotation in `CodenameOne/src/com/codename1/annotations/buildhints`
+or, when it has none, in the catalog; both are edited directly.
+`scripts/gen-build-hint-annotations.sh` renders those declarations into the data
+file the editors read and the developer guide's table. It generates no code.
 
 They are kept only to show where the catalog's contents came from. They read the
 guide's original hand-written table from a `guide_old.asciidoc` that is

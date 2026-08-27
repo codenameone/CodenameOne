@@ -25,8 +25,8 @@ Application code can read a custom build argument through `Display.getProperty()
 include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
 ----
 
-Here is the current list of supported arguments, generated from the same catalog
-the builders and the annotations are generated from:
+Here is the current list of supported arguments, rendered from the annotations
+and the catalog that declare them:
 
 Most of the commonly used hints also have a compiler-checked form: an annotation
 in `com.codename1.annotations.buildhints` that you put on the application's main

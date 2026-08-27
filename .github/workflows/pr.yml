@@ -222,20 +222,6 @@ jobs:
             rm -rf maven/target/cn1-binaries/ble
             cp -r /tmp/cn1bin-ble/ble maven/target/cn1-binaries/ble
           fi
-      - name: Run Codename One Settings tests
-        # JDK 17: the Settings tool is built with it, and its tests are OFF by
-        # default because the app build needs a Codename One project set up.
-        # Nothing ran them anywhere -- the two workflows that touch the module
-        # pass -Dmaven.test.skip=true -- so every test written for the POM
-        # reader and the hint editor was dead weight, and the bugs they cover
-        # reached review instead of CI.
-        if: ${{ matrix.java-version == 17 }}
-        working-directory: scripts/settings
-        env:
-          RETRY_ONLY_MATCHING: transient
-        run: |
-          bash ../../scripts/ci/retry.sh mvn -B -pl common test \
-            -Dcn1.settings.skipTests=false
       - name: Run Maven plugin tests
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
@@ -284,6 +270,32 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
+      - name: Run Codename One Settings tests
+        if: ${{ matrix.java-version == 8 }}
+        # The tests are OFF by default because the module's app build needs a
+        # Codename One project set up, and nothing ran them anywhere -- the two
+        # workflows that touch the module pass -Dmaven.test.skip=true -- so every
+        # test written for the POM reader and the hint editor was dead weight and
+        # the bugs they cover reached review instead of CI.
+        #
+        # On the 8 leg rather than the 17 one even though the module is compiled
+        # with JDK 17: its POM binds codenameone-maven-plugin at process-classes
+        # and depends on codenameone-javase, and this is the leg that builds both.
+        # The 17 leg builds neither, so the step died at plugin resolution before
+        # running a test. JAVA_HOME_17 comes from the CI container image.
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          set -euo pipefail
+          test -n "${JAVA_HOME_17:-}" && test -d "${JAVA_HOME_17}"
+          (cd maven && mvn -B -Dmaven.javadoc.skip=true \
+            -Dcodename1.platform=javase \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -pl codenameone-maven-plugin -am -Plocal-dev-javase -DskipTests install)
+          cd scripts/settings
+          JAVA_HOME="${JAVA_HOME_17}" bash ../../scripts/ci/retry.sh \
+            mvn -B -pl common test -Dcn1.settings.skipTests=false
       - name: Verify encrypted databases interoperate with reference SQLCipher
         if: ${{ matrix.java-version == 8 }}
         # The portability claim is that every port writes one on-disk format. A cipher

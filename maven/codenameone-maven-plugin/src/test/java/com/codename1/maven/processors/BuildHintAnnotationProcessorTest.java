@@ -1463,7 +1463,7 @@ public class BuildHintAnnotationProcessorTest {
         return new File(url.toURI());
     }
 
-    /// The generated annotations live in codenameone-core, which is already a
+    /// The annotations live in codenameone-core, which is already a
     /// dependency of the plugin, so the compiled sources can reference them.
     private static File coreJar() throws Exception {
         URL url = Class.forName("com.codename1.annotations.buildhints.Ios")
