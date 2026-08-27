@@ -1473,15 +1473,34 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callAvailability___R_int(
     // refuse the next report, which is worth knowing BEFORE telling a caller
     // their call is ringing.
     CXCallObserver *observer = [[CXCallObserver alloc] init];
+    BOOL mineLive = NO;
     for (CXCall *c in observer.calls) {
+        if (c.hasEnded) {
+            continue;
+        }
         BOOL mine = NO;
         @synchronized (cn1clLock) {
             mine = cn1clCalls != nil
                     && [cn1clCalls objectForKey:[c.UUID UUIDString]] != nil;
         }
-        if (!mine && !c.hasEnded) {
+        if (!mine) {
             return CN1_CALL_AVAIL_OTHER_APP;
         }
+        mineLive = YES;
+    }
+    if (mineLive) {
+        // OUR OWN call still blocks the next one here. cn1clConfiguration
+        // sets maximumCallGroups and maximumCallsPerCallGroup to 1, so
+        // CallKit refuses a second reportNewIncomingCall while this app holds
+        // a live call -- and answering AVAILABLE would be the same broken
+        // promise as answering it before the provider was configured: the
+        // caller is told to stop retrying only when it CANNOT ring, and it is
+        // told it can ring when the report is about to be refused.
+        //
+        // Skipped on Android on purpose, not by omission: Telecom accepts a
+        // second self-managed call from the same account, which is why that
+        // bridge ignores its own calls when it answers this question.
+        return CN1_CALL_AVAIL_THIS_APP;
     }
     return CN1_CALL_AVAIL_AVAILABLE;
 #else

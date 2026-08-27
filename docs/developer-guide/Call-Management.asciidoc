@@ -107,6 +107,14 @@ switched your app's calling off, and `Calls.getAvailability()` will tell you
 before you try. An app that assumes reporting always succeeds shows a caller
 "ringing" over a phone that's silent.
 
+One difference between the platforms is worth designing around rather than
+discovering. On iOS the provider is configured for a single call, so while your
+app holds one, CallKit refuses the next report and `getAvailability()` answers
+`THIS_APP_IN_CALL`. Android Telecom accepts a second self-managed call from the
+same account, so it keeps answering `AVAILABLE`. If your app offers call
+waiting, branch on the availability rather than assuming a second call can
+always ring.
+
 Outgoing calls are the same shape, with two extra reports that drive what the
 user sees: `reportStartedConnecting` while the far end is being rung, and
 `reportConnected` when media is actually flowing, which is what starts the call

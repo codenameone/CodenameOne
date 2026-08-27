@@ -58,5 +58,19 @@ public enum CallAvailability {
     /// before configuring is refused whatever the permissions say. This
     /// exists because answering AVAILABLE and then refusing the very next
     /// report is precisely what the check above is documented to prevent.
-    NOT_CONFIGURED
+    NOT_CONFIGURED,
+
+    /// This application already holds a call the platform will not let it
+    /// stack another on.
+    ///
+    /// Appended rather than inserted: the ordinals cross the SPI boundary.
+    ///
+    /// iOS only, and not an oversight elsewhere. The provider is configured
+    /// for one call group of one call, so CallKit refuses a second report
+    /// while this app owns a live call -- and answering AVAILABLE there would
+    /// be the same broken promise as answering it before configure(). Android
+    /// Telecom accepts a second self-managed call from the same account, so
+    /// its bridge deliberately does NOT report this; see the note in
+    /// AndroidCallBridge about isInCall() being true for our own call too.
+    THIS_APP_IN_CALL
 }
