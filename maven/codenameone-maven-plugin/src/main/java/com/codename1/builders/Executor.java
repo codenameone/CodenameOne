@@ -1391,6 +1391,67 @@ public abstract class Executor {
         }
     }
 
+    /// One archive's entries, scanned under a single budget.
+    ///
+    /// Extracted so the outer loop can be driven by a test the way the nested
+    /// one can. Three defects have been found in this accounting and none of
+    /// them was reachable while it lived inside an instance method on an
+    /// abstract class.
+    static void scanArchiveEntriesForPermissions(java.util.zip.ZipFile zip, File tmp,
+            String archiveName, StringBuilder message) throws IOException {
+        java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+        PermScanBudget budget = new PermScanBudget();
+        while (entries.hasMoreElements()) {
+            java.util.zip.ZipEntry entry = entries.nextElement();
+            // Charged before any branch. Skipping an entry here is cheap --
+            // ZipFile is random access -- but cheap per entry is not the same
+            // as unbounded, and the central directory of the OUTER archive is
+            // attacker-controlled too. Charging only the nested loop left this
+            // one free to iterate past the advertised limit.
+            budget.entry(entry.getName());
+            if (entry.isDirectory()) {
+                continue;
+            }
+            if (entry.getName().endsWith(".jar")) {
+                // An Android archive keeps its bytecode in a nested
+                // classes.jar, so an .aar scanned for .class entries
+                // alone yields nothing at all -- and the permissions it
+                // would have justified are simply absent from the
+                // signature, which shows up as a denial on the device
+                // rather than as a build failure. The database scan
+                // beside this one already descends for the same reason.
+                //
+                // Caught per entry: a name ending in .jar need not be an
+                // archive, and one unreadable entry says nothing about
+                // the rest of the library.
+                try {
+                    InputStream nested = zip.getInputStream(entry);
+                    try {
+                        extractNestedClassesForPermissions(nested, tmp, budget);
+                    } finally {
+                        nested.close();
+                    }
+                } catch (IOException cannotReadEntry) {
+                    message.append("WARNING: could not read ")
+                            .append(entry.getName()).append(" inside ")
+                            .append(archiveName)
+                            .append(" while looking for protected API usage; the rest of "
+                                    + "the archive was still read\n");
+                }
+                continue;
+            }
+            if (!entry.getName().endsWith(".class")) {
+                continue;
+            }
+            InputStream in = zip.getInputStream(entry);
+            try {
+                budget.copy(in, budget.nextFile(tmp), entry.getName(), entry.getSize());
+            } finally {
+                in.close();
+            }
+        }
+    }
+
     private void scanArchiveForPermissions(File archive, ClassScanner scanner) throws IOException {
         File tmp = File.createTempFile("cn1-perm-scan", ".d");
         if (!tmp.delete() || !tmp.mkdirs()) {
@@ -1399,51 +1460,7 @@ public abstract class Executor {
         try {
             java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
             try {
-                java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-                PermScanBudget budget = new PermScanBudget();
-                while (entries.hasMoreElements()) {
-                    java.util.zip.ZipEntry entry = entries.nextElement();
-                    if (entry.isDirectory()) {
-                        continue;
-                    }
-                    if (entry.getName().endsWith(".jar")) {
-                        // An Android archive keeps its bytecode in a nested
-                        // classes.jar, so an .aar scanned for .class entries
-                        // alone yields nothing at all -- and the permissions it
-                        // would have justified are simply absent from the
-                        // signature, which shows up as a denial on the device
-                        // rather than as a build failure. The database scan
-                        // beside this one already descends for the same reason.
-                        //
-                        // Caught per entry: a name ending in .jar need not be an
-                        // archive, and one unreadable entry says nothing about
-                        // the rest of the library.
-                        try {
-                            InputStream nested = zip.getInputStream(entry);
-                            try {
-                                extractNestedClassesForPermissions(nested, tmp, budget);
-                            } finally {
-                                nested.close();
-                            }
-                        } catch (IOException cannotReadEntry) {
-                            message.append("WARNING: could not read ")
-                                    .append(entry.getName()).append(" inside ")
-                                    .append(archive.getName())
-                                    .append(" while looking for protected API usage; the rest of "
-                                            + "the archive was still read\n");
-                        }
-                        continue;
-                    }
-                    if (!entry.getName().endsWith(".class")) {
-                        continue;
-                    }
-                    InputStream in = zip.getInputStream(entry);
-                    try {
-                        budget.copy(in, budget.nextFile(tmp), entry.getName(), entry.getSize());
-                    } finally {
-                        in.close();
-                    }
-                }
+                scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message);
             } finally {
                 zip.close();
             }

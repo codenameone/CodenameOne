@@ -255,4 +255,38 @@ class ExecutorArchiveExtractionTest {
         assertTrue(refused.getMessage().contains("refusing to keep scanning"),
                 "expected the entry-count refusal, got: " + refused.getMessage());
     }
+
+    /**
+     * The outer archive is bounded too, not just its nested jars.
+     *
+     * <p>Skipping an entry in the outer loop is cheap, because ZipFile is
+     * random access -- but cheap per entry is not the same as unbounded, and
+     * the outer central directory comes from the same untrusted upload. The
+     * first fix charged only the nested loop and left this one free to run past
+     * the advertised limit.</p>
+     */
+    @Test
+    void anOuterArchiveOfDirectoryEntriesIsRefused() throws Exception {
+        File archive = temporaryDirectory.resolve("wide.jar").toFile();
+        ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(archive.toPath()));
+        for (int i = 0; i < Executor.PERM_SCAN_MAX_ENTRIES + 10; i++) {
+            zos.putNextEntry(new ZipEntry("d" + i + "/"));
+            zos.closeEntry();
+        }
+        zos.close();
+
+        File scratch = temporaryDirectory.resolve("outer-scan").toFile();
+        assertTrue(scratch.mkdirs());
+
+        java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
+        try {
+            IOException refused = assertThrows(IOException.class,
+                    () -> Executor.scanArchiveEntriesForPermissions(
+                            zip, scratch, archive.getName(), new StringBuilder()));
+            assertTrue(refused.getMessage().contains("refusing to keep scanning"),
+                    "expected the entry-count refusal, got: " + refused.getMessage());
+        } finally {
+            zip.close();
+        }
+    }
 }
