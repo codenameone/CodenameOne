@@ -265,6 +265,51 @@ public final class DocumentIndexSerializer {
     /// happens. Refusing the publish says which node is at fault instead.
     private static final int MAX_COMPONENT_BYTES = 255;
 
+    /// Every code point Unicode canonically decomposes to exactly one OTHER code point.
+    ///
+    /// A closed set, not a selection: these are the characters that are a different character
+    /// after normalization, so a name using one is a name the filesystem stores under a
+    /// different spelling. The CJK compatibility ideographs are the bulk of it and come as
+    /// blocks; the rest are named individually because that is how many there are.
+    private static boolean isCanonicalSingleton(int c) {
+        switch (c) {
+            case 0x0374: // GREEK NUMERAL SIGN -> MODIFIER LETTER PRIME
+            case 0x037E: // GREEK QUESTION MARK -> SEMICOLON
+            case 0x0387: // GREEK ANO TELEIA -> MIDDLE DOT
+            case 0x1F71: // the oxia forms, each to its tonos twin
+            case 0x1F73:
+            case 0x1F75:
+            case 0x1F77:
+            case 0x1F79:
+            case 0x1F7B:
+            case 0x1F7D:
+            case 0x1FBB:
+            case 0x1FBE: // GREEK PROSGEGRAMMENI -> GREEK SMALL LETTER IOTA
+            case 0x1FC9:
+            case 0x1FCB:
+            case 0x1FD3: // IOTA WITH DIALYTIKA AND OXIA -> WITH DIALYTIKA AND TONOS
+            case 0x1FDB:
+            case 0x1FE3: // UPSILON WITH DIALYTIKA AND OXIA
+            case 0x1FEB:
+            case 0x1FEE: // DIALYTIKA AND OXIA -> GREEK DIALYTIKA TONOS
+            case 0x1FEF: // GREEK VARIA -> GRAVE ACCENT
+            case 0x1FF9:
+            case 0x1FFB:
+            case 0x1FFD: // GREEK OXIA -> ACUTE ACCENT
+            case 0x2000: // EN QUAD -> EN SPACE
+            case 0x2001: // EM QUAD -> EM SPACE
+            case 0x2126: // OHM SIGN -> GREEK CAPITAL LETTER OMEGA
+            case 0x212A: // KELVIN SIGN -> LATIN CAPITAL LETTER K
+            case 0x212B: // ANGSTROM SIGN -> LATIN CAPITAL LETTER A WITH RING ABOVE
+            case 0x2329: // LEFT-POINTING ANGLE BRACKET -> LEFT ANGLE BRACKET
+            case 0x232A: // RIGHT-POINTING ANGLE BRACKET -> RIGHT ANGLE BRACKET
+                return true;
+            default:
+                // CJK compatibility ideographs, and their supplementary block.
+                return (c >= 0xF900 && c <= 0xFAFF) || (c >= 0x2F800 && c <= 0x2FA1F);
+        }
+    }
+
     /// The index of the first character a file name cannot carry, or -1.
     ///
     /// NUL terminates a path, so a name holding one is a name the filesystem cannot be given.
@@ -312,15 +357,22 @@ public final class DocumentIndexSerializer {
     /// diacriticals, their supplement and extended range, the symbols block, and the half marks.
     ///
     /// A SINGLETON is a character that normalizes to a different single character with no mark
-    /// involved: the letterlike ANGSTROM, OHM and KELVIN signs, which normalize to the ordinary
-    /// letters, and the CJK compatibility ideographs, which normalize to their unified forms.
-    /// Those are where Unicode's singleton canonical decompositions live, so refusing them
-    /// closes the case a combining-mark test cannot see -- U+212B and U+00C5 carry no mark and
-    /// are still one filename.
+    /// involved -- U+212B ANGSTROM SIGN is U+00C5, and U+1F71 GREEK SMALL LETTER ALPHA WITH OXIA
+    /// is U+03AC WITH TONOS -- so two names can be one filename with neither of them decomposed.
+    /// Unicode's singleton canonical decompositions are a closed set and this is all of it: the
+    /// three letterlike signs, the Greek numeral sign, question mark and ano teleia, the oxia
+    /// forms and the other Greek Extended singletons, the two quads, the two angle brackets, and
+    /// the CJK compatibility ideographs, which are big enough to take by range.
     ///
-    /// This is not a normalizer and does not claim to be one; there is none to call here. It
-    /// makes the accepted set one where equal-looking names are equal strings, which is what the
-    /// sibling check needs.
+    /// The combining ranges are the generic diacriticals, deliberately: those are the marks that
+    /// decompose letters which HAVE a precomposed spelling. A script whose marks have no
+    /// precomposed form -- Devanagari, Hebrew points, Arabic vowels, Thai -- lives outside them
+    /// and is not touched, which is why this can refuse decomposed spellings without refusing
+    /// whole writing systems.
+    ///
+    /// This is not a normalizer and does not claim to be one; there is none to call here. What
+    /// it does is make the accepted set one where equal-looking names are equal strings, which
+    /// is what the sibling check needs.
     private static int combiningMarkAt(String value) {
         // By CODE POINT, not by char. The supplementary compatibility ideographs live at
         // U+2F800-U+2FA1F and arrive here as surrogate pairs, so a char-by-char scan never sees
@@ -332,9 +384,7 @@ public final class DocumentIndexSerializer {
             if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
                     || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
                     || (c >= 0xFE20 && c <= 0xFE2F)
-                    || c == 0x212B || c == 0x2126 || c == 0x212A
-                    || (c >= 0xF900 && c <= 0xFAFF)
-                    || (c >= 0x2F800 && c <= 0x2FA1F)) {
+                    || isCanonicalSingleton(c)) {
                 return i;
             }
             i += Character.charCount(c);

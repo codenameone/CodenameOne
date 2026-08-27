@@ -294,6 +294,27 @@ class DocumentIndexSerializerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(compatibility));
 
+        // The Greek oxia forms are singletons too, and neither spelling is decomposed: U+1F71
+        // normalizes to U+03AC, so the two are one filename on an Apple volume.
+        DocumentNode oxia = DocumentNode.folder("root", "Root");
+        oxia.add(DocumentNode.file("a", "\u1f71.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(oxia));
+
+        DocumentNode tonos = DocumentNode.folder("root", "Root");
+        tonos.add(DocumentNode.file("a", "\u03ac.txt"));
+        assertNotNull(DocumentIndexSerializer.serialize(tonos));
+
+        // A script whose marks have no precomposed form is untouched -- refusing decomposed
+        // spellings must not amount to refusing whole writing systems.
+        DocumentNode devanagari = DocumentNode.folder("root", "Root");
+        devanagari.add(DocumentNode.file("a", "\u0915\u094d\u0937.txt"));
+        assertNotNull(DocumentIndexSerializer.serialize(devanagari));
+
+        DocumentNode hebrew = DocumentNode.folder("root", "Root");
+        hebrew.add(DocumentNode.file("a", "\u05e9\u05c1\u05b8.txt"));
+        assertNotNull(DocumentIndexSerializer.serialize(hebrew));
+
         // The supplementary compatibility block too, which a char-by-char scan cannot see: it
         // arrives as a surrogate pair. U+2F800 normalizes to U+4E3D.
         DocumentNode supplementary = DocumentNode.folder("root", "Root");
