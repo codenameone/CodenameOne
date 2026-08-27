@@ -8563,6 +8563,23 @@ public final class Display extends CN1Constants {
         if (f == null) {
             return;
         }
+        // A gesture that has been claimed stays claimed. The platform reports a
+        // location on every magnify event and the layout under it moves as the
+        // component zooms, so hit-testing each update let an ongoing pinch
+        // migrate to a different component: the first was left mid-gesture and
+        // never received pinchReleased() -- an ImageViewer stuck in
+        // isPinchZooming, never committing currentZoom -- while the second got
+        // the release for a gesture it never started.
+        //
+        // The form check is for a target removed while the gesture was running;
+        // delivering to a detached component would be delivering into nothing.
+        if (pinchGestureTarget != null) {
+            if (pinchGestureTarget.getComponentForm() != null) {
+                pinchGestureTarget.pinch(scale);
+                return;
+            }
+            pinchGestureTarget = null;
+        }
         Component cmp = gestureComponentAt(f, x, y);
         if (cmp == null) {
             cmp = f;

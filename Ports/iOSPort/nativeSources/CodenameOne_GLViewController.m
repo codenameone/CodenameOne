@@ -610,6 +610,7 @@ extern void cn1CapturePointerMetadata(UITouch* touch);
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
                                       int precise, int modifiers);
 extern void pinchMagnifyCallback(float scale, int x, int y);
+extern void CN1MacPinchRelease(int x, int y);
 extern void rotationGestureCallback(float radians, int x, int y);
 extern void screenSizeChanged(int width, int height);
 extern void keyPressedNative(int keyCode);
@@ -3817,6 +3818,17 @@ bool lockDrawing;
             // Reset so each callback carries an incremental scale relative to 1.0.
             recognizer.scale = 1.0;
         }
+    } else if (recognizer.state == UIGestureRecognizerStateEnded
+               || recognizer.state == UIGestureRecognizerStateCancelled) {
+        // The end of the gesture, which this path never used to report. A
+        // trackpad pinch produces no touch events, so nothing else tells the
+        // framework the fingers left -- a component that zooms stayed in its
+        // pinching state afterwards. It also matters now that Display keeps the
+        // gesture on its first consumer: without a release the claim would never
+        // be given up and every later pinch in the process would be delivered to
+        // that same component.
+        CGPoint loc = [recognizer locationInView:self.view];
+        CN1MacPinchRelease((int)(loc.x * scaleValue), (int)(loc.y * scaleValue));
     }
 }
 #endif

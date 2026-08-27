@@ -185,7 +185,14 @@ public class MacOSXcodeProjectTest {
         MacOSXcodeProject.MacOSCapabilities caps = new MacOSXcodeProject.MacOSCapabilities();
         caps.usesPush = true;
 
-        // Both channels, because aps-environment is not a sandbox permission:
+        // The macOS spelling of the key, which is not the iOS one -- Xcode's own
+        // macOS capability template writes com.apple.developer.aps-environment
+        // where the iOS template beside it writes a bare aps-environment, and a
+        // build carrying the wrong one does not match its provisioning profile.
+        assertEquals("com.apple.developer.aps-environment",
+                MacOSXcodeProject.ENT_APS_ENVIRONMENT);
+
+        // Both channels, because APNs is not a sandbox permission:
         // macOS refuses registerForRemoteNotifications for any signed executable
         // that does not carry it, and this build hands codesign an explicit
         // entitlements file -- so what is missing from the file is missing from
@@ -306,8 +313,13 @@ public class MacOSXcodeProjectTest {
                 + "<key>CFBundleTypeName</key><string>Text</string></dict></array>\n"
                 + "<key>NSAppTransportSecurity</key><dict/>";
         assertTrue(MacOSXcodeProject.isRawPlistFragment(xml));
-        assertEquals(Arrays.asList("CFBundleDocumentTypes", "CFBundleTypeName",
-                        "NSAppTransportSecurity"),
+        // ROOT members only. CFBundleTypeName lives inside the fragment's own
+        // array/dict, so it replaces nothing at the top level -- this assertion
+        // used to expect it, and what that pinned was the caller deleting a
+        // generated top-level value the fragment never supplied. <dict/> is
+        // self-closing and must not open a level, or NSAppTransportSecurity
+        // after it would be read as nested.
+        assertEquals(Arrays.asList("CFBundleDocumentTypes", "NSAppTransportSecurity"),
                 MacOSXcodeProject.injectedPlistKeys(xml));
 
         // The shorthand keeps working and is not mistaken for XML.
@@ -320,6 +332,39 @@ public class MacOSXcodeProjectTest {
                 MacOSXcodeProject.injectedPlistKeys("<key>A</key><key>B"));
         assertTrue(MacOSXcodeProject.injectedPlistKeys(null).isEmpty());
         assertFalse(MacOSXcodeProject.isRawPlistFragment(null));
+    }
+
+    /**
+     * A key the fragment does not actually declare at its root must not delete
+     * the generated one.
+     */
+    @Test
+    public void nestedAndCommentedKeysDoNotCountAsOverrides() {
+        // Nested: a URL type whose sub-dictionary names CFBundleIdentifier. The
+        // fragment adds a URL type; it does not replace the bundle identifier,
+        // and removing the generated one leaves a bundle that cannot be signed.
+        String nested = "<key>CFBundleURLTypes</key><array><dict>"
+                + "<key>CFBundleIdentifier</key><string>com.example.url</string>"
+                + "</dict></array>";
+        assertEquals(Arrays.asList("CFBundleURLTypes"),
+                MacOSXcodeProject.injectedPlistKeys(nested));
+
+        // Commented out: the one form that is unmistakably not in effect.
+        String commented = "<!-- <key>CFBundleIdentifier</key><string>x</string> -->"
+                + "<key>CFBundleName</key><string>Thing</string>";
+        assertEquals(Arrays.asList("CFBundleName"),
+                MacOSXcodeProject.injectedPlistKeys(commented));
+
+        // An unterminated comment swallows the rest, which is what a parser
+        // would conclude too.
+        assertTrue(MacOSXcodeProject.injectedPlistKeys(
+                "<!-- <key>CFBundleName</key>").isEmpty());
+
+        // Depth is restored on the way out, so a root key after a nested block
+        // is still a root key.
+        String after = "<key>A</key><array><dict><key>Inner</key><string>v</string></dict></array>"
+                + "<key>B</key><string>v</string>";
+        assertEquals(Arrays.asList("A", "B"), MacOSXcodeProject.injectedPlistKeys(after));
     }
 
     /** The raw fragment reaches the file verbatim, inside the dict. */

@@ -15733,17 +15733,29 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification2___java_lang_St
         UNNotificationTrigger *trigger = cn1CreateNotificationTrigger(fireDate, repeatType);
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:notificationIdString content:content trigger:trigger];
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
+        // Scheduled from INSIDE the completion handler, exactly as the plain
+        // sender above does it. requestAuthorization is asynchronous: on a fresh
+        // install it puts the permission prompt on screen and returns, so
+        // scheduling straight afterwards raced the user's answer and the first
+        // enriched notification an application ever posts was rejected and lost
+        // with nothing said about it. Every later one worked, which is the worst
+        // version of this bug -- it looks like a flake rather than a rule.
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
             completionHandler:^(BOOL granted, NSError * _Nullable authError) {
                 if (authError != nil) {
                     CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                    return;
                 }
-        }];
-        cn1CancelScheduledLocalNotificationById(notificationIdString);
-        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-            if (error != nil) {
-                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
-            }
+                if (!granted) {
+                    CN1Log(@"Local notification authorization was not granted");
+                    return;
+                }
+                cn1CancelScheduledLocalNotificationById(notificationIdString);
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                    if (error != nil) {
+                        CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+                    }
+                }];
         }];
     } else {
         CN1Log(@"Ignoring local notification request on iOS versions below 10");

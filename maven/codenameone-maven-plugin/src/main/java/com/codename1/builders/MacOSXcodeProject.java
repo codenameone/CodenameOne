@@ -56,7 +56,16 @@ public class MacOSXcodeProject {
     static final String ENT_NETWORK_SERVER = "com.apple.security.network.server";
     static final String ENT_FILES_USER_SELECTED = "com.apple.security.files.user-selected.read-write";
     static final String ENT_CAMERA = "com.apple.security.device.camera";
-    static final String ENT_APS_ENVIRONMENT = "aps-environment";
+    /// The APNs entitlement key, in its macOS spelling.
+    ///
+    /// macOS and iOS do not agree on this one. iOS wants a bare
+    /// "aps-environment" and macOS wants it under the com.apple.developer
+    /// prefix, and a build signed with the other platform's spelling carries an
+    /// entitlement the provisioning profile does not match. Verified against
+    /// Xcode's own capability templates rather than remembered: the macOS
+    /// CloudKit template writes com.apple.developer.aps-environment where the
+    /// iOS one beside it writes aps-environment.
+    static final String ENT_APS_ENVIRONMENT = "com.apple.developer.aps-environment";
     static final String ENT_MICROPHONE = "com.apple.security.device.audio-input";
     static final String ENT_BLUETOOTH = "com.apple.security.device.bluetooth";
     static final String ENT_LOCATION = "com.apple.security.personal-information.location";
@@ -198,31 +207,94 @@ public class MacOSXcodeProject {
      * produces a bundle that launches to nothing.</p>
      */
     /**
-     * The keys a raw plist fragment declares, in order.
+     * The keys a raw plist fragment declares at its ROOT, in order.
      *
-     * <p>Scanned rather than parsed: the fragment is written verbatim, and the
-     * only thing the builder needs from it is which generated keys it is about
-     * to replace. Anything that is not a well formed {@code <key>...</key>} is
-     * simply not reported, which is the right answer for a scan whose job is to
-     * warn.</p>
+     * <p>Only the root members, because the caller uses this list to delete
+     * generated entries from the top-level plist. A {@code <key>} nested inside
+     * one of the fragment's own dictionaries or arrays replaces nothing at the
+     * top level, so reporting it deleted a generated value the fragment never
+     * supplied: a fragment adding a URL type whose sub-dictionary happens to name
+     * CFBundleIdentifier removed the bundle's actual identifier, and the result
+     * fails to bundle or sign for a reason nothing in the log connects to the
+     * hint.</p>
+     *
+     * <p>Comments are stripped first, for the same reason and worse: a
+     * commented-out override is the one form that is unmistakably NOT in effect,
+     * and it was deleting the generated key anyway.</p>
+     *
+     * <p>Still a scan rather than a parse -- the fragment is written verbatim and
+     * a malformed one has to reach codesign as the customer wrote it -- but a
+     * scan that tracks depth. Values cannot forge a depth change: a literal
+     * {@code <dict>} inside a string value would have to be escaped to be valid
+     * XML at all.</p>
      */
     public static List<String> injectedPlistKeys(String xml) {
         List<String> keys = new ArrayList<String>();
         if (xml == null) {
             return keys;
         }
+        String scan = stripXmlComments(xml);
+        int depth = 0;
         int at = 0;
-        while (true) {
-            int open = xml.indexOf("<key>", at);
+        while (at < scan.length()) {
+            int open = scan.indexOf('<', at);
             if (open < 0) {
                 return keys;
             }
-            int close = xml.indexOf("</key>", open);
+            int close = scan.indexOf('>', open);
             if (close < 0) {
                 return keys;
             }
-            keys.add(xml.substring(open + "<key>".length(), close).trim());
-            at = close + "</key>".length();
+            String tag = scan.substring(open + 1, close).trim();
+            boolean selfClosing = tag.endsWith("/");
+            if (tag.startsWith("/")) {
+                String name = tag.substring(1).trim();
+                if ("dict".equals(name) || "array".equals(name)) {
+                    depth--;
+                }
+                at = close + 1;
+                continue;
+            }
+            String name = tag.endsWith("/") ? tag.substring(0, tag.length() - 1).trim() : tag;
+            int space = name.indexOf(' ');
+            if (space > -1) {
+                name = name.substring(0, space);
+            }
+            if ("key".equals(name) && depth == 0) {
+                int end = scan.indexOf("</key>", close);
+                if (end < 0) {
+                    return keys;
+                }
+                keys.add(scan.substring(close + 1, end).trim());
+                at = end + "</key>".length();
+                continue;
+            }
+            if (!selfClosing && ("dict".equals(name) || "array".equals(name))) {
+                depth++;
+            }
+            at = close + 1;
+        }
+        return keys;
+    }
+
+    /** The fragment with every {@code <!-- ... -->} region removed. */
+    private static String stripXmlComments(String xml) {
+        StringBuilder out = new StringBuilder(xml.length());
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<!--", at);
+            if (open < 0) {
+                out.append(xml.substring(at));
+                return out.toString();
+            }
+            out.append(xml, at, open);
+            int close = xml.indexOf("-->", open);
+            if (close < 0) {
+                // Unterminated: everything after it is comment, which is what a
+                // parser would conclude too.
+                return out.toString();
+            }
+            at = close + "-->".length();
         }
     }
 
