@@ -5817,7 +5817,15 @@ JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletio
         // Parked off screen at a nominal size, like every other peer, until the
         // framework gives it real bounds.
         moviePlayerInstance = [[AVPlayerView alloc] initWithFrame:NSMakeRect(3000, 0, 200, 200)];
-        moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+        // MRC ownership: alloc is +1 to us and the player property retains it
+        // again, so releasing the view later drops only the property's reference
+        // and the allocation outlives it -- with its player item and media
+        // buffers. Every create/clean-up cycle leaked one player.
+        AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+        moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+        [cn1Player release];
+#endif
         registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
         moviePlayerInstance.controlsStyle = AVPlayerViewControlsStyleInline;
         POOL_END();
@@ -5835,7 +5843,15 @@ JAVA_LONG createVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCompletio
                 u = [NSURL URLWithString:s];
             }
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
         
@@ -5912,7 +5928,15 @@ JAVA_LONG createNativeVideoComponentFromStringAV(JAVA_OBJECT str, JAVA_INT onCom
                 u = [NSURL URLWithString:s];
             }
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
             POOL_END();
         });
@@ -6001,7 +6025,15 @@ JAVA_LONG createVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onCompletionCa
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
 
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
             
@@ -6054,8 +6086,13 @@ JAVA_LONG createNativeVideoComponentAV(JAVA_OBJECT dataObject, JAVA_INT onComple
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
+            // Same MRC ownership as the sites above: this one already used a
+            // temporary but never gave up the allocation's reference.
             AVPlayer* player = [[AVPlayer alloc] initWithURL:u];
             moviePlayerInstance.player = player;
+#ifndef CN1_USE_ARC
+            [player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
@@ -6179,7 +6216,15 @@ JAVA_LONG createVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onCompletionCa
             [d writeToFile:path atomically:YES];
             NSURL *u = [NSURL fileURLWithPath:path];
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
@@ -6261,7 +6306,15 @@ JAVA_LONG createNativeVideoComponentNSDataAV(JAVA_LONG nsData, JAVA_INT onComple
             NSURL *u = [NSURL fileURLWithPath:path];
             
             moviePlayerInstance = [[AVPlayerViewController alloc] init];
-            moviePlayerInstance.player = [[AVPlayer alloc] initWithURL:u];
+            // MRC ownership: alloc is +1 to us and the player property retains it
+            // again, so releasing the view later drops only the property's reference
+            // and the allocation outlives it -- with its player item and media
+            // buffers. Every create/clean-up cycle leaked one player.
+            AVPlayer* cn1Player = [[AVPlayer alloc] initWithURL:u];
+            moviePlayerInstance.player = cn1Player;
+#ifndef CN1_USE_ARC
+            [cn1Player release];
+#endif
             registerVideoCallbackAV(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.player, onCompletionCallbackId);
 
             POOL_END();

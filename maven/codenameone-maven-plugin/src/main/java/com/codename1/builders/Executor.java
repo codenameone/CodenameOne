@@ -1272,10 +1272,42 @@ public abstract class Executor {
          *                 without reading it. It comes out of the same untrusted
          *                 file as the bytes, so it is a hint and never the bound.
          */
+        /**
+         * Reads one entry to its end under the budget WITHOUT keeping it.
+         *
+         * <p>For an entry the scan does not want, which it still cannot afford to
+         * let the stream inflate unbounded.</p>
+         */
+        void drain(InputStream in, String name, long declared) throws IOException {
+            copy(in, null, name, declared);
+        }
+
         void copy(InputStream in, File out, String name, long declared) throws IOException {
             if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
-                throw new IOException("class entry " + name + " declares " + declared
-                        + " bytes; refusing to extract it");
+                throw new IOException("entry " + name + " declares " + declared
+                        + " bytes; refusing to read it");
+            }
+            if (out == null) {
+                // Drain: the same accounting, no file. Kept on one code path so
+                // the limits cannot come to differ between what is extracted and
+                // what is merely stepped over.
+                byte[] buf = new byte[8192];
+                int n;
+                long entryBytes = 0;
+                while ((n = in.read(buf)) != -1) {
+                    entryBytes += n;
+                    total += n;
+                    if (entryBytes > PERM_SCAN_MAX_ENTRY_BYTES) {
+                        throw new IOException("entry " + name + " expands past "
+                                + PERM_SCAN_MAX_ENTRY_BYTES + " bytes; refusing to keep reading");
+                    }
+                    if (total > PERM_SCAN_MAX_TOTAL_BYTES) {
+                        throw new IOException("archive entries expand beyond the "
+                                + PERM_SCAN_MAX_TOTAL_BYTES
+                                + " byte scan budget; refusing to keep reading");
+                    }
+                }
+                return;
             }
             FileOutputStream fos = new FileOutputStream(out);
             try {
@@ -1316,6 +1348,16 @@ public abstract class Executor {
         java.util.zip.ZipEntry inner;
         while ((inner = zis.getNextEntry()) != null) {
             if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
+                // Drained under the budget rather than skipped. This is a
+                // ZipInputStream, so the next getNextEntry() has to reach the end
+                // of this entry to find the boundary and inflates it to get
+                // there -- an entry we never extract is decompressed anyway. A
+                // few kilobytes of deflate stream in a non-class entry could
+                // therefore still occupy the daemon for as long as it liked,
+                // which the class-entry limits alone did nothing about. The
+                // outer scan needs no such thing: it reads through ZipFile,
+                // where skipping an entry is random access and costs nothing.
+                budget.drain(zis, inner.getName(), inner.getSize());
                 continue;
             }
             budget.copy(zis, budget.nextFile(tmp), inner.getName(), inner.getSize());
