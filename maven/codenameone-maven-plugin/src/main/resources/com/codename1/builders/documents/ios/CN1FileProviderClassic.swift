@@ -98,6 +98,21 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         inFlightLock.unlock()
     }
 
+    /// Drops this fetch's entry, and only this one.
+    ///
+    /// The entry is matched by task identity rather than by URL alone. A cancelled download can
+    /// call back after the same URL has been reopened, and removing whatever was under the key
+    /// took the REPLACEMENT's task out of the map -- so a later stop found nothing to cancel and
+    /// a large download went on using the network after its eviction. Generations cannot stand in
+    /// for this: two opens with no stop between them share one.
+    private func clearFetch(_ task: URLSessionTask?, at url: URL) {
+        inFlightLock.lock()
+        if let task = task, inFlight[url] === task {
+            inFlight.removeValue(forKey: url)
+        }
+        inFlightLock.unlock()
+    }
+
     /// Whether a stop has arrived for `url` since `generation` was taken. Read-only: the
     /// in-flight entry is claimed by finishFetch, so this is the after-the-write check.
     private func stillWanted(at url: URL, generation: Int) -> Bool {
@@ -110,7 +125,6 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     private func finishFetch(at url: URL, generation: Int) -> Bool {
         inFlightLock.lock()
         defer { inFlightLock.unlock() }
-        inFlight.removeValue(forKey: url)
         return (stopGeneration[url] ?? 0) == generation
     }
 
@@ -323,10 +337,14 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // Registered below so stopProvidingItem can reach it; the generation is captured first
         // so a stop landing after the download finishes is still seen.
         let generation = beginFetch(at: url)
+        // The completion has to name its OWN task to drop the right entry, and the task does not
+        // exist until fetch returns -- so it is handed over in a box, filled in below before
+        // anything can start: the task comes back suspended.
+        let box = CN1FetchBox()
         let task = CN1DocumentRemote.fetch(remoteId: remoteId,
                                            settings: settings) { fetched, error in
+            self.clearFetch(box.task, at: url)
             guard let fetched = fetched else {
-                _ = self.finishFetch(at: url, generation: generation)
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
                 return
             }
@@ -371,6 +389,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         }
         // Registered before it is started, so a stop arriving in between finds a task to cancel
         // rather than a download it can only refuse to store afterwards.
+        box.task = task
         registerFetch(task, at: url)
         task?.resume()
     }
@@ -471,4 +490,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             return error
         }
     }
+}
+
+/// Carries a task to the completion handler that belongs to it.
+///
+/// The task does not exist until `fetch` returns, and its completion has to name it to drop the
+/// right in-flight entry. The task comes back suspended, so this is filled in before anything can
+/// run and no synchronisation is needed on top of that ordering.
+private final class CN1FetchBox {
+    var task: URLSessionTask?
 }
