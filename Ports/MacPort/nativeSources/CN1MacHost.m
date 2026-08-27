@@ -26,6 +26,7 @@
 #import "CN1MacHost.h"
 #import "METALView.h"
 #import "CN1AppKitCompat.h"
+#import "CN1AppKitWindows.h"
 
 /// Default window size when the application does not ask for one. Chosen to be
 /// a reasonable desktop window rather than a phone-shaped one, which is what an
@@ -167,10 +168,13 @@ void CN1MacRefreshScaleValue(void) {
             | NSWindowStyleMaskClosable
             | NSWindowStyleMaskMiniaturizable
             | NSWindowStyleMaskResizable;
-    _window = [[NSWindow alloc] initWithContentRect:frame
-                                          styleMask:style
-                                            backing:NSBackingStoreBuffered
-                                              defer:NO];
+    // CN1MacWindow, not NSWindow: a modal dialog usually blocks THIS window, and
+    // blocking it has to include refusing key focus. See CN1AppKitWindows.h.
+    _window = [[CN1MacWindow alloc] initWithContentRect:frame
+                                              styleMask:style
+                                                backing:NSBackingStoreBuffered
+                                                  defer:NO];
+    ((CN1MacWindow *)_window).cn1AcceptsKey = YES;
     // Remembers where the user left it between launches. One line, and its
     // absence is the kind of thing that makes an app feel unfinished.
     [_window setFrameAutosaveName:@"CN1MainWindow"];

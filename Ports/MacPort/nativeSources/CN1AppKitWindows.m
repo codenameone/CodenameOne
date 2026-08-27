@@ -24,6 +24,7 @@
 #import "METALView.h"
 #import "CN1MacHost.h"
 #import "CN1AppKitCompat.h"
+#import "CN1AppKitWindows.h"
 #import "CodenameOne_GLViewController.h"
 #include "cn1_globals.h"
 #include "java_lang_String.h"
@@ -49,6 +50,18 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
  * this file is a fraction of the size of CN1MacWindows.m and why none of that
  * machinery appears here.
  */
+
+@implementation CN1MacWindow
+- (BOOL)canBecomeKeyWindow {
+    return self.cn1AcceptsKey && [super canBecomeKeyWindow];
+}
+@end
+
+@implementation CN1MacPanel
+- (BOOL)canBecomeKeyWindow {
+    return self.cn1AcceptsKey && [super canBecomeKeyWindow];
+}
+@end
 
 @interface CN1MacWindowRecord : NSObject <NSWindowDelegate>
 @property (nonatomic, assign) int windowId;
@@ -418,11 +431,12 @@ static NSWindow *cn1MakeWindow(NSRect contentRect, BOOL decorated, BOOL resizabl
             mask |= NSWindowStyleMaskResizable;
         }
     }
-    Class cls = utility ? [NSPanel class] : [NSWindow class];
+    Class cls = utility ? [CN1MacPanel class] : [CN1MacWindow class];
     NSWindow *w = [[cls alloc] initWithContentRect:contentRect
                                          styleMask:mask
                                            backing:NSBackingStoreBuffered
                                              defer:NO];
+    CN1MacWindowSetAcceptsKey(w, YES);
     w.releasedWhenClosed = NO;
     if (utility) {
         ((NSPanel *)w).floatingPanel = NO;
@@ -985,9 +999,33 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRequestFocus___int(CODENAME_
 /// bar belongs to AppKit, so the close button of a window blocked by a modal
 /// dialog still reached the application and disposed it. That is the exact case
 /// WindowManager.setInputEnabled documents as its reason for existing.
+void CN1MacWindowSetAcceptsKey(NSWindow *w, BOOL accepts) {
+    if ([w respondsToSelector:@selector(setCn1AcceptsKey:)]) {
+        [(CN1MacWindow *)w setCn1AcceptsKey:accepts];
+    }
+}
+
 static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled) {
     if (w == nil) {
         return;
+    }
+    // The keyboard, as well as the chrome. Disabling the rendering view makes
+    // the window discard what is typed into it; it does not stop the window
+    // holding the keyboard in the first place, and the modal session this port
+    // begins is never pumped, so it does not stop it either. Without this the
+    // blocked window could take key focus back from the modal one and then throw
+    // away every keystroke aimed at it.
+    CN1MacWindowSetAcceptsKey(w, enabled);
+    if (!enabled && w.isKeyWindow) {
+        // Already holding it, so the gate alone is too late -- it only refuses
+        // the next request. Hand the keyboard to the window that caused the
+        // block. NSApp.modalWindow is the one an application modal session named;
+        // a window modal block names none, and there the framework makes its own
+        // dialog key straight afterwards.
+        NSWindow *modal = [NSApp modalWindow];
+        if (modal != nil && modal != w) {
+            [modal makeKeyAndOrderFront:nil];
+        }
     }
     // Enabling restores what the style mask says rather than switching all three
     // on. AppKit derives these from the mask itself -- a window built without

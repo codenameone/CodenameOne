@@ -1437,6 +1437,43 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     return nl.location == NSNotFound ? text.length : nl.location;
 }
 
+/// The index just past the line break beginning at `at`, treating CRLF as one.
+///
+/// A line break is one break to the user and two UTF-16 units on the wire, and
+/// text arriving from the framework can hold either form. Stepping over a single
+/// unit left the caret between the CR and the LF, where the next lookup found
+/// the LF and reported an empty line -- so Down had to be pressed twice to reach
+/// the next line, and once put the caret inside the break itself. CRLF is not a
+/// composed character sequence as far as NSString is concerned, so nothing does
+/// this on our behalf.
+- (NSUInteger)cn1AfterLineBreak:(NSUInteger)at inText:(NSString *)text {
+    if (text == nil || at >= text.length) {
+        return text == nil ? 0 : text.length;
+    }
+    NSUInteger next = at + 1;
+    if ([text characterAtIndex:at] == 0x000D && next < text.length
+            && [text characterAtIndex:next] == 0x000A) {
+        next++;
+    }
+    return next;
+}
+
+/// The index at which the line break ending just before `lineStart` begins.
+///
+/// The mirror of cn1AfterLineBreak: for Up, which walks the other way and would
+/// otherwise treat the LF of a CRLF as a line of its own.
+- (NSUInteger)cn1BeforeLineBreak:(NSUInteger)lineStart inText:(NSString *)text {
+    if (text == nil || lineStart == 0) {
+        return 0;
+    }
+    NSUInteger end = MIN(lineStart, text.length) - 1;
+    if (end > 0 && [text characterAtIndex:end] == 0x000A
+            && [text characterAtIndex:end - 1] == 0x000D) {
+        end--;
+    }
+    return end;
+}
+
 /// Where Up or Down puts the caret: the same column on the neighbouring line,
 /// clamped to that line's length.
 - (NSUInteger)cn1VerticalTarget:(NSRange)sel up:(BOOL)up inText:(NSString *)text {
@@ -1452,7 +1489,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             // what a Mac text field does rather than nothing at all.
             return 0;
         }
-        NSUInteger prevEnd = lineStart - 1;
+        NSUInteger prevEnd = [self cn1BeforeLineBreak:lineStart inText:text];
         NSUInteger prevStart = [self cn1LineStart:prevEnd inText:text];
         return MIN(prevStart + column, prevEnd);
     }
@@ -1460,7 +1497,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     if (lineEnd >= text.length) {
         return text.length;
     }
-    NSUInteger nextStart = lineEnd + 1;
+    NSUInteger nextStart = [self cn1AfterLineBreak:lineEnd inText:text];
     NSUInteger nextEnd = [self cn1LineEnd:nextStart inText:text];
     return MIN(nextStart + column, nextEnd);
 }
@@ -1724,8 +1761,10 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
             NSUInteger lineEnd = [self cn1LineEnd:sel.location inText:session.text];
             if (lineEnd <= sel.location) {
                 // Already at the end of the line. AppKit's own behaviour is to
-                // take the newline itself, joining this line with the next.
-                lineEnd = MIN(sel.location + 1, len);
+                // take the newline itself, joining this line with the next --
+                // the WHOLE newline, so a CRLF does not leave its LF behind as
+                // an empty line.
+                lineEnd = MIN([self cn1AfterLineBreak:sel.location inText:session.text], len);
             }
             target = NSMakeRange(sel.location, lineEnd - sel.location);
         }
