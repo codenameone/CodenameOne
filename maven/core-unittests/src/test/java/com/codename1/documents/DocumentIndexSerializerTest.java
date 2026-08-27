@@ -165,6 +165,39 @@ class DocumentIndexSerializerTest {
     }
 
     @Test
+    void refusesIdsTheFileProviderReserves() {
+        // A node carrying one of these is listed and then unreachable: every later request for it
+        // resolves to the published root, or is swallowed by the working-set enumeration.
+        for (String reserved : new String[] {
+                "NSFileProviderRootContainerItemIdentifier",
+                "NSFileProviderWorkingSetContainerItemIdentifier",
+                "NSFileProviderTrashContainerItemIdentifier"}) {
+            DocumentNode root = DocumentNode.folder("root", "Root");
+            root.add(DocumentNode.file(reserved, "x.txt"));
+            IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                    () -> DocumentIndexSerializer.serialize(root), reserved);
+            assertTrue(err.getMessage().contains("reserved"), err.getMessage());
+        }
+    }
+
+    @Test
+    void refusesNamesCarryingAPathSeparator() {
+        // The pre-iOS-16 provider builds a URL from the name, so a separator becomes several path
+        // components and its identifier round-trip then reads the wrong directory -- the item is
+        // listed and cannot be opened.
+        DocumentNode root = DocumentNode.folder("root", "Root");
+        root.add(DocumentNode.file("f", "reports/2031.pdf"));
+        IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(root));
+        assertTrue(err.getMessage().contains("path separator"), err.getMessage());
+
+        DocumentNode backslash = DocumentNode.folder("root", "Root");
+        backslash.add(DocumentNode.file("g", "reports\\2031.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(backslash));
+    }
+
+    @Test
     void refusesToNestUnderAFile() {
         assertThrows(IllegalStateException.class,
                 () -> DocumentNode.file("f", "f.txt").add(DocumentNode.file("g", "g.txt")));

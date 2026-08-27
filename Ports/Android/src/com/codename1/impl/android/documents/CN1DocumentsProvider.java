@@ -52,6 +52,11 @@ import java.net.URLEncoder;
 public class CN1DocumentsProvider extends DocumentsProvider {
     private static final String TAG = "CN1Documents";
 
+    /// Long enough for a slow mobile connection, short enough that a dead endpoint cannot pin a
+    /// binder thread for the life of the process.
+    private static final int CONNECT_TIMEOUT_MILLIS = 15000;
+    private static final int READ_TIMEOUT_MILLIS = 30000;
+
     private static final String[] DEFAULT_ROOT_PROJECTION = {
         DocumentsContract.Root.COLUMN_ROOT_ID,
         DocumentsContract.Root.COLUMN_DOCUMENT_ID,
@@ -78,6 +83,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     public Cursor queryRoots(String[] projection) {
         MatrixCursor result = new MatrixCursor(
                 projection == null ? DEFAULT_ROOT_PROJECTION : projection);
+        // Registered before the index is even read. A picker that queried this provider before
+        // the app's first publish would otherwise hold an unobserved empty cursor, and the
+        // notifyChange that first publish fires would have nothing to invalidate -- the source
+        // would stay missing from a picker that is already open.
+        result.setNotificationUri(getContext().getContentResolver(),
+                DocumentsContract.buildRootsUri(authority()));
         CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
         if (index == null) {
             // No publish yet. An empty cursor is a source that does not appear in the picker,
@@ -93,11 +104,6 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         row.add(DocumentsContract.Root.COLUMN_FLAGS,
                 DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD);
         row.add(DocumentsContract.Root.COLUMN_ICON, applicationIcon());
-        // Without this the picker has no observer registered against the roots URI, so the
-        // notifyChange() the bridge fires on publish or clear invalidates nothing and an open
-        // DocumentsUI keeps showing the previous tree until it happens to requery.
-        result.setNotificationUri(getContext().getContentResolver(),
-                DocumentsContract.buildRootsUri(authority()));
         return result;
     }
 
@@ -210,6 +216,13 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             String url = (base.endsWith("/") ? base + "fetch" : base + "/fetch")
                     + "?id=" + URLEncoder.encode(node.remoteId, "UTF-8");
             connection = (HttpURLConnection) new URL(url).openConnection();
+            // Finite by necessity. This runs on a provider binder thread, and the default is no
+            // timeout at all: an endpoint that accepts the connection and then stops answering
+            // would block here forever, where the cancellation signal cannot reach it because
+            // the thread is stuck in a socket read. Enough stalled opens and the whole document
+            // location stops responding.
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+            connection.setReadTimeout(READ_TIMEOUT_MILLIS);
             if (endpoint[1] != null && endpoint[1].length() > 0) {
                 connection.setRequestProperty("Authorization", "Bearer " + endpoint[1]);
             }
@@ -239,6 +252,9 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                     int len;
                     while ((len = in.read(buffer)) > 0) {
                         if (signal != null) {
+                            // Throws out of the read loop; the finally below closes the stream
+                            // and the outer finally disconnects, so a cancelled open does not
+                            // leave a socket draining in the background.
                             signal.throwIfCanceled();
                         }
                         out.write(buffer, 0, len);

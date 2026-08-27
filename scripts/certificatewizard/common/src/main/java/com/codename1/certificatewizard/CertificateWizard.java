@@ -1300,6 +1300,19 @@ public class CertificateWizard extends Lifecycle {
         return firstNonEmpty(fromManifest, WizardDecisions.defaultAppGroup(defaults.packageName));
     }
 
+    /// The App Group to provision for the document provider.
+    ///
+    /// A project that already names one in ios.documentProvider.appGroup keeps it. Falling
+    /// through to the shared resolver would provision a different group and then let the
+    /// installer overwrite the hint with it -- silently moving the shared container out from
+    /// under content the app had already published, which then disappears until the next
+    /// publish.
+    private String resolveDocumentProviderAppGroup(ProjectDefaults defaults) {
+        String configured = binding == null ? null
+                : readSetting(binding.settings(), "codename1.arg.ios.documentProvider.appGroup");
+        return firstNonEmpty(configured, resolveAppGroupIdentifier(defaults));
+    }
+
     private static String surfacesAppGroup(ProjectIO.SurfacesManifest manifest) {
         return manifest == null ? null : manifest.appGroup();
     }
@@ -1337,14 +1350,21 @@ public class CertificateWizard extends Lifecycle {
         final String bundleIdentifier;
         /// Writes the downloaded profiles into the project settings.
         final SigningInstaller installer;
+        /// Which App Group this extension shares with the app.
+        final AppGroupResolver appGroup;
 
         ExtensionSigning(String extensionName, String label, String bundleIdentifier,
-                SigningInstaller installer) {
+                AppGroupResolver appGroup, SigningInstaller installer) {
             this.extensionName = extensionName;
             this.label = label;
             this.bundleIdentifier = bundleIdentifier;
+            this.appGroup = appGroup;
             this.installer = installer;
         }
+    }
+
+    private interface AppGroupResolver {
+        String resolve(ProjectDefaults defaults);
     }
 
     private interface SigningInstaller {
@@ -1364,6 +1384,7 @@ public class CertificateWizard extends Lifecycle {
             return;
         }
         autoSetupExtension(new ExtensionSigning("CN1Widgets", "widget extension", extIdentifier,
+                this::resolveAppGroupIdentifier,
                 (d, release, debug) -> SigningAssetInstaller.applyWidgetExtensionSigning(
                         binding.settings(), resolveAppGroupIdentifier(d), release, debug)),
                 bundleIdentifier, appName, next);
@@ -1388,15 +1409,18 @@ public class CertificateWizard extends Lifecycle {
         }
         autoSetupExtension(new ExtensionSigning("CN1Documents", "document provider extension",
                 extIdentifier,
+                this::resolveDocumentProviderAppGroup,
                 (d, release, debug) -> SigningAssetInstaller.applyDocumentProviderSigning(
-                        binding.settings(), resolveAppGroupIdentifier(d), release, debug)),
+                        binding.settings(), resolveDocumentProviderAppGroup(d), release, debug)),
                 bundleIdentifier, appName, next);
     }
 
     private void autoSetupExtension(ExtensionSigning ext, String bundleIdentifier, String appName,
             Runnable next) {
         ProjectDefaults defaults = projectDefaults();
-        final String groupId = resolveAppGroupIdentifier(defaults);
+        // The group that gets created and enabled must be the one the installer will write, or
+        // the project ends up pointed at a container nothing provisioned.
+        final String groupId = ext.appGroup.resolve(defaults);
         if (groupId == null) {
             next.run();
             return;

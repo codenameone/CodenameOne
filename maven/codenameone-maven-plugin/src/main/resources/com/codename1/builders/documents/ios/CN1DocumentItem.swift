@@ -135,8 +135,21 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // go on serving cached bytes. Those fall back to the index revision, which moves on every
         // publish: coarser, since it re-fetches that item whenever anything is published, but
         // never stale.
-        let data = Data(contentStamp.utf8)
-        return NSFileProviderItemVersion(contentVersion: data, metadataVersion: data)
+        //
+        // Metadata is versioned separately. A rename, a move to another folder or a changed
+        // content type leaves the bytes -- and so the content stamp -- exactly as they were, and
+        // reusing one stamp for both would let the browser keep showing the old name in the old
+        // place. Metadata comes from the index, which is rewritten on every publish, so the
+        // revision belongs in this half: re-reading a name is cheap in a way re-fetching a file
+        // is not.
+        return NSFileProviderItemVersion(contentVersion: Data(contentStamp.utf8),
+                                         metadataVersion: Data(metadataStamp.utf8))
+    }
+
+    private var metadataStamp: String {
+        let parent = parentId.rawValue
+        let type = node.contentType ?? ""
+        return "\(node.name ?? "")|\(parent)|\(type)|\(node.size ?? -1)|\(node.lastModified ?? -1)|\(revision)"
     }
 
     private var contentStamp: String {

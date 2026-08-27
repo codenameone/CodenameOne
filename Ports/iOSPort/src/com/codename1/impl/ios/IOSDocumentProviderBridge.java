@@ -124,8 +124,17 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         if (container == null) {
             return;
         }
-        nativeInstance.documentsRemoveDomain();
+        // Order matters. The tree goes first so anything that re-enumerates from here on finds
+        // nothing; then the browser is told to re-enumerate, which is the only thing that
+        // reaches a pre-iOS-16 provider at all (it registers no domain, so removing one is a
+        // no-op there); then the domain goes, which is what removes the location itself.
         deleteTree(container + "/" + ROOT);
+        // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside the
+        // same group container. Deleting the published tree does not remove those, so without
+        // this a logged-out user's documents stay readable through an already-open browser.
+        deleteTree(container + "/File Provider Storage");
+        nativeInstance.documentsSignalChange();
+        nativeInstance.documentsRemoveDomain();
     }
 
     /// Hand-built rather than routed through a serializer: two optional strings do not justify
