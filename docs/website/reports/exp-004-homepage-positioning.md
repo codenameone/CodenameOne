@@ -17,7 +17,7 @@ Completed Initializr downloads divided by homepage exposures for each arm:
 - `Exp004OwnershipDownload / Exp004OwnershipExposure`
 - `Exp004ReachDownload / Exp004ReachExposure`
 
-Crisp records these events only for visitors who enable Crisp chat and analytics consent. The result therefore describes that consented subset, not every website visitor.
+Crisp records these events only for visitors who enable Crisp chat and analytics consent. The result therefore describes that consented subset, not every website visitor. An arm-specific download is counted only when the same browser tab/session recorded the corresponding homepage exposure, and each event is limited to once per session.
 
 ## Variants
 

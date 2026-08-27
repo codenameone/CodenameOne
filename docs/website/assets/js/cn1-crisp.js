@@ -131,8 +131,7 @@
     return { id: EXP004_ID, arm };
   };
 
-  const withExp004Assignment = (data) => {
-    const assignment = readExp004Assignment();
+  const withExp004Assignment = (data, assignment) => {
     if (!assignment) {
       return data;
     }
@@ -149,15 +148,20 @@
   const firedThisView = {};
   const pendingEvents = {};
 
+  const crispEventDedupeName = (name, data) =>
+    data && data.action ? `${name}-${data.action}` : name;
+  const crispEventSessionKey = (name, data) =>
+    `cn1-crisp-ev-${crispEventDedupeName(name, data)}`;
+
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the
     // moment the event fires, before touching either deduplication guard.
-    const dedupeName = data && data.action ? `${name}-${data.action}` : name;
+    const dedupeName = crispEventDedupeName(name, data);
     if (getConsent() !== "accepted" || !window.$crisp || firedThisView[dedupeName]) {
       return false;
     }
     try {
-      const sessionKey = `cn1-crisp-ev-${dedupeName}`;
+      const sessionKey = crispEventSessionKey(name, data);
       if (sessionStorage.getItem(sessionKey)) {
         return false; // already fired earlier this session
       }
@@ -169,7 +173,7 @@
       window.$crisp.push(["set", "session:event", [[event]]]);
       firedThisView[dedupeName] = true;
       try {
-        sessionStorage.setItem(`cn1-crisp-ev-${dedupeName}`, "1");
+        sessionStorage.setItem(crispEventSessionKey(name, data), "1");
       } catch (e) {
         // sessionStorage unavailable — the per-view guard still applies
       }
@@ -206,6 +210,34 @@
     window.setTimeout(() => requestCrispEvent(name, data), delay);
   };
 
+  const exp004ExposureEvent = (assignment) => ({
+    name: assignment.arm === "ownership"
+      ? "Exp004OwnershipExposure" : "Exp004ReachExposure",
+    data: {
+      action: `${assignment.id.toLowerCase()}-${assignment.arm}`,
+      experiment_id: assignment.id,
+      experiment_arm: assignment.arm,
+      page: "/"
+    }
+  });
+
+  const readCurrentExp004Assignment = () => {
+    const assignment = readExp004Assignment();
+    if (!assignment) {
+      return null;
+    }
+    const exposure = exp004ExposureEvent(assignment);
+    try {
+      return sessionStorage.getItem(crispEventSessionKey(exposure.name, exposure.data))
+        ? assignment : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const withCurrentExp004Assignment = (data) =>
+    withExp004Assignment(data, readCurrentExp004Assignment());
+
   // Explicit hooks for the pages and product surfaces that own each event.
   const crispEvents = window.cn1CrispEvents || {};
   crispEvents.consoleDwell60 = (data) => scheduleCrispEvent(
@@ -220,15 +252,17 @@
   );
   crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
   crispEvents.conversionClick = (data) => requestCrispEvent(
-    "ConversionClick", withExp004Assignment(withOssAttribution(data))
+    "ConversionClick", withCurrentExp004Assignment(withOssAttribution(data))
   );
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
   );
   crispEvents.initializrProjectDownloaded = (data) => {
-    const payload = withExp004Assignment(data || { page: "/initializr/" });
+    const assignment = readCurrentExp004Assignment();
+    const payload = withExp004Assignment(
+      data || { page: "/initializr/" }, assignment
+    );
     requestCrispEvent("InitializrProjectDownloaded", payload);
-    const assignment = readExp004Assignment();
     if (assignment) {
       const eventName = assignment.arm === "ownership"
         ? "Exp004OwnershipDownload" : "Exp004ReachDownload";
@@ -270,14 +304,8 @@
     if (!assignment) {
       return;
     }
-    const eventName = assignment.arm === "ownership"
-      ? "Exp004OwnershipExposure" : "Exp004ReachExposure";
-    requestCrispEvent(eventName, {
-      action: `${assignment.id.toLowerCase()}-${assignment.arm}`,
-      experiment_id: assignment.id,
-      experiment_arm: assignment.arm,
-      page: "/"
-    });
+    const exposure = exp004ExposureEvent(assignment);
+    requestCrispEvent(exposure.name, exposure.data);
   };
 
   const consumeConversionArrival = () => {

@@ -178,11 +178,35 @@ function events(state) {
 
 {
   const state = load("accepted", "", "/", "ownership");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
   const recorded = events(state);
-  assert.equal(recorded.length, 1, "an eligible homepage view should record one arm exposure");
+  assert.equal(recorded.length, 3,
+    "one homepage exposure may produce at most one arm-specific download");
   assert.equal(recorded[0][0], "Exp004OwnershipExposure");
   assert.equal(recorded[0][1].experiment_id, "EXP-004");
   assert.equal(recorded[0][1].experiment_arm, "ownership");
+  assert.equal(
+    state.sessionStorage.getItem(
+      "cn1-crisp-ev-Exp004OwnershipExposure-exp-004-ownership"
+    ),
+    "1"
+  );
+  assert.equal(recorded[1][0], "InitializrProjectDownloaded");
+  assert.equal(recorded[1][1].experiment_arm, "ownership");
+  assert.equal(recorded[2][0], "Exp004OwnershipDownload");
+}
+
+{
+  const state = load("accepted", "", "/playground/", "reach");
+  state.window.cn1CrispEvents.conversionClick({ action: "playground-download" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "ConversionClick");
+  assert.equal(recorded[0][1].experiment_arm, undefined,
+    "a conversion without a current homepage exposure must not inherit a stored arm");
 }
 
 {
@@ -229,11 +253,10 @@ function events(state) {
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
 
   const recorded = events(state);
-  assert.equal(recorded.length, 2, "a project download should keep the base event and add its arm event");
+  assert.equal(recorded.length, 1,
+    "a direct project download must not be attributed without a current homepage exposure");
   assert.equal(recorded[0][0], "InitializrProjectDownloaded");
-  assert.equal(recorded[0][1].experiment_arm, "reach");
-  assert.equal(recorded[1][0], "Exp004ReachDownload");
-  assert.equal(recorded[1][1].experiment_id, "EXP-004");
+  assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
 }
 
 {
