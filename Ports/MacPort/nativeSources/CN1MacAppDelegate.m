@@ -80,6 +80,17 @@ static BOOL cn1MacJavaReady = NO;
 /// arrivals during the interval too, so a URL that lands mid-start queues behind
 /// the launch ones instead of overtaking them.
 static BOOL cn1MacDeliveriesReleased = NO;
+/// Whether a push has been handed over and its callback has not run yet.
+///
+/// Pushes are delivered one at a time, unlike URLs and local notifications,
+/// because a push is two things arriving together: the message, and the
+/// PushContent the native side sets immediately before it. Only the message is
+/// handed straight to the application -- pushReceived() queues the callback onto
+/// the event dispatch thread -- so pushing two of them back to back set
+/// PushContent twice before either callback ran, and BOTH callbacks then read
+/// the second push's title and body. Whoever called PushContent.get() first also
+/// consumed it, leaving the other with nothing.
+static BOOL cn1MacPushInFlight = NO;
 static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
 static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
@@ -249,18 +260,39 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
 ///
 /// Shared by the remote-notification hook and by both notification-center
 /// delegate methods, so none of them can be the one that forgets to wait.
+/// Hands over the next push, if the last one has been dealt with.
+///
+/// One per round trip through the event dispatch thread. Delivering the payload
+/// sets PushContent and queues the callback; asking Java for a barrier puts a
+/// runnable behind that callback, and the barrier calls back in here, so the
+/// next push's PushContent cannot be written until the previous push's callback
+/// has read the one belonging to it.
+static void cn1MacPumpPushQueue(void) {
+    if (!cn1MacDeliveriesReleased || cn1MacPushInFlight || [cn1MacPendingPushes count] == 0) {
+        return;
+    }
+    NSDictionary *payload = [[cn1MacPendingPushes objectAtIndex:0] retain];
+    [cn1MacPendingPushes removeObjectAtIndex:0];
+    cn1MacPushInFlight = YES;
+    cn1MacDeliverPush(payload);
+    [payload release];
+    struct ThreadLocalData* threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
+}
+
 static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
     if (userInfo == nil) {
         return;
     }
-    if (!cn1MacDeliveriesReleased) {
-        if (cn1MacPendingPushes == nil) {
-            cn1MacPendingPushes = [[NSMutableArray alloc] init];
-        }
-        [cn1MacPendingPushes addObject:userInfo];
-        return;
+    // Queued unconditionally, then pumped. A live push takes the same one-at-a-
+    // time path as a replayed one because the operating system can deliver two
+    // in quick succession just as a launch can accumulate two, and the PushContent
+    // race does not care which produced them.
+    if (cn1MacPendingPushes == nil) {
+        cn1MacPendingPushes = [[NSMutableArray alloc] init];
     }
-    cn1MacDeliverPush(userInfo);
+    [cn1MacPendingPushes addObject:userInfo];
+    cn1MacPumpPushQueue();
 }
 
 /// Reports a local notification, filling in what the user did with it.
@@ -364,7 +396,7 @@ void cn1_mac_runtime_markJavaReady(void) {
         // owed -- the deep link or notification it was launched with -- is not
         // released here: init() and start() have only been queued at this point.
         // This asks the Java side to come back once they have run.
-        com_codename1_impl_ios_IOSImplementation_macLaunchDeliveriesAfterStart__(threadStateData);
+        com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
     });
 }
 
@@ -376,24 +408,27 @@ void cn1_mac_runtime_markJavaReady(void) {
 /// before itself -- lives there, and because the deliveries then reach the
 /// application on exactly the thread the live path uses. Only the ordering came
 /// from the EDT.
-void CN1MacFlushLaunchDeliveries(void) {
+void CN1MacRunPendingDeliveries(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (cn1MacDeliveriesReleased) {
-            return;
+        // Reaching here means the event dispatch thread has drained everything
+        // that was queued when the barrier went in -- including the callback for
+        // the push handed over last time, if there was one.
+        cn1MacPushInFlight = NO;
+        if (!cn1MacDeliveriesReleased) {
+            cn1MacDeliveriesReleased = YES;
+            for (NSString *url in cn1MacPendingURLs) {
+                cn1MacDeliverURL(url);
+            }
+            [cn1MacPendingURLs removeAllObjects];
+            // Local notifications need no pacing: each one sets PushContent and
+            // then calls the application on this thread, so its content cannot
+            // be overwritten before it is read.
+            for (NSDictionary *delivery in cn1MacPendingLocalNotifications) {
+                cn1MacDeliverLocalNotification(delivery);
+            }
+            [cn1MacPendingLocalNotifications removeAllObjects];
         }
-        cn1MacDeliveriesReleased = YES;
-        for (NSString *url in cn1MacPendingURLs) {
-            cn1MacDeliverURL(url);
-        }
-        [cn1MacPendingURLs removeAllObjects];
-        for (NSDictionary *payload in cn1MacPendingPushes) {
-            cn1MacDeliverPush(payload);
-        }
-        [cn1MacPendingPushes removeAllObjects];
-        for (NSDictionary *delivery in cn1MacPendingLocalNotifications) {
-            cn1MacDeliverLocalNotification(delivery);
-        }
-        [cn1MacPendingLocalNotifications removeAllObjects];
+        cn1MacPumpPushQueue();
     });
 }
 

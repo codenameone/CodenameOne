@@ -12199,8 +12199,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// The lifecycle notification still fires -- an application that wants to
     /// pause on losing focus is entitled to -- and isActive still goes false.
-    /// Releases the deliveries that cold-launching the application produced, once it has
-    /// actually started.
+    /// Runs the native side's next delivery step behind everything already queued on this
+    /// thread.
     ///
     /// The AppKit delegate holds a launch deep link, local notification or push until the Java
     /// side exists -- and "the Java side exists" is not "the application has run". callback()
@@ -12212,13 +12212,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// It hands straight back to the native side rather than delivering from here, because the
     /// deliveries have to keep the threading they already have. Each notification and push is
-    /// preceded by PushContent state the native side sets immediately before it, which only holds
-    /// if the two stay adjacent, and localNotificationReceived() is deliberately called off this
-    /// thread. The barrier is the only thing being borrowed from the EDT.
-    public static void macLaunchDeliveriesAfterStart() {
+    /// preceded by PushContent state the native side sets immediately before it, and
+    /// localNotificationReceived() is deliberately called off this thread. The barrier is the only
+    /// thing being borrowed from the EDT.
+    ///
+    /// The same barrier paces the pushes afterwards. pushReceived() does not run the callback, it
+    /// QUEUES it here, so handing two pushes over in a row wrote PushContent twice before either
+    /// callback read it. Going back through this method between them means the runnable below sits
+    /// behind the callback for the push already handed over, and the next one cannot be written
+    /// until that callback has had what belongs to it.
+    public static void macDeliverAfterEdt() {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                nativeInstance.macFlushLaunchDeliveries();
+                nativeInstance.macRunPendingDeliveries();
             }
         });
     }

@@ -199,10 +199,11 @@ public final class IOSNative {
     // IOSImplementation.fireMacMenuCommand() with the id the row's last column carries.
     native void setNativeMenuCommands(String namesNewlineJoined);
 
-    // Mac native: release the deliveries that cold-launching the application queued -- a deep link,
-    // a local notification, a push -- now that the application's init/start have run. Nothing to
-    // release on any other platform, where the delegate does not hold them.
-    native void macFlushLaunchDeliveries();
+    // Mac native: run the next step of the delivery queue -- releasing what cold-launching the
+    // application held (a deep link, a local notification, a push) the first time, and handing over
+    // the next push after that. Called from the far side of an EDT barrier, which is what paces it.
+    // Nothing to run on any other platform, where the delegate holds nothing.
+    native void macRunPendingDeliveries();
 
     // Mac native: propagate the current form's brightness to the host
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not
