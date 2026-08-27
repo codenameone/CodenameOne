@@ -469,8 +469,12 @@ jobs:
       - name: Check build hint catalog
         if: ${{ matrix.java-version == 8 }}
         run: scripts/check-build-hint-catalog.sh
-      - name: Check generated build hint annotations
+      - name: Check the build hint data file can be rendered
         if: ${{ matrix.java-version == 8 }}
+        # Not a drift check: nothing is committed to drift from, because every
+        # module that needs the data file renders it into its own target/classes
+        # during its build. What can still break is the rendering itself, which
+        # would otherwise reach a user as an editor with no hints in it.
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           scripts/gen-build-hint-annotations.sh --check

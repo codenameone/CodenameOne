@@ -15,6 +15,15 @@
     <name>cn1-settings-common</name>
 
     <dependencies>
+        <!-- Build-time only: it runs the generator below and must never reach a
+             built app, because it pulls in ASM and ParparVM parses every class
+             in an app jar. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-tools</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-build-hint-catalog</artifactId>
@@ -84,6 +93,35 @@
             </resource>
         </resources>
         <plugins>
+            <!-- The build hint data file, rendered from the annotations in
+                 CodenameOne/src into this module's own classes. Generated rather
+                 than checked in, because a committed generated file conflicts on
+                 every merge and there is nothing for a hand edit to survive in.
+                 classpathScope=compile so that build-hint-tools resolves from the
+                 reactor: a plugin level dependency would have to come from the
+                 repository, which is a chicken and egg on a clean checkout. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>cn1-generate-build-hint-data</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>${project.basedir}/../../../CodenameOne/src</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

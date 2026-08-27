@@ -129,20 +129,24 @@ jobs:
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
             catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-platform-feature-catalog/${GITHUB_REF_NAME}/codenameone-platform-feature-catalog-${GITHUB_REF_NAME}.pom")
+            # One URL per curl: two URLs share the single -o, so the second body
+            # lands on stdout with both status codes appended and the captured
+            # value can never equal 200.
             hints_code=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom"
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom")
+            tools_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-tools/${GITHUB_REF_NAME}/codenameone-build-hint-tools-${GITHUB_REF_NAME}.pom")
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1lib-archetype/${GITHUB_REF_NAME}/cn1lib-archetype-${GITHUB_REF_NAME}.pom")
             if [ "$plugin_code" = "200" ] && [ "$catalog_code" = "200" ] && \
-               [ "$hints_code" = "200" ] && \
+               [ "$hints_code" = "200" ] && [ "$tools_code" = "200" ] && \
                [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
               echo "Confirmed plugin + platform-feature-catalog + build-hint-{catalog,tools} + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, hints=$hints_code, cn1app=$app_code, cn1lib=$lib_code)"
+            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, hints=$hints_code, tools=$tools_code, cn1app=$app_code, cn1lib=$lib_code)"
             sleep 20
           done
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"

@@ -156,3 +156,8 @@ docs/developer-guide/_generated-build-hints.adoc
 # and the symptom is "cannot find symbol" on a class this branch just added.
 # Build with -Dmaven.repo.local=$(pwd)/.m2-repo instead.
 /.m2-repo/
+
+# Rendered from the build hint annotations into each consuming module's
+# target/classes during its build. Never committed: a generated file in git
+# conflicts on every merge and there is nothing for a hand edit to survive in.
+cn1-build-hints.json

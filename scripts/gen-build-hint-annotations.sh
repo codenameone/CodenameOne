@@ -4,15 +4,17 @@
 #
 # The annotations in CodenameOne/src/com/codename1/annotations/buildhints are
 # hand-written and are the source; nothing here writes into that package. This
-# produces cn1-build-hints.json for the two editors that are Codename One apps
-# and so have no bytecode reader -- the Settings tool and the simulator's hint
-# editor -- and the developer guide's table, which is not checked in.
+# produces cn1-build-hints.json for the editors that are Codename One apps and so
+# have no bytecode reader, and the developer guide's table.
 #
-#   scripts/gen-build-hint-annotations.sh            # write into the tree
-#   scripts/gen-build-hint-annotations.sh --check    # fail if anything changed
+#   scripts/gen-build-hint-annotations.sh            # render into build outputs
+#   scripts/gen-build-hint-annotations.sh --check    # fail if it cannot be built
 #
-# The data file is checked in because it ships inside those applications, and
-# --check is what stops it drifting from the annotations beside it.
+# NOTHING here is checked in. Every module that needs the data file renders it
+# into its own target/classes during its build (maven/javase,
+# maven/codenameone-maven-plugin, scripts/settings/common), so there is no
+# committed copy to conflict on a merge and nothing to drift from. This script
+# exists for a local render and for the CI check below.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -42,7 +44,8 @@ build_and_classpath() {
 }
 
 ANN_ROOT="$REPO_ROOT/CodenameOne/src"
-CATALOG_DATA="$CATALOG/src/main/resources"
+# A scratch directory: no module reads from here, and nothing is committed.
+CATALOG_DATA="$(mktemp -d)"
 
 check=0
 [ "${1:-}" = "--check" ] && check=1
@@ -67,18 +70,18 @@ if [ "$check" -eq 1 ]; then
   # a local asciidoctor run -- gitignored, so that copy is never reviewed.
   # NOT the annotation package. Those are hand-written -- they are the source of
   # truth for the hints they expose, and BuildHintAnnotationReader reads them
-  # back rather than any file restating them. Policing them here would report a
-  # deliberate edit as drift.
-  # No generated Java at all: the processor reads the annotation package off the
-  # classpath, and these two are the data file the editors read.
-  targets=("maven/build-hint-catalog/src/main/resources/cn1-build-hints.json")
-  if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
-     || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
-    echo "::error::Generated build hint views are out of date." >&2
-    echo "Run scripts/gen-build-hint-annotations.sh and commit the result." >&2
-    git -C "$REPO_ROOT" --no-pager diff -- "${targets[@]}" >&2 || true
-    git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}" >&2 || true
+  # back rather than any file restating them. There is no committed rendering of
+  # them either, so there is nothing to diff: what this checks is that the
+  # rendering still SUCCEEDS and is not empty, which is the failure that would
+  # otherwise surface as an editor with no hints in it.
+  if [ ! -s "$CATALOG_DATA/cn1-build-hints.json" ]; then
+    echo "::error::The build hint data file could not be rendered." >&2
     exit 1
   fi
-  echo "gen-build-hint-annotations: generated sources are up to date"
+  hints="$(grep -c '"name":' "$CATALOG_DATA/cn1-build-hints.json" || true)"
+  if [ "${hints:-0}" -lt 50 ]; then
+    echo "::error::Only ${hints} annotated hints were rendered; the annotations are not being read." >&2
+    exit 1
+  fi
+  echo "gen-build-hint-annotations: rendered ${hints} annotated hints"
 fi
