@@ -280,7 +280,17 @@ final class CN1CallNotifications {
         IntentFilter f = new IntentFilter();
         f.addAction(ACTION_ANSWER);
         f.addAction(ACTION_DECLINE);
-        registerNotExported(ctx, actions, f);
+        // The APPLICATION context, not the one that happened to be current.
+        // AndroidImplementation.getContext() hands back the Activity whenever
+        // there is one, and a receiver registered against an Activity dies
+        // with it -- so after a rotation the receiver was gone while the
+        // static field above was still set, every later notification took the
+        // early return, and Answer and Decline broadcast into nothing. The
+        // user was left with a ringing notification whose buttons did not
+        // work. This registration is meant to last as long as the process, so
+        // it is made against something that does.
+        Context appCtx = ctx.getApplicationContext();
+        registerNotExported(appCtx == null ? ctx : appCtx, actions, f);
     }
 
     /// `Context.RECEIVER_NOT_EXPORTED` is required from Android 14 and is not
