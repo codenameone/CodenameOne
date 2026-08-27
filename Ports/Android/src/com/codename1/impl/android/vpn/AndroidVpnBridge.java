@@ -226,9 +226,7 @@ public class AndroidVpnBridge implements VpnBridge {
                 // until the work is done; it is held until the last thing
                 // the work PUBLISHES has been published.
                 setStatus(VpnStatus.DISCONNECTED);
-                synchronized (this) {
-                    operationPending = false;
-                }
+                endOperation();
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;
             }
@@ -236,6 +234,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // AndroidCallBridge.currentActivity. A bridge first obtained from
             // a service could otherwise never show a consent prompt again.
             if (currentActivity() == null || consent == null) {
+                endOperation();
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "Installing a VPN needs a foreground activity to show"
                         + " the consent prompt");
@@ -268,11 +267,13 @@ public class AndroidVpnBridge implements VpnBridge {
                 // every later install was refused as though a dialog were
                 // still up -- and the cached record described a profile that
                 // was never installed.
+                endOperation();
                 fail(requestId, VpnError.UNAUTHORIZED,
                         "The VPN consent prompt could not be shown: "
                                 + describe(launchFailed));
             }
         } catch (Exception e) {
+            endOperation();
             fail(requestId, VpnError.INVALID_CONFIGURATION, describe(e));
         } finally {
             // Released on every path that did not hand it to Consent --
@@ -403,8 +404,10 @@ public class AndroidVpnBridge implements VpnBridge {
                 stopWatchingTheTunnel();
             }
             setStatus(VpnStatus.NOT_CONFIGURED);
+            endOperation();
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
+            endOperation();
             fail(requestId, VpnError.UNKNOWN, describe(e));
         } finally {
             // Released on every path; see startVpn.
@@ -416,6 +419,25 @@ public class AndroidVpnBridge implements VpnBridge {
 
     @Override
     public void loadProfile(int requestId) {
+        if (!available()) {
+            // Guarded like every mutating operation, because the bridge is
+            // supplied on EVERY Android version while available() is false
+            // below API 30 and whenever the reflective VpnManager surface
+            // will not load -- and Vpn.load() only checks that the bridge is
+            // non-null. Without this, the one device that cannot hold a
+            // profile was the one that answered load() successfully: with no
+            // profile, or worse with a record restored from a backup taken on
+            // a device that could. LocalVpnBridge and the iOS native both
+            // already answer NOT_SUPPORTED here; this was the odd one out.
+            //
+            // Answered on the LOAD channel, not through fail(): fail() routes
+            // to deliverAck, whose takeAck finds nothing for a request opened
+            // as a string, and load() would then never be answered at all --
+            // worse than any failure.
+            Vpn.deliverProfileFailed(requestId,
+                    VpnError.NOT_SUPPORTED.ordinal(), null);
+            return;
+        }
         // The platform keeps the profile and does not hand it back, so the
         // record this port stored is the only description available -- and
         // the secrets were never written into it in the first place.
@@ -511,6 +533,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // until the network callback says otherwise. Answering the request
             // now is the honest thing: "the platform accepted the request" is
             // all that is actually known.
+            endOperation();
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             startRequested = false;
@@ -528,6 +551,7 @@ public class AndroidVpnBridge implements VpnBridge {
             }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED
                     : VpnStatus.DISCONNECTED);
+            endOperation();
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.CONNECTION_FAILED,
                     describe(e));
@@ -549,6 +573,26 @@ public class AndroidVpnBridge implements VpnBridge {
     /// straight back to DISCONNECTED, while load() keeps describing a profile
     /// Android does not have -- after restored app data, or after the user
     /// removed the profile from Settings.
+    /// Ends the reservation, before control goes back to application code.
+    ///
+    /// The rule the success path of installProfile already states -- held
+    /// until the last thing the work PUBLISHES has been published -- has a
+    /// second half: the acknowledgement IS that last publication, and it
+    /// hands control BACK. VpnRequests settles its EdtResult inline when the
+    /// operation was started on the EDT, so `Vpn.stop().ready(v -> remove())`
+    /// runs the app's next call inside deliverAck, while a `finally` further
+    /// down still had the reservation set. The follow-up was then refused
+    /// with UNKNOWN for an operation that had just reported success.
+    ///
+    /// So: every state change first, then this, then the ack or the failure.
+    /// The finallys are kept -- they still cover the paths that return before
+    /// publishing anything -- and releasing twice is harmless.
+    private void endOperation() {
+        synchronized (this) {
+            operationPending = false;
+        }
+    }
+
     private void forgetInstalledProfile() {
         synchronized (this) {
             installedWire = null;
@@ -583,6 +627,7 @@ public class AndroidVpnBridge implements VpnBridge {
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
             setStatus(VpnStatus.DISCONNECTED);
+            endOperation();
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             // DISCONNECTING was set before the platform was asked, so a
@@ -604,6 +649,7 @@ public class AndroidVpnBridge implements VpnBridge {
                 forgetInstalledProfile();
             }
             setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
+            endOperation();
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
         } finally {
