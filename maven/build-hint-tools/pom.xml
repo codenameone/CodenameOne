@@ -51,6 +51,35 @@
 
     <build>
         <plugins>
+            <!-- The data file, rendered into this module's TEST classes. It is
+                 generated rather than committed, and this is the only module that
+                 can render it for its own tests: the generator lives here and
+                 depends on the catalog, so the catalog cannot render its own.
+                 That is why the invariants over the complete hint set are
+                 asserted here rather than beside the catalog, which on its own
+                 classpath only has the hand written half. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>cn1-generate-build-hint-data-for-tests</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.codename1.build.shared.BuildHintCodeGenerator</mainClass>
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>${project.basedir}/../../CodenameOne/src</argument>
+                                <argument>${project.build.testOutputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>

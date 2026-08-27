@@ -96,6 +96,13 @@ class BuildHintsTest {
         return m;
     }
 
+    /**
+     * The hand written half. The annotated hints are rendered into a data file
+     * during a build rather than committed, so on THIS module's classpath
+     * {@code entries()} holds only what these sources declare. The invariants
+     * that need the complete set live in build-hint-tools, which is the only
+     * module that can render one for its own tests.
+     */
     @Test
     void theCatalogIsNotEmpty() {
         assertTrue(BuildHints.entries().size() > 400,
@@ -116,19 +123,6 @@ class BuildHintsTest {
         }
     }
 
-    @Test
-    void aliasesResolveToARealNonAliasHint() {
-        for (BuildHints.Hint h : BuildHints.entries()) {
-            if (h.aliasOf() == null) {
-                continue;
-            }
-            BuildHints.Hint target = BuildHints.byName(h.aliasOf());
-            assertNotNull(target, h.name() + " aliases unknown hint " + h.aliasOf());
-            assertTrue(target.aliasOf() == null,
-                    h.name() + " aliases " + target.name() + ", which is itself an alias");
-            assertEquals(target.name(), BuildHints.canonicalName(h.name()));
-        }
-    }
 
     @Test
     void everyAnnotationAttributeIsClaimedExactlyOnce() {
@@ -253,18 +247,6 @@ class BuildHintsTest {
         }
     }
 
-    @Test
-    void theCatalogAgreesWithLibraryHintMergerOnEverySeparatorItDefines() {
-        for (Map.Entry<String, String> e : libraryHintMergerSeparators().entrySet()) {
-            BuildHints.Hint h = BuildHints.byName(e.getKey());
-            assertNotNull(h, "LibraryHintMerger defines a separator for " + e.getKey()
-                    + " but the catalog does not describe it");
-            assertEquals(e.getValue(), BuildHints.separatorFor(e.getKey()),
-                    "separator mismatch for " + e.getKey() + ": LibraryHintMerger says "
-                            + quote(e.getValue()) + ", catalog says "
-                            + quote(BuildHints.separatorFor(e.getKey())));
-        }
-    }
 
     @Test
     void anUnknownHintFallsBackToBareConcatenation() {
