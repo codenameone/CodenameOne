@@ -286,12 +286,27 @@ public class MacOSNativeBuilder extends Executor {
                         + cn1Crypto.getAbsolutePath());
             }
             try {
-                replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO", "#define CN1_INCLUDE_CRYPTO");
-                if ("true".equalsIgnoreCase(request.getArg("macos.crypto.gcm",
-                        request.getArg("ios.crypto.gcm", "false")))) {
-                    replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO_GCM",
-                            "#define CN1_INCLUDE_CRYPTO_GCM");
-                }
+                // CN1_INCLUDE_CRYPTO is a strict PREFIX of CN1_INCLUDE_CRYPTO_GCM
+                // and they sit on consecutive lines, while replaceInFile is an
+                // unrestricted String.replace -- so enabling the base switch also
+                // uncommented the GCM line, and macos.crypto.gcm was ignored for
+                // any application that used crypto at all. The conditional below
+                // it then had nothing left to match, which is why the opt-in
+                // looked wired up.
+                //
+                // The GCM directive is parked under a placeholder first so the
+                // base replacement cannot see it, then restored to what the hint
+                // actually asked for. Parked rather than anchored to a newline
+                // because that anchor would quietly depend on the file staying LF.
+                boolean wantsGcm = "true".equalsIgnoreCase(request.getArg("macos.crypto.gcm",
+                        request.getArg("ios.crypto.gcm", "false")));
+                replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO_GCM",
+                        "//@CN1_CRYPTO_GCM_PLACEHOLDER@");
+                replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO",
+                        "#define CN1_INCLUDE_CRYPTO");
+                replaceInFile(cn1Crypto, "//@CN1_CRYPTO_GCM_PLACEHOLDER@",
+                        wantsGcm ? "#define CN1_INCLUDE_CRYPTO_GCM"
+                                 : "//#define CN1_INCLUDE_CRYPTO_GCM");
             } catch (Exception ex) {
                 throw new BuildException("Failed to configure CN1Crypto.h", ex);
             }
@@ -967,9 +982,23 @@ public class MacOSNativeBuilder extends Executor {
         String entitlements = appName + "-src/" + appName + "-"
                 + channelSuffix(channels.get(0)) + ".entitlements";
         String infoPlist = "INFOPLIST_FILE = \"" + appName + "-src/" + appName + "-Info.plist\";";
+        // The bundle identifier goes in alongside the entitlements, in the SAME
+        // replacement. Naming it on the xcodebuild command line settles this
+        // build and nothing else: the generated project carries no
+        // PRODUCT_BUNDLE_IDENTIFIER at all, so the .xcodeproj a customer opens --
+        // from an includeSource export, or from a mac-source build locally --
+        // shows an empty identifier in Signing & Capabilities and cannot match a
+        // provisioning profile, even though its Info.plist declares the right
+        // one. One replacement rather than two because both settings anchor on
+        // the same line and a second pass would match it again.
+        String bundleId = hints.getBundleId() == null ? "" : hints.getBundleId().trim();
+        String settings = infoPlist;
+        if (bundleId.length() > 0) {
+            settings += "\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = \"" + bundleId + "\";";
+        }
         try {
             replaceInFile(pbxproj, infoPlist,
-                    infoPlist + "\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = \"" + entitlements + "\";");
+                    settings + "\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = \"" + entitlements + "\";");
         } catch (Exception ex) {
             // Not fatal: a project without the setting still builds, it just
             // signs without entitlements, and saying so is more use than failing

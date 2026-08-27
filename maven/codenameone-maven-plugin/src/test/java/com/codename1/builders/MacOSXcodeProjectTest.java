@@ -202,6 +202,36 @@ public class MacOSXcodeProjectTest {
         assertEquals("production", MacOSXcodeProject.entitlements(false, false, caps, false)
                 .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
 
+        // The environment is configurable, because a mac-source project signed
+        // in Xcode with an Apple Development profile needs "development" and
+        // production does not match that profile. The same hint suppresses the
+        // entitlement entirely, since "which environment, or none" is one
+        // question.
+        assertEquals("development", MacOSXcodeProject.entitlements(false,
+                new MacOSBuildHints.EntitlementOverrides(
+                false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                false, false, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                "development"), caps, false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+        assertNull(MacOSXcodeProject.entitlements(false,
+                new MacOSBuildHints.EntitlementOverrides(
+                false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                false, false, null,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                MacOSBuildHints.EntitlementOverrides.UNSET,
+                "false"), caps, false)
+                .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
+
         // And not for an app that never registers -- an unused APNs entitlement
         // on an App Store build is a submission the reviewer asks about.
         assertNull(MacOSXcodeProject.entitlements(true, true,
@@ -254,7 +284,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                MacOSBuildHints.EntitlementOverrides.UNSET);
+                null);
         Map<String, Object> withJit = MacOSXcodeProject.entitlements(false, jit, null, false);
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_JIT));
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
@@ -269,7 +299,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                MacOSBuildHints.EntitlementOverrides.UNSET);
+                null);
         Map<String, Object> without = MacOSXcodeProject.entitlements(false, off, null, false);
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_JIT));
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
@@ -295,7 +325,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.ON,
-                MacOSBuildHints.EntitlementOverrides.UNSET);
+                null);
         assertEquals(Boolean.TRUE, MacOSXcodeProject.entitlements(true, on, null, false)
                 .get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
     }

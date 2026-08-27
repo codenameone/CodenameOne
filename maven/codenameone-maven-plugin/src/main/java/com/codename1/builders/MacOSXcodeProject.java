@@ -412,7 +412,11 @@ public class MacOSXcodeProject {
         // that genuinely wants the sandbox environment sets
         // macos.entitlements.apsEnvironment and gets it through the extra hint.
         if (overrides.push(c.usesPush)) {
-            ent.put(ENT_APS_ENVIRONMENT, "production");
+            // The environment from the hint rather than a constant: a mac-source
+            // project signed in Xcode with an Apple Development profile needs
+            // "development", and production does not match that profile -- which
+            // fails registration and signing both, with nothing to say why.
+            ent.put(ENT_APS_ENVIRONMENT, overrides.getApsEnvironment());
         }
         // JIT is a hardened-runtime exception, not a sandbox one, so it is
         // outside the block above: a Developer ID build is hardened and not

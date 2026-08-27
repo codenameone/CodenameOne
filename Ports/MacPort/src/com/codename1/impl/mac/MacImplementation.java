@@ -71,6 +71,37 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
+    /// The duration variants as well as the shared list. CN1MacPickers builds an
+    /// hours-only and a minutes-only field set, but Picker asks this before it
+    /// calls showNativePicker() -- so while the inherited answer named only
+    /// PICKER_TYPE_DURATION, both of those branches were unreachable and the
+    /// lightweight spinner was shown instead. Native code that nothing can call
+    /// is the failure this port has to be most careful about.
+    @Override
+    public boolean isNativePickerTypeSupported(int pickerType) {
+        return pickerType == com.codename1.ui.Display.PICKER_TYPE_DURATION_HOURS
+                || pickerType == com.codename1.ui.Display.PICKER_TYPE_DURATION_MINUTES
+                || super.isNativePickerTypeSupported(pickerType);
+    }
+
+    /// @inheritDoc
+    ///
+    /// "macOS", not the inherited "iOS". getPlatformName() has reported "mac"
+    /// since this port existed, but the documented property API is a second way
+    /// to ask the same question and it still answered for the superclass -- so
+    /// an application or a diagnostic that reads OS or Platform saw an iOS
+    /// process and could pick iOS behaviour on a Mac. Every other key stays with
+    /// IOSImplementation, which is the point of subclassing it.
+    @Override
+    public String getProperty(String key, String defaultValue) {
+        if ("OS".equalsIgnoreCase(key) || "Platform".equalsIgnoreCase(key)) {
+            return "macOS";
+        }
+        return super.getProperty(key, defaultValue);
+    }
+
+    /// @inheritDoc
+    ///
     /// False, because nothing on this port can ever deliver it. The capability
     /// is a promise that `Lifecycle.onReceivedSharedContent()` will be called,
     /// and the single producer of that callback is the share-extension handler

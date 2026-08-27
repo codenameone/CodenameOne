@@ -573,11 +573,11 @@ public class MacOSBuildHints {
                 entTri(source, "files.downloads"),
                 // Spelled apsEnvironment rather than aps-environment: the hint
                 // namespace is dotted, so a dash in the key reads as part of a
-                // path segment. The VALUE it selects is the aps-environment
-                // string, chosen from the channel rather than asked for, because
-                // "development" is only correct for an Xcode-signed local build
-                // and neither channel here is one.
-                entTri(source, "apsEnvironment"));
+                // path segment. Carried as a STRING, because the value is what a
+                // locally signed build needs to change -- an Apple Development
+                // profile wants "development" and a tri-state boolean had no way
+                // to say it.
+                entString(source, "apsEnvironment", null));
     }
 
     /**
@@ -639,12 +639,12 @@ public class MacOSBuildHints {
         private final int location;
         private final int calendars;
         private final int filesDownloads;
-        private final int push;
+        private final String apsEnvironment;
 
         EntitlementOverrides(boolean sandbox, boolean networkClient, int networkServer,
                 String filesUserSelected, boolean hardenedRuntime, boolean allowJit, String extra,
                 int camera, int microphone, int bluetooth, int location, int calendars,
-                int filesDownloads, int push) {
+                int filesDownloads, String apsEnvironment) {
             this.sandbox = sandbox;
             this.networkClient = networkClient;
             this.networkServer = networkServer;
@@ -658,13 +658,13 @@ public class MacOSBuildHints {
             this.location = location;
             this.calendars = calendars;
             this.filesDownloads = filesDownloads;
-            this.push = push;
+            this.apsEnvironment = apsEnvironment;
         }
 
         /** The defaults, for a caller that has no hints to resolve against. */
         public static EntitlementOverrides defaults(boolean appStore, boolean sandboxed) {
             return new EntitlementOverrides(sandboxed, true, UNSET, "readwrite", !appStore, false,
-                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET);
+                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, null);
         }
 
         public boolean isSandbox() {
@@ -715,8 +715,30 @@ public class MacOSBuildHints {
         /// permission, so it is emitted for a Developer ID build too: it is what
         /// makes registerForRemoteNotifications succeed at all, and macOS
         /// refuses registration for a signed executable that does not carry it.
+        ///
+        /// {@code macos.entitlements.apsEnvironment} answers both questions at
+        /// once -- whether to declare it and which environment to declare -- so
+        /// {@code false} or {@code none} suppresses it and anything else selects
+        /// a value. One key, because "which APNs environment, or none" is one
+        /// question.
         public boolean push(boolean detected) {
-            return resolve(push, detected);
+            if (apsEnvironment == null || apsEnvironment.length() == 0) {
+                return detected;
+            }
+            return !"false".equalsIgnoreCase(apsEnvironment)
+                    && !"none".equalsIgnoreCase(apsEnvironment);
+        }
+
+        /// The aps-environment value, {@code production} unless the hint asks for
+        /// {@code development}.
+        ///
+        /// Production is right for both channels this builder ships, which are
+        /// distribution channels. Development exists for the mac-source project
+        /// a developer opens in Xcode and signs with an Apple Development
+        /// profile: production does not match that profile, so registration and
+        /// signing both fail, and hard-coding it left no way to say so.
+        public String getApsEnvironment() {
+            return "development".equalsIgnoreCase(apsEnvironment) ? "development" : "production";
         }
 
         public boolean microphone(boolean detected) {
