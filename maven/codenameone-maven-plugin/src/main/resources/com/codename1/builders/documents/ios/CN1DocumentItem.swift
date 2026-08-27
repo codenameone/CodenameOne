@@ -60,7 +60,26 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     }
 
     var filename: String {
-        node.name ?? node.id
+        CN1DocumentItem.displayName(node.name ?? node.id)
+    }
+
+    /// Reduces whatever the index offers to something the browser will accept as a file name.
+    ///
+    /// The publisher already refuses a name -- or an id standing in for one -- that carries a
+    /// separator or is "." or "..", so a tree published through the API never reaches this. This
+    /// reader serves whatever index is on disk, though, and a name it cannot show is an item
+    /// Files may drop from the listing entirely, which is a worse failure than a renamed one.
+    /// The classic provider's storage leaf is sanitized for exactly this reason.
+    ///
+    /// The identifier is untouched by any of this: it is namespaced and escaped separately, so a
+    /// renamed display name still opens the right node.
+    static func displayName(_ raw: String) -> String {
+        var cleaned = raw.replacingOccurrences(of: "/", with: "_")
+        cleaned = cleaned.replacingOccurrences(of: "\\", with: "_")
+        if cleaned.isEmpty || cleaned == "." || cleaned == ".." {
+            cleaned = "item"
+        }
+        return cleaned
     }
 
     // iOS only: AppKit's NSFileProviderItem marks the string UTI unavailable, and the macOS
@@ -174,7 +193,20 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
            let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
             let size = (attrs[.size] as? NSNumber)?.int64Value ?? -1
             let modified = (attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? -1
-            return "disk-\(size)-\(modified)"
+            // The file number as well as the size and the date. A publish that swaps the bytes by
+            // writing a temporary file and renaming it over the old one -- which is how anything
+            // careful replaces a file, and how the Codename One side writes the index itself --
+            // gives the path a different file, and it can carry the size and the timestamp of the
+            // one it replaced. Size and date alone would call that unchanged and the browser would
+            // go on serving what it cached.
+            //
+            // The publish revision is deliberately NOT folded in here: it moves on every publish,
+            // so every materialized local document would be re-read whenever the app republishes
+            // anything. What that would additionally catch is an in-place rewrite that restores
+            // both the size and the modification time, which nothing reachable through
+            // FileSystemStorage can do -- it has no way to set a timestamp.
+            let file = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
+            return "disk-\(size)-\(modified)-\(file)"
         }
         // Remote content has no local bytes to measure, so the app's declared size and date are
         // the only per-item signal there is. They are trusted rather than overridden with the
