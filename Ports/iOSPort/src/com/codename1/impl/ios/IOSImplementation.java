@@ -2063,10 +2063,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Invoked when the platform reports that a magnify gesture BEGAN, before any
     /// scale arrives. Scopes the gesture so its updates and its release all reach
     /// one component, and discards a claim whose release never came.
+    /// Whether a magnify gesture was reported begun and not yet released.
+    ///
+    /// The gate below drops events while a modal file chooser is up, and the
+    /// terminating release of a gesture already in flight must not be one of
+    /// them: nothing else clears the component's pinching state.
+    private static boolean pinchGestureOpen;
+
     public static void pinchBeginCallback() {
         if (dropEvents || instance == null) {
             return;
         }
+        // Recorded so the release closing THIS gesture can be let through the
+        // same gate. A file chooser opened mid-pinch sets dropEvents, and a
+        // dropped release leaves the component pinching for good.
+        pinchGestureOpen = true;
         // Marshalled for the same reason as pinchMagnifyCallback.
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             public void run() {
@@ -2076,7 +2087,16 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     public static void pinchReleaseCallback(final int x, final int y) {
-        if (dropEvents || instance == null) {
+        // The release of a gesture already begun goes through even while events
+        // are being dropped. openFileChooser() sets dropEvents while a magnify is
+        // in flight, and discarding the Ended left ImageViewer pinching and never
+        // committing its zoom -- the same defect the native gate had, one layer
+        // up, so fixing only the native side left this half of the path broken.
+        // A release with no gesture open is still dropped, as are new begins and
+        // every update.
+        boolean closingOpenGesture = pinchGestureOpen;
+        pinchGestureOpen = false;
+        if ((dropEvents && !closingOpenGesture) || instance == null) {
             return;
         }
         // Marshalled for the same reason as pinchMagnifyCallback.
@@ -11179,6 +11199,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         PushCallback explicit = CodenameOneImplementation.getPushCallback();
         if (explicit != null) {
             pushCallback = explicit;
+            // Every path that installs a callback flushes: this one,
+            // setPushCallback and setMainClass. A held push released by only some
+            // of them would be a launch notification lost depending on how the
+            // application happens to register.
+            firePendingPush();
         }
         nativeInstance.registerPush();
     }
@@ -11197,6 +11222,29 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private static PushCallback pushCallback;
     
+    /// A push that arrived before anything was registered to receive it.
+    ///
+    /// A managed notification can cold-launch the application, and the native
+    /// replay runs as soon as the framework is callable -- which is before the
+    /// main class's init() has installed the callback, because installing it is
+    /// queued on the EDT. Dropped there, the very notification that launched the
+    /// application was the one it never saw. Held instead, and delivered when a
+    /// callback appears.
+    private static String pendingPushMessage;
+    private static String pendingPushType;
+
+    /// Delivers a push held from before a callback existed, if there is one.
+    private static void firePendingPush() {
+        String message = pendingPushMessage;
+        String type = pendingPushType;
+        if (message == null || pushCallback == null) {
+            return;
+        }
+        pendingPushMessage = null;
+        pendingPushType = null;
+        pushReceived(message, type);
+    }
+
     public static void pushReceived(final String message, final String type) {
         if(pushCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
@@ -11217,6 +11265,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             });
         } else {
+            // Held rather than dropped: registration is imminent on a cold
+            // launch, and firing the completion handler here told the system the
+            // notification had been handled when nothing had seen it. Only the
+            // most recent is kept, which is what the system itself delivers on a
+            // launch from a notification.
+            pendingPushMessage = message;
+            pendingPushType = type;
             nativeInstance.firePushCompletionHandler();
             /*
             // Removing this section because the race condition shouldn't happen
@@ -11296,6 +11351,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     public static void setPushCallback(PushCallback callback) {
         pushCallback = callback;
+        // Anything that arrived before this point is delivered now.
+        firePendingPush();
     }
     
     public static void setLocalNotificationCallback(LocalNotificationCallback callback) {
@@ -11333,6 +11390,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         setCurrentApplicationInstance(main);
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
+            firePendingPush();
         }
         if(main instanceof PurchaseCallback) {
             purchaseCallback = (PurchaseCallback)main;
