@@ -485,6 +485,13 @@ static int64_t cn1clTrackAction(CXAction *action) {
         [cn1clQueuedActions removeAllObjects];
         cn1clAudioCall = nil;
         cn1clAudioRetiring = nil;
+        // cn1clPending is deliberately NOT cleared here. A queued pushed call
+        // the reset destroyed still has to reach the app, as a MISSED call --
+        // dropping the record would leave the user with no trace of a call
+        // that rang. The drain already downgrades it: a record queued
+        // non-stale is delivered stale unless its uuid is still in
+        // cn1clCalls, and that table has just been emptied above. Clearing
+        // the queue here would lose the notification, not protect anything.
     }
     com_codename1_impl_ios_IOSCallCallbacks_providerReset__(getThreadLocalData());
 }
