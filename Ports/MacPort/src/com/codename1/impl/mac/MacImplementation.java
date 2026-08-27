@@ -164,14 +164,47 @@ public class MacImplementation extends IOSImplementation {
     /// the shared editing entry points take no window, and the component knows
     /// its own top level.
     private void nameEditingWindow(com.codename1.ui.Component cmp) {
-        int slot = -1;
+        // The framework's window id, which is what the native side looks up. It
+        // is NOT the native slot: a slot is an index into the window table and is
+        // reused once a window is disposed, while an id belongs to the Window and
+        // starts at 1. Handing one where the other was expected named a different
+        // window, or none, and the ownership check then refused the field's keys.
+        int windowId = -1;
         if (cmp != null) {
             com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
             if (top instanceof com.codename1.ui.Window) {
-                slot = ((com.codename1.ui.Window) top).getWindowId();
+                windowId = ((com.codename1.ui.Window) top).getWindowId();
             }
         }
-        macNative.macTextInputSetOwnerWindow(slot);
+        macNative.macTextInputSetOwnerWindow(windowId);
+    }
+
+    /// @inheritDoc
+    ///
+    /// Names the source component's window so the popover anchors there.
+    ///
+    /// The coordinates handed to the native picker are relative to the source
+    /// component's window, but the presentation anchored in the KEY window --
+    /// right when the user tapped the Picker, wrong when the application opened
+    /// one for a component in another visible window, which put the popover over
+    /// the wrong window at unrelated coordinates.
+    @Override
+    public Object showNativePicker(int type, com.codename1.ui.Component source,
+            Object currentValue, Object data) {
+        nameNextPresentationWindow(source);
+        return super.showNativePicker(type, source, currentValue, data);
+    }
+
+    /// Names the window a component lives in for the next popover presentation.
+    private void nameNextPresentationWindow(com.codename1.ui.Component cmp) {
+        int windowId = -1;
+        if (cmp != null) {
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top instanceof com.codename1.ui.Window) {
+                windowId = ((com.codename1.ui.Window) top).getWindowId();
+            }
+        }
+        macNative.macPresentationSetOwnerWindow(windowId);
     }
 
     /// @inheritDoc

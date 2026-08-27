@@ -173,13 +173,15 @@ void CN1MacTextInputSetPendingOwner(NSView *view) {
         // Chosen by conformance rather than by class: the thing that has to
         // become first responder is whatever can receive text input, and asking
         // that question directly needs no import of the view's header.
-        NSView *view = nil;
-        NSWindow *key = [NSApp keyWindow];
-        if (key != nil
-                && [key.contentView conformsToProtocol:@protocol(NSTextInputClient)]) {
-            view = key.contentView;
-        }
-        if (view == nil) {
+        // The view this session was bound to, not whichever window is key. The
+        // owner was resolved when the session started -- from the window the
+        // caller named, or the key window when nobody named one -- and picking
+        // the key window again here handed first responder to a view that then
+        // REFUSED the session, because METALView only accepts text input when it
+        // owns it. The field would have received nothing at all.
+        NSView *view = self.ownerView;
+        if (view == nil
+                || ![view conformsToProtocol:@protocol(NSTextInputClient)]) {
             view = [CN1MacHost sharedHost].renderingView;
         }
         [view.window makeFirstResponder:view];

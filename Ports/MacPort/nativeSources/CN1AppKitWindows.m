@@ -197,6 +197,20 @@ static CN1MacWindowRecord *cn1WindowAt(int slot) {
 }
 
 /// The record owning this AppKit window, or nil for a window we did not create.
+/// The record carrying this framework window id, or nil if none does.
+static CN1MacWindowRecord *cn1RecordForWindowId(int windowId) {
+    for (id entry in cn1WindowTable()) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (!rec.disposed && rec.windowId == windowId) {
+            return rec;
+        }
+    }
+    return nil;
+}
+
 static CN1MacWindowRecord *cn1RecordForWindow(NSWindow *window) {
     if (window == nil) {
         return nil;
@@ -555,8 +569,10 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             [rec.window makeKeyAndOrderFront:nil];
             // The application's own decision outranks the app-hide bookkeeping:
             // whatever unhiding would have done for this window, it has just
-            // been said explicitly.
+            // been said explicitly. Both flags, so a later owner restore does not
+            // announce a window the application already showed.
             rec.hiddenByApp = NO;
+            rec.hiddenByOwner = NO;
             cn1DeliverShownWithOwner(rec);
             CN1MacWindowVisibilityChanged();
             // AppKit hands back a usable window synchronously, so the content is
@@ -572,9 +588,13 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             cn1DeliverHiddenWithOwner(rec);
             [rec.window orderOut:nil];
             // Cleared for the same reason, and this is the direction that
-            // matters: hiding a window while the application itself is hidden
-            // must not be undone by the later unhide.
+            // matters: hiding a window while the application itself is hidden --
+            // or while its OWNER is off screen -- must not be undone when that
+            // owner or the application comes back. Both flags, because the owner
+            // may have gone first and marked this child before the application
+            // hid it explicitly.
             rec.hiddenByApp = NO;
+            rec.hiddenByOwner = NO;
             CN1MacWindowVisibilityChanged();
         }
     });
@@ -589,6 +609,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowReopen___int_R_boolean(CO
         }
         [rec.window makeKeyAndOrderFront:nil];
         rec.hiddenByApp = NO;
+        rec.hiddenByOwner = NO;
         cn1DeliverShownWithOwner(rec);
         CN1MacWindowVisibilityChanged();
         ok = YES;
@@ -1195,14 +1216,36 @@ void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
 /// says so here first and startWithText: uses this instead of guessing. Cleared
 /// after one use: an owner named for one session must not silently apply to the
 /// next, which may well be the user clicking somewhere else entirely.
-JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot) {
+/// Anchors the next popover presentation in a named window.
+///
+/// Same reasoning as macTextInputSetOwnerWindow: the key window is the right
+/// guess when the user drove the interaction and the wrong one when the
+/// application opened it for a component elsewhere. Takes the framework's window
+/// id; -1 restores the default.
+JAVA_VOID com_codename1_impl_mac_MacNative_macPresentationSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
+    cn1OnMain(^{
+        extern void CN1MacSetPendingHostView(NSView *view);
+        if (windowId < 0) {
+            CN1MacSetPendingHostView(nil);
+            return;
+        }
+        CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
+        CN1MacSetPendingHostView(rec != nil ? rec.view : nil);
+    });
+}
+
+JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
     cn1OnMain(^{
         extern void CN1MacTextInputSetPendingOwner(NSView *view);
-        if (slot < 0) {
+        if (windowId < 0) {
             CN1MacTextInputSetPendingOwner([CN1MacHost sharedHost].renderingView);
             return;
         }
-        CN1MacWindowRecord *rec = cn1WindowAt(slot);
+        // By WINDOW ID, not by slot. The two are different numbers -- a slot is
+        // this table's index and is reused after a dispose, an id is the
+        // framework's own and starts at 1 -- and the Java side has the id. Read
+        // as a slot it named a different window, or none.
+        CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
         CN1MacTextInputSetPendingOwner(rec != nil ? rec.view : nil);
     });
 }

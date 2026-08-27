@@ -61,7 +61,27 @@ NSView *CN1MacPeerHostView(void) {
     return [CN1MacHost sharedHost].activeRenderingView;
 }
 
+/// The window a presentation was told to anchor in, or nil for "work it out".
+///
+/// A picker or share sheet opened programmatically for a component in a visible
+/// but non-key Window supplies coordinates relative to THAT window, so anchoring
+/// in the key window put the popover over the wrong one at unrelated
+/// coordinates -- and could not present at all when the key window was not the
+/// source. The Java side knows the source component's window and names it here.
+static NSView *cn1PendingHostView = nil;
+
+void CN1MacSetPendingHostView(NSView *view) {
+    cn1PendingHostView = view;
+}
+
 NSView *CN1MacKeyRenderingHostView(void) {
+    if (cn1PendingHostView != nil) {
+        // Consumed, not left standing: it was named for ONE presentation, and a
+        // stale one would anchor the next popover in a window nobody named.
+        NSView *named = cn1PendingHostView;
+        cn1PendingHostView = nil;
+        return named;
+    }
     NSWindow *key = [NSApp keyWindow];
     if (key != nil && [key.contentView conformsToProtocol:@protocol(NSTextInputClient)]) {
         return key.contentView;

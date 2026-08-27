@@ -145,7 +145,15 @@ class MacNative {
     /// session to the wrong one: the intended field received the callbacks while
     /// keyboard and input-method ownership sat elsewhere. -1 means the main
     /// window.
-    native void macTextInputSetOwnerWindow(int slot);
+    ///
+    /// Takes the framework's window id, NOT the native slot: those are different
+    /// numbers, and the Java side holds the id.
+    /// Anchors the next picker or share popover in a named window instead of the
+    /// key one, for a presentation the application opened rather than the user.
+    /// Takes the framework's window id; -1 restores the default.
+    native void macPresentationSetOwnerWindow(int windowId);
+
+    native void macTextInputSetOwnerWindow(int windowId);
 
     native int macMonitorForMainWindow();
 
