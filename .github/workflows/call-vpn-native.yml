@@ -124,10 +124,15 @@ jobs:
               extra="-DCN1_INCLUDE_CALL -DCN1_CALL_VOIP -DCN1_CALL_DIRECTORY -DCN1_INCLUDE_VPN"
             fi
             echo "::group::clang call/vpn $label"
+            # NO -fobjc-arc. The production iOS target sets
+            # CLANG_ENABLE_OBJC_ARC = NO, so these sources are manual
+            # reference counting: compiling them under ARC checked a memory
+            # model the app never builds with, hid every leak this gate
+            # exists to catch, and rejected the explicit release that fixes
+            # one. The flag has to match the target or the check is theatre.
             xcrun --sdk iphoneos clang \
                 -fsyntax-only \
                 -arch arm64 \
-                -fobjc-arc \
                 -Werror=incompatible-pointer-types \
                 -Werror=objc-method-access \
                 -Wno-unused-parameter \

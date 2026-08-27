@@ -538,7 +538,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         BOOL ipsecSecretMissing = NO;
         BOOL passwordMissing = NO;
         if (proto == CN1_VPN_PROTO_IPSEC) {
-            NEVPNProtocolIPSec *ipsec = [[NEVPNProtocolIPSec alloc] init];
+            NEVPNProtocolIPSec *ipsec = [[[NEVPNProtocolIPSec alloc] init] autorelease];
             ipsec.authenticationMethod = [psk length] > 0
                     ? NEVPNIKEAuthenticationMethodSharedSecret
                     : NEVPNIKEAuthenticationMethodNone;
@@ -585,7 +585,7 @@ void com_codename1_impl_ios_IOSNative_vpnInstallProfile___int_java_lang_String(
         manager.enabled = YES;
         manager.onDemandEnabled = onDemand;
         if (onDemand) {
-            NEOnDemandRuleConnect *rule = [[NEOnDemandRuleConnect alloc] init];
+            NEOnDemandRuleConnect *rule = [[[NEOnDemandRuleConnect alloc] init] autorelease];
             manager.onDemandRules = [NSArray arrayWithObject:rule];
         }
         // A keychain write that failed hands back nil, and assigning that as

@@ -294,7 +294,7 @@ static BOOL cn1clHoldUntilReady(CXAction *action, void (^deliver)(void)) {
         // had already discarded, and moving Java's session to match.
         [cn1clQueuedActions addObject:@{
             @"action": action == nil ? [NSNull null] : action,
-            @"deliver": [deliver copy]
+            @"deliver": [[deliver copy] autorelease]
         }];
         return YES;
     }
@@ -770,12 +770,12 @@ static CXProviderConfiguration *cn1clConfiguration(void) {
     CXProviderConfiguration *cfg;
 #if defined(__IPHONE_14_0)
     if (@available(iOS 14.0, *)) {
-        cfg = [[CXProviderConfiguration alloc] init];
+        cfg = [[[CXProviderConfiguration alloc] init] autorelease];
     } else {
-        cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+        cfg = [[[CXProviderConfiguration alloc] initWithLocalizedName:name] autorelease];
     }
 #else
-    cfg = [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+    cfg = [[[CXProviderConfiguration alloc] initWithLocalizedName:name] autorelease];
 #endif
     cfg.supportsVideo = cn1clPlistBool(@"CN1CallSupportsVideo", NO);
     cfg.includesCallsInRecents = cn1clPlistBool(@"CN1CallIncludesCallsInRecents", YES);
@@ -833,7 +833,7 @@ static CXHandle *cn1clHandleFromWire(NSString *wire) {
     } else if (type == CN1_CALL_HANDLE_EMAIL) {
         t = CXHandleTypeEmailAddress;
     }
-    return [[CXHandle alloc] initWithType:t value:value];
+    return [[[CXHandle alloc] initWithType:t value:value] autorelease];
 }
 
 /// The single funnel through which a call is reported to CallKit.
@@ -848,7 +848,7 @@ static CXHandle *cn1clHandleFromWire(NSString *wire) {
 static void cn1clReportIncoming(int requestId, NSString *uuidString,
         NSString *handleWire, NSString *displayName, BOOL hasVideo) {
     cn1clEnsureState();
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
     if (uuid == nil) {
         if (requestId >= 0) {
             cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID,
@@ -856,7 +856,7 @@ static void cn1clReportIncoming(int requestId, NSString *uuidString,
         }
         return;
     }
-    CXCallUpdate *update = [[CXCallUpdate alloc] init];
+    CXCallUpdate *update = [[[CXCallUpdate alloc] init] autorelease];
     update.remoteHandle = cn1clHandleFromWire(handleWire);
     if ([displayName length] > 0) {
         update.localizedCallerName = displayName;
@@ -1128,7 +1128,7 @@ static NSString *cn1clVoipToken = nil;
 static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     id raw = [call objectForKey:@"uuid"];
     if ([raw isKindOfClass:[NSString class]]) {
-        NSUUID *parsed = [[NSUUID alloc] initWithUUIDString:(NSString *)raw];
+        NSUUID *parsed = [[[NSUUID alloc] initWithUUIDString:(NSString *)raw] autorelease];
         if (parsed != nil) {
             *synthesized = NO;
             return [parsed UUIDString];
@@ -1228,14 +1228,14 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         // is strictly better than returning without reporting: the process
         // survives, and the user sees nothing.
         NSString *uuid = [[NSUUID UUID] UUIDString];
-        CXCallUpdate *update = [[CXCallUpdate alloc] init];
-        update.remoteHandle = [[CXHandle alloc] initWithType:CXHandleTypeGeneric
-                                                      value:@" "];
+        CXCallUpdate *update = [[[CXCallUpdate alloc] init] autorelease];
+        update.remoteHandle = [[[CXHandle alloc] initWithType:CXHandleTypeGeneric
+                                                      value:@" "] autorelease];
         [cn1clEnsureProvider() reportNewIncomingCallWithUUID:
-                [[NSUUID alloc] initWithUUIDString:uuid] update:update
+                [[[NSUUID alloc] initWithUUIDString:uuid] autorelease] update:update
                 completion:^(NSError *error) {
             [cn1clEnsureProvider() reportCallWithUUID:
-                    [[NSUUID alloc] initWithUUIDString:uuid]
+                    [[[NSUUID alloc] initWithUUIDString:uuid] autorelease]
                     endedAtDate:nil
                     reason:CXCallEndedReasonFailed];
             completion();
@@ -1249,7 +1249,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     id cancel = [call objectForKey:@"cancel"];
     if ([cancel respondsToSelector:@selector(boolValue)] && [cancel boolValue]) {
         // A retraction: the call was cancelled before it was answered.
-        NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+        NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
         if (uuid != nil) {
             id reason = [call objectForKey:@"reason"];
             CXCallEndedReason r = CXCallEndedReasonRemoteEnded;
@@ -1275,10 +1275,10 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                 // Reported and ended at once, exactly as the payload with no
                 // cn1call above is: the process survives and the user sees
                 // nothing.
-                CXCallUpdate *cancelled = [[CXCallUpdate alloc] init];
+                CXCallUpdate *cancelled = [[[CXCallUpdate alloc] init] autorelease];
                 cancelled.remoteHandle =
-                        [[CXHandle alloc] initWithType:CXHandleTypeGeneric
-                                                 value:@" "];
+                        [[[CXHandle alloc] initWithType:CXHandleTypeGeneric
+                                                 value:@" "] autorelease];
                 [cn1clEnsureProvider() reportNewIncomingCallWithUUID:uuid
                         update:cancelled completion:^(NSError *error) {
                     [cn1clEnsureProvider() reportCallWithUUID:uuid
@@ -1371,7 +1371,7 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
                     && [cn1clUnclaimed containsObject:uuidString];
         }
         if (live) {
-            NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+            NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
             [cn1clEnsureProvider() reportCallWithUUID:uuid endedAtDate:nil
                     reason:CXCallEndedReasonUnanswered];
             @synchronized (cn1clLock) {
@@ -1643,7 +1643,7 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
         // would throw.
         if (![cfg respondsToSelector:@selector(setLocalizedName:)]) {
             CXProviderConfiguration *replacement =
-                    [[CXProviderConfiguration alloc] initWithLocalizedName:name];
+                    [[[CXProviderConfiguration alloc] initWithLocalizedName:name] autorelease];
             // EVERYTHING the bundle configured, carried across -- not just the
             // ringtone. The icon in particular comes only from
             // CN1CallIconTemplateImageName, so an app that set ios.call.icon
@@ -1720,7 +1720,7 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
         JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
 #ifdef CN1_CALL_HAS_CALLKIT
     NSString *uuidString = toNSString(threadStateData, callId);
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
     if (uuid == nil) {
         cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID,
                 @"Not a canonical call id");
@@ -1744,9 +1744,9 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
         cn1clAck(requestId, YES, 0, nil);
         return;
     }
-    CXStartCallAction *action = [[CXStartCallAction alloc]
+    CXStartCallAction *action = [[[CXStartCallAction alloc]
             initWithCallUUID:uuid
-            handle:cn1clHandleFromWire(toNSString(threadStateData, handleWire))];
+            handle:cn1clHandleFromWire(toNSString(threadStateData, handleWire))] autorelease];
     action.video = hasVideo != JAVA_FALSE;
     if (displayName != JAVA_NULL) {
         action.contactIdentifier = toNSString(threadStateData, displayName);
@@ -1756,7 +1756,7 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
     // action to performStartCallAction before this call returns, and the
     // delegate uses this to tell an app-originated start from a system one.
     cn1clClaimOwn(uuidString, [CXStartCallAction class]);
-    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+    [cn1clController requestTransaction:[[[CXTransaction alloc] initWithAction:action] autorelease]
             completion:^(NSError *error) {
         if (error != nil) {
             cn1clReleaseOwn(uuidString, [CXStartCallAction class]);
@@ -1779,8 +1779,8 @@ void com_codename1_impl_ios_IOSNative_callStartedConnecting___java_lang_String_l
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_OBJECT callId, JAVA_LONG timestampMs) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid != nil) {
         [cn1clEnsureProvider() reportOutgoingCallWithUUID:uuid
                 startedConnectingAtDate:[NSDate dateWithTimeIntervalSince1970:
@@ -1793,8 +1793,8 @@ void com_codename1_impl_ios_IOSNative_callOutgoingConnected___java_lang_String_l
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_OBJECT callId, JAVA_LONG timestampMs) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid != nil) {
         [cn1clEnsureProvider() reportOutgoingCallWithUUID:uuid
                 connectedAtDate:[NSDate dateWithTimeIntervalSince1970:
@@ -1815,12 +1815,12 @@ void com_codename1_impl_ios_IOSNative_callUpdate___java_lang_String_java_lang_St
         JAVA_OBJECT callId, JAVA_OBJECT handleWire, JAVA_OBJECT displayName,
         JAVA_BOOLEAN hasVideo) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid == nil) {
         return;
     }
-    CXCallUpdate *update = [[CXCallUpdate alloc] init];
+    CXCallUpdate *update = [[[CXCallUpdate alloc] init] autorelease];
     if (handleWire != JAVA_NULL) {
         NSString *wire = toNSString(threadStateData, handleWire);
         if ([wire length] > 0) {
@@ -1839,7 +1839,7 @@ void com_codename1_impl_ios_IOSNative_callReportEnded___java_lang_String_int_lon
         JAVA_OBJECT callId, JAVA_INT endReasonOrdinal, JAVA_LONG timestampMs) {
 #ifdef CN1_CALL_HAS_CALLKIT
     NSString *uuidString = toNSString(threadStateData, callId);
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
     if (uuid == nil) {
         return;
     }
@@ -1869,7 +1869,7 @@ void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_INT endReasonOrdinal) {
 #ifdef CN1_CALL_HAS_CALLKIT
     NSString *uuidString = toNSString(threadStateData, callId);
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:uuidString];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
     BOOL known = NO;
     @synchronized (cn1clLock) {
         known = cn1clCalls != nil && [cn1clCalls objectForKey:uuidString] != nil;
@@ -1879,9 +1879,9 @@ void com_codename1_impl_ios_IOSNative_callEnd___int_java_lang_String_int(
                 @"No such call");
         return;
     }
-    CXEndCallAction *action = [[CXEndCallAction alloc] initWithCallUUID:uuid];
+    CXEndCallAction *action = [[[CXEndCallAction alloc] initWithCallUUID:uuid] autorelease];
     cn1clClaimOwn(uuidString, [CXEndCallAction class]);
-    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+    [cn1clController requestTransaction:[[[CXTransaction alloc] initWithAction:action] autorelease]
             completion:^(NSError *error) {
         if (error != nil) {
             cn1clReleaseOwn(uuidString, [CXEndCallAction class]);
@@ -1909,17 +1909,17 @@ void com_codename1_impl_ios_IOSNative_callSetHeld___int_java_lang_String_boolean
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN held) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid == nil) {
         cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
         return;
     }
-    CXSetHeldCallAction *action = [[CXSetHeldCallAction alloc]
-            initWithCallUUID:uuid onHold:held != JAVA_FALSE];
+    CXSetHeldCallAction *action = [[[CXSetHeldCallAction alloc]
+            initWithCallUUID:uuid onHold:held != JAVA_FALSE] autorelease];
     NSString *heldUuid = [uuid UUIDString];
     cn1clClaimOwn(heldUuid, [CXSetHeldCallAction class]);
-    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+    [cn1clController requestTransaction:[[[CXTransaction alloc] initWithAction:action] autorelease]
             completion:^(NSError *error) {
         if (error != nil) {
             cn1clReleaseOwn(heldUuid, [CXSetHeldCallAction class]);
@@ -1936,17 +1936,17 @@ void com_codename1_impl_ios_IOSNative_callSetMuted___int_java_lang_String_boolea
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_BOOLEAN muted) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid == nil) {
         cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
         return;
     }
-    CXSetMutedCallAction *action = [[CXSetMutedCallAction alloc]
-            initWithCallUUID:uuid muted:muted != JAVA_FALSE];
+    CXSetMutedCallAction *action = [[[CXSetMutedCallAction alloc]
+            initWithCallUUID:uuid muted:muted != JAVA_FALSE] autorelease];
     NSString *mutedUuid = [uuid UUIDString];
     cn1clClaimOwn(mutedUuid, [CXSetMutedCallAction class]);
-    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+    [cn1clController requestTransaction:[[[CXTransaction alloc] initWithAction:action] autorelease]
             completion:^(NSError *error) {
         if (error != nil) {
             cn1clReleaseOwn(mutedUuid, [CXSetMutedCallAction class]);
@@ -1963,17 +1963,17 @@ void com_codename1_impl_ios_IOSNative_callSendDtmf___int_java_lang_String_java_l
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT digits) {
 #ifdef CN1_CALL_HAS_CALLKIT
-    NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:
-            toNSString(threadStateData, callId)];
+    NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:
+            toNSString(threadStateData, callId)] autorelease];
     if (uuid == nil) {
         cn1clAck(requestId, NO, CN1_CALL_ERR_INVALID_ID, @"No such call");
         return;
     }
-    CXPlayDTMFCallAction *action = [[CXPlayDTMFCallAction alloc]
+    CXPlayDTMFCallAction *action = [[[CXPlayDTMFCallAction alloc]
             initWithCallUUID:uuid
             digits:toNSString(threadStateData, digits)
-            type:CXPlayDTMFCallActionTypeSingleTone];
-    [cn1clController requestTransaction:[[CXTransaction alloc] initWithAction:action]
+            type:CXPlayDTMFCallActionTypeSingleTone] autorelease];
+    [cn1clController requestTransaction:[[[CXTransaction alloc] initWithAction:action] autorelease]
             completion:^(NSError *error) {
         cn1clAck(requestId, error == nil, CN1_CALL_ERR_UNKNOWN,
                 error == nil ? nil : [error localizedDescription]);
