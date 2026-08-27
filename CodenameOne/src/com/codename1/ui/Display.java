@@ -8563,36 +8563,64 @@ public final class Display extends CN1Constants {
         if (f == null) {
             return;
         }
+        // Once a component has taken the gesture it keeps it, updates and
+        // release alike, for as long as the gesture lasts. A magnify carries a
+        // location on every event and the layout under it moves as the component
+        // zooms, so hit-testing each update let one gesture drive two components:
+        // whichever did not get the release was left mid-pinch -- an ImageViewer
+        // that never receives pinchReleased() stays in isPinchZooming and never
+        // commits currentZoom -- and pinning only the release just moved which of
+        // the two was stranded.
+        //
+        // Scoped by pinchGestureActive, which is what makes this safe. A claim
+        // with no end would swallow every later gesture in the process, and ends
+        // are not guaranteed: a gesture can be cancelled, and fireMagnifyGesture
+        // is public and driven directly by tests and by ports with no gesture
+        // phases at all. So the claim exists only between an explicit begin and
+        // its release; a producer that reports no begin hit-tests every update,
+        // exactly as before, and is no worse off than it was.
+        if (pinchGestureActive && pinchGestureTarget != null
+                && pinchGestureTarget.getComponentForm() != null) {
+            pinchGestureTarget.pinch(scale);
+            return;
+        }
         Component cmp = gestureComponentAt(f, x, y);
         if (cmp == null) {
             cmp = f;
         }
         while (cmp != null) {
             if (cmp.pinch(scale)) {
-                // The FIRST consumer of the gesture is the one the release goes
-                // to, so an ongoing pinch that drifts over another pinch-capable
-                // component -- the layout moves as the first one zooms -- does
-                // not hand the release to a component that never started it,
-                // leaving the first stuck mid-gesture: an ImageViewer that never
-                // receives pinchReleased() stays in isPinchZooming and never
-                // commits currentZoom.
-                //
-                // Only the release is pinned, not the updates. Routing updates
-                // to the claim as well was tried and is wrong without a
-                // gesture-BEGIN signal to scope the claim: nothing bounds a claim
-                // whose release never arrives -- a system-cancelled pinch, or any
-                // caller that drives fireMagnifyGesture directly -- and the claim
-                // then swallows every later gesture in the process. Two core
-                // tests caught exactly that. Pinning the release needs no such
-                // signal because a release only arrives at the end of a gesture
-                // anyway.
-                if (pinchGestureTarget == null) {
+                if (pinchGestureActive) {
+                    pinchGestureTarget = cmp;
+                } else if (pinchGestureTarget == null) {
+                    // No begin was reported, so the claim cannot be scoped to a
+                    // gesture. Recording the first consumer still routes the
+                    // release to whoever started it, which is the half that needs
+                    // no scoping.
                     pinchGestureTarget = cmp;
                 }
                 return;
             }
             cmp = cmp.getParent();
         }
+    }
+
+    /// True between a reported gesture begin and its release. See
+    /// `#windowMagnifyGestureImpl` for why the claim is scoped rather than held
+    /// from the first consumption.
+    private boolean pinchGestureActive;
+
+    /// Starts a magnify (pinch) gesture. Invoked by the implementation when the
+    /// platform reports that a gesture began, before any scale is delivered.
+    ///
+    /// A port that reports this gets the gesture delivered to one component for
+    /// its whole duration; one that does not keeps the older behaviour of
+    /// resolving the component from the coordinates on every update. Reporting it
+    /// also discards a claim whose release never arrived, so a cancelled gesture
+    /// cannot strand the next one.
+    public void firePinchBeginGesture() {
+        pinchGestureActive = true;
+        pinchGestureTarget = null;
     }
 
     /// The component that consumed the magnify gesture currently in progress.
@@ -8616,6 +8644,7 @@ public final class Display extends CN1Constants {
     public void firePinchReleaseGesture(int x, int y) {
         Component cmp = pinchGestureTarget;
         pinchGestureTarget = null;
+        pinchGestureActive = false;
         if (cmp != null) {
             cmp.pinchReleased(x, y);
         }

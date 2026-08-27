@@ -303,7 +303,12 @@ void cn1_mac_runtime_markJavaReady(void) {
         if (cn1MacPendingActive == 1) {
             com_codename1_impl_ios_IOSImplementation_applicationDidBecomeActive__(threadStateData);
         } else if (cn1MacPendingActive == 0) {
-            com_codename1_impl_ios_IOSImplementation_applicationWillResignActive__(threadStateData);
+            // The macOS callback here too, not the iOS one. This replays a
+            // deactivation that happened before Java was ready -- the user
+            // switching away during a slow start -- and it deactivates the same
+            // still-visible window the live path does, so it must not set the
+            // minimized flag either.
+            com_codename1_impl_ios_IOSImplementation_macApplicationWillResignActive__(threadStateData);
         }
         if (cn1MacPendingHidden == 1) {
             com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(threadStateData);

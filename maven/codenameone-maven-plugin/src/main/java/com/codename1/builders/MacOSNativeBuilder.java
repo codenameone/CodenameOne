@@ -1115,6 +1115,17 @@ public class MacOSNativeBuilder extends Executor {
         if (cls == null || method == null) {
             return false;
         }
+        // PushClient.register() is the DOCUMENTED entry point, and matching it is
+        // not optional: it reaches Display.registerPush() from inside
+        // PushClient, which is framework bytecode this scan never opens -- it
+        // reads the application's own classes. So an application following the
+        // recommended PushClient.builder(...).build().register() path invokes
+        // nothing this predicate could otherwise see, and shipped with no APNs
+        // entitlement at all. Matched by equality rather than by substring so
+        // unregister() does not count as registering.
+        if (cls.equals("com/codename1/push/PushClient")) {
+            return "register".equals(method);
+        }
         if (method.indexOf("registerPush") < 0) {
             return false;
         }

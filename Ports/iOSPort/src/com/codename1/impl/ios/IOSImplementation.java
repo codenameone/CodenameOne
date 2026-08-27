@@ -2036,6 +2036,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// The AppKit port is the one that needs this: a trackpad pinch produces no
     /// pointer events, so the two-pointer path that normally ends a pinch never
     /// runs and a component that zoomed would stay in its pinching state.
+    /// Invoked when the platform reports that a magnify gesture BEGAN, before any
+    /// scale arrives. Scopes the gesture so its updates and its release all reach
+    /// one component, and discards a claim whose release never came.
+    public static void pinchBeginCallback() {
+        if (dropEvents || instance == null) {
+            return;
+        }
+        // Marshalled for the same reason as pinchMagnifyCallback.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                com.codename1.ui.Display.getInstance().firePinchBeginGesture();
+            }
+        });
+    }
+
     public static void pinchReleaseCallback(final int x, final int y) {
         if (dropEvents || instance == null) {
             return;

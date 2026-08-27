@@ -510,6 +510,7 @@ extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
 extern void CN1MacPointerButton(int button, int mask, int modifiers);
 extern void CN1MacCopyTextSelection(void);
+extern void CN1MacPinchBegin(void);
 extern void CN1MacPinchRelease(int x, int y);
 extern void pointerHoverNative(int x, int y);
 extern void pointerHoverPressedNative(int x, int y);
@@ -780,6 +781,10 @@ static int cn1HeldButtonMask(void) {
     // zoom however far the user pinched.
     if (event.phase == NSEventPhaseBegan) {
         cn1PinchScale = 1.0;
+        // Reported so the framework can keep the whole gesture on one component
+        // instead of resolving it from the coordinates on every update, and so a
+        // previous gesture whose end never arrived cannot strand this one.
+        CN1MacPinchBegin();
     }
     cn1PinchScale *= (1.0 + event.magnification);
     float scale = (float)cn1PinchScale;

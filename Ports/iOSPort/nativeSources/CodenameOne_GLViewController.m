@@ -610,6 +610,7 @@ extern void cn1CapturePointerMetadata(UITouch* touch);
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY,
                                       int precise, int modifiers);
 extern void pinchMagnifyCallback(float scale, int x, int y);
+extern void CN1MacPinchBegin(void);
 extern void CN1MacPinchRelease(int x, int y);
 extern void rotationGestureCallback(float radians, int x, int y);
 extern void screenSizeChanged(int width, int height);
@@ -3810,6 +3811,13 @@ bool lockDrawing;
 
 #if TARGET_OS_MACCATALYST
 - (void)cn1HandlePinch:(UIPinchGestureRecognizer *)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan) {
+        // Reported so the framework keeps the whole gesture on one component,
+        // and so a previous gesture whose end never arrived cannot strand this
+        // one.
+        CN1MacPinchBegin();
+        return;
+    }
     if (recognizer.state == UIGestureRecognizerStateChanged) {
         CGPoint loc = [recognizer locationInView:self.view];
         float scale = (float)recognizer.scale;
