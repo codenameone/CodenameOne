@@ -13557,8 +13557,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// An activity is only needed to SHOW something, and the two places that
     /// need one look for it when they get there.
     private Context callServiceContext() {
-        Context activity = getActivity();
-        return activity != null ? activity : getContext();
+        Context any = getActivity();
+        if (any == null) {
+            any = getContext();
+        }
+        if (any == null) {
+            return null;
+        }
+        // The APPLICATION context, never the Activity. Both bridges keep
+        // what they are given in a final field and are never cleared, so
+        // caching an Activity here held that Activity and its whole view
+        // hierarchy reachable for the rest of the process -- a leak renewed
+        // by every rotation. Nothing the bridges do with it needs an
+        // Activity: they look up system services, the package manager and
+        // the application label, and the two places that must SHOW
+        // something ask getActivity() at the point of showing, which is
+        // what the comment above already promised and what
+        // currentActivity() implements.
+        Context app = any.getApplicationContext();
+        return app != null ? app : any;
     }
 
     /// The VPN bridge, on the platform's managed IKEv2 client.

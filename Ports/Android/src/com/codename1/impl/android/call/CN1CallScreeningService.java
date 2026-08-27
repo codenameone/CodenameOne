@@ -37,7 +37,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /// Screens incoming calls against the numbers the app installed.
@@ -281,15 +283,20 @@ public class CN1CallScreeningService extends CallScreeningService {
             // no error anywhere.
             synchronized (CN1CallScreeningService.class) {
                 if (rolePending) {
-                    if (requestId >= 0) {
-                        Calls.deliverAck(requestId, false,
-                                com.codename1.call.CallError.BUSY.ordinal(),
-                                "The screening role prompt is already on"
-                                + " screen");
-                    }
-                    if (whenDone != null) {
-                        whenDone.run();
-                    }
+                    // QUEUED behind the prompt, not answered now. Answering
+                    // immediately reported the role as absent -- or BUSY --
+                    // while the very prompt that grants it was still on
+                    // screen, so a second caller was told "denied" moments
+                    // before the user granted it. That is the premature
+                    // answer this whole sequence exists to avoid, arrived at
+                    // through the one path that does not block: requestRole
+                    // returns as soon as the dialog is up, so the permission
+                    // lock is already released by the time the second caller
+                    // gets here.
+                    //
+                    // Added under the monitor the result drains under, so a
+                    // waiter cannot be parked after the drain has run.
+                    ROLE_WAITERS.add(new RoleResult(requestId, whenDone));
                     return;
                 }
                 rolePending = true;
@@ -367,6 +374,17 @@ public class CN1CallScreeningService extends CallScreeningService {
     /// Whether a role dialog owns the activity's single result channel.
     private static boolean rolePending;
 
+    /// Requests that arrived while the prompt was already up, answered from
+    /// its real result. Guarded by CN1CallScreeningService.class.
+    ///
+    /// Nothing here is answered twice: a waiter is parked instead of being
+    /// answered, and the drain empties the list under the same monitor that
+    /// fills it. A prompt whose result never arrives leaves them unanswered,
+    /// which is the exposure the FIRST request already has -- the queue does
+    /// not add a failure mode, it shares one.
+    private static final List<RoleResult> ROLE_WAITERS =
+            new ArrayList<RoleResult>();
+
     private static final class RoleResult
             implements com.codename1.impl.android.IntentResultListener {
         private final int requestId;
@@ -378,23 +396,37 @@ public class CN1CallScreeningService extends CallScreeningService {
             this.whenDone = whenDone;
         }
 
+        /// Hands this one caller the outcome, exactly once.
+        private void answer(boolean granted) {
+            if (requestId >= 0) {
+                Calls.deliverAck(requestId, granted,
+                        com.codename1.call.CallError.UNAUTHORIZED.ordinal(),
+                        "The user declined the call screening role");
+            }
+            if (whenDone != null) {
+                // The mask callers re-read getGrantedPermissions(), so they
+                // see what Android actually holds rather than this flag.
+                whenDone.run();
+            }
+        }
+
         @Override
         public void onActivityResult(int requestCode, int resultCode,
                 Intent data) {
             // First, and whatever the outcome: a declined prompt that never
             // cleared this would block every later request for the life of
             // the process.
+            RoleResult[] waiting;
             synchronized (CN1CallScreeningService.class) {
                 rolePending = false;
+                waiting = ROLE_WAITERS.toArray(
+                        new RoleResult[ROLE_WAITERS.size()]);
+                ROLE_WAITERS.clear();
             }
             enabled = resultCode == Activity.RESULT_OK;
-            if (requestId >= 0) {
-                Calls.deliverAck(requestId, enabled,
-                        com.codename1.call.CallError.UNAUTHORIZED.ordinal(),
-                        "The user declined the call screening role");
-            }
-            if (whenDone != null) {
-                whenDone.run();
+            answer(enabled);
+            for (RoleResult w : waiting) {
+                w.answer(enabled);
             }
         }
     }
