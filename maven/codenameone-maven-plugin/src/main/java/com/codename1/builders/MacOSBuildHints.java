@@ -231,11 +231,18 @@ public class MacOSBuildHints {
         // change is what makes a strict pixel comparison meaningful.
         fixedWindowSize = hint(src, "fixedWindowSize", null);
 
-        packaging = hint(src, "packaging", null);
-        packagingExplicit = packaging != null && packaging.length() > 0;
-        if (!packagingExplicit) {
-            packaging = defaultPackagingFor(distribution);
-        }
+        String packagingRaw = hint(src, "packaging", null);
+        packagingExplicit = packagingRaw != null && packagingRaw.length() > 0;
+        // Normalized once, here, the way files.userSelected already is. The
+        // builder compares this value with equalsIgnoreCase, so macos.packaging
+        // =PKG genuinely produces a package -- while every comparison in this
+        // class was spelled lowercase and quietly disagreed with it. That split
+        // let an uppercase spelling slip past the guard below and past the
+        // two-package check in getInstallerIdentityFor, handing one installer
+        // certificate to both channels: the exact case that guard exists for.
+        packaging = packagingExplicit
+                ? packagingRaw.trim().toLowerCase()
+                : defaultPackagingFor(distribution);
 
         // The installer identity is a different certificate from the application
         // one -- "3rd Party Mac Developer Installer" / "Developer ID Installer"
@@ -260,7 +267,9 @@ public class MacOSBuildHints {
         }
         if (packagingExplicit && buildsAppStoreChannel()
                 && !"pkg".equals(packaging) && !"both".equals(packaging)) {
-            warnings.add("macos.packaging=" + packaging + " is ignored for the App Store "
+            // The value as the developer wrote it, not the normalized one -- the
+            // whole job of this warning is to name the hint they typed.
+            warnings.add("macos.packaging=" + packagingRaw + " is ignored for the App Store "
                     + "channel, which is always packaged as a pkg; a dmg or a zipped .app "
                     + "cannot be submitted. It is honored for the Developer ID channel.");
         }

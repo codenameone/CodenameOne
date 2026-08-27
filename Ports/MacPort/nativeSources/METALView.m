@@ -569,6 +569,14 @@ extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
 #define CN1_PE_MASK_SECONDARY   (1 << 1)
 #define CN1_PE_BUTTON_MIDDLE    2
 #define CN1_PE_MASK_MIDDLE      (1 << 2)
+// Back and forward are first-class in PointerEvent -- BUTTON_BACK/FORWARD and
+// MASK_BACK/FORWARD -- so a mouse that has them must not have them reported as
+// the middle button.
+#define CN1_PE_BUTTON_NONE      (-1)
+#define CN1_PE_BUTTON_BACK      3
+#define CN1_PE_BUTTON_FORWARD   4
+#define CN1_PE_MASK_BACK        (1 << 3)
+#define CN1_PE_MASK_FORWARD     (1 << 4)
 #define CN1_PE_MODIFIER_SHIFT   (1 << 0)
 #define CN1_PE_MODIFIER_CONTROL (1 << 1)
 #define CN1_PE_MODIFIER_ALT     (1 << 2)
@@ -597,7 +605,28 @@ static int cn1HeldButtonMask(void) {
     if (pressed & (1 << 0)) { mask |= CN1_PE_MASK_PRIMARY; }
     if (pressed & (1 << 1)) { mask |= CN1_PE_MASK_SECONDARY; }
     if (pressed & (1 << 2)) { mask |= CN1_PE_MASK_MIDDLE; }
+    if (pressed & (1 << 3)) { mask |= CN1_PE_MASK_BACK; }
+    if (pressed & (1 << 4)) { mask |= CN1_PE_MASK_FORWARD; }
     return mask;
+}
+
+/// The Codename One button for an AppKit buttonNumber.
+///
+/// AppKit routes everything that is not left or right through otherMouse*, so
+/// the number is the only thing that distinguishes middle from back from
+/// forward. Labelling them all BUTTON_MIDDLE meant an application could not tell
+/// a navigation button from a middle click and ran middle-click behaviour for
+/// it. A number beyond forward has no PointerEvent equivalent, so it reports
+/// BUTTON_NONE rather than claiming to be a button it is not.
+static int cn1ButtonFromNumber(NSInteger buttonNumber) {
+    switch (buttonNumber) {
+        case 0: return CN1_PE_BUTTON_PRIMARY;
+        case 1: return CN1_PE_BUTTON_SECONDARY;
+        case 2: return CN1_PE_BUTTON_MIDDLE;
+        case 3: return CN1_PE_BUTTON_BACK;
+        case 4: return CN1_PE_BUTTON_FORWARD;
+        default: return CN1_PE_BUTTON_NONE;
+    }
 }
 
 - (void)mouseDown:(NSEvent *)event {
@@ -615,21 +644,26 @@ static int cn1HeldButtonMask(void) {
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
-// The middle button. AppKit routes it through otherMouse*, so without these
-// three a middle click produced no pointer event at all and BUTTON_MIDDLE could
-// never be observed on this port.
+// Every button that is not left or right. AppKit routes them all through
+// otherMouse*, so without these three a middle click produced no pointer event
+// at all -- and reporting them all as the middle button, which is what this did
+// first, is the same mistake one step in: buttonNumber is what tells middle from
+// back from forward.
 - (void)otherMouseDown:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
+    CN1MacPointerButton(cn1ButtonFromNumber(event.buttonNumber), cn1HeldButtonMask(),
+                        cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerPressed type:CN1_POINTER_PRESSED];
 }
 
 - (void)otherMouseDragged:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
+    CN1MacPointerButton(cn1ButtonFromNumber(event.buttonNumber), cn1HeldButtonMask(),
+                        cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerDragged type:CN1_POINTER_DRAGGED];
 }
 
 - (void)otherMouseUp:(NSEvent *)event {
-    CN1MacPointerButton(CN1_PE_BUTTON_MIDDLE, cn1HeldButtonMask(), cn1ModifiersOf(event));
+    CN1MacPointerButton(cn1ButtonFromNumber(event.buttonNumber), cn1HeldButtonMask(),
+                        cn1ModifiersOf(event));
     [self cn1Deliver:event to:pointerReleased type:CN1_POINTER_RELEASED];
 }
 
@@ -664,6 +698,14 @@ static int cn1HeldButtonMask(void) {
     if (!self.cn1InputEnabled) {
         return;
     }
+    // Staged for the hover too, not only for clicks. The metadata is sticky --
+    // it is whatever the last press left behind -- so moving the mouse after a
+    // right click reported a hovering SECONDARY button with that click's
+    // modifiers, and before any click at all it reported TYPE_UNKNOWN with the
+    // default primary button. PointerEvent documents hover as BUTTON_NONE, and
+    // the mask still carries whatever is genuinely held so a drag-hover is not
+    // misreported as nothing held.
+    CN1MacPointerButton(CN1_PE_BUTTON_NONE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     CGPoint p = [self cn1PointFromEvent:event];
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_DRAGGED, (int)p.x, (int)p.y);
@@ -679,6 +721,14 @@ static int cn1HeldButtonMask(void) {
     if (!self.cn1InputEnabled) {
         return;
     }
+    // Staged for the hover too, not only for clicks. The metadata is sticky --
+    // it is whatever the last press left behind -- so moving the mouse after a
+    // right click reported a hovering SECONDARY button with that click's
+    // modifiers, and before any click at all it reported TYPE_UNKNOWN with the
+    // default primary button. PointerEvent documents hover as BUTTON_NONE, and
+    // the mask still carries whatever is genuinely held so a drag-hover is not
+    // misreported as nothing held.
+    CN1MacPointerButton(CN1_PE_BUTTON_NONE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     CGPoint p = [self cn1PointFromEvent:event];
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_PRESSED, (int)p.x, (int)p.y);
@@ -692,6 +742,14 @@ static int cn1HeldButtonMask(void) {
     if (!self.cn1InputEnabled) {
         return;
     }
+    // Staged for the hover too, not only for clicks. The metadata is sticky --
+    // it is whatever the last press left behind -- so moving the mouse after a
+    // right click reported a hovering SECONDARY button with that click's
+    // modifiers, and before any click at all it reported TYPE_UNKNOWN with the
+    // default primary button. PointerEvent documents hover as BUTTON_NONE, and
+    // the mask still carries whatever is genuinely held so a drag-hover is not
+    // misreported as nothing held.
+    CN1MacPointerButton(CN1_PE_BUTTON_NONE, cn1HeldButtonMask(), cn1ModifiersOf(event));
     CGPoint p = [self cn1PointFromEvent:event];
     if (self.cn1WindowId >= 0) {
         CN1MacWindowDeliverHover(self.cn1WindowId, CN1_POINTER_RELEASED, (int)p.x, (int)p.y);

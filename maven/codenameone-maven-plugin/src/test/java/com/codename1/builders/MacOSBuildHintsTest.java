@@ -241,6 +241,18 @@ public class MacOSBuildHintsTest {
         assertNull(bothPkg.getInstallerIdentityFor("appStore"));
         assertNull(bothPkg.getInstallerIdentityFor("developerID"));
 
+        // Spelled in upper case, which the builder accepts with
+        // equalsIgnoreCase and therefore genuinely produces two packages. Every
+        // comparison in the hints class was lowercase, so an uppercase spelling
+        // used to slip past this guard and hand one installer certificate to
+        // both channels -- the precise case it exists to stop.
+        MacOSBuildHints shouty = parse(raw("macos.distribution", "both",
+                "macos.packaging", "PKG",
+                "macos.signingIdentity.installer", "3rd Party Mac Developer Installer: Someone"), "p");
+        assertEquals("pkg", shouty.getPackagingFor("developerID"));
+        assertNull(shouty.getInstallerIdentityFor("appStore"));
+        assertNull(shouty.getInstallerIdentityFor("developerID"));
+
         // A per-channel identity always wins, including then.
         MacOSBuildHints perChannel = parse(raw("macos.distribution", "both",
                 "macos.packaging", "pkg",
