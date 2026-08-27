@@ -323,7 +323,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             if placed != nil {
                 // place() cleaned up what it wrote; the placeholder it replaced has to come back
-                // or the browser is left with neither a document nor a stand-in for one.
+                // or the browser is left with neither a document nor a stand-in for one. The
+                // download goes too: place() moves rather than copies, so a move that failed
+                // leaves the whole file where it landed -- and the likely reason for the failure
+                // is a full volume, which every retry would then make worse.
+                try? FileManager.default.removeItem(at: fetched)
                 self.providePlaceholder(at: url) { _ in }
             }
             completionHandler(placed)
