@@ -322,12 +322,43 @@ final class IOSProvisioningPreflight {
         }
         String bundleId = packageName + "." + name;
         if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
-            // A wildcard App ID signs the whole subtree, so this build is fine as it is.
+            // No wildcard exemption here, unlike the folder-driven check above. A wildcard App ID
+            // does cover the bundle id, but this extension always declares
+            // com.apple.security.application-groups -- it resolves the container it reads from
+            // that group -- and Apple does not offer App Groups on a wildcard App ID at all. The
+            // profile therefore matches the name and still authorizes none of the entitlement, so
+            // the build would go on to fail in signing rather than here. A hand-written extension
+            // is left alone because nothing tells this check what it declares.
+            problems.add(new Problem(wildcardAppGroupMessage(name, bundleId, appProfile, release),
+                    true));
             return problems;
         }
         problems.add(new Problem(appExtensionProfileMessage(name, bundleId, appProfile, release),
                 true));
         return problems;
+    }
+
+    /// Says why a wildcard profile cannot stand in for the generated extension's own.
+    private static String wildcardAppGroupMessage(String name, String bundleId, Profile appProfile,
+            boolean release) {
+        String buildType = release ? "release" : "debug";
+        return "The " + name + " app extension has no provisioning profile of its own, and the "
+                + "wildcard profile this build signs with (\"" + appProfile.name + "\", App ID "
+                + appIdPattern(appProfile.applicationIdentifier) + ") cannot sign it. The bundle "
+                + "ID matches, but the extension declares the App Group it shares with the app "
+                + "and Apple does not offer the App Groups capability on a wildcard App ID, so "
+                + "signing fails on the entitlement rather than on the name.\n"
+                + "Create an explicit App ID for " + bundleId + " in the Apple Developer portal, "
+                + "enable App Groups on it and on the app's own App ID, generate a provisioning "
+                + "profile for it against the same certificate as the app, and supply it in one "
+                + "of these ways:\n"
+                + "  1. Set codename1.ios." + buildType + ".appext." + name + ".provision="
+                + "{path to the .mobileprovision} in codenameone_settings.properties.\n"
+                + "  2. Host the profile and name its URL in codename1.arg.ios." + buildType
+                + ".appext." + name + ".provisioningURL.\n"
+                + "The Certificate Wizard does all of this for you.\n"
+                + "The app's own profile has to change too: it carries the same App Group, which "
+                + "a wildcard App ID cannot authorize either.";
     }
 
     private static String trimmed(String value) {

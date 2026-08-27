@@ -205,7 +205,7 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // Node ids are the app's own record keys and a switch reuses them, so the check is the
         // remote id AND the credential the download was authorized with, which is the thing a
         // switch always changes.
-        if (!stillPublished(documentId, node.remoteId, credentials)) {
+        if (!stillPublished(documentId, node, credentials)) {
             if (!cached.delete()) {
                 Log.w(TAG, "Could not delete the withdrawn download " + cached);
             }
@@ -215,14 +215,29 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
     }
 
-    /// Whether the document still names the same remote object, under the same credential.
+    /// Whether the document still names the same remote object, at the same version, under the
+    /// same credential.
     ///
     /// Re-read from disk rather than taken from the copy the request started with: the point is
     /// to see what the app has done since.
-    private boolean stillPublished(String documentId, String remoteId, String[] credentials) {
+    ///
+    /// The declared size and date are compared as well as the id. A server-side revision usually
+    /// keeps its key, so an app that republishes the node with a new size or date while the old
+    /// bytes are still streaming would otherwise have those bytes handed to the picker as the new
+    /// version. That is the same signal the Apple providers version remote content by, and the
+    /// same bargain: an app that declares neither gets no per-item change detection, which
+    /// DocumentNode documents.
+    private boolean stillPublished(String documentId, CN1DocumentStore.Node requested,
+            String[] credentials) {
         CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
         CN1DocumentStore.Node node = index == null ? null : index.nodes.get(documentId);
-        if (node == null || !remoteId.equals(node.remoteId)) {
+        // openDocument only reaches this for a node whose remote id it already checked, but the
+        // field is nullable and read here through a second object, so it is guarded rather than
+        // assumed.
+        String remoteId = requested.remoteId;
+        if (node == null || remoteId == null || !remoteId.equals(node.remoteId)
+                || node.size != requested.size
+                || node.lastModified != requested.lastModified) {
             return false;
         }
         String[] current = CN1DocumentStore.loadEndpoint(getContext());

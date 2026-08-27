@@ -148,9 +148,19 @@ public class IOSAppExtensionSigningPreflightTest {
     }
 
     @Test
-    public void aWildcardAppIdCoversTheGeneratedDocumentProvider() throws Exception {
+    public void aWildcardAppIdDoesNotCoverTheGeneratedDocumentProvider() throws Exception {
+        // A wildcard covers the bundle ID and still cannot sign this extension: it declares the
+        // App Group it resolves its container from, and Apple does not offer App Groups on a
+        // wildcard App ID. Passing it here would move the failure to Xcode, where the message
+        // is about an entitlement rather than about the profile nobody supplied.
         Properties p = settings(profile("PROD", "ABCD1234.com.example.*"));
         p.setProperty("codename1.arg.ios.documentProvider.enabled", "true");
+        List<IOSProvisioningPreflight.Problem> problems = checkGenerated(p);
+        assertEquals(1, problems.size());
+        assertTrue(problems.get(0).message, problems.get(0).message.contains("App Groups"));
+
+        // A profile of its own settles it, wildcard app profile or not.
+        p.setProperty("codename1.ios.appext.CN1Documents.provision", "/tmp/CN1Documents.mobileprovision");
         assertTrue(checkGenerated(p).isEmpty());
     }
 
