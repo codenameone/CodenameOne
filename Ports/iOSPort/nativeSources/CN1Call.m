@@ -1716,7 +1716,9 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
         }
     }
     provider.configuration = cfg;
-    cn1clConfigured = YES;
+    @synchronized (cn1clLock) {
+        cn1clConfigured = YES;
+    }
     cn1clAck(requestId, YES, 0, nil);
 #else
     cn1clAck(requestId, NO, CN1_CALL_ERR_NOT_SUPPORTED,
@@ -1724,11 +1726,42 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
 #endif
 }
 
+/// Whether a Java-originated report may proceed, answering it when not.
+///
+/// iOS was the only port that let a call be reported before
+/// Calls.configure() ran: its CXProvider exists from launch with a
+/// bundle-derived configuration, so the report simply worked. Android's
+/// Telecom ignores calls from an unregistered PhoneAccount and the
+/// simulation refuses outright, so an app written and tested against iOS
+/// alone met the rule for the first time on a device it had shipped to. The
+/// flag was already being set here and read nowhere.
+///
+/// A NEGATIVE request id is the PushKit path, which reports before any Java
+/// has run and must never be gated on Java having configured anything.
+static BOOL cn1clReportAllowed(int requestId) {
+    if (requestId < 0) {
+        return YES;
+    }
+    BOOL ready;
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        ready = cn1clConfigured;
+    }
+    if (!ready) {
+        cn1clAck(requestId, NO, CN1_CALL_ERR_CALL_REFUSED,
+                @"Calls.configure() must run before a call is reported");
+    }
+    return ready;
+}
+
 void com_codename1_impl_ios_IOSNative_callReportIncoming___int_java_lang_String_java_lang_String_java_lang_String_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
         JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
 #ifdef CN1_CALL_HAS_CALLKIT
+    if (!cn1clReportAllowed(requestId)) {
+        return;
+    }
     cn1clReportIncoming(requestId, toNSString(threadStateData, callId),
             toNSString(threadStateData, handleWire),
             displayName == JAVA_NULL ? nil : toNSString(threadStateData, displayName),
@@ -1744,6 +1777,9 @@ void com_codename1_impl_ios_IOSNative_callReportOutgoing___int_java_lang_String_
         JAVA_INT requestId, JAVA_OBJECT callId, JAVA_OBJECT handleWire,
         JAVA_OBJECT displayName, JAVA_BOOLEAN hasVideo) {
 #ifdef CN1_CALL_HAS_CALLKIT
+    if (!cn1clReportAllowed(requestId)) {
+        return;
+    }
     NSString *uuidString = toNSString(threadStateData, callId);
     NSUUID *uuid = [[[NSUUID alloc] initWithUUIDString:uuidString] autorelease];
     if (uuid == nil) {
