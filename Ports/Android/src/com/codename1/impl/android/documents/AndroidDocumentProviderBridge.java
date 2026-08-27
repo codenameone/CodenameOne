@@ -214,17 +214,32 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (authority == null || index == null) {
             return;
         }
-        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+        // The READ mode alone. revokeUriPermission takes the access modes and nothing else --
+        // FLAG_GRANT_PERSISTABLE_URI_PERMISSION is not one of them, and passing it makes the call
+        // reject the whole request, which the catch below would then have swallowed once per
+        // node while every grant stayed live. Revoking the read mode takes its persisted grant
+        // with it, which is the grant this is here for.
         for (CN1DocumentStore.Node node : index.nodes.values()) {
-            try {
-                ctx.revokeUriPermission(
-                        DocumentsContract.buildDocumentUri(authority, node.id), flags);
-            } catch (Throwable t) {
-                // One document that cannot be revoked must not stop the rest, and must not stop
-                // the deletion below either -- the content going away is the part that matters.
-                Log.w(TAG, "Could not revoke access to " + node.id, t);
+            revoke(ctx, DocumentsContract.buildDocumentUri(authority, node.id), node.id);
+            // A folder can also have been picked whole, through ACTION_OPEN_DOCUMENT_TREE, and
+            // that grant is on the /tree/ URI rather than the /document/ one -- so revoking
+            // documents alone left the holder tree-scoped access to everything republished
+            // under the same folder id. buildTreeDocumentUri arrived in API 21 and the port
+            // still builds for 19, where no tree grant can exist to revoke.
+            if (node.folder && android.os.Build.VERSION.SDK_INT >= 21) {
+                revoke(ctx, DocumentsContract.buildTreeDocumentUri(authority, node.id), node.id);
             }
+        }
+    }
+
+    /// One revocation, with its own failure. One document that cannot be revoked must not stop
+    /// the rest, and must not stop the deletion that follows -- the content going away is the
+    /// part that matters.
+    private void revoke(Context ctx, android.net.Uri uri, String nodeId) {
+        try {
+            ctx.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not revoke access to " + nodeId, t);
         }
     }
 
