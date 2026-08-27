@@ -974,12 +974,19 @@ static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
     if ([mimeType isEqualToString:@"text/plain"]) return @"public.utf8-plain-text";
     if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
     if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
-    // The writer puts Markdown under the conventional UTI, so the reader has to
-    // ask for the same one. Without this a Markdown-only copy read back with no
-    // Markdown representation at all -- inside the very application that had just
-    // written it. text/asciidoc has no UTI and is written under its MIME type, so
-    // it needs no entry and falls through correctly.
+#if TARGET_OS_OSX
+    // macOS ONLY, because only the AppKit writer uses the UTI. The reader has to
+    // name the same type the writer used, or a Markdown-only copy reads back with
+    // no Markdown representation inside the very application that wrote it -- but
+    // the UIKit writer below still puts Markdown under text/markdown, and mapping
+    // it here for every platform broke iOS in exactly the direction this fixes on
+    // macOS. Aligning the two writers is a change to what an iOS application
+    // already reads and writes, so it is not made here.
+    //
+    // text/asciidoc has no UTI and is written under its MIME type on both, so it
+    // needs no entry either way.
     if ([mimeType isEqualToString:@"text/markdown"]) return @"net.daringfireball.markdown";
+#endif
     return mimeType;
 }
 

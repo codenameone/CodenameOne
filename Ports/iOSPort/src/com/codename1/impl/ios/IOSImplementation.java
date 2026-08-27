@@ -12773,7 +12773,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             nativeInstance.openStringPicker(strs, offset, x, y, w, h, preferredWidth, preferredHeight);
-        } else if (type == Display.PICKER_TYPE_DURATION) {
+        } else if (type == Display.PICKER_TYPE_DURATION
+                || type == Display.PICKER_TYPE_DURATION_HOURS
+                || type == Display.PICKER_TYPE_DURATION_MINUTES) {
+            // All three duration types, matching the result conversion further
+            // down which has always handled the trio. Only PICKER_TYPE_DURATION
+            // was dispatched here, so the two variants fell into the date branch
+            // below and cast Picker's Long to a Date -- and on ParparVM a failed
+            // cast is not an exception but the next instruction reading a Long as
+            // a Date, which is a native crash rather than something to catch. The
+            // native takes the type, so it already knows which of the three to
+            // present.
+            //
+            // Inert on iOS, whose isNativePickerTypeSupported answers false for
+            // the two variants, so nothing reaches this with them there.
             long time;
             if (currentValue instanceof Long) {
                 time = (Long)currentValue;
