@@ -157,6 +157,9 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         // and calling the system's completion handler twice is a contract violation of its own.
         let once = CN1FetchCompletion(completionHandler)
         let container = containerURL
+        // Captured before the download starts, so what comes back is checked against what was
+        // asked for rather than against whatever happens to be current when it arrives.
+        let requested = CN1RemoteVersion(node)
         let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
         let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container,
                                            destination: handoffDirectory()) { url, error in
@@ -171,6 +174,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
                 // the request began may name a file that has since been renamed or moved.
                 if let current = CN1FileProviderExtension.publishedItem(for: itemIdentifier,
                                                                        remoteId: remoteId,
+                                                                       version: requested,
                                                                        credentials: credentials,
                                                                        containerURL: container) {
                     once.call(url, current, nil)
@@ -229,15 +233,23 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
     }
 
     private static func publishedItem(for identifier: NSFileProviderItemIdentifier,
-                                      remoteId: String, credentials: String,
+                                      remoteId: String, version: CN1RemoteVersion,
+                                      credentials: String,
                                       containerURL: URL) -> NSFileProviderItem? {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], node.remoteId == remoteId,
+              CN1RemoteVersion(node) == version,
               CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
             // The credential is compared as well as the node and the remote object: an account
             // switch reuses node ids, and can reuse the server's keys for them, so those two
             // alone would let the previous account's bytes through.
+            //
+            // And the declared version, because a server-side revision usually keeps its key: an
+            // app that republishes the node with a new size or date while the old bytes are still
+            // arriving would otherwise have them handed over AND rebuilt into an item carrying
+            // the new version, so the browser would cache stale content under a stamp that says
+            // it is current -- and never ask again.
             return nil
         }
         return item(for: node, resolved: resolved, in: index, containerURL: containerURL)

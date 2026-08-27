@@ -146,3 +146,18 @@ final class CN1DocumentIndex {
         return CN1DocumentIndex(root: doc.root, revision: stamp)
     }
 }
+
+/// The part of a node that says which revision of a remote object it names.
+///
+/// Compared before a download is accepted: the remote id is the key, and the key survives a
+/// server-side revision, so an app that republishes with a new size or date while the previous
+/// bytes are still arriving has to be able to reject them.
+struct CN1RemoteVersion: Equatable {
+    let size: Int64?
+    let lastModified: Int64?
+
+    init(_ node: CN1DocumentNode) {
+        size = node.size
+        lastModified = node.lastModified
+    }
+}

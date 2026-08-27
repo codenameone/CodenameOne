@@ -144,7 +144,9 @@ Provisioning profile "MyApp_Distribution" has app ID "com.example.myapp", which 
 match the bundle ID "com.example.myapp.CN1Documents"
 ....
 
-Codename One refuses that build before sending it, naming the extension and the bundle id its App ID has to match. A wildcard App ID (`com.example.*`) is the one case that needs no extra profile - it already covers the extension - and the build lets it through.
+Codename One refuses that build before sending it, naming the extension and the bundle id its App ID has to match.
+
+A wildcard App ID (`com.example.*`) isn't a way around this, unlike for other extensions. It covers the bundle id, and it still can't sign this extension: the extension declares the App Group it shares with the app, and Apple doesn't offer the App Groups capability on a wildcard App ID at all. Signing fails on the entitlement rather than on the name, so the build is refused here too. The app's own profile has the same problem, because it carries the same group. Both need explicit App IDs - which is what the Certificate Wizard creates.
 
 A Mac build embeds no extension and needs no signing assets for one: Apple's FileProvider framework is unavailable to Mac Catalyst apps, so the Mac slice of an iOS project can't host a provider however it's entitled. `isSupported()` answers `false` there and every publish call is a no-op, so the same code runs unchanged.
 

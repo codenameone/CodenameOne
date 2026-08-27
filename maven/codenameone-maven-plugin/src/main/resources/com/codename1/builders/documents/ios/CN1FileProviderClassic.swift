@@ -193,6 +193,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // transfer -- so there is nothing to hang a cancel on without keeping a URL-to-task map
         // alive in the extension. The replicated path, which every supported OS uses, does cancel.
         let container = containerURL
+        // Captured before the download starts, for the reason the replicated provider gives: a
+        // server-side revision usually keeps its key, so an app republishing the node with a new
+        // size or date while the old bytes are still arriving has to be able to reject them.
+        let requested = CN1RemoteVersion(node)
         let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
         CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container) { fetched, error in
             guard let fetched = fetched else {
@@ -209,6 +213,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // finished before the write, the second a clear that landed during it. A clear after
             // the second check purges the file itself.
             guard CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                        version: requested,
                                                         credentials: credentials,
                                                         containerURL: container) else {
                 try? FileManager.default.removeItem(at: fetched)
@@ -217,6 +222,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             }
             let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
             if !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
+                                                     version: requested,
                                                      credentials: credentials,
                                                      containerURL: container) {
                 try? FileManager.default.removeItem(at: url)
@@ -266,11 +272,15 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     }
 
     private static func stillPublished(_ identifier: NSFileProviderItemIdentifier,
-                                       remoteId: String, credentials: String,
-                                       containerURL: URL) -> Bool {
+                                       remoteId: String, version: CN1RemoteVersion,
+                                       credentials: String, containerURL: URL) -> Bool {
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
-              let node = index.nodes[resolved], node.remoteId == remoteId else {
+              let node = index.nodes[resolved], node.remoteId == remoteId,
+              // The declared version too: the remote id is the app's key for the object and a
+              // server-side revision keeps it, so an id match alone would move the previous
+              // revision's bytes into storage after the newer publication is already current.
+              CN1RemoteVersion(node) == version else {
             return false
         }
         // And the same credential the download was authorized with. An account switch that reuses
