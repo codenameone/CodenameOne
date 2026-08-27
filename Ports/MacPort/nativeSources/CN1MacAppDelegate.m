@@ -377,15 +377,12 @@ static void cn1MacRefreshSurfaceHidden(void) {
     }
 }
 
+extern void CN1MacWindowsDeliverAppHidden(BOOL hidden);
+
 /// The application was hidden or unhidden -- Cmd-H, or Hide Others elsewhere.
 void CN1MacDeliverAppHidden(BOOL hidden) {
     cn1MacAppHidden = hidden;
     cn1MacRefreshSurfaceHidden();
-    // The secondary windows too. The surface flag above speaks for the main one
-    // only, and a Window that still reports itself visible keeps the EDT out of
-    // its minimized shortcut for as long as the application stays hidden.
-    extern void CN1MacWindowsDeliverAppHidden(BOOL hidden);
-    CN1MacWindowsDeliverAppHidden(hidden);
 }
 
 /// The main window was minimized or restored.
@@ -529,12 +526,24 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
     com_codename1_impl_ios_IOSImplementation_macApplicationWillResignActive__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
+- (void)applicationWillHide:(NSNotification *)notification {
+    // The secondary windows are swept HERE rather than in applicationDidHide:,
+    // because the sweep records which windows were actually on screen and by
+    // the time the application is hidden every one of them reports NO. The
+    // surface flag below does not care about the ordering, so it stays where it
+    // was.
+    CN1MacWindowsDeliverAppHidden(YES);
+}
+
 - (void)applicationDidHide:(NSNotification *)notification {
     CN1MacDeliverAppHidden(YES);
 }
 
 - (void)applicationWillUnhide:(NSNotification *)notification {
     CN1MacDeliverAppHidden(NO);
+    // Only the windows the hide actually took away, which is what the flag set
+    // in applicationWillHide: records.
+    CN1MacWindowsDeliverAppHidden(NO);
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {

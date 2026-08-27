@@ -330,7 +330,24 @@ public class MacOSNativeBuilder extends Executor {
         // to clang's implicit module auto-import -- which the comment beside
         // that import in IOSNative.m already records as the fragile
         // arrangement it exists to replace.
-        if (usesLocalNotifications[0] || usesPush[0]) {
+        // The override counts as well as the scan. macos.entitlements.apsEnvironment
+        // turns push on for an application whose registration the scanner cannot
+        // see -- a reflective call, most obviously -- and it is the same hint that
+        // writes the APNs entitlement. Reading only the scan flags here shipped a
+        // bundle advertising APNs with the push natives compiled out of it, which
+        // is the precise mismatch this define exists to prevent. Any channel that
+        // resolves to push is enough: the define is written once for the build,
+        // while the entitlements are written per channel.
+        boolean pushEnabled = usesPush[0];
+        if (!pushEnabled) {
+            for (String channel : hints.getChannels()) {
+                if (hints.entitlementsFor(channel).push(false)) {
+                    pushEnabled = true;
+                    break;
+                }
+            }
+        }
+        if (usesLocalNotifications[0] || pushEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
             if (!iosNative.exists()) {
                 throw new BuildException("The application uses com.codename1.notifications but "

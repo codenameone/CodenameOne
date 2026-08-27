@@ -456,6 +456,10 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
                 rec.pendingOwner = nil;
             }
             [rec.window makeKeyAndOrderFront:nil];
+            // The application's own decision outranks the app-hide bookkeeping:
+            // whatever unhiding would have done for this window, it has just
+            // been said explicitly.
+            rec.hiddenByApp = NO;
             CN1MacWindowDeliverVisibility(rec.windowId, YES);
             // AppKit hands back a usable window synchronously, so the content is
             // ready as soon as it is on screen. Catalyst has to wait for a scene
@@ -463,6 +467,10 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowShow___int_boolean(CODENAME_
             CN1MacWindowDeliverContentReady(rec.windowId);
         } else {
             [rec.window orderOut:nil];
+            // Cleared for the same reason, and this is the direction that
+            // matters: hiding a window while the application itself is hidden
+            // must not be undone by the later unhide.
+            rec.hiddenByApp = NO;
             CN1MacWindowDeliverVisibility(rec.windowId, NO);
         }
     });
@@ -476,6 +484,7 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowReopen___int_R_boolean(CO
             return;
         }
         [rec.window makeKeyAndOrderFront:nil];
+        rec.hiddenByApp = NO;
         CN1MacWindowDeliverVisibility(rec.windowId, YES);
         ok = YES;
     });
@@ -993,10 +1002,15 @@ void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
             continue;
         }
         if (hidden) {
-            // Already reported hidden by its own miniaturize, so leave it be:
-            // restoring it on unhide would show the framework a window the user
-            // still has in the Dock.
-            if (rec.window.isMiniaturized || rec.hiddenByApp) {
+            // isVisible, not isMiniaturized. A window the application already
+            // took off screen with Window.hide() is not miniaturized either, and
+            // marking it would hand it a visible callback on unhide that AppKit
+            // never backs -- the framework would then paint a window that is
+            // still ordered out. isVisible is NO for a miniaturized window too,
+            // so this covers that case as well. It is only meaningful because
+            // the sweep runs from applicationWillHide:, while the windows are
+            // still on screen; by applicationDidHide: they all read NO.
+            if (!rec.window.isVisible || rec.hiddenByApp) {
                 continue;
             }
             rec.hiddenByApp = YES;

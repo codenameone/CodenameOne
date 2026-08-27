@@ -289,4 +289,65 @@ class ExecutorArchiveExtractionTest {
             zip.close();
         }
     }
+
+    /**
+     * Entry headers are charged, not only entry payloads.
+     *
+     * <p>ZipInputStream.getNextEntry() inflates and parses each local header --
+     * the name included, and a name may run to 64KB -- before any per-entry
+     * budget can charge for it. An archive of directory entries with very long
+     * names therefore costs gigabytes of work while spending no payload bytes
+     * and, on its own, staying inside the entry count. The stream bound is what
+     * closes that, so the archive here is built entirely out of metadata.</p>
+     */
+    @Test
+    void nestedEntryHeadersAreBoundedToo() throws Exception {
+        StringBuilder longName = new StringBuilder();
+        for (int i = 0; i < 2000; i++) {
+            longName.append('n');
+        }
+
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        ZipOutputStream zos = new ZipOutputStream(raw);
+        for (int i = 0; i < 200; i++) {
+            zos.putNextEntry(new ZipEntry(longName + "-" + i + "/"));
+            zos.closeEntry();
+        }
+        zos.close();
+
+        File scratch = temporaryDirectory.resolve("header-scan").toFile();
+        assertTrue(scratch.mkdirs());
+
+        IOException refused = assertThrows(IOException.class,
+                () -> Executor.extractNestedClassesForPermissions(
+                        new ByteArrayInputStream(raw.toByteArray()), scratch,
+                        new Executor.PermScanBudget(), 4096L));
+        assertTrue(refused.getMessage().contains("refusing to keep reading"),
+                "expected the stream bound to stop it, got: " + refused.getMessage());
+    }
+
+    /**
+     * The bound counts every route bytes can leave the stream by. skip() is the
+     * one that matters here: ZipInputStream uses it to step over entry data.
+     */
+    @Test
+    void theStreamBoundChargesReadsAndSkipsAlike() throws Exception {
+        byte[] payload = new byte[64];
+
+        Executor.BoundedInputStream viaArray = new Executor.BoundedInputStream(
+                new ByteArrayInputStream(payload), 16L);
+        assertThrows(IOException.class, () -> viaArray.read(new byte[64], 0, 64));
+
+        Executor.BoundedInputStream viaSkip = new Executor.BoundedInputStream(
+                new ByteArrayInputStream(payload), 16L);
+        assertThrows(IOException.class, () -> viaSkip.skip(64));
+
+        Executor.BoundedInputStream viaSingle = new Executor.BoundedInputStream(
+                new ByteArrayInputStream(payload), 4L);
+        assertThrows(IOException.class, () -> {
+            for (int i = 0; i < 64; i++) {
+                viaSingle.read();
+            }
+        });
+    }
 }

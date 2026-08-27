@@ -1248,6 +1248,72 @@ public abstract class Executor {
      * the nested-jar descent so the two cannot disagree about the limit -- and so
      * a bomb cannot get twice the budget by being nested.
      */
+    /**
+     * A stream that refuses to yield more than a fixed number of bytes.
+     *
+     * <p>Wrapped around a nested archive before ZipInputStream sees it.
+     * getNextEntry() inflates and parses each local header -- the entry name
+     * included, and a name may be 64KB -- before any per-entry budget can
+     * charge for it, so an archive of 50,000 maximally-named entries is
+     * gigabytes of metadata that the payload budgets never observe. Counting
+     * what the stream yields bounds headers and payloads alike, at the one
+     * place every byte has to pass through.</p>
+     */
+    static final class BoundedInputStream extends InputStream {
+        private final InputStream delegate;
+        private final long limit;
+        private long consumed;
+
+        BoundedInputStream(InputStream delegate, long limit) {
+            this.delegate = delegate;
+            this.limit = limit;
+        }
+
+        private void charge(long n) throws IOException {
+            if (n <= 0) {
+                return;
+            }
+            consumed += n;
+            if (consumed > limit) {
+                throw new IOException("a nested archive fed more than " + limit
+                        + " bytes to the permission scan; refusing to keep reading");
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = delegate.read();
+            if (b >= 0) {
+                charge(1);
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = delegate.read(b, off, len);
+            charge(n);
+            return n;
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            long skipped = delegate.skip(n);
+            charge(skipped);
+            return skipped;
+        }
+
+        @Override
+        public int available() throws IOException {
+            return delegate.available();
+        }
+
+        @Override
+        public void close() throws IOException {
+            delegate.close();
+        }
+    }
+
     static final class PermScanBudget {
         private long total;
         private int extracted;
@@ -1368,7 +1434,17 @@ public abstract class Executor {
     // this loop charges it.
     static void extractNestedClassesForPermissions(InputStream nested, File tmp,
             PermScanBudget budget) throws IOException {
-        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
+        extractNestedClassesForPermissions(nested, tmp, budget, PERM_SCAN_MAX_TOTAL_BYTES);
+    }
+
+    /// The stream bound is a parameter so a test can drive this loop with a
+    /// limit it can actually reach; production always passes the real one.
+    static void extractNestedClassesForPermissions(InputStream nested, File tmp,
+            PermScanBudget budget, long streamLimit) throws IOException {
+        // Bounded at the source: see BoundedInputStream. The per-entry budgets
+        // below cannot see the bytes getNextEntry() spends parsing headers.
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                new BoundedInputStream(nested, streamLimit));
         java.util.zip.ZipEntry inner;
         while ((inner = zis.getNextEntry()) != null) {
             // Charged before the branch, so a drained entry costs the same
