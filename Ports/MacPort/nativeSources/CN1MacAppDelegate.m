@@ -94,15 +94,25 @@ static BOOL cn1MacPushInFlight = NO;
 static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
 static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
-static NSMutableArray<NSDictionary *> *cn1MacPendingPushes = nil;
 
-/// Local notifications that arrived before the Java side existed.
+/// Pushes and local notifications waiting their turn, in arrival order.
 ///
-/// Held as the whole delivery -- the id plus whatever the user did with it --
-/// because the action and the reply text are as much a part of the callback as
-/// the id is, and re-deriving them on replay is not possible once the
-/// UNNotificationResponse has gone.
-static NSMutableArray<NSDictionary *> *cn1MacPendingLocalNotifications = nil;
+/// ONE queue for both kinds, not one each. They write the same singleton --
+/// PushContent -- so ordering them against each other is the only way a delivery
+/// can be sure the content it wrote is the content its own callback reads. A
+/// local notification is handed over synchronously and is safe on its own, which
+/// is what made it look like it needed no pacing; it is not safe next to a push
+/// whose callback is still queued on the event dispatch thread, because it
+/// rewrites the content that push is waiting to be given.
+///
+/// A notification is held as the whole delivery -- the id plus whatever the user
+/// did with it -- because the action and the reply text are as much a part of
+/// the callback as the id is, and re-deriving them on replay is not possible
+/// once the UNNotificationResponse has gone.
+static NSMutableArray<NSDictionary *> *cn1MacPendingDeliveries = nil;
+static NSString * const CN1MacDeliveryKind = @"cn1Kind";
+static NSString * const CN1MacDeliveryPayload = @"cn1Payload";
+static NSString * const CN1MacDeliveryPush = @"push";
 
 /// Decodes one APNs payload the way the shared iOS router does and hands each
 /// part to the application.
@@ -247,6 +257,57 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
     }
 }
 
+/// Defined below, beside the other delivery decoders; the queue that paces both
+/// kinds has to sit above them.
+static void cn1MacDeliverLocalNotification(NSDictionary *delivery);
+
+/// Hands over what is next in the queue, as far as the pacing allows.
+///
+/// A push costs one round trip through the event dispatch thread: delivering it
+/// writes PushContent and QUEUES the callback, so asking Java for a barrier puts
+/// a runnable behind that callback and the barrier calls back in here. Nothing
+/// else may write PushContent until then -- not the next push, and not a local
+/// notification, which would otherwise overwrite the content a queued push
+/// callback is still waiting to be given.
+///
+/// A local notification costs nothing: it is handed over on this thread, so its
+/// content has been read by the time it returns and the loop continues.
+static void cn1MacPumpDeliveryQueue(void) {
+    while (cn1MacDeliveriesReleased && !cn1MacPushInFlight
+            && [cn1MacPendingDeliveries count] > 0) {
+        NSDictionary *entry = [[cn1MacPendingDeliveries objectAtIndex:0] retain];
+        [cn1MacPendingDeliveries removeObjectAtIndex:0];
+        NSDictionary *payload = [entry objectForKey:CN1MacDeliveryPayload];
+        if ([[entry objectForKey:CN1MacDeliveryKind] isEqualToString:CN1MacDeliveryPush]) {
+            // Ends the loop: nothing else may write PushContent until the
+            // barrier reports this push's callback has read it.
+            cn1MacPushInFlight = YES;
+            cn1MacDeliverPush(payload);
+            struct ThreadLocalData* threadStateData = getThreadLocalData();
+            com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
+        } else {
+            // Handed over on this thread, so its content is read before this
+            // returns and the next delivery may go straight out.
+            cn1MacDeliverLocalNotification(payload);
+        }
+        [entry release];
+    }
+}
+
+/// Adds one delivery to the queue and pumps it.
+static void cn1MacEnqueueDelivery(NSString *kind, NSDictionary *payload) {
+    if (payload == nil) {
+        return;
+    }
+    if (cn1MacPendingDeliveries == nil) {
+        cn1MacPendingDeliveries = [[NSMutableArray alloc] init];
+    }
+    [cn1MacPendingDeliveries addObject:
+            [NSDictionary dictionaryWithObjectsAndKeys:
+                    kind, CN1MacDeliveryKind, payload, CN1MacDeliveryPayload, nil]];
+    cn1MacPumpDeliveryQueue();
+}
+
 /// Delivers a push payload, or holds it until the Java side exists.
 ///
 /// Queued like the lifecycle transitions and the launch URL, and for the sharper
@@ -260,39 +321,15 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
 ///
 /// Shared by the remote-notification hook and by both notification-center
 /// delegate methods, so none of them can be the one that forgets to wait.
-/// Hands over the next push, if the last one has been dealt with.
-///
-/// One per round trip through the event dispatch thread. Delivering the payload
-/// sets PushContent and queues the callback; asking Java for a barrier puts a
-/// runnable behind that callback, and the barrier calls back in here, so the
-/// next push's PushContent cannot be written until the previous push's callback
-/// has read the one belonging to it.
-static void cn1MacPumpPushQueue(void) {
-    if (!cn1MacDeliveriesReleased || cn1MacPushInFlight || [cn1MacPendingPushes count] == 0) {
-        return;
-    }
-    NSDictionary *payload = [[cn1MacPendingPushes objectAtIndex:0] retain];
-    [cn1MacPendingPushes removeObjectAtIndex:0];
-    cn1MacPushInFlight = YES;
-    cn1MacDeliverPush(payload);
-    [payload release];
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    com_codename1_impl_ios_IOSImplementation_macDeliverAfterEdt__(threadStateData);
-}
-
 static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
     if (userInfo == nil) {
         return;
     }
-    // Queued unconditionally, then pumped. A live push takes the same one-at-a-
-    // time path as a replayed one because the operating system can deliver two
-    // in quick succession just as a launch can accumulate two, and the PushContent
-    // race does not care which produced them.
-    if (cn1MacPendingPushes == nil) {
-        cn1MacPendingPushes = [[NSMutableArray alloc] init];
-    }
-    [cn1MacPendingPushes addObject:userInfo];
-    cn1MacPumpPushQueue();
+    // Queued unconditionally, then pumped. A live push takes the same paced path
+    // as a replayed one because the operating system can deliver two in quick
+    // succession just as a launch can accumulate two, and the PushContent race
+    // does not care which produced them.
+    cn1MacEnqueueDelivery(CN1MacDeliveryPush, userInfo);
 }
 
 /// Reports a local notification, filling in what the user did with it.
@@ -344,14 +381,7 @@ static void cn1MacQueueOrDeliverLocalNotification(NSDictionary *delivery) {
     if (delivery == nil) {
         return;
     }
-    if (!cn1MacDeliveriesReleased) {
-        if (cn1MacPendingLocalNotifications == nil) {
-            cn1MacPendingLocalNotifications = [[NSMutableArray alloc] init];
-        }
-        [cn1MacPendingLocalNotifications addObject:delivery];
-        return;
-    }
-    cn1MacDeliverLocalNotification(delivery);
+    cn1MacEnqueueDelivery(@"local", delivery);
 }
 
 static void cn1MacDeliverURL(NSString *url) {
@@ -420,15 +450,8 @@ void CN1MacRunPendingDeliveries(void) {
                 cn1MacDeliverURL(url);
             }
             [cn1MacPendingURLs removeAllObjects];
-            // Local notifications need no pacing: each one sets PushContent and
-            // then calls the application on this thread, so its content cannot
-            // be overwritten before it is read.
-            for (NSDictionary *delivery in cn1MacPendingLocalNotifications) {
-                cn1MacDeliverLocalNotification(delivery);
-            }
-            [cn1MacPendingLocalNotifications removeAllObjects];
         }
-        cn1MacPumpPushQueue();
+        cn1MacPumpDeliveryQueue();
     });
 }
 
