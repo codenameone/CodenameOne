@@ -5336,6 +5336,30 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * Callback for the native layer
      */
+    /**
+     * One result of a capture or a gallery pick, in the "file:&lt;path&gt;" form the callback
+     * documents.
+     *
+     * <p>A percent encoded file:// URL is what the macOS panels report: a filename there may
+     * legally contain the newline a multiple selection is separated by, so the native side encodes
+     * rather than hand over a raw path that would split into several. Decoding it here produces the
+     * plain path every other port produces, so nothing downstream sees the difference.</p>
+     *
+     * <p>Shared by both branches deliberately. The decode used to sit inside the multiple-selection
+     * loop, which left a single pick holding a URL that still spelled a space "%20" -- every file
+     * API downstream then looked for a name nothing on disk had. Nothing about the encoding depends
+     * on how many files were chosen.</p>
+     */
+    private static String capturedPath(String path) {
+        if (path.startsWith("file://")) {
+            return "file:" + Util.decode(path.substring("file://".length()), "UTF-8", false);
+        }
+        if (path.startsWith("file:")) {
+            return path;
+        }
+        return "file:" + path;
+    }
+
     public static void capturePictureResult(String r) {
         dropEvents = false;
         if(captureCallback != null) {
@@ -5344,28 +5368,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                     String[] paths = Util.split(r, "\n");
                     int len = paths.length;
                     for (int i=0; i<len; i++) {
-                        if (paths[i].startsWith("file://")) {
-                            // A percent encoded file URL, which is what the macOS
-                            // panel reports: a filename there may legally contain
-                            // the newline this list is separated by, so the native
-                            // side encodes rather than hands over a raw path that
-                            // would split into several. Decoded back to the plain
-                            // "file:<path>" every other port produces, so nothing
-                            // downstream sees the difference.
-                            String decoded = Util.decode(
-                                    paths[i].substring("file://".length()), "UTF-8", false);
-                            paths[i] = "file:" + decoded;
-                        } else if (!paths[i].startsWith("file:")) {
-                            paths[i] = "file:"+paths[i];
-                        }
+                        paths[i] = capturedPath(paths[i]);
                     }
                     captureCallback.fireActionEvent(new ActionEvent(paths));
                 } else {
-                    if(r.startsWith("file:")) {
-                        captureCallback.fireActionEvent(new ActionEvent(r));
-                    } else {
-                        captureCallback.fireActionEvent(new ActionEvent("file:" + r));
-                    }
+                    captureCallback.fireActionEvent(new ActionEvent(capturedPath(r)));
                 }
             } else {
                 captureCallback.fireActionEvent(new ActionEvent(null));

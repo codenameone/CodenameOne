@@ -989,13 +989,26 @@ static void cn1SetWindowChromeEnabled(NSWindow *w, BOOL enabled) {
     if (w == nil) {
         return;
     }
-    NSWindowButton buttons[] = {
-        NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton
+    // Enabling restores what the style mask says rather than switching all three
+    // on. AppKit derives these from the mask itself -- a window built without
+    // NSWindowStyleMaskResizable has a dead zoom button -- and this function
+    // overrides that for as long as something is blocking the window. Turning
+    // them all on afterwards therefore left a non-resizable window with a live
+    // zoom button, and an unclosable one with a live close button, purely as a
+    // side effect of a modal having opened and closed in front of it.
+    NSWindowStyleMask mask = w.styleMask;
+    struct {
+        NSWindowButton button;
+        NSWindowStyleMask required;
+    } chrome[] = {
+        { NSWindowCloseButton, NSWindowStyleMaskClosable },
+        { NSWindowMiniaturizeButton, NSWindowStyleMaskMiniaturizable },
+        { NSWindowZoomButton, NSWindowStyleMaskResizable }
     };
-    for (unsigned i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
-        NSButton *b = [w standardWindowButton:buttons[i]];
+    for (unsigned i = 0; i < sizeof(chrome) / sizeof(chrome[0]); i++) {
+        NSButton *b = [w standardWindowButton:chrome[i].button];
         if (b != nil) {
-            b.enabled = enabled;
+            b.enabled = enabled && (mask & chrome[i].required) != 0;
         }
     }
 }
