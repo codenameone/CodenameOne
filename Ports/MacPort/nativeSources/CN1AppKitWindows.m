@@ -1127,16 +1127,21 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetModal___int_boolean_boole
 }
 
 JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetIcon___int_int_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT slot, JAVA_OBJECT argbArr, JAVA_INT width, JAVA_INT height) {
-    if (argbArr == JAVA_NULL || width <= 0 || height <= 0) {
-        return;
-    }
-    JAVA_ARRAY arr = (JAVA_ARRAY)argbArr;
-    if (arr->length < width * height) {
-        return;
-    }
-    NSImage *image = CN1AppKitNSImageFromARGB((unsigned int *)arr->data, width, height);
-    if (image == nil) {
-        return;
+    // A null array is setIcon(null): the application removing the icon, which
+    // has to reach AppKit rather than being dropped here.
+    NSImage *image = nil;
+    if (argbArr != JAVA_NULL) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        JAVA_ARRAY arr = (JAVA_ARRAY)argbArr;
+        if (arr->length < width * height) {
+            return;
+        }
+        image = CN1AppKitNSImageFromARGB((unsigned int *)arr->data, width, height);
+        if (image == nil) {
+            return;
+        }
     }
     cn1OnMain(^{
         CN1MacWindowRecord *rec = cn1WindowAt(slot);
@@ -1145,7 +1150,12 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowSetIcon___int_int_1ARRAY_int
         }
         // A window's icon on macOS is its represented file's icon, and a window
         // with no file has none. Setting the application's icon is the closest
-        // honest equivalent and is what the user actually sees.
+        // honest equivalent and is what the user actually sees. nil restores the
+        // icon from the bundle -- checked, not assumed.
+        //
+        // One consequence of mapping a per-window property onto a per-process
+        // one: with several windows carrying icons, the last to set or clear one
+        // wins. That is the same trade the set path already makes.
         [NSApp setApplicationIconImage:image];
     });
 }

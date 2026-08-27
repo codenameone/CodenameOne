@@ -303,12 +303,24 @@ class AppKitWindowManager extends WindowManager {
     @Override
     public void setIcon(Object p, Image icon) {
         int s = slot(p);
-        if (s < 0 || icon == null) {
+        if (s < 0) {
+            return;
+        }
+        if (icon == null) {
+            // Passed through rather than ignored. getWindowIcon() answers null
+            // after this, and returning early left the image the application had
+            // just removed still showing in the Dock and the task switcher,
+            // where it is the only place any of this is visible. The native side
+            // puts the bundle's own icon back.
+            nativeInstance.macWindowSetIcon(s, null, 0, 0);
             return;
         }
         int width = icon.getWidth();
         int height = icon.getHeight();
         if (width <= 0 || height <= 0) {
+            // An icon with no pixels is a malformed one, not a removal: there is
+            // nothing to build an image from, and clearing here would take away
+            // an icon the application never asked to take away.
             return;
         }
         nativeInstance.macWindowSetIcon(s, icon.getRGB(), width, height);
