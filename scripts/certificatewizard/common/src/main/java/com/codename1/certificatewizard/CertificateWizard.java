@@ -1258,6 +1258,22 @@ public class CertificateWizard extends Lifecycle {
         ProjectDefaults defaults = projectDefaults();
         // One group per extension kind, de-duplicated: a project using both usually shares one.
         List<String> wanted = new ArrayList<String>();
+        // Whatever the project already declares comes first. enableAppGroupCapability REPLACES the
+        // App ID's group association rather than adding to it, so a group the developer configured
+        // by hand -- for a share extension, say -- would be dropped here and then be missing from
+        // the reissued profile, while the builder still writes it into the entitlements from
+        // ios.app_groups. That combination cannot sign. The wizard has no way to read the App ID's
+        // current association back from the service, so the project's own hint is the source: it
+        // is also exactly the set the next build will demand.
+        if (binding != null) {
+            String declared = readSetting(binding.settings(), "codename1.arg.ios.app_groups");
+            if (declared != null) {
+                String[] parts = declared.split(",");
+                for (int i = 0; i < parts.length; i++) {
+                    addIfMissing(wanted, parts[i].trim());
+                }
+            }
+        }
         if (widgets) {
             addIfMissing(wanted, resolveAppGroupIdentifier(defaults));
         }

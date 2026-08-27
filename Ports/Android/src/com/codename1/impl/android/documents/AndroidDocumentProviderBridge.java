@@ -79,12 +79,19 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (ctx == null || indexJson == null) {
             return;
         }
-        rememberFolders(ctx);
-        try {
-            CN1DocumentStore.writeAtomically(CN1DocumentStore.indexFile(ctx),
-                    indexJson.getBytes("UTF-8"));
-        } catch (IOException err) {
-            Log.e(TAG, "Could not publish the document index", err);
+        // The whole operation holds the store's lock, not just the write. publish() and clear()
+        // are called from application code on whatever thread it likes -- a logout clear() racing
+        // a background publish() could otherwise delete the tree between this write's temporary
+        // file and its rename, and the rename would then put the departing user's index back
+        // after the clear had returned.
+        synchronized (CN1DocumentStore.WRITE_LOCK) {
+            rememberFolders(ctx);
+            try {
+                CN1DocumentStore.writeAtomically(CN1DocumentStore.indexFile(ctx),
+                        indexJson.getBytes("UTF-8"));
+            } catch (IOException err) {
+                Log.e(TAG, "Could not publish the document index", err);
+            }
         }
     }
 
@@ -109,11 +116,15 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (ctx == null) {
             return;
         }
-        try {
-            CN1DocumentStore.writeAtomically(CN1DocumentStore.endpointFile(ctx),
-                    endpointJson(endpoint, authToken).getBytes("UTF-8"));
-        } catch (IOException err) {
-            Log.e(TAG, "Could not store the document endpoint", err);
+        // Under the same lock as publish and clear: this file holds the bearer token, so a
+        // clear() that interleaved with it would leave the token on disk after logout.
+        synchronized (CN1DocumentStore.WRITE_LOCK) {
+            try {
+                CN1DocumentStore.writeAtomically(CN1DocumentStore.endpointFile(ctx),
+                        endpointJson(endpoint, authToken).getBytes("UTF-8"));
+            } catch (IOException err) {
+                Log.e(TAG, "Could not store the document endpoint", err);
+            }
         }
     }
 
@@ -167,10 +178,15 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
         if (ctx == null) {
             return;
         }
-        // Remembered before the tree goes, or the folders that just disappeared could not be
-        // named afterwards and an open picker would keep showing them.
-        rememberFolders(ctx);
-        CN1DocumentStore.deleteTree(CN1DocumentStore.baseDir(ctx));
+        // Under the store's lock so a publish in flight cannot rename its freshly written index
+        // back in behind the deletion. The notification is sent afterwards, outside the lock:
+        // it mutates nothing and the ContentResolver round trip should not block a publish.
+        synchronized (CN1DocumentStore.WRITE_LOCK) {
+            // Remembered before the tree goes, or the folders that just disappeared could not be
+            // named afterwards and an open picker would keep showing them.
+            rememberFolders(ctx);
+            CN1DocumentStore.deleteTree(CN1DocumentStore.baseDir(ctx));
+        }
         signalChange();
     }
 

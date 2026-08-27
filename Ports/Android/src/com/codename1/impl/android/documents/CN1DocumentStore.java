@@ -197,7 +197,11 @@ public final class CN1DocumentStore {
     /// once previously shared one fixed ".tmp" path: whichever renamed first had its file pulled
     /// out from under the other, which then deleted the freshly published target and failed to
     /// find its own temporary -- leaving no index.json at all.
-    private static final Object WRITE_LOCK = new Object();
+    /// Also held by the bridge across whole operations -- publish, endpoint write and clear --
+    /// so that a clear() cannot land between a publish's temporary file and its rename and be
+    /// undone by it. `synchronized` is reentrant, so `writeAtomically` taking it again inside a
+    /// caller that already holds it is not a deadlock.
+    static final Object WRITE_LOCK = new Object();
 
     static void writeAtomically(File target, byte[] data) throws IOException {
         File parent = target.getParentFile();

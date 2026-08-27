@@ -88,16 +88,23 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         if (container == null || indexJson == null) {
             return;
         }
-        try {
-            mkdirs(container, ROOT);
-            writeAtomically(container + "/" + ROOT, "index.json",
-                    indexJson.getBytes("UTF-8"));
-            // Registering on every publish rather than once at startup: the domain is what makes
-            // the location exist at all, and an app that publishes before the first registration
-            // completed would otherwise have written a tree nothing is listening for.
-            nativeInstance.documentsRegisterDomain();
-        } catch (IOException err) {
-            Log.e(err);
+        // The whole operation holds the lock, not just the write. publish() and clear() are
+        // called from application code on whatever thread it likes -- a logout clear() racing a
+        // background publish() could otherwise delete the tree between this write's temporary
+        // file and its rename, and the rename would then put the departing user's index back
+        // after the clear had returned.
+        synchronized (WRITE_LOCK) {
+            try {
+                mkdirs(container, ROOT);
+                writeAtomically(container + "/" + ROOT, "index.json",
+                        indexJson.getBytes("UTF-8"));
+                // Registering on every publish rather than once at startup: the domain is what
+                // makes the location exist at all, and an app that publishes before the first
+                // registration completed would otherwise have written a tree nothing listens for.
+                nativeInstance.documentsRegisterDomain();
+            } catch (IOException err) {
+                Log.e(err);
+            }
         }
     }
 
@@ -106,12 +113,16 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         if (container == null) {
             return;
         }
-        try {
-            mkdirs(container, ROOT);
-            writeAtomically(container + "/" + ROOT, "endpoint.json",
-                    endpointJson(endpoint, authToken).getBytes("UTF-8"));
-        } catch (IOException err) {
-            Log.e(err);
+        // Under the same lock as publish and clear: this file holds the bearer token, so a clear()
+        // that interleaved with it would leave the token on disk after logout.
+        synchronized (WRITE_LOCK) {
+            try {
+                mkdirs(container, ROOT);
+                writeAtomically(container + "/" + ROOT, "endpoint.json",
+                        endpointJson(endpoint, authToken).getBytes("UTF-8"));
+            } catch (IOException err) {
+                Log.e(err);
+            }
         }
     }
 
@@ -131,11 +142,16 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
         // nothing; then the browser is told to re-enumerate, which is the only thing that
         // reaches a pre-iOS-16 provider at all (it registers no domain, so removing one is a
         // no-op there); then the domain goes, which is what removes the location itself.
-        deleteTree(container + "/" + ROOT);
-        // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside the
-        // same group container. Deleting the published tree does not remove those, so without
-        // this a logged-out user's documents stay readable through an already-open browser.
-        deleteTree(container + "/File Provider Storage");
+        //
+        // Both deletions hold the mutation lock, so a publish in flight cannot rename its
+        // freshly written index back in behind them.
+        synchronized (WRITE_LOCK) {
+            deleteTree(container + "/" + ROOT);
+            // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside
+            // the same group container. Deleting the published tree does not remove those, so
+            // without this a logged-out user's documents stay readable through an open browser.
+            deleteTree(container + "/File Provider Storage");
+        }
         nativeInstance.documentsSignalChange();
         nativeInstance.documentsRemoveDomain();
     }
@@ -215,6 +231,10 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
     /// once previously shared one fixed ".tmp" path: whichever renamed first had its file pulled
     /// out from under the other, which then deleted the freshly published target and failed to
     /// find its own temporary -- leaving nothing published at all.
+    /// Serializes every mutation of the published state -- the index write, the endpoint write
+    /// and clear() -- against each other, not merely one write against another. Held across whole
+    /// operations, so a clear() cannot land in the middle of a publish and be undone by its
+    /// rename. `synchronized` is reentrant, so the writers below can take it again.
     private static final Object WRITE_LOCK = new Object();
 
     /// Counter for temporary names, so even a relaxed lock cannot put two writers on one path.

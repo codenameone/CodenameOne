@@ -40,19 +40,25 @@ enum CN1DocumentRemote {
     }
 
     /// Downloads one remote item into a temporary file.
+    ///
+    /// Returns the task so the caller can cancel it. File Provider hands the user's cancel or
+    /// dismiss to the `Progress` returned by `fetchContents`; without the task behind it, that
+    /// cancel stops nothing and a large download keeps running -- on the user's mobile data, in a
+    /// process the system already memory-limits harder than the app.
+    @discardableResult
     static func fetch(remoteId: String, containerURL: URL,
-                      completion: @escaping (URL?, Error?) -> Void) {
+                      completion: @escaping (URL?, Error?) -> Void) -> URLSessionTask? {
         guard let settings = settings(containerURL: containerURL),
               let base = settings.endpoint,
               var components = URLComponents(string: base.hasSuffix("/") ? base + "fetch"
                                                                          : base + "/fetch") else {
             completion(nil, CN1DocumentRemote.noEndpoint())
-            return
+            return nil
         }
         components.queryItems = [URLQueryItem(name: "id", value: remoteId)]
         guard let url = components.url else {
             completion(nil, CN1DocumentRemote.noEndpoint())
-            return
+            return nil
         }
         var request = URLRequest(url: url)
         if let token = settings.authToken, !token.isEmpty {
@@ -82,6 +88,7 @@ enum CN1DocumentRemote {
             }
         }
         task.resume()
+        return task
     }
 
     private static func noEndpoint() -> NSError {

@@ -117,7 +117,8 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             progress.completedUnitCount = 1
             return progress
         }
-        CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: containerURL) { url, error in
+        let task = CN1DocumentRemote.fetch(remoteId: remoteId,
+                                           containerURL: containerURL) { url, error in
             if let url = url {
                 completionHandler(url, item, nil)
             } else {
@@ -125,6 +126,11 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             }
             progress.completedUnitCount = 1
         }
+        // The Progress is the only handle File Provider has on this transfer. Cancelling it has to
+        // reach the session task, or dismissing a large download leaves it running to completion.
+        // The cancelled task still calls back, with NSURLErrorCancelled, which is what the browser
+        // expects to see for a transfer it stopped.
+        progress.cancellationHandler = { task?.cancel() }
         return progress
     }
 

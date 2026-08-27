@@ -164,6 +164,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             completionHandler(NSFileProviderError(.noSuchItem))
             return
         }
+        // The task is deliberately dropped here. The classic API hands out no Progress and no
+        // per-request cancellation handle -- `stopProvidingItem` is told about a URL, not about a
+        // transfer -- so there is nothing to hang a cancel on without keeping a URL-to-task map
+        // alive in the extension. The replicated path, which every supported OS uses, does cancel.
         CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: containerURL) { fetched, error in
             guard let fetched = fetched else {
                 completionHandler(error ?? NSFileProviderError(.noSuchItem))
