@@ -195,9 +195,14 @@ public final class IOSNative {
     native void setWindowTitle(String title);
 
     // Mac native (Catalyst): replace the application menu's CN1 command items. namesNewlineJoined
-    // holds the visible command labels separated by '\n'; selecting item i calls back into
-    // IOSImplementation.fireMacMenuCommand(i).
+    // holds one row per command separated by '\n'; selecting an item calls back into
+    // IOSImplementation.fireMacMenuCommand() with the id the row's last column carries.
     native void setNativeMenuCommands(String namesNewlineJoined);
+
+    // Mac native: release the deliveries that cold-launching the application queued -- a deep link,
+    // a local notification, a push -- now that the application's init/start have run. Nothing to
+    // release on any other platform, where the delegate does not hold them.
+    native void macFlushLaunchDeliveries();
 
     // Mac native: propagate the current form's brightness to the host
     // NSWindow's appearance so the Mac titlebar (rendered by AppKit, not

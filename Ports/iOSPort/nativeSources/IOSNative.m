@@ -2822,6 +2822,12 @@ void com_codename1_impl_ios_IOSNative_setNativeMenuCommands___java_lang_String(C
     });
 #endif
 }
+void com_codename1_impl_ios_IOSNative_macFlushLaunchDeliveries__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_OSX
+    extern void CN1MacFlushLaunchDeliveries(void);
+    CN1MacFlushLaunchDeliveries();
+#endif
+}
 void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN undecorated) {
 #if TARGET_OS_OSX
     CN1MacHostSetWindowUndecorated(undecorated ? YES : NO);

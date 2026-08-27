@@ -12192,6 +12192,30 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// The lifecycle notification still fires -- an application that wants to
     /// pause on losing focus is entitled to -- and isActive still goes false.
+    /// Releases the deliveries that cold-launching the application produced, once it has
+    /// actually started.
+    ///
+    /// The AppKit delegate holds a launch deep link, local notification or push until the Java
+    /// side exists -- and "the Java side exists" is not "the application has run". callback()
+    /// above only QUEUES the runnable that calls the application's init() and start(), so
+    /// anything delivered at that moment reaches URLCallback and LocalNotificationCallback code
+    /// belonging to an application that has not initialized: its services are unbuilt and its
+    /// fields are unset. The event dispatch thread is serial and that runnable is already on it,
+    /// so this one runs at the first moment after start() has returned.
+    ///
+    /// It hands straight back to the native side rather than delivering from here, because the
+    /// deliveries have to keep the threading they already have. Each notification and push is
+    /// preceded by PushContent state the native side sets immediately before it, which only holds
+    /// if the two stay adjacent, and localNotificationReceived() is deliberately called off this
+    /// thread. The barrier is the only thing being borrowed from the EDT.
+    public static void macLaunchDeliveriesAfterStart() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                nativeInstance.macFlushLaunchDeliveries();
+            }
+        });
+    }
+
     public static void macApplicationWillResignActive() {
         if(instance.life != null) {
             safeCallSerially(new Runnable() {

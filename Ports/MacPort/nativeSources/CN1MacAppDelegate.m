@@ -67,6 +67,19 @@ int pendingRemoteNotificationRegistrations = 0;
  * hops over rather than touching this state directly.
  */
 static BOOL cn1MacJavaReady = NO;
+/// Whether a launch-time delivery may reach the application yet.
+///
+/// Deliberately not cn1MacJavaReady. That flag answers "can the framework be
+/// called", and a deep link, a local notification or a push is not a call into
+/// the framework -- it is a call into the APPLICATION, which at that moment has
+/// only been QUEUED to initialize: IOSImplementation.callback() dispatches the
+/// runnable holding init() and start() onto the event dispatch thread and
+/// returns. Delivering against that flag ran URLCallback and
+/// LocalNotificationCallback code before the application had built anything they
+/// read. This one is set from the other side of that runnable, and it gates
+/// arrivals during the interval too, so a URL that lands mid-start queues behind
+/// the launch ones instead of overtaking them.
+static BOOL cn1MacDeliveriesReleased = NO;
 static int cn1MacPendingActive = -1;   // 1 became active, 0 resigned, -1 nothing
 static int cn1MacPendingHidden = -1;   // 1 hidden, 0 unhidden, -1 nothing
 static NSMutableArray<NSString *> *cn1MacPendingURLs = nil;
@@ -240,7 +253,7 @@ static void cn1MacQueueOrDeliverPush(NSDictionary *userInfo) {
     if (userInfo == nil) {
         return;
     }
-    if (!cn1MacJavaReady) {
+    if (!cn1MacDeliveriesReleased) {
         if (cn1MacPendingPushes == nil) {
             cn1MacPendingPushes = [[NSMutableArray alloc] init];
         }
@@ -299,7 +312,7 @@ static void cn1MacQueueOrDeliverLocalNotification(NSDictionary *delivery) {
     if (delivery == nil) {
         return;
     }
-    if (!cn1MacJavaReady) {
+    if (!cn1MacDeliveriesReleased) {
         if (cn1MacPendingLocalNotifications == nil) {
             cn1MacPendingLocalNotifications = [[NSMutableArray alloc] init];
         }
@@ -346,6 +359,29 @@ void cn1_mac_runtime_markJavaReady(void) {
         }
         cn1MacPendingActive = -1;
         cn1MacPendingHidden = -1;
+        // The lifecycle state above is replayed here because it is the
+        // framework's, and the framework exists now. What the APPLICATION is
+        // owed -- the deep link or notification it was launched with -- is not
+        // released here: init() and start() have only been queued at this point.
+        // This asks the Java side to come back once they have run.
+        com_codename1_impl_ios_IOSImplementation_macLaunchDeliveriesAfterStart__(threadStateData);
+    });
+}
+
+/// Releases the launch-time deliveries, called back from the event dispatch
+/// thread once the application's start() has returned.
+///
+/// Back onto the main queue first, because everything these functions touch --
+/// the queues, the flag, the PushContent state each delivery sets immediately
+/// before itself -- lives there, and because the deliveries then reach the
+/// application on exactly the thread the live path uses. Only the ordering came
+/// from the EDT.
+void CN1MacFlushLaunchDeliveries(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cn1MacDeliveriesReleased) {
+            return;
+        }
+        cn1MacDeliveriesReleased = YES;
         for (NSString *url in cn1MacPendingURLs) {
             cn1MacDeliverURL(url);
         }
@@ -633,7 +669,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
         // readiness test stays inside the loop: the queue is drained on the main
         // thread, so it cannot flip part way through this one, and keeping it
         // here means each URL takes whichever path is correct for it.
-        if (!cn1MacJavaReady) {
+        if (!cn1MacDeliveriesReleased) {
             if (cn1MacPendingURLs == nil) {
                 cn1MacPendingURLs = [[NSMutableArray alloc] init];
             }
