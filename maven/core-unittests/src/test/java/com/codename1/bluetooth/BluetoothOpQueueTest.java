@@ -99,33 +99,58 @@ class BluetoothOpQueueTest extends UITestBase {
     }
 
     @Test
-    void cancellingAnInFlightOperationAdvancesTheQueue() {
-        // The other half of the cancel, and the one the earlier test missed:
-        // a QUEUED operation is skipped by startOp, but an IN-FLIGHT one has
-        // to advance the queue itself. AsyncResource.cancel() marks itself
-        // done and notifies observers without running the callback chain, so
-        // the queue's advancement listener never fired and the timeout
-        // declines to advance a result that is already done -- leaving the
-        // queue waiting on a platform callback for an operation nobody wants,
-        // for ever if that callback never comes.
+    void cancellingAnInFlightOperationKeepsTheNativeSlot() {
+        // Cancel cancels the CALLER's interest; the platform still has the
+        // request and will still answer it. Starting the next operation
+        // immediately put two in flight at once -- on Android the second
+        // overwrites the first's pending slot, so the first callback settles
+        // the second request with the wrong result. The slot stays reserved
+        // until the platform answers.
         AsyncResource<Integer> inFlight = p.requestMtu(185);
         AsyncResource<byte[]> behind = p.readCharacteristic(c1);
-        assertEquals(FakeBlePeripheral.OpKind.REQUEST_MTU, p.peekNext().kind);
         assertEquals(1, p.pendingCount(), "the read is queued behind it");
 
         inFlight.cancel(true);
+        assertEquals(1, p.pendingCount(),
+                "the platform still owns the cancelled request");
 
-        assertEquals(2, p.pendingCount(),
-                "cancelling the in-flight operation must start the next one");
-        // The platform still holds the cancelled request -- nothing answered
-        // it, which is the whole point -- so it stays at the head of the
-        // fake's list and the read sits behind it.
-        p.takeNext();
-        assertSame(c1, p.peekNext().characteristic);
-        p.completeNext(bytes(7, 8));
-        assertArrayEquals(bytes(7, 8), behind.get());
+        // The platform answers the cancelled request; the queue moves on and
+        // the answer is not published to the caller who gave up.
+        p.completeNext(Integer.valueOf(185));
         assertEquals(23, p.getMtu(),
                 "a cancelled request must not publish an MTU");
+        assertSame(c1, p.peekNext().characteristic,
+                "the next operation runs once the slot is free");
+        p.completeNext(bytes(7, 8));
+        assertArrayEquals(bytes(7, 8), behind.get());
+    }
+
+    @Test
+    void aLostCallbackAfterACancelDoesNotWedgeTheQueue() {
+        // The case the reserved slot would otherwise strand: the caller
+        // cancels and the platform never answers. Releasing on the safety
+        // timeout is the difference between one lost operation and a
+        // peripheral that accepts nothing else for the life of the
+        // connection.
+        p.setOpTimeout(50);
+        AsyncResource<Integer> inFlight = p.requestMtu(185);
+        AsyncResource<byte[]> behind = p.readCharacteristic(c1);
+        inFlight.cancel(true);
+
+        long limit = System.currentTimeMillis() + 5000;
+        while (p.pendingCount() < 2 && System.currentTimeMillis() < limit) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        assertEquals(2, p.pendingCount(),
+                "the timeout must release a cancelled operation's slot");
+        p.takeNext();
+        p.completeNext(bytes(9, 9));
+        assertArrayEquals(bytes(9, 9), behind.get());
     }
 
     @Test

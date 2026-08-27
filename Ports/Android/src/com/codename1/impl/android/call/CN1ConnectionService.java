@@ -91,6 +91,11 @@ public class CN1ConnectionService extends ConnectionService {
     /// then acknowledged the wrong request and the other acknowledged
     /// nothing, leaving an AsyncResource that never settled. The call id is
     /// already in the request extras, so correlating by it costs nothing.
+    /// Addresses this app asked Telecom to place or ring, keyed to the call
+    /// id that asked. Guarded by PENDING_REPORTS.
+    private static final Map<String, String> PENDING_ADDRESSES =
+            new HashMap<String, String>();
+
     private static final Map<String, Integer> PENDING_REPORTS =
             new HashMap<String, Integer>();
 
@@ -158,19 +163,24 @@ public class CN1ConnectionService extends ConnectionService {
         // without one there is nothing for a dropped extra to belong to.
         boolean external = false;
         if (id == null && !incoming) {
-            boolean reportPending;
-            synchronized (PENDING_REPORTS) {
-                reportPending = !PENDING_REPORTS.isEmpty();
+            // Matched on the ADDRESS, not on "is any report pending". A call
+            // the system placed while an unrelated report happened to be in
+            // flight was classified as that report: it adopted the other
+            // call's id, acknowledged a request nobody had answered, and
+            // never delivered startCallRequested -- and the real report's
+            // callback then built a second connection under the same id.
+            //
+            // Only a report to the same address can be this request.
+            String matched = pendingReportFor(
+                    request == null ? null : request.getAddress());
+            if (matched != null) {
+                id = matched;
+            } else {
+                external = true;
             }
-            external = !reportPending;
         }
         if (external) {
             id = CallId.random();
-        } else if (id == null) {
-            // Only reachable when Telecom dropped our extras; with one report
-            // in flight this is still the right answer, and with several
-            // there is nothing better to guess.
-            id = lastReportedCallId;
         }
         if (id == null) {
             // Nothing can be routed to a call with no identifier, so refusing
@@ -247,6 +257,9 @@ public class CN1ConnectionService extends ConnectionService {
     private static void answerReport(String callId, boolean ok, int error,
             String message) {
         Integer requestId;
+        if (callId != null) {
+            forgetPendingAddress(callId);
+        }
         synchronized (PENDING_REPORTS) {
             requestId = callId == null ? null : PENDING_REPORTS.remove(callId);
             if (requestId == null && PENDING_REPORTS.size() == 1) {
@@ -290,10 +303,39 @@ public class CN1ConnectionService extends ConnectionService {
     }
 
     /// Parks the request id a forthcoming Telecom callback will answer.
-    static void expectReport(int requestId, String callId) {
+    ///
+    /// The address is parked with it so an incoming request that lost this
+    /// bridge's extras can still be recognised as THIS report rather than as
+    /// a call the system placed on its own; see adopt().
+    static void expectReport(int requestId, String callId, String address) {
         lastReportedCallId = callId;
         synchronized (PENDING_REPORTS) {
             PENDING_REPORTS.put(callId, Integer.valueOf(requestId));
+            if (address != null) {
+                PENDING_ADDRESSES.put(address, callId);
+            }
+        }
+    }
+
+    /// The call id a pending report placed to this address, or null.
+    private static String pendingReportFor(Uri address) {
+        if (address == null) {
+            return null;
+        }
+        synchronized (PENDING_REPORTS) {
+            return PENDING_ADDRESSES.get(address.toString());
+        }
+    }
+
+    /// Forgets a parked address once its report has been answered.
+    private static void forgetPendingAddress(String callId) {
+        synchronized (PENDING_REPORTS) {
+            for (Map.Entry<String, String> e : PENDING_ADDRESSES.entrySet()) {
+                if (e.getValue().equals(callId)) {
+                    PENDING_ADDRESSES.remove(e.getKey());
+                    return;
+                }
+            }
         }
     }
 

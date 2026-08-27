@@ -344,6 +344,22 @@ public final class VoipPush {
         @Override
         public void run() {
             VoipPushListener[] ls = listeners();
+            if (ls.length == 0) {
+                // The listener went away between post() deciding there was
+                // one and this reaching the EDT. A CALL dropped here is lost
+                // for good: the native drain already claimed it, so its
+                // unclaimed-call timeout no longer owns it, and HELD is only
+                // consulted by setListener. Put it back so the next listener
+                // gets it.
+                //
+                // A token is not requeued, for the reason post() gives.
+                if (call != null) {
+                    synchronized (LISTENERS) {
+                        HELD.add(this);
+                    }
+                }
+                return;
+            }
             for (VoipPushListener l : ls) {
                 if (call != null) {
                     l.callReceived(call);

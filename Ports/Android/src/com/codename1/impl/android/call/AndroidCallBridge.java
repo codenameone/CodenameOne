@@ -329,7 +329,8 @@ public class AndroidCallBridge implements CallBridge {
             return;
         }
         Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
-        CN1ConnectionService.expectReport(requestId, callId);
+        CN1ConnectionService.expectReport(requestId, callId,
+                String.valueOf(uriFor(handleWire)));
         try {
             telecom().addNewIncomingCall(handle, extras);
         } catch (SecurityException e) {
@@ -358,7 +359,8 @@ public class AndroidCallBridge implements CallBridge {
         Bundle outer = new Bundle();
         outer.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle);
         outer.putBundle(TelecomManager.EXTRA_OUTGOING_CALL_EXTRAS, extras);
-        CN1ConnectionService.expectReport(requestId, callId);
+        CN1ConnectionService.expectReport(requestId, callId,
+                String.valueOf(uriFor(handleWire)));
         try {
             telecom().placeCall(uriFor(handleWire), outer);
         } catch (SecurityException e) {
