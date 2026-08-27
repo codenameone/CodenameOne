@@ -73,12 +73,16 @@ public final class CallSession {
 
     /// Who is on the other end.
     public CallHandle getHandle() {
-        return handle;
+        synchronized (this) {
+            return handle;
+        }
     }
 
     /// The name shown for the far end, or null.
     public String getDisplayName() {
-        return displayName;
+        synchronized (this) {
+            return displayName;
+        }
     }
 
     /// Where the call is in its life.
@@ -164,13 +168,24 @@ public final class CallSession {
 
     /// Changes what the system shows for this call. Arguments left null are
     /// left alone.
+    ///
+    /// The two fields are written under the session monitor, like the state
+    /// and the mute flag: a signalling worker calls this while the EDT reads
+    /// the same session to refresh the in-app call UI, and plain writes gave
+    /// that reader no reason ever to see them -- so the system UI could show
+    /// the new identity while Java went on displaying the old one, or a
+    /// mixed pair of the two.
     public void update(CallHandle newHandle, String newDisplayName) {
         CallBridge b = CallRequests.bridge();
         if (newHandle != null) {
-            handle = newHandle;
+            synchronized (this) {
+                handle = newHandle;
+            }
         }
         if (newDisplayName != null) {
-            displayName = newDisplayName;
+            synchronized (this) {
+                displayName = newDisplayName;
+            }
         }
         if (b != null) {
             b.updateCall(callId, newHandle == null ? null

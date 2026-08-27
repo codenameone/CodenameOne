@@ -1471,8 +1471,21 @@ JAVA_INT com_codename1_impl_ios_IOSNative_callCapabilities___R_int(
     // itself -- so advertising the bit only leads apps to call a method that
     // always answers NOT_SUPPORTED.
     int caps = CN1_CALL_CAP_SYSTEM_UI | CN1_CALL_CAP_OUTGOING
-            | CN1_CALL_CAP_HOLD | CN1_CALL_CAP_MUTE | CN1_CALL_CAP_DTMF
-            | CN1_CALL_CAP_VIDEO;
+            | CN1_CALL_CAP_HOLD | CN1_CALL_CAP_MUTE | CN1_CALL_CAP_DTMF;
+    // VIDEO only when the BUILD is video-enabled. IPhoneBuilder writes
+    // NSCameraUsageDescription only for a video build, and iOS terminates an
+    // app that touches the camera with no purpose string -- so advertising
+    // the bit on an audio-only build invited a caller that followed the
+    // capability API into requestPermissions(PERMISSION_CAMERA) and a kill.
+    // The same plist key the provider is configured from answers it, so the
+    // capability and the configuration cannot disagree.
+    //
+    // This is the iOS half of the Android camera gate; that one asks the
+    // manifest, this one asks the bundle, and both refuse to promise video a
+    // build cannot deliver.
+    if (cn1clPlistBool(@"CN1CallSupportsVideo", NO)) {
+        caps |= CN1_CALL_CAP_VIDEO;
+    }
 #ifdef CN1_CALL_HAS_PUSHKIT
     caps |= CN1_CALL_CAP_VOIP_PUSH;
 #endif

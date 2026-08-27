@@ -13531,8 +13531,16 @@ public class IPhoneBuilder extends Executor {
                     request.getArg("ios.call.unknownCaller", null));
             inject = appendCallPlist(inject, "CN1CallPendingTTLSeconds",
                     request.getArg("ios.call.pushTTL", "30"));
+            // The SHARED hint too, exactly as the camera-purpose-string path
+            // does. Reading only the ios-qualified one wrote
+            // CN1CallSupportsVideo=false for a project that set the
+            // documented cross-platform call.video, so the provider built
+            // before Java starts was audio-only and a cold-start VoIP video
+            // call was reported through a provider claiming not to support
+            // video.
             inject = appendCallPlist(inject, "CN1CallSupportsVideo",
-                    request.getArg("ios.call.video", "false"));
+                    request.getArg("ios.call.video",
+                            request.getArg("call.video", "false")));
             inject = appendCallPlist(inject, "CN1CallIncludesCallsInRecents",
                     request.getArg("ios.call.recents", "true"));
             // The two keys the directory half needs. CN1Call.m refuses
