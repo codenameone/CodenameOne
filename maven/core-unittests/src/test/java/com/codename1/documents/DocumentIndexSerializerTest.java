@@ -248,6 +248,14 @@ class DocumentIndexSerializerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(inName));
 
+        // The remote id travels the same lossy path and is worse when it breaks: it is the key
+        // sent to the endpoint, so "?" in place of the surrogate asks the server for a different
+        // object.
+        DocumentNode remote = DocumentNode.folder("root", "Root");
+        remote.add(DocumentNode.file("a", "fine.pdf").setRemoteId("key\ud800"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(remote));
+
         // A properly paired one is an ordinary character and is accepted.
         DocumentNode paired = DocumentNode.folder("root", "Root");
         paired.add(DocumentNode.file("a", "report\ud83d\ude00.pdf"));

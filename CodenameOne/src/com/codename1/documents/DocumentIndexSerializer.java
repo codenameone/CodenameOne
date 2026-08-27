@@ -176,13 +176,21 @@ public final class DocumentIndexSerializer {
         if (loneSurrogate < 0) {
             loneSurrogate = loneSurrogateAt(node.getId());
         }
+        if (loneSurrogate < 0 && node.getRemoteId() != null) {
+            // The remote id travels the same lossy path and is worse when it breaks: it is the
+            // key the readers send to the endpoint, so a "?" in place of the surrogate asks the
+            // server for a DIFFERENT object -- and gets one, if the server has a key with a
+            // question mark in it.
+            loneSurrogate = loneSurrogateAt(node.getRemoteId());
+        }
         if (loneSurrogate >= 0) {
-            throw new IllegalArgumentException("A document id or name contains an unpaired "
-                    + "surrogate (index " + loneSurrogate + " of \"" + effective + "\" or of the "
-                    + "id). It cannot be encoded as UTF-8, and the readers write the index as "
-                    + "UTF-8: the character becomes \"?\", two ids that differed only there "
-                    + "become one, and the whole index is then rejected as holding a duplicate -- "
-                    + "so the location disappears rather than one document going missing.");
+            throw new IllegalArgumentException("A document id, name or remote id contains an "
+                    + "unpaired surrogate (index " + loneSurrogate + ", on the node shown as \""
+                    + effective + "\"). It cannot be encoded as UTF-8, and the index is written "
+                    + "as UTF-8: the character becomes \"?\", two values that differed only "
+                    + "there become one, and the reader then rejects the whole index as holding "
+                    + "a duplicate -- so the location disappears rather than one document going "
+                    + "missing.");
         }
         int mark = combiningMarkAt(effective);
         if (mark >= 0) {

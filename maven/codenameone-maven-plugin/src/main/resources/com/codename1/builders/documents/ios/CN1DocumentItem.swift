@@ -85,6 +85,20 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     // iOS only: AppKit's NSFileProviderItem marks the string UTI unavailable, and the macOS
     // provider is always the replicated one, which asks for contentType instead.
     #if os(iOS)
+    /// The legacy content version, which is the only one the pre-iOS-16 provider has.
+    ///
+    /// itemVersion replaced it and the classic provider never reaches that path, so without this
+    /// nothing there carries the content stamp: a metadata-less remote item republished after an
+    /// account change kept the same nil date and the same size, and Files went on serving the
+    /// bytes it had materialized for the previous account. The stamp already folds in the
+    /// credential generation and the publication revision, so handing it over as bytes is all
+    /// this needs to do.
+    ///
+    /// iOS only, as the SDK marks it: the macOS provider is always the replicated one.
+    var versionIdentifier: Data? {
+        Data(contentStamp.utf8)
+    }
+
     var typeIdentifier: String {
         if node.folder {
             return "public.folder"

@@ -237,16 +237,23 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 // check cannot see that, because nothing about the publication changed.
                 let publication = index.revision
                 let stopped = beginFetch(at: url)
-                let placed = CN1FileProviderClassic.place(local, at: url, copy: true)
-                if !stillWanted(at: url, generation: stopped)
-                    || !CN1FileProviderClassic.stillPublished(identifier, path: path,
-                                                              generation: publication,
-                                                              containerURL: containerURL) {
-                    try? FileManager.default.removeItem(at: url)
-                    completionHandler(NSFileProviderError(.noSuchItem))
-                    return
+                let container = containerURL
+                // Off the provider thread, as the replicated provider's copy is. This one is
+                // called on the thread that has to return from startProvidingItem, and copying a
+                // large document inline holds every other request behind it until it finishes --
+                // long enough for the system to treat the provider as hung.
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let placed = CN1FileProviderClassic.place(local, at: url, copy: true)
+                    if !self.stillWanted(at: url, generation: stopped)
+                        || !CN1FileProviderClassic.stillPublished(identifier, path: path,
+                                                                  generation: publication,
+                                                                  containerURL: container) {
+                        try? FileManager.default.removeItem(at: url)
+                        completionHandler(NSFileProviderError(.noSuchItem))
+                        return
+                    }
+                    completionHandler(placed)
                 }
-                completionHandler(placed)
                 return
             }
         }

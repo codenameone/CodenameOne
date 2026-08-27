@@ -126,6 +126,10 @@ public class AndroidDocumentProviderBridge implements DocumentProviderBridge {
                 Log.e(TAG, "Could not store the document endpoint", err);
             }
         }
+        // Told, not left to be noticed: a picker holding this location open re-queries on the
+        // notification, and anything it fetches afterwards goes out under the new credential.
+        // Outside the lock, as clear()'s notification is.
+        signalChange();
     }
 
     @Override

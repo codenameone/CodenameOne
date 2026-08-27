@@ -120,6 +120,11 @@ final class IOSDocumentProviderBridge implements DocumentProviderBridge {
                 mkdirs(container, ROOT);
                 writeAtomically(container + "/" + ROOT, "endpoint.json",
                         endpointJson(endpoint, authToken).getBytes("UTF-8"));
+                // Told, not left to be noticed. A credential change moves the content version of
+                // every remote item, but the browser only learns that when it asks for the item
+                // again -- so without this a signed-in-again user kept seeing the bytes
+                // materialized under the old token until something unrelated published.
+                nativeInstance.documentsSignalChange();
             } catch (IOException err) {
                 Log.e(err);
             }
