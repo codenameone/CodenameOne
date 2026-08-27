@@ -36,6 +36,45 @@ is accepted, never read, and has no effect. The Annotation column below
 names that form where one exists. Setting the same hint both ways fails the
 build.
 
+Each annotation groups the hints of one platform, and the attribute names match
+the part of the hint name after the prefix, so `codename1.arg.ios.pods` is
+`@Ios(pods = ...)`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/BuildHintAnnotationSnippet.java[tag=buildHintAnnotations,indent=0]
+----
+
+That's the same as writing these lines in `codenameone_settings.properties`:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/advanced-topics-under-the-hood.properties[tag=advanced-topics-under-the-hood-properties-004,indent=0]
+----
+
+Three things in that example are worth calling out.
+
+A hint whose value is a list takes a Java array, and the build joins it with the
+separator that hint uses -- a comma for `ios.pods`, so you never have to
+remember which hint wants which delimiter.
+
+A boolean hint takes `Toggle`, not `boolean`. `Toggle.ON` and `Toggle.OFF` say
+what you want, and leaving the attribute out entirely means you have said
+nothing, so the build service applies whatever it applies today. That's why the
+Default column reads _(set by the build)_ for these hints: the annotation
+deliberately records no default of its own, because a value compiled into your
+app can't follow the build service when the service changes it.
+
+A hint with a closed set of values takes an enum, so `@Ios(themeMode = ...)`
+offers you the four themes that exist and rejects anything else at compile time.
+Hints whose accepted values are open ended stay `String`.
+
+The long tail of hints has no annotation, and neither do the open-ended families
+such as `android.permission.<NAME>`, because a Java annotation can't express a
+map. Set those in `codenameone_settings.properties` exactly as before. You can
+mix the two forms freely in one project, as long as no single hint is declared
+in both.
+
 [IMPORTANT]
 ====
 Build hints are the one part of Codename One that doesn't promise source
