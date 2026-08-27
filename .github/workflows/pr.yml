@@ -27,6 +27,16 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The build hint gates are run from this workflow and nowhere else, and one
+      # of them holds an empty baseline. Ignoring the whole directory meant a
+      # change that breaks a gate, or that adds a line to the baseline, could
+      # merge without the gate it weakens ever running.
+      - 'scripts/check-build-hint-catalog.sh'
+      - 'scripts/check-build-hint-catalog.py'
+      - 'scripts/build_hint_miner.py'
+      - 'scripts/build-hint-catalog-baseline.txt'
+      - 'scripts/build-hint-computed-sites.txt'
+      - 'scripts/gen-build-hint-annotations.sh'
       # Same reasoning for the cn1lib native gates: they run from this workflow
       # and nowhere else, and the stubs are the API surface their Android check
       # compiles against, so excluding scripts/ wholesale would let a change to
@@ -68,6 +78,16 @@ on:
       - 'scripts/ci/retry.sh'
       - 'scripts/ci/apt-get-update.sh'
       - 'scripts/ci/apt-get-install.sh'
+      # The build hint gates are run from this workflow and nowhere else, and one
+      # of them holds an empty baseline. Ignoring the whole directory meant a
+      # change that breaks a gate, or that adds a line to the baseline, could
+      # merge without the gate it weakens ever running.
+      - 'scripts/check-build-hint-catalog.sh'
+      - 'scripts/check-build-hint-catalog.py'
+      - 'scripts/build_hint_miner.py'
+      - 'scripts/build-hint-catalog-baseline.txt'
+      - 'scripts/build-hint-computed-sites.txt'
+      - 'scripts/gen-build-hint-annotations.sh'
       # Same reasoning for the cn1lib native gates: they run from this workflow
       # and nowhere else, and the stubs are the API surface their Android check
       # compiles against, so excluding scripts/ wholesale would let a change to
@@ -207,8 +227,14 @@ jobs:
         working-directory: maven
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+          # Central served a Connection reset here and Maven treats that as a
+          # permanent resolution failure -- the step died at plugin download,
+          # before a single test ran, and reported the branch red. RETRY_ONLY_
+          # MATCHING=transient returns anything else on the FIRST attempt, so a
+          # genuine test failure still fails once and fails fast.
+          RETRY_ONLY_MATCHING: transient
         run: |
-          mvn -B -Dmaven.javadoc.skip=true \
+          bash ../scripts/ci/retry.sh mvn -B -Dmaven.javadoc.skip=true \
             -DunitTests=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
@@ -434,6 +460,24 @@ jobs:
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
         run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
+      # A build hint is a string nothing checks: a misspelled name is accepted,
+      # never read, and silently does nothing. The catalog in
+      # maven/build-hint-catalog is what gives every hint a type, a default and a
+      # value domain, and it is what the @Ios/@Android annotations, the developer
+      # guide table and the Settings tool are generated from. These two steps keep
+      # the catalog complete and the generated files in step with it.
+      - name: Check build hint catalog
+        if: ${{ matrix.java-version == 8 }}
+        run: scripts/check-build-hint-catalog.sh
+      - name: Check the build hint data file can be rendered
+        if: ${{ matrix.java-version == 8 }}
+        # Not a drift check: nothing is committed to drift from, because every
+        # module that needs the data file renders it into its own target/classes
+        # during its build. What can still break is the rendering itself, which
+        # would otherwise reach a user as an editor with no hints in it.
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          scripts/gen-build-hint-annotations.sh --check
       # ParparVM's CHECKCAST is unchecked, so a failed cast does not throw
       # ClassCastException on iOS -- code written to catch it silently uses the
       # wrong object instead (issue #5531). core/android/ios are already compiled
@@ -520,10 +564,45 @@ jobs:
           RETRY_ATTEMPTS: '5'
           RETRY_DELAY_SECONDS: '60'
         run: bash ../scripts/ci/retry.sh mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
+      - name: Run Codename One Settings tests
+        if: ${{ matrix.java-version == 8 }}
+        # The tests are OFF by default because the module's app build needs a
+        # Codename One project set up, and nothing ran them anywhere -- the two
+        # workflows that touch the module pass -Dmaven.test.skip=true -- so every
+        # test written for the POM reader and the hint editor was dead weight and
+        # the bugs they cover reached review instead of CI.
+        #
+        # On the 8 leg rather than the 17 one even though the module is compiled
+        # with JDK 17: its POM binds codenameone-maven-plugin at process-classes
+        # and depends on codenameone-javase, and this is the leg that builds both.
+        # The 17 leg builds neither, so the step died at plugin resolution before
+        # running a test. JAVA_HOME_17 comes from the CI container image.
+        #
+        # LAST among the gates on this leg, and not before them: it reinstalls the
+        # maven plugin, and a failure here used to skip the SpotBugs steps that
+        # follow -- so the quality report then failed for a missing
+        # ByteCodeTranslator report, which said nothing about what actually broke.
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+          RETRY_ONLY_MATCHING: transient
+        run: |
+          set -euo pipefail
+          test -n "${JAVA_HOME_17:-}" && test -d "${JAVA_HOME_17}"
+          (cd maven && mvn -B -Dmaven.javadoc.skip=true \
+            -Dcodename1.platform=javase \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -pl codenameone-maven-plugin -am -Plocal-dev-javase -DskipTests install)
+          cd scripts/settings
+          # Under xvfb: the module's POM binds cn1:css at process-classes, and
+          # the CSS compiler opens a JFrame -- in this container that is
+          # java.awt.HeadlessException before a test runs. Same X server for the
+          # whole retry sequence.
+          JAVA_HOME="${JAVA_HOME_17}" xvfb-run bash ../../scripts/ci/retry.sh \
+            mvn -B -pl common test -Dcn1.settings.skipTests=false
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -652,11 +731,11 @@ jobs:
       - name: Generate quality report summary
         if: ${{ always() && matrix.java-version == 8 }}
         env:
-          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target:maven/android/target:maven/ios/target:vm/ByteCodeTranslator/target:maven/codenameone-maven-plugin/target:maven/build-hint-catalog/target:maven/build-hint-tools/target
           # Every project listed here must produce a SpotBugs report and that
           # report must be empty. A missing report fails the gate too, so a
           # SpotBugs run that silently stops running is not mistaken for clean.
-          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin
+          QUALITY_REPORT_REQUIRED_SPOTBUGS: core-unittests:android:ios:ByteCodeTranslator:codenameone-maven-plugin:build-hint-catalog:build-hint-tools
           QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
           QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
           QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}

@@ -32,6 +32,15 @@
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea
 !maven/cn1app-archetype/src/main/resources/archetype-resources/.idea/**
 **/build/*
+# `build` is a build directory everywhere except in com.codename1.build.shared,
+# where it is a Java package name. Without this a NEW source file there is
+# silently untracked -- git add skips it, the module compiles locally from the
+# working tree, and CI fails on a file nobody can see is missing. Keyed on the
+# package rather than on a module because more than one module uses it, and a
+# per-module list drifts: build-hint-tools was added later with the same
+# package and was ignored until a reviewer noticed.
+!**/src/main/java/com/codename1/build/**
+!**/src/test/java/com/codename1/build/**
 **/dist/*
 *.zip
 CodenameOneDesigner/src/version.properties
@@ -133,6 +142,12 @@ scripts/fidelity-app/common/src/main/resources/*ThemeDev.res
 scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res
 scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res
 
+# Rendered from maven/build-hint-catalog by scripts/gen-build-hint-table.sh every
+# time the developer guide is built. Not checked in: a generated file living in
+# git invites a hand edit that the next regeneration silently discards, and needs
+# a drift gate to notice. Generating it on the fly removes both.
+docs/developer-guide/_generated-build-hints.adoc
+
 # Maven repository private to THIS checkout.
 #
 # Several CodenameOne checkouts live on the same machine and all install
@@ -141,3 +156,8 @@ scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res
 # and the symptom is "cannot find symbol" on a class this branch just added.
 # Build with -Dmaven.repo.local=$(pwd)/.m2-repo instead.
 /.m2-repo/
+
+# Rendered from the build hint annotations into each consuming module's
+# target/classes during its build. Never committed: a generated file in git
+# conflicts on every merge and there is nothing for a hand edit to survive in.
+cn1-build-hints.json

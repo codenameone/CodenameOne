@@ -72,7 +72,7 @@ image::img/intellij-new-project-menu.png[]
 . Select "Maven" in the left menu.
 +
 image::img/intellij-new-project-dialog-maven.png[]
-. Check the "Create from Archetype" checkbox. image:img/intellij-create-from-archetype-checkbox.png[] This should allow you to choose from of archetypes that are already known to IntelliJ.
+. Check the "Create from Archetype" checkbox image:img/intellij-create-from-archetype-checkbox.png[]. This should allow you to choose from the archetypes that are already known to IntelliJ.
 . If you don't see an option for `com.codenameone:cn1lib-archetype`, then IntelliJ doesn't know about it yet. If, but you *do* see this option, you can skip to the next step. Press the "Add Archetype..." button. This will display a dialog for you to enter the details of the archetype.
 +
 image::img/intellij-add-archetype.png[]

@@ -52,6 +52,9 @@ public final class GeneratedAccess_com_codename1_annotations {
 
 
     private static Class<?> findClassChunk0(String simpleName) {
+        if ("AppIntent".equals(simpleName)) {
+            return com.codename1.annotations.AppIntent.class;
+        }
         if ("Async".equals(simpleName)) {
             return com.codename1.annotations.Async.class;
         }
@@ -88,6 +91,24 @@ public final class GeneratedAccess_com_codename1_annotations {
         if ("Entity".equals(simpleName)) {
             return com.codename1.annotations.Entity.class;
         }
+        if ("EntityId".equals(simpleName)) {
+            return com.codename1.annotations.EntityId.class;
+        }
+        if ("EntityImage".equals(simpleName)) {
+            return com.codename1.annotations.EntityImage.class;
+        }
+        if ("EntityQuery".equals(simpleName)) {
+            return com.codename1.annotations.EntityQuery.class;
+        }
+        if ("Kind".equals(simpleName)) {
+            return com.codename1.annotations.EntityQuery.Kind.class;
+        }
+        if ("EntitySubtitle".equals(simpleName)) {
+            return com.codename1.annotations.EntitySubtitle.class;
+        }
+        if ("EntityTitle".equals(simpleName)) {
+            return com.codename1.annotations.EntityTitle.class;
+        }
         if ("ExistIn".equals(simpleName)) {
             return com.codename1.annotations.ExistIn.class;
         }
@@ -96,6 +117,12 @@ public final class GeneratedAccess_com_codename1_annotations {
         }
         if ("Id".equals(simpleName)) {
             return com.codename1.annotations.Id.class;
+        }
+        if ("IntentEntity".equals(simpleName)) {
+            return com.codename1.annotations.IntentEntity.class;
+        }
+        if ("IntentParam".equals(simpleName)) {
+            return com.codename1.annotations.IntentParam.class;
         }
         if ("JsonIgnore".equals(simpleName)) {
             return com.codename1.annotations.JsonIgnore.class;
@@ -160,142 +187,170 @@ public final class GeneratedAccess_com_codename1_annotations {
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.annotations.AppIntent) {
+            try {
+                return invoke0((com.codename1.annotations.AppIntent) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.annotations.Bind) {
             try {
-                return invoke0((com.codename1.annotations.Bind) target, name, safeArgs);
+                return invoke1((com.codename1.annotations.Bind) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Column) {
             try {
-                return invoke1((com.codename1.annotations.Column) target, name, safeArgs);
+                return invoke2((com.codename1.annotations.Column) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Concrete) {
             try {
-                return invoke2((com.codename1.annotations.Concrete) target, name, safeArgs);
+                return invoke3((com.codename1.annotations.Concrete) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Email) {
             try {
-                return invoke3((com.codename1.annotations.Email) target, name, safeArgs);
+                return invoke4((com.codename1.annotations.Email) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Entity) {
             try {
-                return invoke4((com.codename1.annotations.Entity) target, name, safeArgs);
+                return invoke5((com.codename1.annotations.Entity) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.EntityQuery) {
+            try {
+                return invoke6((com.codename1.annotations.EntityQuery) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.ExistIn) {
             try {
-                return invoke5((com.codename1.annotations.ExistIn) target, name, safeArgs);
+                return invoke7((com.codename1.annotations.ExistIn) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Id) {
             try {
-                return invoke6((com.codename1.annotations.Id) target, name, safeArgs);
+                return invoke8((com.codename1.annotations.Id) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.IntentEntity) {
+            try {
+                return invoke9((com.codename1.annotations.IntentEntity) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.annotations.IntentParam) {
+            try {
+                return invoke10((com.codename1.annotations.IntentParam) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.JsonProperty) {
             try {
-                return invoke7((com.codename1.annotations.JsonProperty) target, name, safeArgs);
+                return invoke11((com.codename1.annotations.JsonProperty) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Length) {
             try {
-                return invoke8((com.codename1.annotations.Length) target, name, safeArgs);
+                return invoke12((com.codename1.annotations.Length) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Numeric) {
             try {
-                return invoke9((com.codename1.annotations.Numeric) target, name, safeArgs);
+                return invoke13((com.codename1.annotations.Numeric) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Regex) {
             try {
-                return invoke10((com.codename1.annotations.Regex) target, name, safeArgs);
+                return invoke14((com.codename1.annotations.Regex) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Required) {
             try {
-                return invoke11((com.codename1.annotations.Required) target, name, safeArgs);
+                return invoke15((com.codename1.annotations.Required) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Route) {
             try {
-                return invoke12((com.codename1.annotations.Route) target, name, safeArgs);
+                return invoke16((com.codename1.annotations.Route) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Route.Routes) {
             try {
-                return invoke13((com.codename1.annotations.Route.Routes) target, name, safeArgs);
+                return invoke17((com.codename1.annotations.Route.Routes) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.RouteParam) {
             try {
-                return invoke14((com.codename1.annotations.RouteParam) target, name, safeArgs);
+                return invoke18((com.codename1.annotations.RouteParam) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Url) {
             try {
-                return invoke15((com.codename1.annotations.Url) target, name, safeArgs);
+                return invoke19((com.codename1.annotations.Url) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.Validate) {
             try {
-                return invoke16((com.codename1.annotations.Validate) target, name, safeArgs);
+                return invoke20((com.codename1.annotations.Validate) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.XmlAttribute) {
             try {
-                return invoke17((com.codename1.annotations.XmlAttribute) target, name, safeArgs);
+                return invoke21((com.codename1.annotations.XmlAttribute) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.XmlElement) {
             try {
-                return invoke18((com.codename1.annotations.XmlElement) target, name, safeArgs);
+                return invoke22((com.codename1.annotations.XmlElement) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.annotations.XmlRoot) {
             try {
-                return invoke19((com.codename1.annotations.XmlRoot) target, name, safeArgs);
+                return invoke23((com.codename1.annotations.XmlRoot) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -306,7 +361,61 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(target, name, safeArgs);
     }
 
-    private static Object invoke0(com.codename1.annotations.Bind typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke0(com.codename1.annotations.AppIntent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("description".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.description();
+            }
+        }
+        if ("destructive".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.destructive();
+            }
+        }
+        if ("discoverable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.discoverable();
+            }
+        }
+        if ("exposure".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.exposure();
+            }
+        }
+        if ("headless".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.headless();
+            }
+        }
+        if ("opensRoute".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.opensRoute();
+            }
+        }
+        if ("phrases".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.phrases();
+            }
+        }
+        if ("timeoutSeconds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.timeoutSeconds();
+            }
+        }
+        if ("title".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.title();
+            }
+        }
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.annotations.Bind typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("attr".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.attr();
@@ -335,7 +444,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(com.codename1.annotations.Column typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.annotations.Column typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("name".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.name();
@@ -354,7 +463,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.annotations.Concrete typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("linux".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.linux();
@@ -373,7 +482,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.annotations.Email typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.annotations.Email typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("message".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.message();
@@ -382,7 +491,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.annotations.Entity typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.annotations.Entity typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("table".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.table();
@@ -391,7 +500,16 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.annotations.ExistIn typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.annotations.EntityQuery typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.annotations.ExistIn typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("caseSensitive".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.caseSensitive();
@@ -410,7 +528,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.annotations.Id typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.annotations.Id typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("autoIncrement".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.autoIncrement();
@@ -419,7 +537,17 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.annotations.JsonProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.annotations.IntentEntity typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("indexed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.indexed();
+            }
+        }
+        if ("title".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.title();
+            }
+        }
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -428,7 +556,45 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.annotations.Length typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.annotations.IntentParam typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("defaultValue".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.defaultValue();
+            }
+        }
+        if ("options".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.options();
+            }
+        }
+        if ("required".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.required();
+            }
+        }
+        if ("title".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.title();
+            }
+        }
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.annotations.JsonProperty typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("value".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.value();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke12(com.codename1.annotations.Length typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("message".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.message();
@@ -442,7 +608,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.annotations.Numeric typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.annotations.Numeric typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("decimal".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.decimal();
@@ -466,7 +632,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.annotations.Regex typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.annotations.Regex typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("message".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.message();
@@ -480,7 +646,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.annotations.Required typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke15(com.codename1.annotations.Required typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("message".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.message();
@@ -489,7 +655,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.annotations.Route typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke16(com.codename1.annotations.Route typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -498,7 +664,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.annotations.Route.Routes typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke17(com.codename1.annotations.Route.Routes typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -507,7 +673,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.annotations.RouteParam typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke18(com.codename1.annotations.RouteParam typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("required".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.required();
@@ -521,7 +687,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.annotations.Url typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke19(com.codename1.annotations.Url typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("message".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.message();
@@ -530,7 +696,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke16(com.codename1.annotations.Validate typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke20(com.codename1.annotations.Validate typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -539,7 +705,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke17(com.codename1.annotations.XmlAttribute typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke21(com.codename1.annotations.XmlAttribute typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -548,7 +714,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke18(com.codename1.annotations.XmlElement typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke22(com.codename1.annotations.XmlElement typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -557,7 +723,7 @@ public final class GeneratedAccess_com_codename1_annotations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke19(com.codename1.annotations.XmlRoot typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke23(com.codename1.annotations.XmlRoot typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("value".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.value();
@@ -567,7 +733,15 @@ public final class GeneratedAccess_com_codename1_annotations {
     }
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
+        if (type == com.codename1.annotations.EntityQuery.Kind.class) return getStaticField0(name);
         throw unsupportedStaticField(type, name);
+    }
+
+    private static Object getStaticField0(String name) throws Exception {
+        if ("BY_ID".equals(name)) return com.codename1.annotations.EntityQuery.Kind.BY_ID;
+        if ("SEARCH".equals(name)) return com.codename1.annotations.EntityQuery.Kind.SEARCH;
+        if ("SUGGESTED".equals(name)) return com.codename1.annotations.EntityQuery.Kind.SUGGESTED;
+        throw unsupportedStaticField(com.codename1.annotations.EntityQuery.Kind.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

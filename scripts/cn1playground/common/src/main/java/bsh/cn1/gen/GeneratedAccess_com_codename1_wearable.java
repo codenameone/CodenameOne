@@ -55,6 +55,9 @@ public final class GeneratedAccess_com_codename1_wearable {
         if ("WearableConnection".equals(simpleName)) {
             return com.codename1.wearable.WearableConnection.class;
         }
+        if ("DroppedDeliveryHandler".equals(simpleName)) {
+            return com.codename1.wearable.WearableConnection.DroppedDeliveryHandler.class;
+        }
         if ("WearableDataListener".equals(simpleName)) {
             return com.codename1.wearable.WearableDataListener.class;
         }
@@ -133,17 +136,37 @@ public final class GeneratedAccess_com_codename1_wearable {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Runnable.class}, false);
                 return com.codename1.wearable.WearableConnection.deliverDataChangedTracked((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], (java.lang.Runnable) adaptedArgs[2]);
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Runnable.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Runnable.class, java.lang.Runnable.class}, false);
+                return com.codename1.wearable.WearableConnection.deliverDataChangedTracked((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], (java.lang.Runnable) adaptedArgs[2], (java.lang.Runnable) adaptedArgs[3]);
+            }
         }
         if ("deliverDataRemoved".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 com.codename1.wearable.WearableConnection.deliverDataRemoved((java.lang.String) adaptedArgs[0]); return null;
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.deliverDataRemoved((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.deliverDataRemoved((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1], (java.lang.Runnable) adaptedArgs[2]); return null;
+            }
         }
         if ("deliverMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class}, false);
                 com.codename1.wearable.WearableConnection.deliverMessage((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2])); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.deliverMessage((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Runnable) adaptedArgs[3]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class, java.lang.Runnable.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class, java.lang.Integer.class, java.lang.Runnable.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.deliverMessage((java.lang.String) adaptedArgs[0], (byte[]) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Runnable) adaptedArgs[3], (java.lang.Runnable) adaptedArgs[4]); return null;
             }
         }
         if ("deliverReply".equals(name)) {
@@ -166,6 +189,22 @@ public final class GeneratedAccess_com_codename1_wearable {
         if ("getDataPaths".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.wearable.WearableConnection.getDataPaths();
+            }
+        }
+        if ("hasDataListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.wearable.WearableConnection.hasDataListener();
+            }
+        }
+        if ("hasMessageListener".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.wearable.WearableConnection.hasMessageListener();
+            }
+        }
+        if ("hasPendingReply".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.wearable.WearableConnection.hasPendingReply(toIntValue(adaptedArgs[0]));
             }
         }
         if ("isCompanionAppInstalled".equals(name)) {
@@ -223,6 +262,23 @@ public final class GeneratedAccess_com_codename1_wearable {
                 com.codename1.wearable.WearableConnection.removeStateListener((com.codename1.wearable.WearableStateListener) adaptedArgs[0]); return null;
             }
         }
+        if ("requestReplayAfterDrain".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.requestReplayAfterDrain((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
+            }
+        }
+        if ("resetForReload".equals(name)) {
+            if (safeArgs.length == 0) {
+                com.codename1.wearable.WearableConnection.resetForReload(); return null;
+            }
+        }
+        if ("runWhenListenerRegisters".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Runnable.class}, false);
+                com.codename1.wearable.WearableConnection.runWhenListenerRegisters((java.lang.String) adaptedArgs[0], (java.lang.Runnable) adaptedArgs[1]); return null;
+            }
+        }
         if ("sendMessage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class}, false);
@@ -231,6 +287,12 @@ public final class GeneratedAccess_com_codename1_wearable {
             if (matches(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class, com.codename1.wearable.WearableReplyHandler.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class, com.codename1.wearable.WearableReplyHandler.class}, false);
                 com.codename1.wearable.WearableConnection.sendMessage((com.codename1.wearable.WearableMessage) adaptedArgs[0], (com.codename1.wearable.WearableReplyHandler) adaptedArgs[1]); return null;
+            }
+        }
+        if ("setDroppedDeliveryHandler".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.wearable.WearableConnection.DroppedDeliveryHandler.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.wearable.WearableConnection.DroppedDeliveryHandler.class}, false);
+                com.codename1.wearable.WearableConnection.setDroppedDeliveryHandler((com.codename1.wearable.WearableConnection.DroppedDeliveryHandler) adaptedArgs[0]); return null;
             }
         }
         if ("transferFile".equals(name)) {
@@ -269,30 +331,37 @@ public final class GeneratedAccess_com_codename1_wearable {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.wearable.WearableConnection.DroppedDeliveryHandler) {
+            try {
+                return invoke2((com.codename1.wearable.WearableConnection.DroppedDeliveryHandler) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.wearable.WearableDataListener) {
             try {
-                return invoke2((com.codename1.wearable.WearableDataListener) target, name, safeArgs);
+                return invoke3((com.codename1.wearable.WearableDataListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.wearable.WearableMessageListener) {
             try {
-                return invoke3((com.codename1.wearable.WearableMessageListener) target, name, safeArgs);
+                return invoke4((com.codename1.wearable.WearableMessageListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.wearable.WearableReplyHandler) {
             try {
-                return invoke4((com.codename1.wearable.WearableReplyHandler) target, name, safeArgs);
+                return invoke5((com.codename1.wearable.WearableReplyHandler) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.wearable.WearableStateListener) {
             try {
-                return invoke5((com.codename1.wearable.WearableStateListener) target, name, safeArgs);
+                return invoke6((com.codename1.wearable.WearableStateListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -419,7 +488,17 @@ public final class GeneratedAccess_com_codename1_wearable {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.wearable.WearableDataListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.wearable.WearableConnection.DroppedDeliveryHandler typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("deliveryDropped".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.deliveryDropped((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.wearable.WearableDataListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class}, false);
@@ -435,7 +514,7 @@ public final class GeneratedAccess_com_codename1_wearable {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.wearable.WearableMessageListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.wearable.WearableMessageListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("messageReceived".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.wearable.WearableMessage.class, java.lang.Boolean.class}, false);
@@ -445,7 +524,7 @@ public final class GeneratedAccess_com_codename1_wearable {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.wearable.WearableReplyHandler typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.wearable.WearableReplyHandler typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("replyFailed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -461,7 +540,7 @@ public final class GeneratedAccess_com_codename1_wearable {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.wearable.WearableStateListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.wearable.WearableStateListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("connectionStateChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.connectionStateChanged(); return null;

@@ -15,8 +15,6 @@ When in doubt, search the developer guide for the exact key name — there are h
 | Hint | Effect |
 | --- | --- |
 | `codename1.arg.java.version=17` | **Required.** Picks the JDK 17 build server toolchain. |
-| `codename1.arg.build.compile=true` | Run the ahead-of-time / bytecode-to-native compile (recommended for iOS, smaller binaries). |
-| `codename1.arg.build.timeout=180` | Build server timeout in minutes. Bump for very large apps. |
 | `codename1.arg.var.<name>=...` | Define a custom variable referenced as `${var.name}` elsewhere in hints. |
 
 ## iOS
@@ -47,12 +45,10 @@ When in doubt, search the developer guide for the exact key name — there are h
 
 | Hint | Effect |
 | --- | --- |
-| `codename1.arg.android.googlePlayVersion=true` | Build the Google Play–compatible APK/AAB variant. |
-| `codename1.arg.android.sdkVersion=34` | Compile-time Android SDK. |
 | `codename1.arg.android.targetSDKVersion=34` | Target SDK in the manifest (drives Play Store acceptance). |
-| `codename1.arg.android.minSdkVersion=24` | Minimum Android API level. |
-| `codename1.arg.android.buildToolsVersion=34.0.0` | Android build-tools version. |
-| `codename1.arg.android.xPermissions=<uses-permission android:name="..."/>` | Inject extra `<uses-permission>` lines into the manifest. |
+| `codename1.arg.android.min_sdk_version=24` | Minimum Android API level. |
+| `codename1.arg.android.buildToolsVersion=34.0.0` | Android build-tools version. Also selects the compile SDK — there is no separate compile-SDK hint. |
+| `codename1.arg.android.xpermissions=<uses-permission android:name="..."/>` | Inject extra `<uses-permission>` lines into the manifest. |
 | `codename1.arg.android.xapplication=<receiver .../>` | Inject XML inside the manifest's `<application>` element. |
 | `codename1.arg.android.activity.launchMode=singleTask` | Launch mode for the main activity. |
 | `codename1.arg.android.statusbar_hidden=true` | Hide the Android status bar. |
@@ -133,8 +129,6 @@ The extension needs its own App ID and provisioning profile; `mvn cn1:certificat
 | `codename1.arg.javascript.proxy.allowedTargets=...` | Restrict the generated proxy to comma-separated origins, hosts, or wildcard subdomains. |
 | `codename1.arg.javascript.proxy.url=...` | Use an externally hosted proxy URL. This suppresses generated packaging unless `javascript.proxy.target` is also explicit. |
 | `codename1.arg.javascript.inject_proxy=false` | Disable proxy generation and proxy URL injection. |
-| `codename1.arg.javascript.html5=true` | Emit modern ES output. |
-| `codename1.arg.javascript.bundleResources=true` | Inline `theme.res` into the bundle (faster cold start). |
 
 ## Variable substitution
 

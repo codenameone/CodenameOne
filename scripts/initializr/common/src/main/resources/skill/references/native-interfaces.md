@@ -147,10 +147,10 @@ public class GpsBridgeImpl {
 }
 ```
 
-Permissions in the Android manifest are injected via `codename1.arg.android.xPermissions`. For example:
+Permissions in the Android manifest are injected via `codename1.arg.android.xpermissions`. For example:
 
 ```properties
-codename1.arg.android.xPermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+codename1.arg.android.xpermissions=<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 ```
 
 Extra Gradle dependencies go in `codename1.arg.android.gradleDep`. See `references/build-hints.md`.
@@ -299,6 +299,6 @@ navigator.geolocation.watchPosition(function(pos) {
 - **Method signature mismatch between the interface and the stub** — happens after you edit the Java interface but forget to regenerate. Re-run `mvn cn1:generate-native-interfaces -Dcn1.generateNativeInterfaces.overwrite=true` and re-apply your platform code.
 - **Returning Java objects** — not supported by the bridge marshaler. Return primitives, `String`, `byte[]`, or `PeerComponent` only.
 - **`PeerComponent` on iOS without ARC** — peer-component implementations can dangle if you treat the bridge like an ARC-managed Swift method. Retain natively, or wrap returned views in a static holder.
-- **Permissions / Info.plist** — the build server happily accepts a native interface that calls a privacy-protected API, but the App Store / Play Store reject it. Set `codename1.arg.ios.plistInject` and `codename1.arg.android.xPermissions` (see `references/build-hints.md`).
+- **Permissions / Info.plist** — the build server happily accepts a native interface that calls a privacy-protected API, but the App Store / Play Store reject it. Set `codename1.arg.ios.plistInject` and `codename1.arg.android.xpermissions` (see `references/build-hints.md`).
 - **Forgetting `isSupported()` return** — defaults to `false`, so the Java side thinks the bridge isn't available. Always override.
 - **`NativeLookup.create()` returns null in the simulator only** — usually means the `javase/` impl class is missing or in the wrong package.

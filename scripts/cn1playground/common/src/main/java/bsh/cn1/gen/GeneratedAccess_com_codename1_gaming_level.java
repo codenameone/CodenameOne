@@ -2229,6 +2229,11 @@ public final class GeneratedAccess_com_codename1_gaming_level {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getUIID".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getUIID();
