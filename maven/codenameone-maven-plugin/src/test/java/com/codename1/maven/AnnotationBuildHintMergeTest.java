@@ -614,10 +614,11 @@ public class AnnotationBuildHintMergeTest {
     }
 
     /**
-     * Drives the shipped merge rather than a restatement of it, so a change to
-     * the rule is a change to what this asserts.
+     * The same, over several classpath elements in the order given.
+     *
+     * <p>Drives the shipped merge rather than a restatement of it, so a change
+     * to the rule is a change to what this asserts.</p>
      */
-    /** The same, over several classpath elements in the order given. */
     private void mergeAll(Properties target, List<File> elements, String mainName, String pkg)
             throws Exception {
         CN1BuildMojo mojo = new CN1BuildMojo();

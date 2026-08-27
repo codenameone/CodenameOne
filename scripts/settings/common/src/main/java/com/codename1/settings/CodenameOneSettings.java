@@ -2380,6 +2380,14 @@ public class CodenameOneSettings extends Lifecycle {
     /// The directories a module's MAIN sources are compiled from, by
     /// convention, as candidates to be filtered by what exists.
     ///
+    /// WHY THE ROOT LIST HAS TO BE RIGHT, stated once here because every rule
+    /// below shares this consequence: the first file found for the main class
+    /// answers for it. Include a directory the build does not compile and a
+    /// dormant copy there answers instead of the compiled source, so its missing
+    /// or obsolete annotations make an annotation-owned hint look editable --
+    /// and Add then writes the properties line that the next build refuses as a
+    /// duplicate declaration.
+    ///
     /// An allow-list rather than a walk of the whole project with exclusions.
     /// The exclusions were never going to be complete -- `src/test` was
     /// followed by `src/testFixtures`, then `src/main/resources`, then
@@ -2414,10 +2422,7 @@ public class CodenameOneSettings extends Lifecycle {
     ///
     /// It was always offered, and searched BEFORE anything the POM declares. A
     /// module with no Kotlin plugin, or one that replaces the root with its own
-    /// `<sourceDirs>`, can still have a dormant copy of the main class sitting
-    /// there -- and picking that one over the compiled source is what makes an
-    /// annotation-owned hint look editable, so Add writes the duplicate the next
-    /// build refuses.
+    /// `<sourceDirs>`, can still have a copy of the main class sitting there.
     static java.util.List<String> candidateSourceRoots(String projectDir, boolean hasSrcMain,
                                                        boolean kotlinCompiled) {
         return candidateSourceRoots(projectDir, hasSrcMain, kotlinCompiled, true);
@@ -2593,9 +2598,7 @@ public class CodenameOneSettings extends Lifecycle {
         // <sourceDirectory> is Maven's compile root only as a direct child of
         // <build>. Checkstyle's <sourceDirectories><sourceDirectory> names a
         // directory to ANALYSE, PMD's does the same, and reading the whole POM
-        // for the element made an analysis-only path a compile root -- so a
-        // dormant copy of the main class under it was searched ahead of the
-        // compiled source, which is how annotation-owned hints look editable.
+        // for the element made an analysis-only path a compile root.
         collectRoots(elementValues(compileRootsOnly(pomText), "sourceDirectory"), properties, out);
         String kotlin = activePluginBlock(pomText, "kotlin-maven-plugin", "sourceDir",
                 "compile", managedFromChain);
@@ -2648,8 +2651,7 @@ public class CodenameOneSettings extends Lifecycle {
     /// build-helper, whose `add-source` runs only where an execution says so:
     /// plugin-level `<sources>` with no execution is dormant configuration, and
     /// reading it as a compiled root put a directory the build never touches
-    /// ahead of the real one -- where a dormant copy of the main class hides the
-    /// compiled source and its annotation-owned hints look editable.
+    /// ahead of the real one.
     private static java.util.List<String> compileGoalConfiguration(String pluginBlock,
                                                                    String goal,
                                                                    String element,
@@ -3342,11 +3344,9 @@ public class CodenameOneSettings extends Lifecycle {
             // walk added later cannot be the one that forgets. A plugin or
             // execution marked <inherited>false</inherited> applies to the POM
             // that wrote it and not to its children, so an ANCESTOR's copy is
-            // not part of this module's build -- and a root it configures is one
-            // the module never compiles, where a dormant copy of the main class
-            // shadows the live annotated source. depth 0 is this module's own
-            // POM, which applies its declarations whatever it says about
-            // children.
+            // not part of this module's build, and a root it configures is one
+            // the module never compiles. depth 0 is this module's own POM, which
+            // applies its declarations whatever it says about children.
             // Two things an ANCESTOR's declarations are subject to and its own
             // are not, both applied here rather than in the seven walks over
             // this list. Maven merges the active <plugins> of a parent and a
@@ -5105,9 +5105,8 @@ public class CodenameOneSettings extends Lifecycle {
     /// Matched by value rather than as the serialized string
     /// `<artifactId>x</artifactId>`. A POM may pretty-print it across lines and
     /// Maven trims the text, so the plugin is active while the substring search
-    /// found nothing -- and the Kotlin or build-helper roots it configures went
-    /// missing from the scan, which is how a dormant copy of the main class ends
-    /// up answering for the compiled one.
+    /// found nothing, and the Kotlin or build-helper roots it configures went
+    /// missing from the scan.
     private static int indexOfArtifactId(String xml, String artifactId, int from) {
         String open = "<artifactId>";
         String shut = "</artifactId>";
@@ -5149,9 +5148,7 @@ public class CodenameOneSettings extends Lifecycle {
         }
         // A commented-out <plugin> is not a plugin. This reader is a string
         // search, so a block someone parked inside <!-- --> matched exactly like
-        // a live one and contributed source roots the build does not compile --
-        // where a dormant copy of the main class hides the compiled source, and
-        // its annotation-owned hints look editable.
+        // a live one and contributed source roots the build does not compile.
         pomText = withoutComments(pomText);
         int at = indexOfArtifactId(pomText, artifactId, 0);
         if (at < 0) {

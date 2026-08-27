@@ -265,13 +265,6 @@ public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
                     + "migrated lines from " + settingsFile.getName() + ".");
         }
 
-        // Add the annotations, prove the build actually turns them back into hints,
-        // and only then delete the properties. Deciding that from the POM instead
-        // meant guessing whether process-annotations would run -- and the goal is
-        // skippable, bindable to a phase with no compiled classes, bindable to the
-        // wrong module, and skippable through a property expression. Observing the
-        // emitted resource answers all of those at once, and answers correctly for
-        // whatever the next way to not-run turns out to be.
         // Apply the whole migration, prove the build turns the annotations back
         // into hints, and roll both files back if it does not.
         //

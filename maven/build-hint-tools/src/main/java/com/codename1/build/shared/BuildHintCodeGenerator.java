@@ -130,19 +130,15 @@ public final class BuildHintCodeGenerator {
             });
         }
 
-        // The annotations are NOT generated. They are the source of truth for the
-        // hints they expose -- hand-written, and read back by
-        // BuildHintAnnotationReader -- so nothing here writes into
-        // CodenameOne/src.
-        // DATA, not code. The hints the annotations declare are rendered for the
-        // consumers that cannot read bytecode -- the Settings editor and the
-        // simulator's hint editor, both Codename One apps with no class reader.
+        // Data, never code: this renders what the hand-written annotations declare
+        // for the two consumers that cannot read bytecode -- the Settings editor
+        // and the simulator's, both Codename One apps with no class reader.
         // Everything that can read bytecode reads the annotations themselves.
-        // At the resource ROOT, deliberately not under com/codename1/build/.
-        // .gitignore carries a repo-wide `**/build/*` rule, so a data file in
-        // that package is silently untracked -- git add skips it, the module
-        // builds locally from the working tree, and CI fails with a file nobody
-        // can see is missing.
+        //
+        // At the resource ROOT rather than under com/codename1/build/, because
+        // .gitignore's repo-wide `**/build/*` rule covers resources: a data file
+        // in that package would be silently untracked, building locally from the
+        // working tree and failing CI with a file nobody can see is missing.
         write(new File(args[1], DATA_FILE), json(annotated));
         for (int i = 2; i < args.length; i++) {
             File target = new File(args[i]);

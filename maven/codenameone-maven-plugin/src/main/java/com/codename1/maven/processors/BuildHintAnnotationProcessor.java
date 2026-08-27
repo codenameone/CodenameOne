@@ -226,10 +226,16 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
             for (Map.Entry<String, Object> member : values.all().entrySet()) {
                 String hint = bindings(ctx).hintFor(descriptor, member.getKey());
                 if (hint == null) {
+                    // Not "regenerate": these bindings are read from the
+                    // annotation CLASSES on the compile classpath, so nothing a
+                    // generator writes changes this answer. Either the classpath
+                    // holds an older codenameone-core than the source was
+                    // compiled against, or the attribute carries no @Hint.
                     ctx.error(cls, "@" + simpleName(descriptor) + "(" + member.getKey()
-                            + ") is not a known build hint. The catalog and the annotation "
-                            + "have drifted; regenerate with "
-                            + "scripts/gen-build-hint-annotations.sh.");
+                            + ") is not a known build hint. It is read from the annotation on "
+                            + "the compile classpath, so either that codenameone-core is older "
+                            + "than the one this was written against, or the attribute has no "
+                            + "@Hint on it.");
                     continue;
                 }
                 String value = wireValue(cls, descriptor, member.getKey(), member.getValue(),
@@ -1793,9 +1799,9 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
                 String wire = bindings.wireValue(pair[0], pair[1]);
                 if (wire == null) {
                     ctx.error(cls, "@" + simpleName(descriptor) + "(" + member + ") uses the "
-                            + "constant " + pair[1] + ", which the build hint catalog does not "
-                            + "map to a value. Regenerate with "
-                            + "scripts/gen-build-hint-annotations.sh.");
+                            + "constant " + pair[1] + ", which carries no @HintValue and is not "
+                            + "the @HintUnset one, so there is no value to send. It is read from "
+                            + "the enum on the compile classpath.");
                     return null;
                 }
                 return wire;
