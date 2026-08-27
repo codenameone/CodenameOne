@@ -211,7 +211,11 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // request's own; neither is atomicity.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
-            if (local != null && local.exists()) {
+            // isFile, not exists. A published path that names a DIRECTORY exists, and opening one
+            // read-only succeeds here -- the picker is handed a descriptor whose every read fails
+            // with EISDIR, and the node's remote id, which would have worked, is never consulted
+            // because a local path wins. The Apple readers answer the same question the same way.
+            if (local != null && local.isFile()) {
                 synchronized (CN1DocumentStore.WRITE_LOCK) {
                     ParcelFileDescriptor descriptor =
                             ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
@@ -326,7 +330,10 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // said is on disk.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
-            if (local != null && local.exists()) {
+            // The same question openDocument asks, answered the same way: a directory is not
+            // content, so a node whose path names one has not stopped being remote and this
+            // download is still the answer.
+            if (local != null && local.isFile()) {
                 return false;
             }
         }

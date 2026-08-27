@@ -67,6 +67,39 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         return created
     }
 
+    /// How many requests are currently working on a URL.
+    ///
+    /// Every one of these dictionaries is keyed by URL, and without this every distinct item the
+    /// user ever opens leaves an entry in each of them for as long as the extension lives -- a
+    /// process the browser keeps alive across a whole session of browsing, and one the system
+    /// kills for using memory. Counting the requests is what makes it safe to drop the entries:
+    /// none of them can be dropped while a request still holds the generation or the sequence it
+    /// was given, because the numbers restart at zero and a stale request would compare equal to
+    /// a fresh one and write bytes into a URL the system had evicted.
+    private var urlUsers: [URL: Int] = [:]
+
+    private func retainURL(_ url: URL) {
+        inFlightLock.lock()
+        urlUsers[url] = (urlUsers[url] ?? 0) + 1
+        inFlightLock.unlock()
+    }
+
+    private func releaseURL(_ url: URL) {
+        inFlightLock.lock()
+        let remaining = (urlUsers[url] ?? 1) - 1
+        if remaining > 0 {
+            urlUsers[url] = remaining
+        } else {
+            urlUsers.removeValue(forKey: url)
+            urlGates.removeValue(forKey: url)
+            inFlight.removeValue(forKey: url)
+            stopGeneration.removeValue(forKey: url)
+            materializationSequence.removeValue(forKey: url)
+            installedSequence.removeValue(forKey: url)
+        }
+        inFlightLock.unlock()
+    }
+
     /// A number for this materialization, rising per URL.
     ///
     /// The stop generation cannot order two requests that no stop separates: an app that
@@ -411,7 +444,13 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // and the registration below then refuses the same request -- and the system's handler
         // must be called exactly once.
         let answer = CN1ClassicCompletion(rawCompletion)
-        let completionHandler: (Error?) -> Void = { answer.call($0) }
+        // Held for the whole request and let go with its single answer -- CN1ClassicCompletion
+        // runs the handler for the first call only, and this rides on that, so the count matches
+        // the requests rather than the number of times the code answered.
+        retainURL(url)
+        let completionHandler: (Error?) -> Void = { [weak self] error in
+            answer.call(error) { self?.releaseURL(url) }
+        }
         guard let identifier = persistentIdentifierForItem(at: url),
               let index = index() else {
             completionHandler(NSFileProviderError(.noSuchItem))
@@ -427,7 +466,7 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             // have come from a server, so "../" in it must not be able to reach the app's own
             // storage and hand it to the system picker.
             if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
-               FileManager.default.fileExists(atPath: local.path) {
+               CN1DocumentIndex.hasFileContent(at: local) {
                 // Copied, then checked against the publication it was copied from. The copy is
                 // synchronous but a large file takes long enough for a clear() to finish during
                 // it, and place() CREATES the storage directory -- so without this a logout would
@@ -608,6 +647,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     }
 
     override func stopProvidingItem(at url: URL) {
+        // A user of the URL for the length of the call: it takes the gate and moves the
+        // generation, so the entries it reads must not be dropped underneath it by a request
+        // finishing at the same moment.
+        retainURL(url)
+        defer { releaseURL(url) }
         // Any download still running for this URL is cancelled first, and the generation moves so
         // one that has already finished downloading cannot place its bytes either. Without that,
         // a fetch completing just after this call rebuilds the very file the eviction below
@@ -740,13 +784,17 @@ private final class CN1ClassicCompletion {
         self.handler = handler
     }
 
-    func call(_ error: Error?) {
+    /// - Parameter onFirstAnswer: run with the handler, once, whichever call gets there first.
+    ///   The caller uses it to let go of per-request state; running it on every call would let go
+    ///   of it more times than it was taken.
+    func call(_ error: Error?, _ onFirstAnswer: (() -> Void)? = nil) {
         lock.lock()
         let first = !done
         done = true
         lock.unlock()
         if first {
             handler(error)
+            onFirstAnswer?()
         }
     }
 }

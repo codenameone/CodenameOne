@@ -148,7 +148,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
             // have come from a server, so "../" in it must not be able to reach the app's own
             // storage and hand it to the system picker.
             if let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
-               FileManager.default.fileExists(atPath: local.path) {
+               CN1DocumentIndex.hasFileContent(at: local) {
                 // A clone, never the published file itself. Apple: "The system clones and unlinks
                 // the received fileContents... If the extension wishes to keep a copy of the
                 // content, it must provide a clone of that content as the URL passed to the

@@ -160,6 +160,21 @@ final class CN1DocumentIndex {
     /// able to reach the app's own databases or preferences and hand them to the system picker.
     /// Standardizing first is what makes the prefix check meaningful: without it "a/../../x"
     /// still starts with the directory it escapes.
+    /// Whether a resolved path is content a reader can hand over.
+    ///
+    /// Existence is not enough. A published path that names a DIRECTORY exists, and opening one
+    /// read-only succeeds on both platforms -- the reader then hands the browser a descriptor
+    /// whose every read fails with EISDIR, and the node's remote id, which would have worked, is
+    /// never consulted because a local path wins. Anything that is not a plain file is treated as
+    /// no local content at all.
+    static func hasFileContent(at url: URL) -> Bool {
+        var directory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &directory) else {
+            return false
+        }
+        return !directory.boolValue
+    }
+
     static func resolveLocal(path: String, containerURL: URL) -> URL? {
         // Symlinks are resolved on both sides before the prefix test. standardizedFileURL only
         // folds ".." lexically, so a link inside the published tree -- "files/shared" pointing at
@@ -292,5 +307,5 @@ func cn1HasLocalContent(_ node: CN1DocumentNode, containerURL: URL) -> Bool {
           let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL) else {
         return false
     }
-    return FileManager.default.fileExists(atPath: local.path)
+    return CN1DocumentIndex.hasFileContent(at: local)
 }

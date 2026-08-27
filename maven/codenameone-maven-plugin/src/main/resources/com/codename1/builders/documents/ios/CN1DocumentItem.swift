@@ -193,6 +193,7 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // -- the same bargain contentStamp documents below.
         if let path = node.path, !path.isEmpty, let container = containerURL,
            let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
+           CN1DocumentIndex.hasFileContent(at: local),
            let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
             return attrs[.modificationDate] as? Date
         }
@@ -266,6 +267,7 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
     /// only holds if both are measured the same way.
     static func localStamp(path: String, containerURL: URL) -> String? {
         guard let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: containerURL),
+              CN1DocumentIndex.hasFileContent(at: local),
               let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) else {
             return nil
         }
