@@ -65,6 +65,11 @@ extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 /// an owner. assign, not retain: AppKit owns its windows and a retain here would
 /// be a cycle through the child's own delegate.
 @property (nonatomic, assign) NSWindow *pendingOwner;
+/// Set when the application was hidden while this window was on screen, so
+/// unhiding restores exactly the windows the hide took away and no others. A
+/// window already miniaturized when the hide arrived reported itself hidden
+/// then and must stay that way.
+@property (nonatomic, assign) BOOL hiddenByApp;
 @end
 
 @implementation CN1MacWindowRecord
@@ -964,6 +969,43 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_
     // Desktop-Windows.asciidoc rather than left for someone to discover.
     return [rec.view readbackInto:(unsigned int *)arr->data width:width height:height]
         ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/// Report every on-screen window hidden when the application is hidden, and
+/// restore them when it is unhidden.
+///
+/// Cmd-H (and Hide Others) takes every window off screen, but AppKit posts no
+/// per-window notification for it -- windowDidMiniaturize: fires only for an
+/// actual miniaturize -- so without this a secondary window kept reporting
+/// nativeVisible. Display.shouldEDTSleep() takes its minimized shortcut only
+/// when no window is visible, deliberately, so that a miniaturized main window
+/// cannot park the EDT while a tool window is still on screen animating. Under
+/// a whole-application hide nothing is on screen, so that same guard held the
+/// EDT awake for as long as the user left the application hidden.
+void CN1MacWindowsDeliverAppHidden(BOOL hidden) {
+    NSMutableArray *table = cn1WindowTable();
+    for (id entry in table) {
+        if (entry == [NSNull null]) {
+            continue;
+        }
+        CN1MacWindowRecord *rec = (CN1MacWindowRecord *)entry;
+        if (rec.disposed || rec.window == nil) {
+            continue;
+        }
+        if (hidden) {
+            // Already reported hidden by its own miniaturize, so leave it be:
+            // restoring it on unhide would show the framework a window the user
+            // still has in the Dock.
+            if (rec.window.isMiniaturized || rec.hiddenByApp) {
+                continue;
+            }
+            rec.hiddenByApp = YES;
+            CN1MacWindowDeliverVisibility(rec.windowId, NO);
+        } else if (rec.hiddenByApp) {
+            rec.hiddenByApp = NO;
+            CN1MacWindowDeliverVisibility(rec.windowId, YES);
+        }
+    }
 }
 
 // ---- monitors ------------------------------------------------------------

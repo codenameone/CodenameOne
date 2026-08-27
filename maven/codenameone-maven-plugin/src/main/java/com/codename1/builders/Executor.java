@@ -1248,6 +1248,24 @@ public abstract class Executor {
     private static final class PermScanBudget {
         private long total;
         private int extracted;
+        private int entries;
+
+        /**
+         * Charges one archive entry, whatever becomes of it.
+         *
+         * <p>Every entry, not just the ones extracted: a nested entry that is
+         * drained costs no data bytes, so the byte budgets say nothing about it,
+         * and its ZIP header compresses to almost nothing in the enclosing
+         * archive. Counting only extracted entries therefore let a small upload
+         * ask the daemon to step through an unbounded number of empty or
+         * directory entries.</p>
+         */
+        void entry(String name) throws IOException {
+            if (++entries > PERM_SCAN_MAX_ENTRIES) {
+                throw new IOException("more than " + PERM_SCAN_MAX_ENTRIES
+                        + " archive entries; refusing to keep scanning (at " + name + ")");
+            }
+        }
 
         /**
          * The file the next entry extracts to, numbered flat.
@@ -1347,6 +1365,9 @@ public abstract class Executor {
         java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(nested);
         java.util.zip.ZipEntry inner;
         while ((inner = zis.getNextEntry()) != null) {
+            // Charged before the branch, so a drained entry costs the same
+            // against the count as an extracted one.
+            budget.entry(inner.getName());
             if (inner.isDirectory() || !inner.getName().endsWith(".class")) {
                 // Drained under the budget rather than skipped. This is a
                 // ZipInputStream, so the next getNextEntry() has to reach the end

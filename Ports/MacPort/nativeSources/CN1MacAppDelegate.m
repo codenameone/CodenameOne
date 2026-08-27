@@ -381,6 +381,11 @@ static void cn1MacRefreshSurfaceHidden(void) {
 void CN1MacDeliverAppHidden(BOOL hidden) {
     cn1MacAppHidden = hidden;
     cn1MacRefreshSurfaceHidden();
+    // The secondary windows too. The surface flag above speaks for the main one
+    // only, and a Window that still reports itself visible keeps the EDT out of
+    // its minimized shortcut for as long as the application stays hidden.
+    extern void CN1MacWindowsDeliverAppHidden(BOOL hidden);
+    CN1MacWindowsDeliverAppHidden(hidden);
 }
 
 /// The main window was minimized or restored.

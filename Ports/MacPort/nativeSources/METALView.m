@@ -794,10 +794,13 @@ static int cn1ButtonFromNumber(NSInteger buttonNumber) {
         dx *= 16;
         dy *= 16;
     }
-    if (event.isDirectionInvertedFromDevice) {
-        dx = -dx;
-        dy = -dy;
-    }
+    // isDirectionInvertedFromDevice is deliberately NOT applied. NSEvent.h is
+    // explicit that scrollingDeltaX/Y "are automatically inverted ... according
+    // to the user's preferences", and that the flag exists so a use which should
+    // NOT respect that preference can "compensate by multiplying -1". Scrolling a
+    // view is the ordinary use, not the exceptional one, so compensating here
+    // inverted a second time and scrolled against every other Mac application for
+    // anyone with Natural scrolling on -- which is the default.
     // Momentum arrives as further scrollWheel: events with a momentumPhase set,
     // so it is forwarded like any other delta rather than being recomputed on
     // top of what the system already sent -- doubling it is what makes a port
