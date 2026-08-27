@@ -69,6 +69,13 @@ public class MacOSNativeBuilder extends Executor {
     /// the native-feature scan to the permission generation that runs later.
     private boolean calendarDetected;
 
+    /// Whether the application registers for push, taken from the
+    /// native-feature scan rather than the capability scan -- one detection,
+    /// one result, the way calendarDetected works. It has to be known EARLY:
+    /// it decides whether CN1_INCLUDE_NOTIFICATIONS2 is enabled while the
+    /// native sources are still being staged, long before the capability scan.
+    private boolean pushDetected;
+
     private MacOSXcodeProject.MacOSCapabilities capabilities;
     private boolean loadsExternalCode;
 
@@ -248,9 +255,10 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesMicrophone = {false};
         final boolean[] usesBluetooth = {false};
         final boolean[] usesCalendar = {false};
+        final boolean[] usesPush = {false};
         try {
             scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
-                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar));
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -258,7 +266,7 @@ public class MacOSNativeBuilder extends Executor {
             // buffer untouched -- commonly all zeroes. A random source that silently
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
-                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar));
+                    usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -299,7 +307,15 @@ public class MacOSNativeBuilder extends Executor {
         // The app delegate's CN1_INCLUDE_NOTIFICATIONS is deliberately NOT set:
         // that one lives in CodenameOne_GLAppDelegate.h, which this port
         // excludes. CN1MacAppDelegate handles delivery instead.
-        if (usesLocalNotifications[0]) {
+        // Push as well as local notifications, which is what IPhoneBuilder does:
+        // it enables this define for a push certificate, ios.includePush OR
+        // local notifications. Gating on local notifications alone gave a
+        // push-only application a bundle carrying the APNs entitlement while
+        // the UserNotifications import that registerPush depends on was left
+        // to clang's implicit module auto-import -- which the comment beside
+        // that import in IOSNative.m already records as the fragile
+        // arrangement it exists to replace.
+        if (usesLocalNotifications[0] || usesPush[0]) {
             File iosNative = new File(nativeSources, "IOSNative.m");
             if (!iosNative.exists()) {
                 throw new BuildException("The application uses com.codename1.notifications but "
@@ -425,6 +441,7 @@ public class MacOSNativeBuilder extends Executor {
         // framework and is refused access to it at first use, and an unsandboxed
         // one is terminated for a missing privacy string.
         calendarDetected = usesCalendar[0];
+        pushDetected = usesPush[0];
 
         // The application's entry point. A Codename One main class is a
         // Lifecycle subclass with no main(String[]), and the translator refuses
@@ -725,6 +742,11 @@ public class MacOSNativeBuilder extends Executor {
         // this one, because it is the same answer that decides whether EventKit
         // is linked at all -- one detection, one result.
         caps.usesCalendar = calendarDetected;
+        // Push comes from the native-feature scan for the same reason the
+        // calendar does: it is the same answer that decided whether
+        // CN1_INCLUDE_NOTIFICATIONS2 was enabled, and detecting it twice is
+        // how the entitlement and the compiled-in code come to disagree.
+        caps.usesPush = pushDetected;
         capabilities = caps;
         // loadsExternalCode: a hardened-runtime bundle that dlopens anything --
         // which a Codename One application does not, but a cn1lib shipping a
@@ -1006,14 +1028,17 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesMicrophone;
         private final boolean[] usesBluetooth;
         private final boolean[] usesCalendar;
+        private final boolean[] usesPush;
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
-                boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar) {
+                boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar,
+                boolean[] usesPush) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
             this.usesBluetooth = usesBluetooth;
             this.usesCalendar = usesCalendar;
+            this.usesPush = usesPush;
         }
 
         @Override
@@ -1070,6 +1095,13 @@ public class MacOSNativeBuilder extends Executor {
             }
             if (usesNotifications(cls, method)) {
                 usesLocalNotifications[0] = true;
+            }
+            // Push registration, detected here rather than only in the later
+            // capability scan: that one runs long after the native sources are
+            // staged, and CN1_INCLUDE_NOTIFICATIONS2 has to be decided while
+            // they can still be edited.
+            if (usesPushRegistration(cls, method)) {
+                usesPush[0] = true;
             }
             if (usesLocalCalendar(cls, method)) {
                 usesCalendar[0] = true;
@@ -1254,9 +1286,6 @@ public class MacOSNativeBuilder extends Executor {
             // hasCamera(), declared both while opening nothing.
             if (opensCamera(cls, method)) {
                 caps.usesCamera = true;
-            }
-            if (usesPushRegistration(cls, method)) {
-                caps.usesPush = true;
             }
         }
     }

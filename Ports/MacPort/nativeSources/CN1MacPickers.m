@@ -244,7 +244,14 @@ static NSView *cn1BuildDurationView(CN1MacPickerController *controller, int type
     // portable spinner's: whichever field stands alone counts up to 999, and
     // minutes beside hours are the 0..59 of an hour.
     if (type == 5 || type == 6) {
-        long long hours = type == 6 ? (totalMinutes + 30) / 60 : totalMinutes / 60;
+        // Truncated, never rounded -- including for the hours-only picker, which
+        // is where rounding is most tempting because the minutes have nowhere to
+        // show. Rounding made merely opening and accepting the picker change the
+        // value: 1h30m opened on 2 hours and committed 2h with the user touching
+        // nothing. The portable picker seeds its hour field with v / 1000 / 60 /
+        // 60 for every duration type, so this is also what keeps the two showing
+        // the same number for the same duration.
+        long long hours = totalMinutes / 60;
         x = cn1AddDurationField(view, x, &hoursField, @"hours",
                                 (NSInteger)MIN(hours, 999LL), 999, 1);
     }
