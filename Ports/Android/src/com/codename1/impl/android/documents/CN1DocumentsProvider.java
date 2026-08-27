@@ -35,9 +35,12 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /// Exposes the tree the app published through `com.codename1.documents.DocumentProvider` as a
 /// source in the Android storage picker and the Files app.
@@ -348,17 +351,16 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// documents would then share one cache file. The id's hash is appended so distinct ids stay
     /// distinct while the readable part is kept for anyone looking at the cache directory.
     private static String cacheName(String id) {
-        String hash = Integer.toHexString(id.hashCode());
+        String hash = digest(id);
         // The readable part is bounded so the whole name fits a path component. A node id may be
         // long -- the publisher allows up to what a component takes -- and appending the hash to
         // all of it overran the limit: the download then succeeded, renameTo failed with
         // ENAMETOOLONG, and the fallback served the temporary file without removing it, so every
         // open of that document downloaded it again and left another full copy in the cache.
         //
-        // Truncating cannot collide two different ids into one file: the hash is derived from the
-        // WHOLE id and is appended after the truncation, so two ids sharing a prefix still differ
-        // here unless they also share a hash, which is the same collision the untruncated name
-        // always had.
+        // Truncating cannot collide two different ids into one file: the digest is taken over the
+        // WHOLE id and appended after the truncation, so two ids sharing a prefix still differ
+        // here.
         int budget = MAX_CACHE_NAME_BYTES - hash.length() - 1;
         StringBuilder sb = new StringBuilder(Math.min(id.length(), budget) + hash.length() + 1);
         for (int i = 0; i < id.length() && sb.length() < budget; i++) {
@@ -373,6 +375,40 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// this name is one path component. Every character the loop above emits is ASCII -- anything
     /// else becomes "_" -- so counting characters is counting bytes.
     private static final int MAX_CACHE_NAME_BYTES = 255;
+
+    /// Distinguishes two ids that sanitize to the same readable text.
+    ///
+    /// String.hashCode is not enough for this: it is 32 bits and trivially collided -- the two
+    /// valid ids "\"!" and "!@" both sanitize to "__" and both hash to 1087, so they shared a
+    /// cache file, and since a download replaces that path by rename, one request could be handed
+    /// the other document's bytes. A truncated SHA-256 has no collision anyone can construct.
+    ///
+    /// The fallback cannot be reached on Android, where SHA-256 is always present, and exists
+    /// because the API is declared to throw. It is the old 32-bit hash, which is worse than the
+    /// digest and better than failing the open.
+    private static String digest(String id) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = sha.digest(id.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder(32);
+            // Half the digest: 128 bits, which no accident and no app reaches, and 32 characters
+            // rather than 64 out of a 255-byte budget shared with the readable half.
+            for (int i = 0; i < 16; i++) {
+                int b = bytes[i] & 0xff;
+                if (b < 0x10) {
+                    sb.append('0');
+                }
+                sb.append(Integer.toHexString(b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException err) {
+            Log.w(TAG, "SHA-256 is unavailable; falling back to a 32-bit cache key", err);
+            return Integer.toHexString(id.hashCode());
+        } catch (UnsupportedEncodingException err) {
+            Log.w(TAG, "UTF-8 is unavailable; falling back to a 32-bit cache key", err);
+            return Integer.toHexString(id.hashCode());
+        }
+    }
 
     private void addRow(MatrixCursor result, CN1DocumentStore.Node node) {
         MatrixCursor.RowBuilder row = result.newRow();
