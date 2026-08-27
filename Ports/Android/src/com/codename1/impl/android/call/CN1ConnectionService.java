@@ -41,7 +41,9 @@ import com.codename1.impl.call.CallWire;
 import com.codename1.call.session.CallAudioRoute;
 import com.codename1.call.session.Calls;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -91,17 +93,20 @@ public class CN1ConnectionService extends ConnectionService {
     /// then acknowledged the wrong request and the other acknowledged
     /// nothing, leaving an AsyncResource that never settled. The call id is
     /// already in the request extras, so correlating by it costs nothing.
-    /// Addresses this app asked Telecom to place or ring, keyed to the call
-    /// id that asked. Guarded by PENDING_REPORTS.
-    private static final Map<String, String> PENDING_ADDRESSES =
-            new HashMap<String, String>();
+    /// Addresses this app asked Telecom to place or ring, each holding EVERY
+    /// call id still waiting on it, oldest first. Guarded by PENDING_REPORTS.
+    ///
+    /// A list rather than one id: two calls to the same number can be in
+    /// flight at once, and a single value let the second overwrite the first.
+    /// On a device that omits the private extras -- the case this map exists
+    /// to recover -- the first callback was then attributed to the second
+    /// report, and the next one looked like a system-placed call while the
+    /// first report waited for an answer that never came.
+    private static final Map<String, List<String>> PENDING_ADDRESSES =
+            new HashMap<String, List<String>>();
 
     private static final Map<String, Integer> PENDING_REPORTS =
             new HashMap<String, Integer>();
-
-    /// The call id of the most recent report, for the one case where Telecom
-    /// hands back a request with none of our extras to read.
-    private static volatile String lastReportedCallId;
 
     /// Calls the SYSTEM asked this app to place and that Java has not
     /// reported back yet.
@@ -247,7 +252,22 @@ public class CN1ConnectionService extends ConnectionService {
     private void refuse(ConnectionRequest request) {
         String id = request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(EXTRA_CALL_ID);
-        answerReport(id == null ? lastReportedCallId : id, false,
+        if (id == null) {
+            // Matched on the ADDRESS, exactly as adopt() does. Falling back
+            // to the last report failed an unrelated one whenever Telecom
+            // refused a call the SYSTEM placed -- and that report's own
+            // callback could then still arrive and build a connection for a
+            // CallSession Java had already failed and forgotten.
+            id = pendingReportFor(request == null ? null
+                    : request.getAddress());
+        }
+        if (id == null) {
+            // A system-placed call Telecom refused. Nothing of this app's was
+            // waiting on it, so there is nothing to answer; the user sees the
+            // system's own failure.
+            return;
+        }
+        answerReport(id, false,
                 CallError.CALL_REFUSED.ordinal(),
                 "Telecom refused the call: an emergency call is in progress,"
                 + " another application holds a call, or calling is switched"
@@ -305,22 +325,31 @@ public class CN1ConnectionService extends ConnectionService {
     /// bridge's extras can still be recognised as THIS report rather than as
     /// a call the system placed on its own; see adopt().
     static void expectReport(int requestId, String callId, String address) {
-        lastReportedCallId = callId;
         synchronized (PENDING_REPORTS) {
             PENDING_REPORTS.put(callId, Integer.valueOf(requestId));
             if (address != null) {
-                PENDING_ADDRESSES.put(address, callId);
+                List<String> waiting = PENDING_ADDRESSES.get(address);
+                if (waiting == null) {
+                    waiting = new ArrayList<String>();
+                    PENDING_ADDRESSES.put(address, waiting);
+                }
+                waiting.add(callId);
             }
         }
     }
 
-    /// The call id a pending report placed to this address, or null.
+    /// The OLDEST pending report to this address, or null.
+    ///
+    /// Oldest first because Telecom answers in the order it was asked, so the
+    /// first callback for an address belongs to the first report made to it.
     private static String pendingReportFor(Uri address) {
         if (address == null) {
             return null;
         }
         synchronized (PENDING_REPORTS) {
-            return PENDING_ADDRESSES.get(address.toString());
+            List<String> waiting = PENDING_ADDRESSES.get(address.toString());
+            return waiting == null || waiting.isEmpty() ? null
+                    : waiting.get(0);
         }
     }
 
@@ -340,9 +369,11 @@ public class CN1ConnectionService extends ConnectionService {
         if (callId == null) {
             return null;
         }
-        for (Map.Entry<String, String> e : PENDING_ADDRESSES.entrySet()) {
-            if (e.getValue().equals(callId)) {
-                PENDING_ADDRESSES.remove(e.getKey());
+        for (Map.Entry<String, List<String>> e : PENDING_ADDRESSES.entrySet()) {
+            if (e.getValue().remove(callId)) {
+                if (e.getValue().isEmpty()) {
+                    PENDING_ADDRESSES.remove(e.getKey());
+                }
                 break;
             }
         }

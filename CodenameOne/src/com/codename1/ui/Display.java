@@ -1453,18 +1453,20 @@ public final class Display extends CN1Constants {
         // never dispatch again, and an init() that arrives meanwhile must
         // start a new EDT rather than adopt this one.
         setEdtRetiring(true);
-        // Whether an init() got past the wait and installed a successor while
-        // this thread was leaving. Read as late as possible, because
-        // everything below depends on it.
-        boolean superseded = INSTANCE.edt != Thread.currentThread(); //NOPMD CompareObjectsWithEquals
-        if (!superseded) {
+        // Re-read at EVERY point that acts on it, never cached. A successor
+        // can be installed at any moment once the wait in init() has timed
+        // out or been interrupted, so a snapshot taken here is already
+        // capable of being wrong by the next line -- and both decisions below
+        // are destructive.
+        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
             // Dispose any window still open, on the EDT, before the implementation goes
             // away. Doing this from the static deinitialize() would run the teardown off
             // the EDT, which is exactly the thread the window's tree expects.
             //
-            // SKIPPED when superseded: the window registry is a singleton, so
+            // SKIPPED once superseded: the window registry is a singleton, so
             // disposing "all" of them would close the windows the new runtime
-            // has already opened.
+            // has already opened -- while it is initializing or dispatching
+            // into them.
             Desktop.getInstance().disposeAll();
         }
         // The implementation THIS EDT served, never whatever the static field
