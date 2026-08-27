@@ -62,13 +62,32 @@ public @interface Mac {
     /// category list].
     String appCategory() default "";
 
+    /// macOS builds. The architectures to compile, as an `ARCHS` value. Default
+    /// `arm64 x86_64`, which is what a Mac application is expected to be: a
+    /// single-architecture build is the kind of thing nobody notices until an
+    /// Intel user reports it.
+    String arch() default "arm64 x86_64";
+
     /// macOS builds. Used only when `macos.deriveBundleId=false`. Default:
     /// `<packageName>.mac`.
     String bundleId() default "";
 
+    /// macOS builds. `CFBundleVersion` in the Info.plist. `ios.bundleVersion` is
+    /// read when this is unset, and the project's version when neither is set.
+    String bundleVersion() default "";
+
+    /// macOS builds. The Xcode configuration to archive, as passed to
+    /// `xcodebuild -configuration`. Default `Release`.
+    String configuration() default "Release";
+
     /// macOS builds. `NSHumanReadableCopyright` in the Info.plist. Defaults to
     /// `Copyright (c) <year> <vendor>`.
     String copyright() default "";
+
+    /// macOS builds. `true` compiles AES-GCM support into the bundled crypto
+    /// library. `ios.crypto.gcm` is read when this is unset.
+    @Hint(name = "macos.crypto.gcm")
+    Toggle cryptoGcm() default Toggle.DEFAULT;
 
     /// macOS builds. `false` (default) gives the app its own bundle identifier,
     /// `<packageName>.mac`, because a macOS app and an iOS app are separate
@@ -154,6 +173,12 @@ public @interface Mac {
     /// entitlement hint below is a different thing despite the similar name.
     Toggle hardenedRuntime() default Toggle.DEFAULT;
 
+    /// macOS builds. `true` grants the hardened-runtime exception for loading
+    /// unsigned libraries. A Codename One application does not dlopen anything,
+    /// but a cn1lib shipping a dylib needs this, or the load is refused at
+    /// runtime with nothing in the application's own logs.
+    Toggle loadsExternalCode() default Toggle.DEFAULT;
+
     /// macOS builds. Minimum macOS version (`MACOSX_DEPLOYMENT_TARGET`). Default
     /// `11.0` on the native macOS build, which is the floor for a universal Apple
     /// silicon binary. The legacy Mac Catalyst target defaults to `10.15`.
@@ -227,8 +252,18 @@ public @interface Mac {
     @Hint(name = "macos.signingIdentity.installer.developerID")
     String signingIdentityInstallerDeveloperID() default "";
 
+    /// macOS builds. `true` stops after generating the Xcode project, which is
+    /// what the `mac-source` target delivers. Set by that target rather than by
+    /// hand.
+    Toggle sourceOnly() default Toggle.DEFAULT;
+
     /// macOS builds. Apple Developer Team ID (alphanumeric). Falls back to
     /// `ios.release.teamId` -> `ios.teamId` -> `ios.debug.teamId` since most apps
     /// share a single Apple Developer Team for iOS and Mac.
     String teamId() default "";
+
+    /// macOS builds. Custom URL schemes to register, comma separated.
+    /// `ios.urlSchemes` and then `ios.urlScheme` are read when this is unset, so
+    /// a project migrated from the Mac Catalyst build keeps its deep links.
+    String urlSchemes() default "";
 }

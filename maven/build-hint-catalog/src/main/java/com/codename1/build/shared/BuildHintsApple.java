@@ -55,6 +55,13 @@ final class BuildHintsApple {
                 .doc("Mac Native builds only. Used only when `macNative.deriveBundleId=false`. Default: "
                         + "`<packageName>.mac`."));
 
+        h.add(new Hint("macNative.appCategory")
+                .group(HintGroup.MAC_NATIVE)
+                .type(HintType.STRING)
+                .platform("mac")
+                .doc("Mac Native builds only. `LSApplicationCategoryType` in the generated "
+                        + "Info.plist. Default `public.app-category.utilities`."));
+
         h.add(new Hint("macNative.copyright")
                 .group(HintGroup.MAC_NATIVE)
                 .type(HintType.STRING)
