@@ -78,8 +78,18 @@ enum CN1DocumentRemote {
                 completion(nil, error)
                 return
             }
-            guard let location = location,
-                  let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            if status == 401 || status == 403 {
+                // A rejected or expired token comes back as an ordinary HTTP response, not as a
+                // URLSession error, so it has to be recognised here: the generic path below
+                // produces an error in this file's own domain, which providerError can only wrap
+                // as an opaque Cocoa failure. .notAuthenticated is the one the browser
+                // understands -- it presents the location as needing to be signed in to again
+                // instead of just failing the open.
+                completion(nil, NSFileProviderError(.notAuthenticated))
+                return
+            }
+            guard let location = location, status == 200 else {
                 completion(nil, CN1DocumentRemote.badResponse(response))
                 return
             }
