@@ -216,9 +216,19 @@ public class AndroidVpnBridge implements VpnBridge {
                 synchronized (this) {
                     installedWire = wire;
                     Preferences.set(WIRE_PREF, strip(wire));
+                }
+                // Status FIRST, reservation after. Released here, a removal
+                // could claim it, delete the profile just provisioned and
+                // publish NOT_CONFIGURED -- and this thread would then
+                // overwrite that with DISCONNECTED. Both calls report
+                // success, load() finds no profile, and getStatus insists
+                // one is merely disconnected. The reservation is not held
+                // until the work is done; it is held until the last thing
+                // the work PUBLISHES has been published.
+                setStatus(VpnStatus.DISCONNECTED);
+                synchronized (this) {
                     operationPending = false;
                 }
-                setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
                 return;
             }
@@ -331,10 +341,17 @@ public class AndroidVpnBridge implements VpnBridge {
                         Preferences.set(WIRE_PREF, strip(previous));
                     }
                 }
+            }
+            // The same ordering as the already-authorized path above: the
+            // status this install publishes has to land before anything else
+            // may claim the profile.
+            if (approved) {
+                bridge.setStatus(VpnStatus.DISCONNECTED);
+            }
+            synchronized (bridge) {
                 bridge.operationPending = false;
             }
             if (approved) {
-                bridge.setStatus(VpnStatus.DISCONNECTED);
                 Vpn.deliverAck(requestId, true, 0, null);
             } else {
                 Vpn.deliverAck(requestId, false,
