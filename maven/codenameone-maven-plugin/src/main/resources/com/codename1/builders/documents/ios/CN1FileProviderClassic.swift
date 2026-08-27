@@ -98,11 +98,23 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         }
         inFlightLock.lock()
         let alreadyInstalled = installedSequence[url] ?? 0
+        let latestStarted = materializationSequence[url] ?? 0
         inFlightLock.unlock()
         if alreadyInstalled > sequence {
             // A materialization that started after this one has already put its bytes there.
             // They are this item's bytes too -- a newer read of the same path -- so this request
             // is satisfied by them and must not overwrite them with what it copied earlier.
+            try? FileManager.default.removeItem(at: staged)
+            return .superseded
+        }
+        if latestStarted > sequence
+            && FileManager.default.fileExists(atPath: url.path) {
+            // A newer read is under way and has not landed yet, but the URL already holds a
+            // materialization. Installing over it would put an older snapshot in front of the
+            // system for as long as the newer copy takes, so this request stands behind what is
+            // there. The emptiness check matters: with nothing at the URL, standing back would
+            // report success over a file that is not there, so the copy goes in and the newer
+            // one replaces it.
             try? FileManager.default.removeItem(at: staged)
             return .superseded
         }
@@ -332,6 +344,23 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         if leaf.isEmpty || leaf == "." || leaf == ".." {
             leaf = "item"
         }
+        if leaf.utf8.count > maxComponentBytes {
+            // The publisher refuses names this long, so this is for an index that arrived some
+            // other way -- the same reason the separators above are replaced rather than trusted.
+            // Kept readable at the front and made unique at the back: the identifier directory is
+            // what the provider reads back, never this, so shortening here loses nothing.
+            let suffix = "-" + CN1DocumentRemote.digest(leaf)
+                .prefix(8).map { String(format: "%02x", $0) }.joined()
+            var kept = ""
+            for character in leaf {
+                let candidate = kept + String(character)
+                if candidate.utf8.count + suffix.utf8.count > maxComponentBytes {
+                    break
+                }
+                kept = candidate
+            }
+            leaf = kept + suffix
+        }
         return leaf
     }
 
@@ -423,6 +452,10 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                     case .stopped:
                         completionHandler(NSFileProviderError(.noSuchItem))
                     case .failed(let error):
+                        // install moves rather than copies, so a failed move leaves the staged
+                        // copy where it was written -- a whole document in provider storage per
+                        // retry, which on a full volume is what made the retry fail too.
+                        try? FileManager.default.removeItem(at: staged)
                         self.providePlaceholder(at: url) { _ in }
                         completionHandler(error)
                     }

@@ -182,13 +182,33 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("No published document " + documentId);
         }
         // A local copy always wins, which is what makes a cached remote document open without a
-        // round trip. It is opened directly, with no window to guard: the descriptor is taken
-        // from the file the index named, and a clear() that follows removes the file rather than
-        // changing what this descriptor already refers to.
+        // round trip.
+        //
+        // Checked against the publication it was resolved from, after the descriptor exists. A
+        // binder call can be scheduled out between reading the index and opening the file, and a
+        // logout plus a new login can land in that gap: the path is a relative one the next
+        // account may reuse, so the open would return the NEW account's bytes to a request the
+        // old one made -- and a revoked grant does not reach into a call already running. The
+        // descriptor is closed rather than returned when the publication moved under it.
         if (node.path != null && node.path.length() > 0) {
             File local = CN1DocumentStore.resolveLocal(getContext(), node.path);
             if (local != null && local.exists()) {
-                return ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
+                ParcelFileDescriptor descriptor =
+                        ParcelFileDescriptor.open(local, ParcelFileDescriptor.MODE_READ_ONLY);
+                CN1DocumentStore.Index current = CN1DocumentStore.loadIndex(getContext());
+                CN1DocumentStore.Node reread =
+                        current == null ? null : current.nodes.get(documentId);
+                if (current != null && current.revision.equals(index.revision)
+                        && reread != null && node.path.equals(reread.path)) {
+                    return descriptor;
+                }
+                try {
+                    descriptor.close();
+                } catch (IOException err) {
+                    Log.w(TAG, "Could not close a withdrawn descriptor for " + documentId, err);
+                }
+                throw new FileNotFoundException("Published document " + documentId
+                        + " was withdrawn while it was being opened");
             }
         }
         if (node.remoteId == null || node.remoteId.length() == 0) {
