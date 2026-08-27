@@ -303,11 +303,11 @@ Both work inside a window. A `BrowserComponent`, a video player, a map or a nati
 field placed in a `Window` is attached to *that* window's native view hierarchy, not to
 the main window's.
 
-The native macOS port qualifies this for one case. A peer is attached when it is
-initialized, and a peer that is already in the window's content when the window is first
+The native macOS port qualifies this for one case. A peer is attached when it's
+initialized, and a peer already in the window's content when the window is first
 shown initializes before that window has painted -- at which point nothing yet says which
-window it belongs to, so it lands on the main window's view. Add the peer once the window
-is on screen, in response to `WindowEvent.Type.Shown`, and it attaches to its own window.
+window it belongs to, so it lands on the main window's view. Add the peer in response to
+`WindowEvent.Type.Shown` and it attaches to its own window.
 
 This is worth knowing about because it was the single most common way an early
 multi-window implementation looks correct and isn't: the peer or the text caret appears
@@ -397,7 +397,7 @@ than a re-render of the hierarchy.
 
 The native macOS port is the exception to the peers-included half of that. It reads back
 the window's own Metal texture, so the image holds everything Codename One drew, but the
-native peer views AppKit composites above that texture are not in it: a `BrowserComponent`,
+native peer views AppKit composites above that texture aren't in it: a `BrowserComponent`,
 a video player or a map inside the window is missing from the result. Everything else the
 window shows is captured normally.
 
