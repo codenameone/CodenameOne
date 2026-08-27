@@ -1344,18 +1344,26 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
         [session commitFinished:NO];
         return;
     }
-    [self cn1ForgetAnchor];
+    // Forgotten INSIDE the plain-movement branches, not before them. These two
+    // resets ran unconditionally, so by the time a ...AndModifySelection:
+    // selector was matched further down the anchor it depends on had already
+    // been discarded: a second Shift-Left re-derived the anchor from the current
+    // selection and collapsed it instead of extending, so holding Shift and
+    // pressing an arrow twice from offset 5 gave [4,5) and then 4 rather than
+    // [3,5). A plain arrow genuinely ends the selection gesture and still
+    // forgets; an extending one must not.
     if (selector == @selector(moveLeft:)) {
         NSUInteger at = sel.length > 0 ? sel.location
             : [self cn1IndexBefore:sel.location inText:session.text];
         [self cn1SetSelection:NSMakeRange(at, 0)];
+        [self cn1ForgetAnchor];
         return;
     }
-    [self cn1ForgetAnchor];
     if (selector == @selector(moveRight:)) {
         NSUInteger at = sel.length > 0 ? NSMaxRange(sel)
             : [self cn1IndexAfter:sel.location inText:session.text];
         [self cn1SetSelection:NSMakeRange(at, 0)];
+        [self cn1ForgetAnchor];
         return;
     }
     // Shift-arrow and its line/document variants. AppKit turns them into these
@@ -1856,6 +1864,24 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
 // name, and building an image from a CGImage, which NSImage does through an
 // initializer rather than a class method.
 
+/// Releases a per-frame scratch texture on an early-exit path.
+///
+/// newTextureWithDescriptor: follows the "new" convention and hands back a +1
+/// texture, and this port is compiled without ARC, so a scratch that is not
+/// released is a GPU allocation the size of the blurred region leaked once per
+/// repaint -- an animated blur walks through memory quickly. The three
+/// long-lived textures in this file (the screen, the stencil and the readback
+/// staging texture) were already released; these per-frame ones were not.
+///
+/// Written as a macro because every one of these methods leaves through several
+/// inline `if (...) { ...; return; }` guards, and spelling the #ifndef out at
+/// each of them would bury the guard it is attached to.
+#ifdef CN1_USE_ARC
+#define CN1_SCRATCH_RELEASE
+#else
+#define CN1_SCRATCH_RELEASE [scratch release];
+#endif
+
 - (void)blurScreenRegionX:(int)x y:(int)y w:(int)w h:(int)h radius:(float)radius {
     if (self.screenTexture == nil || w <= 0 || h <= 0 || radius <= 0.0f) {
         return;
@@ -1902,7 +1928,7 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
 
     NSUInteger rowBytes = (NSUInteger)fw * 4;
     uint8_t *bytes = (uint8_t *)malloc(rowBytes * (NSUInteger)fh);
-    if (bytes == NULL) { [self setFramebuffer]; return; }
+    if (bytes == NULL) { [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
     [scratch getBytes:bytes bytesPerRow:rowBytes fromRegion:MTLRegionMake2D(0, 0, fw, fh) mipmapLevel:0];
 
     // 3) CIGaussianBlur + saturation (the UIBlurEffect-style material recipe).
@@ -1946,6 +1972,9 @@ static void glassApplyOptics(uint32_t *src, int bw, int bh, int pad, uint32_t *o
             CN1MetalDrawImage(blurredTex, 255, x, y, w, h);
         }
     }
+#ifndef CN1_USE_ARC
+    [scratch release];
+#endif
 }
 
 // Live-screen "Liquid Glass" MATERIAL: the full backdrop-filter recipe matching
@@ -2060,7 +2089,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     [blitCb waitUntilCompleted];
     NSUInteger availRow = (NSUInteger)aw * 4;
     uint8_t *avail = (uint8_t *)malloc(availRow * (NSUInteger)ah);
-    if (avail == NULL) { [self setFramebuffer]; return; }
+    if (avail == NULL) { [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
     [scratch getBytes:avail bytesPerRow:availRow fromRegion:MTLRegionMake2D(0, 0, aw, ah) mipmapLevel:0];
 
 #ifdef CN1_GLASS_PROFILE
@@ -2088,7 +2117,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
                       fx, fy, fw, fh, (unsigned long long)backdropHash,
                       (CACurrentMediaTime() - cn1gpT0) * 1000.0);
 #endif
-                return;
+                CN1_SCRATCH_RELEASE return;
             }
             break;
         }
@@ -2096,7 +2125,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
 
     // 3) Edge-replicate into a padded buffer and apply the colour material.
     uint32_t *prgb = (uint32_t *)malloc((size_t)bw * (size_t)bh * 4);
-    if (prgb == NULL) { free(avail); [self setFramebuffer]; return; }
+    if (prgb == NULL) { free(avail); [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
     for (int by = 0; by < bh; by++) {
         int ay = (fy - pad + by) - ay0; if (ay < 0) ay = 0; else if (ay >= ah) ay = ah - 1;
         for (int bx = 0; bx < bw; bx++) {
@@ -2118,7 +2147,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 4) Blur the padded material buffer, then optics -> premultiplied patch.
     glassGaussianBlur(prgb, bw, bh, rad);
     uint32_t *out = (uint32_t *)malloc((size_t)fw * (size_t)fh * 4);
-    if (out == NULL) { free(prgb); [self setFramebuffer]; return; }
+    if (out == NULL) { free(prgb); [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
     glassApplyOptics(prgb, bw, bh, pad, out, fw, fh, cornerRadius, refract, specular, (float)s);
     free(prgb);
 
@@ -2146,6 +2175,9 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     NSLog(@"CN1GLASSPROF miss rect=%d,%d %dx%d hash=%016llx %.2fms",
           fx, fy, fw, fh, (unsigned long long)backdropHash,
           (CACurrentMediaTime() - cn1gpT0) * 1000.0);
+#endif
+#ifndef CN1_USE_ARC
+    [scratch release];
 #endif
 }
 
@@ -2212,7 +2244,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     desc.usage = MTLTextureUsageShaderRead;
     desc.storageMode = MTLStorageModePrivate;
     id<MTLTexture> scratch = [device newTextureWithDescriptor:desc];
-    if (scratch == nil) { [self setFramebuffer]; return; }
+    if (scratch == nil) { [self setFramebuffer]; CN1_SCRATCH_RELEASE return; }
 
     // 3) Blit the bar region screenTexture -> scratch on the frame's command buffer.
     id<MTLBlitCommandEncoder> blit = [self.commandBuffer blitCommandEncoder];
@@ -2225,7 +2257,7 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 4) Restart a render encoder on the SAME command buffer (loadAction Load preserves the
     //    bar) and re-publish it to the CN1Metalcompat draw layer.
     [self createRenderPassDescriptor];
-    if (self.renderPassDescriptor == nil) { return; }
+    if (self.renderPassDescriptor == nil) { CN1_SCRATCH_RELEASE return; }
     self.renderCommandEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
     [self.renderCommandEncoder setViewport:(MTLViewport){ 0.0, 0.0, (double)framebufferWidth, (double)framebufferHeight, 0.0, 1.0 }];
     CN1MetalBeginFrame(self.renderCommandEncoder, projectionMatrix, framebufferWidth, framebufferHeight);
@@ -2233,6 +2265,9 @@ static uint64_t cn1GlassBackdropHash(const uint8_t *bytes, size_t len) {
     // 5) Draw the lens quad sampling scratch (cornerRadius logical -> physical px; < 0 = capsule).
     float crPx = cornerRadius < 0.0f ? -1.0f : cornerRadius * (float)s;
     CN1MetalDrawLens(scratch, x, y, w, h, fw, fh, magnify, aberration, tintColor, tintStrength, crPx);
+#ifndef CN1_USE_ARC
+    [scratch release];
+#endif
 }
 
 @end
