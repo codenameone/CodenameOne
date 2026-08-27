@@ -81,6 +81,34 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    public void aTopLevelValueIsReadOnlyWhenItIsAPlainOne() {
+        // What the document provider's two internal keys are compared against. A value that
+        // disagrees fails the build: the entitlements carry the group the hint resolved to, so an
+        // injected key naming a different one publishes into a container the extension cannot
+        // read -- nothing appears and nothing says why.
+        assertEquals("group.a", IPhoneBuilder.topLevelPlistString(
+                "<key>CN1DocumentsAppGroup</key><string>group.a</string>",
+                "CN1DocumentsAppGroup"));
+        assertEquals("true", IPhoneBuilder.topLevelPlistString(
+                "<key>CN1DocumentsReplicated</key><true/>", "CN1DocumentsReplicated"));
+
+        // Absent, so there is nothing to disagree with.
+        assertNull(IPhoneBuilder.topLevelPlistString("<key>Other</key><string>x</string>",
+                "CN1DocumentsAppGroup"));
+
+        // Nested, which the main bundle's top level does not carry.
+        assertNull(IPhoneBuilder.topLevelPlistString(
+                "<key>Nested</key><dict><key>CN1DocumentsAppGroup</key><string>group.a</string>"
+                        + "</dict>",
+                "CN1DocumentsAppGroup"));
+
+        // Present as something this cannot compare -- not a value it can call wrong.
+        assertNull(IPhoneBuilder.topLevelPlistString(
+                "<key>CN1DocumentsAppGroup</key><array><string>group.a</string></array>",
+                "CN1DocumentsAppGroup"));
+    }
+
+    @Test
     public void aTopLevelKeyIsNotFoundInsideACommentOrANestedDictionary() {
         // What the document provider's plist injection keys on. Everywhere else in injectToPlist
         // a loose match only decides whether to add a key of our own; there it suppresses the

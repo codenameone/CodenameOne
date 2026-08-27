@@ -11714,6 +11714,32 @@ public class IPhoneBuilder extends Executor {
         return range == null ? "" : plist.substring(range[0], range[1]);
     }
 
+    /// The text of a top-level string or boolean member, or null when the fragment has none.
+    ///
+    /// Enough for the two internal keys that are compared against what the build resolved: both
+    /// are a plain value, and a fragment that put something else there -- a dict, an array -- is
+    /// not a value this can disagree with, so it answers null and the caller leaves it alone.
+    static String topLevelPlistString(String plist, String key) {
+        if (plist == null) {
+            return null;
+        }
+        int[] range = plistMemberRange(plist, 0, plist.length(), key);
+        if (range == null) {
+            return null;
+        }
+        String value = plist.substring(range[0], range[1]).trim();
+        if (value.startsWith("<true")) {
+            return "true";
+        }
+        if (value.startsWith("<false")) {
+            return "false";
+        }
+        if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
+            return null;
+        }
+        return value.substring("<string>".length(), value.length() - "</string>".length()).trim();
+    }
+
     /// Whether the fragment declares the key as a member of ITS OWN level.
     ///
     /// plistDeclaresKey answers for a key anywhere in the fragment, nested dictionaries included.
@@ -13298,6 +13324,20 @@ public class IPhoneBuilder extends Executor {
             // ONLY the main bundle's top-level key -- so it finds nothing, isSupported() answers
             // false, and publishing becomes a silent no-op in a build that generated the
             // extension and signed it.
+            // A value that disagrees is refused rather than left alone. This key is not a hint
+            // -- ios.documentProvider.appGroup is -- and the entitlements on both targets carry
+            // the group the hint resolved to, so an injected key naming a different one has the
+            // app publishing into a container the extension is not entitled to read: nothing
+            // appears, and nothing says why. A stale manual injection is exactly how a project
+            // gets there.
+            String injectedGroup = topLevelPlistString(inject, "CN1DocumentsAppGroup");
+            if (injectedGroup != null && !injectedGroup.equals(documentsAppGroup)) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsAppGroup to '"
+                        + injectedGroup + "' while this build shares '" + documentsAppGroup
+                        + "' with the generated extension. The app would publish into a container "
+                        + "the extension cannot read. Remove the injected key and set "
+                        + "ios.documentProvider.appGroup instead, which entitles both sides.");
+            }
             if (!declaresTopLevelPlistKey(inject, "CN1DocumentsAppGroup")) {
                 inject += "\n<key>CN1DocumentsAppGroup</key><string>"
                         + xmlEscape(documentsAppGroup) + "</string>";
@@ -13317,6 +13357,18 @@ public class IPhoneBuilder extends Executor {
             // domain and signal through a manager that the generated NSFileProviderExtension
             // never registers with, leaving the location inert on exactly the systems the
             // classic provider exists for.
+            // Same reasoning, and the same cost: this says which of the two FileProvider APIs
+            // was generated, so a value that disagrees has the app registering a domain the
+            // extension never serves, or signalling through a manager it never registers with.
+            String injectedReplicated = topLevelPlistString(inject, "CN1DocumentsReplicated");
+            if (injectedReplicated != null
+                    && !injectedReplicated.equals(String.valueOf(documentsUsesReplicatedApi))) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsReplicated to '"
+                        + injectedReplicated + "' while this build generated the "
+                        + (documentsUsesReplicatedApi ? "replicated" : "classic")
+                        + " provider. Remove the injected key; ios.documentProvider."
+                        + "deploymentTarget is what chooses between them.");
+            }
             if (!declaresTopLevelPlistKey(inject, "CN1DocumentsReplicated")) {
                 inject += "\n<key>CN1DocumentsReplicated</key><string>"
                         + (documentsUsesReplicatedApi ? "true" : "false") + "</string>";
