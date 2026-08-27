@@ -114,8 +114,28 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
 
     @Override
     public Set<String> getAnnotationDescriptors() {
-        return new LinkedHashSet<String>(bindings(context).descriptors());
+        Set<String> out = new LinkedHashSet<String>(bindings(context).descriptors());
+        // The meta-annotations as well, so a class that carries one is dispatched
+        // here and refused. They describe a build hint annotation; on anything
+        // else they compile, set nothing and report nothing, which is the
+        // failure this package exists to remove.
+        out.addAll(META_ANNOTATIONS);
+        return out;
     }
+
+    /// ACC_ANNOTATION: the class file flag for an annotation declaration.
+    private static final int ANNOTATION_DECLARATION = 0x2000;
+
+    /// The annotations that DESCRIBE a hint rather than being one.
+    ///
+    /// `@Target` cannot keep these off an ordinary method: an annotation member
+    /// and a method are both ElementType.METHOD, so javac has no way to tell
+    /// them apart and the check has to happen here.
+    private static final Set<String> META_ANNOTATIONS = new LinkedHashSet<String>(
+            java.util.Arrays.asList(
+                    "Lcom/codename1/annotations/buildhints/Hint;",
+                    "Lcom/codename1/annotations/buildhints/HintValue;",
+                    "Lcom/codename1/annotations/buildhints/HintUnset;"));
 
     @Override
     public void start(ProcessorContext ctx) throws ProcessingException {
@@ -139,8 +159,29 @@ public class BuildHintAnnotationProcessor extends AbstractAnnotationProcessor {
         // time, but @Target is a front-end check and this reads bytecode: a
         // class produced another way could still carry one, and silently
         // ignoring it would be the exact failure this feature removes.
+        // @Hint, @HintValue and @HintUnset describe a build hint annotation.
+        // Anywhere else they are inert: the processor reads the GROUP
+        // annotations, so a hint named in one of these on an application class
+        // or method is never written and never mentioned again. The annotation
+        // declarations that legitimately carry them live in the core jar and are
+        // not what this scans.
+        if ((cls.getAccess() & ANNOTATION_DECLARATION) == 0) {
+            for (String d : cls.getAllAnnotationDescriptors()) {
+                if (META_ANNOTATIONS.contains(d)) {
+                    ctx.error(cls, "@" + simpleName(d) + " describes a build hint annotation and "
+                            + "sets no hint on its own. Put the hint on the application's main "
+                            + "class with the annotation for its platform -- @Ios, @Android, "
+                            + "@DesktopBuild and so on.");
+                }
+            }
+        }
+
         for (String d : cls.getAllAnnotationDescriptors()) {
-            if (descriptors.contains(d) && !cls.getClassAnnotations().containsKey(d)) {
+            // Not the meta-annotations: those are reported above, and "belongs
+            // on the class itself" is the wrong advice for one of them -- it
+            // belongs on an annotation declaration, or nowhere.
+            if (descriptors.contains(d) && !META_ANNOTATIONS.contains(d)
+                    && !cls.getClassAnnotations().containsKey(d)) {
                 ctx.error(cls, "@" + simpleName(d) + " is a build hint annotation and belongs on "
                         + "the class itself, not on one of its members.");
             }

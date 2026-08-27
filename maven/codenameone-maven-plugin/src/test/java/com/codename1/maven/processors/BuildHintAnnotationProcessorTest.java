@@ -39,6 +39,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -238,6 +239,52 @@ public class BuildHintAnnotationProcessorTest {
         // on methods. Neither would resolve if the target were too narrow.
         Properties p = hintsOf("@Ios(pods = {\"Alamofire\"})");
         assertEquals("Alamofire", p.getProperty("codename1.arg.ios.pods"));
+    }
+
+    /// `@Hint` on an ordinary method is refused.
+    ///
+    /// @Target cannot stop it: an annotation member and a method are both
+    /// ElementType.METHOD, so javac has no way to tell them apart. Written
+    /// there it compiled, set nothing and was never mentioned again -- the
+    /// processor reads the GROUP annotations -- which is the inert hint this
+    /// package exists to remove.
+    @Test
+    public void theMetaAnnotationOnAnOrdinaryMethodIsRefused() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(JavaSourceCompiler.singleSource(MAIN,
+                "package com.example;\n"
+                        + "import com.codename1.annotations.buildhints.Hint;\n"
+                        + "public class MyApp {\n"
+                        + "    @Hint(name = \"ios.pods\")\n"
+                        + "    public void notAHint() {\n    }\n"
+                        + "}\n"),
+                classes, Arrays.asList(testClassesDir(), coreJar()));
+        ProcessorContext ctx = run(classes, settings(), MAIN, false);
+        assertTrue("@Hint on a method must be refused", ctx.hasErrors());
+        String message = ctx.getErrors().get(0).getMessage();
+        assertTrue(message, message.contains("@Hint"));
+        assertTrue(message, message.contains("sets no hint on its own"));
+    }
+
+    /// ...and the processor asks to SEE such a class in the first place.
+    ///
+    /// ProcessAnnotationsMojo dispatches a class only when it carries an
+    /// annotation the processor declares interest in. Leave the meta-annotations
+    /// out of that set and a class whose only build hint annotation is `@Hint`
+    /// is never handed over, so the refusal above never runs in a real build --
+    /// which the test above cannot see, because it calls processClass directly.
+    @Test
+    public void theProcessorAsksForTheMetaAnnotationsToo() throws Exception {
+        BuildHintAnnotationProcessor proc = new BuildHintAnnotationProcessor();
+        proc.start(run(compile("@Ios(teamId = \"ABCDE12345\")"), settings(), MAIN, true));
+        Set<String> descriptors = proc.getAnnotationDescriptors();
+        for (String meta : new String[]{"Hint", "HintValue", "HintUnset"}) {
+            assertTrue(meta + " missing from " + descriptors,
+                    descriptors.contains("Lcom/codename1/annotations/buildhints/" + meta + ";"));
+        }
+        // and still the group annotations it actually processes
+        assertTrue(descriptors.toString(),
+                descriptors.contains("Lcom/codename1/annotations/buildhints/Ios;"));
     }
 
     // ------------------------------------------------------------------
