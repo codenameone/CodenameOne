@@ -69,30 +69,6 @@ public final class BuildHintCodeGenerator {
     /** The generated data file, at the root of whichever resource tree gets it. */
     private static final String DATA_FILE = "cn1-build-hints.json";
 
-    private static final String LICENSE =
-        "/*\n"
-      + " * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.\n"
-      + " * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.\n"
-      + " * This code is free software; you can redistribute it and/or modify it\n"
-      + " * under the terms of the GNU General Public License version 2 only, as\n"
-      + " * published by the Free Software Foundation.  Codename One designates this\n"
-      + " * particular file as subject to the \"Classpath\" exception as provided\n"
-      + " * by Oracle in the LICENSE file that accompanied this code.\n"
-      + " *\n"
-      + " * This code is distributed in the hope that it will be useful, but WITHOUT\n"
-      + " * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or\n"
-      + " * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License\n"
-      + " * version 2 for more details (a copy is included in the LICENSE file that\n"
-      + " * accompanied this code).\n"
-      + " *\n"
-      + " * You should have received a copy of the GNU General Public License version\n"
-      + " * 2 along with this work; if not, write to the Free Software Foundation,\n"
-      + " * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.\n"
-      + " *\n"
-      + " * Please contact Codename One through http://www.codenameone.com/ if you\n"
-      + " * need additional information or have any questions.\n"
-      + " */\n";
-
     // NOT ...annotations.build: .gitignore carries a repo-wide **/build/* rule,
     // which would silently make every generated source uncommittable and leave
     // the CI drift gate with nothing to compare.
@@ -126,7 +102,6 @@ public final class BuildHintCodeGenerator {
             System.exit(2);
         }
         File annRoot = new File(args[0], PKG_PATH);
-        File catalogRoot = new File(args[1], "com/codename1/build/shared");
         if (!annRoot.isDirectory()) {
             throw new IOException("No build hint annotations at " + annRoot);
         }
@@ -308,21 +283,6 @@ public final class BuildHintCodeGenerator {
     private static final java.util.regex.Pattern LOOKS_LIKE_IP =
             java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}|::1|[0-9a-fA-F:]*:[0-9a-fA-F:]+");
 
-    private static String groupBlurb(HintGroup g) {
-        switch (g) {
-            case IOS: return "iOS build hints, checked by the compiler.";
-            case ANDROID: return "Android build hints, checked by the compiler.";
-            case DESKTOP: return "Desktop build hints, checked by the compiler.";
-            case HARDENING: return "App hardening build hints, checked by the compiler.";
-            case ON_DEVICE_DEBUG: return "On-device debugging build hints for iOS and Android.";
-            case IOS_PRIVACY: return "iOS `Info.plist` privacy usage descriptions. Set the one "
-                    + "for every protected resource your app touches: the build server accepts "
-                    + "an app without them, and the App Store rejects it.";
-            case GENERAL: return "Build hints that are not specific to one platform.";
-            default: return g.annotationSimpleName() + " build hints.";
-        }
-    }
-
     /// The hints the catalog still describes, plus the annotated ones read from
     /// source.
     ///
@@ -421,7 +381,9 @@ public final class BuildHintCodeGenerator {
             String sep = "\n".equals(h.separator()) ? "newline" : "`" + h.separator() + "`";
             return "list (" + sep + " delimited)";
         }
-        return h.type().name().toLowerCase();
+        // ROOT: a hint type is a wire token, not text for a human, and
+        // toLowerCase() in a Turkish locale turns I into a dotless i.
+        return h.type().name().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static String groupLabel(HintGroup g) {
@@ -490,7 +452,7 @@ public final class BuildHintCodeGenerator {
                     // from a hint's documentation is a worse outcome than telling
                     // whoever edited the catalog to add a mapping here.
                     throw new IllegalArgumentException("Build hint documentation contains '"
-                            + c + "' (U+" + Integer.toHexString(c).toUpperCase()
+                            + c + "' (U+" + Integer.toHexString(c).toUpperCase(java.util.Locale.ROOT)
                             + "), which has no ASCII equivalent in toAscii(). The Ant javac step "
                             + "compiles CodenameOne/src as ASCII and rejects it as unmappable. "
                             + "Add a mapping, or reword the text.");
@@ -499,46 +461,13 @@ public final class BuildHintCodeGenerator {
         return sb.toString();
     }
 
-    /** Wraps text as /// markdown doc comment lines. */
-    private static String doc(String text, String indent) {
-        String clean = toAscii(text).replace("@since", "since").replaceAll("\\s+", " ").trim();
-        StringBuilder sb = new StringBuilder();
-        StringBuilder line = new StringBuilder();
-        for (String word : clean.split(" ")) {
-            if (line.length() > 0 && line.length() + word.length() + 1 > 76) {
-                sb.append(indent).append("/// ").append(line).append("\n");
-                line.setLength(0);
-            }
-            if (line.length() > 0) {
-                line.append(' ');
-            }
-            line.append(word);
-        }
-        if (line.length() > 0) {
-            sb.append(indent).append("/// ").append(line).append("\n");
-        }
-        return sb.toString();
-    }
-
-    private static String visible(String sep) {
-        if ("\n".equals(sep)) {
-            return "\\n";
-        }
-        return sep;
-    }
-
-    private static String esc(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\t", "\\t").replace("\r", "");
-    }
-
     private static void write(File f, String content) throws IOException {
         if (f.getName().endsWith(".java")) {
             for (int i = 0; i < content.length(); i++) {
                 if (content.charAt(i) >= 0x80) {
                     throw new IOException(f.getName() + " would contain the non-ASCII character '"
                             + content.charAt(i) + "' (U+"
-                            + Integer.toHexString(content.charAt(i)).toUpperCase()
+                            + Integer.toHexString(content.charAt(i)).toUpperCase(java.util.Locale.ROOT)
                             + "), which the Ant javac step rejects as unmappable. Add it to "
                             + "toAscii().");
                 }
