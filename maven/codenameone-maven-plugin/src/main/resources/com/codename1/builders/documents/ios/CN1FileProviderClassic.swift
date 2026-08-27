@@ -44,6 +44,45 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// the stop arrived can still tell that it is no longer wanted.
     private var stopGeneration: [URL: Int] = [:]
 
+    /// One lock per materialization URL, held only while the shared path is touched.
+    ///
+    /// Two requests for the same URL can overlap -- a stop and an immediate reopen while the
+    /// first copy is still running -- and both used to write straight to it. The stale one could
+    /// overwrite what the newer one had already materialized and then delete the shared path as
+    /// its own cleanup, leaving the newer request reporting success over nothing.
+    ///
+    /// The long part of the work never holds this. A copy or a download goes to a private file
+    /// first; the lock covers the moment it is claimed and moved into place, and the moment a
+    /// stop takes the URL away, so those cannot interleave.
+    private var urlGates: [URL: NSLock] = [:]
+
+    private func gate(for url: URL) -> NSLock {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        if let existing = urlGates[url] {
+            return existing
+        }
+        let created = NSLock()
+        urlGates[url] = created
+        return created
+    }
+
+    /// Moves a staged file onto the shared URL, but only while this request still owns it.
+    ///
+    /// - Returns: nil when the file is in place, an error when the move failed, and
+    ///   NSFileProviderError(.noSuchItem) when a stop claimed the URL first -- in which case
+    ///   nothing was written and the staged file has been removed.
+    private func install(_ staged: URL, at url: URL, generation: Int) -> Error? {
+        let lock = gate(for: url)
+        lock.lock()
+        defer { lock.unlock() }
+        guard stillWanted(at: url, generation: generation) else {
+            try? FileManager.default.removeItem(at: staged)
+            return NSFileProviderError(.noSuchItem)
+        }
+        return CN1FileProviderClassic.place(staged, at: url, copy: false)
+    }
+
     private func beginFetch(at url: URL) -> Int {
         inFlightLock.lock()
         defer { inFlightLock.unlock() }
@@ -243,15 +282,23 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 // large document inline holds every other request behind it until it finishes --
                 // long enough for the system to treat the provider as hung.
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let placed = CN1FileProviderClassic.place(local, at: url, copy: true)
-                    if !self.stillWanted(at: url, generation: stopped)
-                        || !CN1FileProviderClassic.stillPublished(identifier, path: path,
-                                                                  generation: publication,
-                                                                  containerURL: container) {
-                        try? FileManager.default.removeItem(at: url)
+                    // Staged beside the destination -- same directory, so the same volume -- and
+                    // only then claimed. The shared URL is never written by a request that has
+                    // been superseded, which is what stopped a stale copy from overwriting a
+                    // newer one and then deleting it as its own cleanup.
+                    let staged = self.storageURL.appendingPathComponent(UUID().uuidString)
+                    if let error = CN1FileProviderClassic.place(local, at: staged, copy: true) {
+                        completionHandler(error)
+                        return
+                    }
+                    guard CN1FileProviderClassic.stillPublished(identifier, path: path,
+                                                                generation: publication,
+                                                                containerURL: container) else {
+                        try? FileManager.default.removeItem(at: staged)
                         completionHandler(NSFileProviderError(.noSuchItem))
                         return
                     }
+                    let placed = self.install(staged, at: url, generation: stopped)
                     if placed != nil {
                         self.providePlaceholder(at: url) { _ in }
                     }
@@ -307,26 +354,16 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
                 completionHandler(NSFileProviderError(.noSuchItem))
                 return
             }
-            let placed = CN1FileProviderClassic.place(fetched, at: url, copy: false)
-            // Checked again after the write, for the stop as well as for the publication. A stop
-            // arriving during place() finds no task left to cancel -- this fetch had already
-            // claimed it -- so it only bumps the generation and deletes the URL, and place() then
-            // puts the file back. Reading the generation once more is what catches that.
-            if !self.stillWanted(at: url, generation: generation)
-                || !CN1FileProviderClassic.stillPublished(identifier, remoteId: remoteId,
-                                                          version: requested,
-                                                          credentials: credentials,
-                                                          containerURL: container) {
-                try? FileManager.default.removeItem(at: url)
-                completionHandler(NSFileProviderError(.noSuchItem))
-                return
-            }
+            // The download is already a private file, so this is the same claim the local branch
+            // makes: the shared URL is written only while this request still owns it, under its
+            // gate, so a stop and a reopen cannot both be writing there.
+            let placed = self.install(fetched, at: url, generation: generation)
             if placed != nil {
-                // place() cleaned up what it wrote; the placeholder it replaced has to come back
-                // or the browser is left with neither a document nor a stand-in for one. The
-                // download goes too: place() moves rather than copies, so a move that failed
-                // leaves the whole file where it landed -- and the likely reason for the failure
-                // is a full volume, which every retry would then make worse.
+                // Either the move failed or a stop claimed the URL first. The download goes
+                // either way: install moves rather than copies, so a failed move leaves the whole
+                // file where it landed, and the likely reason is a full volume that every retry
+                // would make worse. The placeholder is rewritten for the failure case; after a
+                // stop it is already there, and writing it again costs nothing.
                 try? FileManager.default.removeItem(at: fetched)
                 self.providePlaceholder(at: url) { _ in }
             }
@@ -343,15 +380,21 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         // one that has already finished downloading cannot place its bytes either. Without that,
         // a fetch completing just after this call rebuilds the very file the eviction below
         // removed, and hands the system a document it stopped asking for.
+        let lock = gate(for: url)
+        lock.lock()
         inFlightLock.lock()
         let task = inFlight.removeValue(forKey: url)
         stopGeneration[url] = (stopGeneration[url] ?? 0) + 1
         inFlightLock.unlock()
-        task?.cancel()
 
         // The materialized copy is a cache of content the app owns, so dropping it loses nothing
-        // and keeps the working directory from growing without bound.
+        // and keeps the working directory from growing without bound. Under the URL's gate, so a
+        // materialization cannot be installing at the same moment: the generation moves and the
+        // file goes as one step, and any request holding an older generation is refused before it
+        // writes anything.
         try? FileManager.default.removeItem(at: url)
+        lock.unlock()
+        task?.cancel()
         providePlaceholder(at: url) { _ in }
     }
 
