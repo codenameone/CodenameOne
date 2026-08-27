@@ -11714,6 +11714,15 @@ public class IPhoneBuilder extends Executor {
         return range == null ? "" : plist.substring(range[0], range[1]);
     }
 
+    /// Whether the fragment declares the key as a member of ITS OWN level.
+    ///
+    /// plistDeclaresKey answers for a key anywhere in the fragment, nested dictionaries included.
+    /// A key the app-side code reads off the main bundle has to be a top-level member to be read
+    /// at all, so a nested namesake is not the same declaration and must not stand in for one.
+    static boolean declaresTopLevelPlistKey(String plist, String key) {
+        return plist != null && plistMemberRange(plist, 0, plist.length(), key) != null;
+    }
+
     /// Whether the fragment actually declares the given key.
     ///
     /// The rest of this method tests the injected plist with plain `contains`, which is
@@ -13281,11 +13290,19 @@ public class IPhoneBuilder extends Executor {
         // browser through the next one; the CN1Documents extension carries its own copy of the
         // group in its generated Info.plist. See the ios.documentProvider.* build hints.
         if (documentProviderEnabled) {
-            if (!inject.contains("CN1DocumentsAppGroup")) {
+            // Structurally, not by substring. Everywhere else in this method a loose match only
+            // decides whether to add a key of our own, and matching too eagerly just skips an
+            // injection the developer clearly made themselves. Here it is not benign: the name
+            // appearing in a comment, inside a string value, in a nested dictionary or as part
+            // of a longer key would suppress the top-level entry, and the app-side native reads
+            // ONLY the main bundle's top-level key -- so it finds nothing, isSupported() answers
+            // false, and publishing becomes a silent no-op in a build that generated the
+            // extension and signed it.
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsAppGroup")) {
                 inject += "\n<key>CN1DocumentsAppGroup</key><string>"
                         + xmlEscape(documentsAppGroup) + "</string>";
             }
-            if (!inject.contains("CN1DocumentsDisplayName")) {
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsDisplayName")) {
                 inject += "\n<key>CN1DocumentsDisplayName</key><string>"
                         + plistEscape(documentsDisplayName) + "</string>";
             }

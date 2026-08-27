@@ -81,6 +81,37 @@ class IPhoneBuilderSceneManifestValidationTest {
     }
 
     @Test
+    public void aTopLevelKeyIsNotFoundInsideACommentOrANestedDictionary() {
+        // What the document provider's plist injection keys on. Everywhere else in injectToPlist
+        // a loose match only decides whether to add a key of our own; there it suppresses the
+        // entry the app-side native reads off the main bundle's TOP level, and a suppressed entry
+        // is a build that generated and signed an extension whose API then does nothing.
+        assertTrue(IPhoneBuilder.declaresTopLevelPlistKey(
+                "<key>CN1DocumentsAppGroup</key><string>group.a</string>",
+                "CN1DocumentsAppGroup"));
+
+        // Named in a comment.
+        assertFalse(IPhoneBuilder.declaresTopLevelPlistKey(
+                "<!-- CN1DocumentsAppGroup is set by the build -->", "CN1DocumentsAppGroup"));
+
+        // Quoted in someone else's string value.
+        assertFalse(IPhoneBuilder.declaresTopLevelPlistKey(
+                "<key>MyNote</key><string>see CN1DocumentsAppGroup</string>",
+                "CN1DocumentsAppGroup"));
+
+        // A member of a nested dictionary, which the main bundle's top level does not carry.
+        assertFalse(IPhoneBuilder.declaresTopLevelPlistKey(
+                "<key>Nested</key><dict><key>CN1DocumentsAppGroup</key><string>group.a</string>"
+                        + "</dict>",
+                "CN1DocumentsAppGroup"));
+
+        // A longer key that merely starts with the name.
+        assertFalse(IPhoneBuilder.declaresTopLevelPlistKey(
+                "<key>CN1DocumentsAppGroupOverride</key><string>group.a</string>",
+                "CN1DocumentsAppGroup"));
+    }
+
+    @Test
     void aWellFormedManifestSatisfiesBothQuestions() {
         String plist = wellFormedManifest();
         assertTrue(IPhoneBuilder.plistManifestSupportsMultipleScenes(plist));
