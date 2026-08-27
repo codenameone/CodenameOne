@@ -562,12 +562,26 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         add(row, columns, DocumentsContract.Document.COLUMN_DISPLAY_NAME, node.name);
         add(row, columns, DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType(node));
         add(row, columns, DocumentsContract.Document.COLUMN_FLAGS, Integer.valueOf(0));
-        if (node.size >= 0) {
-            add(row, columns, DocumentsContract.Document.COLUMN_SIZE, Long.valueOf(node.size));
+        // Content in the shared directory is MEASURED rather than taken from the publication,
+        // which is what DocumentNode promises for it: "items backed by the shared directory need
+        // none of this; their bytes are measured directly". A declared size is a number the app
+        // wrote once, and an app that replaces the bytes without republishing -- or never
+        // declared one, as it is entitled not to -- would otherwise have the picker show a stale
+        // size or none at all for a file whose length is a stat away. The Apple reader answers
+        // the same way. The declared values stay the answer for remote content, where there is
+        // nothing here to measure.
+        File local = node.path == null || node.path.length() == 0 ? null
+                : CN1DocumentStore.resolveLocal(getContext(), node.path);
+        boolean measured = local != null && local.isFile();
+        long size = measured ? local.length() : node.size;
+        long modified = measured && local.lastModified() > 0 ? local.lastModified()
+                : node.lastModified;
+        if (size >= 0) {
+            add(row, columns, DocumentsContract.Document.COLUMN_SIZE, Long.valueOf(size));
         }
-        if (node.lastModified >= 0) {
+        if (modified >= 0) {
             add(row, columns, DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-                    Long.valueOf(node.lastModified));
+                    Long.valueOf(modified));
         }
     }
 

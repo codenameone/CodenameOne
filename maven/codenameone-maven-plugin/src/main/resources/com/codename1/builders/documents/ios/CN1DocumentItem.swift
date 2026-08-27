@@ -172,31 +172,44 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         return [.allowsReading]
     }
 
+    /// The file this node is served from, when it is served from one.
+    ///
+    /// Content in the shared directory is MEASURED rather than taken from the publication, which
+    /// is what DocumentNode promises for it: "items backed by the shared directory need none of
+    /// this; their bytes are measured directly". A declared size is a number the app wrote once,
+    /// and an app that replaces the bytes without republishing -- or never declared one, as it is
+    /// entitled not to -- would otherwise have the browser show a stale size or none at all for a
+    /// file whose length is a stat away. The declared values stay the answer for remote content,
+    /// where there is nothing here to measure.
+    private var localAttributes: [FileAttributeKey: Any]? {
+        guard let path = node.path, !path.isEmpty, let container = containerURL,
+              let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
+              CN1DocumentIndex.hasFileContent(at: local) else {
+            return nil
+        }
+        return try? FileManager.default.attributesOfItem(atPath: local.path)
+    }
+
     var documentSize: NSNumber? {
+        if let size = (localAttributes?[.size] as? NSNumber)?.int64Value {
+            return NSNumber(value: size)
+        }
         // A negative size never gets here: CN1DocumentNode normalizes the sentinel away.
         guard let size = node.size else { return nil }
         return NSNumber(value: size)
     }
 
     var contentModificationDate: Date? {
+        if let date = localAttributes?[.modificationDate] as? Date {
+            return date
+        }
         if let ms = node.lastModified {
             return Date(timeIntervalSince1970: TimeInterval(ms) / 1000.0)
         }
-        // Falls back to the file on disk when the app declared no date. The pre-iOS-16 provider
-        // has no itemVersion to tell it the bytes moved, so this date is the only change signal it
-        // gets: without the fallback a locally backed item that never declared one looks unchanged
-        // forever and the browser goes on serving the copy it materialized first.
-        //
         // A remote node has nothing to measure and stays nil rather than borrowing the publish
         // revision. A revision-derived date would move on every publish and re-fetch every opened
         // remote document each time, which for a drive of any size is the expensive wrong default
         // -- the same bargain contentStamp documents below.
-        if let path = node.path, !path.isEmpty, let container = containerURL,
-           let local = CN1DocumentIndex.resolveLocal(path: path, containerURL: container),
-           CN1DocumentIndex.hasFileContent(at: local),
-           let attrs = try? FileManager.default.attributesOfItem(atPath: local.path) {
-            return attrs[.modificationDate] as? Date
-        }
         return nil
     }
 
