@@ -974,6 +974,12 @@ static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
     if ([mimeType isEqualToString:@"text/plain"]) return @"public.utf8-plain-text";
     if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
     if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
+    // The writer puts Markdown under the conventional UTI, so the reader has to
+    // ask for the same one. Without this a Markdown-only copy read back with no
+    // Markdown representation at all -- inside the very application that had just
+    // written it. text/asciidoc has no UTI and is written under its MIME type, so
+    // it needs no entry and falls through correctly.
+    if ([mimeType isEqualToString:@"text/markdown"]) return @"net.daringfireball.markdown";
     return mimeType;
 }
 
