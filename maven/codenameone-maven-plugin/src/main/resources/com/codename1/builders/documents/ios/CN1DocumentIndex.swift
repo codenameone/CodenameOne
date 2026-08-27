@@ -155,9 +155,19 @@ final class CN1DocumentIndex {
 struct CN1RemoteVersion: Equatable {
     let size: Int64?
     let lastModified: Int64?
+    let revision: String?
 
-    init(_ node: CN1DocumentNode) {
+    init(_ node: CN1DocumentNode, revision: String) {
         size = node.size
         lastModified = node.lastModified
+        // A node declaring neither is versioned by the publication it came from, exactly as its
+        // content stamp is: with both nil there is nothing else to compare, so a republish while
+        // its old download was in flight would accept those bytes and then label them with the
+        // new item's revision-based version -- cached as current, indefinitely.
+        //
+        // A node that DOES declare metadata is left alone by the revision on purpose. Folding it
+        // in would discard every download racing any publish, which for a drive of any size is
+        // the expensive wrong default; DocumentNode documents the other half of that bargain.
+        self.revision = (size == nil && lastModified == nil) ? revision : nil
     }
 }

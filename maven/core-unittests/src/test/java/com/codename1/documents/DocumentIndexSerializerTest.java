@@ -229,12 +229,31 @@ class DocumentIndexSerializerTest {
         root.add(DocumentNode.file("a", "expos\u0065\u0301.pdf"));
         IllegalArgumentException err = assertThrows(IllegalArgumentException.class,
                 () -> DocumentIndexSerializer.serialize(root));
-        assertTrue(err.getMessage().contains("combining mark"), err.getMessage());
+        assertTrue(err.getMessage().contains("U+301"), err.getMessage());
 
         // The precomposed spelling of the same name is accepted, and is the one to use.
         DocumentNode composed = DocumentNode.folder("root", "Root");
         composed.add(DocumentNode.file("a", "expos\u00e9.pdf"));
         assertNotNull(DocumentIndexSerializer.serialize(composed));
+
+        // A canonical SINGLETON carries no combining mark and still normalizes to another
+        // character: U+212B ANGSTROM SIGN is U+00C5 on an Apple filesystem, so the two spellings
+        // are one filename. The letterlike signs and the CJK compatibility ideographs are where
+        // those live.
+        DocumentNode angstrom = DocumentNode.folder("root", "Root");
+        angstrom.add(DocumentNode.file("a", "\u212b.pdf"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(angstrom));
+
+        DocumentNode compatibility = DocumentNode.folder("root", "Root");
+        compatibility.add(DocumentNode.file("a", "\uf900.txt"));
+        assertThrows(IllegalArgumentException.class,
+                () -> DocumentIndexSerializer.serialize(compatibility));
+
+        // The ordinary letter it normalizes to is accepted.
+        DocumentNode plain = DocumentNode.folder("root", "Root");
+        plain.add(DocumentNode.file("a", "\u00c5.pdf"));
+        assertNotNull(DocumentIndexSerializer.serialize(plain));
     }
 
     @Test

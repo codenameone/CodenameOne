@@ -234,6 +234,14 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
             return "meta-\(generation)-\(remoteId.count):\(remoteId)"
                 + "-\(node.lastModified ?? -1)-\(node.size ?? -1)"
         }
+        if let container = containerURL, node.remoteId != nil {
+            // A remote node that declared neither size nor date still has a credential, and
+            // changing the endpoint or the token without republishing has to invalidate what the
+            // browser holds. Without this the version stays "rev-<revision>" across an account
+            // switch that did not republish, and the previous account's materialized bytes are
+            // served as current.
+            return "rev-\(revision)-\(CN1DocumentRemote.credentialGeneration(containerURL: container))"
+        }
         return "rev-\(revision)"
     }
 }

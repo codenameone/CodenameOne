@@ -155,6 +155,13 @@ public final class CN1DocumentStore {
         node.id = json.getString("id");
         node.parentId = parentId;
         node.name = json.optString("name", node.id);
+        if (node.name.length() == 0) {
+            // optString keeps an empty value rather than taking the fallback, and an empty
+            // display name is a row the picker shows as nothing. The Apple readers normalize the
+            // same case to "item", and the publisher compares sibling names after that
+            // normalization, so answering anything else here would show one publication two ways.
+            node.name = "item";
+        }
         node.folder = json.optBoolean("folder", false);
         node.contentType = json.optString("contentType", null);
         node.path = json.optString("path", null);

@@ -181,7 +181,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         let container = containerURL
         // Captured before the download starts, so what comes back is checked against what was
         // asked for rather than against whatever happens to be current when it arrives.
-        let requested = CN1RemoteVersion(node)
+        let requested = CN1RemoteVersion(node, revision: index.revision)
         let credentials = CN1DocumentRemote.credentialStamp(containerURL: container)
         let task = CN1DocumentRemote.fetch(remoteId: remoteId, containerURL: container,
                                            destination: handoffDirectory()) { url, error in
@@ -267,7 +267,7 @@ final class CN1FileProviderExtension: NSObject, NSFileProviderReplicatedExtensio
         guard let index = CN1DocumentIndex.load(containerURL: containerURL),
               let resolved = CN1DocumentEnumerator.resolve(identifier, in: index),
               let node = index.nodes[resolved], node.remoteId == remoteId,
-              CN1RemoteVersion(node) == version,
+              CN1RemoteVersion(node, revision: index.revision) == version,
               CN1DocumentRemote.credentialStamp(containerURL: containerURL) == credentials else {
             // The credential is compared as well as the node and the remote object: an account
             // switch reuses node ids, and can reuse the server's keys for them, so those two

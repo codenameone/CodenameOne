@@ -135,13 +135,14 @@ public final class DocumentIndexSerializer {
         }
         int mark = combiningMarkAt(effective);
         if (mark >= 0) {
-            throw new IllegalArgumentException("\"" + effective + "\" spells its accents with a "
-                    + "combining mark (U+" + Integer.toHexString(effective.charAt(mark))
-                    .toUpperCase() + " at index " + mark + "). Apple's filesystems compare "
-                    + "names after canonical normalization, so a decomposed name and its "
-                    + "precomposed twin are one file there while they are two strings here -- "
-                    + "and the browser hides one of the pair. Use the precomposed spelling, "
-                    + "e.g. \"\u00e9\" rather than \"e\" followed by U+0301.");
+            throw new IllegalArgumentException("\"" + effective + "\" contains U+"
+                    + Integer.toHexString(effective.charAt(mark)).toUpperCase() + " at index "
+                    + mark + ", which Apple's filesystems normalize to something else. They "
+                    + "compare names after canonical normalization, so a name spelled this way "
+                    + "and its normalized twin are one file there while they are two strings "
+                    + "here -- and the browser hides one of the pair. Use the normalized "
+                    + "spelling: \"\u00e9\" rather than \"e\" followed by U+0301, and the "
+                    + "ordinary letter rather than a letterlike or compatibility form.");
         }
         if (utf8Length(effective) > MAX_COMPONENT_BYTES) {
             throw new IllegalArgumentException("\"" + effective + "\" is too long to be a file "
@@ -198,17 +199,32 @@ public final class DocumentIndexSerializer {
     /// happens. Refusing the publish says which node is at fault instead.
     private static final int MAX_COMPONENT_BYTES = 255;
 
-    /// The index of the first combining mark in the name, or -1.
+    /// The index of the first character that makes the name non-canonical, or -1.
     ///
-    /// The blocks are the ones that carry accents in practice: the combining diacriticals, their
-    /// supplement and extended range, the symbols block, and the half marks. A name using any of
-    /// them is decomposed, which is what the check above refuses.
+    /// Two kinds, both of which give Apple's filesystems a name that is not the one written here.
+    ///
+    /// A COMBINING MARK means the name is decomposed: "e" followed by U+0301 is the same file as
+    /// the precomposed letter. The blocks are the ones that carry accents -- the combining
+    /// diacriticals, their supplement and extended range, the symbols block, and the half marks.
+    ///
+    /// A SINGLETON is a character that normalizes to a different single character with no mark
+    /// involved: the letterlike ANGSTROM, OHM and KELVIN signs, which normalize to the ordinary
+    /// letters, and the CJK compatibility ideographs, which normalize to their unified forms.
+    /// Those are where Unicode's singleton canonical decompositions live, so refusing them
+    /// closes the case a combining-mark test cannot see -- U+212B and U+00C5 carry no mark and
+    /// are still one filename.
+    ///
+    /// This is not a normalizer and does not claim to be one; there is none to call here. It
+    /// makes the accepted set one where equal-looking names are equal strings, which is what the
+    /// sibling check needs.
     private static int combiningMarkAt(String value) {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if ((c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
                     || (c >= 0x1DC0 && c <= 0x1DFF) || (c >= 0x20D0 && c <= 0x20F0)
-                    || (c >= 0xFE20 && c <= 0xFE2F)) {
+                    || (c >= 0xFE20 && c <= 0xFE2F)
+                    || c == 0x212B || c == 0x2126 || c == 0x212A
+                    || (c >= 0xF900 && c <= 0xFAFF)) {
                 return i;
             }
         }

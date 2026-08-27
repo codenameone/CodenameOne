@@ -36,11 +36,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /// Exposes the tree the app published through `com.codename1.documents.DocumentProvider` as a
 /// source in the Android storage picker and the Files app.
@@ -215,7 +212,16 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             throw new FileNotFoundException("Published document " + documentId
                     + " was withdrawn while it was being fetched");
         }
-        return ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+        ParcelFileDescriptor descriptor =
+                ParcelFileDescriptor.open(cached, ParcelFileDescriptor.MODE_READ_ONLY);
+        // Unlinked once it is open. The descriptor keeps the inode alive for as long as the
+        // caller reads it, so the bytes survive while the name does not. That is what stops a
+        // download outliving the request that fetched it -- and what keeps a departed user's
+        // document out of a cache directory clear() has no reason to walk.
+        if (!cached.delete()) {
+            Log.w(TAG, "Could not delete the served download " + cached);
+        }
+        return descriptor;
     }
 
     /// Whether the document still names the same remote object, at the same version, under the
@@ -296,7 +302,6 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
                 throw new IOException("Could not create " + cacheDir);
             }
-            File target = new File(cacheDir, cacheName(node.id));
             // Downloaded into a file nobody else can be holding, then moved into place. Two
             // clients opening the same document arrive here on separate binder threads; writing
             // straight to the shared path let one truncate the bytes the other had already
@@ -332,13 +337,7 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             } finally {
                 in.close();
             }
-            if (!partial.renameTo(target)) {
-                // A rename onto an existing name fails on some filesystems; the existing file is
-                // a complete copy of the same content, so serve the partial's own path instead of
-                // failing the open.
-                return partial;
-            }
-            return target;
+            return partial;
         } catch (IOException err) {
             Log.e(TAG, "Could not fetch document " + node.id, err);
             throw new FileNotFoundException("Could not fetch document " + node.id + ": "
@@ -349,74 +348,6 @@ public class CN1DocumentsProvider extends DocumentsProvider {
             }
         }
     }
-
-    /// The cache file name for a node id.
-    ///
-    /// Node ids are the app's own record keys and may contain anything, including separators, so
-    /// this has to collapse to a single path component. Replacing the awkward characters is not
-    /// enough on its own -- "a/b" and "a_b" collapse to the same name, and two different
-    /// documents would then share one cache file. The id's hash is appended so distinct ids stay
-    /// distinct while the readable part is kept for anyone looking at the cache directory.
-    private static String cacheName(String id) {
-        String hash = digest(id);
-        // The readable part is bounded so the whole name fits a path component. A node id may be
-        // long -- the publisher allows up to what a component takes -- and appending the hash to
-        // all of it overran the limit: the download then succeeded, renameTo failed with
-        // ENAMETOOLONG, and the fallback served the temporary file without removing it, so every
-        // open of that document downloaded it again and left another full copy in the cache.
-        //
-        // Truncating cannot collide two different ids into one file: the digest is taken over the
-        // WHOLE id and appended after the truncation, so two ids sharing a prefix still differ
-        // here.
-        int budget = MAX_CACHE_NAME_BYTES - hash.length() - 1;
-        StringBuilder sb = new StringBuilder(Math.min(id.length(), budget) + hash.length() + 1);
-        for (int i = 0; i < id.length() && sb.length() < budget; i++) {
-            char c = id.charAt(i);
-            sb.append(Character.isLetterOrDigit(c) || c == '.' || c == '-' ? c : '_');
-        }
-        sb.append('-').append(hash);
-        return sb.toString();
-    }
-
-    /// The most bytes a cache file name may take. 255 is where APFS, ext4 and NTFS all stop, and
-    /// this name is one path component. Every character the loop above emits is ASCII -- anything
-    /// else becomes "_" -- so counting characters is counting bytes.
-    private static final int MAX_CACHE_NAME_BYTES = 255;
-
-    /// Distinguishes two ids that sanitize to the same readable text.
-    ///
-    /// String.hashCode is not enough for this: it is 32 bits and trivially collided -- the two
-    /// valid ids "\"!" and "!@" both sanitize to "__" and both hash to 1087, so they shared a
-    /// cache file, and since a download replaces that path by rename, one request could be handed
-    /// the other document's bytes. A truncated SHA-256 has no collision anyone can construct.
-    ///
-    /// The fallback cannot be reached on Android, where SHA-256 is always present, and exists
-    /// because the API is declared to throw. It is the old 32-bit hash, which is worse than the
-    /// digest and better than failing the open.
-    private static String digest(String id) {
-        try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = sha.digest(id.getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder(32);
-            // Half the digest: 128 bits, which no accident and no app reaches, and 32 characters
-            // rather than 64 out of a 255-byte budget shared with the readable half.
-            for (int i = 0; i < 16; i++) {
-                int b = bytes[i] & 0xff;
-                if (b < 0x10) {
-                    sb.append('0');
-                }
-                sb.append(Integer.toHexString(b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException err) {
-            Log.w(TAG, "SHA-256 is unavailable; falling back to a 32-bit cache key", err);
-            return Integer.toHexString(id.hashCode());
-        } catch (UnsupportedEncodingException err) {
-            Log.w(TAG, "UTF-8 is unavailable; falling back to a 32-bit cache key", err);
-            return Integer.toHexString(id.hashCode());
-        }
-    }
-
     private void addRow(MatrixCursor result, CN1DocumentStore.Node node) {
         MatrixCursor.RowBuilder row = result.newRow();
         row.add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, node.id);
