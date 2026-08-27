@@ -157,6 +157,18 @@
             <artifactId>commons-io</artifactId>
             <version>2.20.0</version>
         </dependency>
+        <!--
+            The build hint data the simulator's hint editor reads. Device-safe
+            by construction: this artifact holds the model and the data and
+            nothing that touches ASM or the host JDK. Depending on it beats
+            keeping a second copy of the generated JSON in this module, which
+            was one more file to conflict over and one more thing to drift.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-build-hint-catalog</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>

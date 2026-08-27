@@ -149,9 +149,6 @@ public final class BuildHintCodeGenerator {
             if (target.getName().endsWith(".adoc") || target.getName().endsWith(".asciidoc")) {
                 write(target, asciidocTable(everything(annotated)));
             } else {
-                // A second copy for the simulator, whose module does not depend
-                // on this one. Written in the same run from the same list, and
-                // both are drift-gated, so they cannot say different things.
                 write(new File(target, DATA_FILE), json(annotated));
             }
         }

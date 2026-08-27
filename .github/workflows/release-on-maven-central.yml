@@ -116,7 +116,8 @@ jobs:
           # the codenameone-maven-plugin (proxy for the core release), the two
           # catalogs it depends on at runtime, and both archetypes. Each catalog
           # is a separate reactor artifact -- platform-feature-catalog for
-          # built-in platform dependency selection, build-hint-catalog for the
+          # built-in platform dependency selection, build-hint-catalog and
+          # build-hint-tools (a compile dependency of the plugin) for the
           # build hint table the plugin reads -- so confirming only the plugin
           # could leave a released plugin whose own dependency will not resolve.
           # Skipped when the deploy already reported success (the
@@ -129,7 +130,8 @@ jobs:
             catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-platform-feature-catalog/${GITHUB_REF_NAME}/codenameone-platform-feature-catalog-${GITHUB_REF_NAME}.pom")
             hints_code=$(curl -s -o /dev/null -w "%{http_code}" \
-              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom")
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom"
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-tools/${GITHUB_REF_NAME}/codenameone-build-hint-tools-${GITHUB_REF_NAME}.pom")
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -137,7 +139,7 @@ jobs:
             if [ "$plugin_code" = "200" ] && [ "$catalog_code" = "200" ] && \
                [ "$hints_code" = "200" ] && \
                [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
-              echo "Confirmed plugin + platform-feature-catalog + build-hint-catalog + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
+              echo "Confirmed plugin + platform-feature-catalog + build-hint-{catalog,tools} + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
             echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, hints=$hints_code, cn1app=$app_code, cn1lib=$lib_code)"
@@ -157,7 +159,7 @@ jobs:
           # this keeps the release green even if that rule is ever removed.
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
-                          codenameone-build-hint-catalog \
+                          codenameone-build-hint-catalog codenameone-build-hint-tools \
                           cn1app-archetype cn1lib-archetype; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")

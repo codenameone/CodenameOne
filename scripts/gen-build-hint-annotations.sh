@@ -23,17 +23,22 @@ CLASSES="$TOOLS/target/classes"
 CATALOG_CLASSES="$CATALOG/target/classes"
 
 # The generator reads the annotations out of their compiled classes, so ASM has
-# to be on ITS classpath. Provided scope keeps it off the Settings tool's, which
-# is why it is not simply a compile dependency.
-asm_cp() {
-  local out
-  out="$(mktemp)"
-  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools dependency:build-classpath \
-      -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
-  if [ -s "$out" ]; then
-    printf '%s' ":$(cat "$out")"
+# to be on ITS classpath. Built in the SAME reactor invocation as the module, so
+# the catalog resolves from the reactor rather than from the local repository --
+# a separate `dependency:build-classpath -pl build-hint-tools` cannot see a
+# sibling that has only been packaged, which on CI produced an empty classpath
+# and a NoClassDefFoundError for org/objectweb/asm/ClassVisitor.
+#
+# Not silenced: an unresolvable classpath used to be swallowed by `|| true`, so
+# the failure surfaced as a missing class much later instead of here.
+build_and_classpath() {
+  local out="$1"
+  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package \
+      dependency:build-classpath -DskipTests -Dmdep.outputFile="$out")
+  if [ ! -s "$out" ]; then
+    echo "could not resolve the build hint tools classpath" >&2
+    exit 1
   fi
-  rm -f "$out"
 }
 
 ANN_ROOT="$REPO_ROOT/CodenameOne/src"
@@ -47,16 +52,13 @@ check=0
 # the previous build's bytecode -- reporting success while silently ignoring the
 # edit, and in --check mode passing a tree that is genuinely out of date.
 echo "gen-build-hint-annotations: building the catalog" >&2
-(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package -DskipTests)
+CP_FILE="$(mktemp)"
+build_and_classpath "$CP_FILE"
 
-# The simulator's copy of the data file. maven/javase does not depend on the
-# catalog module, so it carries its own resource; both copies are written in
-# this one run and both are checked below, so they cannot disagree.
-JAVASE_DATA="$REPO_ROOT/maven/javase/src/main/resources"
 GUIDE_TABLE="$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc"
 
-java -cp "$CLASSES:$CATALOG_CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator \
-     "$ANN_ROOT" "$CATALOG_DATA" "$JAVASE_DATA" "$GUIDE_TABLE"
+java -cp "$CLASSES:$CATALOG_CLASSES:$(cat "$CP_FILE")" com.codename1.build.shared.BuildHintCodeGenerator \
+     "$ANN_ROOT" "$CATALOG_DATA" "$GUIDE_TABLE"
 
 if [ "$check" -eq 1 ]; then
   # The developer guide's table is deliberately absent: it is not checked in, so
@@ -69,8 +71,7 @@ if [ "$check" -eq 1 ]; then
   # deliberate edit as drift.
   # No generated Java at all: the processor reads the annotation package off the
   # classpath, and these two are the data file the editors read.
-  targets=("maven/build-hint-catalog/src/main/resources/cn1-build-hints.json"
-           "maven/javase/src/main/resources/cn1-build-hints.json")
+  targets=("maven/build-hint-catalog/src/main/resources/cn1-build-hints.json")
   if ! git -C "$REPO_ROOT" diff --quiet -- "${targets[@]}" \
      || [ -n "$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "${targets[@]}")" ]; then
     echo "::error::Generated build hint views are out of date." >&2

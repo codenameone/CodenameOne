@@ -14,25 +14,31 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-$REPO_ROOT/docs/developer-guide/_generated-build-hints.adoc}"
 
-echo "gen-build-hint-table: building the catalog" >&2
-(cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package -DskipTests)
-
 CLASSES="$REPO_ROOT/maven/build-hint-tools/target/classes"
 CATALOG_CLASSES="$REPO_ROOT/maven/build-hint-catalog/target/classes"
 
 # The generator reads the annotations out of their compiled classes, so ASM has
-# to be on ITS classpath. Provided scope keeps it off the Settings tool's, which
-# is why it is not simply a compile dependency.
-asm_cp() {
-  local out
-  out="$(mktemp)"
-  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools dependency:build-classpath \
-      -Dmdep.outputFile="$out" >/dev/null 2>&1) || true
-  if [ -s "$out" ]; then
-    printf '%s' ":$(cat "$out")"
+# to be on ITS classpath. Built in the SAME reactor invocation as the module, so
+# the catalog resolves from the reactor rather than from the local repository --
+# a separate `dependency:build-classpath -pl build-hint-tools` cannot see a
+# sibling that has only been packaged, which on CI produced an empty classpath
+# and a NoClassDefFoundError for org/objectweb/asm/ClassVisitor.
+#
+# Not silenced: an unresolvable classpath used to be swallowed by `|| true`, so
+# the failure surfaced as a missing class much later instead of here.
+build_and_classpath() {
+  local out="$1"
+  (cd "$REPO_ROOT/maven" && mvn -q -B -pl build-hint-tools -am package \
+      dependency:build-classpath -DskipTests -Dmdep.outputFile="$out")
+  if [ ! -s "$out" ]; then
+    echo "could not resolve the build hint tools classpath" >&2
+    exit 1
   fi
-  rm -f "$out"
 }
 
-java -cp "$CLASSES:$CATALOG_CLASSES$(asm_cp)" com.codename1.build.shared.BuildHintCodeGenerator --table-only "$REPO_ROOT/CodenameOne/src" "$OUT"
+echo "gen-build-hint-table: building the catalog" >&2
+CP_FILE="$(mktemp)"
+build_and_classpath "$CP_FILE"
+
+java -cp "$CLASSES:$CATALOG_CLASSES:$(cat "$CP_FILE")" com.codename1.build.shared.BuildHintCodeGenerator --table-only "$REPO_ROOT/CodenameOne/src" "$OUT"
 echo "gen-build-hint-table: wrote $OUT" >&2
