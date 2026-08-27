@@ -176,6 +176,20 @@ void CN1MacRefreshScaleValue(void) {
                 usingBlock:^(NSNotification *note) {
         CN1MacDeliverWindowMiniaturized(NO);
     }];
+    // Closing the main window is the application quitting, which is what
+    // applicationShouldTerminateAfterLastWindowClosed: says -- but AppKit only
+    // consults that when the LAST window goes, so with a secondary Window still
+    // open the primary Form was closed with no lifecycle transition and no way
+    // back, while the process and that other window carried on. Terminating here
+    // routes it through the delegate, so applicationWillTerminate reaches the
+    // framework exactly as it does for Quit.
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:NSWindowWillCloseNotification
+                    object:_window
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification *note) {
+        [NSApp terminate:nil];
+    }];
     _window.releasedWhenClosed = NO;
     NSString *name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
     if (name == nil) {

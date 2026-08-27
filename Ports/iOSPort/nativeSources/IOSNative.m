@@ -8412,13 +8412,24 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
         if (response == NSModalResponseOK) {
             NSMutableArray *paths = [NSMutableArray array];
             for (NSURL *url in panel.URLs) {
-                if (url.path != nil) {
-                    [paths addObject:url.path];
+                // absoluteString, not path: a macOS filename may legally contain
+                // a newline, and a raw path joined by newlines split that one
+                // file into several truncated ones on the Java side -- and threw
+                // off every selection after it. A file:// URL is percent encoded,
+                // so the separator cannot occur inside an element. There is no
+                // separator that raw paths could safely use: only '/' and NUL are
+                // impossible in a name, and NUL cannot survive the trip through
+                // a C string.
+                //
+                // capturePictureResult percent decodes the file:// form back to
+                // an ordinary path, so what the application finally receives is
+                // unchanged.
+                NSString *encoded = url.absoluteString;
+                if (encoded != nil) {
+                    [paths addObject:encoded];
                 }
             }
             if ([paths count] > 0) {
-                // Newline separated for a multiple selection, which is the
-                // shape capturePictureResult already splits on.
                 result = [paths componentsJoinedByString:@"\n"];
             }
         }

@@ -5301,7 +5301,18 @@ public class IOSImplementation extends CodenameOneImplementation {
                     String[] paths = Util.split(r, "\n");
                     int len = paths.length;
                     for (int i=0; i<len; i++) {
-                        if (!paths[i].startsWith("file:")) {
+                        if (paths[i].startsWith("file://")) {
+                            // A percent encoded file URL, which is what the macOS
+                            // panel reports: a filename there may legally contain
+                            // the newline this list is separated by, so the native
+                            // side encodes rather than hands over a raw path that
+                            // would split into several. Decoded back to the plain
+                            // "file:<path>" every other port produces, so nothing
+                            // downstream sees the difference.
+                            String decoded = Util.decode(
+                                    paths[i].substring("file://".length()), "UTF-8", false);
+                            paths[i] = "file:" + decoded;
+                        } else if (!paths[i].startsWith("file:")) {
                             paths[i] = "file:"+paths[i];
                         }
                     }

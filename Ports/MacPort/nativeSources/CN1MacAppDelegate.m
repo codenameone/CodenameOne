@@ -92,6 +92,34 @@ static NSMutableArray<NSDictionary *> *cn1MacPendingLocalNotifications = nil;
 /// Reading only aps.alert.body, as this used to, dropped every type 2 on the
 /// floor: a silent notification has no alert by definition, so the whole
 /// category of background pushes never reached the application on this port.
+/// One field of an APNs alert dictionary, literal or localized.
+///
+/// A payload may carry `body` and `title` as strings, or name entries in the
+/// application's Localizable.strings through `loc-key`/`loc-args` and
+/// `title-loc-key`/`title-loc-args` -- which is the standard way to send a push
+/// that reads in the recipient's language. Reading only the literal keys left
+/// both nil for such a payload, so a localized push with no meta was delivered
+/// to the application not at all.
+///
+/// localizedUserNotificationStringForKey:arguments: is what resolves those
+/// against the bundle, and is the same thing UNNotificationContent does before
+/// showing the banner.
+static NSString *cn1AlertString(NSDictionary *alert, NSString *literalKey,
+                                NSString *locKey, NSString *argsKey) {
+    id literal = [alert objectForKey:literalKey];
+    if ([literal isKindOfClass:[NSString class]]) {
+        return (NSString *)literal;
+    }
+    id key = [alert objectForKey:locKey];
+    if (![key isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    id args = [alert objectForKey:argsKey];
+    return [NSString localizedUserNotificationStringForKey:(NSString *)key
+                                                arguments:[args isKindOfClass:[NSArray class]]
+                                                              ? (NSArray *)args : nil];
+}
+
 static void cn1MacDeliverPush(NSDictionary *userInfo) {
     if (userInfo == nil) {
         return;
@@ -145,8 +173,9 @@ static void cn1MacDeliverPush(NSDictionary *userInfo) {
 
     if ([alert isKindOfClass:[NSDictionary class]]) {
         NSDictionary *alertDict = (NSDictionary *)alert;
-        NSString *title = [alertDict objectForKey:@"title"];
-        NSString *body = [alertDict objectForKey:@"body"];
+        NSString *title = cn1AlertString(alertDict, @"title", @"title-loc-key",
+                                         @"title-loc-args");
+        NSString *body = cn1AlertString(alertDict, @"body", @"loc-key", @"loc-args");
         if (title != nil && body != nil) {
             includedBody = YES;
             com_codename1_push_PushContent_setTitle___java_lang_String(
