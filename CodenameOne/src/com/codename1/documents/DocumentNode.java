@@ -204,12 +204,15 @@ public class DocumentNode {
     /// Sets the size in bytes. The browser shows this before any content is fetched, so it is
     /// worth setting for remote items even though it costs a round trip to learn.
     ///
-    /// For a remote item this is also half of how the browser learns that content changed: it has
-    /// no local bytes to compare, so the size and last-modified you declare are the only signal
-    /// it has. Declare them and keep them accurate across republishes, or leave both unset --
-    /// an item that declares values it never updates is one the browser will go on serving from
-    /// its cache. Items backed by the shared directory need none of this; their bytes are
-    /// measured directly.
+    /// For a remote item the size is NOT how the browser learns that content changed: content
+    /// can change to different bytes of the same length -- a corrected total, a redacted page --
+    /// and the size would not move. `setLastModified` is the signal. Declare it and keep it
+    /// accurate across republishes; a remote item that declares no date is versioned by the
+    /// publication instead, which means it is re-fetched whenever anything is published, and one
+    /// that declares a date it never updates is served from the cache for good.
+    ///
+    /// Items backed by the shared directory need none of this; their bytes are measured
+    /// directly.
     ///
     /// #### Parameters
     ///

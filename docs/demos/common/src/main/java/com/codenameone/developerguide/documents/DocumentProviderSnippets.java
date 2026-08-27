@@ -73,7 +73,10 @@ public class DocumentProviderSnippets {
             root.add(DocumentNode.file(invoice.id, invoice.title + ".pdf")
                     .setContentType("application/pdf")
                     .setRemoteId(invoice.serverKey)
-                    .setSize(invoice.pdf.length));
+                    .setSize(invoice.pdf.length)
+                    // The date, not the size, is what tells the browser the content changed: a
+                    // correction that keeps the length would move nothing otherwise.
+                    .setLastModified(invoice.modified));
         }
         DocumentProvider.publish(root);
         // end::publishRemote[]

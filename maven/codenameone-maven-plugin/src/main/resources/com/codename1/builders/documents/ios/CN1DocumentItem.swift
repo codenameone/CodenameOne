@@ -279,7 +279,12 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
         // document after any publish, which for a drive of any size is the expensive wrong
         // default. DocumentNode documents the other half of that bargain -- declare them, and
         // keep them accurate.
-        if let remoteId = node.remoteId, node.lastModified != nil || node.size != nil {
+        // A DATE is the per-item signal. A size is not: content that changes to different bytes
+        // of the same length -- a corrected total on an invoice, a redacted page -- leaves it
+        // exactly where it was, so a node declaring only a size has nothing that moves when its
+        // content does. Those fall through to the revision below, which moves on every publish:
+        // coarser, and the only honest answer for an item that reports no version of its own.
+        if let remoteId = node.remoteId, node.lastModified != nil {
             // The credential generation leads, so an account switch invalidates what the browser
             // cached even when the node id, the remote id, the size and the date all survive it.
             // Without that the system reuses its materialized copy and never asks for the item,
