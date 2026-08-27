@@ -269,23 +269,6 @@ public final class Display extends CN1Constants {
     /// so a high/low FPS will have no effect then.
     private int framerateLock = 15;
     private boolean codenameOneRunning = false;
-
-    /// Set the moment the EDT leaves its dispatch loop, BEFORE the teardown
-    /// that follows it.
-    ///
-    /// isAlive() alone cannot answer "will this thread dispatch anything
-    /// again": between the loop exiting and the thread ending there is
-    /// disposeAll() and impl.deinitialize(), and that teardown deliberately
-    /// runs ON the EDT, so the field cannot simply be cleared first. An
-    /// init() landing in that window adopted a thread that was never going to
-    /// dispatch again, and every later operation timed out with the display
-    /// reporting itself uninitialized.
-    ///
-    /// Guarded by `lock`, which is the monitor the EDT already synchronizes
-    /// its dispatch on -- this repo's PMD ruleset forbids volatile, and the
-    /// flag is written by the dying EDT and read by whichever thread calls
-    /// init(), so it does need the ordering.
-    private boolean edtRetiring;
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
@@ -445,58 +428,6 @@ public final class Display extends CN1Constants {
     private Display() {
     }
 
-    /// Whether an EDT has left its dispatch loop and not yet finished tearing
-    /// down. See [#edtRetiring].
-    private static boolean isEdtRetiring() {
-        synchronized (lock) {
-            return INSTANCE.edtRetiring;
-        }
-    }
-
-    /// Publishes [#edtRetiring] under the monitor that orders it.
-    private static void setEdtRetiring(boolean value) {
-        synchronized (lock) {
-            INSTANCE.edtRetiring = value;
-        }
-    }
-
-    /// How long [#init] waits for a retiring EDT to finish its teardown.
-    private static final long EDT_RETIREMENT_WAIT_MILLIS = 5000;
-
-    /// How often [#awaitEdtRetirement] rechecks while it waits.
-    private static final long EDT_RETIREMENT_POLL_MILLIS = 10;
-
-    /// Waits for an EDT that has left its dispatch loop to finish tearing
-    /// down, so its teardown cannot run against a replacement.
-    ///
-    /// Returns at once when there is no such thread, when the caller IS that
-    /// thread -- joining self would deadlock -- or when the wait expires.
-    private static void awaitEdtRetirement() {
-        Thread retiring = INSTANCE.edt;
-        if (retiring == null || !isEdtRetiring()
-                || retiring == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            return;
-        }
-        // Polled rather than joined: this class compiles against the CLDC
-        // Thread, which has join() and no timed overload, and an untimed join
-        // would hang the app on a teardown that has itself wedged.
-        //
-        // The retiring EDT clears INSTANCE.edt on its way out, so that is the
-        // signal being waited for.
-        long deadline = System.currentTimeMillis() + EDT_RETIREMENT_WAIT_MILLIS;
-        while (INSTANCE.edt == retiring && isEdtRetiring() //NOPMD CompareObjectsWithEquals
-                && System.currentTimeMillis() < deadline) {
-            try {
-                Thread.sleep(EDT_RETIREMENT_POLL_MILLIS);
-            } catch (InterruptedException interrupted) {
-                // The caller's interrupt is not this method's to swallow, and
-                // mainEDTLoop does not depend on this wait having succeeded.
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
     /// This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
     /// This method must be called before any Form is shown
     ///
@@ -508,27 +439,6 @@ public final class Display extends CN1Constants {
     ///
     /// this method is invoked internally do not invoke it!
     public static void init(Object m) {
-        // A previous EDT may still be inside the teardown that follows its
-        // dispatch loop, and that teardown ends with impl.deinitialize() and
-        // Desktop.disposeAll(). Both read state this method is about to
-        // REPLACE: impl is swapped a few lines below, so a retiring EDT
-        // reaching those calls afterwards would deinitialize the port this
-        // init just created and dispose the windows it is about to show --
-        // while its successor is already dispatching into them.
-        //
-        // Waiting keeps the ORDINARY case simple -- one EDT and one
-        // implementation at a time, which is what every other line here
-        // assumes -- and it is bounded, so a teardown that has itself wedged
-        // cannot hang the app that is trying to start.
-        //
-        // The bound is why mainEDTLoop does not rely on this: past it, or on
-        // an interrupt, a successor can still be installed while the old
-        // thread is on its way out, so that teardown holds its own reference
-        // to the implementation it served and skips the window disposal when
-        // it finds itself superseded. This wait makes that path rare; it does
-        // not make it impossible, and correctness cannot depend on a
-        // timeout.
-        awaitEdtRetirement();
         if (!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
             INSTANCE.initialWindowSizeApplied = false;
@@ -599,21 +509,7 @@ public final class Display extends CN1Constants {
 
             // this can happen on some cases where an application was restarted etc...
             // generally its probably a bug but we can let it slide...
-            // A recorded thread that is no longer alive is not a dispatch
-            // thread. The EDT clears this field itself at the END of its
-            // shutdown, after disposing windows and deinitialising the
-            // implementation, so a thread that died without getting that far
-            // -- or died some other way -- would otherwise stop a re-init
-            // from ever starting a working one.
-            //
-            // edtRetiring closes the rest of it: a thread that has left the
-            // dispatch loop but is still inside that teardown is ALIVE, and
-            // an init() adopting it gets no dispatch at all. The dying EDT
-            // says so itself the moment it leaves the loop, which is the only
-            // point at which the answer is knowable.
-            if (INSTANCE.edt == null || !INSTANCE.edt.isAlive()
-                    || isEdtRetiring()) {
-                setEdtRetiring(false);
+            if (INSTANCE.edt == null) {
                 INSTANCE.touchScreen = impl.isTouchDevice();
                 // initialize the Codename One EDT which from now on will take all responsibility
                 // for the event delivery.
@@ -1339,14 +1235,6 @@ public final class Display extends CN1Constants {
     /// prevent blocking of actual input and drawing operations. This also
     /// enables functionality such as "true" modal dialogs etc...
     void mainEDTLoop() {
-        // CAPTURED, because the teardown at the bottom of this method has to
-        // act on the implementation THIS EDT served and no other. init()
-        // replaces the static field, and a bounded wait for retirement only
-        // shrinks the window in which it can do so while this thread is
-        // still on its way out -- past the bound, or on an interrupt, the
-        // old thread would deinitialize the port the new init just created.
-        // Holding the reference makes that impossible whatever the timing.
-        final CodenameOneImplementation servedImpl = impl;
         impl.initEDT();
         UIManager.getInstance();
         try {
@@ -1447,44 +1335,14 @@ public final class Display extends CN1Constants {
                 }
             }
         }
-        // PUBLISHED BEFORE the teardown, not after. Everything below still
-        // has to run on this thread -- that is the whole reason the field
-        // cannot just be cleared here -- but from this point the thread will
-        // never dispatch again, and an init() that arrives meanwhile must
-        // start a new EDT rather than adopt this one.
-        setEdtRetiring(true);
-        // Re-read at EVERY point that acts on it, never cached. A successor
-        // can be installed at any moment once the wait in init() has timed
-        // out or been interrupted, so a snapshot taken here is already
-        // capable of being wrong by the next line -- and both decisions below
-        // are destructive.
-        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            // Dispose any window still open, on the EDT, before the implementation goes
-            // away. Doing this from the static deinitialize() would run the teardown off
-            // the EDT, which is exactly the thread the window's tree expects.
-            //
-            // SKIPPED once superseded: the window registry is a singleton, so
-            // disposing "all" of them would close the windows the new runtime
-            // has already opened -- while it is initializing or dispatching
-            // into them.
-            Desktop.getInstance().disposeAll();
-        }
-        // The implementation THIS EDT served, never whatever the static field
-        // holds now. Not null-checked: initEDT() was called on it at the top
-        // of this method, so it cannot have been null.
-        servedImpl.deinitialize();
+        // Dispose any window still open, on the EDT, before the implementation goes
+        // away. Doing this from the static deinitialize() would run the teardown off
+        // the EDT, which is exactly the thread the window's tree expects.
+        Desktop.getInstance().disposeAll();
+        impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
-        // RE-READ, not the decision cached above. disposeAll() and
-        // deinitialize() run in between, and a successor can be installed
-        // during them whenever the wait in init() timed out or was
-        // interrupted -- so the earlier answer can be stale by now. Clearing
-        // the field on that stale answer would leave the display with a
-        // running EDT it no longer knows about: isEdt() false on the dispatch
-        // thread itself, and the next init() unable to see it.
-        if (INSTANCE.edt == Thread.currentThread()) { //NOPMD CompareObjectsWithEquals
-            INSTANCE.edt = null;
-        }
+        INSTANCE.edt = null;
     }
 
     /// Returns the stack trace from the exception on the given
