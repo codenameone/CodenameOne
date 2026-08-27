@@ -461,21 +461,24 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
         // meant a window created while a 1x display held focus was placed and
         // sized in that display's unit and then reported back in the primary's.
         CGFloat scale = cn1DesktopScale();
-        // Creation takes the CONTENT rect, unlike setBounds/getBounds which are
-        // the outer-frame pair the WindowManager SPI specifies. Deliberate: the
-        // size an application asks for at creation is the area it draws into,
-        // and shrinking it by the title bar would make every Window come up
-        // smaller than it asked for. Once the window exists, geometry travels as
-        // the outer rectangle so a get/set round trip agrees with itself.
-        NSRect content = NSMakeRect(x / scale, y / scale,
-                                    MAX(width / scale, 1), MAX(height / scale, 1));
-        NSWindow *w = cn1MakeWindow(content, decorated != 0, resizable != 0, NO);
+        // The OUTER frame, the same rectangle setBounds and getBounds carry and
+        // the same one the JavaSE port applies with setSize/setLocation. This
+        // used to be read as the CONTENT rect, on the reasoning that the size an
+        // application asks for is the area it draws into -- but then a
+        // setWindowBounds() before show() came back from getBounds() taller by
+        // the title bar and with its top edge moved up, because the two ends of
+        // the round trip did not mean the same rectangle. Whatever the merits of
+        // either unit, the SPI has one, and getBounds already documents it.
+        NSRect requested = NSMakeRect(x / scale, y / scale,
+                                      MAX(width / scale, 1), MAX(height / scale, 1));
+        // cn1MakeWindow takes a content rect; the requested frame is applied
+        // below, where there is a window to convert between the two with.
+        NSWindow *w = cn1MakeWindow(requested, decorated != 0, resizable != 0, NO);
         if (w == nil) {
             return;
         }
         if (positionSet != 0) {
-            NSRect frame = [w frameRectForContentRect:cn1ToAppKitFrame(content)];
-            [w setFrame:frame display:NO];
+            [w setFrame:cn1ToAppKitFrame(requested) display:NO];
             // Position is desktop-space and converts against the primary
             // screen's scale, but the SIZE is this window's own drawable pixels.
             // Which display that is cannot be known until the window has
@@ -484,22 +487,27 @@ JAVA_INT com_codename1_impl_mac_MacNative_macWindowCreate___int_java_lang_String
             // divided by the 2x primary's scale.
             CGFloat destScale = w.backingScaleFactor;
             if (destScale > 0 && destScale != scale) {
-                NSRect placed = [w contentRectForFrameRect:w.frame];
+                NSRect placed = w.frame;
                 CGFloat top = placed.origin.y + placed.size.height;
                 placed.size = NSMakeSize(MAX(width / destScale, 1), MAX(height / destScale, 1));
                 // AppKit measures from the bottom, so the origin moves to keep
                 // the top edge -- the one the caller positioned -- where it was
                 // put.
                 placed.origin.y = top - placed.size.height;
-                [w setFrame:[w frameRectForContentRect:placed] display:NO];
+                [w setFrame:placed display:NO];
             }
         } else {
+            // Nobody asked for a position, but the size is still the outer one,
+            // so it cannot be left as the content rect the window was built with.
+            NSRect sized = w.frame;
+            sized.size = requested.size;
+            [w setFrame:sized display:NO];
             [w center];
         }
         // Re-read rather than reused: the window may have been resized for its
         // display just above, and the view and its framebuffer have to follow
         // what the window actually is.
-        content = [w contentRectForFrameRect:w.frame];
+        NSRect content = [w contentRectForFrameRect:w.frame];
         w.title = title;
 
         METALView *view = [[METALView alloc] initWithFrame:NSMakeRect(0, 0,
