@@ -350,22 +350,27 @@ public class AndroidVpnBridge implements VpnBridge {
             fail(requestId, VpnError.NOT_SUPPORTED, null);
             return;
         }
+        // RESERVED for the whole removal, not just the delete. The monitor
+        // was released before startRequested and the status were updated, so
+        // an already-authorized install could provision and publish the
+        // replacement in that gap and then have this removal overwrite its
+        // status and tunnel ownership -- or a start could bring the
+        // replacement up and have its callbacks ignored, because
+        // startRequested was cleared after it.
+        synchronized (this) {
+            if (operationPending) {
+                // An install owns the profile: a prompt is on screen, or an
+                // already-authorized install is between provisioning and
+                // persisting. Either way deleting now would race it.
+                fail(requestId, VpnError.UNKNOWN,
+                        "A VPN profile install is in progress; wait for it"
+                        + " to finish before removing the profile");
+                return;
+            }
+            operationPending = true;
+        }
         try {
-            // The check AND the deletion under one monitor, the same one the
-            // install reservation takes. Released in between, an install
-            // could reserve consent after this method looked and then be
-            // approved after it reported success -- so both answered success
-            // and the approved install put the profile back.
             synchronized (this) {
-                if (operationPending) {
-                    // An install owns the profile: a prompt is on screen, or
-                    // an already-authorized install is between provisioning
-                    // and persisting. Either way deleting now would race it.
-                    fail(requestId, VpnError.UNKNOWN,
-                            "A VPN profile install is in progress; wait for it"
-                            + " to finish before removing the profile");
-                    return;
-                }
                 Reflect.DELETE.invoke(Reflect.manager(context));
                 installedWire = null;
                 Preferences.delete(WIRE_PREF);
@@ -384,6 +389,11 @@ public class AndroidVpnBridge implements VpnBridge {
             Vpn.deliverAck(requestId, true, 0, null);
         } catch (Exception e) {
             fail(requestId, VpnError.UNKNOWN, describe(e));
+        } finally {
+            // Released on every path; see startVpn.
+            synchronized (this) {
+                operationPending = false;
+            }
         }
     }
 

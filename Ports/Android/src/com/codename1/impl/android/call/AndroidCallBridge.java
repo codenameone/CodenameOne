@@ -156,7 +156,8 @@ public class AndroidCallBridge implements CallBridge {
         // Reported as NOT_PERMITTED, which is what it is: an app that asks
         // can recover by requesting it, and one that has been refused should
         // not be reporting incoming calls at all.
-        if ((granted & PERMISSION_NOTIFICATIONS) == 0) {
+        if ((granted & PERMISSION_NOTIFICATIONS) == 0
+                || !notificationsWillShow()) {
             return CallAvailability.NOT_PERMITTED.ordinal();
         }
         TelecomManager tm = telecom();
@@ -172,6 +173,61 @@ public class AndroidCallBridge implements CallBridge {
             return CallAvailability.OTHER_APP_IN_CALL.ordinal();
         }
         return CallAvailability.AVAILABLE.ordinal();
+    }
+
+    /// Whether a ringing notification would actually appear.
+    ///
+    /// The runtime permission is not the whole answer and is not even asked
+    /// for below API 33, so it reads as granted on every older device. A user
+    /// who turns notifications off for the app, or sets this port's incoming
+    /// call channel to IMPORTANCE_NONE, suppresses the ringing UI just as
+    /// completely -- Telecom accepts the call and nothing appears, leaving no
+    /// Answer and no Decline while the app believes it is ringing.
+    ///
+    /// Reflective because NotificationChannel is API 26 and this port
+    /// compiles against an older SDK. Anything it cannot determine is treated
+    /// as showable: refusing calls on a device this cannot interrogate would
+    /// be worse than the failure it is guarding. The catches are the four
+    /// reflection can raise rather than a bare Exception, which the
+    /// SpotBugs gate reports for this package.
+    private boolean notificationsWillShow() {
+        try {
+            Object nm = context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) {
+                return true;
+            }
+            if (Build.VERSION.SDK_INT >= 24) {
+                Object enabled = nm.getClass()
+                        .getMethod("areNotificationsEnabled").invoke(nm);
+                if (Boolean.FALSE.equals(enabled)) {
+                    return false;
+                }
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                Object channel = nm.getClass()
+                        .getMethod("getNotificationChannel", String.class)
+                        .invoke(nm, CN1CallNotifications.CHANNEL_ID);
+                if (channel == null) {
+                    // Not created yet, which is the state before the first
+                    // call; showIncoming creates it.
+                    return true;
+                }
+                Object importance = channel.getClass()
+                        .getMethod("getImportance").invoke(channel);
+                // IMPORTANCE_NONE. The channel exists and the user has
+                // silenced it, so nothing this port posts will be seen.
+                return !Integer.valueOf(0).equals(importance);
+            }
+            return true;
+        } catch (NoSuchMethodException notOnThisPlatform) {
+            return true;
+        } catch (IllegalAccessException notReachable) {
+            return true;
+        } catch (java.lang.reflect.InvocationTargetException threw) {
+            return true;
+        } catch (RuntimeException cannotTell) {
+            return true;
+        }
     }
 
     @Override

@@ -276,6 +276,10 @@ public class LocalCallTest {
         // just placed: on Android reportOutgoing adopts the connection and
         // acknowledges it, and the failed token then tore that connection
         // down, handing the app a CallSession for a call Telecom had ended.
+        // Configured FIRST: the report has to be one the platform accepts,
+        // or the action is answered false and the test would be asserting
+        // the old behaviour of claiming success before asking.
+        CallAwait.value(Calls.configure(new CallConfiguration().displayName("Acme")));
         final List<String> started = new ArrayList<String>();
         Calls.addActionListener(new CallActionAdapter() {
             public void startCallRequested(String callId, CallHandle handle,
@@ -299,6 +303,40 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aRefusedReportFailsTheSystemStart() {
+        // The START used to be answered TRUE before the platform had accepted
+        // the call, so a report the port refuses told the system the call had
+        // been placed while the failed handover removed the Java session,
+        // leaving the connection Telecom created dialing for ever.
+        //
+        // Calls.configure is deliberately NOT called: an unconfigured
+        // provider is the cold start this guards -- the PhoneAccount is
+        // registered from a previous launch, so the system can raise a call
+        // before configure() has run.
+        final List<String> asked = new ArrayList<String>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void startCallRequested(String callId, CallHandle handle,
+                    boolean video, CallAction action) {
+                asked.add(callId);
+                Calls.reportOutgoing(callId, handle, "Ada", video);
+            }
+        });
+        String id = CallId.random();
+        bridge.simulateStartCallRequest(id, CallHandle.phone("+14155551212"),
+                false);
+        waitFor(asked, 1);
+
+        long limit = System.currentTimeMillis() + 5000;
+        while (bridge.getLastActionFulfilled() == null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertEquals(Boolean.FALSE, bridge.getLastActionFulfilled(),
+                "a report the platform refused did not place the call");
+        assertNull(Calls.getSession(id));
+    }
+
+    @Test
     public void aDeferredStartIsStillAnsweredByTheReport() {
         // defer() is the documented way to place the call asynchronously, so
         // the adoption entry has to outlive the listener returning. Dropping
@@ -306,6 +344,7 @@ public class LocalCallTest {
         // own safety timer then failed a request the app had honoured --
         // destroying the system-started connection after the report had
         // already succeeded.
+        CallAwait.value(Calls.configure(new CallConfiguration().displayName("Acme")));
         final List<CallAction> deferred = new ArrayList<CallAction>();
         Calls.addActionListener(new CallActionAdapter() {
             public void startCallRequested(String callId, CallHandle handle,

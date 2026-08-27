@@ -59,7 +59,10 @@ import java.util.Map;
 /// ringing screen is the last place to show an untranslated English string.
 final class CN1CallNotifications {
 
-    private static final String CHANNEL_ID = "cn1-incoming-call";
+    /// The channel a ringing call posts on. Package-visible because the
+    /// bridge has to ask whether the user has silenced it before reporting
+    /// a call this port would have no way to show.
+    static final String CHANNEL_ID = "cn1-incoming-call";
     private static final String ACTION_ANSWER =
             "com.codename1.call.NOTIFICATION_ANSWER";
     private static final String ACTION_DECLINE =

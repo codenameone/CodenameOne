@@ -262,13 +262,24 @@ public final class Calls {
             started = PENDING_STARTS.remove(id);
         }
         if (started != null && !started.isAnswered()) {
-            started.answer(true);
+            // CLAIMED here, ANSWERED from the handover. Answering true at
+            // this point told the system the call had been placed before the
+            // platform had accepted it -- and a report the port refuses (a
+            // cold start whose Calls.configure has not finished is the
+            // ordinary way) then left the Telecom connection dialing for ever
+            // with the failed handover having removed the Java session.
+            //
+            // defer() is exactly the "answer is coming later" primitive the
+            // listener contract already documents, so settleStart leaves it
+            // alone and the acknowledgement below decides.
+            started.defer();
         }
         int reqId = CallRequests.nextId();
         EdtResult<Boolean> ack = CallRequests.openAck(reqId);
         // The session is only handed over once the system has accepted it,
         // so an app can never act on a call that was refused.
-        ack.onResult(new SessionHandover(out, session, id, reportedGeneration));
+        ack.onResult(new SessionHandover(out, session, id, reportedGeneration,
+                started));
         String wire = CallWire.encodeHandle(handle);
         if (direction == CallDirection.INCOMING) {
             b.reportIncomingCall(reqId, id, wire, displayName, -1, video);
@@ -351,18 +362,32 @@ public final class Calls {
         private final CallSession session;
         private final String id;
         private final int generation;
+        /// The system START this report answers, or null when it answers none.
+        private final CallAction started;
 
         SessionHandover(EdtResult<CallSession> out, CallSession session,
-                String id, int generation) {
+                String id, int generation, CallAction started) {
             this.out = out;
             this.session = session;
             this.id = id;
             this.generation = generation;
+            this.started = started;
+        }
+
+        /// Answers the system's request with what the platform said.
+        private void settleStarted(boolean placed) {
+            if (started != null && !started.isAnswered()) {
+                started.answer(placed);
+            }
         }
 
         @Override
         public void onReady(Boolean value, Throwable error) {
             if (error != null) {
+                // The platform refused the call, so the system's request was
+                // NOT carried out; saying otherwise strands the connection it
+                // created.
+                settleStarted(false);
                 forget(id, session);
                 out.error(error);
                 return;
@@ -378,12 +403,14 @@ public final class Calls {
                 // refers to a provider that is gone. Handing the session over
                 // would give the app one that getSession() does not know and
                 // no operation can address.
+                settleStarted(false);
                 session.setStateInternal(CallState.ENDED);
                 forget(id, session);
                 out.error(new CallException(CallError.PROVIDER_RESET,
                         "The system's call provider was reset"));
                 return;
             }
+            settleStarted(true);
             out.complete(session);
         }
     }
