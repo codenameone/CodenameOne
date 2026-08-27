@@ -509,7 +509,7 @@ extern void pointerPressed(int *x, int *y, int length);
 extern void pointerDragged(int *x, int *y, int length);
 extern void pointerReleased(int *x, int *y, int length);
 extern void CN1MacPointerButton(int button, int mask, int modifiers);
-extern void CN1MacCopyTextSelection(void);
+extern void CN1MacCopyTextSelection(int windowId);
 extern void CN1MacPinchBegin(void);
 extern void CN1MacPinchRelease(int x, int y);
 extern void pointerHoverNative(int x, int y);
@@ -1609,7 +1609,7 @@ static NSUInteger cn1ActiveEdge(NSRange sel, NSUInteger anchor) {
     if (![CN1MacTextInputSession sharedSession].active) {
         // The form's own selection, copied on the event dispatch thread where
         // the hierarchy can be walked safely.
-        CN1MacCopyTextSelection();
+        CN1MacCopyTextSelection(self.cn1WindowId);
         return;
     }
     NSRange sel = [self cn1SelectionForEditing];

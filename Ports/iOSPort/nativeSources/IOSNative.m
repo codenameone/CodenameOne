@@ -2464,9 +2464,9 @@ void CN1MacPinchRelease(int x, int y) {
         CN1_THREAD_GET_STATE_PASS_ARG x, y);
 }
 
-void CN1MacCopyTextSelection(void) {
-    com_codename1_impl_ios_IOSImplementation_macCopyTextSelection__(
-        CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+void CN1MacCopyTextSelection(int windowId) {
+    com_codename1_impl_ios_IOSImplementation_macCopyTextSelection___int(
+        CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
 void CN1MacPointerButton(int button, int mask, int modifiers) {

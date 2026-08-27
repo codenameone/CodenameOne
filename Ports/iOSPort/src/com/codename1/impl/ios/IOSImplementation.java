@@ -2099,14 +2099,26 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Queued rather than answered here: TextSelection walks the component
     /// hierarchy, which belongs to the event dispatch thread, and this is called
     /// from AppKit's main thread.
-    public static void macCopyTextSelection() {
+    public static void macCopyTextSelection(final int windowId) {
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                com.codename1.ui.Form f = com.codename1.ui.Display.getInstance().getCurrent();
-                if (f == null) {
+                // The window the keystroke arrived in, not Display.getCurrent().
+                // Every Window owns its own TextSelection, so resolving the
+                // current Form copied the main window's selection -- or nothing
+                // -- while the text the user had highlighted sat in another one.
+                // Window 0 IS the main form, which is why it falls through to
+                // getCurrent() rather than being looked up.
+                com.codename1.ui.TopLevelContainer top = null;
+                if (windowId > 0) {
+                    top = com.codename1.ui.Desktop.getInstance().windowById(windowId);
+                }
+                if (top == null) {
+                    top = com.codename1.ui.Display.getInstance().getCurrent();
+                }
+                if (top == null) {
                     return;
                 }
-                com.codename1.ui.TextSelection sel = f.getTextSelection();
+                com.codename1.ui.TextSelection sel = top.getTextSelection();
                 if (sel != null && sel.isEnabled()) {
                     sel.copy();
                 }
