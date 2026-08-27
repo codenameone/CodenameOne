@@ -768,11 +768,17 @@ public final class Calls {
             // this whenever the listener finally fulfils it, which can be
             // after the call ended or after a provider reset discarded the
             // native action entirely -- and the session is no longer even
-            // registered by then. The third place this had to be said, after
-            // the acknowledgement hook and reportConnected: ENDED is terminal
-            // and every path that writes state has to respect that.
-            if (session != null && session.getState() != CallState.ENDED) {
-                session.setStateInternal(target);
+            // registered by then.
+            //
+            // Through the session's own atomic step rather than a check here
+            // and an assignment after it: the app fulfils from a worker
+            // thread while the end is delivered on the EDT, so those two
+            // statements are a window the end fits through, and the hook then
+            // resurrected a retained session as ACTIVE or HELD. Restating the
+            // test was what made this the third place it had to be said; now
+            // there is one place that decides.
+            if (session != null) {
+                session.moveUnlessOver(target);
             }
         }
     }

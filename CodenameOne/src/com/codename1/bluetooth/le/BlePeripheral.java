@@ -320,28 +320,42 @@ public abstract class BlePeripheral extends BluetoothDevice {
         out.addObserver(new Observer() {
             @Override
             public void update(Observable o, Object arg) {
-                if (out.isCancelled()) {
-                    inner.cancel(true);
+                if (!out.isCancelled()) {
+                    return;
                 }
+                // CLAIMS the same slot the publication claims, so the two
+                // cannot both act. Leaving the cancel test to the publication
+                // left a window either side of it: the callback claimed, read
+                // "not cancelled", and a cancel arriving while apply.onReady
+                // ran then had it write the service or MTU cache and complete
+                // a resource whose caller had already given up. Whoever
+                // claims first decides; the loser does nothing.
+                synchronized (published) {
+                    if (published[0]) {
+                        // The answer is already on its way out. Cancelling
+                        // inner now would achieve nothing, and the caller
+                        // gets the result it was a moment too late to refuse.
+                        return;
+                    }
+                    published[0] = true;
+                }
+                inner.cancel(true);
             }
         });
         inner.onResult(new AsyncResult<T>() {
             @Override
             public void onReady(T value, Throwable err) {
+                // The claim IS the cancel test now. A separate isCancelled()
+                // read after it could only ever be a snapshot, and the cancel
+                // it was meant to catch can land in the statement after the
+                // one that read it; the observer above claims this same slot
+                // instead, so reaching here means cancellation did not get
+                // there first.
                 synchronized (published) {
                     if (published[0]) {
                         return;
                     }
                     published[0] = true;
-                }
-                if (out.isCancelled()) {
-                    // The other half of the cancel. Skipping the start only
-                    // covers an operation still QUEUED; one already in flight
-                    // gets its answer from the platform afterwards, and
-                    // applying it would write the service or MTU cache on
-                    // behalf of a caller who had given up -- and complete a
-                    // resource that is already done.
-                    return;
                 }
                 // CONTAINED. Both the state update and the caller's own
                 // callbacks run inside this listener, and the queue's

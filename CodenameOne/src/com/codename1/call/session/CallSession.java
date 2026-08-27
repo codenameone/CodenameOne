@@ -90,7 +90,16 @@ public final class CallSession {
 
     /// Whether the call is muted, as far as the system is concerned.
     public boolean isMuted() {
-        return muted;
+        // Under the monitor, like the state beside it. Telecom and CallKit
+        // both deliver a mute change on the EDT while a media worker reads
+        // this to decide whether to keep transmitting, and a plain field
+        // gives that worker no reason ever to see the new value -- so it
+        // could go on sending audio after the system UI showed the call
+        // muted. Not volatile: PMD's forbidden list rules it out in core, and
+        // the monitor this class already has answers the same question.
+        synchronized (this) {
+            return muted;
+        }
     }
 
     /// Tells the system the outgoing call has begun connecting -- the far end
@@ -108,6 +117,10 @@ public final class CallSession {
 
     /// Moves to `next` unless the call is already over, as ONE step.
     ///
+    /// Package-private because Calls' deferred-action hooks need the same
+    /// step: they were restating the check and then assigning, which is the
+    /// same two-step this exists to replace.
+    ///
     /// ENDED is terminal in [CallState], and signalling is asynchronous: a
     /// media-connected callback that was already in flight when the call
     /// ended used to move the session back to ACTIVE. The ports drop the
@@ -124,7 +137,7 @@ public final class CallSession {
     /// documented to give. A separate terminal-state test before the
     /// assignment only narrows that window; it cannot close it, which is why
     /// the predicate it used to call is gone rather than merely unused.
-    private boolean moveUnlessOver(CallState next) {
+    boolean moveUnlessOver(CallState next) {
         synchronized (this) {
             if (state == CallState.ENDED) {
                 return false;
@@ -350,7 +363,9 @@ public final class CallSession {
         @Override
         public void onReady(Boolean value, Throwable error) {
             if (error == null) {
-                session.muted = target;
+                synchronized (session) {
+                    session.muted = target;
+                }
             }
         }
     }
@@ -368,6 +383,8 @@ public final class CallSession {
 
     /// Sets the mute flag without telling the system.
     void setMutedInternal(boolean value) {
-        muted = value;
+        synchronized (this) {
+            muted = value;
+        }
     }
 }
