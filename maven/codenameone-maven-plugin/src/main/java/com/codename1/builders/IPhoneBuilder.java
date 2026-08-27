@@ -1038,6 +1038,25 @@ public class IPhoneBuilder extends Executor {
         return input.replace("\\", "\\\\").replace("'", "\\'");
     }
 
+    /**
+     * <p>Escapes a value for a DOUBLE-quoted Ruby literal, which is what the generated
+     * xcodeproj script writes build settings into.</p>
+     *
+     * <p>Build-setting values are developer input -- they arrive from
+     * {@code <target>.buildSettings.*} hints and from a buildSettings.properties inside a
+     * submitted app_extensions archive -- and a perfectly ordinary one carries a quote:
+     * {@code OTHER_SWIFT_FLAGS=$(inherited) -DNAME="foo"}. Emitted verbatim it closes the
+     * literal, and the script then fails to parse before it has configured anything, with a
+     * Ruby error naming a line nobody wrote.</p>
+     *
+     * <p>Backslash first, or escaping the quote would be undone by escaping what precedes
+     * it. {@code #} is escaped too: Ruby interpolates {@code #{...}} inside double quotes,
+     * so a value containing one would otherwise be evaluated rather than written.</p>
+     */
+    private static String escapeRubyDoubleQuoted(String input) {
+        return input.replace("\\", "\\\\").replace("\"", "\\\"").replace("#", "\\#");
+    }
+
     /** Package-private accessor so {@link MacNativeBuilder} (separate file in
      *  the same package) can use the same escaping helper. */
     static String escapeRubyStr(String input) {
@@ -5989,7 +6008,8 @@ public class IPhoneBuilder extends Executor {
                                     + "embed_phase.add_file_reference(fileref)\n"
                                     + "service_target.build_configurations.each{|e| \n");
                             for (String buildSettingKey : buildSettingsMap.keySet()) {
-                                sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+                                sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
                             }
                             sb.append("}\n");
                             sb.append("end\n");
@@ -10578,8 +10598,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
-                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -10649,7 +10669,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -11390,7 +11411,8 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -11533,7 +11555,8 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");

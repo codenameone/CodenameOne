@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-import CryptoKit
+import CommonCrypto
 import FileProvider
 import Foundation
 
@@ -71,7 +71,13 @@ enum CN1DocumentRemote {
             if let cached = generationCache[key] {
                 return cached
             }
-            let digest = SHA256.hash(data: Data(credentialStamp(containerURL: containerURL).utf8))
+            // CommonCrypto rather than CryptoKit: this file is also compiled into the
+            // pre-iOS-16 provider, whose deployment target can be iOS 11 or 12, and CryptoKit
+            // starts at 13. Swift checks availability at compile time whether or not the call is
+            // reachable, so importing it there fails the build outright.
+            let bytes = Array(credentialStamp(containerURL: containerURL).utf8)
+            var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+            CC_SHA256(bytes, CC_LONG(bytes.count), &digest)
             let hex = digest.prefix(16).map { String(format: "%02x", $0) }.joined()
             // One entry per settings file per revision; a handful over a process lifetime.
             generationCache[key] = hex

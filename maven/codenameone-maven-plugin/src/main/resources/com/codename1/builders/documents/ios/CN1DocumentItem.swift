@@ -226,7 +226,13 @@ final class CN1DocumentItem: NSObject, NSFileProviderItem {
             let generation = containerURL.map {
                 CN1DocumentRemote.credentialGeneration(containerURL: $0)
             } ?? ""
-            return "meta-\(generation)-\(remoteId)-\(node.lastModified ?? -1)-\(node.size ?? -1)"
+            // The remote id is length-prefixed. It is free-form text and the fields are joined
+            // with "-", so without that a change from ("a", nil, 2) to ("a-", 1, 2) produces the
+            // same string -- and an unchanged content version is a browser that goes on serving
+            // the bytes it cached for the previous remote object. The other fields are numbers
+            // and the generation is fixed-width hex, so neither can swallow a separator.
+            return "meta-\(generation)-\(remoteId.count):\(remoteId)"
+                + "-\(node.lastModified ?? -1)-\(node.size ?? -1)"
         }
         return "rev-\(revision)"
     }
