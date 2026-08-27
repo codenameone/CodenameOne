@@ -165,6 +165,12 @@ public final class GeneratedAccess_com_codename1_db {
                 return com.codename1.db.Database.isCustomPathSupported();
             }
         }
+        if ("isDatabaseBeingDeleted".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.Database.isDatabaseBeingDeleted((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("isEncrypted".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -179,6 +185,12 @@ public final class GeneratedAccess_com_codename1_db {
         if ("isLegacyBehavior".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.db.Database.isLegacyBehavior();
+            }
+        }
+        if ("normalizeDatabaseKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.db.Database.normalizeDatabaseKey((java.lang.String) adaptedArgs[0]);
             }
         }
         if ("openOrCreate".equals(name)) {

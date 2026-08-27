@@ -1,0 +1,8 @@
+# Build hints read by a builder or a mojo that the catalog does not describe,
+# as of the day this gate was added.
+#
+# This is a ratchet, not an allow-list: new code must not add entries. Delete a
+# line when the hint is added to maven/build-hint-catalog. Regenerate with
+#   scripts/check-build-hint-catalog.sh --write-baseline
+#
+# Format: <hint-name>|<file>:<line>

@@ -143,6 +143,12 @@ public final class GeneratedAccess_com_codename1_crash {
                 return typedTarget.scrubMessage((java.lang.String) adaptedArgs[0]);
             }
         }
+        if ("scrubRawStack".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.scrubRawStack((java.lang.String) adaptedArgs[0]);
+            }
+        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 

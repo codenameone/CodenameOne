@@ -687,6 +687,11 @@ public final class GeneratedAccess_com_codename1_charts {
                 return typedTarget.getTooltip();
             }
         }
+        if ("getTopLevelContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTopLevelContainer();
+            }
+        }
         if ("getTransform".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getTransform();

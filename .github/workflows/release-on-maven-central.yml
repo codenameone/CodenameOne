@@ -113,12 +113,14 @@ jobs:
           # "Deployment failed while publishing" even when the bundle was
           # actually accepted and published. As a safety net for that
           # false-positive case, poll Maven Central for the key artifacts:
-          # the codenameone-maven-plugin (proxy for the core release), its
-          # platform-feature-catalog dependency, and both archetypes. The
-          # catalog is a separate reactor artifact used by the local builders
-          # for built-in platform dependency selection, so confirming only the
-          # plugin could leave a released plugin with an unavailable runtime
-          # dependency. Skipped when the deploy already reported success (the
+          # the codenameone-maven-plugin (proxy for the core release), the two
+          # catalogs it depends on at runtime, and both archetypes. Each catalog
+          # is a separate reactor artifact -- platform-feature-catalog for
+          # built-in platform dependency selection, build-hint-catalog and
+          # build-hint-tools (a compile dependency of the plugin) for the
+          # build hint table the plugin reads -- so confirming only the plugin
+          # could leave a released plugin whose own dependency will not resolve.
+          # Skipped when the deploy already reported success (the
           # artifacts may still be propagating from Sonatype Central to repo1;
           # that propagation can take 30+ minutes and isn't worth blocking on).
           set +e
@@ -127,16 +129,24 @@ jobs:
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-maven-plugin/${GITHUB_REF_NAME}/codenameone-maven-plugin-${GITHUB_REF_NAME}.pom")
             catalog_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/codenameone-platform-feature-catalog/${GITHUB_REF_NAME}/codenameone-platform-feature-catalog-${GITHUB_REF_NAME}.pom")
+            # One URL per curl: two URLs share the single -o, so the second body
+            # lands on stdout with both status codes appended and the captured
+            # value can never equal 200.
+            hints_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-catalog/${GITHUB_REF_NAME}/codenameone-build-hint-catalog-${GITHUB_REF_NAME}.pom")
+            tools_code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "https://repo1.maven.org/maven2/com/codenameone/codenameone-build-hint-tools/${GITHUB_REF_NAME}/codenameone-build-hint-tools-${GITHUB_REF_NAME}.pom")
             app_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1app-archetype/${GITHUB_REF_NAME}/cn1app-archetype-${GITHUB_REF_NAME}.pom")
             lib_code=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://repo1.maven.org/maven2/com/codenameone/cn1lib-archetype/${GITHUB_REF_NAME}/cn1lib-archetype-${GITHUB_REF_NAME}.pom")
             if [ "$plugin_code" = "200" ] && [ "$catalog_code" = "200" ] && \
+               [ "$hints_code" = "200" ] && [ "$tools_code" = "200" ] && \
                [ "$app_code" = "200" ] && [ "$lib_code" = "200" ]; then
-              echo "Confirmed plugin + platform-feature-catalog + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
+              echo "Confirmed plugin + platform-feature-catalog + build-hint-{catalog,tools} + cn1{app,lib}-archetype ${GITHUB_REF_NAME} on Maven Central"
               exit 0
             fi
-            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, cn1app=$app_code, cn1lib=$lib_code)"
+            echo "[$i/90] Waiting on Maven Central (plugin=$plugin_code, catalog=$catalog_code, hints=$hints_code, tools=$tools_code, cn1app=$app_code, cn1lib=$lib_code)"
             sleep 20
           done
           echo "Artifacts ${GITHUB_REF_NAME} did not appear on Maven Central within 30 minutes"
@@ -153,6 +163,7 @@ jobs:
           # this keeps the release green even if that rule is ever removed.
           set -e
           for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
+                          codenameone-build-hint-catalog codenameone-build-hint-tools \
                           cn1app-archetype cn1lib-archetype; do
             url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
             code=$(curl -s -o /dev/null -w "%{http_code}" "$url")

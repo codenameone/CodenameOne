@@ -403,6 +403,7 @@
                         <goals>
                             <goal>bytecode-compliance</goal>
                             <goal>css</goal>
+                            <goal>process-annotations</goal>
                             <!--<goal>compile-javase-sources</goal>-->
                         </goals>
                     </execution>

@@ -1,10 +1,15 @@
 (() => {
-  const CONSENT_KEY = "cn1-crisp-consent-v1";
-  const CONSENT_COOKIE = "cn1_crisp_consent";
+  const CONSENT_KEY = "cn1-crisp-consent-v2";
+  const CONSENT_COOKIE = "cn1_crisp_consent_v2";
   const WEBSITE_ID = "e0201fca-1e59-4f30-9d00-8c37aa18293e";
   const CONSENT_TTL_DAYS = 365;
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
+  const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
+  const EXP004_ID = "EXP-004";
+  const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
+  const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||
+    EXP004_HOSTNAME === "127.0.0.1" || /\.pages\.dev$/i.test(EXP004_HOSTNAME);
   const OSS_VALUE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
   const readCookie = (name) => {
@@ -104,6 +109,38 @@
     return enriched;
   };
 
+  const readExp004Assignment = () => {
+    if (EXP004_PREVIEW_HOST) {
+      return null;
+    }
+    const experiment = window.cn1Exp004;
+    if (experiment && experiment.telemetryEnabled === false) {
+      return null;
+    }
+    let arm = experiment && experiment.arm;
+    if (arm !== "ownership" && arm !== "reach") {
+      try {
+        arm = localStorage.getItem(EXP004_STORAGE_KEY);
+      } catch (e) {
+        return null;
+      }
+    }
+    if (arm !== "ownership" && arm !== "reach") {
+      return null;
+    }
+    return { id: EXP004_ID, arm };
+  };
+
+  const withExp004Assignment = (data, assignment) => {
+    if (!assignment) {
+      return data;
+    }
+    return Object.assign({}, data || {}, {
+      experiment_id: assignment.id,
+      experiment_arm: assignment.arm
+    });
+  };
+
   // --- Crisp trigger events -------------------------------------------------
   // Pages and product surfaces explicitly call the matching function below. This
   // shared script handles consent, timing, and deduplication; it never guesses user
@@ -111,15 +148,20 @@
   const firedThisView = {};
   const pendingEvents = {};
 
+  const crispEventDedupeName = (name, data) =>
+    data && data.action ? `${name}-${data.action}` : name;
+  const crispEventSessionKey = (name, data) =>
+    `cn1-crisp-ev-${crispEventDedupeName(name, data)}`;
+
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the
     // moment the event fires, before touching either deduplication guard.
-    const dedupeName = data && data.action ? `${name}-${data.action}` : name;
+    const dedupeName = crispEventDedupeName(name, data);
     if (getConsent() !== "accepted" || !window.$crisp || firedThisView[dedupeName]) {
       return false;
     }
     try {
-      const sessionKey = `cn1-crisp-ev-${dedupeName}`;
+      const sessionKey = crispEventSessionKey(name, data);
       if (sessionStorage.getItem(sessionKey)) {
         return false; // already fired earlier this session
       }
@@ -131,7 +173,7 @@
       window.$crisp.push(["set", "session:event", [[event]]]);
       firedThisView[dedupeName] = true;
       try {
-        sessionStorage.setItem(`cn1-crisp-ev-${dedupeName}`, "1");
+        sessionStorage.setItem(crispEventSessionKey(name, data), "1");
       } catch (e) {
         // sessionStorage unavailable — the per-view guard still applies
       }
@@ -168,6 +210,34 @@
     window.setTimeout(() => requestCrispEvent(name, data), delay);
   };
 
+  const exp004ExposureEvent = (assignment) => ({
+    name: assignment.arm === "ownership"
+      ? "Exp004OwnershipExposure" : "Exp004ReachExposure",
+    data: {
+      action: `${assignment.id.toLowerCase()}-${assignment.arm}`,
+      experiment_id: assignment.id,
+      experiment_arm: assignment.arm,
+      page: "/"
+    }
+  });
+
+  const readCurrentExp004Assignment = () => {
+    const assignment = readExp004Assignment();
+    if (!assignment) {
+      return null;
+    }
+    const exposure = exp004ExposureEvent(assignment);
+    try {
+      return sessionStorage.getItem(crispEventSessionKey(exposure.name, exposure.data))
+        ? assignment : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const withCurrentExp004Assignment = (data) =>
+    withExp004Assignment(data, readCurrentExp004Assignment());
+
   // Explicit hooks for the pages and product surfaces that own each event.
   const crispEvents = window.cn1CrispEvents || {};
   crispEvents.consoleDwell60 = (data) => scheduleCrispEvent(
@@ -182,14 +252,23 @@
   );
   crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
   crispEvents.conversionClick = (data) => requestCrispEvent(
-    "ConversionClick", withOssAttribution(data)
+    "ConversionClick", withCurrentExp004Assignment(withOssAttribution(data))
   );
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
   );
-  crispEvents.initializrProjectDownloaded = (data) => requestCrispEvent(
-    "InitializrProjectDownloaded", data || { page: "/initializr/" }
-  );
+  crispEvents.initializrProjectDownloaded = (data) => {
+    const assignment = readCurrentExp004Assignment();
+    const payload = withExp004Assignment(
+      data || { page: "/initializr/" }, assignment
+    );
+    requestCrispEvent("InitializrProjectDownloaded", payload);
+    if (assignment) {
+      const eventName = assignment.arm === "ownership"
+        ? "Exp004OwnershipDownload" : "Exp004ReachDownload";
+      requestCrispEvent(eventName, payload);
+    }
+  };
   crispEvents.pricingEvaluator = (data) => {
     const firePricing = () => requestCrispEvent("PricingEvaluator", data);
     window.setTimeout(firePricing, 30000);
@@ -215,6 +294,18 @@
       data.content = attribution.content;
     }
     requestCrispEvent("OssArrival", data);
+  };
+
+  const reportExp004Exposure = () => {
+    if ((window.location.pathname || "/") !== "/") {
+      return;
+    }
+    const assignment = readExp004Assignment();
+    if (!assignment) {
+      return;
+    }
+    const exposure = exp004ExposureEvent(assignment);
+    requestCrispEvent(exposure.name, exposure.data);
   };
 
   const consumeConversionArrival = () => {
@@ -294,10 +385,14 @@
 
   const acceptConsent = () => {
     setConsent("accepted");
+    if (window.cn1Exp004 && window.cn1Exp004.persist) {
+      window.cn1Exp004.persist();
+    }
     closeBanner();
     loadCrisp();
     reportOssArrival();
     flushPendingEvents();
+    reportExp004Exposure();
   };
 
   const declineConsent = () => {
@@ -319,6 +414,7 @@
     openBanner();
   }
   consumeConversionArrival();
+  reportExp004Exposure();
 
   if (acceptBtn) {
     acceptBtn.addEventListener("click", acceptConsent);
@@ -331,7 +427,7 @@
   document.querySelectorAll("[data-cn1-enable-chat]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      acceptConsent();
+      openBanner();
     });
   });
 

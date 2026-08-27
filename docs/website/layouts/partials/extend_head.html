@@ -1,4 +1,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{{- if .IsHome -}}
+  {{- $cn1Exp004 := resources.Get "js/cn1-exp-004.js" | minify | fingerprint -}}
+<script src="{{ $cn1Exp004.RelPermalink }}" integrity="{{ $cn1Exp004.Data.Integrity }}"></script>
+{{- end -}}
 {{- if eq .Layout "developer-guide" -}}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   {{- $asciidoctorCssPath := "static/developer-guide/asciidoctor-scoped.css" -}}

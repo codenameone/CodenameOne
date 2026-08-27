@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.maven.plugin.logging.Log;
 
@@ -45,6 +46,9 @@ import org.apache.maven.plugin.logging.Log;
 /// - A **stub source directory** in `target/generated-sources/cn1-annotations`
 ///   used by the GENERATE_SOURCES Mojo; the PROCESS_CLASSES path doesn't write
 ///   to it but the directory may exist either way.
+/// - The **project settings** exactly as `codenameone_settings.properties`
+///   holds them, plus the main class those settings name. A processor that
+///   validates against project configuration needs both.
 public final class ProcessorContext {
 
     private final File outputClassDir;
@@ -55,16 +59,91 @@ public final class ProcessorContext {
     private final Map<String, byte[]> emittedClasses = new LinkedHashMap<String, byte[]>();
     private final Map<String, String> emittedStubSources = new LinkedHashMap<String, String>();
     private final Map<String, byte[]> emittedResources = new LinkedHashMap<String, byte[]>();
+    private final File projectDir;
+    private final Properties projectSettings;
+    private final String mainClassBinaryName;
+    private final List<String> compileSourceRoots;
+    private final String sourceEncoding;
+    private final List<String> compileClasspath;
 
     public ProcessorContext(File outputClassDir, File stubSourceDir,
                              Map<String, AnnotatedClass> classIndex, Log log) {
+        this(outputClassDir, stubSourceDir, classIndex, log, null, null, null, null, null, null);
+    }
+
+    /// Full form, adding the project configuration.
+    ///
+    /// `projectSettings` must be the **raw** contents of
+    /// `codenameone_settings.properties`, without any `-D` overlay: a hint given
+    /// on the command line is the documented way to override one for a single
+    /// build, so it must never be mistaken for something the project declares.
+    ///
+    /// `compileSourceRoots` is passed in rather than guessed at from the project
+    /// directory: a module may add `generated-sources`, or a Kotlin root, or
+    /// replace the conventional one altogether, and a processor that assumes
+    /// `src/main/java` would decide a perfectly live class has no source.
+    ///
+    /// `sourceEncoding` is the encoding the module's sources are COMPILED with.
+    /// A processor that reads a source file back has to decode it the way javac
+    /// did or it is reading a different text. Guessing from the bytes settles
+    /// UTF-16 and UTF-8 but cannot separate one single-byte encoding from
+    /// another, so a Windows-1251 source came back as the wrong -- and equally
+    /// valid -- identifier characters. Null means the module did not say, which
+    /// a reader must treat as "cannot tell" rather than as a licence to guess.
+    ///
+    /// `compileClasspath` is where the build hint ANNOTATIONS live. A processor
+    /// that must know what an annotation member sets reads the annotation
+    /// itself, off this classpath. The alternative was a generated table listing
+    /// every annotation by name -- a second statement of which types exist,
+    /// which had to be regenerated whenever one was added.
+    public ProcessorContext(File outputClassDir, File stubSourceDir,
+                             Map<String, AnnotatedClass> classIndex, Log log,
+                             File projectDir, Properties projectSettings,
+                             String mainClassBinaryName, List<String> compileSourceRoots,
+                             String sourceEncoding, List<String> compileClasspath) {
+        this.compileClasspath = compileClasspath == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileClasspath));
+        this.sourceEncoding = sourceEncoding == null || sourceEncoding.trim().length() == 0
+                ? null : sourceEncoding.trim();
         this.outputClassDir = outputClassDir;
         this.stubSourceDir = stubSourceDir;
         this.classIndex = classIndex == null
                 ? Collections.<String, AnnotatedClass>emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<String, AnnotatedClass>(classIndex));
         this.log = log;
+        this.projectDir = projectDir;
+        this.projectSettings = projectSettings;
+        this.mainClassBinaryName = mainClassBinaryName;
+        this.compileSourceRoots = compileSourceRoots == null
+                ? Collections.<String>emptyList()
+                : Collections.unmodifiableList(new ArrayList<String>(compileSourceRoots));
     }
+
+    /// The compile classpath, where the build hint annotations are found.
+    public List<String> getCompileClasspath() { return compileClasspath; }
+
+    /// The encoding the module's sources are compiled with, null when unknown.
+    public String getSourceEncoding() { return sourceEncoding; }
+
+    /// The module's configured compile source roots, empty when unknown.
+    ///
+    /// Empty means "not told", never "there are none": a caller deciding whether
+    /// a class still has a source has to treat the two differently, or an
+    /// unfamiliar layout looks exactly like a deleted file.
+    public List<String> getCompileSourceRoots() { return compileSourceRoots; }
+
+    /// The Codename One project directory -- the one holding
+    /// `codenameone_settings.properties` -- or null when it could not be found.
+    public File getProjectDir() { return projectDir; }
+
+    /// The raw `codenameone_settings.properties`, or null when absent. Never
+    /// carries a `-D` overlay; see the constructor.
+    public Properties getProjectSettings() { return projectSettings; }
+
+    /// Fully qualified name of the class named by `codename1.mainName`, or null
+    /// when the project does not declare one (a cn1lib, for instance).
+    public String getMainClassBinaryName() { return mainClassBinaryName; }
 
     /// `target/classes` for the project, or the equivalent output directory.
     public File getOutputClassDir() { return outputClassDir; }

@@ -1,0 +1,2209 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.maven;
+
+import com.codename1.build.shared.BuildHints;
+import com.codename1.build.shared.HintType;
+
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.shared.invoker.DefaultInvocationRequest;
+import org.apache.maven.shared.invoker.DefaultInvoker;
+import org.apache.maven.shared.invoker.InvocationRequest;
+import org.apache.maven.shared.invoker.InvocationResult;
+import org.apache.maven.shared.invoker.MavenInvocationException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
+
+import java.io.BufferedReader;
+import java.io.Reader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.TreeMap;
+
+/**
+ * Rewrites {@code codename1.arg.*} lines in {@code codenameone_settings.properties}
+ * as build hint annotations on the application's main class.
+ *
+ * <p>A build hint written as a properties line is a string nothing checks: a
+ * misspelled name is accepted, never read, and silently does nothing. The same
+ * hint written as an annotation is checked by the compiler. This goal moves the
+ * ones that have an annotation and leaves the rest alone.</p>
+ *
+ * <p>Runs in place and prints what it did. Pass {@code -Dcn1.migrate.dryRun=true}
+ * to see the plan without touching anything.</p>
+ */
+// Aggregator: every module of a Codename One project resolves to the same
+// codenameone_settings.properties, so running per-module would try to migrate
+// the same file several times and the second pass would find its own output.
+@Mojo(name = "migrate-build-hints", requiresProject = true, aggregator = true,
+      requiresDependencyResolution = ResolutionScope.COMPILE)
+public class MigrateBuildHintsMojo extends AbstractCN1Mojo {
+
+    /**
+     * The whole reactor. This goal is an aggregator, so {@code project} is the
+     * root pom -- which carries no codenameone-core dependency of its own. The
+     * core has to be looked for across the modules.
+     */
+    @Parameter(defaultValue = "${session.projects}", readonly = true, required = true)
+    java.util.List<org.apache.maven.project.MavenProject> reactorProjects;
+
+    /** Report what would change without writing anything. */
+    @Parameter(property = "cn1.migrate.dryRun", defaultValue = "false")
+    private boolean dryRun;
+
+    /**
+     * Hints to leave in the properties file even though they have an annotation.
+     * {@code java.version} is always kept: it selects the toolchain that compiles
+     * the class the annotations would live on, so it has to be readable before
+     * any of the project's own code exists.
+     */
+    @Parameter(property = "cn1.migrate.keep")
+    private String keep;
+
+    @Override
+    protected void executeImpl() throws MojoExecutionException, MojoFailureException {
+        File projectDir = getCN1ProjectDir();
+        if (projectDir == null) {
+            throw new MojoExecutionException("No Codename One project directory found; "
+                    + "this goal must run in a project with a codenameone_settings.properties.");
+        }
+        File settingsFile = new File(projectDir, "codenameone_settings.properties");
+        if (!settingsFile.isFile()) {
+            throw new MojoExecutionException("No codenameone_settings.properties in " + projectDir);
+        }
+
+        // The annotations ship in codenameone-core. A project pinned to a release
+        // that predates them would migrate cleanly here and then fail to compile,
+        // so refuse rather than hand back a broken project.
+        if (!coreHasBuildHintAnnotations()) {
+            throw new MojoFailureException("This project builds against a Codename One version "
+                    + "whose core has no com.codename1.annotations.buildhints package, so the "
+                    + "annotations would not resolve. Update the project's cn1.version first.");
+        }
+
+        Properties settings = new Properties();
+        try (FileInputStream in = new FileInputStream(settingsFile)) {
+            settings.load(in);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Could not read " + settingsFile, ex);
+        }
+        overlayEffectiveIdentity(settings);
+
+        List<String> kept = new ArrayList<String>();
+        kept.add("java.version");
+        if (keep != null) {
+            for (String k : keep.split(",")) {
+                if (k.trim().length() > 0) {
+                    kept.add(k.trim());
+                }
+            }
+        }
+
+        // Resolve the target language before rendering: Kotlin writes an array
+        // literal as [a, b] and rejects Java's {a, b}, so the same hint renders
+        // differently depending on which file it is going into.
+        String mainSourcePath = findMainClassSource(projectDir, settings);
+        boolean kotlinTarget = mainSourcePath != null && mainSourcePath.endsWith(".kt");
+
+        // annotation simple name -> attribute -> source literal
+        Map<String, Map<String, String>> plan = new TreeMap<String, Map<String, String>>();
+        List<String> migratedKeys = new ArrayList<String>();
+        /// Canonical keys to look for in the emitted manifest. Not the same list:
+        /// a legacy spelling is deleted under the name the file used and comes
+        /// back under the name the annotation carries.
+        List<String> verifiedKeys = new ArrayList<String>();
+        List<String> skipped = new ArrayList<String>();
+        /// Canonical hint name to every properties key that names it.
+        Map<String, List<String>> declaredAs = new TreeMap<String, List<String>>();
+        Map<String, BuildHints.Hint> byHint = new TreeMap<String, BuildHints.Hint>();
+
+        for (String key : new ArrayList<String>(settings.stringPropertyNames())) {
+            if (!key.startsWith(BuildHints.ARG_PREFIX)) {
+                continue;
+            }
+            String name = key.substring(BuildHints.ARG_PREFIX.length());
+            if (kept.contains(name)) {
+                skipped.add(name + " (kept by configuration)");
+                continue;
+            }
+            // Through the alias, not at it. byName("cn1.androidTheme") returns the
+            // alias entry, whose own isAnnotated() is false even though the
+            // setting it names has an annotation -- so the legacy spellings, which
+            // are exactly the ones an existing project is most likely to be
+            // carrying, were reported as having no annotation and left behind.
+            BuildHints.Hint hint = BuildHints.resolve(BuildHints.byName(name));
+            if (hint == null || !hint.isAnnotated()) {
+                skipped.add(name + " (no annotation for this hint yet)");
+                continue;
+            }
+            List<String> spellings = declaredAs.get(hint.name());
+            if (spellings == null) {
+                spellings = new ArrayList<String>();
+                declaredAs.put(hint.name(), spellings);
+                byHint.put(hint.name(), hint);
+            }
+            spellings.add(key);
+        }
+
+        for (Map.Entry<String, List<String>> e : declaredAs.entrySet()) {
+            BuildHints.Hint hint = byHint.get(e.getKey());
+            List<String> spellings = e.getValue();
+
+            // One setting, spelled more than one way, with the two disagreeing.
+            // Which one the build honours is decided per hint and not always by
+            // the builder: and.captureRecord is read after android.captureRecord
+            // and overrides it, while the theme aliases are each handed to
+            // Display.setProperty and resolved in the framework. So there is no
+            // rule to apply here, and picking either value would change what the
+            // app builds with while reporting a successful migration -- the
+            // verification cannot catch it, since it checks that the hint came
+            // back and not what it holds. The developer decides.
+            String value = settings.getProperty(spellings.get(0));
+            boolean disagree = false;
+            for (String other : spellings) {
+                String v = settings.getProperty(other);
+                if (value == null ? v != null : !value.equals(v)) {
+                    disagree = true;
+                }
+            }
+            if (disagree) {
+                skipped.add(e.getKey() + " (declared as " + spellings + " with different values; "
+                        + "delete all but one and run this again)");
+                continue;
+            }
+
+            String literal = toSourceLiteral(hint, value, kotlinTarget);
+            if (literal == null) {
+                boolean padded = value != null && !value.equals(value.trim());
+                skipped.add(e.getKey() + " = '" + value + "' ("
+                        + (padded
+                            ? "has surrounding whitespace, which builders read differently; "
+                              + "remove it and run this again"
+                            : "value is outside the hint's supported set")
+                        + ")");
+                continue;
+            }
+            String annotation = hint.group().annotationSimpleName();
+            Map<String, String> members = plan.get(annotation);
+            if (members == null) {
+                members = new TreeMap<String, String>();
+                plan.put(annotation, members);
+            }
+            members.put(hint.attr(), literal);
+            // Every spelling goes, because they were all naming this one setting.
+            migratedKeys.addAll(spellings);
+            // Verified under the CANONICAL key: that is what the annotation makes
+            // the processor emit. Checking the alias the file happened to use
+            // reported it missing and rolled a correct migration back.
+            verifiedKeys.add(BuildHints.ARG_PREFIX + hint.name());
+        }
+
+        if (plan.isEmpty()) {
+            getLog().info("cn1: nothing to migrate -- no annotated build hint is set in "
+                    + settingsFile.getName());
+            for (String s : skipped) {
+                getLog().debug("cn1:   left in place: " + s);
+            }
+            return;
+        }
+
+        String mainSource = mainSourcePath;
+        StringBuilder rendered = new StringBuilder();
+        for (Map.Entry<String, Map<String, String>> e : plan.entrySet()) {
+            rendered.append(render(e.getKey(), e.getValue())).append('\n');
+        }
+
+        getLog().info("cn1: move these onto " + (mainSource == null ? "your main class"
+                : new File(mainSource).getName()) + ":");
+        for (String line : rendered.toString().split("\n")) {
+            getLog().info("cn1:   " + line);
+        }
+        for (String s : skipped) {
+            getLog().info("cn1: leaving " + s);
+        }
+
+        if (dryRun) {
+            getLog().info("cn1: dry run -- nothing written");
+            return;
+        }
+        if (mainSource == null) {
+            throw new MojoFailureException("Could not find the source of the main class named by "
+                    + "codename1.mainName. Add the annotations above by hand, then delete the "
+                    + "migrated lines from " + settingsFile.getName() + ".");
+        }
+
+        // Apply the whole migration, prove the build turns the annotations back
+        // into hints, and roll both files back if it does not.
+        //
+        // Both files have to move together before the check: leaving the
+        // properties in place while the annotations are added *is* the
+        // duplicate-declaration case, so the build would fail for that reason and
+        // never tell us whether processing works at all.
+        //
+        // Deciding this from the POM instead meant guessing whether
+        // process-annotations would run, and the goal is skippable, bindable to a
+        // phase with no compiled classes, bindable to the wrong module, and
+        // skippable through a property expression. Observing the emitted resource
+        // answers all of those at once, and answers correctly for whatever the
+        // next way to not-run turns out to be.
+        File source = new File(mainSource);
+        String originalSource;
+        String originalSettings;
+        try {
+            originalSource = read(source);
+            originalSettings = readProperties(settingsFile);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Migration failed: " + ex.getMessage(), ex);
+        }
+
+        // Anything that throws from here on has to put both files back. The half
+        // that fails is not always the second one: if the annotations go in and
+        // the properties rewrite then fails -- an unwritable file, a full disk, a
+        // partial write -- the project is left declaring the same hint twice,
+        // which is exactly the state the next build refuses to compile. Leaving
+        // the developer with that is worse than not migrating at all.
+        try {
+            insertAnnotations(source, rendered.toString(),
+                    settings.getProperty("codename1.mainName", "").trim());
+            removeMigratedLines(settingsFile, migratedKeys);
+        } catch (IOException | RuntimeException ex) {
+            throw new MojoExecutionException("Migration failed, so " + source.getName() + " and "
+                    + settingsFile.getName() + " have been put back as they were: "
+                    + ex.getMessage()
+                    + restore(source, originalSource, settingsFile, originalSettings), ex);
+        }
+
+        String pkgName = settings.getProperty("codename1.packageName", "").trim();
+        String mainName = settings.getProperty("codename1.mainName", "").trim();
+        String missing = verifyAnnotationsAreProcessed(projectDir, verifiedKeys,
+                mainName.isEmpty() ? null
+                        : (pkgName.isEmpty() ? mainName : pkgName + "." + mainName));
+        if (missing != null) {
+            String restoreFailed = restore(source, originalSource, settingsFile, originalSettings);
+            throw new MojoFailureException("The annotations were added but the build did not turn "
+                    + "them into build hints, so " + source.getName() + " and "
+                    + settingsFile.getName() + " have been put back as they were.\n\n"
+                    + missing + "\n\nThe usual cause is that this module does not run the cn1 "
+                    + "process-annotations goal, or runs it skipped or before compile. Add it and "
+                    + "try again:\n"
+                    + "    <execution>\n"
+                    + "      <id>cn1-process-classes</id>\n"
+                    + "      <phase>process-classes</phase>\n"
+                    + "      <goals>\n"
+                    + "        <goal>process-annotations</goal>\n"
+                    + "      </goals>\n"
+                    + "    </execution>"
+                    + restoreFailed);
+        }
+
+        getLog().info("cn1: migrated " + migratedKeys.size() + " build hint(s) into "
+                + new File(mainSource).getName());
+    }
+
+    /**
+     * Puts both files back as they were.
+     *
+     * @return an empty string when both were restored, otherwise a description of
+     *         what could not be, to append to the failure being reported
+     */
+    private String restore(File source, String originalSource,
+                           File settingsFile, String originalSettings) {
+        StringBuilder failed = new StringBuilder();
+        try {
+            write(source, originalSource);
+        } catch (IOException ex) {
+            failed.append("\nCould not restore ").append(source).append(": ")
+                    .append(ex.getMessage());
+        }
+        try {
+            writeProperties(settingsFile, originalSettings);
+        } catch (IOException ex) {
+            failed.append("\nCould not restore ").append(settingsFile).append(": ")
+                    .append(ex.getMessage());
+        }
+        return failed.toString();
+    }
+
+    /**
+     * Runs the project's own build over the module that holds the main class and
+     * checks that every migrated hint came back out of it.
+     *
+     * @return null when all of them did, otherwise a description of what is
+     *         missing, suitable for showing to the developer
+     */
+    private String verifyAnnotationsAreProcessed(File projectDir, List<String> migratedKeys,
+                                                 String mainBinaryName) {
+        getLog().info("cn1: building " + projectDir.getName()
+                + " to confirm the annotations produce the hints...");
+        // Delete any manifest an earlier build left behind first. Checking that
+        // the file exists and holds the right keys proves nothing if it was
+        // already there: with processing now skipped or unbound the nested build
+        // leaves it untouched, the check passes, the properties are deleted, and
+        // the next clean build removes the stale artifact and the hints with it.
+        // Where the processor will actually write, which is not always
+        // target/classes: a module is free to configure build/outputDirectory,
+        // and looking in the wrong place would report a successful build as
+        // having produced nothing and roll a correct migration back.
+        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
+        File outputDir = configuredOutputDirectory(owner, projectDir);
+        File emitted = new File(outputDir, ANNOTATION_HINTS_RESOURCE);
+        if (emitted.isFile() && !emitted.delete()) {
+            return "Could not remove the previous " + ANNOTATION_HINTS_RESOURCE
+                    + ", so this build's output could not be told apart from it.";
+        }
+        // Run the REACTOR and select the owning module, rather than pointing
+        // Maven at that module's own POM. A module POM on its own resolves its
+        // siblings from the local repository, so a project whose main module
+        // depends on another module of the same build -- normal, and not
+        // necessarily installed -- fails to resolve here and the migration rolls
+        // back over a build that a plain `mvn package` performs happily.
+        File modulePom = new File(projectDir, "pom.xml");
+        File reactorPom = new File(project.getBasedir(), "pom.xml");
+        InvocationRequest request = new DefaultInvocationRequest();
+        if (reactorPom.isFile() && owner != null) {
+            request.setPomFile(reactorPom);
+            request.setProjects(Collections.singletonList(
+                    owner.getGroupId() + ":" + owner.getArtifactId()));
+            request.setAlsoMake(true);
+        } else {
+            request.setPomFile(modulePom.isFile() ? modulePom : reactorPom);
+        }
+        request.setGoals(Collections.singletonList("process-classes"));
+        Properties props = new Properties();
+        props.setProperty("skipTests", "true");
+        // Reproduce the invocation the developer actually made. A project that
+        // needs `-Pcustomer` to compile, or `-Dfeature=true` to bind
+        // process-annotations, is a different build without them: the check
+        // would roll back a migration that works, or -- worse -- pass a build
+        // whose processing an outer -D was switching off. The user properties go
+        // in first so skipTests below cannot be silently overridden by one.
+        if (getSession() != null) {
+            Properties user = getSession().getUserProperties();
+            if (user != null) {
+                for (String name : user.stringPropertyNames()) {
+                    props.setProperty(name, user.getProperty(name));
+                }
+            }
+            props.setProperty("skipTests", "true");
+            List<String> profiles = profileSelections();
+            if (!profiles.isEmpty()) {
+                request.setProfiles(profiles);
+            }
+        }
+        request.setProperties(props);
+        request.setBatchMode(true);
+        try {
+            InvocationResult result = new DefaultInvoker().execute(request);
+            if (result.getExitCode() != 0) {
+                return "The build failed with exit code " + result.getExitCode()
+                        + ", so the annotations could not be checked.";
+            }
+        } catch (MavenInvocationException ex) {
+            return "The build could not be run (" + ex.getMessage()
+                    + "), so the annotations could not be checked.";
+        }
+
+        if (!emitted.isFile()) {
+            return "No " + ANNOTATION_HINTS_RESOURCE + " was written under " + outputDir + ".";
+        }
+        Properties produced = new Properties();
+        try (FileInputStream in = new FileInputStream(emitted)) {
+            produced.load(in);
+        } catch (IOException ex) {
+            return "Could not read " + emitted + ": " + ex.getMessage();
+        }
+        String notOurs = notWrittenByTheProcessor(produced, outputDir, mainBinaryName);
+        if (notOurs != null) {
+            return notOurs;
+        }
+        List<String> absent = new ArrayList<String>();
+        for (String key : migratedKeys) {
+            if (produced.getProperty(key) == null) {
+                absent.add(key);
+            }
+        }
+        if (!absent.isEmpty()) {
+            return "These hints were annotated but did not come back out of the build: " + absent;
+        }
+        return null;
+    }
+
+    /**
+     * Why the manifest is not this build's processor output, or null when it is.
+     *
+     * <p>Its presence proves nothing on its own. A project can keep a
+     * {@code META-INF/codenameone/build-hints.properties} in
+     * {@code src/main/resources}, and any resource-producing plugin then
+     * recreates it in the output directory whether or not the processor ran --
+     * so the keys are all there, the migration is reported as verified, and the
+     * properties lines are deleted for good although nothing processed the
+     * annotations.</p>
+     *
+     * <p>The fingerprint is what tells them apart: the processor records the
+     * main class it read and a digest of the annotations it found on it, so
+     * recomputing that digest from the compiled class answers whether THIS
+     * build produced THIS file.</p>
+     */
+    String notWrittenByTheProcessor(Properties produced, File outputDir,
+                                    String mainBinaryName) {
+        String stamped = produced.getProperty("cn1.buildHints.mainClass");
+        if (mainBinaryName != null && stamped != null && !mainBinaryName.equals(stamped)) {
+            return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " was generated for "
+                    + stamped + " rather than " + mainBinaryName
+                    + ", so it is not this build's output.";
+        }
+        String recorded = produced.getProperty(
+                com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY);
+        if (recorded == null) {
+            return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " carries no "
+                    + com.codename1.maven.processors.BuildHintAnnotationProcessor.SOURCE_DIGEST_KEY
+                    + ", so it was not written by the annotation processor -- check that the cn1 "
+                    + "process-annotations goal runs on the module that compiles the main class.";
+        }
+        if (mainBinaryName == null) {
+            return null;
+        }
+        File classFile = new File(outputDir,
+                mainBinaryName.replace('.', File.separatorChar) + ".class");
+        if (!classFile.isFile()) {
+            return null;
+        }
+        try {
+            String actual = com.codename1.maven.processors.BuildHintAnnotationProcessor.sourceDigest(
+                    com.codename1.maven.annotations.ClassScanner.readClass(classFile));
+            if (!actual.equals(recorded)) {
+                return ANNOTATION_HINTS_RESOURCE + " under " + outputDir + " does not describe the "
+                        + "annotations on " + mainBinaryName + ", so it is left over rather than "
+                        + "written by this build.";
+            }
+        } catch (com.codename1.maven.annotations.ProcessingException ex) {
+            // Unreadable class: this check cannot answer, and the key presence
+            // below is what is left. Not a verification failure on its own.
+            getLog().debug("cn1: could not fingerprint " + classFile, ex);
+        }
+        return null;
+    }
+
+    /**
+     * The profile selections this invocation was started with, in the form
+     * {@code -P} takes: ids to activate, and {@code !id} for each one turned
+     * off.
+     *
+     * <p>Taken from the request rather than from the resolved project, because
+     * what has to be reproduced is what the developer typed: a profile activated
+     * by a property or a file is activated again on its own terms in the nested
+     * build, while one named with {@code -P} is not unless it is passed on.</p>
+     *
+     * <p>The DEACTIVATIONS matter as much. Dropping them let the verification
+     * build re-activate a profile the developer had switched off -- typically an
+     * {@code activeByDefault} one -- so the manifest was generated by a build
+     * nobody runs, the migration was reported as verified, and the next clean
+     * build had no processor and no manifest.</p>
+     */
+    private List<String> profileSelections() {
+        List<String> out = new ArrayList<String>();
+        if (getSession() == null || getSession().getRequest() == null) {
+            return out;
+        }
+        addProfiles(getSession().getRequest().getActiveProfiles(), "", out);
+        addProfiles(getSession().getRequest().getInactiveProfiles(), "!", out);
+        return out;
+    }
+
+    private static void addProfiles(List<String> ids, String prefix, List<String> out) {
+        if (ids == null) {
+            return;
+        }
+        for (String id : ids) {
+            if (id != null && id.trim().length() > 0) {
+                out.add(prefix + id.trim());
+            }
+        }
+    }
+
+    /** The reactor module whose basedir is {@code dir}, or null when none is. */
+    /// The nearest reactor module a file belongs to, walking up from it, or
+    /// null when it is under none.
+    ///
+    /// A source sits several package directories below its module, so an exact
+    /// basedir match on its parent finds nothing.
+    private org.apache.maven.project.MavenProject moduleOwning(File file) {
+        for (File at = file == null ? null : file.getParentFile(); at != null;
+                at = at.getParentFile()) {
+            org.apache.maven.project.MavenProject owner = moduleAt(at);
+            if (owner != null) {
+                return owner;
+            }
+        }
+        return null;
+    }
+
+    private org.apache.maven.project.MavenProject moduleAt(File dir) {
+        if (reactorProjects == null || dir == null) {
+            return null;
+        }
+        File wanted = canonical(dir);
+        for (org.apache.maven.project.MavenProject p : reactorProjects) {
+            if (p.getBasedir() != null && canonical(p.getBasedir()).equals(wanted)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The directory {@code process-classes} writes compiled output to.
+     *
+     * <p>Read off the module rather than assumed, since a POM may configure it.
+     * Falls back to the conventional path when the directory is not a reactor
+     * module at all -- an Ant-layout project, for instance.</p>
+     */
+    private static File configuredOutputDirectory(org.apache.maven.project.MavenProject owner,
+                                                  File projectDir) {
+        if (owner != null && owner.getBuild() != null
+                && owner.getBuild().getOutputDirectory() != null
+                && owner.getBuild().getOutputDirectory().length() > 0) {
+            return new File(owner.getBuild().getOutputDirectory());
+        }
+        return new File(projectDir, "target" + File.separator + "classes");
+    }
+
+    private static File canonical(File f) {
+        try {
+            return f.getCanonicalFile();
+        } catch (IOException ex) {
+            return f.getAbsoluteFile();
+        }
+    }
+
+    /** Name of the resource the annotation processor emits into target/classes. */
+    private static final String ANNOTATION_HINTS_RESOURCE =
+            "META-INF/codenameone/build-hints.properties";
+
+    /**
+     * Whether the codenameone-core on this project's compile classpath actually
+     * carries the annotations.
+     */
+    private boolean coreHasBuildHintAnnotations() {
+        java.util.List<org.apache.maven.project.MavenProject> projects = reactorProjects;
+        if (projects == null || projects.isEmpty()) {
+            projects = java.util.Collections.singletonList(project);
+        }
+        for (org.apache.maven.project.MavenProject p : projects) {
+            if (carriesBuildHintAnnotations(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean carriesBuildHintAnnotations(org.apache.maven.project.MavenProject p) {
+        try {
+            for (Object element : p.getCompileClasspathElements()) {
+                File f = new File((String) element);
+                if (f.isDirectory()) {
+                    if (new File(f, "com/codename1/annotations/buildhints/Ios.class").isFile()) {
+                        return true;
+                    }
+                } else if (f.isFile()) {
+                    try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(f)) {
+                        if (zip.getEntry("com/codename1/annotations/buildhints/Ios.class") != null) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            getLog().debug("cn1: could not inspect the compile classpath: " + ex.getMessage());
+            return true;
+        }
+        return false;
+    }
+
+    /// Whether `value` is spelled exactly as the domain declares it, alias or not.
+    ///
+    /// canonicalValue ignores case because a reader might; the migration cannot
+    /// afford to, because a reader might not.
+    private static boolean exactlySpelled(BuildHints.Hint hint, String value) {
+        for (String allowed : hint.values()) {
+            if (allowed.equals(value)) {
+                return true;
+            }
+        }
+        return hint.valueAliases().containsKey(value);
+    }
+
+    /**
+     * Renders a value as the Java literal for its attribute.
+     *
+     * @return the literal, or null when the value is outside a closed domain --
+     *         which is worth reporting rather than silently translating, because
+     *         it means the properties file has been setting something the build
+     *         never understood
+     */
+    String toSourceLiteral(BuildHints.Hint hint, String value, boolean kotlin) {
+        if (value == null) {
+            return null;
+        }
+        // A scalar with surrounding whitespace is NOT migrated at all. It looks
+        // like it means what it says, and it does not: AndroidGradleBuilder
+        // compares android.hideStatusBar with .equals("true"), so `=true ` is
+        // false today, while other builders trim or ignore case. Trimming it into
+        // an annotation `true` would change what the app builds with and report a
+        // successful migration, since the verification asks whether the hint came
+        // back and not what it holds. Which reading is right differs per builder,
+        // so this refuses rather than picks.
+        if (hint.type() != HintType.STRING && hint.type() != HintType.STRING_LIST
+                && !value.equals(value.trim())) {
+            return null;
+        }
+        String v = value;
+        // A value the hint's own pattern rejects is refused HERE, the way an
+        // enum outside its domain and a non-canonical int already are. Rendering
+        // it produces an annotation the processor then refuses, and this goal
+        // reacts to that by rolling the WHOLE migration back -- so one misspelled
+        // ios.interface_orientation would cost a project every other hint's
+        // migration, instead of being left in the properties file where it is.
+        // Against the CANONICAL value. `flat` is a documented spelling of
+        // `ios7` and migrates to the constant it means, so testing the raw text
+        // refused a value the goal is specifically there to translate.
+        String canonicalForPattern = hint.canonicalValue(v);
+        if (violatesPattern(hint, canonicalForPattern == null ? v : canonicalForPattern)) {
+            return null;
+        }
+        switch (hint.type()) {
+            case BOOLEAN:
+                // Exactly, not ignoring case. AndroidGradleBuilder compares
+                // android.hideStatusBar with .equals("true"), so `=TRUE` is false
+                // today, while other hints are read with equalsIgnoreCase. Which
+                // applies is per hint and this cannot know, so a value that is not
+                // already canonical is refused rather than normalised into one
+                // that may mean the opposite.
+                // Toggle, not a boolean literal: the attribute has three states
+                // and the properties line only ever expressed two of them. A
+                // hint that is present in the file was deliberately set, so it
+                // migrates to ON or OFF -- never to DEFAULT, which would silently
+                // drop the setting and hand the decision back to the server.
+                if ("true".equals(v)) return "Toggle.ON";
+                if ("false".equals(v)) return "Toggle.OFF";
+                return null;
+            case INT:
+                try {
+                    // Round-tripped for the same reason: 007 and +5 parse, and a
+                    // builder comparing the raw string would not see the 7 or 5
+                    // this would otherwise write.
+                    String canonical = String.valueOf(Integer.parseInt(v));
+                    return canonical.equals(v) ? canonical : null;
+                } catch (NumberFormatException ex) {
+                    return null;
+                }
+            case ENUM: {
+                // A documented spelling that is not its own constant migrates to
+                // the constant it means -- ios.themeMode=flat becomes
+                // ThemeMode.IOS7 -- rather than being refused as outside the
+                // domain, which is what an existing project setting a legacy
+                // spelling would have hit.
+                //
+                // Case-sensitively, though: installNativeTheme compares with
+                // .equals, so `MODERN` is not `modern` to the runtime and
+                // migrating it would change the theme rather than preserve it.
+                String canonical = hint.canonicalValue(v);
+                if (canonical == null || !exactlySpelled(hint, v)) {
+                    return null;
+                }
+                // The constant the enum really declares, from the catalog.
+                // Deriving it from the wire value gave V23 for AndroidMinSdk's
+                // "23" and TRUE for Toggle's "true" -- source that does not
+                // compile, written by a goal whose whole job is to migrate a
+                // project without breaking it.
+                String constant = hint.constantFor(canonical);
+                if (constant == null) {
+                    return null;
+                }
+                return hint.enumName() + "." + constant;
+            }
+            case STRING_LIST: {
+                String sep = hint.separator();
+                if (sep == null || sep.length() == 0) {
+                    return quoteFor(v, kotlin);
+                }
+                // Verbatim, and every element kept. Trimming and dropping empties
+                // looked tidy and is a rewrite: android.xgradle is newline
+                // delimited raw Groovy that AndroidGradleBuilder appends as it
+                // stands, so the indentation inside a multiline string is part of
+                // the value. Splitting on the separator and joining the elements
+                // back with it now reproduces the original string exactly, which
+                // is the only property that makes this migration lossless -- the
+                // verification cannot see it, since it checks that the hint came
+                // back and not what it holds.
+                String[] parts = v.split(java.util.regex.Pattern.quote(sep), -1);
+                StringBuilder sb = new StringBuilder(kotlin ? "[" : "{");
+                for (int i = 0; i < parts.length; i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(quoteFor(parts[i], kotlin));
+                }
+                return sb.append(kotlin ? ']' : '}').toString();
+            }
+            default:
+                return quoteFor(v, kotlin);
+        }
+    }
+
+    /**
+     * Renders a value as a string literal for the target language.
+     *
+     * <p>Kotlin interpolates {@code $} inside a string, and hint values contain
+     * it: an {@code android.gradleDep} of
+     * {@code implementation "com.x:y:${'$'}{version}"} would either fail to
+     * compile as an unresolved reference or silently resolve to something else.
+     * Java has no such construct, so the escape is emitted only for Kotlin.</p>
+     *
+     * <p>Everything outside ASCII is written as a {@code \}{@code uXXXX} escape,
+     * which both languages accept. {@code Properties.load} turns a
+     * {@code \}{@code u20ac} in the file into a real euro sign, and the source is
+     * written back through ISO-8859-1 to keep the rest of the file byte-identical
+     * -- so emitting the character raw would replace it with {@code ?}, or write a
+     * high byte that corrupts a UTF-8 source. Neither shows up in the
+     * verification build, which checks that the hint came back, not what its
+     * value was.</p>
+     */
+    static String quoteFor(String s, boolean kotlin) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                case '$':
+                    sb.append(kotlin ? "\\$" : "$");
+                    break;
+                default:
+                    if (c < 0x20 || c > 0x7e) {
+                        sb.append("\\u");
+                        for (int shift = 12; shift >= 0; shift -= 4) {
+                            sb.append(Character.forDigit((c >> shift) & 0xf, 16));
+                        }
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.append('"').toString();
+    }
+
+    static String render(String annotation, Map<String, String> members) {
+        StringBuilder sb = new StringBuilder("@").append(annotation).append('(');
+        int i = 0;
+        for (Map.Entry<String, String> e : members.entrySet()) {
+            if (i++ > 0) {
+                sb.append(", ");
+            }
+            sb.append(e.getKey()).append(" = ").append(e.getValue());
+        }
+        return sb.append(')').toString();
+    }
+
+    /**
+     * Applies a {@code -Dcodename1.mainName} / {@code -Dcodename1.packageName}
+     * override to the settings this migration works from.
+     *
+     * <p>The entry point has to be the same one end to end. The source lookup,
+     * the class the annotations are written above and the class the verification
+     * build expects all read it from here -- and the verification build is a
+     * nested Maven run that inherits the developer's command line, so it applies
+     * the override whether or not this does. Without this, an overridden
+     * invocation annotated the file's entry point, {@code process-annotations}
+     * called that placement misplaced relative to the overridden one, and the
+     * migration rolled back a change that was otherwise correct.</p>
+     *
+     * <p>The identity ONLY. A {@code -Dcodename1.arg.*} stays out of the
+     * settings this reads: it is an override of a value for one build, not a
+     * declaration in the project, and migrating it would write an annotation for
+     * a hint the file never carried.</p>
+     */
+    void overlayEffectiveIdentity(Properties settings) {
+        overlayEffective(settings, "codename1.mainName");
+        overlayEffective(settings, "codename1.packageName");
+    }
+
+    private void overlayEffective(Properties settings, String key) {
+        String value = properties == null ? null : properties.getProperty(key);
+        if (value != null && value.trim().length() > 0) {
+            settings.setProperty(key, value.trim());
+        }
+    }
+
+    String findMainClassSource(File projectDir, Properties settings) {
+        String main = settings.getProperty("codename1.mainName");
+        String pkg = settings.getProperty("codename1.packageName");
+        if (main == null || main.trim().length() == 0) {
+            return null;
+        }
+        String path = (pkg == null ? "" : pkg.trim().replace('.', File.separatorChar)
+                + File.separator) + main.trim();
+        String simple = main.trim();
+        String expectedPkg = pkg == null ? "" : pkg.trim();
+        String[] extensions = {".java", ".kt"};
+
+        // Maven first. It is the authority on where this module's sources are --
+        // a module may replace src/main/java with a root of its own, and the
+        // Kotlin plugin compiles its own sourceDirs without adding them back.
+        //
+        // The conventional paths used to be tried first, and a dormant copy of
+        // the main class left behind at src/main/java then won over the root the
+        // build actually compiles: the annotations went into a file Maven
+        // ignores, the verification build saw no manifest, and the migration
+        // rolled itself back on a project that is perfectly valid. Which is the
+        // same mistake as trusting the conventional Kotlin root -- a convention
+        // must not outrank a resolved answer.
+        org.apache.maven.project.MavenProject owner = moduleAt(projectDir);
+        java.util.List<String> moduleRoots = compileSourceRoots(owner, userProperties());
+        if (moduleRoots != null && !moduleRoots.isEmpty()) {
+            // The named file in each root first, which is exact, then a scan --
+            // Kotlin does not require a file to be named after its class, so the
+            // file is identified by what it DECLARES.
+            for (String root : moduleRoots) {
+                for (String ext : extensions) {
+                    File f = new File(root, path + ext);
+                    if (f.isFile() && declares(f, expectedPkg, simple)) {
+                        return f.getAbsolutePath();
+                    }
+                }
+            }
+            for (String root : moduleRoots) {
+                File dir = new File(root);
+                if (!dir.isDirectory()) {
+                    continue;
+                }
+                File hit = findDeclaringFile(dir, expectedPkg, simple, 0);
+                if (hit != null) {
+                    return hit.getAbsolutePath();
+                }
+            }
+            // Maven answered, so that IS the set. Falling back to the
+            // conventions here is what let the dormant file win.
+            return null;
+        }
+
+        // Nobody resolved the roots -- no reactor to ask, which is how this goal
+        // runs outside a build. The conventions are the only guess there is.
+        String[] roots = {"src" + File.separator + "main" + File.separator + "java",
+                          "src" + File.separator + "main" + File.separator + "kotlin",
+                          "src"};
+        for (String root : roots) {
+            for (String ext : extensions) {
+                File f = new File(projectDir, root + File.separator + path + ext);
+                // Declaring the class, not merely sitting at the conventional
+                // path: a Kotlin main class moved into a differently named file
+                // can leave the old one behind holding something else.
+                if (f.isFile() && declares(f, expectedPkg, simple)) {
+                    return f.getAbsolutePath();
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The first .java or .kt under `dir` declaring `simple` in `pkg`, or null.
+    private File findDeclaringFile(File dir, String pkg, String simple, int depth) {
+        if (depth > 24) {
+            return null;
+        }
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return null;
+        }
+        for (File f : children) {
+            if (f.isDirectory()) {
+                File hit = findDeclaringFile(f, pkg, simple, depth + 1);
+                if (hit != null) {
+                    return hit;
+                }
+            } else if ((f.getName().endsWith(".java") || f.getName().endsWith(".kt"))
+                    && declares(f, pkg, simple)) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    /// Whether `f` declares type `simple` in package `pkg`.
+    ///
+    /// Through the annotation processor's helpers rather than a second copy: the
+    /// two have already drifted apart once in this change, and "what counts as a
+    /// declaration" should have one answer.
+    boolean declares(File f, String pkg, String simple) {
+        String text;
+        try {
+            // IDENTIFYING the file, not editing it, so it is read in the
+            // encoding the compiler uses. The byte-transparent read that the
+            // rewrite depends on cannot answer this for a multibyte encoding:
+            // Shift_JIS bytes are control characters in ISO-8859-1, so the name
+            // is not even readable as an identifier, let alone comparable.
+            text = read(f, sourceCharset(f));
+        } catch (IOException ex) {
+            return false;
+        }
+        boolean kotlin = f.getName().endsWith(".kt");
+        // TOP LEVEL, which a single-segment nested path is exactly the test for.
+        // An application's main class is not nested, and accepting one at any
+        // depth stopped the search on a leftover Main.kt holding
+        // `class Outer { class Main }` -- the annotations were then inserted on
+        // Outer, and the verification build rejected the placement and rolled the
+        // migration back.
+        // The plain spelling first, which is what a correctly decoded source
+        // gives. The byte spelling remains as an alternative for a project that
+        // declares no encoding and is not UTF-8 either, where the read above
+        // falls back to byte-transparent.
+        String declaredPkg = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaredPackageIn(text, kotlin);
+        return (pkg.equals(declaredPkg) || asWrittenInSource(pkg).equals(declaredPkg))
+                && (com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaresNestedPath(text, new String[] {simple}, kotlin)
+                    || com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .declaresNestedPath(text, new String[] {asWrittenInSource(simple)},
+                                kotlin));
+    }
+
+    /// `name` spelled the way a UTF-8 source file reads under the
+    /// byte-transparent scheme, or `name` itself when it is ASCII.
+    ///
+    /// The source is read byte for byte -- see [#read(File)] -- while
+    /// `codename1.packageName` and `codename1.mainName` come from a properties
+    /// file, which is real Unicode. For an ASCII name the two are identical, but
+    /// a package name with a non-ASCII letter reads, in a UTF-8 file, as that
+    /// letter's individual bytes, so the comparison failed and the goal refused a
+    /// valid migration saying it could not find the main source.
+    ///
+    /// Compared as an ALTERNATIVE rather than a replacement, so nothing is
+    /// assumed about the file's encoding: an ASCII file matches either way, a
+    /// UTF-8 one matches this spelling, and a source genuinely written in a
+    /// single-byte encoding still matches the plain one. Reinterpreting the file
+    /// instead would decide its encoding for it, which is the thing the
+    /// byte-transparent read exists to avoid.
+    static String asWrittenInSource(String name) {
+        return asWrittenInSource(name, "UTF-8");
+    }
+
+    /// As above, for a source written in `charset`.
+    ///
+    /// The byte spelling depends on the encoding the compiler uses: the UTF-8
+    /// bytes of a name are not its Shift_JIS bytes, so assuming UTF-8 matched
+    /// neither spelling of a non-ASCII name in a multibyte-encoded source and
+    /// the goal refused a migration it could have made.
+    static String asWrittenInSource(String name, String charset) {
+        try {
+            return new String(name.getBytes(charset == null ? "UTF-8" : charset),
+                    SOURCE_BYTE_TRANSPARENT_ENCODING);
+        } catch (java.io.UnsupportedEncodingException ex) {
+            return name;
+        }
+    }
+
+    /// The encoding this module's sources are compiled with.
+    ///
+    /// UTF-8 was assumed when nothing is configured, and that is not what the
+    /// build does: javac with no `-encoding` uses the PLATFORM default. A
+    /// Windows-1252 source with a non-ASCII package or class name read as UTF-8
+    /// comes back as replacement characters, the name never matches, and the
+    /// goal refused a project that compiles perfectly well.
+    ///
+    /// So: what the module declares, else the platform default when the file
+    /// round-trips through it, else byte-transparent -- which never fails to
+    /// decode, and which `declares` already knows how to compare against by
+    /// spelling the name it is looking for in the file's own bytes.
+    String sourceCharset(File source) {
+        // The module that OWNS the file, not the reactor root. `cn1:migrate-
+        // build-hints` runs from the root of a multi-module project while the
+        // sources live in common, and a module may set an encoding the root
+        // does not -- asking the root decoded the file with somebody else's
+        // charset, which is the bug this was added to fix, one level out.
+        org.apache.maven.project.MavenProject owner = moduleOwning(source);
+        String configured = sourceEncodingOf(owner == null ? project : owner, userProperties());
+        if (configured != null && configured.trim().length() > 0) {
+            return configured.trim();
+        }
+        String platform = java.nio.charset.Charset.defaultCharset().name();
+        return roundTripsThrough(source, platform) ? platform
+                : SOURCE_BYTE_TRANSPARENT_ENCODING;
+    }
+
+    /**
+     * Splices the annotations in above the class declaration, with the import.
+     *
+     * <p>Textual rather than a parse: the file may be Java or Kotlin, it may use
+     * any formatting, and rewriting it through a parser would reformat code the
+     * developer did not ask to have touched.</p>
+     */
+    void insertAnnotations(File source, String annotations, String simpleName)
+            throws IOException {
+        String charset = rewriteCharset(source);
+        boolean decoded = !SOURCE_BYTE_TRANSPARENT_ENCODING.equals(charset);
+        String text = read(source, charset);
+        boolean kotlin = source.getName().endsWith(".kt");
+        String blanked = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(text, kotlin);
+        // A live import, not the words anywhere in the file. A comment or a
+        // string mentioning the package -- a javadoc line about build hints, say
+        // -- aborted the migration on a source that compiles perfectly well and
+        // has no import at all.
+        if (importsBuildHints(blanked)) {
+            throw new IOException(source.getName() + " already imports the build hint "
+                    + "annotations; migrate the remaining hints by hand so nothing is "
+                    + "overwritten.");
+        }
+
+        // Named imports, one per annotation written, rather than the package on
+        // demand -- and the fully qualified name instead for any whose simple
+        // name the file has already given to something else. A wildcard import
+        // loses to an explicit `import com.example.Build;` and to a type in the
+        // file's own package, so the generated `@Build` referred to theirs, the
+        // verification build failed, and an otherwise valid migration rolled
+        // back. A named import beats a same-package type; only a type declared
+        // in this very file cannot be imported at all, so that one is qualified.
+        StringBuilder importLines = new StringBuilder();
+        StringBuilder written = new StringBuilder();
+        for (String line : annotations.split("\n", -1)) {
+            String name = annotationNameOf(line);
+            if (name == null) {
+                written.append(line).append('\n');
+                continue;
+            }
+            String body = line;
+            if (simpleNameIsTaken(text, blanked, name, kotlin)) {
+                body = "@" + ANNOTATION_PACKAGE + "." + line.substring(1);
+            } else if (importLines.indexOf(importOf(name, kotlin)) < 0) {
+                importLines.append(importOf(name, kotlin)).append('\n');
+            }
+            // An enum-valued hint renders as `ThemeMode.MODERN`, which is a
+            // second type to account for -- without its own import the generated
+            // annotation does not compile, so every enum-valued migration was
+            // rolled back by its own verification build.
+            written.append(withEnumsResolved(body, text, blanked, kotlin, importLines))
+                    .append('\n');
+        }
+        // split(-1) keeps the trailing empty piece, which put a blank line back.
+        annotations = written.substring(0, Math.max(0, written.length() - 1));
+        String importLine = importLines.length() == 0 ? null
+                : importLines.substring(0, importLines.length() - 1);
+
+        // Decoded text needs no offset mapping: every index IS a character
+        // index in the string about to be written back.
+        int declaration = decoded ? classDeclarationIndex(text, kotlin, simpleName)
+                : declarationOffsetIn(source, text, kotlin, simpleName);
+        if (declaration < 0) {
+            throw new IOException("Could not find the class declaration in " + source.getName());
+        }
+        String head = text.substring(0, declaration);
+        String tail = text.substring(declaration);
+
+        String blankedHead = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(head, kotlin);
+        int lastImport = lastImportIndex(blankedHead);
+        if (lastImport >= 0) {
+            // After the whole declaration. `import java.\n util.List;` is legal
+            // and the first newline after the keyword is inside it, so cutting
+            // there spliced the new import into the middle of the old one and the
+            // verification build rolled a correct migration back.
+            int at = endOfImportDeclaration(blankedHead, lastImport);
+            if (importLine != null) {
+                head = head.substring(0, at) + importLine + "\n" + head.substring(at);
+            }
+        } else if (importLine != null) {
+            // No existing import. Anchor after the package declaration, and when
+            // the class is in the default package anchor above any annotation it
+            // already carries: indexOf returns -1 there, and the old arithmetic
+            // then put the import at the first newline in the file, which is
+            // inside the copyright comment.
+            //
+            // The package is found in CODE. A header sentence mentioning the word
+            // -- "// The package layout is documented here" -- was selected by a
+            // raw search, and the import went in before the real declaration or
+            // inside the comment itself, so the verification build failed and
+            // rolled back a migration that was otherwise correct.
+            int pkg = livePackageIndex(blankedHead);
+            int anchor = pkg >= 0 ? endOfPackageDeclaration(blankedHead, pkg)
+                    : startOfFirstDeclaration(head, kotlin);
+            head = head.substring(0, anchor) + (pkg >= 0 ? "\n" : "")
+                    + importLine + "\n" + (pkg >= 0 ? "" : "\n") + head.substring(anchor);
+        }
+        write(source, head + annotations + tail, charset);
+    }
+
+    /**
+     * The charset to parse and rewrite {@code source} with.
+     *
+     * <p>The rewrite is byte-transparent by default: read and write ISO-8859-1,
+     * so every byte round-trips and the only change is the inserted ASCII. That
+     * is the right answer for a file whose real encoding cannot be known, and it
+     * works for any ASCII-compatible one, because the tokens this scanner looks
+     * for -- {@code package}, {@code import}, {@code class}, {@code &#123;} --
+     * are single ASCII bytes either way.</p>
+     *
+     * <p>It is wrong for UTF-16. There every ASCII character is two bytes with a
+     * NUL beside it, so read byte-transparently the file is
+     * {@code p\0a\0c\0k\0...}: no import is found, no package is found, and
+     * the ASCII the migration splices in would be written as single bytes into a
+     * two-byte-per-character file. The goal would have mangled a source it had
+     * just correctly IDENTIFIED, since {@code declares} already reads in the
+     * compiler's charset.</p>
+     *
+     * <p>So the module's declared charset is used when it declares one AND the
+     * file round-trips through it byte for byte. Never a guess and never a
+     * default: decoding a source with the wrong charset and writing it back
+     * would corrupt every non-ASCII character in it, which is worse than
+     * refusing the migration.</p>
+     */
+    String rewriteCharset(File source) {
+        // The SAME answer the read uses. These were two chains: the read fell
+        // back to the platform default and the rewrite to byte-transparent, so
+        // on a platform whose default is UTF-16 the migration identified the
+        // main class correctly and then spliced single-byte ASCII into it.
+        //
+        // The round trip is checked here and not there because only the rewrite
+        // needs it: reading a name is a comparison, writing the file back is
+        // destructive, and a charset that does not reproduce the bytes exactly
+        // would lose whatever it could not decode.
+        String charset = sourceCharset(source);
+        if (SOURCE_BYTE_TRANSPARENT_ENCODING.equals(charset)) {
+            return charset;
+        }
+        return roundTripsThrough(source, charset) ? charset : SOURCE_BYTE_TRANSPARENT_ENCODING;
+    }
+
+    /// Whether decoding `f` as `charset` and encoding it back reproduces the
+    /// file exactly.
+    ///
+    /// Stronger than "it decodes without error", and it is the property the
+    /// rewrite actually needs: a file declared UTF-8 that is not valid UTF-8
+    /// decodes into replacement characters quite happily, and writing that back
+    /// destroys the bytes it could not read.
+    private boolean roundTripsThrough(File f, String charset) {
+        try {
+            byte[] raw = readAllBytes(f);
+            java.nio.charset.CharsetDecoder decoder = java.nio.charset.Charset.forName(charset)
+                    .newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT);
+            String text = decoder.decode(java.nio.ByteBuffer.wrap(raw)).toString();
+            return java.util.Arrays.equals(raw, text.getBytes(charset));
+        } catch (Exception ex) {
+            getLog().debug("cn1: " + f + " does not round-trip through " + charset, ex);
+            return false;
+        }
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.io.InputStream in = new FileInputStream(f);
+        try {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+        } finally {
+            in.close();
+        }
+        return out.toByteArray();
+    }
+
+    /// `line` with every enum type it names either imported or written out in
+    /// full, by the same rule the annotation names follow.
+    private static String withEnumsResolved(String line, String text, String blanked,
+                                            boolean kotlin, StringBuilder importLines) {
+        java.util.Set<String> enums = enumTypeNames();
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < line.length()) {
+            char c = line.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(line.charAt(i - 1)))) {
+                out.append(c);
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end < line.length() && Character.isJavaIdentifierPart(line.charAt(end))) {
+                end++;
+            }
+            String word = line.substring(i, end);
+            if (!enums.contains(word) || end >= line.length() || line.charAt(end) != '.') {
+                out.append(word);
+                i = end;
+                continue;
+            }
+            if (simpleNameIsTaken(text, blanked, word, kotlin)) {
+                out.append(ANNOTATION_PACKAGE).append('.').append(word);
+            } else {
+                if (importLines.indexOf(importOf(word, kotlin)) < 0) {
+                    importLines.append(importOf(word, kotlin)).append('\n');
+                }
+                out.append(word);
+            }
+            i = end;
+        }
+        return out.toString();
+    }
+
+    /// Whether `value` fails the hint's declared value pattern.
+    ///
+    /// A pattern the catalog cannot compile is not a reason to refuse a
+    /// migration: the catalog's own tests are where a bad pattern belongs.
+    private static boolean violatesPattern(com.codename1.build.shared.BuildHints.Hint hint,
+                                           String value) {
+        String pattern = hint.valuePattern();
+        if (pattern == null || pattern.length() == 0) {
+            return false;
+        }
+        try {
+            return !java.util.regex.Pattern.compile(pattern).matcher(value).matches();
+        } catch (java.util.regex.PatternSyntaxException badPattern) {
+            return false;
+        }
+    }
+
+    /// Every enum type the catalog can render a value as.
+    private static java.util.Set<String> enumTypeNames() {
+        java.util.Set<String> out = new java.util.LinkedHashSet<String>();
+        for (com.codename1.build.shared.BuildHints.Hint h
+                : com.codename1.build.shared.BuildHints.entries()) {
+            if (h.enumName() != null && h.enumName().length() > 0) {
+                out.add(h.enumName());
+            }
+        }
+        return out;
+    }
+
+    /** The package the build hint annotations live in. */
+    private static final String ANNOTATION_PACKAGE = "com.codename1.annotations.buildhints";
+
+    /** The import statement for one of them, in the right language. */
+    private static String importOf(String simple, boolean kotlin) {
+        return "import " + ANNOTATION_PACKAGE + "." + simple + (kotlin ? "" : ";");
+    }
+
+    /// The annotation a generated line writes, or null when the line is not one.
+    ///
+    /// The text being read here is the text this goal just rendered, one
+    /// annotation to a line, so this recognises that shape rather than parsing
+    /// the language.
+    private static String annotationNameOf(String line) {
+        if (!line.startsWith("@")) {
+            return null;
+        }
+        int end = 1;
+        while (end < line.length() && Character.isJavaIdentifierPart(line.charAt(end))) {
+            end++;
+        }
+        return end > 1 ? line.substring(1, end) : null;
+    }
+
+    /// Whether `simple` already names something else in this file: a type it
+    /// declares, or a type it imports from elsewhere.
+    ///
+    /// A same-package type is NOT taken, because the named import this goal
+    /// writes beats it. A type declared in this very file is, because importing
+    /// a name the compilation unit declares is an error rather than a shadowing.
+    private static boolean simpleNameIsTaken(String text, String blanked, String simple,
+                                             boolean kotlin) {
+        if (com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .declaresType(text, simple, kotlin)) {
+            return true;
+        }
+        if (kotlin && declaresTypeAlias(blanked, simple)) {
+            return true;
+        }
+        for (int at = importKeywordAt(blanked, 0); at >= 0;
+                at = importKeywordAt(blanked, at + "import".length())) {
+            if (simple.equals(importedSimpleName(blanked, at, kotlin))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether blanked `code` declares `typealias simple = ...`.
+    ///
+    /// A typealias is a declaration this file makes, so it takes the name as
+    /// surely as a class does -- and the type lookup only knows about class,
+    /// object, interface, enum and record. Writing a named import beside one
+    /// gives the same local name twice, which does not compile.
+    private static boolean declaresTypeAlias(String code, String simple) {
+        int at = 0;
+        while (true) {
+            at = code.indexOf("typealias", at);
+            if (at < 0) {
+                return false;
+            }
+            int after = at + "typealias".length();
+            boolean whole = (at == 0 || !Character.isJavaIdentifierPart(code.charAt(at - 1)))
+                    && after < code.length()
+                    && !Character.isJavaIdentifierPart(code.charAt(after));
+            if (whole) {
+                int n = after;
+                while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                        .escapedIdentifierEnd(code, n);
+                String name;
+                if (escaped > n) {
+                    name = code.substring(n + 1, escaped - 1);
+                } else {
+                    int stop = n;
+                    while (stop < code.length()
+                            && Character.isJavaIdentifierPart(code.charAt(stop))) {
+                        stop++;
+                    }
+                    name = code.substring(n, stop);
+                }
+                if (simple.equals(name)) {
+                    return true;
+                }
+            }
+            at = after;
+        }
+    }
+
+    /// The name the import at `at` makes available, or null when it makes none
+    /// this goal has to work around.
+    ///
+    /// The `as` alias is read as a TOKEN. Searching for the literal `" as "`
+    /// missed `import com.example.Other as\nIos`, which is legal, so the goal
+    /// wrote its own `import ...buildhints.Ios` beside it -- two imports giving
+    /// the same local name, which does not compile, so verification rolled back
+    /// an otherwise valid migration. An on-demand import is not a name at all:
+    /// the named import this goal writes beats it.
+    private static String importedSimpleName(String blanked, int at, boolean kotlin) {
+        int nameAt = at + "import".length();
+        int probeStatic = nameAt;
+        while (probeStatic < blanked.length()
+                && Character.isWhitespace(blanked.charAt(probeStatic))) {
+            probeStatic++;
+        }
+        if (!kotlin && blanked.startsWith("static", probeStatic)
+                && probeStatic + 6 < blanked.length()
+                && !Character.isJavaIdentifierPart(blanked.charAt(probeStatic + 6))) {
+            nameAt = probeStatic + 6;
+        }
+        String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameAt(blanked, nameAt);
+        int end = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameEnd(blanked, nameAt);
+        int dot = name.lastIndexOf('.');
+        String last = dot < 0 ? name : name.substring(dot + 1);
+        if ("*".equals(last) || last.length() == 0) {
+            return null;
+        }
+        if (!kotlin) {
+            return last;
+        }
+        int probe = end;
+        while (probe < blanked.length() && Character.isWhitespace(blanked.charAt(probe))) {
+            probe++;
+        }
+        if (!blanked.startsWith("as", probe) || probe + 2 >= blanked.length()
+                || Character.isJavaIdentifierPart(blanked.charAt(probe + 2))) {
+            return last;
+        }
+        int alias = probe + 2;
+        while (alias < blanked.length() && Character.isWhitespace(blanked.charAt(alias))) {
+            alias++;
+        }
+        int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .escapedIdentifierEnd(blanked, alias);
+        if (escaped > alias) {
+            return blanked.substring(alias + 1, escaped - 1);
+        }
+        int stop = alias;
+        while (stop < blanked.length() && Character.isJavaIdentifierPart(blanked.charAt(stop))) {
+            stop++;
+        }
+        return stop > alias ? blanked.substring(alias, stop) : last;
+    }
+
+    /// Whether blanked `code` contains a live import of the build hint package.
+    /// The end of the declaration that has been read up to `i`: its terminating
+    /// semicolon if it has one, then the rest of that line.
+    ///
+    /// Any whitespace before the semicolon, newlines included -- a blanked block
+    /// comment keeps its newlines, so `import foo.Bar /* note\n */ ;` left the
+    /// semicolon unconsumed and ended the declaration at that newline, INSIDE
+    /// the comment. The generated import was written there and stayed commented
+    /// out, so the annotations failed verification and a valid migration was
+    /// rolled back. Only taken when a semicolon is what follows, so a Kotlin
+    /// declaration that has none still ends on its own line.
+    private static int endOfDeclarationLine(String code, int i) {
+        int probe = i;
+        while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+            probe++;
+        }
+        if (probe < code.length() && code.charAt(probe) == ';') {
+            i = probe + 1;
+        }
+        int eol = code.indexOf('\n', i);
+        return eol < 0 ? code.length() : eol + 1;
+    }
+
+    static boolean importsBuildHints(String code) {
+        for (int at = importKeywordAt(code, 0); at >= 0;
+                at = importKeywordAt(code, at + "import".length())) {
+            String name = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .qualifiedNameAt(code, at + "import".length());
+            // The PACKAGE, not any name that starts with its letters. An
+            // unrelated com.codename1.annotations.buildhintsExtra.Widget read as
+            // "already imported" and aborted a migration with nothing to
+            // conflict with.
+            if (name.equals("com.codename1.annotations.buildhints")
+                    || name.startsWith("com.codename1.annotations.buildhints.")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The offset of the last live `import` keyword in blanked `code`, or -1.
+    static int lastImportIndex(String code) {
+        int last = -1;
+        for (int at = importKeywordAt(code, 0); at >= 0;
+                at = importKeywordAt(code, at + "import".length())) {
+            last = at;
+        }
+        return last;
+    }
+
+    private static int importKeywordAt(String code, int from) {
+        int i = from;
+        while (i < code.length()) {
+            // A Kotlin escaped identifier is code, not a keyword: `fun
+            // `import`() {}` declares a function called import.
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
+            char c = code.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int end = i;
+            while (end < code.length() && Character.isJavaIdentifierPart(code.charAt(end))) {
+                end++;
+            }
+            if ("import".equals(code.substring(i, end))) {
+                return i;
+            }
+            i = end;
+        }
+        return -1;
+    }
+
+    /// The index just past the import declaration beginning at `importAt`.
+    static int endOfImportDeclaration(String code, int importAt) {
+        int i = importAt + "import".length();
+        // Java's optional `static` first. Passing it to the name reader made
+        // `static` itself the imported name, and the declaration then ended at
+        // the newline inside the real name -- so `import static java.util.\n
+        // Collections.emptyList;` had the generated import spliced into it.
+        int probeStatic = i;
+        while (probeStatic < code.length() && Character.isWhitespace(code.charAt(probeStatic))) {
+            probeStatic++;
+        }
+        if (code.startsWith("static", probeStatic)
+                && probeStatic + 6 < code.length()
+                && !Character.isJavaIdentifierPart(code.charAt(probeStatic + 6))) {
+            i = probeStatic + 6;
+        }
+        // The name, then an optional Kotlin `as` alias, then an optional
+        // semicolon, then the rest of that line.
+        for (int pass = 0; pass < 2; pass++) {
+            // Component by component: `import java.\n util.List;` is legal, and a
+            // contiguous run stops at the newline in the middle of the name.
+            i = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .qualifiedNameEnd(code, i);
+            int probe = i;
+            while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+                probe++;
+            }
+            if (!code.startsWith("as", probe) || probe + 2 >= code.length()
+                    || Character.isJavaIdentifierPart(code.charAt(probe + 2))) {
+                break;
+            }
+            i = probe + 2;
+        }
+        return endOfDeclarationLine(code, i);
+    }
+
+    /// The offset of the `package` keyword in already-blanked code, or -1.
+    static int livePackageIndex(String code) {
+        int i = 0;
+        while (i < code.length()) {
+            // A Kotlin escaped identifier is code, not a keyword: `fun
+            // `import`() {}` declares a function called import.
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
+            char c = code.charAt(i);
+            if (!Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            if ("package".equals(code.substring(i, wordEnd))) {
+                return i;
+            }
+            i = wordEnd;
+        }
+        return -1;
+    }
+
+    /// The index just past the whole package declaration beginning at `pkgAt`.
+    ///
+    /// Past the NAME and its optional semicolon, not merely to the next newline:
+    /// `package\ncom.example;` is valid Java, and cutting at the first newline
+    /// would have inserted the import into the middle of the statement.
+    static int endOfPackageDeclaration(String code, int pkgAt) {
+        // Component by component. `package com.\nexample;` is legal, and a
+        // contiguous scan stops at the newline -- so the import was inserted
+        // before `example;` and the verification build rolled back a correct
+        // migration. Same reader the import anchor uses, so the two cannot
+        // disagree about where a name ends.
+        int i = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .qualifiedNameEnd(code, pkgAt + "package".length());
+        return endOfDeclarationLine(code, i);
+    }
+
+    /// The offset in `original` where an import may be inserted: before the
+    /// FIRST top-level declaration, whatever it is.
+    ///
+    /// Only for a file with no package declaration and no existing import --
+    /// otherwise the anchor is the end of one of those. This replaced a backward
+    /// walk from the main class over its annotations and modifiers, which
+    /// answered the wrong question: an import goes above EVERY top-level
+    /// declaration, so a `fun helper() {}` written before the main class left
+    /// the import below it and the verification build rejected the file. There
+    /// is nothing to back over once the anchor is the first declaration in the
+    /// file, which is also why the annotation and modifier cases it used to
+    /// handle now need no handling.
+    ///
+    /// Kotlin's FILE annotations are the exception, and the only one: the
+    /// grammar puts them above the package header and the imports both, so the
+    /// leading `@file:` run is stepped over rather than displaced.
+    static int startOfFirstDeclaration(String original) {
+        return startOfFirstDeclaration(original, false);
+    }
+
+    static int startOfFirstDeclaration(String original, boolean kotlin) {
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(original, kotlin);
+        int i = 0;
+        while (true) {
+            while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+                i++;
+            }
+            if (i >= code.length()) {
+                return code.length();
+            }
+            if (!kotlin || !fileAnnotationAt(code, i)) {
+                return i;
+            }
+            int after = endOfAnnotation(code, i);
+            if (after <= i) {
+                return i;
+            }
+            i = after;
+        }
+    }
+
+    /// Whether `@file:` starts at `at`. Kotlin allows space around the colon.
+    private static boolean fileAnnotationAt(String code, int at) {
+        if (at >= code.length() || code.charAt(at) != '@') {
+            return false;
+        }
+        int i = at + 1;
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        if (!code.startsWith("file", i)) {
+            return false;
+        }
+        i += 4;
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        return i < code.length() && code.charAt(i) == ':';
+    }
+
+    /// The offset just past the annotation starting at `at`, or `at` when it
+    /// cannot be read. Blanked code, so a parenthesis inside a literal is gone.
+    private static int endOfAnnotation(String code, int at) {
+        int i = at + 1;
+        while (i < code.length() && (Character.isWhitespace(code.charAt(i))
+                || code.charAt(i) == ':' || code.charAt(i) == '.'
+                || Character.isJavaIdentifierPart(code.charAt(i)))) {
+            i++;
+        }
+        int probe = i;
+        while (probe < code.length() && Character.isWhitespace(code.charAt(probe))) {
+            probe++;
+        }
+        if (probe >= code.length()) {
+            return i;
+        }
+        char c = code.charAt(probe);
+        // Arguments, or a BRACKETED list: Kotlin lets one use-site target carry
+        // several annotations -- `@file:[JvmName("X") Suppress("unchecked")]` --
+        // and stopping at the `[` read the bracket as the first declaration, so
+        // the import went between `@file:` and its own list.
+        if (c == '(') {
+            return balancedEnd(code, probe, '(', ')', at);
+        }
+        if (c == '[') {
+            return balancedEnd(code, probe, '[', ']', at);
+        }
+        return i;
+    }
+
+    /// The offset just past the run opened at `from`, or `fallback` when it never
+    /// closes. Blanked code, so a delimiter inside a literal is already gone.
+    private static int balancedEnd(String code, int from, char open, char close, int fallback) {
+        int depth = 0;
+        for (int j = from; j < code.length(); j++) {
+            if (code.charAt(j) == open) {
+                depth++;
+            } else if (code.charAt(j) == close) {
+                depth--;
+                if (depth == 0) {
+                    return j + 1;
+                }
+            }
+        }
+        return fallback;
+    }
+
+    /// Where the named declaration starts, as an offset into the BYTE-
+    /// TRANSPARENT text that gets rewritten.
+    ///
+    /// The name is found in the source decoded properly -- a multibyte name is
+    /// not readable in the byte-transparent view, and falling back to the first
+    /// top-level declaration put the annotations on an ASCII helper that
+    /// happened to come first, which the verification build then rejected. The
+    /// offset is carried back by measuring how many bytes the decoded prefix
+    /// occupies, which is exactly its index in a text of one char per byte.
+    ///
+    /// Only when the decoded text round-trips to the same bytes: a file that is
+    /// not in the encoding the project claims cannot be measured this way, and
+    /// the byte-transparent scan stays the answer for it.
+    private int declarationOffsetIn(File source, String text, boolean kotlin, String simpleName) {
+        String charset = sourceCharset(source);
+        try {
+            String decoded = read(source, charset);
+            byte[] round = decoded.getBytes(charset);
+            if (round.length == text.length()) {
+                int at = classDeclarationIndex(decoded, kotlin, simpleName);
+                if (at >= 0) {
+                    return decoded.substring(0, at).getBytes(charset).length;
+                }
+            }
+        } catch (IOException | RuntimeException ex) {
+            getLog().debug("cn1: could not read " + source + " as " + charset, ex);
+        }
+        return classDeclarationIndex(text, kotlin, simpleName);
+    }
+
+    /// The name is matched in the byte-transparent text, so a source in a
+    /// multibyte encoding falls back to the FIRST declaration rather than the
+    /// named one -- its bytes are not readable as an identifier here. That is
+    /// the right trade for an INDEX: every offset this returns is written back
+    /// into the file as it is on disk, and for a main source the first
+    /// top-level declaration is the one being annotated anyway. Which file to
+    /// annotate is decided elsewhere, by `declares`, which reads the source in
+    /// its own encoding.
+    ///
+    /// One thing this deliberately does NOT do: translate Java's unicode
+    /// escapes. `public cl\\u0061ss Main` is a legal spelling of the keyword
+    /// (written with two backslashes here because javac would translate a real
+    /// one even inside this comment), and
+    /// the processor-side reader decodes it -- so the source lookup accepts a
+    /// file this locator then cannot find a declaration in, and the goal refuses
+    /// with "Could not find the class declaration".
+    ///
+    /// That is the outcome we want from it. Every index here is written back
+    /// into the file as it is on disk, so decoding would need an offset map
+    /// threaded through the import scan, the package scan, the annotation walk
+    /// and the insertion itself -- and the failure being avoided is a refusal
+    /// that names what it could not do and changes nothing, on a spelling no
+    /// project writes. A migration that guessed an offset wrong would corrupt
+    /// the source instead. Refusing is the safe half of the trade.
+    static int classDeclarationIndex(String text, boolean kotlin, String simpleName) {
+        // Top level means brace depth zero, not column zero. Anchoring the
+        // pattern to the start of a line refused `  public class MyApp`, which
+        // compiles perfectly well -- so the goal rolled back with "Could not find
+        // the class declaration" on a project whose source it had just accepted
+        // through the token-aware lookup.
+        String code = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                .blankNonCode(text, kotlin);
+        int first = -1;
+        int depth = 0;
+        int i = 0;
+        while (i < code.length()) {
+            int escaped = com.codename1.maven.processors.BuildHintAnnotationProcessor
+                    .escapedIdentifierEnd(code, i);
+            if (escaped > i) {
+                i = escaped;
+                continue;
+            }
+            char c = code.charAt(i);
+            if (c == '{') {
+                depth++;
+                i++;
+                continue;
+            }
+            if (c == '}') {
+                depth--;
+                i++;
+                continue;
+            }
+            if (depth != 0 || !Character.isJavaIdentifierStart(c)
+                    || (i > 0 && Character.isJavaIdentifierPart(code.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+            int wordEnd = i;
+            while (wordEnd < code.length()
+                    && Character.isJavaIdentifierPart(code.charAt(wordEnd))) {
+                wordEnd++;
+            }
+            String word = code.substring(i, wordEnd);
+            if (isTypeKind(word, kotlin)) {
+                int n = wordEnd;
+                while (n < code.length() && Character.isWhitespace(code.charAt(n))) {
+                    n++;
+                }
+                // Kotlin may ESCAPE the declared name in backticks, and
+                // codename1.mainName holds the name between them. Reading only
+                // identifier characters recorded nothing for `class `when``, so
+                // the goal reported "Could not find the class declaration" and
+                // rolled back a valid migration of a file it had just accepted.
+                int end = n;
+                String declared;
+                if (kotlin && n < code.length() && code.charAt(n) == '`') {
+                    int close = code.indexOf('`', n + 1);
+                    declared = close < 0 ? "" : code.substring(n + 1, close);
+                } else {
+                    while (end < code.length()
+                            && Character.isJavaIdentifierPart(code.charAt(end))) {
+                        end++;
+                    }
+                    declared = code.substring(n, end);
+                }
+                if (declared.length() > 0) {
+                    // The declaration's own modifiers come before the keyword, and
+                    // the annotations have to go before those.
+                    int start = startOfModifiers(code, i);
+                    if (simpleName != null && simpleName.length() > 0
+                            && (declared.equals(simpleName)
+                                || declared.equals(asWrittenInSource(simpleName)))) {
+                        return start;
+                    }
+                    if (first < 0) {
+                        first = start;
+                    }
+                }
+            }
+            i = wordEnd;
+        }
+        return first;
+    }
+
+    private static boolean isTypeKind(String word, boolean kotlin) {
+        if (kotlin) {
+            return "class".equals(word) || "object".equals(word) || "interface".equals(word);
+        }
+        return "class".equals(word) || "interface".equals(word) || "enum".equals(word)
+                || "record".equals(word);
+    }
+
+    /// Back up over the modifiers preceding the keyword at `at`, so the
+    /// annotations land above `public final class` rather than inside it.
+    ///
+    /// Across any whitespace, newlines included. `public\nclass Main` is legal,
+    /// and stopping at the line break left `public` in the head -- so the
+    /// generated import was written after it, which is not valid Java, and the
+    /// verification build rolled back a migration that was otherwise correct.
+    /// Comments are already spaces here, since this runs on blanked code.
+    private static int startOfModifiers(String code, int at) {
+        int start = at;
+        while (true) {
+            int i = start - 1;
+            while (i >= 0 && Character.isWhitespace(code.charAt(i))) {
+                i--;
+            }
+            if (i < 0) {
+                return start;
+            }
+            int wordEnd = i + 1;
+            while (i >= 0 && (Character.isJavaIdentifierPart(code.charAt(i))
+                    || code.charAt(i) == '-')) {
+                i--;
+            }
+            String word = code.substring(i + 1, wordEnd);
+            if (word.length() == 0 || !isModifier(word)) {
+                return start;
+            }
+            start = i + 1;
+        }
+    }
+
+    private static boolean isModifier(String word) {
+        String[] modifiers = {"public", "protected", "private", "abstract", "final", "static",
+                              "strictfp", "sealed", "non-sealed", "internal", "open", "data",
+                              "value", "annotation", "inner", "expect", "actual"};
+        for (String m : modifiers) {
+            if (m.equals(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Deletes the migrated declarations, leaving every other line -- comments,
+     * ordering, unrelated settings -- byte for byte as it was.
+     *
+     * <p>Keys are recognised the way {@code Properties.load} defines them, not
+     * just {@code key=value}: {@code key:value} and {@code key value} are equally
+     * valid, and a line ending in an odd number of backslashes continues onto the
+     * next. A declaration this pass fails to recognise is left behind while the
+     * annotation is added, and the very next build fails with the duplicate-hint
+     * error this goal exists to avoid.</p>
+     *
+     * <p>Written back as ISO-8859-1 because that is what {@code Properties.load}
+     * reads a {@code .properties} stream as. Rewriting the file as UTF-8 would
+     * turn any non-ASCII byte elsewhere in it -- an accented
+     * {@code codename1.displayName}, say -- into mojibake, even though it has
+     * nothing to do with the hint being migrated.</p>
+     */
+    static void removeMigratedLines(File settingsFile, List<String> keys) throws IOException {
+        // Each entry keeps its own terminator. readLine() discards it, and
+        // appending '\n' to every retained line rewrote a CRLF checkout end to
+        // end -- a whole-file diff from a goal that promises to delete some
+        // lines and touch nothing else, and one this repository has been bitten
+        // by before.
+        List<String> lines = physicalLines(readAll(settingsFile));
+
+        Map<String, Boolean> wanted = new LinkedHashMap<String, Boolean>();
+        for (String k : keys) {
+            wanted.put(k, Boolean.TRUE);
+        }
+
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < lines.size(); i++) {
+            // Gather the whole logical line: continuations belong to the same
+            // declaration and have to go with it.
+            int last = i;
+            StringBuilder logical = new StringBuilder(withoutTerminator(lines.get(i)));
+            // A COMMENT is a natural line: continuation does not apply to it, so
+            // `# note \` ends at the newline and the declaration below it is an
+            // ordinary property. Joining the two made the pair read as a
+            // comment, so the migrated declaration was retained and the
+            // verification build failed on the duplicate.
+            boolean comment = isCommentLine(logical.toString());
+            while (!comment && continues(withoutTerminator(lines.get(last)))
+                    && last + 1 < lines.size()) {
+                // The continuation backslash is a MARKER, not part of the value:
+                // Properties.load drops it, so leaving it in made
+                // `codename1.arg.ios.teamId\` + ` =ABCDE` read as an escaped `=`
+                // and the key never matched the one being migrated. The
+                // declaration stayed behind, and the verification build then
+                // failed on the duplicate the goal had just created.
+                logical.setLength(logical.length() - 1);
+                last++;
+                logical.append(withoutTerminator(lines.get(last)).replaceFirst("^\\s+", ""));
+            }
+            // A marker with nothing after it is still a marker: a file whose
+            // last byte is that backslash reads as an empty value to
+            // Properties.load, while leaving it in produced a key ending in `\`
+            // that matched nothing -- so the declaration stayed and the
+            // verification build failed on the duplicate.
+            if (!comment && continues(logical.toString())) {
+                logical.setLength(logical.length() - 1);
+            }
+            String key = propertyKeyOf(logical.toString());
+            if (key != null && wanted.containsKey(key)) {
+                i = last;
+                continue;
+            }
+            for (int j = i; j <= last; j++) {
+                out.append(lines.get(j));
+            }
+            i = last;
+        }
+        writeProperties(settingsFile, out.toString());
+    }
+
+    /** The whole file, as the encoding {@code Properties.load} would use. */
+    private static String readAll(File f) throws IOException {
+        Reader r = new InputStreamReader(new FileInputStream(f), PROPERTIES_ENCODING);
+        try {
+            StringBuilder sb = new StringBuilder();
+            char[] buf = new char[8192];
+            for (int n = r.read(buf); n > 0; n = r.read(buf)) {
+                sb.append(buf, 0, n);
+            }
+            return sb.toString();
+        } finally {
+            r.close();
+        }
+    }
+
+    /**
+     * The physical lines of {@code text}, each WITH the terminator it ended on.
+     *
+     * <p>All three of CRLF, LF and CR end a line for {@code Properties.load}, and
+     * a file need not end with one at all -- so the terminators travel with their
+     * lines rather than being normalised away and guessed at on the way out.</p>
+     */
+    private static List<String> physicalLines(String text) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c != '\n' && c != '\r') {
+                continue;
+            }
+            int end = i + 1;
+            if (c == '\r' && end < text.length() && text.charAt(end) == '\n') {
+                end++;
+            }
+            out.add(text.substring(start, end));
+            start = end;
+            i = end - 1;
+        }
+        if (start < text.length()) {
+            out.add(text.substring(start));
+        }
+        return out;
+    }
+
+    /** That line without its terminator, which is what the parsing reads. */
+    private static String withoutTerminator(String line) {
+        int end = line.length();
+        if (end > 0 && line.charAt(end - 1) == '\n') {
+            end--;
+        }
+        if (end > 0 && line.charAt(end - 1) == '\r') {
+            end--;
+        }
+        return line.substring(0, end);
+    }
+
+    /** Whether the line is a comment, which continuation does not apply to. */
+    private static boolean isCommentLine(String line) {
+        int i = 0;
+        while (i < line.length() && isPropertySpace(line.charAt(i))) {
+            i++;
+        }
+        return i < line.length() && (line.charAt(i) == '#' || line.charAt(i) == '!');
+    }
+
+    /** Whether a physical line ends in an odd number of backslashes. */
+    private static boolean continues(String line) {
+        int backslashes = 0;
+        for (int i = line.length() - 1; i >= 0 && line.charAt(i) == '\\'; i--) {
+            backslashes++;
+        }
+        return backslashes % 2 != 0;
+    }
+
+    /**
+     * The key a logical properties line declares, or null when the line is blank
+     * or a comment.
+     *
+     * <p>Follows {@code java.util.Properties}: the key runs to the first
+     * unescaped {@code =}, {@code :} or whitespace, and {@code \}{@code uXXXX}
+     * decodes to the character it names. The escape matters because the key this
+     * returns is compared against one {@code Properties.load} produced: a file
+     * writing {@code codename1.arg.\}{@code u0069os.teamId} declares
+     * {@code ios.teamId}, and reading it as {@code u0069os.teamId} leaves the
+     * original line in place, so the migration rolls back over a duplicate
+     * declaration it created itself.</p>
+     */
+    static String propertyKeyOf(String logicalLine) {
+        int i = 0;
+        while (i < logicalLine.length() && isPropertySpace(logicalLine.charAt(i))) {
+            i++;
+        }
+        if (i >= logicalLine.length()) {
+            return null;
+        }
+        char first = logicalLine.charAt(i);
+        if (first == '#' || first == '!') {
+            return null;
+        }
+        StringBuilder key = new StringBuilder();
+        for (; i < logicalLine.length(); i++) {
+            char c = logicalLine.charAt(i);
+            if (c == '\\' && i + 1 < logicalLine.length()) {
+                char escaped = logicalLine.charAt(++i);
+                if (escaped == 'u' && i + 4 < logicalLine.length()) {
+                    String hex = logicalLine.substring(i + 1, i + 5);
+                    int value = hexValue(hex);
+                    if (value >= 0) {
+                        key.append((char) value);
+                        i += 4;
+                        continue;
+                    }
+                }
+                key.append(escaped);
+                continue;
+            }
+            if (c == '=' || c == ':' || isPropertySpace(c)) {
+                break;
+            }
+            key.append(c);
+        }
+        return key.length() == 0 ? null : key.toString();
+    }
+
+    private static boolean isPropertySpace(char c) {
+        return c == ' ' || c == '\t' || c == '\f';
+    }
+
+    /** Four hex digits as a char value, or -1 when they are not four hex digits. */
+    private static int hexValue(String hex) {
+        int value = 0;
+        for (int i = 0; i < hex.length(); i++) {
+            int digit = Character.digit(hex.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = value * 16 + digit;
+        }
+        return value;
+    }
+
+    /** The encoding {@code Properties.load(InputStream)} reads. */
+    private static final String PROPERTIES_ENCODING = "ISO-8859-1";
+
+    private static void writeProperties(File f, String content) throws IOException {
+        Writer w = new OutputStreamWriter(new FileOutputStream(f), PROPERTIES_ENCODING);
+        try {
+            w.write(content);
+        } finally {
+            w.close();
+        }
+    }
+
+    /**
+     * Reads a properties file as ISO-8859-1, matching {@link #writeProperties}.
+     *
+     * <p>The rollback snapshot has to round-trip byte for byte. Taking it through
+     * the UTF-8 {@link #read} and restoring it with the ISO-8859-1 writer would
+     * mangle any raw high byte in an unrelated property -- an accented
+     * {@code codename1.displayName}, say -- while the goal reports that both
+     * files were put back as they were.</p>
+     */
+    private static String readProperties(File f) throws IOException {
+        return read(f, PROPERTIES_ENCODING);
+    }
+
+    /**
+     * Reads a source file byte-transparently.
+     *
+     * <p>ISO-8859-1 maps every byte 0-255 to the same char, so decoding with it,
+     * splicing in text that is pure ASCII, and encoding back reproduces the
+     * original bytes exactly -- whatever the project's real source encoding is.
+     * Hard-coding UTF-8 here reinterpreted the whole file, so a raw byte in a
+     * comment or a string literal came back changed even when the migration
+     * succeeded, and reading {@code project.build.sourceEncoding} would only
+     * narrow that to projects that declare it correctly.</p>
+     *
+     * <p>The markers this class searches for -- {@code package}, {@code import},
+     * the class declaration -- are ASCII, and every ASCII-compatible encoding
+     * decodes them identically under this scheme.</p>
+     */
+    private static String read(File f) throws IOException {
+        return read(f, SOURCE_BYTE_TRANSPARENT_ENCODING);
+    }
+
+    /** See {@link #read(File)}: byte-transparent, not a claim about the file. */
+    private static final String SOURCE_BYTE_TRANSPARENT_ENCODING = "ISO-8859-1";
+
+    private static String read(File f, String encoding) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), encoding));
+        try {
+            int c;
+            while ((c = r.read()) >= 0) {
+                sb.append((char) c);
+            }
+        } finally {
+            r.close();
+        }
+        return sb.toString();
+    }
+
+    private static void write(File f, String content) throws IOException {
+        write(f, content, SOURCE_BYTE_TRANSPARENT_ENCODING);
+    }
+
+    private static void write(File f, String content, String charset) throws IOException {
+        Writer w = new OutputStreamWriter(new FileOutputStream(f), charset);
+        try {
+            w.write(content);
+        } finally {
+            w.close();
+        }
+    }
+}

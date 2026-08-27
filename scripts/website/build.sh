@@ -321,6 +321,11 @@ build_developer_guide_for_site() {
   local build_date
   build_date="$(date +%Y-%m-%d)"
 
+  # The guide includes a build hint table that is rendered from
+  # maven/build-hint-catalog rather than checked in, so it has to exist before
+  # asciidoctor resolves the include.
+  "${REPO_ROOT}/scripts/gen-build-hint-table.sh"
+
   (
     cd "${REPO_ROOT}"
     asciidoctor \

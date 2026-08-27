@@ -169,9 +169,18 @@ jobs:
       # and cn1-ads-mock (a sample dependency) -- the same inputs the native
       # Windows screenshot job installs. JDK 8: core is source/target 1.5.
       - name: Build core + Windows port + CN1 maven plugin (JDK 8)
+        env:
+          # A build-only step: it compiles and then asserts two class files
+          # exist, so there is no test for a blanket retry to launder. Narrowed
+          # to resolution failures anyway, on the same principle the steps below
+          # apply -- this died on `Connection reset` pulling maven-plugin-api
+          # from Central, which is the canonical set's business and not this
+          # branch's.
+          RETRY_ONLY_MATCHING: transient
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am \
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
           test -f core/target/classes/com/codename1/ui/Form.class
           test -f windows/target/classes/com/codename1/impl/windows/WindowsImplementation.class
@@ -194,7 +203,9 @@ jobs:
           sleep 2
           mkdir -p "$HOME/.codenameone"
           [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
-          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          RETRY_ONLY_MATCHING=transient bash scripts/ci/retry.sh \
+            mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install \
+            -DskipTests '-Dmaven.javadoc.skip=true'
           test -f scripts/hellocodenameone/common/target/classes/com/codenameone/examples/hellocodenameone/tests/Cn1ssDeviceRunner.class
           test -f scripts/hellocodenameone/common/target/classes/com/codename1/generated/svg/SVGRegistry.class
 

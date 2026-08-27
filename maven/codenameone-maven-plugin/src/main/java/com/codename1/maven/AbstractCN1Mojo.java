@@ -222,6 +222,134 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
+    /// The modules this build is running over, for resolving which one produced
+    /// a classpath element.
+    @Parameter(defaultValue = "${reactorProjects}", readonly = true)
+    private List<MavenProject> reactorProjects;
+
+    /**
+     * The reactor module whose compiled output is `element`, or null.
+     *
+     * <p>In the generated layout the application's classes come from `common`
+     * while a platform module is what runs: asking the RUNNING project where its
+     * sources are answers for the wrong module, and a class compiled from
+     * `common` then has no backing source and reads as stale.</p>
+     */
+    protected MavenProject moduleProducing(File element) {
+        if (reactorProjects == null || element == null) {
+            return null;
+        }
+        String wanted = canonicalPath(element);
+        for (MavenProject candidate : reactorProjects) {
+            if (candidate.getBuild() != null
+                    && candidate.getBuild().getOutputDirectory() != null
+                    && wanted.equals(
+                        canonicalPath(new File(candidate.getBuild().getOutputDirectory())))) {
+                return candidate;
+            }
+            // A reactor `package` build hands over the dependency module's JAR
+            // rather than its output directory, which is the ordinary shape for
+            // the generated layout -- matching directories alone sent every
+            // class in that jar back to the running module's source roots, where
+            // it has none, so a live misplaced annotation read as stale.
+            if (candidate.getArtifact() != null && candidate.getArtifact().getFile() != null
+                    && wanted.equals(canonicalPath(candidate.getArtifact().getFile()))) {
+                return candidate;
+            }
+            if (wanted.equals(canonicalPath(packagedFileOf(candidate)))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /// Where `candidate` writes its jar, or null when it does not say.
+    ///
+    /// The artifact's own file is the better answer and is checked first, but it
+    /// is only set once the module has been packaged in this session.
+    private static File packagedFileOf(MavenProject candidate) {
+        if (candidate.getBuild() == null || candidate.getBuild().getDirectory() == null
+                || candidate.getBuild().getFinalName() == null) {
+            return null;
+        }
+        return new File(candidate.getBuild().getDirectory(),
+                candidate.getBuild().getFinalName() + ".jar");
+    }
+
+    private static String canonicalPath(File f) {
+        if (f == null) {
+            return null;
+        }
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException ex) {
+            return f.getAbsolutePath();
+        }
+    }
+
+    /**
+     * The `-D` properties this build was invoked with, or null when there is no
+     * session -- which is what the tests run without.
+     */
+    protected Properties userProperties() {
+        return session == null ? null : session.getUserProperties();
+    }
+
+    /**
+     * What the nested build is invoked with.
+     *
+     * <p>cn1:run is a nested Maven build, and nothing of the outer command line
+     * reached it. So {@code mvn cn1:run -Dcodename1.arg.desktop.titleBar=NATIVE}
+     * -- or {@code -Dcodename1.mainName} -- was accepted, printed, and then
+     * dropped: the inner build overlaid nothing, process-annotations stamped the
+     * manifest for the file's entry point, and the simulator ran on values the
+     * same command line would have changed for a device build.</p>
+     *
+     * <p>Everything in the {@code codename1} namespace, which is the rule
+     * {@code overlayCommandLineBuildHints} applies -- except the platform, which
+     * is set last because this goal IS the javase simulator and a stray
+     * {@code -Dcodename1.platform} must not send the nested build elsewhere.</p>
+     */
+    protected static Properties nestedBuildProperties(Properties userProperties) {
+        Properties props = new Properties();
+        if (userProperties != null) {
+            for (String key : userProperties.stringPropertyNames()) {
+                if (key.startsWith("codename1.")) {
+                    props.setProperty(key, userProperties.getProperty(key));
+                }
+            }
+        }
+        props.setProperty("codename1.platform", "javase");
+        return props;
+    }
+
+    /**
+     * The {@code codename1.arg.*} entries of {@code userProperties}, which is
+     * what {@code -D} actually passed.
+     *
+     * <p>Only those, never every hint in the settings file. The simulator reads
+     * a system property before the file, so publishing the file's own hints that
+     * way would outrank the file itself and hide the both-declared conflict the
+     * simulator is supposed to report.</p>
+     */
+    protected static Properties commandLineBuildHints(Properties userProperties) {
+        Properties out = new Properties();
+        if (userProperties == null) {
+            return out;
+        }
+        for (String key : userProperties.stringPropertyNames()) {
+            if (key.startsWith("codename1.arg.")) {
+                out.setProperty(key, userProperties.getProperty(key));
+            }
+        }
+        return out;
+    }
+
+    /** The session this mojo is running in, for a subclass that has to reproduce it. */
+    protected MavenSession getSession() {
+        return session;
+    }
+
     /**
      * Lets {@code -Dcodename1.arg.x=y} override the settings file.
      *
@@ -1110,5 +1238,735 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return true;
     }
    
+
+    /**
+     * Every directory a source could be compiled from, not only the ones
+     * {@code getCompileSourceRoots} lists.
+     *
+     * <p>build-helper and the generated-source plugins do add their roots there,
+     * but the Kotlin plugin compiles its own {@code <sourceDirs>} without adding
+     * them back -- so in a module that configures them, a Kotlin class could
+     * have a perfectly good source and still look deleted. The orphan filter
+     * would then drop it silently and its misplaced annotation would produce
+     * neither its hint nor the placement error.</p>
+     *
+     * <p>The conventional {@code src/main/kotlin} is included when it exists for
+     * the same reason: this list is used to decide that a source is ABSENT, and
+     * a list that is merely incomplete must not be read as that.</p>
+     */
+    protected static List<String> compileSourceRoots(MavenProject project) {
+        return compileSourceRoots(project, null);
+    }
+
+    /**
+     * The same list, resolving `${...}` against the `-D` properties the build
+     * was invoked with as well as the module's own.
+     *
+     * @param userProperties the session's user properties, or null when there
+     *                       is no session to read them from
+     */
+    protected static List<String> compileSourceRoots(MavenProject project,
+                                                     Properties userProperties) {
+        if (project == null) {
+            return null;
+        }
+        Interpolation expressions = new Interpolation(project, userProperties);
+        List<String> roots = new ArrayList<String>();
+        List<String> configured = project.getCompileSourceRoots();
+        if (configured != null && compilesJava(project)) {
+            roots.addAll(configured);
+        }
+        addKotlinSourceDirs(expressions, roots);
+        // The conventional Kotlin root, but only where the Kotlin plugin has not
+        // said where its sources are. A configured <sourceDirs> REPLACES the
+        // default, so an existing src/main/kotlin beside one is a tree the build
+        // does not compile -- and a stale class whose source still sits there
+        // then looked live, so the orphan filter kept it and the placement error
+        // it carries fired on every build.
+        File basedir = project.getBasedir();
+        // ...and only where the build compiles Kotlin at all. A module that
+        // never had the plugin, or had it removed, does not compile
+        // src/main/kotlin however many .kt files are sitting in it. Adding it
+        // anyway made a stale class in target/classes look LIVE because its old
+        // source was still on disk, and a build hint annotation on that class
+        // then failed the placement check on every incremental build -- a hard
+        // error nothing in the project could clear except deleting files.
+        if (basedir != null && compilesTheConventionalKotlinRoot(project)) {
+            File kotlin = new File(basedir, "src" + File.separator + "main"
+                    + File.separator + "kotlin");
+            if (kotlin.isDirectory() && !roots.contains(kotlin.getAbsolutePath())) {
+                roots.add(kotlin.getAbsolutePath());
+            }
+        }
+        addBuildHelperSources(expressions, roots);
+        return roots;
+    }
+
+    /**
+     * The configurations that apply to {@code goal}, most specific first: each
+     * execution bound to it, then the plugin-level one.
+     *
+     * <p>Maven merges plugin-level configuration into every execution, so a
+     * parameter written once outside them applies to this goal too -- and an
+     * execution's own value overrides it. Reading only one of the two got both
+     * halves wrong in turn: the build-helper roots missed a plugin-level
+     * {@code <sources>}, and the compiler encoding reported the plugin-level
+     * value over an execution that overrides it.</p>
+     *
+     * <p>An execution that names no goal but carries Maven's own id for one --
+     * {@code default-compile} -- is bound to it: that is how a POM overrides a
+     * lifecycle-injected execution.</p>
+     */
+    private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
+                                                  String goal, String element) {
+        return configurationsFor(plugin, goal, element, true);
+    }
+
+    /**
+     * The same, with {@code runsWithoutExecution} saying whether the goal is
+     * bound when the POM writes no execution for it.
+     *
+     * <p>It is for {@code maven-compiler-plugin}, which the default lifecycle
+     * binds, and for a Kotlin plugin with {@code <extensions>true</extensions>}.
+     * It is NOT for {@code build-helper-maven-plugin}, whose {@code add-source}
+     * runs only where an execution says so: plugin-level {@code <sources>} with
+     * no execution is dormant configuration, and treating it as a compiled root
+     * made a stale class in target/classes look live because its source sits
+     * there -- failing the placement check on every incremental build over a
+     * directory Maven never reads.</p>
+     */
+    private static List<Object> configurationsFor(org.apache.maven.model.Plugin plugin,
+                                                  String goal, String element,
+                                                  boolean runsWithoutExecution) {
+        List<Object> out = new ArrayList<Object>();
+        boolean bound = false;
+        if (plugin.getExecutions() != null) {
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                boolean thisOne = execution.getGoals() != null
+                        && execution.getGoals().contains(goal);
+                // The id alone binds the goal only where the LIFECYCLE provides
+                // an execution for it -- maven-compiler-plugin, and a Kotlin
+                // plugin with <extensions>true</extensions>. build-helper never
+                // gets one, so `default-add-source` with no <goal> is an
+                // execution with an odd name that runs nothing, and counting it
+                // pulled in sources Maven does not compile. That is the same
+                // question runsWithoutExecution answers.
+                if (!thisOne && runsWithoutExecution
+                        && ("default-" + goal).equals(execution.getId())) {
+                    thisOne = true;
+                }
+                if (!thisOne || isDisabled(execution)) {
+                    // A disabled execution contributes no configuration and does
+                    // not count as binding the goal -- with `bound` set, an
+                    // execution switched off with <phase>none</phase> would hide
+                    // the plugin-level configuration that still applies.
+                    continue;
+                }
+                bound = true;
+                // The execution's own value REPLACES the plugin-level one --
+                // Maven merges by element, and a repeated list is not appended
+                // unless the POM says so. Taking both would have added a
+                // directory the build does not compile, which is a phantom root
+                // for everything downstream to scan.
+                //
+                // Unless the POM DOES say so: `combine.children="append"` is how
+                // it asks for both, and then both are in effect.
+                if (!has(execution.getConfiguration(), element)) {
+                    // `combine.self="override"` discards the inherited
+                    // configuration wholesale, so an execution that says it and
+                    // omits the element is not falling back to the plugin's --
+                    // it has none. Reporting the plugin-level value there named
+                    // a setting the build does not use.
+                    if (!overrides(execution.getConfiguration())) {
+                        out.add(plugin.getConfiguration());
+                    }
+                    continue;
+                }
+                out.add(execution.getConfiguration());
+                if (appends(execution.getConfiguration(), element)
+                        && plugin.getConfiguration() != null) {
+                    out.add(plugin.getConfiguration());
+                }
+            }
+        }
+        if (!bound && runsWithoutExecution && plugin.getConfiguration() != null) {
+            out.add(plugin.getConfiguration());
+        }
+        return out;
+    }
+
+    /// Whether the POM asked for this element's children to be appended to the
+    /// inherited ones rather than to replace them.
+    ///
+    /// Maven reads the attribute on the element itself or on the configuration
+    /// it sits in, so both are checked.
+    private static boolean appends(Object configuration, String element) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return false;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom root =
+                (org.codehaus.plexus.util.xml.Xpp3Dom) configuration;
+        return "append".equals(root.getAttribute("combine.children"))
+                || (root.getChild(element) != null
+                    && "append".equals(root.getChild(element).getAttribute("combine.children")));
+    }
+
+    /// Whether the POM asked for this configuration to replace the inherited
+    /// one entirely rather than merge with it.
+    private static boolean overrides(Object configuration) {
+        return configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom
+                && "override".equals(((org.codehaus.plexus.util.xml.Xpp3Dom) configuration)
+                        .getAttribute("combine.self"));
+    }
+
+    private static boolean has(Object configuration, String element) {
+        return configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom
+                && ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild(element) != null;
+    }
+
+    /**
+     * build-helper's {@code add-source} directories.
+     *
+     * <p>That goal runs at {@code generate-sources} and adds them to the project
+     * itself, so a mojo bound after it sees them already. A goal invoked
+     * DIRECTLY -- {@code mvn cn1:settings} -- runs no lifecycle at all, so the
+     * list it reads is missing them, and a main class living only in an added
+     * root looked absent.</p>
+     *
+     * <p>{@code add-test-source} uses the same element and is passed over, the
+     * same distinction the Kotlin plugin's compile and test-compile executions
+     * need.</p>
+     */
+    private static void addBuildHelperSources(Interpolation expressions, List<String> roots) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = expressions.project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return;
+        }
+        if (plugins == null) {
+            return;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"build-helper-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            // Once per execution bound to add-source, taking the configuration
+            // that actually supplies its <sources>. Every such execution adds
+            // its own roots, so these accumulate -- but within one execution the
+            // levels do not, they override.
+            for (Object configuration
+                    : configurationsFor(plugin, "add-source", "sources", false)) {
+                addSourcesFrom(expressions, configuration, roots);
+            }
+        }
+    }
+
+    private static void addSourcesFrom(Interpolation expressions, Object configuration,
+                                       List<String> roots) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom sources =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("sources");
+        if (sources == null) {
+            return;
+        }
+        for (org.codehaus.plexus.util.xml.Xpp3Dom source : sources.getChildren()) {
+            addRoot(expressions, source.getValue(), roots);
+        }
+    }
+
+    /**
+     * A configured path with every expression this can resolve applied, or null
+     * when it is empty or still holds one it could not.
+     *
+     * <p>Maven usually interpolates these while building the model, so this is
+     * normally a no-op -- but a value that arrives unexpanded was being dropped
+     * outright, and `${project.basedir}/appsrc` is an ordinary way to write a
+     * root. A root dropped here is a main class the migration cannot find.</p>
+     *
+     * <p>A `$` that opens nothing is an ordinary character in a path and is
+     * left alone; only an unresolved `${...}` makes the value unusable.</p>
+     */
+    private static String expandProjectExpressions(Interpolation expressions, String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        String out = expressions.resolve(value.trim());
+        return out.indexOf("${") >= 0 ? null : out;
+    }
+
+    /**
+     * Resolves `${...}` the way Maven does when it hands a plugin its
+     * configuration: the project's own expressions, then the `-D` properties
+     * the build was invoked with, then the module's properties -- which is
+     * where a profile Maven activated has already put its own.
+     *
+     * <p>Only the project expressions used to be resolved, so a root or an
+     * encoding written as `${generated.sources}` or `${source.charset}` was
+     * discarded even though Maven compiles with it. Discarding a root loses a
+     * main class; discarding an encoding decodes a non-ASCII name with the
+     * wrong charset, or reports an inherited encoding that is not the one in
+     * force.</p>
+     */
+    private static final class Interpolation {
+
+        /** Long enough for a property defined in terms of another; a cycle stops here. */
+        private static final int PASSES = 8;
+
+        private final MavenProject project;
+        private final Properties user;
+
+        Interpolation(MavenProject project, Properties user) {
+            this.project = project;
+            this.user = user;
+        }
+
+        String resolve(String value) {
+            if (value == null) {
+                return null;
+            }
+            String out = value;
+            for (int pass = 0; pass < PASSES && out.indexOf("${") >= 0; pass++) {
+                StringBuilder expanded = new StringBuilder();
+                boolean changed = false;
+                int at = 0;
+                while (true) {
+                    int open = out.indexOf("${", at);
+                    if (open < 0) {
+                        expanded.append(out.substring(at));
+                        break;
+                    }
+                    int close = out.indexOf('}', open + 2);
+                    if (close < 0) {
+                        // Not an expression, just a stray `${`.
+                        expanded.append(out.substring(at));
+                        break;
+                    }
+                    expanded.append(out, at, open);
+                    String resolved = valueOf(out.substring(open + 2, close));
+                    if (resolved == null) {
+                        expanded.append(out, open, close + 1);
+                    } else {
+                        expanded.append(resolved);
+                        changed = true;
+                    }
+                    at = close + 1;
+                }
+                out = expanded.toString();
+                if (!changed) {
+                    // Everything left is a name nothing defines; another pass
+                    // would produce the same string.
+                    break;
+                }
+            }
+            return out;
+        }
+
+        private String valueOf(String key) {
+            if (key.isEmpty()) {
+                return null;
+            }
+            // The project's own expressions first: a property named
+            // `project.basedir` does not shadow the real basedir in Maven
+            // either.
+            String standard = standard(key);
+            if (standard != null) {
+                return standard;
+            }
+            if (user != null) {
+                String value = user.getProperty(key);
+                if (value != null) {
+                    return value;
+                }
+            }
+            if (project != null && project.getProperties() != null) {
+                String value = project.getProperties().getProperty(key);
+                if (value != null) {
+                    return value;
+                }
+            }
+            return System.getProperty(key);
+        }
+
+        private String standard(String key) {
+            if (project == null) {
+                return null;
+            }
+            File basedir = project.getBasedir();
+            if (basedir != null
+                    && ("project.basedir".equals(key) || "project.baseDir".equals(key)
+                        || "basedir".equals(key) || "pom.basedir".equals(key))) {
+                return basedir.getAbsolutePath();
+            }
+            if (project.getBuild() != null) {
+                if ("project.build.directory".equals(key)) {
+                    return project.getBuild().getDirectory();
+                }
+                if ("project.build.outputDirectory".equals(key)) {
+                    return project.getBuild().getOutputDirectory();
+                }
+                if ("project.build.sourceDirectory".equals(key)) {
+                    return project.getBuild().getSourceDirectory();
+                }
+            }
+            if ("project.groupId".equals(key)) {
+                return project.getGroupId();
+            }
+            if ("project.artifactId".equals(key)) {
+                return project.getArtifactId();
+            }
+            if ("project.version".equals(key)) {
+                return project.getVersion();
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Whether {@code src/main/kotlin} is a root this module actually compiles.
+     *
+     * <p>Two conditions, and both are about what Maven does rather than what is
+     * on disk: the Kotlin plugin has to be bound to the {@code compile} goal --
+     * a {@code test-compile} execution compiles the test tree, not this one --
+     * and it must not say where its sources are, because a configured
+     * {@code <sourceDirs>} REPLACES the default.</p>
+     */
+    private static boolean compilesTheConventionalKotlinRoot(MavenProject project) {
+        return hasKotlinCompileExecution(project) && !declaresKotlinSourceDirs(project);
+    }
+
+    /**
+     * Whether `execution` was switched off with `<phase>none</phase>`.
+     *
+     * <p>That is the conventional way to disable an execution inherited from a
+     * parent while leaving its goal in place, so the goal alone does not mean
+     * the build runs it. Treating a disabled one as live made a stale class in
+     * target/classes look current because its source is still on disk, and a
+     * build hint annotation on that class then failed the placement check on
+     * every incremental build.</p>
+     *
+     * <p>Only `none`. Maven ignores any phase outside the lifecycle, but naming
+     * the others needs a lifecycle model this does not have, and `none` is the
+     * spelling every POM uses.</p>
+     */
+    private static boolean isDisabled(org.apache.maven.model.PluginExecution execution) {
+        String phase = execution == null ? null : execution.getPhase();
+        return phase != null && "none".equalsIgnoreCase(phase.trim());
+    }
+
+    /**
+     * Whether the Kotlin plugin compiles this module's main sources.
+     *
+     * <p>An execution bound to {@code compile}, or {@code <extensions>true</extensions>}
+     * -- which is the documented way to let the plugin contribute its own
+     * lifecycle, and then it compiles with no execution written at all. Reading
+     * only the executions called such a module Kotlin-less, so an existing
+     * {@code src/main/kotlin} was left out of the roots and a Kotlin main class
+     * living there could not be found.</p>
+     */
+    private static boolean hasKotlinCompileExecution(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            if (kotlinRunsWithoutExecution(plugin)) {
+                return true;
+            }
+            if (plugin.getExecutions() == null) {
+                continue;
+            }
+            {
+                for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                    if (bindsCompile(execution, plugin.isExtensions()) && !isDisabled(execution)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether anything compiles the roots {@code getCompileSourceRoots} lists.
+     *
+     * <p>That list comes from the model, not from what the build runs, so it is
+     * still populated when a POM switches {@code default-compile} off with
+     * {@code <phase>none</phase>}. A source sitting in a tree nothing compiles
+     * would then vouch for a stale class in {@code target/classes}, and a
+     * misplaced annotation on that class fails every incremental build.</p>
+     *
+     * <p>Only a JAVA compiler execution counts. An earlier version of this also
+     * accepted a Kotlin compile execution, on the belief that a module could
+     * leave its Java sources to the Kotlin plugin -- which is not what happens.
+     * kotlinc does JOINT compilation: it reads Java sources to resolve against
+     * them and emits no class files for them, which is exactly why Kotlin's own
+     * documented Maven setup disables {@code default-compile} and then adds a
+     * {@code java-compile} execution back. That replacement is what the second
+     * condition sees, and it is the only thing that makes those roots
+     * compiled.</p>
+     */
+    private static boolean compilesJava(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return true;
+        }
+        if (plugins == null) {
+            return true;
+        }
+        boolean defaultCompileDisabled = false;
+        boolean replacementBound = false;
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"maven-compiler-plugin".equals(plugin.getArtifactId())
+                    || plugin.getExecutions() == null) {
+                continue;
+            }
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                boolean compiles = execution.getGoals() != null
+                        && execution.getGoals().contains("compile");
+                if ("default-compile".equals(execution.getId())) {
+                    if (isDisabled(execution)) {
+                        defaultCompileDisabled = true;
+                    } else {
+                        replacementBound = true;
+                    }
+                } else if (compiles && !isDisabled(execution)) {
+                    replacementBound = true;
+                }
+            }
+        }
+        return !defaultCompileDisabled || replacementBound;
+    }
+
+    /**
+     * Whether this Kotlin plugin compiles with no execution written for it.
+     *
+     * <p>That is what {@code <extensions>true</extensions>} buys -- the plugin
+     * contributes its own lifecycle. A POM switches THAT off the way it switches
+     * off any inherited execution, {@code <id>default-compile</id>} with
+     * {@code <phase>none</phase>}, and then nothing is bound: not the
+     * conventional root, and not the plugin-level {@code <sourceDirs>} either,
+     * which is a directory Maven does not compile and a place a stale annotated
+     * class can keep a source.</p>
+     *
+     * <p>Only {@code default-compile} cancels it. The execution the extension
+     * contributes is that one, so disabling a DIFFERENTLY named execution that
+     * happens to bind {@code compile} switches off only that execution and
+     * leaves the lifecycle running. Reading any disabled compile execution as
+     * cancellation dropped the Kotlin roots of a module that still compiles
+     * Kotlin, which classifies a live class as stale -- the opposite mistake,
+     * and the one that loses a real annotation.</p>
+     */
+    private static boolean kotlinRunsWithoutExecution(org.apache.maven.model.Plugin plugin) {
+        if (!plugin.isExtensions()) {
+            return false;
+        }
+        if (plugin.getExecutions() != null) {
+            for (org.apache.maven.model.PluginExecution execution : plugin.getExecutions()) {
+                if ("default-compile".equals(execution.getId()) && isDisabled(execution)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /// Whether `execution` binds the `compile` goal, disabled or not.
+    ///
+    /// `lifecycleProvided` says whether the plugin has a lifecycle-injected
+    /// execution at all: without `<extensions>true</extensions>` the Kotlin
+    /// plugin has none, so `default-compile` with no `<goal>` is a name and
+    /// nothing more.
+    private static boolean bindsCompile(org.apache.maven.model.PluginExecution execution,
+                                        boolean lifecycleProvided) {
+        if (execution.getGoals() != null && execution.getGoals().contains("compile")) {
+            return true;
+        }
+        return lifecycleProvided && "default-compile".equals(execution.getId());
+    }
+
+    /** Whether the Kotlin plugin says where its main sources are. */
+    private static boolean declaresKotlinSourceDirs(MavenProject project) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+        if (plugins == null) {
+            return false;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            for (Object configuration
+                    : configurationsFor(plugin, "compile", "sourceDirs",
+                            kotlinRunsWithoutExecution(plugin))) {
+                if (has(configuration, "sourceDirs")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** The Kotlin plugin's {@code <sourceDirs>}, wherever they are configured. */
+    private static void addKotlinSourceDirs(Interpolation expressions, List<String> roots) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = expressions.project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return;
+        }
+        if (plugins == null) {
+            return;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"kotlin-maven-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            // The same selection build-helper uses: the `compile` goal only --
+            // a `test-compile` execution's sourceDirs are src/test/kotlin and
+            // friends, and adding them made a deleted production class look
+            // like it still had a source -- and within an execution the
+            // configuration levels override rather than accumulate.
+            for (Object configuration
+                    : configurationsFor(plugin, "compile", "sourceDirs",
+                            kotlinRunsWithoutExecution(plugin))) {
+                addSourceDirsFrom(expressions, configuration, roots);
+            }
+        }
+    }
+
+    private static void addSourceDirsFrom(Interpolation expressions, Object configuration,
+                                          List<String> roots) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom dirs =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("sourceDirs");
+        if (dirs == null) {
+            return;
+        }
+        for (org.codehaus.plexus.util.xml.Xpp3Dom dir : dirs.getChildren()) {
+            addRoot(expressions, dir.getValue(), roots);
+        }
+    }
+
+    private static void addRoot(Interpolation expressions, String value, List<String> roots) {
+        String path = expandProjectExpressions(expressions, value);
+        if (path == null) {
+            return;
+        }
+        File f = new File(path);
+        if (!f.isAbsolute() && expressions.project.getBasedir() != null) {
+            f = new File(expressions.project.getBasedir(), path);
+        }
+        if (!roots.contains(f.getAbsolutePath())) {
+            roots.add(f.getAbsolutePath());
+        }
+    }
+
+
+    /**
+     * The source encoding Maven compiles `module` with, or null when nothing
+     * says.
+     *
+     * <p>The plugin's own {@code <encoding>} first. The parameter DEFAULTS to
+     * {@code ${project.build.sourceEncoding}}, so an explicit one overrides the
+     * property -- reading the property first meant a module that sets the
+     * plugin parameter got its parent's value instead of its own.</p>
+     *
+     * <p>Read from the effective model, so a profile Maven activated is already
+     * folded in -- which is the part a tool reading POM text cannot do.</p>
+     */
+    protected static String sourceEncodingOf(MavenProject module) {
+        return sourceEncodingOf(module, null);
+    }
+
+    /**
+     * The same answer, resolving `${...}` against the `-D` properties the build
+     * was invoked with as well as the module's own.
+     *
+     * @param userProperties the session's user properties, or null when there
+     *                       is no session to read them from
+     */
+    protected static String sourceEncodingOf(MavenProject module, Properties userProperties) {
+        if (module == null) {
+            return null;
+        }
+        Interpolation expressions = new Interpolation(module, userProperties);
+        String encoding = compilerPluginEncoding(expressions);
+        if (encoding == null || encoding.trim().isEmpty()) {
+            encoding = expressions.valueOf("project.build.sourceEncoding");
+            if (encoding == null) {
+                encoding = expressions.valueOf("maven.compiler.encoding");
+            }
+            // A property can be written in terms of another one.
+            encoding = expressions.resolve(encoding);
+            if (encoding != null && encoding.indexOf("${") >= 0) {
+                encoding = null;
+            }
+        }
+        return encoding == null || encoding.trim().isEmpty() ? null : encoding.trim();
+    }
+
+    /// The `<encoding>` maven-compiler-plugin is configured with, from the
+    /// EFFECTIVE model -- so a profile that Maven activated is already folded in.
+    private static String compilerPluginEncoding(Interpolation expressions) {
+        List<org.apache.maven.model.Plugin> plugins;
+        try {
+            plugins = expressions.project.getBuildPlugins();
+        } catch (RuntimeException ex) {
+            return null;
+        }
+        if (plugins == null) {
+            return null;
+        }
+        for (org.apache.maven.model.Plugin plugin : plugins) {
+            if (!"maven-compiler-plugin".equals(plugin.getArtifactId())) {
+                continue;
+            }
+            // Most specific first: an execution bound to `compile` overrides
+            // the plugin-level value, and testCompile's is not this one.
+            for (Object configuration : configurationsFor(plugin, "compile", "encoding")) {
+                String encoding = encodingIn(expressions, configuration);
+                if (encoding != null) {
+                    return encoding;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String encodingIn(Interpolation expressions, Object configuration) {
+        if (!(configuration instanceof org.codehaus.plexus.util.xml.Xpp3Dom)) {
+            return null;
+        }
+        org.codehaus.plexus.util.xml.Xpp3Dom encoding =
+                ((org.codehaus.plexus.util.xml.Xpp3Dom) configuration).getChild("encoding");
+        if (encoding == null || encoding.getValue() == null) {
+            return null;
+        }
+        String value = expressions.resolve(encoding.getValue().trim());
+        // An expression nothing defines is not an encoding -- but a `$` that
+        // opens nothing is just a character, and a resolved one is the charset
+        // Maven really compiles with.
+        return value.isEmpty() || value.indexOf("${") >= 0 ? null : value;
+    }
+
 }
     
