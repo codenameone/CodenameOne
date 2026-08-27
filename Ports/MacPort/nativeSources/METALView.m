@@ -91,6 +91,17 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     BOOL cn1PinchActive;
     /// Covers the native peers while input is disabled; nil when it is enabled.
     NSView *cn1InputBlocker;
+    /// A resize the main thread asked for that the render thread has not applied.
+    ///
+    /// AppKit resizes on ITS thread while the event dispatch thread may be
+    /// mid-frame, and the resize replaces the very encoder and textures that
+    /// frame is encoding into -- concurrent use and teardown of one Metal
+    /// encoder, which is a validation failure or a crash rather than a glitch.
+    /// The request is recorded here and applied by the render thread at a frame
+    /// boundary, where by definition no encoder exists.
+    int cn1PendingFbWidth;
+    int cn1PendingFbHeight;
+    BOOL cn1FbResizePending;
     /// Whether a pointer press was delivered and its release has not been.
     ///
     /// A modal opened from a press handler or a timer disables this view between
@@ -296,6 +307,12 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
 
 // ---- framebuffer --------------------------------------------------------
 
+/// Records a resize for the render thread to apply.
+///
+/// Called from AppKit's thread on a live resize, and from the framework's own
+/// paths. It touches nothing the render thread is using: the textures and the
+/// encoder are replaced in applyPendingFrameBufferSize, which runs at a frame
+/// boundary on the thread that paints.
 - (void)updateFrameBufferSize:(int)w h:(int)h {
     int pw = w, ph = h;
     if (pw <= 0 || ph <= 0) {
@@ -306,9 +323,29 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     if (pw <= 0 || ph <= 0 || (pw == framebufferWidth && ph == framebufferHeight)) {
         return;
     }
-    // An encoder may be mid-frame. Tear it down rather than letting draws land
-    // on a texture about to be replaced, which would also leave the stale
-    // dimensions cached inside CN1Metalcompat and break scissor clamping.
+    cn1PendingFbWidth = pw;
+    cn1PendingFbHeight = ph;
+    cn1FbResizePending = YES;
+    // The layer's own geometry is AppKit's to own and is safe to set here; only
+    // the Metal objects have to wait for the render thread.
+    CAMetalLayer *sizedLayer = (CAMetalLayer *)self.layer;
+    sizedLayer.contentsScale = CN1AppKitBackingScale(self);
+    sizedLayer.drawableSize = CGSizeMake(pw, ph);
+    [self setNeedsDisplay:YES];
+}
+
+/// Applies a recorded resize. Render thread only, at a frame boundary.
+- (void)applyPendingFrameBufferSize {
+    if (!cn1FbResizePending) {
+        return;
+    }
+    cn1FbResizePending = NO;
+    int pw = cn1PendingFbWidth, ph = cn1PendingFbHeight;
+    if (pw <= 0 || ph <= 0 || (pw == framebufferWidth && ph == framebufferHeight)) {
+        return;
+    }
+    // No encoder can be live here -- this runs before one is created -- but the
+    // teardown is kept for the framework paths that call in mid-frame.
     if (self.renderCommandEncoder != nil) {
         CN1MetalEndFrame();
         [self.renderCommandEncoder endEncoding];
@@ -325,9 +362,10 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     framebufferHeight = ph;
     projectionMatrix = CN1MacOrtho(0.0f, (float)pw, (float)ph, 0.0f, -1.0f, 1.0f);
 
+    // The layer's geometry was already set when the resize was requested, on
+    // whichever thread asked; repeating it here would be a second layer mutation
+    // from the render thread for no gain.
     CAMetalLayer *layer = (CAMetalLayer *)self.layer;
-    layer.contentsScale = CN1AppKitBackingScale(self);
-    layer.drawableSize = CGSizeMake(pw, ph);
 
     // The persistent target. Codename One only queues the operations that
     // changed since the previous frame, so it has to survive between them; a
@@ -431,6 +469,9 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     if (self.renderCommandEncoder != nil) {
         return;
     }
+    // The frame boundary, and the only place a resize may touch the textures:
+    // no encoder exists yet, so nothing can be encoding into what is replaced.
+    [self applyPendingFrameBufferSize];
     self.commandBuffer = [self.commandQueue commandBuffer];
     [self createRenderPassDescriptor];
     if (self.renderPassDescriptor == nil) {
@@ -1715,17 +1756,28 @@ extern BOOL CN1_blockPaste;
 extern BOOL CN1_blockCut;
 extern BOOL CN1_blockCopy;
 
-/// Either door closed is a block: the global switch or the field's own argument.
-static BOOL cn1CopyBlocked(CN1MacTextInputSession *session) {
-    return CN1_blockCopy || (session != nil && session.active && session.blockCopyPaste);
+/// Either door closed is a block: the global switch, or the field's own argument
+/// -- but the field's only where THIS view is the one editing it.
+///
+/// The session is a singleton, so testing session.active alone let a protected
+/// field still open in one window block Copy in another: the second window's
+/// view does not own that session and its Copy is about its own selectable Label
+/// or SpanLabel, which the protected field has nothing to do with. The global
+/// switch keeps applying everywhere, because that is what makes it global.
+static BOOL cn1SessionBlocks(NSView *view, CN1MacTextInputSession *session) {
+    return session != nil && session.blockCopyPaste && cn1OwnsSession(view, session);
 }
 
-static BOOL cn1CutBlocked(CN1MacTextInputSession *session) {
-    return CN1_blockCut || (session != nil && session.active && session.blockCopyPaste);
+static BOOL cn1CopyBlocked(NSView *view, CN1MacTextInputSession *session) {
+    return CN1_blockCopy || cn1SessionBlocks(view, session);
 }
 
-static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
-    return CN1_blockPaste || (session != nil && session.active && session.blockCopyPaste);
+static BOOL cn1CutBlocked(NSView *view, CN1MacTextInputSession *session) {
+    return CN1_blockCut || cn1SessionBlocks(view, session);
+}
+
+static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
+    return CN1_blockPaste || cn1SessionBlocks(view, session);
 }
 
 - (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item {
@@ -1737,9 +1789,9 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
     // Command-C, Command-X, Command-V and the Edit menu stayed live in a field
     // that had explicitly refused them -- the shortcuts go through the responder
     // chain and never touch the portable menu that was doing the blocking.
-    if ((action == @selector(copy:) && cn1CopyBlocked(session))
-            || (action == @selector(cut:) && cn1CutBlocked(session))
-            || (action == @selector(paste:) && cn1PasteBlocked(session))) {
+    if ((action == @selector(copy:) && cn1CopyBlocked(self, session))
+            || (action == @selector(cut:) && cn1CutBlocked(self, session))
+            || (action == @selector(paste:) && cn1PasteBlocked(self, session))) {
         return NO;
     }
     if (action == @selector(undo:) || action == @selector(redo:)) {
@@ -1782,7 +1834,7 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
     // Checked here as well as in validation: a key equivalent reaches the
     // responder chain directly and never asks whether the menu item is
     // enabled, so validation alone leaves Command-C working.
-    if (cn1CopyBlocked([CN1MacTextInputSession sharedSession])) {
+    if (cn1CopyBlocked(self, [CN1MacTextInputSession sharedSession])) {
         return;
     }
     if (!cn1OwnsSession(self, [CN1MacTextInputSession sharedSession])) {
@@ -1804,7 +1856,7 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
 }
 
 - (void)cut:(id)sender {
-    if (cn1CutBlocked([CN1MacTextInputSession sharedSession])) {
+    if (cn1CutBlocked(self, [CN1MacTextInputSession sharedSession])) {
         return;
     }
     NSRange sel = [self cn1SelectionForEditing];
@@ -1837,7 +1889,7 @@ static BOOL cn1PasteBlocked(CN1MacTextInputSession *session) {
 
 - (void)paste:(id)sender {
     CN1MacTextInputSession *session = [CN1MacTextInputSession sharedSession];
-    if (cn1PasteBlocked(session)) {
+    if (cn1PasteBlocked(self, session)) {
         return;
     }
     if (!cn1OwnsSession(self, session)) {
