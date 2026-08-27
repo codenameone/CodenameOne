@@ -196,7 +196,12 @@ public class CN1DocumentsProvider extends DocumentsProvider {
                     + " names neither a local path nor a remote id");
         }
         String[] credentials = CN1DocumentStore.loadEndpoint(getContext());
-        File cached = fetch(node, signal);
+        // The download is given the credentials that were captured, not left to load them again.
+        // Two reads can straddle an account switch: the check would then compare the pair it
+        // captured against the pair that is current -- equal if the app switched away and back --
+        // while the request had actually been sent with the other account's token. Handing the
+        // same pair to both makes what was fetched and what is checked the same thing.
+        File cached = fetch(node, credentials, signal);
         // The download runs outside the publication lock and takes as long as the network takes,
         // so the app may have cleared -- a logout -- or switched accounts meanwhile. Handing the
         // descriptor over regardless would give the picker the departed user's document, and
@@ -205,7 +210,7 @@ public class CN1DocumentsProvider extends DocumentsProvider {
         // Node ids are the app's own record keys and a switch reuses them, so the check is the
         // remote id AND the credential the download was authorized with, which is the thing a
         // switch always changes.
-        if (!stillPublished(documentId, node, credentials)) {
+        if (!stillPublished(documentId, node, index.revision, credentials)) {
             if (!cached.delete()) {
                 Log.w(TAG, "Could not delete the withdrawn download " + cached);
             }
@@ -237,9 +242,22 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// same bargain: an app that declares neither gets no per-item change detection, which
     /// DocumentNode documents.
     private boolean stillPublished(String documentId, CN1DocumentStore.Node requested,
-            String[] credentials) {
+            long revision, String[] credentials) {
         CN1DocumentStore.Index index = CN1DocumentStore.loadIndex(getContext());
         CN1DocumentStore.Node node = index == null ? null : index.nodes.get(documentId);
+        if (node != null && requested.size < 0 && requested.lastModified < 0
+                && index.revision != revision) {
+            // A node that declared neither a size nor a date has nothing per-item to compare, so
+            // it is bound to the publication it was requested from -- the same fallback its
+            // content version uses. Without this an object revised under the same remote id, and
+            // republished while the old response was still streaming, passed every check because
+            // both sides read -1.
+            //
+            // A node that DOES declare metadata is deliberately not bound to the revision: that
+            // would discard every download racing any publish, which for a drive of any size is
+            // the expensive wrong default. DocumentNode documents the other half of the bargain.
+            return false;
+        }
         // openDocument only reaches this for a node whose remote id it already checked, but the
         // field is nullable and read here through a second object, so it is guarded rather than
         // assumed.
@@ -264,9 +282,8 @@ public class CN1DocumentsProvider extends DocumentsProvider {
     /// descriptor to already-present bytes, so there is nothing useful to do but wait. The
     /// cancellation signal is honoured between chunks, which is what keeps a large download from
     /// outliving the picker the user just dismissed.
-    private File fetch(CN1DocumentStore.Node node, CancellationSignal signal)
+    private File fetch(CN1DocumentStore.Node node, String[] endpoint, CancellationSignal signal)
             throws FileNotFoundException {
-        String[] endpoint = CN1DocumentStore.loadEndpoint(getContext());
         if (endpoint[0] == null || endpoint[0].length() == 0) {
             throw new FileNotFoundException("Document " + node.id + " is stored remotely but no "
                     + "endpoint was configured; call DocumentProvider.setRemoteEndpoint");
