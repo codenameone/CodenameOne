@@ -30,7 +30,15 @@ function control() {
   };
 }
 
-function load(consent, search = "") {
+function load(
+  consent,
+  search = "",
+  pathname = "/playground/",
+  experimentArm = null,
+  experimentTelemetryEnabled = true,
+  hostname = "www.codenameone.com",
+  legacyConsent = null
+) {
   const timers = [];
   const documentListeners = {};
   const banner = control();
@@ -38,7 +46,10 @@ function load(consent, search = "") {
   const decline = control();
   const cookies = new Map();
   if (consent) {
-    cookies.set("cn1_crisp_consent", consent);
+    cookies.set("cn1_crisp_consent_v2", consent);
+  }
+  if (legacyConsent) {
+    cookies.set("cn1_crisp_consent", legacyConsent);
   }
 
   const document = {
@@ -68,9 +79,15 @@ function load(consent, search = "") {
     },
   });
 
+  const localStore = storage();
+  if (experimentArm) {
+    localStore.setItem("cn1-exp-004-arm-v1", experimentArm);
+  }
+
   const window = {
     location: {
-      pathname: "/playground/",
+      hostname,
+      pathname,
       search,
     },
     setTimeout(callback) {
@@ -78,6 +95,14 @@ function load(consent, search = "") {
       return timers.length;
     },
   };
+  if (experimentArm) {
+    window.cn1Exp004 = {
+      id: "EXP-004",
+      arm: experimentArm,
+      telemetryEnabled: experimentTelemetryEnabled,
+      persist() { return true; },
+    };
+  }
   window.window = window;
 
   const context = vm.createContext({
@@ -85,7 +110,7 @@ function load(consent, search = "") {
     decodeURIComponent,
     document,
     encodeURIComponent,
-    localStorage: storage(),
+    localStorage: localStore,
     sessionStorage: storage(),
     URL,
     URLSearchParams,
@@ -141,6 +166,97 @@ function events(state) {
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
   assert.equal(eventCommands(state).length, 0,
     "a project download must not be recorded without analytics consent");
+}
+
+{
+  const state = load(null, "", "/", "ownership", true, "www.codenameone.com", "accepted");
+  assert.equal(eventCommands(state).length, 0,
+    "old chat-only consent must not authorize experiment telemetry");
+  assert.equal(state.window.CRISP_WEBSITE_ID, undefined,
+    "old chat-only consent must not load Crisp before the new opt-in");
+}
+
+{
+  const state = load("accepted", "", "/", "ownership");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 3,
+    "one homepage exposure may produce at most one arm-specific download");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+  assert.equal(recorded[0][1].experiment_id, "EXP-004");
+  assert.equal(recorded[0][1].experiment_arm, "ownership");
+  assert.equal(
+    state.sessionStorage.getItem(
+      "cn1-crisp-ev-Exp004OwnershipExposure-exp-004-ownership"
+    ),
+    "1"
+  );
+  assert.equal(recorded[1][0], "InitializrProjectDownloaded");
+  assert.equal(recorded[1][1].experiment_arm, "ownership");
+  assert.equal(recorded[2][0], "Exp004OwnershipDownload");
+}
+
+{
+  const state = load("accepted", "", "/playground/", "reach");
+  state.window.cn1CrispEvents.conversionClick({ action: "playground-download" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "ConversionClick");
+  assert.equal(recorded[0][1].experiment_arm, undefined,
+    "a conversion without a current homepage exposure must not inherit a stored arm");
+}
+
+{
+  const state = load(null, "", "/", "reach");
+  assert.equal(eventCommands(state).length, 0, "experiment exposure must wait for consent");
+  state.accept.click();
+  const recorded = events(state);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0][0], "Exp004ReachExposure");
+}
+
+{
+  const state = load("declined", "", "/", "ownership");
+  assert.equal(eventCommands(state).length, 0,
+    "a declined homepage view must not be recorded");
+  state.accept.click();
+  const recorded = events(state);
+  assert.equal(recorded.length, 1,
+    "opting in after a prior decline must record the exposure denominator");
+  assert.equal(recorded[0][0], "Exp004OwnershipExposure");
+}
+
+{
+  const state = load("accepted", "", "/", "reach", false);
+  assert.equal(eventCommands(state).length, 0,
+    "a preview assignment must never emit production experiment telemetry");
+}
+
+{
+  const state = load(
+    "accepted",
+    "",
+    "/",
+    "reach",
+    true,
+    "exp-004-homepage-positioning.codenameone.pages.dev"
+  );
+  assert.equal(eventCommands(state).length, 0,
+    "a Cloudflare preview host must never emit production experiment telemetry");
+}
+
+{
+  const state = load("accepted", "", "/initializr/", "reach");
+  state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+
+  const recorded = events(state);
+  assert.equal(recorded.length, 1,
+    "a direct project download must not be attributed without a current homepage exposure");
+  assert.equal(recorded[0][0], "InitializrProjectDownloaded");
+  assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
 }
 
 {

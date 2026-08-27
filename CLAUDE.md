@@ -2,17 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
-
-Codename One is a cross-platform mobile development framework that compiles Java/Kotlin bytecode to native OS executables for iOS, Android, and other platforms. The repository includes:
-
-- **Core framework** (`CodenameOne/src/`) - The main UI framework and APIs
-- **ParparVM** (`vm/`) - iOS VM that translates Java bytecode to C code for native iOS compilation
-- **Platform ports** (`Ports/`, `maven/android/`, `maven/ios/`) - Platform-specific implementations
-- **Build tools** (`maven/codenameone-maven-plugin/`) - Maven plugin for building apps
-- **Designer** (`CodenameOneDesigner/`) - Visual design tool
-- **Tests** (`tests/`) - Test suites and samples
-
 ## Build System
 
 The project is transitioning from Ant to Maven. **Maven is the preferred build system.**
@@ -72,38 +61,7 @@ mvn test -Plocal-dev-javase
 ant samples
 ```
 
-### Legacy Ant Build
-
-While Maven is preferred, Ant builds are still supported:
-
-```bash
-ant                    # Build core
-ant core              # Build Codename One core
-ant ios               # Build iOS port
-ant android           # Build Android port
-ant javase            # Build JavaSE port
-ant test-javase       # Run tests
-ant samples           # Launch sample runner
-```
-
 ## Project Architecture
-
-### Core Framework Structure
-
-The framework is organized into these main packages under `CodenameOne/src/com/codename1/`:
-
-- **`ui/`** - UI components, layouts, and rendering
-- **`io/`** - Networking, storage, and I/O operations
-- **`components/`** - High-level UI components (e.g., SpanLabel, InfiniteProgress)
-- **`charts/`** - Charting library
-- **`maps/`** - Mapping support
-- **`util/`** - Utilities (e.g., StringUtil, MathUtil)
-- **`l10n/`** - Localization support
-- **`impl/`** - Platform implementation interfaces
-- **`db/`** - Database APIs
-- **`push/`** - Push notification support
-- **`media/`** - Media playback
-- **`properties/`** - Property binding framework
 
 ### ParparVM (iOS Translation)
 
@@ -120,28 +78,6 @@ Located in `vm/`, ParparVM is Codename One's iOS VM that translates Java bytecod
 - Targets Java 5 with Java 8 syntax via retrolambda
 
 **Build output:** Valid Xcode project that can be opened, debugged, and profiled with native tools.
-
-### Maven Module Structure
-
-- **`core/`** - Framework core (compiled with `-source 1.5 -target 1.5`)
-- **`factory/`** - Factory interfaces for platform implementations
-- **`javase/`** - JavaSE simulator port
-- **`javase-svg/`** - SVG support for JavaSE
-- **`android/`** - Android port
-- **`ios/`** - iOS port resources
-- **`parparvm/`** - ParparVM resources
-- **`designer/`** - Visual designer tool
-- **`codenameone-maven-plugin/`** - Maven build plugin
-- **`sqlite-jdbc/`** - SQLite support
-- **`java-runtime/`** - Java runtime utilities
-
-### Platform Implementations
-
-Each platform provides implementation of interfaces in `com.codename1.impl`:
-
-- **JavaSE** (`Ports/JavaSE/`) - Desktop simulator
-- **Android** (`maven/android/`) - Android native implementation
-- **iOS** (`maven/ios/`, `Ports/iOSPort/`) - iOS native implementation via ParparVM
 
 ## Development Workflow
 
@@ -225,15 +161,19 @@ silently does nothing, so every hint must be declared in exactly one place:
 - **`maven/build-hint-catalog`** otherwise: dynamic families, build-service-only
   hints, the long tail.
 
-Nothing generates code. `BuildHintCodeGenerator` renders the annotated hints
-into `cn1-build-hints.json` for the editors that cannot read bytecode, and the
-developer guide's table. Adding a hint to a builder means declaring it in the
-same change:
+Nothing is generated into the tree. `BuildHintCodeGenerator` renders the
+annotated hints into `cn1-build-hints.json` for the editors that cannot read
+bytecode, and into the developer guide's table -- both during a build, neither
+committed. Every module that needs the data file renders it into its own
+`target/classes`: `maven/javase`, `maven/codenameone-maven-plugin` and
+`scripts/settings/common`. The catalog cannot render its own, because the
+generator lives in `build-hint-tools`, which depends on it.
+
+Adding a hint to a builder means declaring it in the same change:
 
 ```bash
 source tools/env.sh
-scripts/gen-build-hint-annotations.sh          # rewrite the data file
-scripts/gen-build-hint-annotations.sh --check  # what CI runs
+scripts/gen-build-hint-annotations.sh --check  # the render still works (CI)
 scripts/check-build-hint-catalog.sh            # every hint the code reads is declared
 ```
 
@@ -275,78 +215,6 @@ source tools/env.sh
 scripts/check-cast-semantics.sh
 scripts/check-cast-semantics.sh --write-baseline   # after fixing a method
 ```
-
-### GC memory: measure the steady state, not the peak
-
-Every GC workload in `vm/tests` measures a **peak under load**, and a peak cannot express
-the failure mode issue #5537 reported: a heap that grows forever at a modest rate passes
-`GcOverflowSpiralIntegrationTest`'s "peak < 2GB over 50 rounds" without difficulty. When
-investigating memory, the question to ask is whether the growth **stops**.
-
-`-DCN1_GC_CONFORM` adds the instrument for that. Unlike `CN1_GC_VERIFY` it changes **no**
-allocator behaviour -- which matters, because `CN1_GC_VERIFY` forces
-`cn1BibopReleaseOffset()` to return 0 and therefore compiles out the page-release path,
-the major sweep and every `madvise` call. Those are exactly the paths a footprint
-investigation is about, so they cannot be measured in a verifier build.
-
-Build with `-DCN1_GC_CONFORM` and set `CN1_GC_PROBE=<n>` at runtime (every nth cycle;
-unset = off, so probe-on and probe-off are the same binary). Two emitters:
-
-- `[GCPROBE]` per cycle, on the GC thread after the sweep. It **partitions the
-  footprint** -- `residentPgKb`, `legBlockKb`, `legTableKb`, `sideKb` -- and prints the
-  residual `residKb` that the four do not account for. Read the residual first: if it
-  carries the drift, the growth is not in the Java heap and every heap hypothesis is dead
-  in one run. It also breaks the mark down by phase (`waitMs stackMs tdrainMs migrateMs
-  satbMs poolMs graceMs drainMs`), which is what localises a lengthening pause to a
-  subsystem rather than to a guess.
-- `[GCPROBE-T]` once a second, atomics only. This is the series that survives a collector
-  that has stopped finishing cycles -- the state in which the per-cycle emitter goes
-  silent, and the state being investigated.
-
-`vm/benchmarks/src/com/bench/GcSteadyState.java` is the churn workload, parameterised
-through the environment (`CN1_WL_SECONDS`, `CN1_WL_THREADS`, `CN1_WL_DEPTH`,
-`CN1_WL_BRANCH`, `CN1_WL_SLEEP_MS`, ...) because the clean target's generated `main()`
-passes `JAVA_NULL` for args. Sweeping `CN1_WL_SLEEP_MS` over `{0,1,10,100,1000}` is the
-cheapest discriminator between a rate problem and a retention problem, and needs no
-rebuild.
-
-Every GC ablation is a **compile-time** macro, so each A/B arm is a rebuild; use
-`vm/benchmarks/translate-and-build.sh` with `CN1_BENCH_CFLAGS` (see `ab-adopt.sh`), which
-is ~15s per arm. Useful arms: `-DCN1_ADOPT_POLICY=0`, `-DCN1_DISABLE_BIBOP`,
-`-DCN1_BIBOP_NO_FASTSWEEP`, `-DCN1_BIBOP_NO_PAGE_RELEASE`, `-DCN1_DISABLE_SATB`,
-`-DCN1_SATB_LOG_FRESH`, and `-DCN1_DISABLE_CONSERVATIVE_GC_ROOTS` (which also needs the
-translator run with `-Dcn1.frameless.objects=false -Dcn1.frameless.instance=false`, so it
-is confounded with a codegen change -- make it the last arm, not the first).
-
-Two traps worth knowing before believing a number:
-
-- **`[GC-INSTR] outOfLineAllocs=` is not an allocation count.** `CN1_FAST_NEW`'s inlined
-  bump path never reaches that counter, so on a small-object workload it understates
-  allocation by orders of magnitude. `CN1_ALLOC_CENSUS` counts at every entry point.
-- **Physical footprint moves with the host's memory pressure.** A/B by interleaving both
-  builds inside one session on a non-swapping host; two soaks an hour apart measure the
-  machine (see the note at `vm/JavaAPI/src/java/lang/System.java`).
-
-`GcSteadyStateIntegrationTest` is the gate. It asserts that the SATB log stays sized by
-the live set rather than by the allocation rate, and that the page heap stops growing in
-the second half of the run; then it rebuilds with `-DCN1_SATB_LOG_FRESH` and **requires
-both assertions to fail**, so the gate cannot go inert.
-
-**Under a per-process ceiling, budget headroom is not a footprint bound.** Admission
-against `os_proc_available_memory()` answers only "is there budget left", so on its own it
-keeps saying yes until the budget is gone and the process converges on ceiling minus
-`CN1_PACING_HEADROOM_MARGIN` however small its live set is. The collector therefore also
-defends a reserve — `CN1_PACING_RESERVE_SHIFT`, a quarter of the budget — by clamping how
-far the mutator may run ahead of it once headroom drops inside that reserve. It is a
-control loop, not a tax — `volumeParks` in the `[PACING]` report is 0 for a run that never
-enters the reserve — and the whole branch is unreachable on a platform with no per-process
-budget, which is why the `vm/benchmarks` numbers are untouched by it. Note the ceiling is
-not special: given an 8GB budget the unbounded build rides to 7.5GB, because admission has
-no footprint *target*. `-DCN1_PACING_NO_RESERVE` compiles it out for
-A/B, and is what the gate's third scenario re-injects to prove it can fail.
-
-Reach for `CN1_SIMULATE_PROC_MEMORY_LIMIT=<bytes>` to exercise any of this off-device —
-without it the budgeted pacing path never runs, which is how the original bug survived.
 
 ### Working with Native Code
 
@@ -424,17 +292,6 @@ cd maven/integration-tests
 ./android-native-interface-test.sh  # Test Android native interfaces
 ```
 
-## Important Files and Locations
-
-- **`maven/pom.xml`** - Root Maven POM, defines all modules and dependencies
-- **`maven/CodeNameOneBuildClient.jar`** - Build client (copied to `~/.codenameone/`)
-- **`scripts/setup-workspace.sh`** - Initial workspace setup script
-- **`scripts/build-android-port.sh`** - Android port build script
-- **`scripts/build-ios-port.sh`** - iOS port build script
-- **`tools/env.sh`** - Environment variables (created by setup-workspace.sh)
-- **`BUILDING.md`** - Detailed build instructions
-- **`README.md`** - Project overview and getting started
-
 ## Common Patterns
 
 ### Resource Files
@@ -496,19 +353,3 @@ The JavaSE port serves as the simulator with:
 - **Missing cn1-binaries**: Run `setup-workspace.sh` or manually clone to `../cn1-binaries`
 - **Build client missing**: Copy `maven/CodeNameOneBuildClient.jar` to `~/.codenameone/`
 - **macOS ARM JDK8**: Setup script downloads x64 version (works via Rosetta)
-
-## Contributing
-
-- Discuss changes in [discussion forum](https://www.codenameone.com/discussion-forum.html) or [Stack Overflow](http://stackoverflow.com/tags/codenameone)
-- File clear, concise issues with test cases
-- JavaDoc editable directly in source
-- Developer guide wiki: https://github.com/codenameone/CodenameOne/wiki/
-- By contributing, you grant Codename One shared ownership of your work
-
-## Additional Resources
-
-- Main site: https://www.codenameone.com
-- JavaDoc: https://www.codenameone.com/javadoc/
-- Developer Guide: https://www.codenameone.com/manual/
-- Maven Manual: https://shannah.github.io/codenameone-maven-manual/
-- Build from source blog: https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html

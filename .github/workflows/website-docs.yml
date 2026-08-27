@@ -205,6 +205,12 @@ jobs:
           node docs/website/scripts/test-initializr-download-bridge.mjs \
             docs/website/public/initializr-app/com_codename1_initializr_WebsiteThemeNative.js
 
+      - name: Validate website experiment telemetry
+        run: |
+          set -euo pipefail
+          node docs/website/scripts/test-cn1-exp-004.mjs
+          node docs/website/scripts/test-cn1-crisp-events.mjs
+
       - name: Validate Playground JS bundle output
         run: test -f docs/website/public/playground-app/index.html
 
