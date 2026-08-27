@@ -11280,11 +11280,29 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Held rather than dropped: registration is imminent on a cold
             // launch, and firing the completion handler here told the system the
             // notification had been handled when nothing had seen it.
+            //
+            // And the completion handler is NOT fired for a held message. It is
+            // the operating system's grant of execution time, so releasing it
+            // here says "done" before anything has run: iOS may suspend the
+            // process before the replay, and a content-available push that asked
+            // for background time through delayPushCompletion would lose it
+            // outright. The replay path fires it from the same finally every
+            // delivered push uses, so the grant is released exactly once, when
+            // the callback has actually had it.
+            //
+            // The one case this leaves is an application that registers no push
+            // callback at all, where a held grant is never released. That
+            // application is already misconfigured -- it asked the system for
+            // pushes and has nothing to receive them -- and the alternative,
+            // releasing the grant up front, breaks the case that does work.
             if (pendingPushes.size() >= MAX_PENDING_PUSHES) {
                 pendingPushes.remove(0);
+                // The evicted one will never be delivered, so ITS grant is
+                // released here -- otherwise the queue cap would leak a
+                // background task the system is still waiting on.
+                nativeInstance.firePushCompletionHandler();
             }
             pendingPushes.add(new String[] {message, type});
-            nativeInstance.firePushCompletionHandler();
             /*
             // Removing this section because the race condition shouldn't happen
             // anymore as setMainClass() is now called before initialization.
