@@ -62,9 +62,14 @@ class PlatformFeatureCatalogTest {
         assertTrue(e.iosFrameworks().contains("CallKit"));
         assertFalse(e.iosFrameworks().contains("PushKit"),
                 "owning a call must not buy the VoIP push machinery");
-        // A self-managed ConnectionService is exactly API 26; below it there
-        // is nothing to degrade to.
-        assertEquals(26, e.androidMinimumSdk());
+        // NO Android floor, deliberately. A self-managed ConnectionService is
+        // exactly API 26 and the bridge reports the capability absent below
+        // it -- but folding that into the generated minSdk stopped the app
+        // installing on 19 to 25 at all, so the in-app fallback the port
+        // exists to allow could never run. The guard is at runtime; an app
+        // branches on Calls.isSupported().
+        assertEquals(0, e.androidMinimumSdk(),
+                "a runtime-guarded capability must not floor the manifest");
     }
 
     @Test
