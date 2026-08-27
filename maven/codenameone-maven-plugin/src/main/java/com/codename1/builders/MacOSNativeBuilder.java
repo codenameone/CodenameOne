@@ -1306,6 +1306,23 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add("ARCHS=" + request.getArg("macos.arch", "arm64 x86_64"));
         cmd.add("ONLY_ACTIVE_ARCH=NO");
         cmd.add("MACOSX_DEPLOYMENT_TARGET=" + hints.getMinDeploymentTarget());
+        // The identifier signing and provisioning read. Checked against a
+        // generated project rather than assumed: neither the macOS template nor
+        // the emitted pbxproj sets PRODUCT_BUNDLE_IDENTIFIER at all, so the
+        // resolved id -- <package>.mac by default, macos.bundleId when set --
+        // reached the app through the Info.plist alone and the build setting
+        // stayed empty. That is enough for the product to declare the right
+        // identifier and not enough for the rest: automatic signing matches a
+        // provisioning profile on the build setting, and an empty one leaves it
+        // matching against nothing while the bundle declares something else.
+        // Stating it here makes the same value authoritative in both places.
+        // Guarded only against the empty string, which xcodebuild accepts and
+        // turns into a bundle nothing can install; the id itself is always
+        // derived from the package when no hint sets it, so this cannot
+        // silently fall back to the translator value in a normal build.
+        if (hints.getBundleId() != null && hints.getBundleId().trim().length() > 0) {
+            cmd.add("PRODUCT_BUNDLE_IDENTIFIER=" + hints.getBundleId().trim());
+        }
         // The template hard-codes ENABLE_HARDENED_RUNTIME = YES in both
         // configurations, so the default was already right and only the opt-out
         // was broken. Passed explicitly either way, because a setting the build
