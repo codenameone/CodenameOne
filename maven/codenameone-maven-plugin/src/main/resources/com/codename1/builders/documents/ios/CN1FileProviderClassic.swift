@@ -75,6 +75,11 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
     /// generation and the same publication revision. Without an order between them the one that
     /// finishes LAST wins, which is not the one that started last -- so a slow older copy could
     /// replace newer bytes with stale ones.
+    ///
+    /// The counter hands out the order; `installedSequence` records who acted on it. Only an
+    /// install that HAPPENED stops a later one, which is why both are kept: a request that has
+    /// merely started has put nothing anywhere, and treating it as though it had would answer
+    /// requests with bytes nobody wrote for them.
     private var materializationSequence: [URL: Int] = [:]
     private var installedSequence: [URL: Int] = [:]
 
@@ -98,7 +103,6 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
         }
         inFlightLock.lock()
         let alreadyInstalled = installedSequence[url] ?? 0
-        let latestStarted = materializationSequence[url] ?? 0
         inFlightLock.unlock()
         if alreadyInstalled > sequence {
             // A materialization that started after this one has already put its bytes there.
@@ -107,17 +111,12 @@ final class CN1FileProviderClassic: NSFileProviderExtension {
             try? FileManager.default.removeItem(at: staged)
             return .superseded
         }
-        if latestStarted > sequence
-            && FileManager.default.fileExists(atPath: url.path) {
-            // A newer read is under way and has not landed yet, but the URL already holds a
-            // materialization. Installing over it would put an older snapshot in front of the
-            // system for as long as the newer copy takes, so this request stands behind what is
-            // there. The emptiness check matters: with nothing at the URL, standing back would
-            // report success over a file that is not there, so the copy goes in and the newer
-            // one replaces it.
-            try? FileManager.default.removeItem(at: staged)
-            return .superseded
-        }
+        // A newer request that has merely STARTED does not stop this one. Standing back for it
+        // would report success over whatever happens to be at the URL -- which can be the copy
+        // from before the update this request is answering, and stays that way for good if the
+        // newer copy then fails. Installing is the truthful answer: these bytes are a real
+        // materialization of the current publication, and the newer request replaces them when
+        // it lands, because its sequence is higher and the check above lets it through.
         if let error = CN1FileProviderClassic.place(staged, at: url, copy: false) {
             return .failed(error)
         }
