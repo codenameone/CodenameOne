@@ -953,6 +953,15 @@ JAVA_BOOLEAN com_codename1_impl_mac_MacNative_macWindowCapture___int_int_1ARRAY_
     // Read back from the window's own retained render target rather than from a
     // shared raster: each window has its own, which is the whole reason this
     // port needs no offscreen image per window.
+    //
+    // This is the texture, so it holds what Codename One drew and NOT the native
+    // peer views AppKit composites above it -- a BrowserComponent or a video
+    // player in the window is absent from the result. Compositing them in is not
+    // one call: cacheDisplayInRect: does not render a layer-hosted CAMetalLayer,
+    // and the peers that matter each need their own snapshot API (WKWebView's is
+    // asynchronous, AVPlayerView has none), so a correct composite is a change of
+    // its own rather than a line here. Documented as a limitation in
+    // Desktop-Windows.asciidoc rather than left for someone to discover.
     return [rec.view readbackInto:(unsigned int *)arr->data width:width height:height]
         ? JAVA_TRUE : JAVA_FALSE;
 }

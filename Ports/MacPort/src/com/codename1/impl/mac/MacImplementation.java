@@ -80,6 +80,12 @@ public class MacImplementation extends IOSImplementation {
     /// focus traversal and arrow navigation therefore did nothing at all on this
     /// port. Anything else still gets the iOS answer, which is what the media
     /// keys rely on.
+    ///
+    /// Return is the fire key, as it is on JavaSE, but note the code differs:
+    /// JavaSE emits -90 for VK_ENTER while CN1MacKeyCode emits 10, so 10 is what
+    /// is mapped here. Without it Button.keyPressed()/keyReleased() -- which
+    /// activate only on GAME_FIRE -- never fire, and the port can traverse to a
+    /// button with the arrows but cannot press it.
     @Override
     public int getGameAction(int keyCode) {
         switch (keyCode) {
@@ -87,7 +93,7 @@ public class MacImplementation extends IOSImplementation {
             case -92: return com.codename1.ui.Display.GAME_DOWN;
             case -93: return com.codename1.ui.Display.GAME_LEFT;
             case -94: return com.codename1.ui.Display.GAME_RIGHT;
-            case -90: return com.codename1.ui.Display.GAME_FIRE;
+            case 10: return com.codename1.ui.Display.GAME_FIRE;
             default: return super.getGameAction(keyCode);
         }
     }
@@ -103,7 +109,7 @@ public class MacImplementation extends IOSImplementation {
             case com.codename1.ui.Display.GAME_DOWN: return -92;
             case com.codename1.ui.Display.GAME_LEFT: return -93;
             case com.codename1.ui.Display.GAME_RIGHT: return -94;
-            case com.codename1.ui.Display.GAME_FIRE: return -90;
+            case com.codename1.ui.Display.GAME_FIRE: return 10;
             default: return super.getKeyCode(gameAction);
         }
     }

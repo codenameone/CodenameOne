@@ -561,6 +561,7 @@ public class MacOSNativeBuilder extends Executor {
         }
 
         attachEntitlementsToProject(distDir, appName, hints);
+        applyDeploymentTargetToProject(distDir, appName, hints);
 
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
@@ -1006,6 +1007,69 @@ public class MacOSNativeBuilder extends Executor {
             log("Could not name the entitlements in the generated Xcode project ("
                     + ex + "); sign with CODE_SIGN_ENTITLEMENTS set by hand.");
         }
+    }
+
+    /// Writes the configured deployment target into the generated project.
+    ///
+    /// The template pins `MACOSX_DEPLOYMENT_TARGET` in every build configuration,
+    /// and naming it on the xcodebuild command line settles only the build this
+    /// run performs. Any project handed to a customer -- a source-only
+    /// deliverable, or an `includeSource` export -- is then a project whose
+    /// command line never ran, so someone who raised the floor to reach an API
+    /// that needs it opens one still compiling against the template value and
+    /// gets exactly the availability errors the hint exists to prevent. Applied
+    /// unconditionally so the project left behind agrees with the binary built.
+    private void applyDeploymentTargetToProject(File distDir, String appName, MacOSBuildHints hints) {
+        String target = hints.getMinDeploymentTarget();
+        if (target == null || target.trim().length() == 0) {
+            return;
+        }
+        File pbxproj = new File(new File(distDir, appName + ".xcodeproj"), "project.pbxproj");
+        if (!pbxproj.isFile()) {
+            return;
+        }
+        String replacement = "MACOSX_DEPLOYMENT_TARGET = " + target.trim() + ";";
+        try {
+            java.util.Set<String> found = deploymentTargetAssignments(readFileToString(pbxproj));
+            if (found.isEmpty()) {
+                // Matched nothing, so the template changed shape. Reported rather
+                // than passed over: the symptom is otherwise invisible until the
+                // customer opens the project and hits an availability error.
+                log("Could not set MACOSX_DEPLOYMENT_TARGET in the generated Xcode "
+                        + "project; it keeps the template default.");
+                return;
+            }
+            for (String literal : found) {
+                if (!literal.equals(replacement)) {
+                    replaceInFile(pbxproj, literal, replacement);
+                }
+            }
+        } catch (Exception ex) {
+            // Not fatal, matching attachEntitlementsToProject: the project still
+            // builds, it just carries the template floor.
+            log("Could not set the deployment target in the generated Xcode project ("
+                    + ex + "); set MACOSX_DEPLOYMENT_TARGET by hand.");
+        }
+    }
+
+    /// The distinct `MACOSX_DEPLOYMENT_TARGET` assignments in a pbxproj body.
+    ///
+    /// Separated from the file handling so the matching can be tested without
+    /// Xcode, which is the half that silently stops working when the template
+    /// changes shape. Distinct rather than a list because the template carries
+    /// the setting once per build configuration and both get the same value;
+    /// `replaceInFile` then rewrites every occurrence of each literal.
+    static java.util.Set<String> deploymentTargetAssignments(String pbxprojBody) {
+        java.util.Set<String> found = new java.util.LinkedHashSet<String>();
+        if (pbxprojBody == null) {
+            return found;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("MACOSX_DEPLOYMENT_TARGET = [^;\\n]*;").matcher(pbxprojBody);
+        while (m.find()) {
+            found.add(m.group());
+        }
+        return found;
     }
 
     /// The file-name suffix for one signing channel. One place, because the

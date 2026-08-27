@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -115,5 +116,67 @@ public class MacOSNativeBuilderScanTest {
                         "com/example/MyHelper", "requestNotificationPermission"));
         assertFalse(MacOSNativeBuilder.usesNotifications(null, "requestNotificationPermission"));
         assertFalse(MacOSNativeBuilder.usesNotifications("com/codename1/ui/Display", null));
+    }
+
+    /**
+     * The deployment-target hint reaches the project file, not just the
+     * xcodebuild command line.
+     *
+     * <p>The command line settles only the build this run performs, so a
+     * source-only deliverable or an {@code includeSource} export used to hand
+     * the customer a project still pinned to the template floor -- and the
+     * symptom, an availability error, appears only once they open it.</p>
+     */
+    @Test
+    public void theDeploymentTargetIsFoundInEveryBuildConfiguration() {
+        String pbxproj = ""
+                + "\t\t\tbuildSettings = {\n"
+                + "\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 11.0;\n"
+                + "\t\t\t\tSDKROOT = macosx;\n"
+                + "\t\t\t};\n"
+                + "\t\t\tbuildSettings = {\n"
+                + "\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 11.0;\n"
+                + "\t\t\t};\n";
+        java.util.Set<String> found =
+                MacOSNativeBuilder.deploymentTargetAssignments(pbxproj);
+        assertEquals("both configurations carry the same literal, so one entry",
+                1, found.size());
+        assertTrue(found.contains("MACOSX_DEPLOYMENT_TARGET = 11.0;"));
+    }
+
+    /**
+     * Two configurations that disagree are both rewritten. A project edited by
+     * hand can carry a different floor per configuration, and replacing only
+     * the first would leave Release pinned while Debug moved.
+     */
+    @Test
+    public void configurationsThatDisagreeAreBothCollected() {
+        java.util.Set<String> found = MacOSNativeBuilder.deploymentTargetAssignments(
+                "MACOSX_DEPLOYMENT_TARGET = 11.0;\nMACOSX_DEPLOYMENT_TARGET = 12.3;\n");
+        assertEquals(2, found.size());
+    }
+
+    /**
+     * The match stops at the semicolon and cannot run past a line. Without
+     * that bound the replacement would swallow whatever setting follows.
+     */
+    @Test
+    public void theMatchIsBoundedToItsOwnAssignment() {
+        java.util.Set<String> found = MacOSNativeBuilder.deploymentTargetAssignments(
+                "\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 13.0;\n\t\t\t\tSDKROOT = macosx;\n");
+        assertEquals(1, found.size());
+        assertEquals("MACOSX_DEPLOYMENT_TARGET = 13.0;", found.iterator().next());
+    }
+
+    /**
+     * A template that no longer carries the setting yields nothing, which is
+     * what makes the builder report it rather than claim success. Silence here
+     * would be a project shipped on the wrong floor with a green build.
+     */
+    @Test
+    public void aTemplateWithoutTheSettingYieldsNothing() {
+        assertTrue(MacOSNativeBuilder.deploymentTargetAssignments(
+                "\t\t\t\tSDKROOT = macosx;\n").isEmpty());
+        assertTrue(MacOSNativeBuilder.deploymentTargetAssignments(null).isEmpty());
     }
 }

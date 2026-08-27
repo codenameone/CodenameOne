@@ -303,6 +303,12 @@ Both work inside a window. A `BrowserComponent`, a video player, a map or a nati
 field placed in a `Window` is attached to *that* window's native view hierarchy, not to
 the main window's.
 
+The native macOS port qualifies this for one case. A peer is attached when it is
+initialized, and a peer that is already in the window's content when the window is first
+shown initializes before that window has painted -- at which point nothing yet says which
+window it belongs to, so it lands on the main window's view. Add the peer once the window
+is on screen, in response to `WindowEvent.Type.Shown`, and it attaches to its own window.
+
 This is worth knowing about because it was the single most common way an early
 multi-window implementation looks correct and isn't: the peer or the text caret appears
 on the main window while the content it belongs to is in another one.
@@ -381,13 +387,19 @@ window. Components inside a window should size against their own top level.
 operating-system window is simply not in it. `Window.capture()` exists for that and
 returns an image of the window itself.
 
-Every desktop port reads the window's own pixels back, so what you get is what the
+Most desktop ports read the window's own pixels back, so what you get is what the
 window is showing -- native peers and editors included. The JavaSE simulator, Mac
 Catalyst and native Linux read their rasters directly. Native Windows takes a different
 route to the same place: a secondary window renders into a Direct2D `HWND` target,
 which Direct2D gives no readback for, so the port asks the window to render itself into
 a device context with `PrintWindow`. That's a real readback of the client area rather
 than a re-render of the hierarchy.
+
+The native macOS port is the exception to the peers-included half of that. It reads back
+the window's own Metal texture, so the image holds everything Codename One drew, but the
+native peer views AppKit composites above that texture are not in it: a `BrowserComponent`,
+a video player or a map inside the window is missing from the result. Everything else the
+window shows is captured normally.
 
 `Window.capture()` falls back to re-rendering the component tree if a port returns
 nothing. That fallback draws what the window *should* be showing: it never contains a

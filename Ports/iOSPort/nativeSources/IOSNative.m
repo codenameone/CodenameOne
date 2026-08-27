@@ -4097,6 +4097,25 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getMotionSensorZ___int_R_float(CN1_T
 
 // Peer Component methods
 
+#if TARGET_OS_OSX
+/// The scale a peer's own window uses, falling back to the process-wide one.
+///
+/// scaleValue tracks the MAIN window, and a peer in a secondary window on a
+/// display of a different density is laid out in ITS window's pixels -- so
+/// dividing by the main window's scale sized and placed it wrongly, at half or
+/// double, while the pointer coordinates and the drawable for that same window
+/// used the right one.
+static CGFloat cn1MacPeerScale(NSView *peerView) {
+    extern float scaleValue;
+    CGFloat scale = (peerView != nil && peerView.window != nil)
+        ? peerView.window.backingScaleFactor : 0;
+    if (scale <= 0) {
+        scale = scaleValue > 0 ? scaleValue : 1;
+    }
+    return scale;
+}
+#endif
+
 void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT w, JAVA_INT h, JAVA_OBJECT response) {
 #if TARGET_OS_OSX
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -4109,9 +4128,15 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
         if (s.width <= 0 || s.height <= 0) {
             s = v.bounds.size;
         }
+        // The peer's own window, not scaleValue: a peer in a secondary window
+        // on a display of a different density is measured in ITS window's
+        // pixels, exactly as updatePeerPositionSize places it. Using the main
+        // window's scale reported a peer on a 1x display beside a Retina main
+        // window at twice its size, and layout then allocated those bounds.
+        CGFloat prefScale = cn1MacPeerScale(v);
         JAVA_ARRAY_INT* data = (JAVA_INT*)((JAVA_ARRAY)response)->data;
-        data[0] = (JAVA_INT)(s.width * scaleValue);
-        data[1] = (JAVA_INT)(s.height * scaleValue);
+        data[0] = (JAVA_INT)(s.width * prefScale);
+        data[1] = (JAVA_INT)(s.height * prefScale);
         POOL_END();
     });
 #else
@@ -4138,24 +4163,6 @@ void com_codename1_impl_ios_IOSNative_calcPreferredSize___long_int_int_int_1ARRA
 
 extern float scaleValue;
 
-#if TARGET_OS_OSX
-/// The scale a peer's own window uses, falling back to the process-wide one.
-///
-/// scaleValue tracks the MAIN window, and a peer in a secondary window on a
-/// display of a different density is laid out in ITS window's pixels -- so
-/// dividing by the main window's scale sized and placed it wrongly, at half or
-/// double, while the pointer coordinates and the drawable for that same window
-/// used the right one.
-static CGFloat cn1MacPeerScale(NSView *peerView) {
-    extern float scaleValue;
-    CGFloat scale = (peerView != nil && peerView.window != nil)
-        ? peerView.window.backingScaleFactor : 0;
-    if (scale <= 0) {
-        scale = scaleValue > 0 ? scaleValue : 1;
-    }
-    return scale;
-}
-#endif
 
 void com_codename1_impl_ios_IOSNative_updatePeerPositionSize___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 #if TARGET_OS_OSX
