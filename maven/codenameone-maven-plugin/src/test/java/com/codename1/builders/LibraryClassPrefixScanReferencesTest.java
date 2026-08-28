@@ -88,6 +88,71 @@ class LibraryClassPrefixScanReferencesTest {
                 "naming a package in a string constant is not using it");
     }
 
+    /// A class file whose only mention of USED is a METHOD DESCRIPTOR.
+    ///
+    /// The pool holds it as a plain Utf8 with nothing pointing at it, which
+    /// is what an interface method returning that type -- or an abstract or
+    /// native declaration -- actually produces: the descriptor is referenced
+    /// by method_info, not by any CONSTANT_Class, NameAndType or MethodType.
+    private static byte[] descriptorOnly(boolean asField) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(52);
+        d.writeShort(3);
+        d.writeByte(1);
+        d.writeUTF(asField ? "L" + USED + ";" : "()L" + USED + ";");
+        d.writeByte(1);
+        d.writeUTF("get");
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);          // interfaces
+        d.writeShort(asField ? 1 : 0);
+        if (asField) {
+            d.writeShort(0);      // access
+            d.writeShort(2);      // name
+            d.writeShort(1);      // descriptor
+            d.writeShort(1);      // one attribute, to prove they are skipped
+            d.writeShort(2);
+            d.writeInt(3);
+            d.write(new byte[]{9, 9, 9});
+        }
+        d.writeShort(asField ? 0 : 1);
+        if (!asField) {
+            d.writeShort(0);
+            d.writeShort(2);
+            d.writeShort(1);
+            d.writeShort(0);
+        }
+        d.writeShort(0);          // class attributes
+        d.flush();
+        return out.toByteArray();
+    }
+
+    @Test
+    void aMethodDescriptorCounts() throws Exception {
+        // A library that names a type only in a signature it never calls was
+        // invisible, so the app built against it got no permissions, no
+        // services and no defines for a package it plainly uses.
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(descriptorOnly(false));
+        assertTrue(refs.contains("()L" + USED + ";"),
+                "a method descriptor is a reference: " + refs);
+    }
+
+    @Test
+    void aFieldDescriptorCountsAndAttributesAreSkipped() throws Exception {
+        // The field table comes first and carries attributes; misreading one
+        // shifts everything after it, so this fixture gives the field an
+        // attribute with a body.
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(descriptorOnly(true));
+        assertTrue(refs.contains("L" + USED + ";"),
+                "a field descriptor is a reference too: " + refs);
+    }
+
     @Test
     void somethingThatIsNotAClassFileIsNotParsed() {
         // Null, not empty: the caller falls back to the raw scan rather than

@@ -35,6 +35,28 @@ public final class TunnelHost {
     private final TunnelTransport transport;
     private boolean stopped;
 
+    /// Orders a start against a stop, whole.
+    ///
+    /// The `stopped` flag makes each transition atomic on its own and does
+    /// not order the two SEQUENCES. Testing it and then attaching left a
+    /// window: a stop landing in between ran finish(), detached and closed,
+    /// and the returning start then reattached the closed transport and
+    /// called onStart -- the application hearing onStop and then onStart for
+    /// a link that was already dead, which is the thing the flag was added
+    /// to prevent.
+    ///
+    /// Its own lock rather than this instance's, because the loop tests
+    /// `stopped` on every read and must not queue behind an onStart the
+    /// application is still inside. Held across application code
+    /// deliberately: ordering the two is the point, and it is reentrant, so
+    /// a tunnel that calls Tunnels.stop() from its own onStart -- which the
+    /// simulation runs on the calling thread -- is not deadlocked by it.
+    ///
+    /// NOT held across the read loop. The loop parks on the transport, and
+    /// closing the transport is what ends it, so a stop has to be able to
+    /// run while it is parked.
+    private final Object lifecycle = new Object();
+
     /// @hidden not part of the public API.
     public TunnelHost(VpnTunnel tunnel, TunnelTransport transport) {
         this.tunnel = tunnel;
@@ -51,20 +73,27 @@ public final class TunnelHost {
     /// @hidden not part of the public API.
     public void start(String server, String[] routes, String[] dns, int mtu,
             String data) {
-        synchronized (this) {
-            if (stopped) {
-                // A host stops ONCE and never restarts -- a port builds a
-                // new one per start -- so a start arriving after the stop is
-                // a race, not a restart. Unguarded it re-attached the closed
-                // transport and called onStart, so a tunnel torn down while
-                // its opener was still committing delivered onStop and then
-                // onStart to the application, for a link that was already
-                // dead.
-                return;
+        synchronized (lifecycle) {
+            synchronized (this) {
+                if (stopped) {
+                    // A host stops ONCE and never restarts -- a port builds
+                    // a new one per start -- so a start arriving after the
+                    // stop is a race, not a restart. Unguarded it
+                    // reattached the closed transport and called onStart, so
+                    // a tunnel torn down while its opener was still
+                    // committing delivered onStop and then onStart to the
+                    // application, for a link that was already dead.
+                    return;
+                }
             }
+            // The test and the two calls it guards under ONE lock. Split, a
+            // stop landing after the test ran the whole teardown and this
+            // then attached and began on top of it.
+            tunnel.attach(transport);
+            tunnel.begin(new TunnelConfiguration(server, routes, dns, mtu,
+                    data));
         }
-        tunnel.attach(transport);
-        tunnel.begin(new TunnelConfiguration(server, routes, dns, mtu, data));
+        // OUTSIDE it; see lifecycle.
         if (transport.isBlocking()) {
             loop();
         }
@@ -85,17 +114,21 @@ public final class TunnelHost {
     ///
     /// @hidden not part of the public API.
     public void stop(int reasonOrdinal) {
-        synchronized (this) {
-            if (stopped) {
-                return;
+        // Under the same lock the start sequence takes, so the two cannot
+        // interleave; see lifecycle.
+        synchronized (lifecycle) {
+            synchronized (this) {
+                if (stopped) {
+                    return;
+                }
+                stopped = true;
             }
-            stopped = true;
+            TunnelStopReason[] values = TunnelStopReason.values();
+            tunnel.finish(reasonOrdinal < 0 || reasonOrdinal >= values.length
+                    ? TunnelStopReason.UNKNOWN : values[reasonOrdinal]);
+            tunnel.attach(null);
+            transport.close();
         }
-        TunnelStopReason[] values = TunnelStopReason.values();
-        tunnel.finish(reasonOrdinal < 0 || reasonOrdinal >= values.length
-                ? TunnelStopReason.UNKNOWN : values[reasonOrdinal]);
-        tunnel.attach(null);
-        transport.close();
     }
 
     private void loop() {

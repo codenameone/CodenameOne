@@ -335,6 +335,41 @@ final class LibraryClassPrefixScan {
                     out.add(utf8[index]);
                 }
             }
+            // The MEMBERS too, which the pool alone does not reach. A field
+            // or method descriptor is referenced by field_info and
+            // method_info directly, so a library that names a type only in a
+            // signature it never calls -- an interface method returning
+            // com.codename1.call.session.Call, an abstract declaration, a
+            // native one -- carries that descriptor as a plain Utf8 that no
+            // CONSTANT_Class, NameAndType or MethodType points at. It was
+            // therefore invisible here, and the app built against that
+            // library got no permissions, no services and no defines for a
+            // package it plainly uses.
+            //
+            // A descriptor is the most direct kind of reference there is,
+            // which is what makes this the right side of the line this
+            // method draws: a CONSTANT_String is a literal the code happens
+            // to carry, and a descriptor is the type system.
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            int interfaces = in.readUnsignedShort();
+            for (int i = 0; i < interfaces; i++) {
+                in.readUnsignedShort();
+            }
+            for (int members = 0; members < 2; members++) {
+                int howMany = in.readUnsignedShort();
+                for (int m = 0; m < howMany; m++) {
+                    in.readUnsignedShort();
+                    in.readUnsignedShort();
+                    int descriptor = in.readUnsignedShort();
+                    if (descriptor > 0 && descriptor < count
+                            && utf8[descriptor] != null) {
+                        out.add(utf8[descriptor]);
+                    }
+                    skipAttributes(in);
+                }
+            }
             return out;
         } catch (Throwable unreadable) {
             return null;
@@ -343,6 +378,32 @@ final class LibraryClassPrefixScan {
                 in.close();
             } catch (java.io.IOException ignored) {
                 // Nothing useful to do about a failed close on a byte array.
+            }
+        }
+    }
+
+    /// Skips an `attributes` table, whatever it holds.
+    ///
+    /// Only the SHAPE is read -- a count, then a name index and a length per
+    /// attribute -- so an attribute this has never heard of costs nothing.
+    /// That is the same reason the constant pool is walked by hand rather
+    /// than through a bytecode library.
+    private static void skipAttributes(java.io.DataInputStream in)
+            throws java.io.IOException {
+        int attributes = in.readUnsignedShort();
+        for (int i = 0; i < attributes; i++) {
+            in.readUnsignedShort();
+            long length = in.readInt() & 0xffffffffL;
+            while (length > 0) {
+                long skipped = in.skip(length);
+                if (skipped <= 0) {
+                    // Nothing left to skip and the table says otherwise, so
+                    // the file is not what it claims. The caller reads a
+                    // throw here as "unreadable" and falls back to the text
+                    // scan, which over-approximates rather than under.
+                    throw new java.io.IOException("truncated attribute");
+                }
+                length -= skipped;
             }
         }
     }
