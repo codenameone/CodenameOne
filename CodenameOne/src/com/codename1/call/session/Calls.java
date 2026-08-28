@@ -905,15 +905,8 @@ public final class Calls {
                     // -- directly, or through the deferred safety timer --
                     // holding an active session over a call iOS had put back
                     // to ringing and Android had destroyed.
-                    if (session == null) {
-                        // The call ended while this sat on the EDT. Native
-                        // callbacks are queued rather than delivered inline,
-                        // so an answer can arrive after the end that
-                        // followed it -- and telling the app to answer a
-                        // call that is over has it accept signalling and
-                        // start answer work for nothing. The later
-                        // completeAction refusal is too late; the listener
-                        // has already run.
+                    if (staleAction(session)) {
+                        // Over before this drained; see staleAction.
                         settle(a);
                         break;
                     }
@@ -929,6 +922,14 @@ public final class Calls {
                 }
                 case END: {
                     CallAction a = new CallAction(token, callId);
+                    // NOT dropped when the session has gone, unlike the
+                    // actions staleAction covers. Every one of those asks the
+                    // app to DO something to a live call; this one asks it to
+                    // stop, and stopping twice is what tearing down is
+                    // supposed to survive. Dropping it would also remove the
+                    // only teardown signal an app gets for a call this
+                    // facade never registered -- a replayed or duplicated
+                    // native end -- which is the case that most needs one.
                     // Registered BEFORE dispatch, and deliberately a hook
                     // rather than a check. Forgetting unconditionally left an
                     // app that failed the action holding a live system call
@@ -950,6 +951,12 @@ public final class Calls {
                 }
                 case HOLD: {
                     CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction: holding or resuming a call that is
+                        // over restarts the media the end had stopped.
+                        settle(a);
+                        break;
+                    }
                     // On fulfilment only, for the reason ANSWER gives.
                     a.whenFulfilled(new StateChange(session,
                             flag ? CallState.HELD : CallState.ACTIVE));
@@ -971,9 +978,14 @@ public final class Calls {
                     // listener written against the iOS shape still compiles
                     // and still runs -- fail() on it changes nothing, which
                     // is exactly the truth on this platform.
-                    if (session != null) {
-                        session.setMutedInternal(flag);
+                    if (staleAction(session)) {
+                        // See staleAction. Skipping only setMutedInternal and
+                        // telling the app anyway was the half-measure: there
+                        // is no session to mute, and the listener still went
+                        // and muted media belonging to a finished call.
+                        break;
                     }
+                    session.setMutedInternal(flag);
                     CallAction done = new CallAction(CallAction.NONE, callId);
                     done.fulfill();
                     try {
@@ -987,6 +999,11 @@ public final class Calls {
                 }
                 case MUTE: {
                     CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction.
+                        settle(a);
+                        break;
+                    }
                     // On fulfilment only, for the reason ANSWER gives: a
                     // listener that fails this action leaves CallKit holding
                     // the PREVIOUS mute state, and Java used to report the
@@ -1006,6 +1023,14 @@ public final class Calls {
                 }
                 case DTMF: {
                     CallAction a = new CallAction(token, callId);
+                    if (staleAction(session)) {
+                        // See staleAction: digits belong to a live call, and
+                        // an app that plays them into signalling that has
+                        // gone gets an exception or, worse, plays them into
+                        // whatever reused the channel.
+                        settle(a);
+                        break;
+                    }
                     try {
                         for (CallActionListener l : ls) {
                             l.dtmfRequested(callId, text, a);
@@ -1080,16 +1105,13 @@ public final class Calls {
                     break;
                 }
                 case AUDIO_ON: {
-                    if (session == null) {
-                        // The call ended while this was in flight. Native
-                        // callbacks arrive off the EDT and are queued onto
-                        // it, so an activation can land after the end that
-                        // followed it -- and audioSessionActivated tells the
-                        // app to START media. On Android the deactivation is
-                        // delivered synchronously as the call ends, so it
-                        // would already have gone by, leaving this late
-                        // activation with no stop event behind it and media
-                        // running after the call was over.
+                    if (staleAction(session)) {
+                        // See staleAction. The particular damage here: on
+                        // Android the deactivation is delivered
+                        // synchronously as the call ends, so it has already
+                        // gone by, leaving this late activation with no stop
+                        // event behind it and media running after the call
+                        // was over.
                         break;
                     }
                     CallAudioSession s = new CallAudioSession(callId, route(ordinal));
@@ -1099,6 +1121,12 @@ public final class Calls {
                     break;
                 }
                 case AUDIO_OFF:
+                    // Not gated on the session either, and for END's reason:
+                    // this one STOPS media. An audio deactivation that
+                    // arrives after the call was forgotten is the last
+                    // chance the app has to release the device, and
+                    // withholding it is the one outcome worse than
+                    // delivering it twice.
                     for (CallActionListener l : ls) {
                         tellAudioOff(l, callId);
                     }
@@ -1171,6 +1199,31 @@ public final class Calls {
                 default:
                     break;
             }
+        }
+
+        /// Whether an action arrived for a call this facade no longer holds.
+        ///
+        /// Native callbacks are queued onto the EDT rather than delivered
+        /// inline, so an action can drain AFTER the end that followed it.
+        /// Every event that asks the application to DO something to a live
+        /// call -- answer, hold, mute, dial digits, start media -- has to be
+        /// dropped in that window. The listener runs first and completeAction
+        /// refuses afterwards, which is too late: by then the app has
+        /// accepted signalling, restarted the media the end had stopped, or
+        /// played tones into a channel that is gone or has been reused.
+        ///
+        /// Three events deliberately do NOT consult this, and each is
+        /// commented where it sits. END and AUDIO_OFF ask the app to STOP,
+        /// which is idempotent and is the last signal it may ever get for
+        /// that call. START has no session by definition -- the system is
+        /// asking for a call to be placed.
+        ///
+        /// The check is trivial and the method is not: it exists so the rule
+        /// and its exceptions are written down once, because ANSWER and
+        /// AUDIO_ON carried it while HOLD, MUTE and DTMF did not, and the
+        /// difference was invisible.
+        private static boolean staleAction(CallSession session) {
+            return session == null;
         }
 
         /// Fulfills an action the application ignored.

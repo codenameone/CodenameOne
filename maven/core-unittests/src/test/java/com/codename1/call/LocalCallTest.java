@@ -751,6 +751,72 @@ public class LocalCallTest {
     }
 
     @Test
+    public void anActionThatDrainsAfterTheEndIsDropped() {
+        // Native callbacks are QUEUED onto the EDT, so an action can drain
+        // after the end that followed it. ANSWER and the audio activation
+        // dropped one; HOLD, MUTE, the mute notification and DTMF did not,
+        // and each of those tells the app to act on media that is gone --
+        // resuming what the end stopped, or playing tones into a channel
+        // that has been reused. completeAction refuses afterwards, which is
+        // too late, because the listener has already run.
+        final List<String> seen = new ArrayList<String>();
+        Calls.addActionListener(new CallActionAdapter() {
+            public void holdRequested(String callId, boolean held,
+                    CallAction action) {
+                seen.add("hold");
+            }
+
+            public void muteRequested(String callId, boolean muted,
+                    CallAction action) {
+                seen.add("mute");
+            }
+
+            public void dtmfRequested(String callId, String digits,
+                    CallAction action) {
+                seen.add("dtmf");
+            }
+
+            public void answerRequested(String callId, CallAction action) {
+                seen.add("answer");
+            }
+
+            public void endRequested(String callId, CallAction action) {
+                seen.add("end");
+            }
+        });
+        String id = CallId.random();
+        CallSession call = ring(id);
+        call.reportEndedRemotely(CallEndReason.REMOTE_ENDED);
+        long limit = System.currentTimeMillis() + 5000;
+        while (Calls.getSession(id) != null
+                && System.currentTimeMillis() < limit) {
+            sleep();
+        }
+        assertNull(Calls.getSession(id), "the call is over");
+        seen.clear();
+
+        // Exactly what a port delivers, which is why these are called
+        // directly rather than driven through the simulation: the race is
+        // between the platform's queue and the end, and no bridge can be
+        // asked to reproduce it on demand.
+        Calls.deliverAnswer(id, 0L);
+        Calls.deliverHold(id, true, 0L);
+        Calls.deliverMute(id, true, 0L);
+        Calls.deliverMuteChanged(id, true);
+        Calls.deliverDtmf(id, "123", 0L);
+        assertTrue(seen.isEmpty(),
+                "an action for a call that has ended must not reach the"
+                + " application, but it saw " + seen);
+
+        // END is the deliberate exception, and it has to stay one: it asks
+        // the app to STOP, which is idempotent and is the last teardown
+        // signal an app gets for a call this facade never registered.
+        Calls.deliverEndRequest(id, 0L);
+        assertEquals(1, seen.size(), "an end still reaches the application");
+        assertEquals("end", seen.get(0));
+    }
+
+    @Test
     public void aStaleSessionCannotEndTheCallThatReusedItsId() {
         // Both ports resolve an end by call ID alone, so a session that no
         // longer owns its id must not reach them. A provider reset retires

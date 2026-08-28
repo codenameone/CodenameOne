@@ -1180,6 +1180,24 @@ static void cn1clDrain(int requestId) {
 static PKPushRegistry *cn1clRegistry = nil;
 static NSString *cn1clVoipToken = nil;
 
+/// Whether this app still wants VoIP pushes, read and written under
+/// cn1clLock.
+///
+/// desiredPushTypes is the switch PushKit obeys, but it cannot order
+/// anything: unregister() empties it from a Java thread while the delegate
+/// runs on the registry's queue, so a credentials callback already in flight
+/// went on to store and deliver a token the app had just opted out of --
+/// VoipPush.getToken() became non-null again and tokenChanged told the app to
+/// hand its server a token it had renounced. Consulting desiredPushTypes in
+/// the callback would only narrow that window, since the read and the store
+/// would still straddle the write. This flag moves under the SAME lock as the
+/// token and the waiting registrations, so unregister-then-credentials and
+/// credentials-then-unregister are the only two orders that exist.
+///
+/// YES to begin with: cn1CallInstallPushRegistry asks for VoIP as it builds
+/// the registry, so wanting it is the state before anyone opts out.
+static BOOL cn1clVoipWanted = YES;
+
 /// The uuid a payload names, or a fresh one when it names none.
 ///
 /// Refusing would return without reporting, which kills the process. So a
@@ -1219,6 +1237,15 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
     NSString *delivered = nil;
     cn1clEnsureState();
     @synchronized (cn1clLock) {
+        if (!cn1clVoipWanted) {
+            // Opted out while this was in flight. Storing it would restore
+            // the token unregister had just cleared, and delivering it would
+            // reach tokenChanged; see cn1clVoipWanted. Nothing is left
+            // parked either -- unregister fails every waiter as it runs, and
+            // a registration arriving afterwards is failed by the register
+            // path -- so there is nobody to answer here.
+            return;
+        }
         // The STORE and the drain under one lock, which is the lock a
         // registration reads the token and parks itself under. Storing
         // outside it left a registration able to read nil from a token this
@@ -1269,6 +1296,10 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
         [cn1clVoipToken release];
         cn1clVoipToken = nil;
     }
+    // NOT gated on cn1clVoipWanted. An invalidation says the token is dead,
+    // which stays true whether or not the app still wants pushes, and the
+    // delivery below only ever clears -- it can never restore something the
+    // app opted out of.
     // Told, not just forgotten. Clearing the native cache alone left
     // VoipPush.getToken() answering with the dead token and tokenChanged
     // never firing, so the app went on believing its server could still
@@ -2280,6 +2311,14 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
     if (cn1clRegistry != nil) {
         cn1clRegistry.desiredPushTypes = [NSSet setWithObject:PKPushTypeVoIP];
     }
+    // Ordered with the delegate rather than only with PushKit; see
+    // cn1clVoipWanted. Set before the block so a credentials callback that
+    // answers this registration is never dropped as belonging to an app that
+    // had opted out.
+    cn1clEnsureState();
+    @synchronized (cn1clLock) {
+        cn1clVoipWanted = YES;
+    }
     // The token READ and the parking under one lock, and the delegate stores
     // the token and drains the waiters under the same one. Split, the
     // credentials callback could land between this check and the insert:
@@ -2304,9 +2343,13 @@ void com_codename1_impl_ios_IOSNative_callRegisterVoipPush___int(
     // reaches application code, which may call back in here.
     dispatch_async(dispatch_get_main_queue(), ^{
         NSString *known = nil;
-        BOOL wanted = cn1clRegistry == nil
-                || [cn1clRegistry.desiredPushTypes count] > 0;
+        BOOL wanted;
         @synchronized (cn1clLock) {
+            // The flag rather than desiredPushTypes: read here it would be a
+            // cross-thread property read racing unregister's write, and the
+            // decision it feeds has to be ordered with the store the
+            // delegate makes. See cn1clVoipWanted.
+            wanted = cn1clVoipWanted;
             known = [[cn1clVoipToken retain] autorelease];
             if (known == nil && wanted) {
                 [cn1clTokenRequests addObject:
@@ -2350,6 +2393,11 @@ void com_codename1_impl_ios_IOSNative_callUnregisterVoipPush___int(
     @synchronized (cn1clLock) {
         // The clear belongs in here with the drain, not above it: this runs
         // on a Java thread, and the token is read under this lock.
+        //
+        // The flag goes first and under the same lock, so a credentials
+        // callback is either wholly before this -- and its token is cleared
+        // here -- or wholly after, and drops itself. See cn1clVoipWanted.
+        cn1clVoipWanted = NO;
         [cn1clVoipToken release];
         cn1clVoipToken = nil;
         waiting = [NSArray arrayWithArray:cn1clTokenRequests];
