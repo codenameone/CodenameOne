@@ -657,8 +657,7 @@ public class MacOSNativeBuilder extends Executor {
         }
         xcodeProjectDir = distDir;
 
-        String bundleVersion = request.getArg("macos.bundleVersion",
-                request.getArg("ios.bundleVersion", version));
+        String bundleVersion = hints.getBundleVersion(version);
         try {
             writeGeneratedPlists(request, hints, srcRoot, appName, version, bundleVersion,
                 classesDir, buildinRes);

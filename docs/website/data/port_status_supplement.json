@@ -1187,6 +1187,7 @@
             "ios-gl",
             "ios-metal",
             "mac-catalyst",
+            "macos",
             "javascript",
             "linux-x64",
             "linux-arm64",
@@ -1196,14 +1197,6 @@
           "state": "conditional",
           "label": "OS assistive tech",
           "detail": "Semantic output is consumed by the screen reader or accessibility stack available on that OS."
-        },
-        {
-          "ports": [
-            "macos"
-          ],
-          "state": "conditional",
-          "label": "Announcements only",
-          "detail": "Focus and status announcements reach VoiceOver, but there is no accessibility tree: isAccessibilityTreeSupported() answers false, so a custom-drawn control is announced rather than navigable by rotor or element."
         },
         {
           "ports": [

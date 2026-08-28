@@ -229,9 +229,32 @@ public class MacOSXcodeProjectTest {
                         MacOSBuildHints.EntitlementOverrides.UNSET,
                         MacOSBuildHints.EntitlementOverrides.UNSET,
                         MacOSBuildHints.EntitlementOverrides.UNSET,
-                        null);
+                        null, false);
         assertNull(MacOSXcodeProject.entitlements(false, unhardened, caps, false)
                 .get(MacOSXcodeProject.ENT_CAMERA));
+
+        // The distinction the bug turned on. macos.entitlements.hardenedRuntime
+        // decides two JIT keys; macos.hardenedRuntime is what the binary is
+        // signed with. Turning the first off on a project still signed hardened
+        // must not take the camera with it -- which is what reading the two as
+        // one hint did.
+        MacOSBuildHints.EntitlementOverrides noJitStillHardened =
+                new MacOSBuildHints.EntitlementOverrides(
+                        false, true, MacOSBuildHints.EntitlementOverrides.UNSET, "readwrite",
+                        false, false, null,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        MacOSBuildHints.EntitlementOverrides.UNSET,
+                        null, true);
+        Map<String, Object> kept =
+                MacOSXcodeProject.entitlements(false, noJitStillHardened, caps, false);
+        assertEquals(Boolean.TRUE, kept.get(MacOSXcodeProject.ENT_CAMERA));
+        assertEquals(Boolean.TRUE, kept.get(MacOSXcodeProject.ENT_MICROPHONE));
+        assertNull("the JIT keys are the ones that hint governs",
+                kept.get(MacOSXcodeProject.ENT_ALLOW_JIT));
     }
 
     @Test
@@ -271,7 +294,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                "development"), caps, false)
+                "development", true), caps, false)
                 .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
         assertNull(MacOSXcodeProject.entitlements(false,
                 new MacOSBuildHints.EntitlementOverrides(
@@ -283,7 +306,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                "false"), caps, false)
+                "false", true), caps, false)
                 .get(MacOSXcodeProject.ENT_APS_ENVIRONMENT));
 
         // And not for an app that never registers -- an unused APNs entitlement
@@ -338,7 +361,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                null);
+                null, true);
         Map<String, Object> withJit = MacOSXcodeProject.entitlements(false, jit, null, false);
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_JIT));
         assertEquals(Boolean.TRUE, withJit.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
@@ -353,7 +376,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
-                null);
+                null, true);
         Map<String, Object> without = MacOSXcodeProject.entitlements(false, off, null, false);
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_JIT));
         assertNull(without.get(MacOSXcodeProject.ENT_ALLOW_UNSIGNED_MEMORY));
@@ -379,7 +402,7 @@ public class MacOSXcodeProjectTest {
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.UNSET,
                 MacOSBuildHints.EntitlementOverrides.ON,
-                null);
+                null, true);
         assertEquals(Boolean.TRUE, MacOSXcodeProject.entitlements(true, on, null, false)
                 .get(MacOSXcodeProject.ENT_FILES_DOWNLOADS));
     }

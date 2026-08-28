@@ -325,6 +325,29 @@ public class MacOSBuildHintsTest {
         assertNull(blankOverride.getInstallerIdentityFor("developerID"));
     }
 
+    /// The build number resolves modern, then legacy, then the iOS spelling an
+    /// existing Catalyst settings file actually carries. The builder read the
+    /// first and third directly and skipped the second, so a project migrating on
+    /// the promised macNative. spelling shipped the application version as its
+    /// build number -- a duplicate one whenever the application version had not
+    /// moved, which distribution rejects.
+    @Test
+    public void theBuildNumberHonoursTheLegacySpellingBetweenTheOtherTwo() {
+        assertEquals("41", parse(raw("macos.bundleVersion", "41"), "p").getBundleVersion("1.0"));
+        assertEquals("42", parse(raw("macNative.bundleVersion", "42"), "p").getBundleVersion("1.0"));
+        assertEquals("43", parse(raw("ios.bundleVersion", "43"), "p").getBundleVersion("1.0"));
+
+        // Precedence, in both directions that matter.
+        assertEquals("modern", parse(raw("macos.bundleVersion", "modern",
+                "macNative.bundleVersion", "legacy"), "p").getBundleVersion("1.0"));
+        assertEquals("legacy", parse(raw("macNative.bundleVersion", "legacy",
+                "ios.bundleVersion", "ios"), "p").getBundleVersion("1.0"));
+
+        // None set: the application version, which is what a project that never
+        // chose a build number wants.
+        assertEquals("1.0", parse(raw(), "p").getBundleVersion("1.0"));
+    }
+
     @Test
     public void appStorePackagingIsAlwaysPkg() {
         MacOSBuildHints pinned = parse(raw("macos.distribution", "both",

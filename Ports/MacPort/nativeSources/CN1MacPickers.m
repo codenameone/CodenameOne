@@ -487,7 +487,23 @@ void CN1MacOpenDatePicker(int type, long long time, int x, int y, int w, int h, 
         long long seeded = time;
         if (type != 1 && controller.minuteStep > 1) {
             long long stepMs = (long long)controller.minuteStep * 60000;
-            seeded = (long long)cn1RoundToStep((long long)seeded, (long long)stepMs);
+            // Rounded in the picker's own time zone, exactly as -done: does when
+            // it commits; the reasoning is written out there. The step is about
+            // the minutes the user can SEE and epoch milliseconds are aligned to
+            // UTC, so in a zone offset by a half or quarter hour -- UTC+05:30,
+            // UTC+05:45 -- an hourly picker seeded at a local 10:00 opened on
+            // 10:30.
+            //
+            // The two ends disagreeing was worse than either being wrong alone:
+            // accepting a picker the user never touched changed the value a
+            // second time, because the commit path rounded correctly what the
+            // seed had already moved. Duration pickers are pinned to GMT just
+            // above, where the offset is zero and this changes nothing.
+            NSDate *seedDate = [NSDate dateWithTimeIntervalSince1970:seeded / 1000.0];
+            NSTimeZone *seedZone = picker.timeZone != nil
+                ? picker.timeZone : [NSTimeZone localTimeZone];
+            long long offsetMs = (long long)[seedZone secondsFromGMTForDate:seedDate] * 1000LL;
+            seeded = cn1RoundToStep(seeded + offsetMs, stepMs) - offsetMs;
         }
         picker.dateValue = [NSDate dateWithTimeIntervalSince1970:seeded / 1000.0];
         controller.datePicker = picker;

@@ -474,6 +474,25 @@ public class MacOSBuildHints {
         return hardenedRuntime;
     }
 
+    /**
+     * The build number written as CFBundleVersion.
+     *
+     * <p>{@code macos.bundleVersion}, then the legacy {@code macNative.}
+     * spelling like every other setting on this class, then
+     * {@code ios.bundleVersion} -- which is what an existing settings file for a
+     * Catalyst project actually carries, that build having been an iOS build.
+     * The builder used to read the first and third directly and skip the second,
+     * so a project migrating on the promised legacy spelling silently fell
+     * through to the application version and shipped a build number it did not
+     * choose -- a duplicate one, if the application version had not moved.</p>
+     *
+     * @param applicationVersion the value to use when no build number is set
+     */
+    public String getBundleVersion(String applicationVersion) {
+        return hint(source, "bundleVersion",
+                source.get("ios.bundleVersion", applicationVersion));
+    }
+
     public String getFixedWindowSize() {
         return fixedWindowSize;
     }
@@ -613,7 +632,9 @@ public class MacOSBuildHints {
                 // locally signed build needs to change -- an Apple Development
                 // profile wants "development" and a tri-state boolean had no way
                 // to say it.
-                entString(source, "apsEnvironment", null));
+                entString(source, "apsEnvironment", null),
+                // The BUILD SETTING, not the entitlements hint above it.
+                hardenedRuntime);
     }
 
     /**
@@ -666,7 +687,11 @@ public class MacOSBuildHints {
         private final boolean networkClient;
         private final int networkServer;
         private final String filesUserSelected;
-        private final boolean hardenedRuntime;
+        /// macos.entitlements.hardenedRuntime -- the JIT exceptions, NOT the
+        /// ENABLE_HARDENED_RUNTIME build setting. See isJitExceptionsDeclared().
+        private final boolean jitExceptionsDeclared;
+        /// macos.hardenedRuntime -- the build setting the project is signed with.
+        private final boolean hardenedRuntimeBuildSetting;
         private final boolean allowJit;
         private final String extra;
         private final int camera;
@@ -678,14 +703,16 @@ public class MacOSBuildHints {
         private final String apsEnvironment;
 
         EntitlementOverrides(boolean sandbox, boolean networkClient, int networkServer,
-                String filesUserSelected, boolean hardenedRuntime, boolean allowJit, String extra,
-                int camera, int microphone, int bluetooth, int location, int calendars,
-                int filesDownloads, String apsEnvironment) {
+                String filesUserSelected, boolean jitExceptionsDeclared, boolean allowJit,
+                String extra, int camera, int microphone, int bluetooth, int location,
+                int calendars, int filesDownloads, String apsEnvironment,
+                boolean hardenedRuntimeBuildSetting) {
             this.sandbox = sandbox;
             this.networkClient = networkClient;
             this.networkServer = networkServer;
             this.filesUserSelected = filesUserSelected;
-            this.hardenedRuntime = hardenedRuntime;
+            this.jitExceptionsDeclared = jitExceptionsDeclared;
+            this.hardenedRuntimeBuildSetting = hardenedRuntimeBuildSetting;
             this.allowJit = allowJit;
             this.extra = extra;
             this.camera = camera;
@@ -700,7 +727,7 @@ public class MacOSBuildHints {
         /** The defaults, for a caller that has no hints to resolve against. */
         public static EntitlementOverrides defaults(boolean appStore, boolean sandboxed) {
             return new EntitlementOverrides(sandboxed, true, UNSET, "readwrite", !appStore, false,
-                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, null);
+                    null, UNSET, UNSET, UNSET, UNSET, UNSET, UNSET, null, !appStore);
         }
 
         public boolean isSandbox() {
@@ -716,8 +743,31 @@ public class MacOSBuildHints {
             return filesUserSelected;
         }
 
-        public boolean isHardenedRuntime() {
-            return hardenedRuntime;
+        /**
+         * Whether the signature declares the JIT exceptions, from
+         * {@code macos.entitlements.hardenedRuntime}.
+         *
+         * <p>Named for what it does, because the hint's name does not: it is NOT
+         * the ENABLE_HARDENED_RUNTIME build setting, and reading it as one put
+         * the resource entitlements behind the wrong flag once already. That
+         * setting is {@code macos.hardenedRuntime}; ask
+         * {@link #isHardenedRuntimeBuildSetting()} for it.</p>
+         */
+        public boolean isJitExceptionsDeclared() {
+            return jitExceptionsDeclared;
+        }
+
+        /**
+         * Whether the project is signed with the hardened runtime, from
+         * {@code macos.hardenedRuntime} -- the same value MacOSNativeBuilder
+         * passes as ENABLE_HARDENED_RUNTIME.
+         *
+         * <p>Carried here so the entitlements can be decided from what the
+         * binary is actually signed with rather than from a similarly named
+         * hint that means something else.</p>
+         */
+        public boolean isHardenedRuntimeBuildSetting() {
+            return hardenedRuntimeBuildSetting;
         }
 
         public boolean isAllowJit() {

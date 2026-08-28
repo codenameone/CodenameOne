@@ -413,7 +413,15 @@ public class MacOSXcodeProject {
         // Everything that stayed inside the block is genuinely sandbox-only:
         // the sandbox flag itself, the network client and server, and the
         // filesystem grants. The hardened runtime does not gate any of those.
-        if (overrides.isSandbox() || overrides.isHardenedRuntime()) {
+        // isHardenedRuntimeBuildSetting(), not isJitExceptionsDeclared(). The two
+        // hints have almost the same name and nothing else in common: this block
+        // is about what the SIGNED BINARY is subject to, which is
+        // macos.hardenedRuntime -- the value MacOSNativeBuilder passes as
+        // ENABLE_HARDENED_RUNTIME -- while macos.entitlements.hardenedRuntime
+        // decides two JIT keys further down. Reading the second one here meant a
+        // build that turned the JIT exceptions off, on a project still signed
+        // hardened, lost the camera and the microphone with it.
+        if (overrides.isSandbox() || overrides.isHardenedRuntimeBuildSetting()) {
             if (overrides.camera(c.usesCamera)) {
                 ent.put(ENT_CAMERA, Boolean.TRUE);
             }
@@ -450,7 +458,7 @@ public class MacOSXcodeProject {
         if (overrides.isAllowJit()) {
             ent.put(ENT_ALLOW_JIT, Boolean.TRUE);
             ent.put(ENT_ALLOW_UNSIGNED_MEMORY, Boolean.TRUE);
-        } else if (overrides.isHardenedRuntime()) {
+        } else if (overrides.isJitExceptionsDeclared()) {
             // The explicit denial the Mac Catalyst target has always written for
             // macNative.entitlements.hardenedRuntime. Reading the resolved value
             // was missing here, which left that hint -- under either spelling --
