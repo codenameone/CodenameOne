@@ -494,18 +494,6 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
-    /// False. The inherited check reads the OS version and says yes on macOS 11
-    /// and later, but the native behind it is compiled out unless the build
-    /// defines CN1_USE_APPREVIEW and links StoreKit, which this builder does
-    /// not -- so requestNativeInAppReview did nothing while its wrapper reported
-    /// success, and AppReview never showed its portable fallback.
-    @Override
-    public boolean isNativeInAppReviewSupported() {
-        return false;
-    }
-
-    /// @inheritDoc
-    ///
     /// False: there is no contacts backend on this port. The shared
     /// implementation is the legacy AddressBook C API, which does not exist on
     /// macOS -- the Catalyst slice already undefines the gate for the same

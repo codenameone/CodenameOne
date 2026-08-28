@@ -257,10 +257,11 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesCalendar = {false};
         final boolean[] usesPush = {false};
         final boolean[] usesLocation = {false};
+        final boolean[] usesAppReview = {false};
         try {
             scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation));
+                    usesLocation, usesAppReview));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -269,7 +270,7 @@ public class MacOSNativeBuilder extends Executor {
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation));
+                    usesLocation, usesAppReview));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -360,6 +361,7 @@ public class MacOSNativeBuilder extends Executor {
         boolean bluetoothEnabled = usesBluetooth[0];
         boolean calendarEnabled = usesCalendar[0];
         boolean locationEnabled = usesLocation[0];
+        boolean appReviewEnabled = usesAppReview[0];
         // Always, on this port, rather than gated on the application.
         //
         // Every other define here is decided by scanning the application, and
@@ -437,6 +439,23 @@ public class MacOSNativeBuilder extends Executor {
             }
         }
         log("Camera " + (cn1CameraEnabled ? "enabled" : "disabled"));
+
+        if (appReviewEnabled) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application asks for an app store review but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define CN1_USE_APPREVIEW",
+                        "#define CN1_USE_APPREVIEW");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the app review prompt in "
+                        + "CodenameOne_GLViewController.h", ex);
+            }
+        }
+        log("App review " + (appReviewEnabled ? "enabled" : "disabled"));
 
         if (locationEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
@@ -1216,10 +1235,11 @@ public class MacOSNativeBuilder extends Executor {
         private final boolean[] usesCalendar;
         private final boolean[] usesPush;
         private final boolean[] usesLocation;
+        private final boolean[] usesAppReview;
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
                 boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar,
-                boolean[] usesPush, boolean[] usesLocation) {
+                boolean[] usesPush, boolean[] usesLocation, boolean[] usesAppReview) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
@@ -1227,6 +1247,7 @@ public class MacOSNativeBuilder extends Executor {
             this.usesCalendar = usesCalendar;
             this.usesPush = usesPush;
             this.usesLocation = usesLocation;
+            this.usesAppReview = usesAppReview;
         }
 
         @Override
@@ -1267,6 +1288,12 @@ public class MacOSNativeBuilder extends Executor {
             if (cls.startsWith("com/codename1/location/")
                     || cls.equals("com/codename1/maps/MapComponent")) {
                 usesLocation[0] = true;
+            }
+            // By package, which is safe here in a way it was not for the camera:
+            // nothing in this port references com.codename1.appreview, so the
+            // scan sees only the application.
+            if (cls.startsWith("com/codename1/appreview")) {
+                usesAppReview[0] = true;
             }
             if (!cls.startsWith("com/codename1/security/")) {
                 return;
