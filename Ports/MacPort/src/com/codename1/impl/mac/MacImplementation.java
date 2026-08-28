@@ -432,22 +432,39 @@ public class MacImplementation extends IOSImplementation {
         com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                com.codename1.ui.Form form = com.codename1.ui.Display.getInstance().getCurrent();
-                com.codename1.ui.Component current = form == null ? null : form.getFocused();
-                if (current == null) {
+                // The focused WINDOW first, then the current form.
+                //
+                // A secondary Window keeps its own focus and its own traversal
+                // order, and is not a Form: reading Display.getCurrent() gave the
+                // main form while the user was typing in a window, so Tab either
+                // moved focus in the wrong top level or found nothing to move.
+                // getComponentForm() is null inside a Window for the same reason,
+                // which is why the target is resolved from the top level itself
+                // rather than from the component.
+                com.codename1.ui.Window window =
+                        com.codename1.ui.Desktop.isSupported()
+                            ? com.codename1.ui.Desktop.getInstance().getFocusedWindow() : null;
+                com.codename1.ui.Component current;
+                com.codename1.ui.Form.TabIterator it;
+                if (window != null) {
+                    current = window.getFocused();
+                    if (current == null) {
+                        return;
+                    }
+                    it = window.getTabIterator(current);
+                } else {
+                    com.codename1.ui.Form form =
+                            com.codename1.ui.Display.getInstance().getCurrent();
+                    current = form == null ? null : form.getFocused();
+                    if (current == null) {
+                        return;
+                    }
+                    it = form.getTabIterator(current);
+                }
+                if (it == null) {
                     return;
                 }
-                // The focused component's OWN form, not the current one: with a
-                // secondary Window up they are different, and traversing the
-                // main form's fields from a window's field would move focus out
-                // of the window the user is typing in.
-                com.codename1.ui.Form owner = current.getComponentForm();
-                if (owner == null) {
-                    return;
-                }
-                com.codename1.ui.Component target = forward
-                        ? owner.getNextComponent(current)
-                        : owner.getPreviousComponent(current);
+                com.codename1.ui.Component target = forward ? it.getNext() : it.getPrevious();
                 if (target == null || !target.isFocusable()) {
                     return;
                 }

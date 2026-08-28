@@ -106,10 +106,10 @@ static long long cn1RoundToStep(long long value, long long step) {
 /// express a duration at all -- see cn1BuildDurationView.
 @property (nonatomic, retain) NSTextField *durationHoursField;
 @property (nonatomic, retain) NSTextField *durationMinutesField;
-/// The largest duration those fields can express, in milliseconds. Their own
-/// maxima stop the USER exceeding it; this is what stops the step rounding
-/// below doing so after the fact.
-@property (nonatomic, assign) long long durationMaxMillis;
+/// The largest value the MINUTE field accepts: 59 beside an hours field, 999
+/// when minutes stand alone. Their own maximum stops the USER exceeding it;
+/// this is what stops the step rounding below doing so after the fact.
+@property (nonatomic, assign) long long durationMinutesMax;
 @end
 
 @implementation CN1MacPickerController
@@ -131,31 +131,33 @@ static long long cn1RoundToStep(long long value, long long step) {
             ? (long long)self.durationHoursField.integerValue : 0;
         long long minutes = self.durationMinutesField != nil
             ? (long long)self.durationMinutesField.integerValue : 0;
-        long long total = hours * 3600000LL + minutes * 60000LL;
-        // Only where minutes are on screen. An hours-only picker shows no
-        // minutes at all, so rounding its value by a minute step can only put
-        // minutes INTO it that nobody chose and nobody can see: one hour with a
-        // seven minute step committed 63 minutes. The lightweight picker builds
-        // no minute spinner for this type, so its value is never touched by the
-        // step either -- rounding here made the two disagree about the same
-        // configuration.
+        // The step applies to the MINUTE field, not to the duration.
+        //
+        // Rounding the combined value moved the hours the user had picked
+        // independently: 1h 0m with a seven minute step became 63 minutes,
+        // because 3600000 is not a multiple of 420000. The portable
+        // DurationSpinner3D steps its minute spinner and leaves the hour spinner
+        // alone, so the two pickers answered differently for the same
+        // configuration -- and this one answered with a duration it had never
+        // displayed. An hours-only picker has no minute field at all, so nothing
+        // is rounded there.
         if (self.minuteStep > 1 && self.durationMinutesField != nil) {
-            long long stepMs = (long long)self.minuteStep * 60000LL;
-            total = (long long)cn1RoundToStep((long long)total, (long long)stepMs);
-            // Rounding is the last thing to touch the value, so it can carry it
-            // out of the range the fields enforce: 999 minutes at a 60 minute
-            // step rounds up to 1020, and 999h59m at the same step rounds up to
-            // 1000 hours. Both are durations the picker never displayed and its
-            // own fields would have refused. Stepping back to the highest value
-            // that is both on the step and inside the range keeps Done returning
-            // something the control could have shown.
-            if (self.durationMaxMillis > 0 && total > self.durationMaxMillis) {
-                total = (self.durationMaxMillis / stepMs) * stepMs;
+            long long step = (long long)self.minuteStep;
+            minutes = cn1RoundToStep(minutes, step);
+            // Clamped to the highest value the field itself allows that is also
+            // on the step: rounding up from the top of the range would otherwise
+            // return minutes the picker would have refused -- 999 at a 60 minute
+            // step becomes 1020, and beside an hours field 59 becomes 60, which
+            // is an hour this picker never showed.
+            long long highest = (self.durationMinutesMax / step) * step;
+            if (minutes > highest) {
+                minutes = highest;
             }
-            if (total < 0) {
-                total = 0;
+            if (minutes < 0) {
+                minutes = 0;
             }
         }
+        long long total = hours * 3600000LL + minutes * 60000LL;
         cn1PickerFinish((JAVA_LONG)total);
         return;
     }
@@ -351,11 +353,8 @@ static NSView *cn1BuildDurationView(CN1MacPickerController *controller, int type
     }
     controller.durationHoursField = hoursField;
     controller.durationMinutesField = minutesField;
-    // The same maxima the fields above were given, as a duration: 999 of
-    // whichever unit stands alone, and 999h59m when both are present.
-    controller.durationMaxMillis = (type == 5 || type == 6 ? 999LL * 3600000LL : 0LL)
-            + (type == 5 ? 59LL * 60000LL : 0LL)
-            + (type == 7 ? 999LL * 60000LL : 0LL);
+    // The same maximum the minute field above was given.
+    controller.durationMinutesMax = (type == 7 ? 999LL : 59LL);
     view.frame = NSMakeRect(0, 0, x, 56);
 #ifndef CN1_USE_ARC
     [view autorelease];
