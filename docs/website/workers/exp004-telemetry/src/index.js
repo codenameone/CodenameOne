@@ -4,6 +4,7 @@ const EXPERIMENT_ID = "EXP-004";
 const ORIGINAL_EXPERIMENT_START = "2026-08-27T04:35:14.000Z";
 const COUNTER_NAME = "homepage-positioning";
 const MAX_BODY_BYTES = 1024;
+const SUBMISSION_TOKEN_TTL_MS = 6 * 60 * 60 * 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EVENT_PATTERN = /^Exp004(Ownership|Reach)(Exposure|Download)$/;
 const ALLOWED_ORIGINS = new Set([
@@ -64,16 +65,35 @@ function parseEvent(payload) {
   const match = typeof payload.event === "string"
     ? payload.event.match(EVENT_PATTERN) : null;
   if (!match || !UUID_PATTERN.test(payload.event_id || "") ||
-      !UUID_PATTERN.test(payload.session_key || "")) {
+      !UUID_PATTERN.test(payload.session_key || "") ||
+      !UUID_PATTERN.test(payload.submission_token || "")) {
     return null;
   }
   return {
     event: payload.event,
     eventId: payload.event_id.toLowerCase(),
     sessionKey: payload.session_key.toLowerCase(),
+    submissionToken: payload.submission_token.toLowerCase(),
     arm: match[1].toLowerCase(),
     kind: match[2].toLowerCase(),
   };
+}
+
+function parseSession(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+      !UUID_PATTERN.test(payload.session_key || "") ||
+      !["ownership", "reach"].includes(payload.arm)) {
+    return null;
+  }
+  return {
+    sessionKey: payload.session_key.toLowerCase(),
+    arm: payload.arm,
+  };
+}
+
+function hasSameOriginBrowserContext(request) {
+  return ALLOWED_ORIGINS.has(request.headers.get("origin")) &&
+    request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 export class Exp004Counter extends DurableObject {
@@ -101,6 +121,12 @@ export class Exp004Counter extends DurableObject {
         );
         CREATE INDEX IF NOT EXISTS events_occurred_at
           ON events (occurred_at, arm, kind);
+        CREATE TABLE IF NOT EXISTS submission_tokens (
+          token TEXT PRIMARY KEY,
+          session_key TEXT NOT NULL UNIQUE,
+          arm TEXT NOT NULL CHECK (arm IN ('ownership', 'reach')),
+          issued_at INTEGER NOT NULL
+        );
       `);
       this.ensureCoverageStart();
     });
@@ -113,8 +139,44 @@ export class Exp004Counter extends DurableObject {
     );
   }
 
+  async issueSession(input) {
+    const existing = this.ctx.storage.sql.exec(
+      "SELECT token, arm, issued_at FROM submission_tokens WHERE session_key = ?",
+      input.sessionKey,
+    ).toArray()[0];
+    if (existing) {
+      if (existing.arm !== input.arm) {
+        return { reason: "arm_conflict" };
+      }
+      if (Date.now() - Number(existing.issued_at) <= SUBMISSION_TOKEN_TTL_MS) {
+        return { submission_token: existing.token };
+      }
+      this.ctx.storage.sql.exec(
+        "DELETE FROM submission_tokens WHERE session_key = ?",
+        input.sessionKey,
+      );
+    }
+
+    const token = crypto.randomUUID().toLowerCase();
+    this.ctx.storage.sql.exec(`
+      INSERT INTO submission_tokens (token, session_key, arm, issued_at)
+      VALUES (?, ?, ?, ?)
+    `, token, input.sessionKey, input.arm, Date.now());
+    return { submission_token: token };
+  }
+
   async record(input) {
     const now = Date.now();
+    const authorization = this.ctx.storage.sql.exec(`
+      SELECT session_key, arm, issued_at
+      FROM submission_tokens
+      WHERE token = ?
+    `, input.submissionToken).toArray()[0];
+    if (!authorization || authorization.session_key !== input.sessionKey ||
+        authorization.arm !== input.arm ||
+        now - Number(authorization.issued_at) > SUBMISSION_TOKEN_TTL_MS) {
+      return { accepted: false, reason: "unauthorized" };
+    }
     this.ctx.storage.sql.exec(
       "INSERT OR IGNORE INTO sessions (session_key, arm, exposed_at) VALUES (?, ?, ?)",
       input.sessionKey,
@@ -221,10 +283,10 @@ export default {
       return json(await counter.snapshot());
     }
 
-    if (url.pathname === "/api/exp004/collect" && request.method === "POST") {
-      const origin = request.headers.get("origin");
-      if (!ALLOWED_ORIGINS.has(origin)) {
-        return json({ error: "forbidden_origin" }, 403);
+    if ((url.pathname === "/api/exp004/session" ||
+         url.pathname === "/api/exp004/collect") && request.method === "POST") {
+      if (!hasSameOriginBrowserContext(request)) {
+        return json({ error: "forbidden_browser_context" }, 403);
       }
       if (!(request.headers.get("content-type") || "").toLowerCase()
         .startsWith("application/json")) {
@@ -238,12 +300,32 @@ export default {
         const status = error.message === "payload_too_large" ? 413 : 400;
         return json({ error: error.message }, status);
       }
+      if (url.pathname === "/api/exp004/session") {
+        const session = parseSession(payload);
+        if (!session) {
+          return json({ error: "invalid_session" }, 400);
+        }
+        const actor = request.headers.get("cf-connecting-ip") || "local";
+        const rate = await env.EXP004_SESSION_LIMITER.limit({
+          key: `${url.hostname}:${actor}`,
+        });
+        if (!rate.success) {
+          return json({ error: "rate_limited" }, 429);
+        }
+        const result = await counter.issueSession(session);
+        return result.reason === "arm_conflict"
+          ? json(result, 409) : json(result, 201);
+      }
+
       const event = parseEvent(payload);
       if (!event) {
         return json({ error: "invalid_event" }, 400);
       }
 
       const result = await counter.record(event);
+      if (result.reason === "unauthorized") {
+        return json(result, 401);
+      }
       if (result.reason === "arm_conflict") {
         return json(result, 409);
       }

@@ -7,8 +7,12 @@
   const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
   const EXP004_STORAGE_KEY = "cn1-exp-004-arm-v1";
   const EXP004_COUNTER_SESSION_KEY = "cn1-exp-004-counter-session-v1";
+  const EXP004_COUNTER_TOKEN_KEY = "cn1-exp-004-counter-token-v1";
   const EXP004_COUNTER_EVENT_PREFIX = "cn1-exp-004-counter-event-v1-";
+  const EXP004_COUNTER_ACK_PREFIX = "cn1-exp-004-counter-ack-v1-";
+  const EXP004_COUNTER_SESSION_ENDPOINT = "/api/exp004/session";
   const EXP004_COUNTER_ENDPOINT = "/api/exp004/collect";
+  const EXP004_COUNTER_RETRY_DELAYS = [1000, 5000, 15000];
   const EXP004_ID = "EXP-004";
   const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
   const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||
@@ -173,37 +177,162 @@
       hex.slice(10).join("");
   };
 
+  const exp004CounterMemory = {
+    sessionKey: null,
+    submissionToken: null,
+    eventIds: {},
+    acknowledged: {}
+  };
+  let exp004CounterSessionPromise = null;
+
+  const readExp004CounterValue = (key, fallback) => {
+    try {
+      return sessionStorage.getItem(key) || fallback || null;
+    } catch (e) {
+      return fallback || null;
+    }
+  };
+
+  const writeExp004CounterValue = (key, value) => {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (e) {
+      // The in-memory copy keeps this page's best-effort reporting alive.
+    }
+  };
+
+  const clearExp004CounterToken = () => {
+    exp004CounterMemory.submissionToken = null;
+    exp004CounterSessionPromise = null;
+    try {
+      sessionStorage.removeItem(EXP004_COUNTER_TOKEN_KEY);
+    } catch (e) {
+      // The token is also cleared from memory.
+    }
+  };
+
+  const ensureExp004CounterSession = (sessionKey, arm) => {
+    const storedToken = readExp004CounterValue(
+      EXP004_COUNTER_TOKEN_KEY,
+      exp004CounterMemory.submissionToken
+    );
+    if (storedToken) {
+      exp004CounterMemory.submissionToken = storedToken;
+      return Promise.resolve(storedToken);
+    }
+    if (exp004CounterSessionPromise) {
+      return exp004CounterSessionPromise;
+    }
+    exp004CounterSessionPromise = window.fetch(EXP004_COUNTER_SESSION_ENDPOINT, {
+      method: "POST",
+      credentials: "same-origin",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_key: sessionKey, arm })
+    }).then((response) => {
+      if (!response.ok) throw new Error("counter_session_rejected");
+      return response.json();
+    }).then((payload) => {
+      const token = payload && payload.submission_token;
+      if (!/^[0-9a-f-]{36}$/i.test(token || "")) {
+        throw new Error("counter_session_invalid");
+      }
+      exp004CounterMemory.submissionToken = token;
+      writeExp004CounterValue(EXP004_COUNTER_TOKEN_KEY, token);
+      return token;
+    }).catch((error) => {
+      exp004CounterSessionPromise = null;
+      throw error;
+    });
+    return exp004CounterSessionPromise;
+  };
+
   const reportFirstPartyExp004Event = (name) => {
     if (!/^Exp004(?:Ownership|Reach)(?:Exposure|Download)$/.test(name) ||
         typeof window.fetch !== "function") {
       return false;
     }
-    try {
-      let sessionKey = sessionStorage.getItem(EXP004_COUNTER_SESSION_KEY);
-      if (!sessionKey) {
-        sessionKey = newExp004CounterId();
-        if (!sessionKey) return false;
-        sessionStorage.setItem(EXP004_COUNTER_SESSION_KEY, sessionKey);
-      }
-      const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
-      let eventId = sessionStorage.getItem(eventKey);
-      if (!eventId) {
-        eventId = newExp004CounterId();
-        if (!eventId) return false;
-        sessionStorage.setItem(eventKey, eventId);
-      }
-      void window.fetch(EXP004_COUNTER_ENDPOINT, {
-        method: "POST",
-        credentials: "same-origin",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: name, event_id: eventId, session_key: sessionKey })
-      }).catch(() => {});
-      return true;
-    } catch (e) {
-      return false;
+    const armMatch = name.match(/^Exp004(Ownership|Reach)/);
+    const arm = armMatch && armMatch[1].toLowerCase();
+    let sessionKey = readExp004CounterValue(
+      EXP004_COUNTER_SESSION_KEY,
+      exp004CounterMemory.sessionKey
+    );
+    if (!sessionKey) {
+      sessionKey = newExp004CounterId();
+      if (!sessionKey) return false;
+      writeExp004CounterValue(EXP004_COUNTER_SESSION_KEY, sessionKey);
     }
+    exp004CounterMemory.sessionKey = sessionKey;
+
+    const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
+    let eventId = readExp004CounterValue(eventKey, exp004CounterMemory.eventIds[name]);
+    if (!eventId) {
+      eventId = newExp004CounterId();
+      if (!eventId) return false;
+      writeExp004CounterValue(eventKey, eventId);
+    }
+    exp004CounterMemory.eventIds[name] = eventId;
+
+    const ackKey = `${EXP004_COUNTER_ACK_PREFIX}${name}`;
+    if (readExp004CounterValue(ackKey, exp004CounterMemory.acknowledged[name])) {
+      return true;
+    }
+
+    const send = (attempt) => {
+      if (getConsent() !== "accepted") return;
+      void ensureExp004CounterSession(sessionKey, arm).then((submissionToken) =>
+        window.fetch(EXP004_COUNTER_ENDPOINT, {
+          method: "POST",
+          credentials: "same-origin",
+          keepalive: true,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: name,
+            event_id: eventId,
+            session_key: sessionKey,
+            submission_token: submissionToken
+          })
+        })
+      ).then((response) => {
+        if (!response.ok) {
+          if (response.status === 401) clearExp004CounterToken();
+          throw new Error("counter_event_rejected");
+        }
+        exp004CounterMemory.acknowledged[name] = "1";
+        writeExp004CounterValue(ackKey, "1");
+      }).catch(() => {
+        if (attempt < EXP004_COUNTER_RETRY_DELAYS.length &&
+            getConsent() === "accepted") {
+          window.setTimeout(
+            () => send(attempt + 1),
+            EXP004_COUNTER_RETRY_DELAYS[attempt]
+          );
+        }
+      });
+    };
+    send(0);
+    return true;
   };
+
+  const retryStoredExp004CounterEvents = () => {
+    if (EXP004_PREVIEW_HOST || getConsent() !== "accepted") return;
+    [
+      "Exp004OwnershipExposure",
+      "Exp004ReachExposure",
+      "Exp004OwnershipDownload",
+      "Exp004ReachDownload"
+    ].forEach((name) => {
+      const eventKey = `${EXP004_COUNTER_EVENT_PREFIX}${name}`;
+      const ackKey = `${EXP004_COUNTER_ACK_PREFIX}${name}`;
+      if (readExp004CounterValue(eventKey, null) &&
+          !readExp004CounterValue(ackKey, null)) {
+        reportFirstPartyExp004Event(name);
+      }
+    });
+  };
+
+  retryStoredExp004CounterEvents();
 
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the

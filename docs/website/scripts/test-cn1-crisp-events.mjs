@@ -37,7 +37,9 @@ function load(
   experimentArm = null,
   experimentTelemetryEnabled = true,
   hostname = "www.codenameone.com",
-  legacyConsent = null
+  legacyConsent = null,
+  sessionStore = storage(),
+  fetchHandler = null
 ) {
   const timers = [];
   const fetches = [];
@@ -95,7 +97,19 @@ function load(
     },
     fetch(url, options) {
       fetches.push({ url, options });
-      return Promise.resolve({ ok: true });
+      if (fetchHandler) {
+        return Promise.resolve(fetchHandler(url, options, fetches));
+      }
+      if (url === "/api/exp004/session") {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            submission_token: "00000000-0000-4000-8000-999999999999",
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 202 });
     },
     location: {
       hostname,
@@ -123,7 +137,7 @@ function load(
     document,
     encodeURIComponent,
     localStorage: localStore,
-    sessionStorage: storage(),
+    sessionStorage: sessionStore,
     URL,
     URLSearchParams,
     window,
@@ -138,6 +152,21 @@ function load(
     window,
     sessionStorage: context.sessionStorage,
   };
+}
+
+async function settle(state, runTimers = false) {
+  for (let round = 0; round < 8; round += 1) {
+    await Promise.resolve();
+  }
+  if (runTimers) {
+    while (state.timers.length) {
+      const callbacks = state.timers.splice(0);
+      callbacks.forEach((callback) => callback());
+      for (let round = 0; round < 8; round += 1) {
+        await Promise.resolve();
+      }
+    }
+  }
 }
 
 function eventCommands(state) {
@@ -200,6 +229,7 @@ function events(state) {
   const state = load("accepted", "", "/", "ownership");
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
   state.window.cn1CrispEvents.initializrProjectDownloaded({ page: "/initializr/" });
+  await settle(state);
 
   const recorded = events(state);
   assert.equal(recorded.length, 3,
@@ -216,8 +246,8 @@ function events(state) {
   assert.equal(recorded[1][0], "InitializrProjectDownloaded");
   assert.equal(recorded[1][1].experiment_arm, "ownership");
   assert.equal(recorded[2][0], "Exp004OwnershipDownload");
-  assert.equal(state.fetches.length, 2,
-    "the queryable counter must mirror the exposure and attributed download");
+  assert.equal(state.fetches.length, 3,
+    "one rate-limited session plus two events must reach the counter");
   assert.deepEqual(
     state.fetches.map(({ url, options }) => ({
       url,
@@ -227,6 +257,15 @@ function events(state) {
     })),
     [
       {
+        url: "/api/exp004/session",
+        method: "POST",
+        keepalive: true,
+        body: {
+          session_key: "00000000-0000-4000-8000-000000000001",
+          arm: "ownership",
+        },
+      },
+      {
         url: "/api/exp004/collect",
         method: "POST",
         keepalive: true,
@@ -234,6 +273,7 @@ function events(state) {
           event: "Exp004OwnershipExposure",
           event_id: "00000000-0000-4000-8000-000000000002",
           session_key: "00000000-0000-4000-8000-000000000001",
+          submission_token: "00000000-0000-4000-8000-999999999999",
         },
       },
       {
@@ -244,6 +284,7 @@ function events(state) {
           event: "Exp004OwnershipDownload",
           event_id: "00000000-0000-4000-8000-000000000003",
           session_key: "00000000-0000-4000-8000-000000000001",
+          submission_token: "00000000-0000-4000-8000-999999999999",
         },
       },
     ],
@@ -265,11 +306,12 @@ function events(state) {
   const state = load(null, "", "/", "reach");
   assert.equal(eventCommands(state).length, 0, "experiment exposure must wait for consent");
   state.accept.click();
+  await settle(state);
   const recorded = events(state);
   assert.equal(recorded.length, 1);
   assert.equal(recorded[0][0], "Exp004ReachExposure");
-  assert.equal(state.fetches.length, 1,
-    "accepting consent must start the queryable exposure denominator");
+  assert.equal(state.fetches.length, 2,
+    "accepting consent must authorize a session and record the exposure denominator");
 }
 
 {
@@ -317,6 +359,58 @@ function events(state) {
   assert.deepEqual(JSON.parse(JSON.stringify(recorded[0][1])), { page: "/initializr/" });
   assert.equal(state.fetches.length, 0,
     "an unexposed download must not hit the experiment counter");
+}
+
+{
+  const sharedSession = storage();
+  const first = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    sharedSession,
+    (url) => url === "/api/exp004/session"
+      ? {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            submission_token: "00000000-0000-4000-8000-999999999999",
+          }),
+        }
+      : { ok: false, status: 503 }
+  );
+  await settle(first);
+  const failedBody = JSON.parse(
+    first.fetches.find(({ url }) => url === "/api/exp004/collect").options.body
+  );
+
+  const recovered = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    sharedSession
+  );
+  await settle(recovered);
+  const recoveredBody = JSON.parse(
+    recovered.fetches.find(({ url }) => url === "/api/exp004/collect").options.body
+  );
+  assert.equal(recoveredBody.event_id, failedBody.event_id,
+    "a reload must retry a failed counter post with its persisted event ID");
+  assert.equal(
+    sharedSession.getItem("cn1-exp-004-counter-ack-v1-Exp004OwnershipExposure"),
+    "1",
+    "only a successful response may acknowledge the persisted event"
+  );
+}
+
+{
+  const unavailableStorage = {
+    getItem() { throw new Error("storage unavailable"); },
+    setItem() { throw new Error("storage unavailable"); },
+    removeItem() { throw new Error("storage unavailable"); },
+  };
+  const state = load(
+    "accepted", "", "/", "reach", true, "www.codenameone.com", null,
+    unavailableStorage
+  );
+  await settle(state);
+  assert.equal(state.fetches.filter(({ url }) => url === "/api/exp004/collect").length, 1,
+    "storage-disabled visitors must still get best-effort in-memory telemetry");
 }
 
 {

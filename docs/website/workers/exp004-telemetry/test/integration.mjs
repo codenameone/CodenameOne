@@ -28,9 +28,29 @@ async function waitFor(url, process) {
 async function post(baseUrl, body, origin = "https://www.codenameone.com") {
   return fetch(`${baseUrl}/api/exp004/collect`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: origin },
+    headers: {
+      "Content-Type": "application/json",
+      Origin: origin,
+      "Sec-Fetch-Site": "same-origin",
+    },
     body: JSON.stringify(body),
   });
+}
+
+async function enroll(baseUrl, sessionKey, arm) {
+  const response = await fetch(`${baseUrl}/api/exp004/session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: "https://www.codenameone.com",
+      "Sec-Fetch-Site": "same-origin",
+    },
+    body: JSON.stringify({ session_key: sessionKey, arm }),
+  });
+  assert.equal(response.status, 201);
+  const payload = await response.json();
+  assert.match(payload.submission_token, /^[0-9a-f-]{36}$/);
+  return payload.submission_token;
 }
 
 async function stopProcess(process) {
@@ -60,11 +80,19 @@ async function stopProcess(process) {
 }
 
 async function verify(baseUrl) {
+  const testStartedAt = Date.now();
   const initial = await fetch(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
   assert.equal(initial.experiment_id, "EXP-004");
   assert.equal(initial.original_experiment_start, "2026-08-27T04:35:14.000Z");
   assert.equal(initial.coverage_complete_from_original_start, false);
-  assert.match(initial.coverage_start, /^2026-/);
+  const coverageStartedAt = Date.parse(initial.coverage_start);
+  assert.ok(Number.isFinite(coverageStartedAt), "coverage_start must be an ISO timestamp");
+  assert.ok(coverageStartedAt <= Date.now() + 1_000,
+    "coverage_start cannot be in the future");
+  assert.ok(coverageStartedAt >= Date.parse(initial.original_experiment_start),
+    "coverage cannot begin before the original experiment deployment");
+  assert.ok(coverageStartedAt <= testStartedAt + 1_000,
+    "coverage must have started by this test run");
 
   const forbidden = await post(baseUrl, {
     event: "Exp004OwnershipExposure",
@@ -81,10 +109,12 @@ async function verify(baseUrl) {
   assert.equal(invalid.status, 400);
 
   const ownershipSession = crypto.randomUUID();
+  const ownershipToken = await enroll(baseUrl, ownershipSession, "ownership");
   const ownershipExposure = {
     event: "Exp004OwnershipExposure",
     event_id: crypto.randomUUID(),
     session_key: ownershipSession,
+    submission_token: ownershipToken,
   };
   const firstExposure = await post(baseUrl, ownershipExposure);
   assert.equal(firstExposure.status, 202);
@@ -93,10 +123,21 @@ async function verify(baseUrl) {
   assert.equal(duplicateExposure.status, 200);
   assert.equal((await duplicateExposure.json()).accepted, false);
 
+  const reachSession = crypto.randomUUID();
+  const reachToken = await enroll(baseUrl, reachSession, "reach");
+  const unauthorized = await post(baseUrl, {
+    event: "Exp004ReachExposure",
+    event_id: crypto.randomUUID(),
+    session_key: reachSession,
+    submission_token: crypto.randomUUID(),
+  });
+  assert.equal(unauthorized.status, 401);
+
   const reachDownload = await post(baseUrl, {
     event: "Exp004ReachDownload",
     event_id: crypto.randomUUID(),
-    session_key: crypto.randomUUID(),
+    session_key: reachSession,
+    submission_token: reachToken,
   });
   assert.equal(reachDownload.status, 202);
   assert.deepEqual(await reachDownload.json(), {
@@ -108,6 +149,7 @@ async function verify(baseUrl) {
     event: "Exp004OwnershipDownload",
     event_id: crypto.randomUUID(),
     session_key: ownershipSession,
+    submission_token: ownershipToken,
   });
   assert.equal(ownershipDownload.status, 202);
 

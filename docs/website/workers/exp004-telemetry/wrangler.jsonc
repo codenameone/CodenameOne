@@ -35,7 +35,14 @@
             "class_name": "Exp004Counter"
           }
         ]
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "EXP004_SESSION_LIMITER",
+          "namespace_id": "20260828",
+          "simple": { "limit": 6, "period": 60 }
+        }
+      ]
     },
     "production": {
       "name": "cn1-exp004-telemetry-production",
@@ -53,7 +60,14 @@
             "class_name": "Exp004Counter"
           }
         ]
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "EXP004_SESSION_LIMITER",
+          "namespace_id": "20260828",
+          "simple": { "limit": 6, "period": 60 }
+        }
+      ]
     }
   }
 }
