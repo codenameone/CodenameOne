@@ -57,7 +57,39 @@ REPO_URL = "https://repo.codenameone.com/maven2"
 # release. They are seeded into R2 once by seed-frozen-artifacts.sh and are resolved by
 # exact pinned version, not discovered, so they carry no release marker -- requiring one
 # would leave them permanently invisible and reported as incomplete on every run.
-FROZEN_ARTIFACTS = {"sqlite-jdbc", "codenameone-designer", "codenameone-javase-svg"}
+#
+# Taken from frozen-coordinates.py rather than repeated, because the hardcoded set this
+# replaces was wrong in both directions: it listed sqlite-jdbc, which is an ordinary
+# reactor module published on every tag and so must NOT be exempt from the release
+# marker, and it omitted cn1-builder-resources-{common,android}.
+#
+# (artifactId, version) pairs, NOT artifactIds. Once the set became the transitive
+# closure of the pins it started including codenameone-core, codenameone-javase,
+# codenameone-css-compiler and sqlite-jdbc at the frozen version -- artifacts that also
+# have ordinary releases. Exempting them BY NAME would have exempted every version of
+# them from the release marker, which is precisely the bug that let an unfinished
+# release advertise its sqlite-jdbc.
+def _frozen_coordinates():
+    """(artifactId, version) pairs from frozen-coordinates.py, derived from the tree."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frozen-coordinates.py")
+    # A subprocess rather than an import: the file name has a hyphen, so it is not a
+    # legal module name, and shelling out keeps the one derivation authoritative.
+    out = subprocess.run([sys.executable, script], stdout=subprocess.PIPE, check=True,
+                         universal_newlines=True).stdout
+    # Fail rather than silently return an empty set: empty means every seeded coordinate
+    # is reported as an unfinished release on every run from here on.
+    pairs = set()
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        bits = line.split(":")
+        pairs.add((bits[0], bits[1]))
+    if not pairs:
+        raise SystemExit("frozen-coordinates.py produced no coordinates")
+    return pairs
+
+
+FROZEN_COORDINATES = _frozen_coordinates()
 
 RELEASES_PSEUDO_ARTIFACT = "_cn1-releases"
 RELEASE_MARKER = "complete"
@@ -184,17 +216,25 @@ def discover(keys, group_path):
             continue
         found.setdefault(artifact, set()).add(version)
 
-    tracked = {v for artifact, versions in found.items() if artifact not in FROZEN_ARTIFACTS
-               for v in versions}
+    # A seeded coordinate is not a release and must not be reported as an unfinished
+    # one. Excluded per coordinate, so an ordinary release of the same artifact is
+    # still held to the marker.
+    tracked = {version for artifact, versions in found.items() for version in versions
+               if (artifact, version) not in FROZEN_COORDINATES}
     for version in sorted(tracked - released):
         print("    skipping %s -- release not marked complete, so some artifact for it "
               "never finished uploading" % version)
 
     result = {}
     for artifact, versions in found.items():
-        # Frozen artifacts were seeded deliberately and completely; everything else is
-        # only advertised once its release was marked complete.
-        usable = versions if artifact in FROZEN_ARTIFACTS else versions & released
+        # Only releases are advertised. A seeded coordinate is resolved by the exact
+        # path a pom names, never discovered, so it needs no metadata entry -- and
+        # listing one would advertise a version whose release was never published here,
+        # which is the same promise the completion marker exists to avoid making. The
+        # closure makes that concrete: codenameone-core at the frozen version is a
+        # single jar copied in to satisfy the Resource Editor, not a release anyone
+        # should be offered.
+        usable = versions & released
         if usable:
             result[artifact] = sorted(usable, key=ComparableVersion)
     return result
