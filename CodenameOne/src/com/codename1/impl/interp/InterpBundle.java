@@ -53,7 +53,13 @@ public final class InterpBundle {
     /// encoding to raw long bits: an older reader would call
     /// `Double.parseDouble` on the new encoding and fail on a value like
     /// "4607182418800017408" (the bits of 1.0).
-    public static final int VERSION = 4;
+    ///
+    /// Bumped to 5 when static field rows started carrying the ConstantValue
+    /// attribute (a tag byte + typed value): older bundles left a
+    /// `static final X = 42` reading as 0 through GETSTATIC because javac's
+    /// inlining does not run for a caller compiled against an earlier
+    /// non-final version.
+    public static final int VERSION = 5;
 
     /// Extern kinds -- what a reference into the host app names.
     public static final int EXTERN_CLASS = 0;

@@ -1108,6 +1108,45 @@ class InterpRuntimeContractTest {
         assertTrue(bundle.getSource("b/Util.java").contains("package b;"));
     }
 
+    /// A `static final X = 42` needs to survive the bundle even for callers
+    /// that read it through GETSTATIC. javac inlines the constant at every
+    /// use site in the same compilation unit, but a caller compiled against
+    /// an older non-final version -- or instrumentation bytecode -- still
+    /// emits `getstatic C.X`, and the reader used to leave the slot at the
+    /// descriptor's default (0 for `int`, null for `String`) because no
+    /// `<clinit>` assigns the ConstantValue attribute. Serialise it
+    /// alongside the field row so the interpreted GETSTATIC sees the
+    /// value the compiler declared.
+    @Test
+    @DisplayName("a static final constant survives the bundle and reads through GETSTATIC")
+    void constantValueStaticFieldsSurviveTheBundle() throws Exception {
+        Path dir = Files.createTempDirectory("interp-constants");
+        String src = "public class K {"
+                + "  public static final int I = 42;"
+                + "  public static final long L = 100L;"
+                + "  public static final String S = \"hi\";"
+                + "  public static int i() { return I; }"
+                + "  public static long l() { return L; }"
+                + "  public static String s() { return S; }"
+                + "}";
+        Path srcFile = dir.resolve("K.java");
+        Files.write(srcFile, src.getBytes(StandardCharsets.UTF_8));
+        int rc = javax.tools.ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "-g", "-nowarn", "-d", dir.toString(), srcFile.toString());
+        assertEquals(0, rc, "fixture did not compile");
+        byte[] bundleBytes = InterpTestHarness.buildBundle(dir, "K", src);
+        InterpBundle bundle = InterpBundleReader.read(new ByteArrayInputStream(bundleBytes));
+        InterpClass k = bundle.findClass("K");
+        // The reader assigned the ConstantValue when it decoded the static
+        // rows, so a direct staticValue reads the declared literal.
+        assertEquals(Integer.valueOf(42), k.staticValue("I"),
+                "int constant lost across the bundle");
+        assertEquals(Long.valueOf(100L), k.staticValue("L"),
+                "long constant lost across the bundle");
+        assertEquals("hi", k.staticValue("S"),
+                "String constant lost across the bundle");
+    }
+
     /// Two source roots may legally contain a same-key file whose contents
     /// differ -- javac lets two `Common.java` in `p` each declare a different
     /// package-private class, so both produce a class whose `SourceFile`

@@ -3876,6 +3876,16 @@ public final class InterpRuntime {
         if (v instanceof InterpBacked) {
             v = ((InterpBacked) v).getInterpObject();
         }
+        if ("java/lang/Object".equals(name)) {
+            // Object is recorded as an extern and no interpreted class lists it
+            // as an interpreted supertype, so the hierarchy walk below answers
+            // false -- for `x instanceof Object`, which is true of every
+            // non-null reference there has ever been. Above every other check
+            // because it applies universally: a NativeStub, for one, is still
+            // a Java reference, and letting the NativeStub branch answer
+            // first would make `stub instanceof Object` come out false.
+            return true;
+        }
         if (v instanceof NativeStub) {
             // The cast the NativeLookup idiom always performs. The stub stands
             // in for the interface it was asked for, and for NativeInterface
@@ -3883,13 +3893,6 @@ public final class InterpRuntime {
             InterpClass iface = ((NativeStub) v).iface;
             return iface.isSubclassOfInterp(name)
                     || "com/codename1/system/NativeInterface".equals(name);
-        }
-        if ("java/lang/Object".equals(name)) {
-            // Object is recorded as an extern and no interpreted class lists it
-            // as an interpreted supertype, so the hierarchy walk below answers
-            // false -- for `x instanceof Object`, which is true of every
-            // non-null reference there has ever been.
-            return true;
         }
         if (v instanceof InterpObject) {
             InterpObject io = (InterpObject) v;

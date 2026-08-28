@@ -246,7 +246,8 @@ public final class InterpBundleReader {
             // whose synchronised bodies establish happens-before, so volatile
             // needs no extra wrapping the way instance fields do.
             in.readInt();
-            c.setStaticValue(fname, InterpValues.defaultValue(fdesc));
+            Object initial = readConstantValue(in, b, fdesc);
+            c.setStaticValue(fname, initial);
         }
 
         int methodCount = in.readInt();
@@ -264,6 +265,36 @@ public final class InterpBundleReader {
             result[i + 1] = interpIfaceNames[i];
         }
         return result;
+    }
+
+    /// Pairs with {@code InterpBundleWriter.writeConstantValue}. A boolean,
+    /// byte, char or short ConstantValue is stored as an int per JVMS 4.7.2;
+    /// the descriptor tells us which one, so coerce the raw int to the
+    /// right box on the way in. Absence (tag 0) falls back to the
+    /// descriptor's default so a field with no ConstantValue reads as its
+    /// zero.
+    private static Object readConstantValue(DataInputStream in, InterpBundle b, String desc)
+            throws java.io.IOException {
+        byte tag = in.readByte();
+        switch (tag) {
+            case 1:
+                int i = in.readInt();
+                if (desc.length() == 1) {
+                    switch (desc.charAt(0)) {
+                        case 'Z': return i != 0 ? Boolean.TRUE : Boolean.FALSE;
+                        case 'B': return Byte.valueOf((byte) i);
+                        case 'C': return Character.valueOf((char) i);
+                        case 'S': return Short.valueOf((short) i);
+                        default:  break;
+                    }
+                }
+                return Integer.valueOf(i);
+            case 2: return Long.valueOf(in.readLong());
+            case 3: return Float.valueOf(in.readFloat());
+            case 4: return Double.valueOf(in.readDouble());
+            case 5: return b.strings[in.readInt()];
+            default: return InterpValues.defaultValue(desc);
+        }
     }
 
     private static InterpMethod readMethod(DataInputStream in, InterpBundle b, InterpClass owner)

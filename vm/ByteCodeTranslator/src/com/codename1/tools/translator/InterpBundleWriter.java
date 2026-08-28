@@ -67,7 +67,7 @@ public class InterpBundleWriter {
     // string like "4607182418800017408" and fail on the number, and would
     // also lose the volatile flag the runtime now needs to fence field
     // accesses. Kept in sync with InterpBundle.VERSION on the reader side.
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
 
     private static final int EXTERN_CLASS = 0;
     private static final int EXTERN_METHOD = 1;
@@ -808,11 +808,45 @@ public class InterpBundleWriter {
             out.writeInt(intern(fn.name));
             out.writeInt(intern(fn.desc));
             out.writeInt(fn.access);
+            // Preserve the ConstantValue attribute (JVMS 4.7.2). javac inlines
+            // the constant at every use site, so most GETSTATIC-of-a-final
+            // primitive never runs -- but a caller compiled against an older
+            // version where the field was not `final`, or bytecode produced
+            // by instrumentation, still emits GETSTATIC. Without the
+            // constant the reader would initialise the slot to 0 / null and
+            // there is no <clinit> assignment to correct it.
+            writeConstantValue(out, fn.value);
         }
 
         out.writeInt(cn.methods.size());
         for (MethodNode mn : cn.methods) {
             writeMethod(out, mn);
+        }
+    }
+
+    /// A discriminated union that carries the field's ConstantValue.
+    /// 0 means absent (the reader falls back to the descriptor's zero); the
+    /// other tags name the ASM/JVMS representation of the constant. Boolean,
+    /// byte, char and short are stored as an int per JVMS 4.7.2 -- the reader
+    /// coerces on the way in using the field descriptor.
+    private void writeConstantValue(DataOutputStream out, Object cv) throws IOException {
+        if (cv instanceof Integer) {
+            out.writeByte(1);
+            out.writeInt(((Integer) cv).intValue());
+        } else if (cv instanceof Long) {
+            out.writeByte(2);
+            out.writeLong(((Long) cv).longValue());
+        } else if (cv instanceof Float) {
+            out.writeByte(3);
+            out.writeFloat(((Float) cv).floatValue());
+        } else if (cv instanceof Double) {
+            out.writeByte(4);
+            out.writeDouble(((Double) cv).doubleValue());
+        } else if (cv instanceof String) {
+            out.writeByte(5);
+            out.writeInt(intern((String) cv));
+        } else {
+            out.writeByte(0);
         }
     }
 
