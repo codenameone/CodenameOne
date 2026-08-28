@@ -42,6 +42,7 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 
 /**
  * A mojo that updates Codename One.
@@ -85,11 +86,24 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         }
 
         if ("LATEST".equals(newVersion)) {
+            String resolved = null;
             try {
-                newVersion = findLatestVersion();
+                resolved = findLatestVersion();
             } catch (Exception ex) {
-                getLog().error("Failed to find latest version from Maven central", ex);
+                getLog().error("Failed to find the latest Codename One version", ex);
             }
+            // "LATEST" is a request, not a version. Leaving it in newVersion wrote the
+            // literal string into cn1.version and cn1.plugin.version below, so a failure
+            // to look the version up corrupted the pom it was asked to update -- into
+            // one that resolves nothing. Returning is also better than falling through
+            // to the else branch, which would report "already up to date".
+            if (resolved == null || resolved.trim().isEmpty() || "LATEST".equals(resolved)) {
+                getLog().error("Could not determine the latest Codename One version. "
+                        + "Leaving cn1.version and cn1.plugin.version unchanged; pass "
+                        + "-DnewVersion=<version> to set one explicitly.");
+                return;
+            }
+            newVersion = resolved;
         }
 
 
@@ -295,7 +309,13 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
 
     private String readLatestVersion(String url) throws IOException, XmlPullParserException {
         MetadataXpp3Reader reader = new MetadataXpp3Reader();
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        // URLConnection, not HttpURLConnection. cn1.metadataUrl is a user-settable
+        // parameter, so it can legitimately be a file: URL pointing at an offline
+        // mirror; casting would throw ClassCastException, which is not an IOException
+        // and so escapes findLatestVersion's fallback entirely.
+        // setRequestProperty and the timeouts are declared on URLConnection, so the
+        // cast bought nothing here in the first place.
+        URLConnection connection = new URL(url).openConnection();
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setConnectTimeout(20000);
         connection.setReadTimeout(20000);
@@ -308,7 +328,11 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
             }
             return latest;
         } finally {
-            connection.disconnect();
+            // Only HTTP connections have one, and only when the connection was
+            // actually made -- a file: URL has nothing to release.
+            if (connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).disconnect();
+            }
         }
     }
     
