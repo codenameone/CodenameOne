@@ -1714,12 +1714,19 @@ static int gcBeltDiagCount = 0;
 // sweep can free under a live pointer. That is the failure the insertion half exists to
 // prevent, and it is not something to leave to a probability argument.
 //
-// So the bulk path registers itself. An enqueuer increments, then re-reads the flag; the
-// collector clears the flag, then waits for the count to fall to zero before its final
-// take. Both sides are seq_cst, which is what makes the store-then-load pair on each side
-// non-reorderable: if the enqueuer sees the flag set, the collector must see the count,
-// and if the collector sees zero, the enqueuer has either finished flushing or has yet to
-// increment and will read the cleared flag and do nothing.
+// So the bulk path registers itself, for the whole barrier OPERATION rather than per range.
+// An enqueuer increments, then re-reads the flag; the collector clears the flag, then waits
+// for the count to fall to zero before its final take. Both sides are seq_cst, which is what
+// makes the store-then-load pair on each side non-reorderable: if the enqueuer sees the flag
+// set, the collector must see the count, and if the collector sees zero, the enqueuer has
+// either finished flushing or has yet to increment and will read the cleared flag and do
+// nothing.
+//
+// Operation, not range, because arraycopy logs TWO ranges -- the deletion half off the
+// destination and the insertion half off the source. Registering them separately lets the
+// count fall to zero in between, which is a full re-opening of the window for the second
+// half: flag cleared, count zero, final drain done, and then the memmove publishes the
+// source's references into the destination with nothing logged for them.
 //
 // The wait is safe to spin on because nothing between the increment and the decrement can
 // block: no allocation, no Java call, no safepoint, so a registered thread cannot be
@@ -1736,7 +1743,34 @@ static int gcBeltDiagCount = 0;
 // barrier is designed around ("off-mark the barrier is a single relaxed flag load"). That
 // window is pre-existing, argued harmless where the flag is cleared, and unchanged here.
 static _Atomic int cn1SatbBulkInFlight = 0;
-static void cn1SatbEnqueueRangeBody(JAVA_ARRAY_OBJECT* refs, int count);
+
+// Register for a whole barrier OPERATION, and re-read the flag while registered. Returns
+// false when the mark has already terminated, in which case the caller must log nothing.
+//
+// The bracket has to span the operation, not each range within it: arraycopy takes BOTH
+// halves, and registering them independently lets the count fall to zero between them --
+// the collector then clears the flag, sees zero, finishes its final drain, and the second
+// range logs nothing while the memmove goes on to publish those references anyway.
+JAVA_BOOLEAN cn1SatbBulkEnter(void) {
+#ifdef CN1_SATB_NO_BULK_HANDSHAKE
+    return gcSatbActive ? JAVA_TRUE : JAVA_FALSE;
+#else
+    atomic_fetch_add_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)) {
+        // The drain reached its fixpoint while we were on our way in, so everything the
+        // snapshot needed is already marked and there is nothing this operation can add.
+        atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+        return JAVA_FALSE;
+    }
+    return JAVA_TRUE;
+#endif
+}
+
+void cn1SatbBulkExit(void) {
+#ifndef CN1_SATB_NO_BULK_HANDSHAKE
+    atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+#endif
+}
 
 // Called by the collector after clearing gcSatbActive and before the final drain.
 void cn1SatbBulkQuiesce(void) {
@@ -1773,24 +1807,9 @@ static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
     pthread_mutex_unlock(&gcSatbMutex);
 }
 
-void cn1SatbEnqueueRange(JAVA_ARRAY_OBJECT* refs, int count) {
-#ifdef CN1_SATB_NO_BULK_HANDSHAKE
-    cn1SatbEnqueueRangeBody(refs, count);
-#else
-    // Register BEFORE re-reading the flag; see cn1SatbBulkQuiesce above.
-    atomic_fetch_add_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
-    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)) {
-        // The drain reached its fixpoint while we were on our way in, so everything the
-        // snapshot needed is already marked and there is nothing this range can add.
-        atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
-        return;
-    }
-    cn1SatbEnqueueRangeBody(refs, count);
-    atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
-#endif
-}
-
-static void cn1SatbEnqueueRangeBody(JAVA_ARRAY_OBJECT* refs, int count) {
+// Log one range. The caller MUST be inside a cn1SatbBulkEnter()/cn1SatbBulkExit() bracket
+// -- that is what keeps the collector's final drain from running underneath it.
+void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
 #ifdef CN1_SATB_NO_BULK
     // Ablation arm: the per-element shape this replaced, one mutex acquisition each.
     for(int i = 0 ; i < count ; i++) {
@@ -11374,8 +11393,9 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // No deletion half: the destination was allocated one line up and holds nothing that
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
-        cn1SatbEnqueueRange((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
+    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType && cn1SatbBulkEnter()) {
+        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
+        cn1SatbBulkExit();
     }
 #endif
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);
