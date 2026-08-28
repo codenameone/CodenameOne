@@ -124,8 +124,8 @@ async function waitFor(url, process) {
  */
 async function readSnapshot(baseUrl) {
   const deadline = Date.now() + 30_000;
-  let lastFailure = "no attempt completed";
   for (;;) {
+    let failure;
     try {
       const response = await fetch(`${baseUrl}/api/exp004/snapshot`);
       const contentType = response.headers.get("content-type") || "";
@@ -133,14 +133,14 @@ async function readSnapshot(baseUrl) {
         return await response.json();
       }
       const body = (await response.text()).slice(0, 200).replace(/\s+/g, " ");
-      lastFailure = `${response.status} `
+      failure = `${response.status} `
         + `${contentType || "with no content-type"}: ${body}`;
     } catch (error) {
-      lastFailure = error.message;
+      failure = error.message;
     }
     if (Date.now() >= deadline) {
       throw new Error(
-        `GET /api/exp004/snapshot never returned the worker's JSON: ${lastFailure}`);
+        `GET /api/exp004/snapshot never returned the worker's JSON: ${failure}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
