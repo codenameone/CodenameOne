@@ -2011,6 +2011,61 @@ double CN1MacWindowEditingScale(void) {
     return scale;
 }
 
+/*
+ * The view controller a system sheet should be presented from, or nil when no
+ * Codename One window owns the window the user is in.
+ *
+ * Sharing, camera capture, the photo gallery, the file chooser and the full screen
+ * video player all present from CodenameOne_GLViewController, which is rooted at the
+ * application's main scene. Invoked from a secondary window that put the sheet over
+ * the main window instead -- and the share popover, which anchors to a view, landed
+ * at coordinates belonging to a window the user was not looking at.
+ *
+ * The key window is the right question rather than a window id threaded down from
+ * Java: Display.share(), Capture.capturePhoto() and FileChooser are context free
+ * statics with nothing to thread. Returning nil rather than a fallback keeps the
+ * decision at the call site, which is where the existing behaviour lives.
+ */
+UIViewController* CN1MacWindowPresentingController(void) {
+    __block UIViewController* found = nil;
+    CN1MacRunOnMainSync(^{
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            UIWindowScene* windowScene = (UIWindowScene*) scene;
+            if (windowScene.activationState != UISceneActivationStateForegroundActive) {
+                continue;
+            }
+            /* A scene no Codename One window claims is the main one, which already
+             * presents correctly through CodenameOne_GLViewController. */
+            if (CN1MacWindowIdForScene(windowScene) < 0) {
+                continue;
+            }
+            for (UIWindow* window in windowScene.windows) {
+                if (window.isKeyWindow && window.rootViewController != nil) {
+                    found = [[window.rootViewController retain] autorelease];
+                    break;
+                }
+            }
+            if (found != nil) {
+                break;
+            }
+        }
+    });
+    return found;
+}
+
+/*
+ * The view a popover presented by CN1MacWindowPresentingController should anchor to,
+ * or nil. The controller's own view, so the popover's source rectangle is in the
+ * coordinate space of the window the sheet is appearing over.
+ */
+UIView* CN1MacWindowPresentingView(void) {
+    UIViewController* c = CN1MacWindowPresentingController();
+    return c == nil ? nil : c.view;
+}
+
 UIView* CN1MacWindowEditingHostView(void) {
     CN1MacWindow* w;
     UIView* content;

@@ -2415,6 +2415,34 @@ void com_codename1_impl_ios_IOSNative_setMacWindowUndecorated___boolean(CN1_THRE
 #import "CN1MacWindows.h"
 #endif
 
+/*
+ * Where a system sheet -- sharing, camera capture, the photo gallery, the file
+ * chooser, the full screen video player -- is presented from.
+ *
+ * All of them presented from CodenameOne_GLViewController, which is rooted at the
+ * application's main scene. On Mac Catalyst, where the application can have several
+ * windows, invoking one from a secondary window put the sheet over the main window
+ * instead, and the share popover anchored to coordinates in a window the user was
+ * not looking at.
+ *
+ * On every other target these expand to the identical expression they replaced, so
+ * the iOS slice is byte for byte what it was.
+ */
+#if TARGET_OS_MACCATALYST
+static UIViewController* cn1PresentingController(void) {
+    UIViewController* c = CN1MacWindowPresentingController();
+    return c != nil ? c : [CodenameOne_GLViewController instance];
+}
+
+static UIView* cn1PresentingView(void) {
+    UIView* v = CN1MacWindowPresentingView();
+    return v != nil ? v : [CodenameOne_GLViewController instance].view;
+}
+#else
+#define cn1PresentingController() [CodenameOne_GLViewController instance]
+#define cn1PresentingView() [CodenameOne_GLViewController instance].view
+#endif
+
 JAVA_INT com_codename1_impl_ios_IOSNative_macWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_boolean_R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
@@ -5502,7 +5530,7 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
                 [picker addAttachmentData:d mimeType:mime fileName:fileComponent];
             }
         }
-        [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+        [cn1PresentingController() presentModalViewController:picker animated:YES];
         
 #ifndef CN1_USE_ARC
         [picker release];
@@ -5980,7 +6008,7 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_BEGIN();
         if (useAVKit()) {
 #ifdef CN1_USE_AVKIT
-            [[CodenameOne_GLViewController instance] presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
+            [cn1PresentingController() presentViewController:getAVPlayerController(peer) animated:YES completion:nil];
 #endif
         } else {
             NSObject* obj = (BRIDGE_CAST NSObject*)peer;
@@ -6775,14 +6803,14 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
                                      initWithContentViewController:pickerController];
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                                   inView:cn1PresentingView()
                                  permittedArrowDirections:UIPopoverArrowDirectionAny
                                                  animated:YES];
 
             }
             else
             {
-                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+                [cn1PresentingController() presentModalViewController:pickerController animated:YES];
             }
             
         } else {
@@ -6855,7 +6883,7 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         if (popoverSupported()) {
             pickerController.modalPresentationStyle = UIModalPresentationFormSheet;
         }
-        [[CodenameOne_GLViewController instance] presentViewController:pickerController animated:YES completion:nil];
+        [cn1PresentingController() presentViewController:pickerController animated:YES completion:nil];
         POOL_END();
     });
 #else
@@ -6915,11 +6943,11 @@ void openGalleryMultipleWithPhotoKit(JAVA_INT type) {
 
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                                   inView:[[CodenameOne_GLViewController instance] view]
+                                                   inView:cn1PresentingView()
                                  permittedArrowDirections:UIPopoverArrowDirectionAny
                                                  animated:YES];
             } else {
-                [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+                [cn1PresentingController() presentModalViewController:pickerController animated:YES];
             }
 
 
@@ -6964,11 +6992,11 @@ void openGalleryMultiple(JAVA_INT type) {
             
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                               inView:[[CodenameOne_GLViewController instance] view]
+                                               inView:cn1PresentingView()
                              permittedArrowDirections:UIPopoverArrowDirectionAny
                                              animated:YES];
         } else {
-            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            [cn1PresentingController() presentModalViewController:pickerController animated:YES];
         }
         POOL_END();
     });
@@ -7039,11 +7067,11 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
             
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
-                                               inView:[[CodenameOne_GLViewController instance] view]
+                                               inView:cn1PresentingView()
                              permittedArrowDirections:UIPopoverArrowDirectionAny
                                              animated:YES];
         } else {
-            [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
+            [cn1PresentingController() presentModalViewController:pickerController animated:YES];
         }
         POOL_END();
     });
@@ -8622,7 +8650,7 @@ void com_codename1_impl_ios_IOSNative_sendSMS___java_lang_String_java_lang_Strin
             
             [picker setBody:smsBody];
             
-            [[CodenameOne_GLViewController instance] presentModalViewController:picker animated:YES];
+            [cn1PresentingController() presentModalViewController:picker animated:YES];
             
 #ifndef CN1_USE_ARC
             [picker release];
@@ -11216,9 +11244,9 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 #ifdef NEW_CODENAME_ONE_VM
         if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
             //iOS8
-            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
-            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
-            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            activityViewController.popoverPresentationController.sourceView = cn1PresentingView();
+            int SCREEN_HEIGHT = cn1PresentingView().bounds.size.height;
+            int SCREEN_WIDTH = cn1PresentingView().bounds.size.width;
             if ( useRect ){
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
@@ -11236,7 +11264,7 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
             
         }
 #endif
-        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [cn1PresentingController() presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
     });
@@ -11287,9 +11315,9 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
                                                                                              applicationActivities:nil];
 #ifdef NEW_CODENAME_ONE_VM
         if ( [activityViewController respondsToSelector:@selector(popoverPresentationController)] ) {
-            activityViewController.popoverPresentationController.sourceView = [CodenameOne_GLViewController instance].view;
-            int SCREEN_HEIGHT = [CodenameOne_GLViewController instance].view.bounds.size.height;
-            int SCREEN_WIDTH = [CodenameOne_GLViewController instance].view.bounds.size.width;
+            activityViewController.popoverPresentationController.sourceView = cn1PresentingView();
+            int SCREEN_HEIGHT = cn1PresentingView().bounds.size.height;
+            int SCREEN_WIDTH = cn1PresentingView().bounds.size.width;
             if ( useRect ){
                 if (cgrect.origin.y < SCREEN_HEIGHT/4 && cgrect.origin.y+cgrect.size.height > 3*SCREEN_HEIGHT/4){
                     cgrect = CGRectMake(
@@ -11329,7 +11357,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
             JAVA_OBJECT jErrMsg = errMsg != nil ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG errMsg) : JAVA_NULL;
             com_codename1_impl_ios_IOSImplementation_socialShareCallback___int_int_java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_INT)cbId, status, jActivityType, jErrMsg);
         };
-        [[CodenameOne_GLViewController instance] presentViewController:activityViewController animated:YES completion:^{}];
+        [cn1PresentingController() presentViewController:activityViewController animated:YES completion:^{}];
         POOL_END();
         repaintUI();
     });

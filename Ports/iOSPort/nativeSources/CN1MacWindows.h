@@ -108,6 +108,11 @@ void CN1MacWindowSetEditingSlot(int slot);
 
 /** The view the native editor belongs in, or nil for the application's main view. */
 UIView* CN1MacWindowEditingHostView(void);
+/* The controller a system sheet should be presented from when the user is in a
+ * Codename One window, or nil when the main scene should present it as before. */
+UIViewController* CN1MacWindowPresentingController(void);
+/* The view a popover from that controller should anchor to, or nil. */
+UIView* CN1MacWindowPresentingView(void);
 
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
