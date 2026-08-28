@@ -28,12 +28,15 @@ import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.CN;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.Window;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.animations.CommonTransitions;
@@ -165,6 +168,51 @@ public final class ToastBar {
         return ToastBarHolder.INSTANCE;
     }
 
+    /// The toast bar for a given top level.
+    ///
+    /// The singleton follows whichever `Form` is current, which is the behaviour every
+    /// existing application relies on, so a `Form` or null still gets it. A
+    /// `com.codename1.ui.Window` gets its own instance instead, cached on the window
+    /// and dying with it -- a settable host on the singleton would have meant one
+    /// window silently redirecting another surface's toasts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: the top level to show on, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the toast bar for that top level, never null
+    public static ToastBar getInstance(TopLevelContainer top) {
+        if (!(top instanceof Window)) {
+            return ToastBarHolder.INSTANCE;
+        }
+        Container c = top.asContainer();
+        ToastBar b = (ToastBar) c.getClientProperty(WINDOW_INSTANCE_PROP);
+        if (b == null) {
+            b = new ToastBar();
+            b.host = top;
+            c.putClientProperty(WINDOW_INSTANCE_PROP, b);
+        }
+        return b;
+    }
+
+    /// The client property a window's own toast bar is cached under.
+    private static final String WINDOW_INSTANCE_PROP = "cn1$ToastBar";
+
+    /// The top level this instance shows on, or null for the singleton, which follows
+    /// whichever form is current.
+    private TopLevelContainer host;
+
+    /// The top level to show on.
+    ///
+    /// #### Returns
+    ///
+    /// the host, or null when there is none
+    private TopLevelContainer resolveHost() {
+        return host != null ? host : CN.getCurrentTopLevel();
+    }
+
     /// Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
     ///
     /// #### Parameters
@@ -190,7 +238,7 @@ public final class ToastBar {
     ///
     /// the status if we want to clear it before timeout elapses
     public static Status showMessage(String msg, char icon, int timeout, ActionListener listener) {
-        Status s = ToastBar.getInstance().createStatus();
+        Status s = ToastBar.getInstance(CN.getCurrentTopLevel()).createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
         s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
@@ -290,7 +338,7 @@ public final class ToastBar {
      */
     public static void showConnectionProgress(String message, final ConnectionRequest cr,
                                               final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
-        final ToastBar.Status s = ToastBar.getInstance().createStatus();
+        final ToastBar.Status s = ToastBar.getInstance(CN.getCurrentTopLevel()).createStatus();
         s.setProgress(-1);
         s.setMessage(message);
         s.show();
@@ -623,7 +671,9 @@ public final class ToastBar {
     }
 
     private Container getLayeredPane() {
-        Form f = Display.getInstance().getCurrent();
+        // The host, not the current form: a window has its own layered panes, and a
+        // toast for one used to be added to the main form behind it.
+        TopLevelContainer f = resolveHost();
         if (f == null) {
             throw new IllegalStateException("Cannot get layered pane when form is null");
         }
@@ -635,7 +685,7 @@ public final class ToastBar {
     }
 
     private void moveLayerToFront() {
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
         if (f == null) {
             return;
         }
@@ -654,29 +704,33 @@ public final class ToastBar {
     }
 
     private ToastBarComponent getToastBarComponent(boolean create) {
-        Form f = Display.getInstance().getCurrent();
+        TopLevelContainer f = resolveHost();
         if (f != null && !(f instanceof Dialog)) {
-            ToastBarComponent c = (ToastBarComponent) f.getClientProperty("ToastBarComponent");
+            ToastBarComponent c = (ToastBarComponent) f.asContainer().getClientProperty("ToastBarComponent");
             if (c == null && !create) {
                 return null;
             }
             if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
-                f.putClientProperty("ToastBarComponent", c);
+                f.asContainer().putClientProperty("ToastBarComponent", c);
                 Container layered = getLayeredPane();
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(position == Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
             }
-            Rectangle safeArea = Display.getInstance().getDisplaySafeArea(new Rectangle(0, 0, 0, 0));
+            // The host's safe area and height. A window has no notch of its own, and
+            // its height is what the toast has to sit inside.
+            Rectangle safeArea = f.getSafeArea();
             // PMD Fix (CollapsibleIfStatements): Combine nested position checks to simplify the layout adjustments.
             if (position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
                 Style s = c.getAllStyles();
                 s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
                 s.setMarginBottom(f.getInvisibleAreaUnderVKB());
             }
-            int safeBottomMargin = Display.getInstance().getDisplayHeight()
+            int safeBottomMargin = (f instanceof Window
+                        ? f.asContainer().getHeight()
+                        : Display.getInstance().getDisplayHeight())
                     - safeArea.getY()
                     - safeArea.getHeight();
             if (position == Component.BOTTOM && safeBottomMargin > 0) {
@@ -715,9 +769,9 @@ public final class ToastBar {
             c.setVisible(false);
             c.setHeight(0);
             c.setShouldCalcPreferredSize(true);
-            Form f = c.getComponentForm();
+            TopLevelContainer f = c.getTopLevelContainer();
             if (f != null) {
-                f.revalidate();
+                f.asContainer().revalidate();
             } else {
                 c.getParent().revalidate();
             }
@@ -731,8 +785,11 @@ public final class ToastBar {
             updateStatus();
 
         } else {
-            Form f = c.getComponentForm();
-            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals
+            TopLevelContainer f = c.getTopLevelContainer();
+            // A window has no menu bar and never will, so the menu test is a Form
+            // question rather than something to widen the top level contract for.
+            boolean menuShowing = f instanceof Form && ((Form) f).getMenuBar().isMenuShowing();
+            if (f != null && f.isTopLevelShowing() && !menuShowing) {
                 if (this.position == Component.BOTTOM) {
                     c.setY(c.getY() + c.getHeight());
                 }
