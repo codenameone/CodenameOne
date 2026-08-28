@@ -53,8 +53,21 @@ async function enroll(baseUrl, sessionKey, arm) {
   return payload.submission_token;
 }
 
-async function stopProcess(process) {
-  if (process.exitCode !== null || process.signalCode !== null) return;
+async function stopProcess(child) {
+  if ((child.exitCode !== null || child.signalCode !== null) &&
+      (process.platform === "win32" || !child.pid)) return;
+
+  const signalTree = (signal) => {
+    if (process.platform !== "win32" && child.pid) {
+      try {
+        process.kill(-child.pid, signal);
+        return;
+      } catch (error) {
+        // Fall back to signaling the wrapper when no process group exists.
+      }
+    }
+    child.kill(signal);
+  };
 
   await new Promise((resolve) => {
     let finished = false;
@@ -63,19 +76,19 @@ async function stopProcess(process) {
       finished = true;
       clearTimeout(forceTimer);
       clearTimeout(giveUpTimer);
-      process.off("exit", finish);
+      child.off("exit", finish);
       resolve();
     };
     const forceTimer = setTimeout(() => {
-      if (process.exitCode === null && process.signalCode === null) {
-        process.kill("SIGKILL");
+      if (child.exitCode === null && child.signalCode === null) {
+        signalTree("SIGKILL");
       }
     }, 5_000);
     const giveUpTimer = setTimeout(finish, 10_000);
 
-    process.once("exit", finish);
-    process.kill("SIGTERM");
-    if (process.exitCode !== null || process.signalCode !== null) finish();
+    child.once("exit", finish);
+    signalTree("SIGTERM");
+    if (child.exitCode !== null || child.signalCode !== null) finish();
   });
 }
 
@@ -182,7 +195,11 @@ if (remoteUrl) {
       "--yes", "wrangler@4", "dev", "--env", "preview", "--local",
       "--persist-to", persistPath, "--port", "8797", "--ip", "127.0.0.1",
     ],
-    { cwd: workerDir, stdio: ["ignore", "pipe", "pipe"] },
+    {
+      cwd: workerDir,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
   let output = "";
   wrangler.stdout.on("data", (chunk) => { output += chunk; });
