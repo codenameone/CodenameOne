@@ -157,3 +157,37 @@ NSImage * _Nullable CN1AppKitNSImageFromARGB(const unsigned int * _Nonnull argb,
     CGImageRelease(cgImage);
     return image;
 }
+
+/// See the category declaration in CN1AppleUI.h: NSImage has the initialisers
+/// these name, but not the class methods, and shared code calls the class
+/// methods because that is UIImage's spelling.
+@implementation NSImage (CN1UIImageCompat)
+
++ (NSImage *)imageWithData:(NSData *)data {
+    if (data == nil) {
+        return nil;
+    }
+    NSImage *image = [[NSImage alloc] initWithData:data];
+#ifndef CN1_USE_ARC
+    [image autorelease];
+#endif
+    return image;
+}
+
++ (NSImage *)imageWithCGImage:(CGImageRef)cgImage {
+    if (cgImage == NULL) {
+        return nil;
+    }
+    // The size UIImage would report: the bitmap's own pixel dimensions. NSImage
+    // sizes in POINTS, so passing anything else here would silently scale every
+    // image that went through it.
+    NSSize size = NSMakeSize((CGFloat)CGImageGetWidth(cgImage),
+                             (CGFloat)CGImageGetHeight(cgImage));
+    NSImage *image = [[NSImage alloc] initWithCGImage:cgImage size:size];
+#ifndef CN1_USE_ARC
+    [image autorelease];
+#endif
+    return image;
+}
+
+@end

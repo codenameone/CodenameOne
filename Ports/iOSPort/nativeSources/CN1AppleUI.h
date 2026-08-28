@@ -284,6 +284,17 @@ static inline NSData * _Nullable UIImageJPEGRepresentation(NSImage * _Nullable i
                              properties:@{NSImageCompressionFactor: @(quality)}];
 }
 
+/// The two UIImage constructors shared code builds images with.
+///
+/// NSImage has the initialisers but not these class methods, so code that is
+/// otherwise identical on both platforms -- the camera bridge decoding a JPEG,
+/// or wrapping a CGImage it just rendered -- would need a macOS branch for the
+/// spelling alone. Declared as a category so the call sites stay one line.
+@interface NSImage (CN1UIImageCompat)
++ (nullable NSImage *)imageWithData:(nullable NSData *)data;
++ (nullable NSImage *)imageWithCGImage:(nullable CGImageRef)cgImage;
+@end
+
 static inline void UIRectFill(CGRect rect) {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
     if (ctx != NULL) {

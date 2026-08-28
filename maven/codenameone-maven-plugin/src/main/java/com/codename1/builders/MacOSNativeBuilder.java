@@ -360,6 +360,22 @@ public class MacOSNativeBuilder extends Executor {
         boolean bluetoothEnabled = usesBluetooth[0];
         boolean calendarEnabled = usesCalendar[0];
         boolean locationEnabled = usesLocation[0];
+        // Always, on this port, rather than gated on the application.
+        //
+        // Every other define here is decided by scanning the application, and
+        // that cannot work for this one: the macOS Capture implementation is
+        // itself written on com.codename1.camera -- see MacCameraCapture -- so
+        // the port's own class is in the scanned set calling Camera.open(), and
+        // any scan precise enough to catch an application using the camera
+        // catches the port implementing it. Gating on the scan produced an
+        // always-on answer dressed up as a decision.
+        //
+        // So it is stated rather than inferred. The AVFoundation bridge is part
+        // of this port the way the Metal renderer is: the port's own code needs
+        // it compiled in. The cost is CN1Camera.m and the AVFoundation link in
+        // every macOS binary; the alternative is a capture API that works only
+        // when a scan happens to guess right.
+        boolean cn1CameraEnabled = true;
         for (MacOSBuildHints.EntitlementOverrides o : channelOverrides) {
             pushEnabled = pushEnabled || o.push(false);
             microphoneEnabled = microphoneEnabled || o.microphone(false);
@@ -399,9 +415,29 @@ public class MacOSNativeBuilder extends Executor {
         // region of CodenameOne_GLViewController.m, which an earlier version of
         // this comment had wrong.
         //
-        // Camera is still NOT wired up: INCLUDE_CAMERA_USAGE compiles a
-        // UIImagePickerController path, and macOS has no such class.
-        // MacImplementation.hasCamera() reports false for it.
+        // Camera is wired through INCLUDE_CN1_CAMERA, the AVFoundation bridge,
+        // rather than INCLUDE_CAMERA_USAGE. The latter compiles the UIKit modal
+        // capture UI, which macOS has no class for; the former is CN1Camera.m,
+        // which is AVFoundation on both platforms. MacImplementation builds the
+        // modal Capture API on top of that bridge in Java, so an application
+        // using either com.codename1.camera or com.codename1.capture gets a
+        // working camera here.
+        if (cn1CameraEnabled) {
+            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
+            if (!controllerHeader.exists()) {
+                throw new BuildException("The application uses the camera but "
+                        + "CodenameOne_GLViewController.h is missing from the staged native "
+                        + "sources at " + controllerHeader.getAbsolutePath());
+            }
+            try {
+                replaceInFile(controllerHeader, "//#define INCLUDE_CN1_CAMERA",
+                        "#define INCLUDE_CN1_CAMERA");
+            } catch (Exception ex) {
+                throw new BuildException("Failed to enable the camera in CodenameOne_GLViewController.h", ex);
+            }
+        }
+        log("Camera " + (cn1CameraEnabled ? "enabled" : "disabled"));
+
         if (locationEnabled) {
             File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
             if (!controllerHeader.exists()) {
@@ -1375,6 +1411,21 @@ public class MacOSNativeBuilder extends Executor {
                 && (method.indexOf("createMediaRecorder") > -1
                     || method.indexOf("captureAudio") > -1
                     || method.indexOf("captureVideo") > -1);
+    }
+
+    /// Whether an invoked method opens a camera through the low level
+    /// com.codename1.camera API, which the modal Capture API above does not
+    /// name. Opening one is what needs the native compiled in; asking whether a
+    /// camera exists is not, and `Camera.isSupported()` is deliberately absent
+    /// so that a hasCamera() check does not compile in a bridge nothing uses.
+    static boolean opensCameraSession(String cls, String method) {
+        if (cls == null || method == null) {
+            return false;
+        }
+        return "com/codename1/camera/Camera".equals(cls)
+                && (method.indexOf("open") > -1
+                    || method.indexOf("getCameras") > -1
+                    || method.indexOf("getDefault") > -1);
     }
 
     /** Whether an invoked method opens the camera. */

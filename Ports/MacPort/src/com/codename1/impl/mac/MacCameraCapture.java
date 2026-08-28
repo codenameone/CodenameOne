@@ -1,0 +1,292 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.mac;
+
+import com.codename1.camera.Camera;
+import com.codename1.camera.CameraFacing;
+import com.codename1.camera.CameraInfo;
+import com.codename1.camera.CameraSession;
+import com.codename1.camera.CameraSessionOptions;
+import com.codename1.camera.CapturedPhoto;
+import com.codename1.camera.VideoRecording;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.ui.Button;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.util.SuccessCallback;
+import java.io.OutputStream;
+
+/// The modal Capture API, built on the portable camera session rather than on a
+/// native picker.
+///
+/// macOS has no UIImagePickerController, and that is what the inherited
+/// implementation drives -- which is why this port used to answer "no camera"
+/// rather than take a photo. It does not need one: com.codename1.camera is the
+/// same AVFoundation bridge on both platforms, CameraView is an ordinary
+/// Component, and "show a preview with a shutter button" is a Form. So the
+/// modal API is served here by driving the low level one, in portable code.
+///
+/// Nothing here is macOS specific beyond living in this port. It is written as
+/// its own class so that a desktop port needing the same thing can lift it
+/// rather than reimplement it.
+final class MacCameraCapture {
+
+    private MacCameraCapture() {
+    }
+
+    /// Whether a capture device exists. The low level API answers this from
+    /// AVFoundation, which is the same question the Capture API is asking.
+    static boolean hasCamera() {
+        try {
+            return Camera.isSupported() && Camera.getDefault(CameraFacing.BACK) != null;
+        } catch (Throwable t) {
+            // Never let a capability probe take the application down: an
+            // application that asks whether a camera exists is by definition
+            // ready to be told no.
+            Log.e(t);
+            return false;
+        }
+    }
+
+    static void capturePhoto(ActionListener response) {
+        start(response, false);
+    }
+
+    static void captureVideo(ActionListener response) {
+        start(response, true);
+    }
+
+    /// Opens the camera and shows the capture form.
+    ///
+    /// Permission first, and asynchronously: on macOS the first use of a capture
+    /// device raises the system prompt, and opening a session before the answer
+    /// arrives gives a session with no device rather than an error worth
+    /// reporting.
+    private static void start(final ActionListener response, final boolean video) {
+        Camera.requestPermissions(video, new SuccessCallback<Boolean>() {
+            @Override
+            public void onSucess(Boolean granted) {
+                if (granted == null || !granted.booleanValue()) {
+                    respond(response, null);
+                    return;
+                }
+                open(response, video);
+            }
+        });
+    }
+
+    private static void open(final ActionListener response, final boolean video) {
+        CameraInfo info = Camera.getDefault(CameraFacing.BACK);
+        if (info == null) {
+            respond(response, null);
+            return;
+        }
+        final CameraSession session;
+        try {
+            session = Camera.open(info, new CameraSessionOptions().captureAudio(video));
+        } catch (Throwable t) {
+            Log.e(t);
+            respond(response, null);
+            return;
+        }
+
+        final Form previous = Display.getInstance().getCurrent();
+        final Form capture = new Form(video ? "Record Video" : "Take Photo", new BorderLayout());
+        capture.add(BorderLayout.CENTER, session.createView());
+
+        final Button shutter = new Button(video ? "Record" : "Capture");
+        Button cancel = new Button("Cancel");
+        Container buttons = new Container(new FlowLayout(com.codename1.ui.Component.CENTER));
+        buttons.add(cancel);
+        buttons.add(shutter);
+        capture.add(BorderLayout.SOUTH, buttons);
+
+        // One flag for both endings. The user can cancel while a photo is still
+        // being written, and both paths close the session and show the previous
+        // form -- doing either twice is a closed session being closed again and a
+        // form being restored over itself.
+        final boolean[] finished = {false};
+
+        cancel.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                finish(finished, session, previous, response, null);
+            }
+        });
+
+        if (video) {
+            final VideoRecording[] recording = {null};
+            shutter.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    if (recording[0] == null) {
+                        String path = tempFile("mp4");
+                        if (path == null) {
+                            finish(finished, session, previous, response, null);
+                            return;
+                        }
+                        try {
+                            recording[0] = session.startVideoRecording(path);
+                        } catch (Throwable t) {
+                            Log.e(t);
+                            finish(finished, session, previous, response, null);
+                            return;
+                        }
+                        shutter.setText("Stop");
+                        capture.revalidate();
+                        return;
+                    }
+                    recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
+                        @Override
+                        public void onSucess(String path) {
+                            finish(finished, session, previous, response, path);
+                        }
+                    }).except(new SuccessCallback<Throwable>() {
+                        @Override
+                        public void onSucess(Throwable err) {
+                            Log.e(err);
+                            finish(finished, session, previous, response, null);
+                        }
+                    });
+                }
+            });
+        } else {
+            shutter.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    shutter.setEnabled(false);
+                    session.takePhoto().ready(new SuccessCallback<CapturedPhoto>() {
+                        @Override
+                        public void onSucess(CapturedPhoto photo) {
+                            finish(finished, session, previous, response, store(photo));
+                        }
+                    }).except(new SuccessCallback<Throwable>() {
+                        @Override
+                        public void onSucess(Throwable err) {
+                            Log.e(err);
+                            finish(finished, session, previous, response, null);
+                        }
+                    });
+                }
+            });
+        }
+
+        capture.show();
+    }
+
+    /// The photo the low level API produced, as a file, because the Capture API
+    /// hands the application a path rather than bytes.
+    ///
+    /// getFilePath() first: a port that already wrote the photo to disk has
+    /// nothing to gain from a second copy, and the JPEG bytes may not be held in
+    /// memory at all.
+    private static String store(CapturedPhoto photo) {
+        if (photo == null) {
+            return null;
+        }
+        String existing = photo.getFilePath();
+        if (existing != null && existing.length() > 0) {
+            return existing;
+        }
+        byte[] jpeg = photo.getJpegBytes();
+        if (jpeg == null || jpeg.length == 0) {
+            return null;
+        }
+        String path = tempFile("jpg");
+        if (path == null) {
+            return null;
+        }
+        OutputStream out = null;
+        try {
+            out = FileSystemStorage.getInstance().openOutputStream(path);
+            out.write(jpeg);
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+            }
+        }
+        return path;
+    }
+
+    /// A path under the application home, named so two captures in the same
+    /// session cannot land on the same file.
+    private static String tempFile(String extension) {
+        try {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String home = fs.getAppHomePath();
+            if (!home.endsWith(fs.getFileSystemSeparator() + "")) {
+                home += fs.getFileSystemSeparator();
+            }
+            return home + "cn1-capture-" + System.currentTimeMillis() + "." + extension;
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
+    }
+
+    private static void finish(boolean[] finished, CameraSession session, Form previous,
+            ActionListener response, String path) {
+        if (finished[0]) {
+            return;
+        }
+        finished[0] = true;
+        try {
+            session.close();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        if (previous != null) {
+            previous.showBack();
+        }
+        respond(response, path);
+    }
+
+    /// The Capture API contract: the listener is invoked with the path, or with
+    /// a null source when the user cancelled or nothing could be captured.
+    private static void respond(final ActionListener response, final String path) {
+        if (response == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                response.actionPerformed(new ActionEvent(path));
+            }
+        });
+    }
+}

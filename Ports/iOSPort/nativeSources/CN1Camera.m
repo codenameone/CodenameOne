@@ -80,7 +80,15 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 }
 
 + (BOOL)hasCameraSupport {
+#if TARGET_OS_OSX
+    // UIImagePickerController is the UIKit MODAL capture UI, and asking it
+    // whether a camera exists is an iOS idiom rather than the question itself.
+    // The question is whether AVFoundation can see a capture device, which is
+    // what the rest of this class uses on both platforms.
+    return [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo] != nil;
+#else
     return [UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypeCamera];
+#endif
 }
 
 #pragma mark - Open / close
@@ -162,7 +170,16 @@ extern JAVA_OBJECT nsDataToByteArr(NSData *data);
 - (CN1View *)createPreviewView {
     if (self.previewView) return self.previewView;
     CN1View *v = [[CN1View alloc] initWithFrame:CGRectMake(0, 0, 320, 480)];
+#if TARGET_OS_OSX
+    // NSView has no backgroundColor; the colour belongs to its layer, and the
+    // view has to be told to have one. Black because the preview layer below
+    // fills it and anything showing through before the first frame should not
+    // flash white.
+    v.wantsLayer = YES;
+    v.layer.backgroundColor = [[NSColor blackColor] CGColor];
+#else
     v.backgroundColor = [UIColor blackColor];
+#endif
     AVCaptureVideoPreviewLayer *layer =
         [[AVCaptureVideoPreviewLayer alloc] initWithSession:self.session];
     layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
@@ -345,11 +362,18 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 }
 
 - (void)setZoomRatio:(float)ratio {
+#if TARGET_OS_OSX
+    // videoZoomFactor and videoMaxZoomFactor are iOS-only: AVFoundation on macOS
+    // exposes no zoom on a capture device. Ignored rather than faked, and
+    // CameraSession reports the range so an application can tell.
+    (void)ratio;
+#else
     if (!self.device) return;
     if (![self.device lockForConfiguration:nil]) return;
     CGFloat r = MAX(1.0, MIN((CGFloat)ratio, self.device.activeFormat.videoMaxZoomFactor));
     self.device.videoZoomFactor = r;
     [self.device unlockForConfiguration];
+#endif
 }
 
 - (void)focusAtX:(float)xNorm y:(float)yNorm {

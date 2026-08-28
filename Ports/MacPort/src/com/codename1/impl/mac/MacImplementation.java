@@ -408,19 +408,36 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
-    /// False until there is an AppKit capture path. The inherited answer is an
-    /// unconditional true, but capturePhoto() and captureVideo() are inherited
-    /// from the iOS port and cannot work here: the macOS builder never sets
-    /// INCLUDE_CAMERA_USAGE, and the native behind them is UIImagePickerController,
-    /// which macOS does not have. An application told yes selects the capture
-    /// path and gets an iOS build-hint exception instead of a photo.
-    ///
-    /// AVFoundation capture does exist on macOS. This is a port that has not
-    /// been written, not a platform that cannot; the ledger records it beside
-    /// the photo picker.
+    /// Answered by AVFoundation rather than assumed. The inherited answer is an
+    /// unconditional true, which is wrong for a Mac with no camera attached, and
+    /// this port used to answer an unconditional false, which was wrong for
+    /// every Mac that has one.
     @Override
     public boolean hasCamera() {
-        return false;
+        return MacCameraCapture.hasCamera();
+    }
+
+    /// @inheritDoc
+    ///
+    /// Driven from the portable camera session rather than from a native picker.
+    ///
+    /// The inherited implementation drives UIImagePickerController, the UIKit
+    /// modal capture UI, and macOS has no such class -- which is what this port
+    /// used to report "no camera" for. It does not need one: com.codename1.camera
+    /// is the same AVFoundation bridge on both platforms, so the modal API is
+    /// served by driving the low level one. See MacCameraCapture.
+    @Override
+    public void capturePhoto(com.codename1.ui.events.ActionListener response) {
+        MacCameraCapture.capturePhoto(response);
+    }
+
+    /// @inheritDoc
+    ///
+    /// As `#capturePhoto(com.codename1.ui.events.ActionListener)`, recording to a
+    /// file through the same session.
+    @Override
+    public void captureVideo(com.codename1.ui.events.ActionListener response) {
+        MacCameraCapture.captureVideo(response);
     }
 
     /// @inheritDoc
