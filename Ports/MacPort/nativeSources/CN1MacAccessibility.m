@@ -162,6 +162,13 @@ static void CN1MacPerformAction(long long nodeId, NSString *actionId) {
 static NSString *CN1MacRoleForNode(NSDictionary *node, NSString **roleDescription) {
     NSString *role = CN1MacJSONValue(node, @"role");
     *roleDescription = nil;
+    // A heading level makes a node a heading whatever its role says, which is
+    // how the UIKit projection reads it too: a Label marked as level 2 is a
+    // heading, and matching only the HEADING role missed every one of them.
+    if ([CN1MacJSONValue(node, @"headingLevel") intValue] > 0) {
+        *roleDescription = @"heading";
+        return NSAccessibilityStaticTextRole;
+    }
     if (role == nil) {
         return NSAccessibilityUnknownRole;
     }
@@ -229,6 +236,12 @@ static NSString *CN1MacValueForNode(NSDictionary *node) {
         value = value == nil ? @"Checked" : [value stringByAppendingString:@", Checked"];
     } else if ([checked isEqualToString:@"UNCHECKED"]) {
         value = value == nil ? @"Unchecked" : [value stringByAppendingString:@", Unchecked"];
+    } else if ([checked isEqualToString:@"MIXED"]) {
+        // A real framework state, not a gap in the enum. Left out, a partially
+        // selected control was indistinguishable from one with no checked state
+        // at all -- VoiceOver said nothing either way. The UIKit projection
+        // says "Mixed" and this now says the same word.
+        value = value == nil ? @"Mixed" : [value stringByAppendingString:@", Mixed"];
     }
     id expanded = CN1MacJSONValue(node, @"expanded");
     if (expanded != nil) {
