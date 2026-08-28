@@ -27,12 +27,14 @@ import com.codename1.components.InteractionDialog;
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -214,6 +216,130 @@ public class Dialog extends Form implements AbstractDialog {
     /// historical way by taking over the main surface. Every behaviour that belongs to
     /// that historical path is gated on this being null.
     private Window layerHost;
+
+    /// The layer inside `#layerHost` this dialog was added to. Held rather than
+    /// re-fetched: `Window#getFormLayeredPane(java.lang.Class, boolean)` re-applies
+    /// its layout flag on every call, so asking again after the add can clear it.
+    private Container activeLayer;
+
+    /// The dimming, input blocking backdrop behind a hosted dialog, or null when the
+    /// dialog neither blocks nor dismisses on an outside press.
+    private Container scrim;
+
+    /// The dialog's own background painter, put back when the hosted showing ends.
+    private Painter savedBgPainter;
+
+    /// Listens for the host window resizing while this dialog is on it.
+    private ActionListener hostSizeListener;
+
+    /// Listens for the back key while this dialog is on a window.
+    private ActionListener hostBackListener;
+
+    /// The host's shape when the dialog was shown, so a resize can tell an orientation
+    /// flip from an ordinary resize. True when it was taller than it was wide.
+    private boolean hostWasPortrait;
+
+    /// Shown a dialog that neither blocks input nor closes on an outside press needs no
+    /// backdrop at all; this is the marker that one was skipped.
+    private static final Painter NO_OP_PAINTER = new NoOpPainter();
+
+    /// A painter that draws nothing.
+    ///
+    /// A hosted dialog spans its whole layer, so its `Form` background would paint an
+    /// opaque rectangle over the window behind it. The historical path has the same
+    /// problem and solves it the same way, by swapping the painter for the duration of
+    /// the showing and putting the original back afterwards.
+    private static final class NoOpPainter implements Painter {
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+        }
+    }
+
+    /// Yields for a moment, so the modal wait does not spin.
+    private static final Runnable BLOCKING_SLEEP = new BlockingSleepRunnable();
+
+    /// The body of `#BLOCKING_SLEEP`, named rather than anonymous so it is a static
+    /// class and does not hold the dialog that created it.
+    private static final class BlockingSleepRunnable implements Runnable {
+        @Override
+        public void run() {
+            com.codename1.io.Util.sleep(10);
+        }
+    }
+
+    /// The backdrop behind a dialog hosted on a window.
+    ///
+    /// It does three jobs at once, and they are the same job: it dims the window, it
+    /// swallows the presses that must not reach what is behind a modal dialog, and it
+    /// is what delivers an outside press to the dialog. Without something in the layer
+    /// that responds to pointer events, `Window` hands the press to its content pane
+    /// instead and the dialog never hears about it.
+    private static final class DialogScrim extends Container {
+        private final Dialog dlg;
+        private final int tint;
+        private final Image backdrop;
+
+        DialogScrim(Dialog dlg, boolean blocking, int tint, Image backdrop) {
+            this.dlg = dlg;
+            this.tint = tint;
+            this.backdrop = backdrop;
+            setGrabsPointerEvents(blocking);
+        }
+
+        @Override
+        protected void paintBackground(Graphics g) {
+            int w = getWidth();
+            int h = getHeight();
+            if (backdrop != null) {
+                g.drawImage(backdrop, getX(), getY(), w, h);
+            }
+            int alpha = (tint >> 24) & 0xff;
+            if (alpha != 0) {
+                g.setColor(tint);
+                g.fillRect(getX(), getY(), w, h, (byte) alpha);
+            }
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+            dlg.scrimPressed(x, y);
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            dlg.scrimReleased(x, y);
+        }
+    }
+
+    /// Watches the host window's size while a dialog is on it, standing in for the
+    /// `sizeChangedInternal` the dialog would have been sent on the main surface.
+    private static final class HostSizeListener implements ActionListener {
+        private final Dialog dlg;
+
+        HostSizeListener(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.hostResized(evt.getX(), evt.getY());
+        }
+    }
+
+    /// Delivers the back key to a dialog hosted on a window. A window has no menu bar
+    /// to route it, so the dialog listens for it directly.
+    private static final class HostBackListener implements ActionListener {
+        private final Dialog dlg;
+
+        HostBackListener(Dialog dlg) {
+            this.dlg = dlg;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            dlg.hostBackPressed();
+        }
+    }
 
     /// Constructs a Dialog with a title
     ///
@@ -1738,6 +1864,20 @@ public class Dialog extends Form implements AbstractDialog {
 
     /// {@inheritDoc}
     ///
+    /// A dialog in a window's layered pane has no previous form to return to and was
+    /// never handed to `Display#setCurrent(Form)`, so none of the base teardown applies
+    /// to it. It comes back out of the layer instead.
+    @Override
+    void disposeImpl() {
+        if (layerHost != null) {
+            disposeFromHostLayer();
+            return;
+        }
+        super.disposeImpl();
+    }
+
+    /// {@inheritDoc}
+    ///
     /// Overridden rather than editing `Form`, because the base version measures the
     /// display before it works out the margins and would centre a window hosted dialog
     /// in the wrong coordinate space -- on a window smaller than the display the
@@ -1755,6 +1895,271 @@ public class Dialog extends Form implements AbstractDialog {
         showModal(h / 100 * 20, h / 100 * 10, w / 100 * 20, w / 100 * 20, true, modal, reverse);
     }
 
+    /// Whether this showing goes into a window's layered pane rather than taking over
+    /// the main surface.
+    ///
+    /// False for everything that has no window to go on, which is every mobile port and
+    /// every desktop application that never opened one -- so the historical path is
+    /// reached by the same code it always was.
+    ///
+    /// #### Returns
+    ///
+    /// true to show in the host's layered pane
+    private boolean usesHostLayer() {
+        if (!Desktop.isSupported()) {
+            return false;
+        }
+        // A menu is framework furniture that Display.getCurrent() deliberately looks
+        // through, and Dialog.dispose() skips super.dispose() for it. A menu can only
+        // come from a Form's MenuBar in the first place, so this never costs anything.
+        if (isMenu()) {
+            return false;
+        }
+        return hostBounds() != null;
+    }
+
+    /// Shows this dialog inside its host window's layered pane and, when modal, waits
+    /// there until it is disposed.
+    ///
+    /// This is the whole of the window path. It replaces `Form#showModal` rather than
+    /// extending it: there is no previous form to swap out, nothing to hand to
+    /// `Display#setCurrent(Form)`, and no `RunnableWrapper` -- the dialog is simply a
+    /// component in a layer that spans the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels above the dialog
+    ///
+    /// - `bottom`: space in pixels below the dialog
+    ///
+    /// - `left`: space in pixels left of the dialog
+    ///
+    /// - `right`: space in pixels right of the dialog
+    ///
+    /// - `includeTitle`: whether the title hangs at the top or is glued to the content
+    ///
+    /// - `modal`: whether to wait here until the dialog is disposed
+    private void showInHostLayer(int top, int bottom, int left, int right,
+            boolean includeTitle, boolean modal) {
+        Display.getInstance().flushEdt();
+        Window host = (Window) resolveHost();
+        layerHost = host;
+        hostWasPortrait = host.getHeight() >= host.getWidth();
+        Container layer = host.getFormLayeredPane(Dialog.class, true);
+        if (!(layer.getLayout() instanceof LayeredLayout)) {
+            layer.setLayout(new LayeredLayout());
+        }
+        activeLayer = layer;
+
+        // Before anything is added to the layer. The layer repaints the whole window
+        // beneath its contents, so capturing afterwards would recurse through that
+        // backdrop and photograph the dialog being set up.
+        Image backdrop = captureBlurBackdrop(host);
+
+        savedBgPainter = getStyle().getBgPainter();
+        getStyle().setBgPainter(NO_OP_PAINTER);
+
+        if (modal || disposeWhenPointerOutOfBounds) {
+            scrim = new DialogScrim(this, modal, getTintColor(), backdrop);
+            layer.addComponent(scrim);
+        }
+
+        applyDialogMargins(top, bottom, left, right, includeTitle);
+        if (getTransitionOutAnimator() == null && getTransitionInAnimator() == null) {
+            initLaf(getUIManager());
+        }
+        layer.addComponent(this);
+        host.revalidateWithAnimationSafety();
+
+        hostSizeListener = new HostSizeListener(this);
+        host.addSizeChangedListener(hostSizeListener);
+        hostBackListener = new HostBackListener(this);
+        host.addKeyListener(MenuBar.backSK, hostBackListener);
+        focusFirstFocusable(host);
+
+        onShow();
+        onShowCompletedImpl();
+
+        if (modal) {
+            while (!isDisposed()) {
+                CN.invokeAndBlock(BLOCKING_SLEEP);
+            }
+            Display.getInstance().setShowVirtualKeyboard(false);
+        }
+    }
+
+    /// The blurred snapshot of the host to sit behind the dialog, or null when this
+    /// dialog does not blur its background.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window being covered
+    ///
+    /// #### Returns
+    ///
+    /// the blurred image, or null
+    private Image captureBlurBackdrop(Window host) {
+        float radius = getBlurBackgroundRadius();
+        if (radius <= 0 || host.getWidth() <= 0 || host.getHeight() <= 0) {
+            return null;
+        }
+        Image shot = host.capture();
+        if (shot == null) {
+            shot = Image.createImage(host.getWidth(), host.getHeight());
+            host.paintComponent(shot.getGraphics(), true);
+        }
+        return Display.getInstance().gaussianBlurImage(shot, radius);
+    }
+
+    /// Gives focus to the first thing in the dialog that can take it.
+    ///
+    /// `Form#initFocused()` cannot be used here: focus belongs to the window, not to
+    /// the dialog, so the dialog has to hand its own first focusable to the host.
+    ///
+    /// #### Parameters
+    ///
+    /// - `host`: the window that owns focus
+    private void focusFirstFocusable(Window host) {
+        Component first = findFirstFocusable(getDialogComponent());
+        if (first != null) {
+            host.setFocused(first);
+        }
+    }
+
+    /// Depth first search for something focusable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to search from
+    ///
+    /// #### Returns
+    ///
+    /// the first focusable component, or null
+    private Component findFirstFocusable(Component c) {
+        if (c == null) {
+            return null;
+        }
+        if (c.isFocusable() && c.isVisible() && c.isEnabled()) {
+            return c;
+        }
+        if (c instanceof Container) {
+            Container cnt = (Container) c;
+            int count = cnt.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                Component found = findFirstFocusable(cnt.getComponentAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// A press landed on the backdrop rather than on the dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the press x
+    ///
+    /// - `y`: the press y
+    void scrimPressed(int x, int y) {
+        pressedOutOfBounds = !getTitleComponent().containsOrOwns(x, y)
+                && !getContentPane().containsOrOwns(x, y)
+                && !getMenuBar().containsOrOwns(x, y);
+    }
+
+    /// A release landed on the backdrop rather than on the dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the release x
+    ///
+    /// - `y`: the release y
+    void scrimReleased(int x, int y) {
+        if (disposeWhenPointerOutOfBounds && pressedOutOfBounds
+                && !getTitleComponent().containsOrOwns(x, y)
+                && !getContentPane().containsOrOwns(x, y)
+                && !getMenuBar().containsOrOwns(x, y)) {
+            dispose();
+        }
+    }
+
+    /// The host window changed size while this dialog was on it.
+    ///
+    /// Stands in for `#sizeChangedInternal(int, int)`, which the window never sends to
+    /// a dialog in its layered pane. A window has no orientation, so `disposeOnRotation`
+    /// fires on the host's shape actually flipping rather than on any resize at all --
+    /// otherwise dragging a window wider would close a popup.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the host's new width
+    ///
+    /// - `h`: the host's new height
+    void hostResized(int w, int h) {
+        boolean portrait = h >= w;
+        if (disposeOnRotation && portrait != hostWasPortrait) {
+            hostWasPortrait = portrait;
+            disposedDueToRotation = true;
+            dispose();
+            return;
+        }
+        hostWasPortrait = portrait;
+        autoAdjust(w, h);
+        revalidate();
+    }
+
+    /// The back key was pressed while this dialog was on a window.
+    ///
+    /// A window has no menu bar to map the key to a command, so the dialog does it.
+    void hostBackPressed() {
+        Command back = getBackCommand();
+        if (back != null) {
+            dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));
+            return;
+        }
+        dispose();
+    }
+
+    /// Takes this dialog back out of its host window's layered pane.
+    ///
+    /// The counterpart to `#showInHostLayer(int, int, int, int, boolean, boolean)`, and
+    /// the reason `#disposeImpl()` is overridden rather than `#dispose()`: `MenuBar`
+    /// calls disposeImpl directly, and a Dialog skips super.dispose() when it is a menu.
+    private void disposeFromHostLayer() {
+        Window host = layerHost;
+        layerHost = null;
+        if (host != null) {
+            if (hostSizeListener != null) {
+                host.removeSizeChangedListener(hostSizeListener);
+                hostSizeListener = null;
+            }
+            if (hostBackListener != null) {
+                host.removeKeyListener(MenuBar.backSK, hostBackListener);
+                hostBackListener = null;
+            }
+        }
+        if (scrim != null) {
+            scrim.remove();
+            scrim = null;
+        }
+        remove();
+        if (savedBgPainter != null) {
+            getStyle().setBgPainter(savedBgPainter);
+            savedBgPainter = null;
+        }
+        Container layer = activeLayer;
+        activeLayer = null;
+        if (layer != null && layer.getComponentCount() == 0) {
+            layer.remove();
+        }
+        if (host != null) {
+            // Without this the pixels the dialog occupied are left on screen: removing
+            // a component from a layer does not by itself wake the window's paint.
+            host.revalidateWithAnimationSafety();
+        }
+    }
+
     @Override
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         if (Display.isInitialized() && Display.getInstance().isMinimized()) {
@@ -1765,6 +2170,10 @@ public class Dialog extends Form implements AbstractDialog {
         this.bottom = bottom;
         this.left = left;
         this.right = right;
+        if (usesHostLayer()) {
+            showInHostLayer(top, bottom, left, right, includeTitle, modal);
+            return;
+        }
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear
         if (dialogTitle != null && getUIManager().isThemeConstant("hideEmptyTitleBool", false)) {
