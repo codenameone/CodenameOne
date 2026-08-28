@@ -77,7 +77,12 @@ public interface CallBridge {
     /// [#getCallCapabilities()] bit: calls can be held and resumed.
     int CAPABILITY_HOLD = 4;
 
-    /// [#getCallCapabilities()] bit: the system offers a mute control.
+    /// [#getCallCapabilities()] bit: the app can SET the system mute state.
+    ///
+    /// About [#setMuted] only. Hearing what the user does with the system's
+    /// own mute control is not gated by this and arrives everywhere, through
+    /// `Calls.deliverMuteChanged`; Android reports that and offers no way to
+    /// drive it, so it does not set this bit.
     int CAPABILITY_MUTE = 8;
 
     /// [#getCallCapabilities()] bit: the system offers a keypad and

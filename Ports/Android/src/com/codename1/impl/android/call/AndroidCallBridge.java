@@ -118,8 +118,19 @@ public class AndroidCallBridge implements CallBridge {
         if (!isCallSupported()) {
             return 0;
         }
+        // MUTE is absent, and it is the bit most likely to be missed.
+        // Telecom OFFERS a mute control and this port reports what the user
+        // does with it, through onCallAudioStateChanged -> deliverMuteChanged
+        // -> muteRequested, which no capability bit gates. What is missing is
+        // the other direction, which is what CallSession.setMuted is: a
+        // self-managed ConnectionService has no way to tell Telecom what the
+        // mute button should read. Advertising the bit and then answering a
+        // set with success left isMuted() -- documented as the state "as far
+        // as the system is concerned" -- holding a value the system never
+        // held, until the next genuine audio-state report quietly flipped it
+        // back.
         int caps = CAPABILITY_SYSTEM_UI | CAPABILITY_OUTGOING | CAPABILITY_HOLD
-                | CAPABILITY_MUTE | CAPABILITY_DTMF;
+                | CAPABILITY_DTMF;
         // VIDEO only when the build can actually reach a camera. The manifest
         // permission comes from the call.video build hint at build time,
         // while videoSupported(true) is a RUNTIME decision the scanner cannot
@@ -744,13 +755,26 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void setMuted(int requestId, String callId, boolean muted) {
-        // Telecom owns the mute control for a self-managed call and does not
-        // take instruction about it from the app; the app mutes its own
-        // media. Answering true rather than failing keeps a portable app from
-        // treating a platform difference as an error.
-        Calls.deliverAck(requestId,
-                CN1ConnectionService.find(callId) != null,
-                CallError.INVALID_ID.ordinal(), "No such call: " + callId);
+        // Refused, not acknowledged. Telecom owns the mute control for a
+        // self-managed call and takes no instruction about it from the app,
+        // so there is nothing here that could make the system UI read muted.
+        //
+        // Answering true was meant to keep a portable app from treating a
+        // platform difference as an error, and it did the opposite: the ack
+        // is what applies the value to CallSession.isMuted(), so the session
+        // claimed a system mute state that did not exist, while the system UI
+        // and the app's own media both disagreed with it. NOT_SUPPORTED is
+        // the difference the app can actually branch on -- and it agrees with
+        // getCallCapabilities, which no longer offers CAPABILITY_MUTE here.
+        //
+        // Unlike sendDtmf below, this cannot be synthesized. A DTMF tone is
+        // carried by the app's own media, so the port can hand the request
+        // back for the app to play; a mute button belongs to a system UI this
+        // process cannot draw on.
+        Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
+                "Telecom does not let a self-managed call set its own mute"
+                + " state; mute the app's media and watch muteRequested for"
+                + " what the user does with the system control");
     }
 
     @Override

@@ -21,6 +21,7 @@ shared value types.
 | System call UI | yes (CallKit) | yes (Android 8 and later, see below) | simulated | --
 | Ring while the app isn't running | yes (`com.codename1.call.voip`) | yes, from your own push handler | simulated | --
 | Answer, hold, mute, keypad from the system | yes | yes | simulated | --
+| Set the system mute state from your app | yes | -- | simulated | --
 | Audio session handoff | yes | synthesized | simulated | --
 | Conference grouping | -- | -- | -- | --
 | Caller identification | yes (Call Directory) | -- | simulated | --
@@ -132,7 +133,12 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `CallSession` carries the rest: `end`, `setHeld`, `setMuted`, `sendDigits`,
 `update` and `groupWith`. Three are worth reading twice. `setMuted` tells the
 operating system what the mute button should look like and does *not* stop your
-app sending audio -- nothing in this package touches media.
+app sending audio -- nothing in this package touches media. It's the one
+`CallSession` method the two platforms don't agree on: check
+`CallBridge.CAPABILITY_MUTE`, which Android doesn't offer, because a
+self-managed call there can't tell Telecom its mute state and the call answers
+`NOT_SUPPORTED`. Hearing what the user does with the system's mute button is a
+different thing and arrives on both through `muteRequested`.
 `reportEndedRemotely` rather than `end` is what you call when the hang-up came
 down your own signalling, so the system call log says the far end hung up
 instead of blaming the user.

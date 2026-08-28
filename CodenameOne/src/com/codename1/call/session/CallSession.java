@@ -303,6 +303,13 @@ public final class CallSession {
     /// This tells the operating system what the mute button should look like.
     /// It does **not** stop the app sending audio -- nothing here touches
     /// media -- so an app that only calls this is still transmitting.
+    ///
+    /// Gated by `CallBridge.CAPABILITY_MUTE`, which Android does not offer: a
+    /// self-managed call there cannot tell Telecom its mute state, so this
+    /// answers `NOT_SUPPORTED` and [#isMuted()] stays where the system left
+    /// it. Hearing what the user does with the system's own mute control is a
+    /// separate thing and works everywhere; see
+    /// [CallActionListener#muteRequested].
     public AsyncResource<Boolean> setMuted(boolean value) {
         CallBridge b = CallRequests.bridge();
         if (b == null) {
