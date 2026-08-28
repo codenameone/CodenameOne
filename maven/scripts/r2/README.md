@@ -48,21 +48,46 @@ being published because their content does not change per release (`<excludeArti
 in `maven/pom.xml`), and consumers are pinned to the last version that *was* published —
 which lives only on Central. That is not history that can be left behind:
 `codenameone-maven-plugin` resolves `codenameone-designer` at `cn1.designer.version` for
-the Resource Editor goals, so ordinary plugin resolution reaches it. It is a live
-dependency of every future release.
+the Resource Editor goals, and declares `cn1-builder-resources-common` and
+`cn1-builder-resources-android` at `7.0` in `runtime` scope, so ordinary plugin
+resolution reaches all of them. They are live dependencies of every future release, not
+history that can be left behind.
 
-Coordinates come from `frozen-coordinates.sh` rather than being repeated here, so the
-seeding and the release-time check cannot disagree about which version is pinned. It
-verifies every file against its `.sha1` from Central before uploading, and is idempotent.
+Coordinates come from `frozen-coordinates.py`, which **derives** them, so the seeding and
+the release-time check cannot disagree and a newly pinned artifact is picked up without
+anyone remembering to add it. It verifies every file against its `.sha1` from Central
+before uploading, and is idempotent. Every file the coordinate has on Central is copied,
+not a chosen subset -- the designer is consumed as its `jar-with-dependencies`
+attachment, and guessing which attachments matter is how the pom gets seeded and the
+artifact does not.
 
 Run it through the **Seed frozen artifacts to R2** workflow (`workflow_dispatch`) after
-bumping `cn1.designer.version`, and before pushing the next release tag. It is manual on
-purpose: it reads from Central, and a release must not depend on Central being reachable
-at that moment.
+bumping a pin, and before pushing the next release tag. It is manual on purpose: it reads
+from Central, and a release must not depend on Central being reachable at that moment.
 
-Note `sqlite-jdbc` is *not* frozen despite reading like a pin in `codenameone-javase`'s
-pom -- its version comes from the parent's `dependencyManagement`, which tracks
-`${project.version}`, so it is an ordinary reactor module the release itself publishes.
+### `frozen-coordinates.py`
+
+Prints `artifactId:version[:classifier,...]` for each frozen artifact. Derived, never
+hand-maintained, and that is load-bearing: the list was hand-written for exactly one
+commit and was already wrong twice. It named `sqlite-jdbc`, which is an ordinary reactor
+module published on every tag, and it omitted `cn1-builder-resources-common` and
+`cn1-builder-resources-android` -- `runtime` dependencies of `codenameone-maven-plugin`
+pinned at `7.0` and published nowhere but Central. That second omission would have broken
+the plugin's own runtime classpath for every R2-only project: every build, not one goal.
+
+An artifact is frozen when a release resolves it at a version that is not the release's
+own. Two ways that happens, both read from where the value actually lives:
+
+1. A `com.codenameone` dependency with a **literal** version in any reactor pom.
+   `${project.version}` and friends move with the release and are published by it, so
+   only a hardcoded version marks a pin. `system` scope is excluded -- Maven resolves it
+   from `systemPath` on disk and never asks a repository, which is what `jfxrt` and
+   `codenameone-buildclient` are. `test` scope never reaches a user.
+2. A version the plugin resolves programmatically, which no pom declares:
+   `cn1.designer.version` on `AbstractCN1Mojo`. `codenameone-javase-svg` shares it --
+   it exists only to give that editor Batik SVG support.
+
+Classifiers are scraped from the same `getArtifact` calls that name them.
 
 Seeded artifacts deliberately carry no release marker: they are resolved by exact pinned
 version rather than discovered, so `regen-maven-metadata.py` knows them as frozen and

@@ -16,8 +16,12 @@
 # nice-to-have: check-frozen-artifacts.sh fails the release while any of it is absent.
 # It is idempotent, so re-running after a pin bump seeds only what is new.
 #
+# Every file the coordinate has on Central is copied, not a chosen subset: the
+# designer is consumed as its jar-with-dependencies attachment, and guessing which
+# attachments matter is how the pom gets seeded and the artifact does not.
+#
 # Usage: seed-frozen-artifacts.sh [<artifactId>:<version> ...]
-#        defaults to the coordinates in frozen-coordinates.sh
+#        defaults to the coordinates derived by frozen-coordinates.py
 #
 set -euo pipefail
 
@@ -26,10 +30,10 @@ set -euo pipefail
 : "${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is required}"
 : "${R2_BUCKET:?R2_BUCKET is required}"
 
-# Coordinates come from frozen-coordinates.sh so that this script and the release-time
-# check cannot disagree about which version is pinned.
-# shellcheck source=maven/scripts/r2/frozen-coordinates.sh
-source "$(dirname "${BASH_SOURCE[0]}")/frozen-coordinates.sh"
+# Coordinates are derived by frozen-coordinates.py so that this script and the
+# release-time check cannot disagree about which version is pinned, and so that a
+# newly pinned artifact is picked up without anyone remembering to add it here.
+COORDINATES_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/frozen-coordinates.py"
 
 coordinates=("$@")
 if [ "${#coordinates[@]}" -eq 0 ]; then
@@ -37,7 +41,7 @@ if [ "${#coordinates[@]}" -eq 0 ]; then
     # exit status of mapfile rather than of the generator, so an unreadable pin would
     # seed nothing and still exit 0 -- and seeding the wrong set is worse than not
     # seeding at all, because the immutability guard then refuses to repair it.
-    if ! frozen_list=$(cn1_frozen_coordinates); then
+    if ! frozen_list=$(python3 "$COORDINATES_SCRIPT"); then
         exit 1
     fi
     while IFS= read -r line; do
@@ -64,8 +68,15 @@ trap 'rm -rf "$work"' EXIT
 seeded=0
 
 for coordinate in "${coordinates[@]}"; do
-    artifact="${coordinate%%:*}"
-    version="${coordinate##*:}"
+    # `artifact:version[:classifier,...]`. Cut rather than ${x##*:}, which would
+    # read the classifier field as the version. Classifiers matter only to the
+    # check script: this one copies every file the coordinate has on Central.
+    artifact=$(echo "$coordinate" | cut -d: -f1)
+    version=$(echo "$coordinate" | cut -d: -f2)
+    if [ -z "$artifact" ] || [ -z "$version" ]; then
+        echo "ERROR: malformed coordinate '${coordinate}'." >&2
+        exit 1
+    fi
     echo "==> ${artifact}:${version}"
 
     listing=$(curl -fsS "${CENTRAL}/${artifact}/${version}/" 2>/dev/null) || {

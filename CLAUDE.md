@@ -340,10 +340,15 @@ See `maven/README.adoc` for the full process. Summary:
    and it is never published
 3. Update to next SNAPSHOT: `bash update-version.sh X.Y.Z+1-SNAPSHOT`
 
-`codenameone-designer` and `codenameone-javase-svg` are built but not published;
-they are frozen at `cn1.designer.version` in `AbstractCN1Mojo`. After bumping that
+Some artifacts are resolved by a release at a version that is not the release's
+own -- `codenameone-designer` and `codenameone-javase-svg` at
+`cn1.designer.version`, and `cn1-builder-resources-{common,android}` at their
+pinned version. They are published nowhere but Maven Central, so they have to be
+copied into the repository once. `maven/scripts/r2/frozen-coordinates.py`
+**derives** that set from the tree; do not replace it with a hand-written list,
+which was wrong twice in its single commit of existence. After bumping any such
 pin, run the *Seed frozen artifacts to R2* workflow before the next release tag.
-The release refuses to build while the pinned version is absent from the
+The release refuses to build while a pinned version is absent from the
 repository, so the ordering is enforced rather than remembered.
 
 ### Build Server

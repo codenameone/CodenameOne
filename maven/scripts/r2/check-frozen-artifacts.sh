@@ -35,7 +35,7 @@
 # out is the one where nothing has been published yet.
 #
 # Usage: check-frozen-artifacts.sh [<artifactId>:<version> ...]
-#        defaults to the coordinates in frozen-coordinates.sh
+#        defaults to the coordinates derived by frozen-coordinates.py
 #
 # Reads only the public repository, so it needs no R2 credentials.
 #
@@ -43,12 +43,11 @@ set -euo pipefail
 
 BASE_URL="${R2_BASE_URL:-https://repo.codenameone.com/maven2}"
 
-# shellcheck source=maven/scripts/r2/frozen-coordinates.sh
-source "$(dirname "${BASH_SOURCE[0]}")/frozen-coordinates.sh"
+COORDINATES_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/frozen-coordinates.py"
 
 coordinates=("$@")
 if [ "${#coordinates[@]}" -eq 0 ]; then
-    if ! frozen_list=$(cn1_frozen_coordinates); then
+    if ! frozen_list=$(python3 "$COORDINATES_SCRIPT"); then
         exit 1
     fi
     while IFS= read -r line; do
@@ -66,23 +65,44 @@ fi
 # stale negative and block a release whose prerequisite is actually in place.
 cb="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-0}-$$"
 
+probe() {
+    local artifact="$1" version="$2" file="$3" label="$4"
+    local url code
+    url="${BASE_URL}/com/codenameone/${artifact}/${version}/${file}?cb=${cb}"
+    code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+    if [ "$code" = "200" ]; then
+        echo "ok: ${artifact}:${version} (${label})"
+    else
+        echo "MISSING on R2: ${artifact}:${version} (${label}, HTTP ${code})" >&2
+        status=1
+    fi
+}
+
 status=0
 for coordinate in "${coordinates[@]}"; do
-    artifact="${coordinate%%:*}"
-    version="${coordinate##*:}"
+    # `artifact:version[:classifier,...]`
+    artifact=$(echo "$coordinate" | cut -d: -f1)
+    version=$(echo "$coordinate" | cut -d: -f2)
+    classifiers=$(echo "$coordinate" | cut -d: -f3)
+    if [ -z "$artifact" ] || [ -z "$version" ]; then
+        echo "ERROR: malformed coordinate '${coordinate}'." >&2
+        exit 1
+    fi
+
     # The jar as well as the pom: a pom-only copy resolves during dependency
     # collection and then fails at the point of actually using the artifact, which is
     # the harder failure to read.
-    for extension in pom jar; do
-        url="${BASE_URL}/com/codenameone/${artifact}/${version}/${artifact}-${version}.${extension}?cb=${cb}"
-        code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
-        if [ "$code" = "200" ]; then
-            echo "ok: ${artifact}:${version} (${extension})"
-        else
-            echo "MISSING on R2: ${artifact}:${version} (${extension}, HTTP ${code})" >&2
-            status=1
-        fi
-    done
+    probe "$artifact" "$version" "${artifact}-${version}.pom" pom
+    probe "$artifact" "$version" "${artifact}-${version}.jar" jar
+
+    # A classified attachment is what the plugin actually consumes for the designer,
+    # so a check that stopped at the main jar would pass while the artifact the goal
+    # needs was absent.
+    if [ -n "$classifiers" ]; then
+        for classifier in $(echo "$classifiers" | tr ',' ' '); do
+            probe "$artifact" "$version" "${artifact}-${version}-${classifier}.jar" "$classifier"
+        done
+    fi
 done
 
 if [ "$status" != "0" ]; then
