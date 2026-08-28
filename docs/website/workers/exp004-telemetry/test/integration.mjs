@@ -22,16 +22,32 @@ async function snapshotIsLive(url) {
  * A cross-site Origin is refused by hasSameOriginBrowserContext before the
  * worker reads the body or reaches the counter, so this probe costs one
  * rejected request and records nothing however often the poll loop runs it.
- * Any status other than 404 means the route is serving: the worker's own
- * router cannot answer 404 for a POST to this path.
+ *
+ * Readiness is that exact 403 and its body, not merely "not a 404". A Worker
+ * whose bindings are still initializing, or an edge that is having a bad
+ * minute, answers 5xx; treating anything non-404 as ready would let waitFor
+ * return on one of those and hand the transient error straight to the first
+ * assertion -- the failure this whole probe exists to stop. Only
+ * forbidden_browser_context proves the request reached our handler and ran it.
+ *
+ * Returns null once ready, otherwise a description of what answered instead.
  */
-async function collectIsRouted(url) {
+async function collectNotReady(url) {
   const response = await post(url, {
     event: "Exp004OwnershipExposure",
     event_id: crypto.randomUUID(),
     session_key: crypto.randomUUID(),
   }, "https://example.com");
-  return response.status !== 404;
+  if (response.status !== 403) {
+    return `POST /api/exp004/collect answered ${response.status}, not the 403 the `
+      + "live handler returns for a cross-site Origin";
+  }
+  const payload = await response.json().catch(() => null);
+  if (!payload || payload.error !== "forbidden_browser_context") {
+    return "POST /api/exp004/collect answered 403 without the worker's "
+      + "forbidden_browser_context body, so something ahead of the worker refused it";
+  }
+  return null;
 }
 
 /*
@@ -56,11 +72,12 @@ async function waitFor(url, process) {
     try {
       if (!await snapshotIsLive(url)) {
         lastFailure = "GET /api/exp004/snapshot is not serving the EXP-004 snapshot yet";
-      } else if (await collectIsRouted(url)) {
-        return;
       } else {
-        lastFailure = "GET /api/exp004/snapshot is live but POST /api/exp004/collect "
-          + "still answers 404, so the route has not propagated";
+        const notReady = await collectNotReady(url);
+        if (notReady === null) {
+          return;
+        }
+        lastFailure = `GET /api/exp004/snapshot is live but ${notReady}`;
       }
     } catch (error) {
       // The local runtime or remote hostname is still becoming ready.
