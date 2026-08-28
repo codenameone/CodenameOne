@@ -499,21 +499,6 @@ public class MacImplementation extends IOSImplementation {
 
     /// @inheritDoc
     ///
-    /// False until there is an AppKit accessibility tree. The projection native
-    /// does nothing on this port, so a true answer both discarded every update
-    /// AND suppressed Component.focusGainedInternal's announcement fallback --
-    /// leaving a custom-drawn control with neither semantics nor focus
-    /// announcements. Saying no gets the fallback back.
-    ///
-    /// Exposing a custom-drawn interface to VoiceOver is a real project, and the
-    /// macOS chapter says so rather than implying it comes free.
-    @Override
-    public boolean isAccessibilityTreeSupported() {
-        return false;
-    }
-
-    /// @inheritDoc
-    ///
     /// False. The inherited check reads the OS version and says yes on macOS 11
     /// and later, but the native behind it is compiled out unless the build
     /// defines CN1_USE_APPREVIEW and links StoreKit, which this builder does
