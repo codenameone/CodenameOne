@@ -1,36 +1,36 @@
 {
-  "commit": "73aa2663eb19d39f8a1787e0d09a267868d1d257",
-  "generated_at": "2026-08-28T07:57:19Z",
+  "commit": "353a5afc198f8a668bed470c38d00afd7d25bd62",
+  "generated_at": "2026-08-28T10:27:39Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 301226000
+        "duration_ns": 328947000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 32230000
+        "duration_ns": 29684000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 124249000
+        "duration_ns": 129803000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 75998000
+        "duration_ns": 82531000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 343601000
+        "duration_ns": 382050000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 224869000
+        "duration_ns": 172583000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 193726000
+        "duration_ns": 268094000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,14 +44,14 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33141185483",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33146980544",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 2,
+    "fail": 0,
     "not-run": 0,
-    "pass": 177,
-    "skip": 3
+    "pass": 178,
+    "skip": 4
   },
   "tests": {
     "ARApiTest": {
@@ -781,18 +781,14 @@
     },
     "VideoIODecodedFramesScreenshotTest": {
       "feature": "video-decoding",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created",
-        "screenshot-missing_actual:VideoIODecodedFrames"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
       "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
+        "encode-write-failed-on-ios"
       ],
-      "status": "fail"
+      "status": "skip"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
