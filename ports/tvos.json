@@ -1,36 +1,36 @@
 {
-  "commit": "d21a3899f19c891752c527f8fa62db2efa923f68",
-  "generated_at": "2026-08-27T21:55:03Z",
+  "commit": "4ff66f36e98a9a8684448a572ae3ef7b4a6b4557",
+  "generated_at": "2026-08-28T04:09:15Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 428971000
+        "duration_ns": 586867000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 195437000
+        "duration_ns": 193306000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 229310000
+        "duration_ns": 230573000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 159847000
+        "duration_ns": 225633000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 561673000
+        "duration_ns": 582134000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 362453000
+        "duration_ns": 524875000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 812059000
+        "duration_ns": 926915000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33097261386",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/33132129941",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 173,
+    "pass": 174,
     "skip": 8
   },
   "tests": {
@@ -291,6 +291,10 @@
     },
     "DialogThemeScreenshotTest": {
       "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "DocumentProviderPublishTest": {
+      "feature": "document-provider",
       "status": "pass"
     },
     "DrawArc": {
