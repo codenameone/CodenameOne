@@ -3102,24 +3102,35 @@ static _Atomic int cn1GcNativeGcRequest = 0;
 // calloc fail on demand -- and it has now been the subject of two review findings that
 // could only be reasoned about. Gated on CN1_GC_CONFORM, like the rest of the QA
 // instrumentation, so no shipping build can be told to fail an allocation.
-static _Atomic long cn1SimulatedAllocFailures = -1;
+// The budget is a plain count with a SEPARATE one-shot initialiser. Overloading -1 as both
+// "not probed yet" and a possible value is what the first version did, and it does not
+// survive two threads: both see a positive count, one decrements 1 -> 0 and the other
+// 0 -> -1, and the next call reads -1 as the sentinel and re-reads the environment, re-arming
+// the hook. A budget that silently refills invalidates the very experiment it exists for.
+static pthread_once_t cn1AllocFailOnce = PTHREAD_ONCE_INIT;
+static _Atomic long cn1SimulatedAllocFailures = 0;
 _Atomic long cn1AllocRetries = 0;   // times the OOM path went round again
 
+static void cn1AllocFailInit(void) {
+    const char* e = getenv("CN1_SIMULATE_ALLOC_FAILURES");
+    long n = e ? atol(e) : 0;
+    atomic_store_explicit(&cn1SimulatedAllocFailures, n < 0 ? 0 : n, memory_order_relaxed);
+}
+
 static JAVA_BOOLEAN cn1ShouldFailAllocation(void) {
+    pthread_once(&cn1AllocFailOnce, cn1AllocFailInit);
+    // Decrement only while positive, so the count cannot go below zero however many
+    // threads race here.
     long v = atomic_load_explicit(&cn1SimulatedAllocFailures, memory_order_relaxed);
-    if(v < 0) {
-        const char* e = getenv("CN1_SIMULATE_ALLOC_FAILURES");
-        v = e ? atol(e) : 0;
-        if(v < 0) {
-            v = 0;
+    for(;;) {
+        if(v <= 0) {
+            return JAVA_FALSE;
         }
-        atomic_store_explicit(&cn1SimulatedAllocFailures, v, memory_order_relaxed);
+        if(atomic_compare_exchange_weak_explicit(&cn1SimulatedAllocFailures, &v, v - 1,
+                                                 memory_order_relaxed, memory_order_relaxed)) {
+            return JAVA_TRUE;
+        }
     }
-    if(v <= 0) {
-        return JAVA_FALSE;
-    }
-    return atomic_fetch_sub_explicit(&cn1SimulatedAllocFailures, 1, memory_order_relaxed) > 0
-            ? JAVA_TRUE : JAVA_FALSE;
 }
 #endif
 
