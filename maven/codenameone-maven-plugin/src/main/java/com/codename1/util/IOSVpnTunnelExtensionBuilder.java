@@ -102,12 +102,37 @@ public final class IOSVpnTunnelExtensionBuilder {
         files.put("CN1VpnTunnelProvider.m", utf8(providerSource(tunnelClass)));
         files.put("Info.plist", utf8(infoPlist(displayName, shortVersion,
                 bundleVersion)));
+        files.put(EXTENSION_NAME + ".entitlements", utf8(entitlements()));
         return files;
     }
 
     /** The bundle identifier the generated target signs under. */
     public static String bundleId(String packageName) {
         return packageName + ".vpntunnel";
+    }
+
+    /**
+     * The extension's entitlements.
+     *
+     * <p>{@code packet-tunnel-provider} is the value that makes this a
+     * packet tunnel; an extension without it is not started, and one whose
+     * App ID has not been GRANTED the entitlement fails codesigning. The
+     * grant is Apple's to give case by case, which is why the build only
+     * writes this for a project that said it holds one.</p>
+     *
+     * @return the entitlements plist
+     */
+    static String entitlements() {
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\""
+                + " \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                + "<plist version=\"1.0\">\n<dict>\n"
+                + "    <key>com.apple.developer.networking.networkextension"
+                + "</key>\n"
+                + "    <array>\n"
+                + "        <string>packet-tunnel-provider</string>\n"
+                + "    </array>\n"
+                + "</dict>\n</plist>\n";
     }
 
     static String providerHeader() {

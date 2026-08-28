@@ -181,6 +181,23 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void theExtensionCarriesTheEntitlementThatMakesItATunnel() throws Exception {
+        Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
+                "com.example.app", "My VPN", "1.0", "17",
+                "com.example.MyTunnel");
+        String ent = text(files, "CN1VpnTunnel.entitlements");
+        assertTrue(ent.contains(
+                "com.apple.developer.networking.networkextension"),
+                "without it the extension is never started");
+        assertTrue(ent.contains("packet-tunnel-provider"),
+                "and this is the value that says which kind it is");
+        // An ARRAY, not a string: this key is array-valued, and a string
+        // either fails codesigning or is dropped.
+        assertTrue(ent.contains("<array>"),
+                "the key is array-valued");
+    }
+
+    @Test
     void theBundleIdIsUnderTheHostApp() {
         // An extension's identifier has to be prefixed by the host's, or the
         // App ID cannot be created and codesigning fails.

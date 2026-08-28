@@ -132,6 +132,18 @@ final class BuildHintsIos {
                         + "alone leaves the tunnel unbuilt. Left false, the build produces no extension and "
                         + "`Tunnels.isSupported()` answers false."));
 
+        h.add(new Hint("ios.vpn.tunnel.class")
+                .group(HintGroup.IOS)
+                .type(HintType.STRING)
+                .platform("ios")
+                .doc("Which `VpnTunnel` subclass the generated packet tunnel extension runs, fully "
+                        + "qualified -- for example `com.example.MyTunnel`. Required when "
+                        + "`ios.vpn.tunnel` is true. It has to be named rather than discovered: "
+                        + "`VpnTunnel` is a class rather than an interface, so the shared class scanner "
+                        + "skips it, and an app may have several subclasses while an extension "
+                        + "runs exactly one. A wrong guess would build the wrong tunnel into the "
+                        + "extension and fail at link on a symbol nobody wrote."));
+
         h.add(new Hint("ios.call.appGroup")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

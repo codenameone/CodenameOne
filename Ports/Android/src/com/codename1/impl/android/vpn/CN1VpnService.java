@@ -117,7 +117,46 @@ public class CN1VpnService extends VpnService {
             stopSelf();
             return START_NOT_STICKY;
         }
-        String[] fields = TunnelWire.split(wire);
+        // OFF the main thread from here. establish() resolves the gateway
+        // name so it can be kept out of the routes, and a DNS lookup on the
+        // main thread is an ANR waiting for a slow network -- which is
+        // exactly the network a VPN is being started on.
+        final String[] fields = TunnelWire.split(wire);
+        final VpnTunnel starting = tunnel;
+        final int rid = requestId;
+        Thread opener = new Thread(new Opener(this, starting, fields, rid),
+                "CN1 VPN tunnel start");
+        opener.setDaemon(true);
+        opener.start();
+        return START_NOT_STICKY;
+    }
+
+    /// Establishes the link and starts the loop, off the main thread.
+    ///
+    /// A named class rather than an anonymous one so it holds no synthetic
+    /// reference to the intent or anything else the callback outlives.
+    private static final class Opener implements Runnable {
+        private final CN1VpnService service;
+        private final VpnTunnel tunnel;
+        private final String[] fields;
+        private final int requestId;
+
+        Opener(CN1VpnService service, VpnTunnel tunnel, String[] fields,
+                int requestId) {
+            this.service = service;
+            this.tunnel = tunnel;
+            this.fields = fields;
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void run() {
+            service.open(tunnel, fields, requestId);
+        }
+    }
+
+    /// The rest of the start, with DNS allowed.
+    private void open(VpnTunnel tunnel, String[] fields, int requestId) {
         ParcelFileDescriptor fd;
         try {
             fd = establish(fields);
@@ -128,14 +167,14 @@ public class CN1VpnService extends VpnService {
             fail(requestId, VpnError.INVALID_CONFIGURATION,
                     String.valueOf(refused.getMessage()));
             stopSelf();
-            return START_NOT_STICKY;
+            return;
         }
         if (fd == null) {
             fail(requestId, VpnError.UNAUTHORIZED,
                     "The VPN consent this app was granted is no longer in"
                     + " force; call Tunnels.start() again to ask for it");
             stopSelf();
-            return START_NOT_STICKY;
+            return;
         }
         // FOREGROUND before the loop starts. Android 8 shuts down an
         // ordinary started service that keeps running, so a tunnel brought
@@ -145,10 +184,6 @@ public class CN1VpnService extends VpnService {
         // notification is the price the platform charges for that.
         promote(TunnelWire.sessionName(fields));
         start(tunnel, fd, fields, requestId);
-        // NOT_STICKY here too. A tunnel is the app's to own: bringing it
-        // back without the app's tunnel object, which a restarted process
-        // does not have, would establish a link with nothing serving it.
-        return START_NOT_STICKY;
     }
 
     /// The notification channel the ongoing-tunnel notification lives in.
@@ -292,20 +327,45 @@ public class CN1VpnService extends VpnService {
         }
     }
 
-    /// The server as a bare address, or null when it is a name.
+    /// The server as a bare address, RESOLVING a host name.
     ///
-    /// A HOST NAME cannot be excluded from a route table -- routes take
-    /// addresses -- so a setup naming its server that way keeps the
-    /// behaviour it had: the app resolves it before the tunnel comes up, or
-    /// arranges its own bypass. Answering null rather than guessing is what
-    /// keeps this from excluding some unrelated address.
+    /// Routes take addresses, so a setup naming its gateway
+    /// `vpn.example.com` -- which is the ordinary way to write one -- has to
+    /// be resolved before the route table can leave it out. Returning null
+    /// for a name, as this first did, meant the common case got no exclusion
+    /// at all: the default route went in, the tunnel's own connection to its
+    /// gateway went into the TUN, and nothing moved.
+    ///
+    /// Resolution happens on the service's start thread, never the main one;
+    /// see onStartCommand.
     private static String serverAddress(String server) {
         if (server == null || server.length() == 0) {
             return null;
         }
+        if (!isLiteral(server)) {
+            try {
+                // The FIRST address only. A gateway behind several is one
+                // this cannot fully exclude, and excluding the one the
+                // transport will most likely use is better than excluding
+                // none -- but an app in that position should give the
+                // literal it dials.
+                return java.net.InetAddress.getByName(server)
+                        .getHostAddress();
+            } catch (java.io.IOException unresolved) {
+                // No DNS yet, or a name that does not resolve. The tunnel
+                // comes up without the exclusion rather than not at all,
+                // which is what it did before this existed.
+                return null;
+            }
+        }
+        return server;
+    }
+
+    /// Whether this is already an address rather than a name.
+    private static boolean isLiteral(String server) {
         if (server.indexOf(':') >= 0) {
-            // IPv6 literal; anything with a colon that is not a name.
-            return server.indexOf('.') < 0 ? server : null;
+            // An IPv6 literal; a name never carries a colon.
+            return true;
         }
         int dots = 0;
         for (int i = 0; i < server.length(); i++) {
@@ -313,10 +373,10 @@ public class CN1VpnService extends VpnService {
             if (c == '.') {
                 dots++;
             } else if (c < '0' || c > '9') {
-                return null;
+                return false;
             }
         }
-        return dots == 3 ? server : null;
+        return dots == 3;
     }
 
     /// Excludes one address from the tunnel, on a platform that can.

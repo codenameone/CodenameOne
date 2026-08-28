@@ -5319,6 +5319,22 @@ public class IPhoneBuilder extends Executor {
             // an error naming an entitlement the developer never asked for.
             customTunnelEnabled = usesCustomTunnel
                     && "true".equals(request.getArg("ios.vpn.tunnel", "false"));
+            if (customTunnelEnabled
+                    && request.getArg("ios.vpn.tunnel.class", "").trim()
+                            .length() == 0) {
+                // NAMED, not discovered. VpnTunnel is an abstract class and
+                // the shared class scanner reports interfaces, not
+                // superclasses -- and an app may legitimately have several
+                // subclasses while an extension runs exactly one. Guessing
+                // would build the wrong tunnel into the extension and fail
+                // at link with a symbol nobody wrote.
+                throw new BuildException("ios.vpn.tunnel is true, so this"
+                        + " build generates a packet tunnel extension, but"
+                        + " ios.vpn.tunnel.class does not say which"
+                        + " VpnTunnel subclass it should run. Set it to the"
+                        + " fully qualified class name, for example"
+                        + " com.example.MyTunnel.");
+            }
             if (usesCustomTunnel && !customTunnelEnabled) {
                 log("This app references com.codename1.vpn.tunnel, but"
                         + " ios.vpn.tunnel is not true, so no packet-tunnel"
@@ -6720,6 +6736,14 @@ public class IPhoneBuilder extends Executor {
                         // runs after the global deployment-target pass, so
                         // the extension keeps its own.
                         appendCallDirectoryExtensionTarget(appExtensionsBuilder,
+                                request, new File(tmpFile, "dist"));
+                    }
+
+                    if (customTunnelEnabled) {
+                        // Same ordering note as the others: after the global
+                        // deployment-target pass, so the extension keeps its
+                        // own.
+                        appendVpnTunnelExtensionTarget(appExtensionsBuilder,
                                 request, new File(tmpFile, "dist"));
                     }
 
@@ -11239,6 +11263,123 @@ public class IPhoneBuilder extends Executor {
             return null;
         }
         return value;
+    }
+
+    /**
+     * Generates the packet tunnel extension and adds it to the project.
+     *
+     * <p>Modelled on {@link #appendCallDirectoryExtensionTarget}, with one
+     * difference that matters: this target's sources are Objective-C that
+     * calls INTO the translated app. The Xcode project the translator
+     * produces compiles the whole app for every target that lists its
+     * sources, which is what puts a virtual machine inside the extension --
+     * so the generated provider can construct the application's own
+     * VpnTunnel rather than reimplementing it.</p>
+     */
+    private void appendVpnTunnelExtensionTarget(StringBuilder sb,
+            BuildRequest request, File distDir)
+            throws IOException, BuildException {
+        String name = IOSVpnTunnelExtensionBuilder.EXTENSION_NAME;
+        String displayName = request.getDisplayName() == null
+                ? name : request.getDisplayName();
+        String tunnelClass = request.getArg("ios.vpn.tunnel.class", "").trim();
+        IOSWalletExtensionBuilder.writeFileMap(
+                IOSVpnTunnelExtensionBuilder.buildFileMap(
+                        request.getPackageName(), displayName,
+                        embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request), tunnelClass),
+                new File(distDir, name));
+        log("Adding packet tunnel extension target " + name + " running "
+                + tunnelClass);
+
+        Map<String, String> buildSettingsMap =
+                new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER",
+                request.getArg(
+                        "ios.vpn.tunnel.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                        IOSVpnTunnelExtensionBuilder.bundleId(
+                                request.getPackageName())));
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS",
+                name + "/" + name + ".entitlements");
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
+                IOSVpnTunnelExtensionBuilder.DEPLOYMENT_TARGET);
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(
+                        request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
+                "$(inherited) @executable_path/Frameworks"
+                + " @executable_path/../../Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        // NOT ARC, unlike every other generated extension here. This target
+        // compiles the translated app, and ParparVM's output is manual
+        // retain-release -- the iOS port itself is built with
+        // CLANG_ENABLE_OBJC_ARC=NO for the same reason. Turning ARC on for
+        // this target would try to manage the VM's own references.
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "NO");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.vpn.tunnel.buildSettings.")) {
+                String overrideValue = request.getArg(key, "");
+                if (overrideValue.trim().length() == 0) {
+                    // A present-but-empty override is not one; see the call
+                    // directory target for the same reasoning.
+                    continue;
+                }
+                buildSettingsMap.put(
+                        key.substring("ios.vpn.tunnel.buildSettings.".length()),
+                        overrideValue);
+            }
+        }
+        String productName = effectiveExtensionProductName(
+                buildSettingsMap.get("PRODUCT_NAME"), name);
+        if (productName == null) {
+            throw new BuildException(
+                    "ios.vpn.tunnel.buildSettings.PRODUCT_NAME is \""
+                    + buildSettingsMap.get("PRODUCT_NAME") + "\", which this"
+                    + " build cannot evaluate, so it cannot know what the"
+                    + " extension's product will be called or embed it in the"
+                    + " app. Use a literal name, or $(TARGET_NAME).");
+        }
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
+                + "tunnel_target = xcproj.new_target(:app_extension, '" + name
+                + "', :ios, '"
+                + IOSVpnTunnelExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + "tunnel_target.add_system_framework('NetworkExtension')\n"
+                + "tunnel_group = xcproj.new_group('" + name + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, name), "tunnel_group",
+                "tunnel_target", distDir);
+        // The APP's own sources too. Without them the extension has no
+        // virtual machine and the provider's calls into the translated
+        // classes do not link -- which is the whole difference between this
+        // target and every other generated extension.
+        sb.append("main_app_target = xcproj.targets.find{|e|"
+                + " e.name==main_class_name}\n"
+                + "main_app_target.source_build_phase.files.each{|f|\n"
+                + "  tunnel_target.source_build_phase.add_file_reference("
+                + "f.file_ref) unless f.file_ref.nil?\n"
+                + "}\n"
+                + "main_app_target.add_dependency(tunnel_target)\n"
+                + "fileref = xcproj.groups.find{|e|"
+                + " e.display_name=='Products'}.new_file('"
+                + productName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases"
+                + ".find{|p| p.name=='Embed App Extensions'} || "
+                + "main_app_target.new_copy_files_build_phase("
+                + "'Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_phase.add_file_reference(fileref)\n");
+        sb.append("tunnel_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['"
+                    + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(
+                            buildSettingsMap.get(buildSettingKey)) + "\"\n");
+        }
+        sb.append("}\nend\n");
     }
 
     private void appendCallDirectoryExtensionTarget(StringBuilder sb,

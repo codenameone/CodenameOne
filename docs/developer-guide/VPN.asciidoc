@@ -11,8 +11,9 @@ developer account can switch on, and is what almost every app that says
 what this chapter is mostly about.
 
 The second is *shipping a tunnel of your own* that receives raw IP packets and
-decides what to do with them. **Codename One doesn't offer that**, and the
-section below says why and what to do instead.
+decides what to do with them. That's `com.codename1.vpn.tunnel`: you write the
+packet loop once, in Java, and the section below covers where it runs and the
+one difference between the platforms that you have to design around.
 
 [options="header"]
 |===
@@ -21,12 +22,13 @@ section below says why and what to do instead.
 | IPsec with a pre-shared key | yes | -- | simulated | --
 | Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
 | Always-on / on-demand | yes | yes | simulated | --
-| A tunnel your app implements | -- | -- | -- | --
+| A tunnel your app implements | yes (needs an Apple grant) | yes | simulated | --
 | Detect that some VPN is active | yes | yes | yes | --
 |===
 
-Branch on `Vpn.isSupported()` and `Vpn.getCapabilities()` rather than on the
-platform. Every callback arrives on the EDT.
+Branch on `Vpn.isSupported()` and `Vpn.getCapabilities()` for the managed
+profile, and on `Tunnels.isSupported()` for a tunnel of your own, rather than
+on the platform. Every callback arrives on the EDT.
 
 === Detecting A VPN Is A Different Question, And Already Answered
 
@@ -165,14 +167,27 @@ Every item is also callable from a test with `CN.execute("vpn:itemN")`.
 |===
 | Hint | Default | What it does
 | `ios.entitlements.com.apple.developer.networking.vpn.api` | injected as `allow-vpn` | The Personal VPN capability. Enable it on the App ID or the app won't sign.
+| `ios.vpn.tunnel` | `false` | Generate the packet tunnel extension. Set it once the App ID carries the Network Extension grant.
+| `ios.vpn.tunnel.class` | none | Which `VpnTunnel` subclass the extension runs, fully qualified. Required when `ios.vpn.tunnel` is set.
 |===
 
-Everything else is automatic: referencing `com.codename1.vpn.profile` links
-`NetworkExtension.framework` and injects the Personal VPN entitlement.
+Referencing `com.codename1.vpn.profile` links `NetworkExtension.framework` and
+injects the Personal VPN entitlement with no hint at all. A tunnel of your own
+needs the two hints above as well, and the reason is
+`com.apple.developer.networking.networkextension`.
 
-Note there's no hint for `com.apple.developer.networking.networkextension`.
-Codename One never injects it, because an entitlement an App ID doesn't carry
-fails codesigning with an error naming the entitlement and not the reason it
-appeared -- and nothing here needs it, since no packet tunnel is generated. An
-app shipping its own extension declares it through that extension's own
-entitlements file.
+Codename One never injects that entitlement from a class reference. Apple
+grants it case by case rather than self-serve, and an entitlement an App ID
+doesn't carry fails codesigning with an error naming the entitlement and not
+the reason it appeared -- so referencing the package is you asking for a
+tunnel, and `ios.vpn.tunnel=true` is you saying the App ID has the grant. Left
+unset, the build generates no extension, logs that it didn't, and
+`Tunnels.isSupported()` answers false.
+
+`ios.vpn.tunnel.class` is separate because `VpnTunnel` is a class rather than
+an interface, and an app may reasonably have several subclasses while an
+extension runs exactly one. The hint tells the build which.
+
+Android needs no hints. Referencing the package adds the `VpnService`, its
+`BIND_VPN_SERVICE` declaration and the foreground-service permissions the
+platform requires to keep a tunnel running.
