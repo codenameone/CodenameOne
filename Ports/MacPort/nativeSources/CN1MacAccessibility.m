@@ -326,6 +326,48 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
                 NSRect inWindow = [container convertRect:inView toView:nil];
                 [element setAccessibilityFrame:[container.window convertRectToScreen:inWindow]];
             }
+            // Everything the node declares that is not one of the four standard
+            // selectors, as a custom action.
+            //
+            // The UIKit projection does exactly this, and without it a node
+            // declaring longPress, expand, collapse, a clipboard operation or an
+            // application's own action ID offered VoiceOver nothing: the four
+            // selectors above did not match it, and the superclass has never
+            // heard of cn1Actions. The handler is what invokes it, so the id is
+            // captured rather than looked up again later -- the tree is rebuilt
+            // on every change and the array this came from will not be the one
+            // in place when the user chooses it.
+            NSMutableArray<NSAccessibilityCustomAction *> *custom = [NSMutableArray array];
+            for (NSDictionary *action in element.cn1Actions) {
+                NSString *actionId = [action objectForKey:@"id"];
+                if (actionId == nil
+                        || [[action objectForKey:@"enabled"] isEqual:@NO]
+                        || [actionId isEqualToString:@"activate"]
+                        || [actionId isEqualToString:@"focus"]
+                        || [actionId isEqualToString:@"increment"]
+                        || [actionId isEqualToString:@"decrement"]
+                        || [actionId isEqualToString:@"dismiss"]
+                        || [actionId isEqualToString:@"scrollForward"]
+                        || [actionId isEqualToString:@"scrollBackward"]) {
+                    continue;
+                }
+                NSString *name = CN1MacJSONValue(action, @"label");
+                if (name == nil) {
+                    name = actionId;
+                }
+                long long nodeId = element.cn1NodeId;
+                NSString *captured = actionId;
+                NSAccessibilityCustomAction *ca = [[NSAccessibilityCustomAction alloc]
+                        initWithName:name handler:^BOOL {
+                    CN1MacPerformAction(nodeId, captured);
+                    return YES;
+                }];
+                [custom addObject:ca];
+                [ca release];
+            }
+            if ([custom count] > 0) {
+                [element setAccessibilityCustomActions:custom];
+            }
             [element setAccessibilityParent:container];
             [elements addObject:element];
             [element release];

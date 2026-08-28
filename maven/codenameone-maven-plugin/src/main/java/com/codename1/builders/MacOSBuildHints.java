@@ -326,6 +326,21 @@ public class MacOSBuildHints {
         return minDeploymentTarget;
     }
 
+    /// The Xcode configuration to archive. Reads the legacy macNative. spelling
+    /// too, like every other setting here -- the builder used to look
+    /// macos.configuration up directly, so a project saying
+    /// macNative.configuration=Debug was silently archived as Release.
+    public String getConfiguration() {
+        return hint(source, "configuration", "Release");
+    }
+
+    /// The architectures to compile, as an ARCHS value. Same alias rule, and the
+    /// same defect before it: macNative.arch=x86_64 was ignored and the build
+    /// came out universal.
+    public String getArch() {
+        return hint(source, "arch", "arm64 x86_64");
+    }
+
     public String getAppCategory() {
         return appCategory;
     }

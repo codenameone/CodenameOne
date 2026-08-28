@@ -88,6 +88,39 @@ public class MacOSBuildHintsTest {
         assertTrue(h.getWarnings().isEmpty());
     }
 
+    /// The xcodebuild settings, which the builder used to read straight off the
+    /// request and so ignored the legacy spelling: a project asking for
+    /// macNative.configuration=Debug was archived as Release, and one asking for
+    /// macNative.arch=x86_64 came out universal. Both silently.
+    @Test
+    public void theXcodeSettingsHonourTheLegacySpelling() {
+        MacOSBuildHints h = parse(raw(
+                "macNative.configuration", "Debug",
+                "macNative.arch", "x86_64"), "com.example.app");
+        assertEquals("Debug", h.getConfiguration());
+        assertEquals("x86_64", h.getArch());
+    }
+
+    /// And keep their documented defaults when nobody says otherwise.
+    @Test
+    public void theXcodeSettingsHaveTheDocumentedDefaults() {
+        MacOSBuildHints h = parse(raw(), "com.example.app");
+        assertEquals("Release", h.getConfiguration());
+        assertEquals("arm64 x86_64", h.getArch());
+    }
+
+    /// The modern spelling wins here too, like everywhere else.
+    @Test
+    public void theModernXcodeSettingsWinOverTheLegacyOnes() {
+        MacOSBuildHints h = parse(raw(
+                "macNative.configuration", "Debug",
+                "macos.configuration", "Release",
+                "macNative.arch", "x86_64",
+                "macos.arch", "arm64"), "com.example.app");
+        assertEquals("Release", h.getConfiguration());
+        assertEquals("arm64", h.getArch());
+    }
+
     @Test
     public void theModernSpellingWinsOverTheLegacyOne() {
         MacOSBuildHints h = parse(raw(

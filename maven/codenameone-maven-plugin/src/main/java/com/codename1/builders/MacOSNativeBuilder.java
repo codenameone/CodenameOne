@@ -1603,7 +1603,7 @@ public class MacOSNativeBuilder extends Executor {
         cmd.add("-target");
         cmd.add(appName);
         cmd.add("-configuration");
-        cmd.add(request.getArg("macos.configuration", "Release"));
+        cmd.add(hints.getConfiguration());
         // SYMROOT/OBJROOT rather than -derivedDataPath. xcodebuild refuses
         // -derivedDataPath unless it is also given -scheme ("The flag -scheme,
         // -testProductsPath, or -xctestrun is required when specifying
@@ -1617,7 +1617,7 @@ public class MacOSNativeBuilder extends Executor {
         // Universal by default. A Mac application is expected to run on both
         // architectures, and a single-architecture build is the kind of thing
         // nobody notices until an Intel user reports it.
-        cmd.add("ARCHS=" + request.getArg("macos.arch", "arm64 x86_64"));
+        cmd.add("ARCHS=" + hints.getArch());
         cmd.add("ONLY_ACTIVE_ARCH=NO");
         cmd.add("MACOSX_DEPLOYMENT_TARGET=" + hints.getMinDeploymentTarget());
         // The identifier signing and provisioning read. Checked against a
