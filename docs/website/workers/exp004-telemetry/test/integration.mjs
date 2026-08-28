@@ -33,6 +33,32 @@ async function post(baseUrl, body, origin = "https://www.codenameone.com") {
   });
 }
 
+async function stopProcess(process) {
+  if (process.exitCode !== null || process.signalCode !== null) return;
+
+  await new Promise((resolve) => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(forceTimer);
+      clearTimeout(giveUpTimer);
+      process.off("exit", finish);
+      resolve();
+    };
+    const forceTimer = setTimeout(() => {
+      if (process.exitCode === null && process.signalCode === null) {
+        process.kill("SIGKILL");
+      }
+    }, 5_000);
+    const giveUpTimer = setTimeout(finish, 10_000);
+
+    process.once("exit", finish);
+    process.kill("SIGTERM");
+    if (process.exitCode !== null || process.signalCode !== null) finish();
+  });
+}
+
 async function verify(baseUrl) {
   const initial = await fetch(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
   assert.equal(initial.experiment_id, "EXP-004");
@@ -127,8 +153,7 @@ if (remoteUrl) {
     process.stderr.write(output);
     throw error;
   } finally {
-    wrangler.kill("SIGTERM");
-    await new Promise((resolve) => wrangler.once("exit", resolve));
+    await stopProcess(wrangler);
     await rm(persistPath, { recursive: true, force: true });
   }
 }
