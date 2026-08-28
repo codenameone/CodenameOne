@@ -4322,7 +4322,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createPeerImage___long_int_1ARRAY(CN1
 #endif
 }
 
-void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h) {
+void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, int x, int y, int w, int h, int windowId) {
 #if TARGET_OS_OSX
     // Resolved here, on the calling thread, rather than inside the block: the
     // window manager marks the active rendering view only for the duration of a
@@ -4335,29 +4335,30 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
     // on METALView, not on NSView, and an id-typed receiver would take a bad
     // selector to runtime instead of to the compiler.
     METALView *peerHost = (METALView *)CN1MacPeerHostView();
-    // A peer created during initComponentImpl, before its window has ever
-    // painted, still lands on the main surface: at that moment there is nothing
-    // that says which window it belongs to.
+    // The owning window travels WITH the peer, as an id. peerHost above answers
+    // the ACTIVE surface, which is the right view only when the peer happens to
+    // be created inside its own window's paint bracket; a peer created during
+    // initComponentImpl, before its window has ever painted, landed on the main
+    // window and was then positioned there using coordinates measured against
+    // its own -- it appeared over the main Form and took input there.
     //
-    // Re-parenting it later on a positioning pass was tried and reverted. It
-    // crashed the screenshot suite immediately after WindowModalTest, and the
-    // mechanism is inherent rather than a detail: the view is resolved on the
-    // calling thread and used from a deferred main-queue block, so a window torn
-    // down in between leaves it pointing at a view its window no longer owns --
-    // and moving a live peer into a dead window is a segfault the next time
-    // anything draws it. Every variant of the heuristic has that shape.
-    //
-    // Doing this properly means the owning window travelling WITH the peer:
-    // peerInitialized would take a window id, which is a shared-native signature
-    // change across iOS and macOS and belongs in its own change. Until then a
-    // secondary window's peer is drawn on the main surface, which is wrong but
-    // is not a crash.
+    // An id rather than a view, and looked up inside the block rather than out
+    // here. Re-parenting later on a positioning pass was tried and reverted: it
+    // crashed the screenshot suite immediately after WindowModalTest, because a
+    // view resolved on this thread and used from the deferred block points into
+    // a window that may have been torn down in between, and moving a live peer
+    // into a dead window is a segfault the next time anything draws it. An int
+    // cannot dangle, and the lookup happens on the main thread at the moment the
+    // view is used, so the window is either still there or the peer falls back.
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         CN1View* v = (BRIDGE_CAST CN1View*)((void *)(uintptr_t)peer);
         if([v superview] == nil) {
-            [(peerHost != nil ? peerHost
-                 : (METALView *)[[CodenameOne_GLViewController instance] eaglView])
+            extern NSView *CN1MacPeerHostViewForWindowId(int windowId);
+            METALView *owner = (METALView *)CN1MacPeerHostViewForWindowId(windowId);
+            [(owner != nil ? owner
+                 : (peerHost != nil ? peerHost
+                    : (METALView *)[[CodenameOne_GLViewController instance] eaglView]))
                     addPeerComponent:v];
         }
         if(w > 0 && h > 0) {

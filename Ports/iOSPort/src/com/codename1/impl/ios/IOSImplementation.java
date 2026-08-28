@@ -5360,6 +5360,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         return "file:" + path;
     }
 
+    /**
+     * The framework id of the Window a peer lives in, or -1 when it is on the main surface.
+     *
+     * <p>Native peers are real views, and which view they are added to has to be decided when they
+     * are added. The native side has only the peer and a rectangle at that point -- the owning
+     * window is not something it can recover -- so a peer created in a secondary Window was added
+     * to the main one and then positioned there using coordinates measured against its own. It
+     * appeared over the main Form and took input there.</p>
+     *
+     * <p>Resolving it late, on a later positioning pass, was tried and reverted: the view is
+     * resolved on one thread and used from a deferred main-queue block, so a window torn down in
+     * between leaves it pointing into a dead window, which is a crash the next time anything draws.
+     * An id is an int -- it carries safely into that block and is looked up on the main thread, at
+     * the moment it is used.</p>
+     */
+    private static int peerWindowId(Component cmp) {
+        if (cmp == null) {
+            return -1;
+        }
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top instanceof com.codename1.ui.Window) {
+            return ((com.codename1.ui.Window) top).getWindowId();
+        }
+        return -1;
+    }
+
     public static void capturePictureResult(String r) {
         dropEvents = false;
         if(captureCallback != null) {
@@ -8921,7 +8947,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         protected void initComponent() {
             if(nativePeer != null && nativePeer[0] != 0) {
-                nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(),
+                        getWidth(), getHeight(), peerWindowId(this));
             }
         }
 
@@ -9956,7 +9983,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected void initComponent() {
             super.initComponent();
             if(nativePeer != 0) {
-                nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+                nativeInstance.peerInitialized(nativePeer, getAbsoluteX(), getAbsoluteY(),
+                        getWidth(), getHeight(), peerWindowId(this));
                 attachToOwningWindow();
             }
         }

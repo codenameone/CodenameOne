@@ -1070,6 +1070,21 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowRequestFocus___int(CODENAME_
 /// bar belongs to AppKit, so the close button of a window blocked by a modal
 /// dialog still reached the application and disposed it. That is the exact case
 /// WindowManager.setInputEnabled documents as its reason for existing.
+/// The rendering view of the window with this framework id, or nil.
+///
+/// Native peers are added to a view, and which one has to be decided when the
+/// peer is added rather than inferred from whatever happens to be painting.
+/// Called from the main queue at the moment the peer is attached, so a window
+/// destroyed in the meantime answers nil and the peer falls back to the main
+/// surface instead of being added to a view that no longer has a window.
+NSView *CN1MacPeerHostViewForWindowId(int windowId) {
+    if (windowId < 0) {
+        return nil;
+    }
+    CN1MacWindowRecord *rec = cn1RecordForWindowId(windowId);
+    return rec != nil ? rec.view : nil;
+}
+
 void CN1MacWindowSetAcceptsKey(NSWindow *w, BOOL accepts) {
     if ([w respondsToSelector:@selector(setCn1AcceptsKey:)]) {
         [(CN1MacWindow *)w setCn1AcceptsKey:accepts];

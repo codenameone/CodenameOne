@@ -311,7 +311,11 @@ public final class IOSNative {
 
     native void updatePeerPositionSize(long peer, int x, int y, int w, int h);
     
-    native void peerInitialized(long peer, int x, int y, int w, int h);
+    // windowId is the framework id of the Window the peer lives in, or -1 for the main surface.
+    // The native side cannot work it out: it sees a view and a rectangle, and on macOS every peer
+    // whose window could not be named landed on the main window and drew there at another window's
+    // coordinates.
+    native void peerInitialized(long peer, int x, int y, int w, int h, int windowId);
 
     native void peerDeinitialized(long peer);
     native void peerSetVisible(long peer, boolean v);
