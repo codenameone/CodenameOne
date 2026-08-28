@@ -91,7 +91,7 @@ flowchart TD
     W3 --> T
 {{< /mermaid >}}
 
-The API exposes the window system through `Desktop`. `Desktop.getWindows()` lists open windows. `Desktop.getMonitors()` reports each monitor's bounds, work area, DPI, and backing scale. A window dragged between a laptop display and an external monitor updates its scale and relays out its hierarchy instead of continuing with the main display's pixel ratio.
+The API exposes the window system through `Desktop.getInstance()`. `Desktop.getInstance().getWindows()` lists open windows. `Desktop.getInstance().getMonitors()` reports each monitor's bounds, work area, DPI, and backing scale. A window dragged between a laptop display and an external monitor updates its scale and relays out its hierarchy instead of continuing with the main display's pixel ratio.
 
 ## One paint queue could not serve two windows
 

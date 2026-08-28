@@ -100,7 +100,7 @@ This mirror is best effort. A product that requires a guaranteed current value s
 `codename1.watchMain` still names the watch application entry point on both platforms:
 
 ```properties
-codename1.arg.codename1.watchMain=com.example.MyWatchApp
+codename1.watchMain=com.example.MyWatchApp
 ```
 
 Without `codename1.watchStandalone`, Android now returns:
