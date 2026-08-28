@@ -169,3 +169,6 @@ quality-report.md
 # target/classes during its build. Never committed: a generated file in git
 # conflicts on every merge and there is nothing for a hand edit to survive in.
 cn1-build-hints.json
+
+# Local wrangler state from running the website worker tests.
+.wrangler/
