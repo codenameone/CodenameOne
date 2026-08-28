@@ -982,25 +982,34 @@ public abstract class Executor {
     /// Reads the class entries of an archive inside an archive, which is where an AAR keeps them.
     private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found,
             PermScanBudget budget) throws IOException {
-        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(nested);
+        // Bounded at the source, exactly as extractNestedClassesForPermissions
+        // is. The per-entry budgets below cannot see the bytes getNextEntry()
+        // spends parsing local headers, and an enclosing AAR compresses fifty
+        // thousand near-identical headers to almost nothing -- so without this a
+        // small upload buys gigabytes of header parsing that nothing charges
+        // for. The permission scanner has had this since it was written; this
+        // scan was a weaker copy of that loop standing next to it.
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
+                new BoundedInputStream(nested, budget));
         java.util.zip.ZipEntry entry = in.getNextEntry();
         while (entry != null && !(found[0] && found[1])) {
             String name = entry.getName();
-            if (!entry.isDirectory()) {
-                // Charged before the .class test, not after it. Stepping over an
-                // entry is not free on a ZipInputStream: getNextEntry() has to
-                // inflate whatever is left of the current one before it can find
-                // the next, so an entry this scan does not want costs the same
-                // CPU as one it does. Charging only class entries left a deflate
-                // bomb under any other name -- or a million tiny ones -- entirely
-                // uncounted, which is the case entry()'s own contract already
-                // says has to be counted.
-                budget.entry(name);
-                if (name.endsWith(".class") && !isFrameworkDatabaseClass(name)) {
-                    inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
-                } else {
-                    budget.drain(in, name, entry.getSize());
-                }
+            // Charged before ANY test of what the entry is, directories
+            // included. A directory carries no payload, so neither byte budget
+            // ever reaches it, and its header is the whole cost -- which is
+            // precisely the case entry()'s own contract calls out by name.
+            budget.entry(name);
+            if (!entry.isDirectory() && name.endsWith(".class")
+                    && !isFrameworkDatabaseClass(name)) {
+                inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
+            } else {
+                // Drained rather than skipped. Stepping over an entry is not
+                // free on a ZipInputStream: getNextEntry() has to inflate
+                // whatever is left of the current one before it can find the
+                // next, so an entry this scan does not want costs the same CPU
+                // as one it does. A directory drains to nothing, which is
+                // correct and cheap.
+                budget.drain(in, name, entry.getSize());
             }
             entry = in.getNextEntry();
         }

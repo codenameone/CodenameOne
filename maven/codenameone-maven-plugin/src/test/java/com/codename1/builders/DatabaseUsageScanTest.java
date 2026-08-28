@@ -450,6 +450,48 @@ class DatabaseUsageScanTest {
                 "a nested archive read to its end reports what it actually contains");
     }
 
+    /// A directory entry costs a header to step over and carries no payload, so
+    /// neither byte budget can ever reach it. Counting only the entries with
+    /// content let a small upload -- an AAR compresses near-identical headers to
+    /// almost nothing -- ask the builder to parse an unbounded number of them,
+    /// which is the case the entry counter exists for and the one it was not
+    /// being consulted about.
+    @Test
+    void directoryEntriesInANestedArchiveAreCountedToo() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            for (int i = 0; i <= Executor.PERM_SCAN_MAX_ENTRIES; i++) {
+                innerZip.putNextEntry(new java.util.zip.ZipEntry("d" + i + "/"));
+                innerZip.closeEntry();
+            }
+            // Past the count, so it is only reached by a scan that let every
+            // directory above it through uncharged.
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Plain.class"));
+            innerZip.write(classTouchingNothing());
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "dirs.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        // Refused on the entry count, which is reported conservatively for the
+        // same reason any other refusal is: the rest is unknown.
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(),
+                "an archive refused on the entry count must not read as clean");
+    }
+
     /// A class that references nothing this scan looks for.
     private byte[] classTouchingNothing() {
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);

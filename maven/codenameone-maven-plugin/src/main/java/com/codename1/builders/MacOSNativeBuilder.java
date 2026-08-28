@@ -1972,7 +1972,10 @@ public class MacOSNativeBuilder extends Executor {
     ///
     /// No symlink following: descending through a link would delete outside the
     /// tree being removed, and a signed bundle is full of them.
-    private static void deleteRecursively(File f) throws IOException {
+    // Package-visible so a test can drive the real recursion: asserting that
+    // isSymlink answers correctly is worth little unless something also asserts
+    // that this loop acts on the answer.
+    static void deleteRecursively(File f) throws IOException {
         if (!f.exists()) {
             return;
         }
@@ -1989,8 +1992,20 @@ public class MacOSNativeBuilder extends Executor {
         }
     }
 
-    private static boolean isSymlink(File f) throws IOException {
-        return !f.getCanonicalFile().equals(f.getAbsoluteFile());
+    /// Whether this path is itself a symbolic link.
+    ///
+    /// java.nio answers this about the LAST component only, which is the whole
+    /// question. Comparing the canonical path against the absolute one answers
+    /// a different one -- "is any component of this path a link" -- and on macOS
+    /// that is true of nearly every path a build touches: /var and /tmp are
+    /// themselves links into /private, so a staging directory under
+    /// /var/folders/... canonicalises somewhere else and every ordinary
+    /// directory in it looked like a symlink. deleteRecursively then declined to
+    /// descend, and deleting a directory it had just refused to empty failed and
+    /// aborted the build -- on any build that reused a non-empty output
+    /// directory, which is every retried or incremental one.
+    private static boolean isSymlink(File f) {
+        return java.nio.file.Files.isSymbolicLink(f.toPath());
     }
 
     private void extractJarResource(String resource, File destDir) throws Exception {
