@@ -69,6 +69,18 @@ class IPhoneBuilderCallPlistValueTypeTest {
     }
 
     @Test
+    void theSelfClosingEmptyStringIsStillAString() {
+        // Both spellings. <string /> is a valid empty value, and the reader
+        // that hunted for the next "<string>" stepped straight over it --
+        // returning a LATER key's text, which was the same defect one
+        // spelling further on.
+        assertEquals("string", IPhoneBuilder.injectedPlistValueTag(
+                "<key>CN1CallAppGroup</key><string/>", "CN1CallAppGroup"));
+        assertEquals("string", IPhoneBuilder.injectedPlistValueTag(
+                "<key>CN1CallAppGroup</key><string />", "CN1CallAppGroup"));
+    }
+
+    @Test
     void aKeyThatIsNotThereHasNoValue() {
         assertNull(IPhoneBuilder.injectedPlistValueTag(
                 "<key>Other</key><string>x</string>", "CN1CallAppGroup"));

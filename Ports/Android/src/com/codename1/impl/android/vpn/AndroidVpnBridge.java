@@ -388,6 +388,25 @@ public class AndroidVpnBridge implements VpnBridge {
                     + " the other");
             return;
         }
+        // Ikev2VpnProfile.Builder cannot express a client IKE identity. Its
+        // two-argument constructor takes the server address and the SERVER's
+        // identity, and no setter carries the local one -- so a profile that
+        // asked for one provisioned with the platform's default client
+        // identity while load() went on reporting the identifier the app had
+        // supplied. A gateway that authenticates on that identity then
+        // refuses the tunnel, and nothing in the app or the profile says why.
+        // Refused for the reason the credential pair above is: a materially
+        // different configuration acknowledged as success is the worse
+        // answer.
+        if (p.getLocalIdentifier() != null
+                && p.getLocalIdentifier().length() > 0) {
+            fail(requestId, VpnError.NOT_SUPPORTED,
+                    "Android's managed VPN cannot set a local IKE identifier;"
+                    + " the platform chooses the client identity. Install the"
+                    + " profile without one, or branch on"
+                    + " Vpn.getCapabilities().");
+            return;
+        }
         if (p.getProtocol() == VpnProtocol.IPSEC) {
             // NOT_SUPPORTED, which is what VpnProtocol.IPSEC documents this
             // platform answering. The profile is not malformed -- it is

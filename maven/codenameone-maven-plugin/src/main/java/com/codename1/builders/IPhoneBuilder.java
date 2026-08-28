@@ -313,19 +313,38 @@ public class IPhoneBuilder extends Executor {
     /// wrong-typed value through unexamined.
     static String injectedPlistValueTag(String inject, String key) {
         String live = plistWithoutComments(inject);
-        int at = live.indexOf("<key>" + key + "</key>");
-        if (at < 0) {
+        int start = plistValueStart(live, key);
+        if (start < 0) {
             return null;
         }
-        int i = at + ("<key>" + key + "</key>").length();
+        int nameEnd = plistTagNameEnd(live, start);
+        return nameEnd > start + 1 ? live.substring(start + 1, nameEnd) : null;
+    }
+
+    /// The index of the `<` that opens the value element belonging to `key`,
+    /// or -1 when the fragment does not give that key a value.
+    ///
+    /// One place where "the value of this key" is decided, because every
+    /// reader that worked it out for itself got it wrong in a different way.
+    private static int plistValueStart(String live, String key) {
+        String marker = "<key>" + key + "</key>";
+        int at = live.indexOf(marker);
+        if (at < 0) {
+            return -1;
+        }
+        int i = at + marker.length();
         while (i < live.length() && Character.isWhitespace(live.charAt(i))) {
             i++;
         }
-        if (i >= live.length() || live.charAt(i) != '<') {
-            return null;
-        }
-        int start = i + 1;
-        int end = start;
+        return i < live.length() && live.charAt(i) == '<' ? i : -1;
+    }
+
+    /// The index just past the tag NAME of the element opening at `start`.
+    ///
+    /// Stops at whitespace, `/` or `>`, so `<string />`, `<string/>` and
+    /// `<string>` all give the same name.
+    private static int plistTagNameEnd(String live, int start) {
+        int end = start + 1;
         while (end < live.length()) {
             char c = live.charAt(end);
             if (c == '>' || c == '/' || Character.isWhitespace(c)) {
@@ -333,7 +352,7 @@ public class IPhoneBuilder extends Executor {
             }
             end++;
         }
-        return end > start ? live.substring(start, end) : null;
+        return end > start + 1 ? end : -1;
     }
 
     private static String appendCallPlist(String inject, String key,
