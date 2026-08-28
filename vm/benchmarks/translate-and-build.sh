@@ -39,22 +39,37 @@ for f in cn1_globals.h cn1_globals.m nativeMethods.m cn1_intrinsics.h; do
     cp "$REPO/vm/ByteCodeTranslator/src/$f" "$TRANSLATOR/$f"
 done
 
-# 3. JavaAPI classes (cached, but INVALIDATED when a source is newer than the cache).
+# 3. JavaAPI classes (cached, but INVALIDATED whenever the source set changes).
 # The presence check alone is not enough and fails in a way that looks like a VM bug: when
 # Thread.sleep(long) stopped being a native and became Java calling sleepImpl, a cache from
 # before that change still declared it native, so the translator emitted a call to
 # java_lang_Thread_sleep___long and nothing defined it -- an undefined-symbol link error in
 # generated code, with no hint that the cause was a stale directory.
+#
+# Three things invalidate it, and it takes all three. `-newer` catches an edited or added
+# source, but a DELETED one moves no remaining file's timestamp, so the cache would keep
+# serving a class whose source no longer exists -- the same stale-cache failure in a
+# different disguise. The sorted manifest catches that, and additions with it. Comparing a
+# file list rather than hashing timestamps keeps this portable: `stat` takes -f on BSD and
+# -c on Linux, and this script runs on both.
 JAVAAPI="$REPO/vm/benchmarks/target/javaapi-classes"
 JAVAAPI_STAMP="$REPO/vm/benchmarks/target/javaapi-classes.stamp"
+JAVAAPI_MANIFEST="$REPO/vm/benchmarks/target/javaapi-classes.manifest"
+mkdir -p "$REPO/vm/benchmarks/target"
+find "$REPO/vm/JavaAPI/src" -name '*.java' | sort > "$JAVAAPI_MANIFEST.now"
 if [ ! -f "$JAVAAPI/java/lang/Object.class" ] || \
-   [ -n "$(find "$REPO/vm/JavaAPI/src" -name '*.java' -newer "$JAVAAPI_STAMP" -print -quit 2>/dev/null)" ] || \
-   [ ! -f "$JAVAAPI_STAMP" ]; then
+   [ ! -f "$JAVAAPI_STAMP" ] || \
+   [ ! -f "$JAVAAPI_MANIFEST" ] || \
+   ! cmp -s "$JAVAAPI_MANIFEST" "$JAVAAPI_MANIFEST.now" || \
+   [ -n "$(find "$REPO/vm/JavaAPI/src" -name '*.java' -newer "$JAVAAPI_STAMP" -print -quit 2>/dev/null)" ]; then
     rm -rf "$JAVAAPI"
     mkdir -p "$JAVAAPI"
     "$J8/bin/javac" -nowarn -source 1.8 -target 1.8 -d "$JAVAAPI" \
-        $(find "$REPO/vm/JavaAPI/src" -name '*.java')
+        $(cat "$JAVAAPI_MANIFEST.now")
+    mv "$JAVAAPI_MANIFEST.now" "$JAVAAPI_MANIFEST"
     touch "$JAVAAPI_STAMP"
+else
+    rm -f "$JAVAAPI_MANIFEST.now"
 fi
 
 # 4. compile the benchmark class against JavaAPI only. Bench is shared with
