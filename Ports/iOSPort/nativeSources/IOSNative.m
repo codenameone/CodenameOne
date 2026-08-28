@@ -17551,21 +17551,20 @@ void cn1AccessibilityNoteClientQuery(void) {
         return;   // one transition only; this is on a UIKit query path
     }
     cn1A11yLatched = YES;
-#if TARGET_OS_OSX
-    // Never reached on the native macOS port: the callers are the UIKit views'
-    // accessibilityElements getters, and this port's rendering view exposes no
-    // accessibility tree yet.
+    // Reached on the native macOS port too, now that its rendering view
+    // publishes a tree and hangs this call off accessibilityChildren. It is the
+    // ONLY trigger there: macOS gives no running flag for Switch Control or
+    // Voice Control and posts no notification when a technology starts, so
+    // without a client query the gate would stay false and those clients would
+    // walk an empty tree.
     //
-    // The Java call is left out rather than kept unreachable, deliberately. The
-    // method is a static invoked only from C, which the dead-code pass drops --
-    // the retention rule keeps a NATIVE method alive by its symbol appearing
-    // here, not a plain static called the other way. Referencing a method that
-    // has been dropped is a link error, and the alternative -- forcing it to be
-    // retained -- would keep a callback nothing can ever invoke.
-#else
+    // The retention worry that used to keep this call out of the macOS branch
+    // was misplaced. isMethodUsedByNative asks whether the mangled symbol is a
+    // SUBSTRING of the native source text; it does not evaluate the
+    // preprocessor. The symbol appears in this file either way, so the method
+    // is retained on every Apple target regardless of which branch compiles.
     com_codename1_impl_ios_IOSImplementation_assistiveTechnologyStatusChanged__(
             CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-#endif
 }
 
 void cn1RegisterAccessibilityStatusObservers(void) {
@@ -17627,6 +17626,14 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAssistiveTechnologyActive___R_bo
     // the only assistive technology the platform lets an application ask about.
     // Switch Control and AssistiveTouch have no macOS query and no macOS
     // equivalent respectively.
+    //
+    // Which is why the latch above matters more here than on iOS rather than
+    // less: it is the whole of this port's coverage for every client that is
+    // not VoiceOver. macOS also posts no notification when a technology starts,
+    // so the latch can only come from a client asking the rendering view for
+    // its children -- see -[METALView accessibilityChildren]. Answering false
+    // from here is therefore "no VoiceOver and nobody has looked yet", not "no
+    // assistive technology".
     extern BOOL CN1MacHostIsVoiceOverRunning(void);
     return CN1MacHostIsVoiceOverRunning() ? JAVA_TRUE : JAVA_FALSE;
 #else

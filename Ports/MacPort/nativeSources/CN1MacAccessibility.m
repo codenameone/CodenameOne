@@ -296,6 +296,7 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
             cn1MacLiveValues = [[NSMutableDictionary alloc] init];
         }
         NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
+        NSMutableDictionary *byId = [NSMutableDictionary dictionaryWithCapacity:[nodes count]];
         for (NSDictionary *node in nodes) {
             CN1MacAccessibilityElement *element = [[CN1MacAccessibilityElement alloc] init];
             NSNumber *nodeId = [node objectForKey:@"id"];
@@ -389,7 +390,7 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
             if ([custom count] > 0) {
                 [element setAccessibilityCustomActions:custom];
             }
-            [element setAccessibilityParent:container];
+            [byId setObject:element forKey:nodeId];
             [elements addObject:element];
             [element release];
 
@@ -420,7 +421,50 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
         // answering NO here would hide the group and everything under it.
         [container setAccessibilityElement:YES];
         [container setAccessibilityRole:NSAccessibilityGroupRole];
-        [container setAccessibilityChildren:elements];
+        // The snapshot is a TREE, and it was being published as a flat list:
+        // every element was parented straight to the rendering view and the
+        // serialized parent/children ids were thrown away. VoiceOver reads
+        // structure out of that hierarchy, so an outline and its rows arrived as
+        // siblings -- the rotor could not step into the collection, row and
+        // column position meant nothing to navigate within, and a modal group
+        // contained nothing for focus to be trapped in.
+        for (NSDictionary *node in nodes) {
+            CN1MacAccessibilityElement *element = [byId objectForKey:[node objectForKey:@"id"]];
+            NSArray *childIds = CN1MacJSONValue(node, @"children");
+            if (element == nil || [childIds count] == 0) {
+                continue;
+            }
+            NSMutableArray *children = [NSMutableArray arrayWithCapacity:[childIds count]];
+            for (NSNumber *childId in childIds) {
+                CN1MacAccessibilityElement *child = [byId objectForKey:childId];
+                if (child != nil) {
+                    [child setAccessibilityParent:element];
+                    [children addObject:child];
+                }
+            }
+            [element setAccessibilityChildren:children];
+        }
+        // Only the roots hang off the rendering view. The second pass is not
+        // redundant: a node whose parent is not itself in this snapshot would
+        // otherwise have no path to the root and be unreachable, so anything the
+        // roots list does not account for is attached here rather than silently
+        // dropped. It also makes a snapshot with no roots at all degrade to the
+        // flat list this used to publish instead of to an empty tree.
+        NSMutableArray *top = [NSMutableArray arrayWithCapacity:[elements count]];
+        for (NSNumber *rootId in [tree objectForKey:@"roots"]) {
+            CN1MacAccessibilityElement *root = [byId objectForKey:rootId];
+            if (root != nil) {
+                [root setAccessibilityParent:container];
+                [top addObject:root];
+            }
+        }
+        for (CN1MacAccessibilityElement *orphan in elements) {
+            if ([orphan accessibilityParent] == nil) {
+                [orphan setAccessibilityParent:container];
+                [top addObject:orphan];
+            }
+        }
+        [container setAccessibilityChildren:top];
         // 256 is the framework's "the screen itself changed" flag. VoiceOver has
         // no separate screen-changed notification the way UIKit does, so both
         // cases post a layout change; the screen case also drops the remembered

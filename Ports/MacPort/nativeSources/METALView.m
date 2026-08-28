@@ -199,6 +199,25 @@ static simd_float4x4 CN1MacOrtho(float left, float right, float bottom, float to
     return YES;
 }
 
+/// The pull trigger the projection gate needs on this platform.
+///
+/// isAssistiveTechnologyActive can only read VoiceOver's preference on macOS --
+/// the platform publishes no running flag for Switch Control or Voice Control
+/// and no notification when any of them starts. So a client that is not
+/// VoiceOver got a false from that gate, AccessibilityManager.invalidate()
+/// declined to schedule a projection, and the client walked an empty tree while
+/// the port advertised accessibility support.
+///
+/// A real client asking for our children is the one signal that does not depend
+/// on a flag the platform withholds, which is exactly why the UIKit views hang
+/// the same call off their accessibilityElements getter. Latching here makes the
+/// gate answer true from then on and the tree arrive on the next projection.
+- (NSArray *)accessibilityChildren {
+    extern void cn1AccessibilityNoteClientQuery(void);
+    cn1AccessibilityNoteClientQuery();
+    return [super accessibilityChildren];
+}
+
 - (instancetype)initWithFrame:(NSRect)frameRect {
     self = [super initWithFrame:frameRect];
     if (self) {
