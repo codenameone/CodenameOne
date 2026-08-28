@@ -228,6 +228,40 @@ public class VpnWireTest {
     }
 
     @Test
+    public void ipv6IsCheckedByItsGrammarRatherThanItsAlphabet() {
+        // The v6 half started as a character test -- hex digits, colons and
+        // the dots of a mapped tail -- so "1::2::3" and ":::" passed here
+        // and failed in VpnService.Builder, which is the divergence this
+        // validation exists to remove. The grammar is small enough to write
+        // out; the several notations were an argument for care, not for
+        // stopping.
+        String[] good = {"::", "::1", "1::", "fd00::2",
+                "1:2:3:4:5:6:1.2.3.4", "::1.2.3.4", "1::1.2.3.4",
+                "2001:db8:0:0:0:0:0:1", "2001:db8::1", "1:2:3:4:5:6:7:8",
+                "1:2:3:4:5:6:7::", "::2:3:4:5:6:7:8", "fe80::1",
+                "::ffff:10.0.0.2", "64:ff9b::192.0.2.33", "FD00::AbCd"};
+        for (String host : good) {
+            TunnelWire.validateAddress(host, "route");
+        }
+        String[] bad = {"1::2::3", ":::", "1:2:3:4:5:6:7:8:9",
+                "1:2:3:4:5:6:7", "12345::", "1::g", ":1:2:3:4:5:6:7",
+                "1:2:3:4:5:6:7:", "::ffff:10.0.0.256", "::ffff:10.0.0",
+                "fe80::1%en0", "1:2:3:4:5:6:7:8::", "10.0.0.1:80",
+                // A v4 quad has to be the last group of the ADDRESS, and
+                // something ending in "::" continues with the zeros the
+                // "::" stands for. Allowing the head to end in a quad
+                // whenever the tail was empty accepted these -- found by
+                // checking the parser against an independent one rather
+                // than against the cases I had thought of.
+                "1.2.3.4::", "222.255.242.194::", "1:2:1.2.3.4::"};
+        for (String host : bad) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> TunnelWire.validateAddress(host, "route"),
+                    host + " is not an IPv6 address");
+        }
+    }
+
+    @Test
     public void anUnreadablePrefixIsRefusedRatherThanShrunk() {
         // The most dangerous answer available was the one this used to give.
         // "0.0.0.0/o" is a typo for the default route, and falling back to

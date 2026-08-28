@@ -174,34 +174,29 @@ public final class TunnelWire {
 
     /// Whether this is an IP address literal.
     ///
-    /// IPv4 is checked exactly: four dot-separated decimal octets in range.
-    /// IPv6 is checked by SHAPE -- hex digits, colons, and the dots of a
-    /// v4-mapped tail -- rather than parsed, because the address has eight
-    /// notations and a hand-written parser here would get one of them wrong
-    /// and refuse a setup that works. Core cannot borrow the platform's
-    /// parser: java.net.InetAddress is not part of the API a Codename One
-    /// application compiles against.
+    /// Both families are PARSED, not shape-checked. The v6 half was a
+    /// character test at first -- hex digits, colons and the dots of a
+    /// mapped tail -- on the reasoning that the address has several
+    /// notations and a hand-written parser would refuse one that works. That
+    /// left "1::2::3" and ":::" passing here and failing in
+    /// VpnService.Builder, which is the divergence this validation exists to
+    /// remove; and the grammar is small enough to write out, so the reasoning
+    /// was an argument for care rather than for stopping.
     ///
-    /// So a malformed v6 literal can still reach the platform, which refuses
-    /// it. What this removes is the case that actually happens -- a
-    /// hostname, or a typo, written where an address belongs.
+    /// Core cannot borrow the platform's parser: java.net.InetAddress is not
+    /// part of the API a Codename One application compiles against.
     private static boolean isAddressLiteral(String host) {
         if (host.length() == 0) {
             return false;
         }
         if (host.indexOf(':') >= 0) {
-            int colons = 0;
-            for (int i = 0; i < host.length(); i++) {
-                char c = host.charAt(i);
-                if (c == ':') {
-                    colons++;
-                } else if (c != '.' && (c < '0' || c > '9')
-                        && (c < 'a' || c > 'f') && (c < 'A' || c > 'F')) {
-                    return false;
-                }
-            }
-            return colons >= 2;
+            return isIpv6Literal(host);
         }
+        return isIpv4Literal(host);
+    }
+
+    /// Whether this is a dotted IPv4 quad: four decimal octets in range.
+    private static boolean isIpv4Literal(String host) {
         int octets = 0;
         int at = 0;
         while (at <= host.length()) {
@@ -229,6 +224,89 @@ public final class TunnelWire {
             at = dot + 1;
         }
         return octets == 4;
+    }
+
+    /// Whether this is an IPv6 literal, by the grammar rather than by its
+    /// alphabet.
+    ///
+    /// One `::` at most, standing for one or more zero groups; every other
+    /// group one to four hex digits; the last group may instead be a dotted
+    /// IPv4 quad, which counts as two. Eight groups exactly without a `::`,
+    /// and fewer than eight with one -- because `::` has to stand for at
+    /// least one group of its own.
+    ///
+    /// A zone index (`fe80::1%en0`) is refused: it names an interface on the
+    /// device that wrote it, which is not something a tunnel configuration
+    /// can carry to another one.
+    private static boolean isIpv6Literal(String host) {
+        int compress = host.indexOf("::");
+        if (compress >= 0 && host.indexOf("::", compress + 1) >= 0) {
+            return false;
+        }
+        String head = compress < 0 ? host : host.substring(0, compress);
+        String tail = compress < 0 ? "" : host.substring(compress + 2);
+        int[] counted = new int[]{0};
+        // The head may end in a v4 quad only when there is NO "::" at all.
+        // Allowing it whenever the tail was empty accepted "1.2.3.4::",
+        // where the quad is not the last group of the address -- something
+        // ending in "::" continues with the zeros the "::" stands for.
+        if (!countGroups(head, counted, compress < 0)) {
+            return false;
+        }
+        if (!countGroups(tail, counted, true)) {
+            return false;
+        }
+        return compress < 0 ? counted[0] == 8 : counted[0] < 8;
+    }
+
+    /// Adds the groups of one colon-separated run to `counted`.
+    ///
+    /// @param run       the run, which may be empty
+    /// @param counted   the running total, added to in place
+    /// @param mayEndV4  whether the last group of this run may be a dotted
+    ///                  IPv4 quad -- only the LAST group of the whole
+    ///                  address may be
+    /// @return false when the run is not a valid sequence of groups
+    private static boolean countGroups(String run, int[] counted,
+            boolean mayEndV4) {
+        if (run.length() == 0) {
+            return true;
+        }
+        int at = 0;
+        while (at <= run.length()) {
+            int colon = run.indexOf(':', at);
+            String group = colon < 0 ? run.substring(at)
+                    : run.substring(at, colon);
+            boolean last = colon < 0;
+            if (group.length() == 0) {
+                // An empty group is only ever the work of "::", which the
+                // caller has already taken out.
+                return false;
+            }
+            if (last && mayEndV4 && group.indexOf('.') >= 0) {
+                if (!isIpv4Literal(group)) {
+                    return false;
+                }
+                counted[0] += 2;
+            } else {
+                if (group.length() > 4) {
+                    return false;
+                }
+                for (int i = 0; i < group.length(); i++) {
+                    char c = group.charAt(i);
+                    if ((c < '0' || c > '9') && (c < 'a' || c > 'f')
+                            && (c < 'A' || c > 'F')) {
+                        return false;
+                    }
+                }
+                counted[0]++;
+            }
+            if (last) {
+                return true;
+            }
+            at = colon + 1;
+        }
+        return true;
     }
 
     /// The prefix half of a `host/prefix` block, REFUSING text that is not
