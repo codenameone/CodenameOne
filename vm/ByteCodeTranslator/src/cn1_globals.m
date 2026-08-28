@@ -1815,6 +1815,19 @@ static _Atomic int cn1SatbBulkInFlight = 0;
 // publishing, so no scan can interleave with one. Nothing inside the bracket can block or
 // reach a safepoint -- the allocation in cloneArray happens before it -- so a registered
 // thread cannot be paused while the collector waits for it.
+//
+// IT IS NOT FREE, and an earlier revision of this comment said it was. ObjCopyCost (40
+// million object-array copies, no allocation, so every copy takes the protocol and finds
+// the mark inactive) measures 634ms against 651ms, interleaved in one session, seven reps,
+// -DCN1_SATB_NO_BULK_HANDSHAKE for the arm without the atomics: **2.7%**. That is under
+// this host's 5% resolution as a magnitude, but the SIGN is not in doubt -- the registered
+// arm was slower in all seven pairs. What made the earlier reading "free" was comparing
+// against a number from a different session, which is the one comparison the measurement
+// notes in vm/CLAUDE.md say never to make.
+//
+// 2.7% of a loop that does nothing but copy object arrays is the worst case, and it buys a
+// hole that the sweep can reclaim a live object through. Primitive arrays never reach here
+// at all, which is where the byte[]/char[] traffic that dominates arraycopy goes.
 JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 #ifdef CN1_SATB_NO_BULK_HANDSHAKE
     return gcSatbActive ? JAVA_TRUE : JAVA_FALSE;
