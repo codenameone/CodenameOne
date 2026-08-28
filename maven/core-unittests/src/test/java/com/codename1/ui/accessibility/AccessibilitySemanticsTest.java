@@ -33,6 +33,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.Slider;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
@@ -89,6 +90,43 @@ class AccessibilitySemanticsTest extends UITestBase {
         assertEquals(AccessibilityRole.TEXT_FIELD, fieldNode.getRole());
         assertEquals("hello", fieldNode.getLabel());
         assertNotNull(fieldNode.getAction(AccessibilityAction.SET_TEXT));
+    }
+
+    /// A password field must never publish its own contents as its label.
+    ///
+    /// The label fallback exists so an unlabelled field still announces
+    /// something, and for an obscured field the only thing it has to offer is
+    /// the secret: Component.focusGainedInternal() would have the platform
+    /// speak it aloud on a port with no accessibility tree, and the node's
+    /// label carries it into the snapshot every port with one publishes. The
+    /// obscured state still has to be reported, because that is what tells a
+    /// port to use its secure-field role -- which is what stops the screen
+    /// reader echoing characters as they are typed.
+    @FormTest
+    void aPasswordFieldNeverPublishesItsContentsAsItsLabel() {
+        Form form = form();
+        TextField secret = place(form, new TextField("hunter2"), 10, 10, 200, 35);
+        secret.setConstraint(TextArea.PASSWORD);
+        TextField plain = place(form, new TextField("hunter2"), 10, 50, 200, 35);
+
+        AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+        AccessibilityNodeSnapshot secretNode = find(tree, secret);
+
+        assertNull(secretNode.getLabel(), "a password must not leak through the label");
+        assertNull(secret.getAccessibilityText(),
+                "nor through the announce-on-focus path, which reads the same method");
+        assertEquals(Boolean.TRUE, secretNode.getObscured());
+        assertNull(secretNode.getValue(), "and it is not published as a value either");
+
+        // The fallback is untouched for an ordinary field, which is the whole
+        // reason it exists.
+        assertEquals("hunter2", find(tree, plain).getLabel());
+
+        // A label the developer chose still wins -- the exclusion is only of
+        // the field's own contents, not of everything.
+        secret.setAccessibilityText("Password");
+        assertEquals("Password",
+                find(AccessibilityInspector.snapshot(form), secret).getLabel());
     }
 
     @FormTest

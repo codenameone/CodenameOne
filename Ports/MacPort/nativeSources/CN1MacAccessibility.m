@@ -159,9 +159,11 @@ static void CN1MacPerformAction(long long nodeId, NSString *actionId) {
 /// the API documents a port should do. HEADING has no NSAccessibility role at
 /// all, so it becomes static text and says "heading" in its role description --
 /// that is what VoiceOver reads out.
-static NSString *CN1MacRoleForNode(NSDictionary *node, NSString **roleDescription) {
+static NSString *CN1MacRoleForNode(NSDictionary *node, NSString **roleDescription,
+        NSString **subrole) {
     NSString *role = CN1MacJSONValue(node, @"role");
     *roleDescription = nil;
+    *subrole = nil;
     // A heading level makes a node a heading whatever its role says, which is
     // how the UIKit projection reads it too: a Label marked as level 2 is a
     // heading, and matching only the HEADING role missed every one of them.
@@ -182,6 +184,21 @@ static NSString *CN1MacRoleForNode(NSDictionary *node, NSString **roleDescriptio
     if ([role isEqualToString:@"IMAGE"]) return NSAccessibilityImageRole;
     if ([role isEqualToString:@"STATIC_TEXT"]) return NSAccessibilityStaticTextRole;
     if ([role isEqualToString:@"TEXT_FIELD"] || [role isEqualToString:@"SEARCH_FIELD"]) {
+        // The obscured state is what makes it secure, not the role: the
+        // framework reports PASSWORD as a state on an ordinary TEXT_FIELD, so
+        // matching the role alone published every password field as a plain
+        // one. The distinction is not cosmetic -- VoiceOver echoes typed
+        // characters in a text field and deliberately does not in a secure one.
+        //
+        // A SUBROLE, which is where AppKit and UIKit part company. UIKit has a
+        // secure trait on the element; AppKit keeps the role at text field and
+        // narrows it with NSAccessibilitySecureTextFieldSubrole. There is no
+        // NSAccessibilitySecureTextFieldRole to return, and reaching for one by
+        // analogy with UIKit does not compile -- which is the only reason this
+        // was caught before it shipped.
+        if ([CN1MacJSONValue(node, @"obscured") boolValue]) {
+            *subrole = NSAccessibilitySecureTextFieldSubrole;
+        }
         return NSAccessibilityTextFieldRole;
     }
     if ([role isEqualToString:@"SLIDER"]) return NSAccessibilitySliderRole;
@@ -286,9 +303,13 @@ void CN1MacAccessibilityUpdateTree(NSString *json, int changeType) {
             element.cn1Actions = CN1MacJSONValue(node, @"actions");
 
             NSString *roleDescription = nil;
-            [element setAccessibilityRole:CN1MacRoleForNode(node, &roleDescription)];
+            NSString *subrole = nil;
+            [element setAccessibilityRole:CN1MacRoleForNode(node, &roleDescription, &subrole)];
             if (roleDescription != nil) {
                 [element setAccessibilityRoleDescription:roleDescription];
+            }
+            if (subrole != nil) {
+                [element setAccessibilitySubrole:subrole];
             }
             [element setAccessibilityLabel:CN1MacJSONValue(node, @"label")];
             [element setAccessibilityValue:CN1MacValueForNode(node)];

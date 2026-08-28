@@ -957,10 +957,21 @@ public abstract class Executor {
         java.util.zip.ZipEntry entry = in.getNextEntry();
         while (entry != null && !(found[0] && found[1])) {
             String name = entry.getName();
-            if (!entry.isDirectory() && name.endsWith(".class")
-                    && !isFrameworkDatabaseClass(name)) {
+            if (!entry.isDirectory()) {
+                // Charged before the .class test, not after it. Stepping over an
+                // entry is not free on a ZipInputStream: getNextEntry() has to
+                // inflate whatever is left of the current one before it can find
+                // the next, so an entry this scan does not want costs the same
+                // CPU as one it does. Charging only class entries left a deflate
+                // bomb under any other name -- or a million tiny ones -- entirely
+                // uncounted, which is the case entry()'s own contract already
+                // says has to be counted.
                 budget.entry(name);
-                inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
+                if (name.endsWith(".class") && !isFrameworkDatabaseClass(name)) {
+                    inspectClassForDatabaseUsage(budget.readEntry(in, name, entry.getSize()), found);
+                } else {
+                    budget.drain(in, name, entry.getSize());
+                }
             }
             entry = in.getNextEntry();
         }
@@ -1384,13 +1395,6 @@ public abstract class Executor {
         }
 
         /**
-         * Copies one entry under the budget.
-         *
-         * @param declared the size the archive CLAIMS, used only to skip an entry
-         *                 without reading it. It comes out of the same untrusted
-         *                 file as the bytes, so it is a hint and never the bound.
-         */
-        /**
          * Reads one entry to its end under the budget WITHOUT keeping it.
          *
          * <p>For an entry the scan does not want, which it still cannot afford to
@@ -1439,6 +1443,13 @@ public abstract class Executor {
             return out.toByteArray();
         }
 
+        /**
+         * Copies one entry under the budget.
+         *
+         * @param declared the size the archive CLAIMS, used only to skip an entry
+         *                 without reading it. It comes out of the same untrusted
+         *                 file as the bytes, so it is a hint and never the bound.
+         */
         void copy(InputStream in, File out, String name, long declared) throws IOException {
             if (declared > PERM_SCAN_MAX_ENTRY_BYTES) {
                 throw new IOException("entry " + name + " declares " + declared

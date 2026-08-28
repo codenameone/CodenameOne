@@ -366,6 +366,83 @@ class DatabaseUsageScanTest {
         assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
     }
 
+    /// A nested archive is bounded even by the entries the scan does not want.
+    ///
+    /// Stepping over an entry is not free on a ZipInputStream: getNextEntry()
+    /// has to inflate whatever is left of the current one before it can find
+    /// the next. So a deflate bomb under a name that is not .class cost the
+    /// same CPU as one that is, while being charged nothing -- a small upload
+    /// could spin the shared build host for as long as it liked. The bomb here
+    /// is 32MB of zeroes, which deflates to a few kilobytes and is past the
+    /// 16MB per-entry ceiling.
+    ///
+    /// Asserted through a database class placed AFTER the bomb in the same
+    /// nested jar: it is not reported, which can only be true if the scan
+    /// stopped at the bomb rather than reading past it. A refused archive is
+    /// logged and skipped rather than failing the build, which is why the
+    /// assertion is on what was found and not on a thrown exception.
+    @Test
+    void aNestedArchiveIsBoundedByEntriesTheScanSkips() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("assets/bomb.bin"));
+            byte[] chunk = new byte[1024 * 1024];
+            for (int i = 0; i < 32; i++) {
+                innerZip.write(chunk);
+            }
+            innerZip.closeEntry();
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
+            innerZip.write(classCalling("rawKey"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "bomb.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesDatabase(),
+                "the scan must stop at the bomb rather than read past it");
+        assertFalse(usage.usesDatabaseCipher(), "and report nothing from beyond it");
+
+        // The same jar without the bomb still scans, so the assertion above is
+        // about the bound and not about the archive being unreadable.
+        assertTrue(new File(lib, "bomb.aar").delete());
+        java.io.ByteArrayOutputStream plainInner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream plainZip = new java.util.zip.ZipOutputStream(plainInner);
+        try {
+            plainZip.putNextEntry(new java.util.zip.ZipEntry("assets/small.bin"));
+            plainZip.write(new byte[16]);
+            plainZip.closeEntry();
+            plainZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
+            plainZip.write(classCalling("rawKey"));
+            plainZip.closeEntry();
+        } finally {
+            plainZip.close();
+        }
+        java.util.zip.ZipOutputStream ok = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "ok.aar")));
+        try {
+            ok.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            ok.write(plainInner.toByteArray());
+            ok.closeEntry();
+        } finally {
+            ok.close();
+        }
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabaseCipher(),
+                "a nested class after an ordinary skipped entry is still read");
+    }
+
     @Test
     void anExplicitlyPlainConfigIsNotEncryption() throws IOException {
         // plain() is the documented way to say a database is not encrypted. Reading a reference to
