@@ -1817,10 +1817,23 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
     CXProviderConfiguration *cfg = cn1clConfiguration();
     NSString *name = cn1clField(cfgFields, 0);
     if ([name length] > 0) {
-        // localizedName is read-only from iOS 14, where the configuration is
-        // built without a name and the bundle supplies it; setting it there
-        // would throw.
-        if (![cfg respondsToSelector:@selector(setLocalizedName:)]) {
+        // ALWAYS a replacement, because localizedName has no setter at any
+        // version. CXProviderConfiguration.h declares it
+        // `readonly ... API_DEPRECATED(ios(10.0, 14.0))`: read-only since it
+        // was introduced, and initWithLocalizedName: is the only way a name
+        // was ever supplied. What changed at 14 is that the initializer was
+        // deprecated "No longer supported" and the system takes the name
+        // from the bundle instead, so a name passed here is honoured up to
+        // 13 and ignored above it -- ios.call.providerName, which reaches
+        // the bundle, is the lever that still works there.
+        //
+        // A respondsToSelector:@selector(setLocalizedName:) test used to
+        // guard this. It reads like a runtime capability check and is not
+        // one: no version answers that selector, so it was always true, and
+        // a review reasonably concluded the branch it never took was the
+        // one iOS 12 and 13 needed. Removed rather than corrected, since
+        // there is no second branch for it to choose.
+        {
             CXProviderConfiguration *replacement =
                     [[[CXProviderConfiguration alloc] initWithLocalizedName:name] autorelease];
             // EVERYTHING the bundle configured, carried across -- not just the
@@ -1836,7 +1849,21 @@ void com_codename1_impl_ios_IOSNative_callConfigureProvider___int_java_lang_Stri
             cfg = replacement;
         }
     }
-    cfg.supportsVideo = [cn1clField(cfgFields, 1) isEqualToString:@"1"];
+    // CLAMPED to what the build can deliver, not simply taken. The
+    // capability gate above this file's getCapabilities answers video from
+    // CN1CallSupportsVideo and says in as many words that the capability and
+    // the configuration cannot be allowed to disagree -- and this line was
+    // where they did. IPhoneBuilder writes NSCameraUsageDescription only for
+    // a video build, so a runtime videoSupported(true) on an audio-only one
+    // put the provider into video while getCapabilities() withheld the bit
+    // and the bundle carried no camera purpose string; the first video call
+    // then reaches the camera prompt and iOS terminates the app.
+    //
+    // Configuration may turn video OFF -- an app that ships video and wants
+    // an audio-only session is asking for less than the build promised, and
+    // that is always safe.
+    cfg.supportsVideo = [cn1clField(cfgFields, 1) isEqualToString:@"1"]
+            && cn1clPlistBool(@"CN1CallSupportsVideo", NO);
     cfg.includesCallsInRecents =
             [cn1clField(cfgFields, 2) isEqualToString:@"1"];
     NSInteger groups = [cn1clField(cfgFields, 3) integerValue];

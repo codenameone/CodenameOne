@@ -103,7 +103,7 @@ If your VPN speaks a protocol the platforms don't implement -- anything that
 isn't IKEv2 or IPsec -- you write the packet loop yourself, in Java, once.
 Extend `VpnTunnel` and hand it to `Tunnels.start`.
 
-The loop is the same on both platforms. Where it *runs* is not, and that
+The loop is the same on both platforms. Where it *runs* differs, and that
 difference is the one thing to design around.
 
 On Android the tunnel runs inside a `VpnService` in your app's own process.
@@ -117,11 +117,12 @@ loop is your Java either way -- but the extension shares nothing else with
 the app. No statics you set, no `Display`, no open connections. Your tunnel is
 constructed fresh over there.
 
-That is why `TunnelSetup.data` exists, and it is the rule worth taking away:
+`TunnelSetup.data` exists for that reason, and the rule worth taking away
+follows from it:
 
 * Everything the tunnel needs arrives through `VpnTunnel.onStart`.
-* Anything it reaches for outside that is a static which works on Android and
-  is absent on iOS.
+* Anything it reaches for outside that becomes a static which works on
+  Android and goes missing on iOS.
 
 The iOS half also needs the
 `com.apple.developer.networking.networkextension` entitlement, which Apple
