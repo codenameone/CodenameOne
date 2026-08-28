@@ -23,12 +23,12 @@
 package com.codename1.impl.mac;
 
 import com.codename1.camera.Camera;
-import com.codename1.camera.CameraFacing;
 import com.codename1.camera.CameraInfo;
-import com.codename1.camera.CameraSession;
 import com.codename1.camera.CameraSessionOptions;
 import com.codename1.camera.CapturedPhoto;
-import com.codename1.camera.VideoRecording;
+import com.codename1.camera.PhotoCaptureOptions;
+import com.codename1.impl.CameraImpl;
+import com.codename1.util.AsyncResource;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.ui.Button;
@@ -62,17 +62,45 @@ final class MacCameraCapture {
     private MacCameraCapture() {
     }
 
-    /// Whether a capture device exists. The low level API answers this from
-    /// AVFoundation, which is the same question the Capture API is asking.
-    static boolean hasCamera() {
+    /// The camera back end, or null when this build has none.
+    ///
+    /// Reached through the implementation's own SPI rather than through the
+    /// com.codename1.camera facade, and that is not a style choice. The build
+    /// decides whether an application uses the camera by scanning for calls to
+    /// Camera.open()/getDefault()/getCameras(); if this class made those calls,
+    /// every macOS application would look like a camera application and would
+    /// ship a camera entitlement and a camera privacy string it never uses.
+    /// Going through the SPI keeps the port out of the evidence.
+    private static CameraImpl backend() {
         try {
-            return Camera.isSupported() && Camera.getDefault(CameraFacing.BACK) != null;
+            return Display.getInstance().getCameraBackend();
+        } catch (Throwable t) {
+            Log.e(t);
+            return null;
+        }
+    }
+
+    /// Whether a capture device exists, answered by AVFoundation.
+    static boolean hasCamera() {
+        CameraImpl impl = backend();
+        if (impl == null) {
+            return false;
+        }
+        try {
+            CameraInfo[] cameras = impl.enumerateCameras();
+            return cameras != null && cameras.length > 0;
         } catch (Throwable t) {
             // Never let a capability probe take the application down: an
             // application that asks whether a camera exists is by definition
             // ready to be told no.
             Log.e(t);
             return false;
+        } finally {
+            try {
+                impl.close();
+            } catch (Throwable t) {
+                Log.e(t);
+            }
         }
     }
 
@@ -104,23 +132,37 @@ final class MacCameraCapture {
     }
 
     private static void open(final ActionListener response, final boolean video) {
-        CameraInfo info = Camera.getDefault(CameraFacing.BACK);
-        if (info == null) {
+        final CameraImpl impl = backend();
+        if (impl == null) {
             respond(response, null);
             return;
         }
-        final CameraSession session;
+        CameraInfo[] cameras;
         try {
-            session = Camera.open(info, new CameraSessionOptions().captureAudio(video));
+            cameras = impl.enumerateCameras();
         } catch (Throwable t) {
             Log.e(t);
+            closeQuietly(impl);
+            respond(response, null);
+            return;
+        }
+        if (cameras == null || cameras.length == 0) {
+            closeQuietly(impl);
+            respond(response, null);
+            return;
+        }
+        try {
+            impl.open(cameras[0].getId(), new CameraSessionOptions().captureAudio(video));
+        } catch (Throwable t) {
+            Log.e(t);
+            closeQuietly(impl);
             respond(response, null);
             return;
         }
 
         final Form previous = Display.getInstance().getCurrent();
         final Form capture = new Form(video ? "Record Video" : "Take Photo", new BorderLayout());
-        capture.add(BorderLayout.CENTER, session.createView());
+        capture.add(BorderLayout.CENTER, impl.createPreviewPeer());
 
         final Button shutter = new Button(video ? "Record" : "Capture");
         Button cancel = new Button("Cancel");
@@ -130,23 +172,21 @@ final class MacCameraCapture {
         capture.add(BorderLayout.SOUTH, buttons);
 
         // One flag for both endings. The user can cancel while a photo is still
-        // being written, and both paths close the session and show the previous
+        // being written, and both paths close the back end and show the previous
         // form -- doing either twice is a closed session being closed again and a
         // form being restored over itself.
         final boolean[] finished = {false};
-
-        // Declared before Cancel so that cancelling mid-recording can reach it.
-        // Closing the session stops the capture but does not finish the file the
-        // recorder had already started writing, so a cancelled recording left a
-        // part-written mp4 in the application home for ever -- and the callback
-        // said "cancelled", so nothing downstream knew to clean it up.
-        final VideoRecording[] recording = {null};
+        // The path being recorded to, so cancelling can remove it. Closing the
+        // back end stops the capture but does not finish that file, and the
+        // callback reports a cancellation, so nothing downstream is ever told a
+        // path to clean up.
+        final String[] recordingPath = {null};
 
         cancel.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                discard(recording[0]);
-                finish(finished, session, previous, response, null);
+                discard(impl, recordingPath[0]);
+                finish(finished, impl, previous, response, null);
             }
         });
 
@@ -154,35 +194,38 @@ final class MacCameraCapture {
             shutter.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    if (recording[0] == null) {
+                    if (recordingPath[0] == null) {
                         String path = tempFile("mp4");
                         if (path == null) {
-                            finish(finished, session, previous, response, null);
+                            finish(finished, impl, previous, response, null);
                             return;
                         }
                         try {
-                            recording[0] = session.startVideoRecording(path);
+                            impl.startVideoRecording(path, true);
                         } catch (Throwable t) {
                             Log.e(t);
-                            finish(finished, session, previous, response, null);
+                            finish(finished, impl, previous, response, null);
                             return;
                         }
+                        recordingPath[0] = path;
                         shutter.setText("Stop");
                         capture.revalidate();
                         return;
                     }
-                    recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
+                    AsyncResource<String> done = new AsyncResource<String>();
+                    done.ready(new SuccessCallback<String>() {
                         @Override
                         public void onSucess(String path) {
-                            finish(finished, session, previous, response, path);
+                            finish(finished, impl, previous, response, path);
                         }
                     }).except(new SuccessCallback<Throwable>() {
                         @Override
                         public void onSucess(Throwable err) {
                             Log.e(err);
-                            finish(finished, session, previous, response, null);
+                            finish(finished, impl, previous, response, null);
                         }
                     });
+                    impl.stopVideoRecording(done);
                 }
             });
         } else {
@@ -190,18 +233,20 @@ final class MacCameraCapture {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     shutter.setEnabled(false);
-                    session.takePhoto().ready(new SuccessCallback<CapturedPhoto>() {
+                    AsyncResource<CapturedPhoto> shot = new AsyncResource<CapturedPhoto>();
+                    shot.ready(new SuccessCallback<CapturedPhoto>() {
                         @Override
                         public void onSucess(CapturedPhoto photo) {
-                            finish(finished, session, previous, response, store(photo));
+                            finish(finished, impl, previous, response, store(photo));
                         }
                     }).except(new SuccessCallback<Throwable>() {
                         @Override
                         public void onSucess(Throwable err) {
                             Log.e(err);
-                            finish(finished, session, previous, response, null);
+                            finish(finished, impl, previous, response, null);
                         }
                     });
+                    impl.takePhoto(new PhotoCaptureOptions(), shot);
                 }
             });
         }
@@ -209,28 +254,30 @@ final class MacCameraCapture {
         capture.show();
     }
 
+    private static void closeQuietly(CameraImpl impl) {
+        try {
+            impl.close();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+    }
+
     /// Stops a recording the user is abandoning and removes what it wrote.
     ///
-    /// Closing the session stops the capture, but the recorder has already been
+    /// Closing the back end stops the capture, but the recorder has already been
     /// writing to the destination and nothing else will ever finish or claim
     /// that file: the callback reports a cancellation, so no application is told
     /// a path to clean up. Stopped first so the file is closed before it is
     /// deleted -- removing one still being written is how a half-flushed file
     /// survives on some filesystems.
-    private static void discard(VideoRecording recording) {
-        if (recording == null) {
-            return;
-        }
-        String path = recording.getRequestedPath();
-        try {
-            if (recording.isRecording()) {
-                recording.stop();
-            }
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+    private static void discard(CameraImpl impl, String path) {
         if (path == null) {
             return;
+        }
+        try {
+            impl.stopVideoRecording(new AsyncResource<String>());
+        } catch (Throwable t) {
+            Log.e(t);
         }
         try {
             FileSystemStorage fs = FileSystemStorage.getInstance();
@@ -299,17 +346,13 @@ final class MacCameraCapture {
         }
     }
 
-    private static void finish(boolean[] finished, CameraSession session, Form previous,
+    private static void finish(boolean[] finished, CameraImpl impl, Form previous,
             ActionListener response, String path) {
         if (finished[0]) {
             return;
         }
         finished[0] = true;
-        try {
-            session.close();
-        } catch (Throwable t) {
-            Log.e(t);
-        }
+        closeQuietly(impl);
         if (previous != null) {
             previous.showBack();
         }

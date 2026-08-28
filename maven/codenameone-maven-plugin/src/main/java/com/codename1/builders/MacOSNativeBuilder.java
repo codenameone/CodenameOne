@@ -362,21 +362,15 @@ public class MacOSNativeBuilder extends Executor {
         boolean calendarEnabled = usesCalendar[0];
         boolean locationEnabled = usesLocation[0];
         boolean appReviewEnabled = usesAppReview[0];
-        // Always, on this port, rather than gated on the application.
-        //
-        // Every other define here is decided by scanning the application, and
-        // that cannot work for this one: the macOS Capture implementation is
-        // itself written on com.codename1.camera -- see MacCameraCapture -- so
-        // the port's own class is in the scanned set calling Camera.open(), and
-        // any scan precise enough to catch an application using the camera
-        // catches the port implementing it. Gating on the scan produced an
-        // always-on answer dressed up as a decision.
-        //
-        // So it is stated rather than inferred. The AVFoundation bridge is part
-        // of this port the way the Metal renderer is: the port's own code needs
-        // it compiled in. The cost is CN1Camera.m and the AVFoundation link in
-        // every macOS binary; the alternative is a capture API that works only
-        // when a scan happens to guess right.
+        // Unconditional, for the reason the capability scan above explains at
+        // length: com/codename1/camera/Camera#open is invoked by the framework's
+        // own Camera class, so no scan can tell an application using the low
+        // level API from the framework merely being present. The bridge is
+        // therefore compiled into every macOS binary -- CN1Camera.m plus the
+        // AVFoundation link -- rather than gated on a test that always answers
+        // yes. The PERMISSION is not: that stays on the Capture/Display signal,
+        // so an application that never opens a camera still does not ask for
+        // one.
         boolean cn1CameraEnabled = true;
         for (MacOSBuildHints.EntitlementOverrides o : channelOverrides) {
             pushEnabled = pushEnabled || o.push(false);
@@ -1521,6 +1515,27 @@ public class MacOSNativeBuilder extends Executor {
             // the camera for an audio-only recorder and the microphone for a
             // photo app -- and merely naming VideoCaptureConstraints, or asking
             // hasCamera(), declared both while opening nothing.
+            // Capture/Display only, and NOT the low level com.codename1.camera
+            // entry points, however much they deserve the same treatment.
+            //
+            // They cannot be told apart from the framework's own internals. This
+            // scan reports the class and method being INVOKED, never the class
+            // doing the invoking, and Camera.getDefault() calls getCameras(),
+            // which calls open() -- so com/codename1/camera/Camera#open appears
+            // in every build that carries the framework, which is every build.
+            // Matching it granted the camera entitlement and the camera privacy
+            // string to applications with no camera code at all, which is a
+            // worse failure than the one it was trying to fix: a privacy
+            // declaration nobody can justify, in every macOS app.
+            //
+            // Display.capturePhoto and Capture.capturePhoto have no such
+            // internal callers, which is why the test below stays honest.
+            //
+            // An application driving com.codename1.camera directly therefore has
+            // to declare the camera itself, with
+            // macos.entitlements.device.camera=true. That is a gap in what a
+            // scan can see, not a decision, and it is written here so the next
+            // person does not spend the afternoon rediscovering it.
             if (opensCamera(cls, method)) {
                 caps.usesCamera = true;
             }
