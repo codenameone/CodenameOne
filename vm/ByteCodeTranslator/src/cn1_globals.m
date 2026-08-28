@@ -10376,10 +10376,17 @@ static _Atomic int cn1StallPeakThreads = 0;
 static void cn1StallSumThreads(long long* outNs, int* outThreads) {
     long long total = 0;
     int threads = 0;
+    // The COLLECTOR is not a mutator. threadRunner marks every Java thread
+    // lightweightThread = JAVA_TRUE, the GC thread included, so counting them all put the
+    // collector in the denominator: four workers plus main plus the collector divided the
+    // aggregate stall by six thread-seconds instead of five and overstated the duty figure
+    // this instrument exists to report.
+    JAVA_OBJECT gcThread = get_static_java_lang_System_gcThreadInstance();
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         struct ThreadLocalData* t = allThreads[iter];
-        if(t != 0 && t->lightweightThread) {
+        if(t != 0 && t->lightweightThread
+           && (gcThread == JAVA_NULL || t->currentThreadObject != gcThread)) {
             total += atomic_load_explicit(&t->gcStallNs, memory_order_relaxed);
             threads++;
         }
@@ -10958,25 +10965,35 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     int byteSize = byteSizeForArray(cls);
 
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(getThreadLocalData(), src->length, cls, byteSize, src->dimensions);
-    memcpy( (*arr).data, (*src).data, arr->length * byteSize);
-    // SATB INSERTION barrier. This memcpy publishes every reference in the source into a
-    // BRAND NEW array without going through the per-element setter, so no barrier fired
-    // for any of them. The destination is by construction a fresh grace object, which is
-    // the exact case the insertion half exists for (see CN1_WRITE_BARRIER): if the source
-    // then dies, the copied-in objects are reachable only through an object the collector
-    // has already walked past, and the sweep frees them under a live reference.
+    // SATB INSERTION barrier, BEFORE the copy that publishes the references -- which is
+    // what java_lang_System_arraycopy does and what this originally did not.
     //
-    // No deletion half: the destination was allocated two lines up and holds nothing that
+    // The copy publishes every reference in the source into a BRAND NEW array without
+    // going through the per-element setter, so no barrier fires for any of them. The
+    // destination is by construction a fresh grace object, which is the exact case the
+    // insertion half exists for (see CN1_WRITE_BARRIER): if the source then dies, the
+    // copied-in objects are reachable only through an object the collector has already
+    // walked past, and the sweep frees them under a live reference.
+    //
+    // Logging AFTER the copy left a window that the flag check cannot close: the copy can
+    // publish while gcSatbActive is set, the collector can then drain the log to empty and
+    // clear the flag, and the check then reads 0 and skips -- references published during
+    // the mark, logged by nobody. Reading the SOURCE first is the same set of references
+    // and puts the log entry ahead of the publication, so clearing the flag can no longer
+    // fall between them.
+    //
+    // No deletion half: the destination was allocated one line up and holds nothing that
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
     if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
-        JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)(*arr).data;
-        for(int i = 0 ; i < arr->length ; i++) {
-            JAVA_OBJECT o = data[i];
+        JAVA_ARRAY_OBJECT* srcData = (JAVA_ARRAY_OBJECT*)(*src).data;
+        for(int i = 0 ; i < src->length ; i++) {
+            JAVA_OBJECT o = srcData[i];
             if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
         }
     }
 #endif
+    memcpy( (*arr).data, (*src).data, arr->length * byteSize);
     return (JAVA_OBJECT)arr;
 }
 

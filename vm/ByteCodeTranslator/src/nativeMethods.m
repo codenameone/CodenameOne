@@ -1758,6 +1758,12 @@ struct ThreadLocalData* getThreadLocalData() {
         // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
         // limit not yet computed" -- it is filled in lazily on first frameless entry.
         i->nativeStackLimit = 0;
+#ifdef CN1_GC_CONFORM
+        // Same reason: malloc'd, so this starts as garbage. It is summed by the probe
+        // thread every second and added to on every park, so an uninitialised value makes
+        // the [GCSTALL] duty figure arbitrary rather than merely noisy.
+        atomic_store_explicit(&i->gcStallNs, 0, memory_order_relaxed);
+#endif
 
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
