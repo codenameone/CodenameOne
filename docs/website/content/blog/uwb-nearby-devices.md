@@ -89,7 +89,7 @@ Ranging.prepareSession(RangingRole.CONTROLLER).onResult((session, err) -> {
 
 Every `RangingUpdate` field except its timestamp is optional. A peer behind the phone can report distance without direction. At the edge of radio range, both can disappear temporarily. Check `hasDistance()` and `hasDirection()` independently.
 
-Azimuth runs from -180 to 180 degrees, with zero straight ahead and positive values to the right. Elevation runs from -90 to 90. Android reports the angles. iOS reports a direction vector, and the port derives the same angles while retaining the original vector.
+Azimuth is platform-dependent, with zero straight ahead and positive values to the right. Android reports -90 to 90 degrees, so azimuth alone cannot distinguish a peer in front from one behind. iOS reports a direction vector, and the port derives a -180 to 180 degree azimuth while retaining the original vector. Elevation runs from -90 to 90 on both platforms when it is available.
 
 One session tracks one peer. This reflects Apple's `NINearbyPeerConfiguration` limit. Track several peers with several sessions.
 
