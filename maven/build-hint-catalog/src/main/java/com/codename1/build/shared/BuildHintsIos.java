@@ -123,7 +123,11 @@ final class BuildHintsIos {
                 .type(HintType.BOOLEAN)
                 .def("false")
                 .platform("ios")
-                .doc("Whether to generate the packet tunnel extension for `com.codename1.vpn.tunnel`. Two "
+                .doc("NOT SUPPORTED YET: setting this fails the build. A packet tunnel on iOS runs in a "
+                        + "Network Extension that has to carry a virtual machine, and the translation that "
+                        + "would give it one without the application shell -- which uses UIKit APIs an "
+                        + "extension may not call -- remains unwritten. `com.codename1.vpn.tunnel` runs on "
+                        + "Android; on iOS `Tunnels.isSupported()` answers false. When the iOS half lands, two "
                         + "things have to be true for a tunnel to be built: the app references the package, "
                         + "and this hint says the App ID holds "
                         + "`com.apple.developer.networking.networkextension`, which Apple grants case by case "

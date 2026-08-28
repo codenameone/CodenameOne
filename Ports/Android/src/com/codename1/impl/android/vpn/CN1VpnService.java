@@ -634,18 +634,27 @@ public class CN1VpnService extends VpnService {
             // for it. Nothing here runs when a stop caused the loop to end:
             // stopLocked has already cleared the fields, so this finds none
             // of its own and does nothing.
+            // The identity check and the teardown in ONE transition. Split,
+            // a stop-then-restart could clear the old host and publish a new
+            // one between them, and this stale loop would then tear down the
+            // tunnel that had just replaced it. Same shape as the
+            // publication in start(): the check is part of the act.
+            //
+            // QUALIFIED, because this class has its own `host` field and the
+            // unqualified name resolved to it -- a self-comparison SpotBugs
+            // caught, always true, so this would have fired after an
+            // ordinary stop too.
             boolean mine;
             synchronized (CN1VpnService.class) {
-                // QUALIFIED, because this class has its own `host` field and
-                // the unqualified name resolved to it -- comparing the field
-                // with itself, which SpotBugs caught as
-                // SA_FIELD_SELF_COMPARISON. Always true, so the teardown
-                // below would have run after an ordinary stop as well as
-                // after a dead link.
                 mine = CN1VpnService.host == this.host;
+                if (mine) {
+                    stopLocked(TunnelStopReason.NETWORK_LOST);
+                }
             }
             if (mine) {
-                stopTunnel(TunnelStopReason.NETWORK_LOST);
+                // Outside the monitor: this reaches application code and
+                // the service, neither of which may run under it.
+                Tunnels.clearRegistered();
                 service.stopSelf();
             }
         }

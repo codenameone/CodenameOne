@@ -2176,26 +2176,7 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
-                    // A packet tunnel the app implements (com.codename1.vpn.tunnel).
-        // Separate from the managed-profile flag beside it: a profile asks
-        // the OS to run its own IKEv2 client and needs no component of ours,
-        // while a tunnel is a VpnService the system binds.
-        if (usesCustomTunnel) {
-            log("VPN tunnel fragments version "
-                    + VpnManifestFragments.FRAGMENT_VERSION);
-            xPermissions = VpnManifestFragments.injectPermissions(true,
-                    xPermissions);
-            String existingApplication =
-                    request.getArg("android.xapplication", "");
-            String tunnelService = VpnManifestFragments.services(true,
-                    existingApplication);
-            if (tunnelService.length() > 0) {
-                request.putArgument("android.xapplication",
-                        existingApplication + tunnelService);
-            }
-        }
-
-        // Smart home (com.codename1.home.*). Gated on actual
+                    // Smart home (com.codename1.home.*). Gated on actual
                     // usage so the Play services home dependency and the
                     // injected bridge are only added for apps that reference
                     // the API.
@@ -2928,6 +2909,34 @@ public class AndroidGradleBuilder extends Executor {
                         existingApplication + callServices);
             }
         }
+
+        // A packet tunnel the app implements (com.codename1.vpn.tunnel).
+        //
+        // AFTER the class scan, beside the call fragments, because the flag
+        // it reads is set BY that scan. Placed earlier -- which is where it
+        // was -- it ran with usesCustomTunnel still false, nothing revisited
+        // it, and the manifest shipped without CN1VpnService or the
+        // foreground-service permissions: the whole Android half silently
+        // absent from an app that had asked for it.
+        //
+        // Separate from the managed-profile flag: a profile asks the OS to
+        // run its own IKEv2 client and needs no component of ours, while a
+        // tunnel is a VpnService the system binds.
+        if (usesCustomTunnel) {
+            log("VPN tunnel fragments version "
+                    + VpnManifestFragments.FRAGMENT_VERSION);
+            xPermissions = VpnManifestFragments.injectPermissions(true,
+                    xPermissions);
+            String existingTunnelApplication =
+                    request.getArg("android.xapplication", "");
+            String tunnelService = VpnManifestFragments.services(true,
+                    existingTunnelApplication);
+            if (tunnelService.length() > 0) {
+                request.putArgument("android.xapplication",
+                        existingTunnelApplication + tunnelService);
+            }
+        }
+
 
         // Smart home (com.codename1.home.*).
         //
