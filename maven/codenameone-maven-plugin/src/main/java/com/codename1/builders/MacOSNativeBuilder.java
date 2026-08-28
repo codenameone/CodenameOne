@@ -1448,6 +1448,56 @@ public class MacOSNativeBuilder extends Executor {
                     || method.indexOf("getDefault") > -1);
     }
 
+    /// The framework's own classes that invoke the low level camera entry
+    /// points. Their references sit in every build, because the tree this scan
+    /// reads is the application merged with the framework -- so counting them
+    /// would grant the camera entitlement and the camera privacy string to every
+    /// macOS application ever built.
+    ///
+    /// Derived by disassembling the built framework, not guessed, and pinned by
+    /// a test that fails when the set changes. That matters more than the list
+    /// being short: a new framework class that opens a camera would otherwise
+    /// silently put the entitlement back into every app, which is the failure
+    /// this exclusion exists to prevent.
+    static final String[] FRAMEWORK_CAMERA_CALLERS = {
+        // Camera.getDefault() calls getCameras(), which calls open(), so the
+        // class reaches its own entry points and appears in every build. This
+        // one was missing from a hand-disassembled first draft of the list and
+        // the test below found it immediately, which is the whole argument for
+        // that test existing.
+        "com/codename1/camera/Camera",
+        "com/codename1/ai/vision/CodeScanner",
+        "com/codename1/ai/vision/VisionCameraView",
+        "com/codename1/impl/mac/MacCameraCapture",
+    };
+
+    /// Whether {@code caller} is one of those, nested classes included -- the
+    /// scanner reports {@code Foo$Session} as its own type.
+    static boolean isFrameworkCameraCaller(String caller) {
+        if (caller == null) {
+            return false;
+        }
+        for (int iter = 0; iter < FRAMEWORK_CAMERA_CALLERS.length; iter++) {
+            String framework = FRAMEWORK_CAMERA_CALLERS[iter];
+            if (caller.equals(framework) || caller.startsWith(framework + "$")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether an APPLICATION class opens a camera through the low level
+    /// com.codename1.camera API.
+    ///
+    /// The modal Capture API is named by `#opensCamera` and needs no such care,
+    /// because nothing inside the framework calls Capture.capturePhoto. The low
+    /// level entry points do have internal callers, and the caller is the only
+    /// thing that separates "this application opens a camera" from "the
+    /// framework contains a code scanner".
+    static boolean applicationOpensCameraSession(String caller, String cls, String method) {
+        return opensCameraSession(cls, method) && !isFrameworkCameraCaller(caller);
+    }
+
     /** Whether an invoked method opens the camera. */
     static boolean opensCamera(String cls, String method) {
         if (cls == null || method == null) {
@@ -1466,9 +1516,18 @@ public class MacOSNativeBuilder extends Executor {
     /** Maps class references onto the entitlements they require. */
     private static final class CapabilityScanner implements Executor.ClassScanner {
         private final MacOSXcodeProject.MacOSCapabilities caps;
+        /// The class currently being read. Needed because the low level camera
+        /// entry points have framework callers whose references are in every
+        /// build; see applicationOpensCameraSession.
+        private String scanning;
 
         CapabilityScanner(MacOSXcodeProject.MacOSCapabilities caps) {
             this.caps = caps;
+        }
+
+        @Override
+        public void scanningType(String cls) {
+            scanning = cls;
         }
 
         @Override
@@ -1530,12 +1589,16 @@ public class MacOSNativeBuilder extends Executor {
             // Display.capturePhoto and Capture.capturePhoto have no such
             // internal callers, which is why the test below stays honest.
             //
-            // An application driving com.codename1.camera directly therefore has
-            // to declare the camera itself, with
-            // macos.entitlements.device.camera=true. That is a gap in what a
-            // scan can see, not a decision, and it is written here so the next
-            // person does not spend the afternoon rediscovering it.
-            if (opensCamera(cls, method)) {
+            // An application driving com.codename1.camera directly is caught by
+            // the caller-aware test instead: the framework classes that reach
+            // those entry points are known and excluded by name, so a reference
+            // from anywhere else is the application's own. Without it, the low
+            // level API -- which is documented, and is what the modal Capture
+            // API is built on -- produced no usage description and no
+            // entitlement, and the application was denied the first time it
+            // opened a camera.
+            if (opensCamera(cls, method)
+                    || applicationOpensCameraSession(scanning, cls, method)) {
                 caps.usesCamera = true;
             }
         }

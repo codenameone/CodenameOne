@@ -430,6 +430,22 @@ public abstract class Executor {
         public void usesClassMethod(String cls, String method);
 
         /**
+         * The class whose body the following {@code usesClass*} callbacks belong
+         * to, reported before any of them.
+         *
+         * <p>{@link #declaresType(String, String, boolean)} cannot serve: it
+         * fires at {@code visitEnd()}, after every reference in the class has
+         * already been delivered. A scanner that needs to know WHO made a
+         * reference -- rather than only what was referenced -- has nothing else
+         * to ask. That distinction is load-bearing wherever the tree being
+         * scanned is the application merged with the framework, because a
+         * framework class's own references are present in every build ever
+         * made.</p>
+         */
+        public default void scanningType(String cls) {
+        }
+
+        /**
          * Reports that {@code cls} declares {@code iface} among its
          * implemented interfaces.
          *
@@ -1785,6 +1801,10 @@ public abstract class Executor {
                         public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
                             scannedName = string;
                             scannedSuper = superName;
+                            // Announced first, before the references below and
+                            // before any method body, so a scanner can attribute
+                            // what follows to the class that made it.
+                            scanner.scanningType(string);
                             // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
                             // ACC_ABSTRACT 0x0400. A class the generated
                             // bindings construct from another package has

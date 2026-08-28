@@ -35,6 +35,125 @@ import static org.junit.Assert.assertTrue;
 public class MacOSNativeBuilderScanTest {
 
     /**
+     * The exclusion list has to match the framework it is excluding.
+     *
+     * <p>It is an exclusion of NAMES, so it decays silently in the worst
+     * direction: a new framework class that opens a camera would put the
+     * entitlement and the privacy string back into every macOS application, and
+     * nothing would say so. This disassembles the built framework and fails when
+     * the set of internal callers stops matching -- which is the moment the
+     * decision has to be made again, not months later in a store review.</p>
+     *
+     * <p>Skipped rather than failed when the framework jar is not on the test
+     * classpath, so this is a gate where it can be one and silent where it
+     * cannot, rather than a spurious failure.</p>
+     */
+    @Test
+    public void theExcludedFrameworkCallersAreTheOnesTheFrameworkActuallyHas() throws Exception {
+        java.security.CodeSource source =
+                com.codename1.camera.Camera.class.getProtectionDomain().getCodeSource();
+        org.junit.Assume.assumeTrue("the framework jar is on the test classpath",
+                source != null && source.getLocation() != null);
+        java.io.File jar = new java.io.File(source.getLocation().toURI());
+        org.junit.Assume.assumeTrue("the framework is packaged as a jar", jar.isFile());
+
+        java.util.Set<String> found = new java.util.TreeSet<String>();
+        java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jar);
+        try {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                if (!entry.getName().endsWith(".class")) {
+                    continue;
+                }
+                final String owner =
+                        entry.getName().substring(0, entry.getName().length() - ".class".length());
+                java.io.InputStream in = zip.getInputStream(entry);
+                try {
+                    new org.objectweb.asm.ClassReader(in).accept(
+                            new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                                @Override
+                                public org.objectweb.asm.MethodVisitor visitMethod(int a, String n,
+                                        String d, String sig, String[] ex) {
+                                    return new org.objectweb.asm.MethodVisitor(
+                                            org.objectweb.asm.Opcodes.ASM9) {
+                                        @Override
+                                        public void visitMethodInsn(int op, String o, String n2,
+                                                String d2, boolean itf) {
+                                            if (MacOSNativeBuilder.opensCameraSession(o, n2)) {
+                                                found.add(owner);
+                                            }
+                                        }
+                                    };
+                                }
+                            }, org.objectweb.asm.ClassReader.SKIP_FRAMES);
+                } finally {
+                    in.close();
+                }
+            }
+        } finally {
+            zip.close();
+        }
+
+        java.util.Set<String> unexcluded = new java.util.TreeSet<String>();
+        for (String caller : found) {
+            if (!MacOSNativeBuilder.isFrameworkCameraCaller(caller)) {
+                unexcluded.add(caller);
+            }
+        }
+        assertTrue("the framework gained a class that opens a camera: " + unexcluded
+                        + ". Decide whether an application linking it genuinely needs the camera "
+                        + "entitlement; if not, add it to FRAMEWORK_CAMERA_CALLERS.",
+                unexcluded.isEmpty());
+    }
+
+    /**
+     * The low level camera API counts, but only when the APPLICATION reaches it.
+     *
+     * <p>The tree this scan reads is the application merged with the framework,
+     * so a framework class's own references are present in every build ever
+     * made. Counting them would put the camera entitlement and the camera
+     * privacy string into every macOS application; not counting the application
+     * denies a documented API the entitlement it needs, and the app is refused
+     * the first time it opens a camera. The caller is the only thing that
+     * separates the two.</p>
+     */
+    @Test
+    public void theLowLevelCameraApiCountsForTheApplicationAndNotForTheFramework() {
+        assertTrue("an application opening a session opens a camera",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/example/MyForm", "com/codename1/camera/Camera", "open"));
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(
+                "com/example/MyForm", "com/codename1/camera/Camera", "getDefault"));
+        assertTrue(MacOSNativeBuilder.applicationOpensCameraSession(
+                "com/example/MyForm", "com/codename1/camera/Camera", "getCameras"));
+
+        assertFalse("the framework's own code scanner is in every build",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/codename1/ai/vision/CodeScanner",
+                        "com/codename1/camera/Camera", "open"));
+        assertFalse("nested classes of one are the same class",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/codename1/ai/vision/CodeScanner$Session",
+                        "com/codename1/camera/Camera", "open"));
+        assertFalse("and so is this port's own modal capture",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/codename1/impl/mac/MacCameraCapture",
+                        "com/codename1/camera/Camera", "open"));
+
+        // An application under the framework's own namespace is still an
+        // application: only the exact names are excluded, never a prefix.
+        assertTrue("a namespace is not an exclusion",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/codename1/ai/vision/MyOwnScanner",
+                        "com/codename1/camera/Camera", "open"));
+
+        assertFalse("asking whether a camera exists opens none",
+                MacOSNativeBuilder.applicationOpensCameraSession(
+                        "com/example/MyForm", "com/codename1/camera/Camera", "isSupported"));
+    }
+
+    /**
      * One rule serves two decisions -- the microphone entitlement and whether
      * the recorder is compiled at all -- so it is worth pinning on its own.
      * Written twice they would drift, and the drift ships an application
