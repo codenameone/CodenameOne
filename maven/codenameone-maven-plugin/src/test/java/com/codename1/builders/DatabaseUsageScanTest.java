@@ -581,6 +581,55 @@ class DatabaseUsageScanTest {
         assertFalse(seen.isEmpty(), "what was extracted before the refusal is still scanned");
     }
 
+    /// The permission budget spans the whole traversal, not one archive.
+    ///
+    /// A per-archive allowance is no cap at all when the number of archives is
+    /// chosen by whoever submitted them: each of these two stays comfortably
+    /// inside the per-entry and aggregate limits on its own, and together they
+    /// cross the entry count. The database scan was given a shared budget for
+    /// exactly this reason and this one was left behind.
+    @Test
+    void thePermissionBudgetSpansEveryArchiveInTheSubmission() throws IOException {
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory());
+        int half = Executor.PERM_SCAN_MAX_ENTRIES / 2 + 10;
+        for (String name : new String[] {"a.jar", "b.jar"}) {
+            java.util.zip.ZipOutputStream jar = new java.util.zip.ZipOutputStream(
+                    new FileOutputStream(new File(lib, name)));
+            try {
+                for (int i = 0; i < half; i++) {
+                    jar.putNextEntry(new java.util.zip.ZipEntry(name + "/d" + i + "/"));
+                    jar.closeEntry();
+                }
+            } finally {
+                jar.close();
+            }
+        }
+
+        Executor.ClassScanner ignoring = new Executor.ClassScanner() {
+            @Override
+            public void usesClass(String cls) {
+            }
+
+            @Override
+            public void usesClassMethod(String cls, String method) {
+            }
+
+            @Override
+            public void implementsInterface(String cls, String iface) {
+            }
+        };
+
+        try {
+            executor.scanClassesForPermissions(lib, ignoring);
+            fail("two archives sharing one budget must cross the entry count together");
+        } catch (IOException refused) {
+            assertTrue(refused.getMessage().contains("refusing to keep scanning")
+                            || refused.getMessage().contains("refused"),
+                    "expected the entry-count refusal, got: " + refused.getMessage());
+        }
+    }
+
     /// A class that references nothing this scan looks for.
     private byte[] classTouchingNothing() {
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);

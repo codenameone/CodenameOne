@@ -283,7 +283,8 @@ class ExecutorArchiveExtractionTest {
         try {
             IOException refused = assertThrows(IOException.class,
                     () -> Executor.scanArchiveEntriesForPermissions(
-                            zip, scratch, archive.getName(), new StringBuilder()));
+                            zip, scratch, archive.getName(), new StringBuilder(),
+                            new Executor.PermScanBudget()));
             assertTrue(refused.getMessage().contains("refusing to keep scanning"),
                     "expected the entry-count refusal, got: " + refused.getMessage());
         } finally {

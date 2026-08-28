@@ -1612,9 +1612,8 @@ public abstract class Executor {
     /// them was reachable while it lived inside an instance method on an
     /// abstract class.
     static void scanArchiveEntriesForPermissions(java.util.zip.ZipFile zip, File tmp,
-            String archiveName, StringBuilder message) throws IOException {
+            String archiveName, StringBuilder message, PermScanBudget budget) throws IOException {
         java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
-        PermScanBudget budget = new PermScanBudget();
         while (entries.hasMoreElements()) {
             java.util.zip.ZipEntry entry = entries.nextElement();
             // Charged before any branch. Skipping an entry here is cheap --
@@ -1674,7 +1673,8 @@ public abstract class Executor {
         }
     }
 
-    private void scanArchiveForPermissions(File archive, ClassScanner scanner) throws IOException {
+    private void scanArchiveForPermissions(File archive, ClassScanner scanner,
+            PermScanBudget budget) throws IOException {
         File tmp = File.createTempFile("cn1-perm-scan", ".d");
         if (!tmp.delete() || !tmp.mkdirs()) {
             return;
@@ -1684,7 +1684,7 @@ public abstract class Executor {
             try {
                 java.util.zip.ZipFile zip = new java.util.zip.ZipFile(archive);
                 try {
-                    scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message);
+                    scanArchiveEntriesForPermissions(zip, tmp, archive.getName(), message, budget);
                 } finally {
                     zip.close();
                 }
@@ -1704,7 +1704,7 @@ public abstract class Executor {
             // call used to sit inside the try, so an archive that failed on its
             // last entry threw away the answers from every entry before it --
             // classes already on disk, already parsed for, and simply dropped.
-            scanClassesForPermissions(tmp, scanner);
+            scanClassesForPermissions(tmp, scanner, budget);
             if (refused != null) {
                 // Rethrown rather than warned about, unlike an unreadable
                 // archive. That one says nothing either way and is common and
@@ -1733,10 +1733,21 @@ public abstract class Executor {
     }
 
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
+        // ONE budget for the whole traversal. It used to be created per archive,
+        // which is no cap at all when the number of archives is chosen by
+        // whoever submitted them: a hundred small bombs each stayed inside the
+        // per-archive allowance and together decompressed without limit on a
+        // shared build host. The database scan was given a shared budget for
+        // exactly this reason and this one was left behind.
+        scanClassesForPermissions(directory, scanner, new PermScanBudget());
+    }
+
+    private void scanClassesForPermissions(File directory, final ClassScanner scanner,
+            PermScanBudget budget) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {
             if (current.isDirectory()) {
-                scanClassesForPermissions(current, scanner);
+                scanClassesForPermissions(current, scanner, budget);
             } else if (current.getName().endsWith(".jar") || current.getName().endsWith(".aar")) {
                 // A submitted library can be the only thing that reaches a
                 // protected API: the application calls the cn1lib, and unzip()
@@ -1747,7 +1758,7 @@ public abstract class Executor {
                 // description -- which macOS answers by killing the process.
                 // scanForDatabaseUsage already descends into archives for the
                 // same reason; this is that rule applied to permissions.
-                scanArchiveForPermissions(current, scanner);
+                scanArchiveForPermissions(current, scanner, budget);
             } else {
                 if (current.getName().endsWith(".class")) {
                     InputStream is = new FileInputStream(current);
