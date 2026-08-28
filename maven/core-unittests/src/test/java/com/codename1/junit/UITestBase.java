@@ -71,6 +71,21 @@ public abstract class UITestBase {
     protected void setUpDisplay() throws Exception {
         DisplayTest.initInvokeAndBlockThreads();
         if (!Display.isInitialized()) {
+            // Display.init() only does anything when codenameOneRunning is false,
+            // and isInitialized() is that flag AND impl.isInitialized(). The two
+            // come apart: the previous class's EDT calls impl.deinitialize() on
+            // its way out, on whatever implementation is current BY THEN -- so if
+            // it is still leaving while this class starts, it clears the flag on
+            // the implementation this class is about to use. init() then returns
+            // without doing anything, because codenameOneRunning is still true,
+            // and every test in the class times out reporting
+            // "display-not-initialized".
+            //
+            // Clearing the flag first makes the init below real in that case, and
+            // costs nothing in the normal one where it is already false. Cheaper
+            // and more reliable than waiting for the old thread: it does not need
+            // the EDT to have noticed anything yet.
+            Display.deinitialize();
             implementation = TestCodenameOneImplementation.getInstance();
             if (implementation == null) {
                 implementation = new TestCodenameOneImplementation();
