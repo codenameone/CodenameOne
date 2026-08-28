@@ -540,6 +540,15 @@ static void cn1StartSimulatedMemoryWarnings(void) {
 // the machine is, and the same binary was measured peaking anywhere from 114MB to
 // 562MB on an idle laptop -- whereas "did backpressure engage, and on which path" is a
 // property of the code under test rather than of the runner.
+// Monotonic millisecond stamp of the most recent pacing-park iteration, and how long after
+// one the collector refuses to take its long idle.
+//
+// A RECENCY STAMP rather than a parked-thread gauge on purpose: cn1PacingPark has five
+// early returns, and a counter that leaks on any of them would pin the collector at the
+// short idle for the rest of the run. A stamp cannot leak -- it simply ages out.
+static _Atomic long long cn1PacingLastParkMs = 0;
+#define CN1_PACING_RECENT_PARK_MS 1000
+
 static _Atomic long cn1PacingParksBibop = 0;
 static _Atomic long cn1PacingParksLegacy = 0;
 // Smallest cap any thread computed this run. Park COUNTS alone cannot tell budget-derived
@@ -3598,6 +3607,36 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_GC_CONFORM
     atomic_fetch_add_explicit(&cn1GcCyclesAfterIdle, 1, memory_order_relaxed);
 #endif
+    if(!highFrequency) {
+        // DO NOT TAKE THE LONG IDLE WHILE A MUTATOR IS PARKED.
+        //
+        // Reading the request above and entering LOCK.wait(idle) back in Java are two
+        // steps, and nothing joins them. A park's in-park re-request that lands in between
+        // sets the flag on a collector that is already asleep, and it cannot notify --
+        // a parked thread must not enter a Java monitor, which is the deadlock
+        // cn1RequestGcFromParkedThread exists to avoid. With the byte demand and the
+        // high-frequency test both quiet -- exactly what a parked mutator produces, since
+        // it allocates nothing -- the collector would then sleep 30 SECONDS on a request
+        // already standing.
+        //
+        // This does not close the race; it bounds it. Closing it means moving the
+        // collector's sleep off the Java monitor onto a primitive a parked thread may
+        // signal, and that is a change to the one mechanism that has already deadlocked
+        // this collector twice. Refusing the long idle while a park is recent costs the
+        // lost request 200ms instead of 30s, on the same path a consumed request already
+        // takes.
+        //
+        // Note this returns a SHORT IDLE, not 0. Returning 0 whenever a mutator was parked
+        // is the mistake documented above: a thread parked on the process BUDGET is waiting
+        // for memory that collecting will not produce, and treating it as demand ran the
+        // collector back to back at 100% and starved the threads it was serving. A short
+        // idle only re-reads the request sooner; it forces no cycle.
+        long long lastPark = atomic_load_explicit(&cn1PacingLastParkMs, memory_order_relaxed);
+        if(lastPark != 0
+           && (long long)cn1MonotonicMillis() - lastPark < CN1_PACING_RECENT_PARK_MS) {
+            return 200;
+        }
+    }
     return highFrequency ? 200 : 30000;
 }
 
@@ -4936,6 +4975,8 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
         while(cn1PacingVolume(which) > (long long)cap &&
               get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
               spins++ < 200000) {
+            atomic_store_explicit(&cn1PacingLastParkMs, (long long)cn1MonotonicMillis(),
+                                  memory_order_relaxed);
             usleep(50);
         }
         while(threadStateData->threadBlockedByGC) {
@@ -5047,6 +5088,8 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             // monitor. See cn1RequestGcFromParkedThread.
             cn1RequestGcFromParkedThread();
         }
+        atomic_store_explicit(&cn1PacingLastParkMs, (long long)cn1MonotonicMillis(),
+                              memory_order_relaxed);
         usleep((JAVA_INT)CN1_PACING_WAIT_SLEEP_US);
         spins++;
         long headroomNow = cn1ProcessHeadroom();
@@ -10823,6 +10866,14 @@ static long long cn1StallLastNs = 0;   // previous second's summed thread stall 
 // clocks with them -- summing live threads there reports one thread and 100% duty on a
 // run that was stalled throughout. Per-cause totals survive thread death (they are
 // process-wide), so the honest denominator is the peak thread count that produced them.
+// Run-total thread-time: the integral of the live mutator count over the whole run, in
+// nanoseconds. The whole-run duty figure used peak threads times wall time, which assumes
+// every thread that ever existed simultaneously existed for the entire run -- on a workload
+// whose population changes (a burst of helpers, sequential thread-churn generations) that
+// denominator is too big and the duty it produces too high, hiding the very pauses this
+// instrument exists to report. Accumulated by the probe thread from the same slices that
+// feed the 1Hz line.
+static _Atomic long long cn1StallThreadTimeTotalNs = 0;
 static _Atomic int cn1StallPeakThreads = 0;
 
 // The aggregate mutator stall clock, and how many mutators are alive to have earned it.
@@ -10902,11 +10953,21 @@ static void cn1ReportStalls(void) {
     // figure deliberately leaves out. See cn1StallMutatorNs.
     long long totalNs = atomic_load_explicit(&cn1StallMutatorNs, memory_order_relaxed);
     int threads = atomic_load_explicit(&cn1StallPeakThreads, memory_order_relaxed);
-    fprintf(stderr, "[GCSTALL] wallMs=%lld threads=%d threadStallMs=%lld dutyPct=%.1f"
-                    " cyclesOnDemand=%ld cyclesAfterIdle=%ld\n",
-            wallMs, threads, totalNs / 1000000LL,
-            (wallMs > 0 && threads > 0)
-                ? 100.0 * (1.0 - ((double)totalNs / 1000000.0) / ((double)wallMs * threads))
+    // Divide by accumulated THREAD-TIME, not peak threads times wall time. See
+    // cn1StallThreadTimeTotalNs. It is zero only when the probe thread never ran (the
+    // emitters off), in which case there is no integral to use and the old approximation
+    // is all there is -- it is reported with the peak count beside it, so a reader can see
+    // which one they are looking at.
+    long long threadTimeNs = atomic_load_explicit(&cn1StallThreadTimeTotalNs,
+                                                  memory_order_relaxed);
+    if(threadTimeNs <= 0) {
+        threadTimeNs = (long long)wallMs * 1000000LL * threads;
+    }
+    fprintf(stderr, "[GCSTALL] wallMs=%lld threads=%d threadMs=%lld threadStallMs=%lld"
+                    " dutyPct=%.1f cyclesOnDemand=%ld cyclesAfterIdle=%ld\n",
+            wallMs, threads, threadTimeNs / 1000000LL, totalNs / 1000000LL,
+            (threadTimeNs > 0)
+                ? 100.0 * (1.0 - (double)totalNs / (double)threadTimeNs)
                 : -1.0,
             atomic_load_explicit(&cn1GcCyclesOnDemand, memory_order_relaxed),
             atomic_load_explicit(&cn1GcCyclesAfterIdle, memory_order_relaxed));
@@ -10985,6 +11046,9 @@ static void* cn1GcProbeThread(void* ignored) {
                     int liveNow = 0;
                     cn1StallSumThreads(&unusedNs, &liveNow);
                     cn1StallThreadTimeNs += (long long)liveNow * sliceMs * 1000000LL;
+                    atomic_fetch_add_explicit(&cn1StallThreadTimeTotalNs,
+                                              (long long)liveNow * sliceMs * 1000000LL,
+                                              memory_order_relaxed);
                     // Track the peak here rather than at emit time: the whole-run
                     // [GCSTALL] line divides by it, and a run shorter than one emit
                     // interval would otherwise report threads=0 and dutyPct=-1.
