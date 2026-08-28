@@ -121,10 +121,15 @@ NOTE: This target replaced a Mac Catalyst build, which produced a UIKit applicat
 
 [NOTE]
 ====
-A few device capabilities have no macOS counterpart and are inert rather than
-emulated: motion sensors, orientation locking, SMS, and background task
-scheduling. `Display` reports each of them as unsupported, so an application
-that checks before using one behaves correctly without a Mac-specific branch.
+A few device capabilities are inert rather than emulated: motion sensors,
+orientation locking, SMS, and background task scheduling have no macOS
+counterpart, and location isn't wired to Core Location yet, so
+`LocationManager` is unavailable and `MapComponent` can't centre on the user.
+`Display` reports each of them as unsupported, so an application that checks
+before using one behaves correctly without a Mac-specific branch. The build
+won't ask for a location entitlement on their behalf either: an application
+that merely references the location API is never made to explain a permission
+it can't use.
 
 Accessibility is partly wired. Codename One builds a portable semantics tree for
 its lightweight components -- see <<_accessibility_semantics>> -- and this port

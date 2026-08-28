@@ -974,14 +974,30 @@ public class MacOSNativeBuilder extends Executor {
         out.usesCamera = scanned.usesCamera;
         out.usesMicrophone = scanned.usesMicrophone;
         out.usesBluetooth = scanned.usesBluetooth;
-        out.usesLocation = scanned.usesLocation;
+        // Location is deliberately NOT taken from the scan on this port.
+        //
+        // The scan is right that the application references location, and the
+        // port still cannot serve it: MacImplementation.getLocationManager()
+        // returns null and there is no Core Location native here at all. Seeding
+        // from the scan therefore put a location entitlement and a location
+        // privacy string into the bundle of an application that can never ask
+        // for a fix -- a privacy-sensitive capability declared for a feature
+        // that does not exist, which is exactly what App Store review and a
+        // user reading the privacy label are entitled to ask about.
+        //
+        // An explicit override still turns it on, for a project whose own native
+        // interface talks to Core Location: false is passed as the DETECTED
+        // value below, so an unset override stays off while an explicit ON does
+        // not. When this port grows a location backend, this seeds from the scan
+        // again like its neighbours.
+        out.usesLocation = false;
         out.usesServerSockets = scanned.usesServerSockets;
         for (String channel : hints.getChannels()) {
             MacOSBuildHints.EntitlementOverrides o = hints.entitlementsFor(channel);
             out.usesCamera |= o.camera(scanned.usesCamera);
             out.usesMicrophone |= o.microphone(scanned.usesMicrophone);
             out.usesBluetooth |= o.bluetooth(scanned.usesBluetooth);
-            out.usesLocation |= o.location(scanned.usesLocation);
+            out.usesLocation |= o.location(false);
             out.usesServerSockets |= o.networkServer(scanned.usesServerSockets);
         }
         return out;
