@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ToolbarTest extends UITestBase {
     private static final int LIGHT_COLOR = 0xff0000;
     private static final int DARK_COLOR = 0x00ff00;
+    private static final int FORM_MANAGER_COLOR = 0x0000ff;
 
     private boolean originalOnTop;
     private boolean originalPermanent;
@@ -591,6 +592,46 @@ class ToolbarTest extends UITestBase {
         toolbar.closeSideMenu();
         form.getAnimationManager().flush();
         flushSerialCalls();
+    }
+
+    /// A form can carry its own UIManager. A closed side menu has no parent, so
+    /// Component.getUIManager falls back to the global singleton for it -- and
+    /// refreshing it against the global theme would reopen it in a theme the
+    /// rest of the form is not using.
+    @FormTest
+    void closedOnTopSideMenuResolvesAgainstTheFormsUIManager() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        UIManager formManager = UIManager.createInstance();
+        java.util.Hashtable formTheme = new java.util.Hashtable();
+        formTheme.put("SideCommand.fgColor", hex(FORM_MANAGER_COLOR));
+        formTheme.put("SideNavigationPanel.bgColor", hex(FORM_MANAGER_COLOR));
+        formManager.addThemeProps(formTheme);
+
+        Form form = new Form("t", new BorderLayout());
+        form.setUIManager(formManager);
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+
+        form.refreshTheme(true);
+        flushSerialCalls();
+
+        assertEquals(FORM_MANAGER_COLOR, b.getUnselectedStyle().getFgColor(),
+                "A closed side menu must resolve against the form's UIManager, "
+                        + "not the global one");
     }
 
     /// An app may call the public refreshTheme on the toolbar itself, with no

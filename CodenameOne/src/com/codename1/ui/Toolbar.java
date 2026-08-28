@@ -3071,6 +3071,16 @@ public class Toolbar extends Container {
     /// so that a font or padding change is applied the next time it is shown
     /// rather than on the first interaction after that.
     ///
+    /// A form may carry its own `UIManager`. `Component#getUIManager()` finds
+    /// it by walking up to the form, which a closed side menu cannot do -- it
+    /// has no parent, so it falls back to the global singleton and would be
+    /// re-styled from the wrong theme, then reopen looking unlike the form it
+    /// belongs to. Pin the toolbar's manager onto it first. Pinning on every
+    /// refresh rather than once keeps it correct across a later
+    /// `Form#setUIManager(UIManager)`, which refreshes as it assigns. An
+    /// attached menu is left alone: its parent chain already answers, and the
+    /// hierarchy is the more authoritative source.
+    ///
     /// #### Parameters
     ///
     /// - `cnt`: the side menu container, null when that menu was never built
@@ -3079,6 +3089,10 @@ public class Toolbar extends Container {
     private void refreshSideMenuTheme(Container cnt, boolean merge) {
         if (cnt == null) {
             return;
+        }
+        UIManager uim = getUIManager();
+        if (cnt.getComponentForm() == null && cnt.getUIManager() != uim) { //NOPMD CompareObjectsWithEquals
+            cnt.setUIManager(uim);
         }
         cnt.refreshTheme(merge);
         cnt.revalidate();
