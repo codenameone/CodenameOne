@@ -3082,10 +3082,19 @@ static _Atomic int cn1BibopGcScheduled = 0;
 // lost is the notify, and only when the collector happens to be inside LOCK.wait() -- in
 // which case the wait is the 200ms high-frequency one, because a mutator parked on the
 // pacing cap means allocation was heavy. A bounded 200ms late request, against a deadlock.
+// The request itself, as an ATOMIC of our own rather than a write to System.forceGc.
+//
+// forceGc is a non-volatile Java static, so the translator emits plain storage for it and a
+// plain store from a mutator against the collector's plain read is a data race: nothing
+// orders the two, and a compiler is free to keep the collector's copy in a register across
+// its loop. The Java System.gc() path does not have that problem because it writes the
+// field under synchronized(LOCK) -- which is exactly the monitor a parked thread must not
+// enter. So the parked path gets its own release/acquire flag, and gcIdleWaitMillis
+// consumes it alongside forceGc.
+static _Atomic int cn1GcNativeGcRequest = 0;
+
 static void cn1RequestGcFromParkedThread(void) {
-    // A plain store, and nothing else. Not startGCThread() either -- that is Java as well,
-    // and the callers' loop conditions already test gcThreadInstance for a dead collector.
-    set_static_java_lang_System_forceGc(JAVA_TRUE);
+    atomic_store_explicit(&cn1GcNativeGcRequest, 1, memory_order_release);
 }
 
 // Upper bound on the pending-table wait in codenameOneGcMalloc, in milliseconds of
@@ -3149,6 +3158,12 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
     // counter accumulate across a whole busy period and then misreport the first quiet one.
     JAVA_BOOLEAN highFrequency = java_lang_System_isHighFrequencyGC___R_boolean(threadStateData);
     JAVA_BOOLEAN forced = get_static_java_lang_System_forceGc();
+    // Consume the native request unconditionally, so it can never linger into a later pass
+    // and force a cycle nobody is waiting for. Acquire pairs with the release store in
+    // cn1RequestGcFromParkedThread.
+    if(atomic_exchange_explicit(&cn1GcNativeGcRequest, 0, memory_order_acquire)) {
+        forced = JAVA_TRUE;
+    }
     if(forced) {
         set_static_java_lang_System_forceGc(JAVA_FALSE);
         // Ablation arm: -DCN1_GC_NO_DEMAND_SIGNAL restores BOTH halves of the old
@@ -4625,15 +4640,15 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
             atomic_fetch_add_explicit(&cn1PacingVolumeParks, 1, memory_order_relaxed);
         }
     }
-    // Ask ONCE while still ACTIVE, so the request carries a notify. Everything below runs
+    // Ask ONCE while still ACTIVE, so the request carries a NOTIFY. Everything below runs
     // parked, and a parked thread must not enter a Java monitor (see
-    // cn1RequestGcFromParkedThread), so the in-park re-requests are plain stores that
-    // reach the collector only at the top of its next loop pass. That is enough to keep an
-    // ALREADY-RUNNING collector going, and not enough to wake a sleeping one: a parked
-    // thread allocates nothing, so isHighFrequencyGC() reads quiet and the idle it chose
-    // is the 30s one. Without this call the process sat out the whole budget waiting for a
-    // collection nobody had scheduled -- ProcessBudgetPacingIntegrationTest under a 120MB
-    // ceiling, which is precisely the failure its own timeout message predicts.
+    // cn1RequestGcFromParkedThread), so the in-park re-requests reach the collector only at
+    // the top of its next loop pass. That is enough to keep an ALREADY-RUNNING collector
+    // going, and not enough to wake a sleeping one: a parked thread allocates nothing, so
+    // isHighFrequencyGC() reads quiet and the idle it chose is the 30s one. Without this
+    // call the process sat out the whole budget waiting for a collection nobody had
+    // scheduled -- ProcessBudgetPacingIntegrationTest under a 120MB ceiling, which is
+    // precisely the failure its own timeout message predicts.
     {
         JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
         threadStateData->nativeAllocationMode = JAVA_TRUE;
@@ -7957,18 +7972,32 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
 #endif
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
-        // Request BEFORE parking, and through the flag rather than through Java: the call
-        // below used to run with threadActive already FALSE, and java_lang_System_gc__
-        // enters a Java monitor, which is a GC safepoint. See cn1RequestGcFromParkedThread
-        // for the deadlock that shape produces.
+        //
+        // The request moves BEFORE the park -- it used to run with threadActive already
+        // FALSE, and java_lang_System_gc__ enters a Java monitor, which is a GC safepoint
+        // (see cn1RequestGcFromParkedThread). Moving it is the whole fix; it must still be
+        // the real Java call, because this path needs everything that call does and the
+        // bare flag does none of it: it NOTIFIES the monitor, so a collector already inside
+        // its 30s idle wakes now rather than in thirty seconds, and it calls
+        // startGCThread(), so a collector that was never started gets started. Without
+        // those, threadBlockedByGC is still false, the wait below falls straight through,
+        // and this function recurses into another failing allocation -- burning stack
+        // instead of giving the collection it just asked for a chance to happen.
         invokedGC = YES;
-        cn1RequestGcFromParkedThread();
+        java_lang_System_gc__(getThreadLocalData());
         threadStateData->threadActive = JAVA_FALSE;
         while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(1000));
         }
         invokedGC = NO;
         threadStateData->threadActive = JAVA_TRUE;
+        // The retry is a TAIL call and every optimised build turns it into a jump, so a
+        // run of failures does not grow the stack. It is also unchanged from before this
+        // work -- what was wrong here was requesting the collection in a way that could not
+        // wake or start the collector, so the wait fell straight through and the retry
+        // raced round again with nothing having been collected. Bounding the retry count
+        // is a separate question about what a VM with no way to fail an allocation should
+        // do when it truly runs out, and it is not this change.
         return codenameOneGcMalloc(threadStateData, size, parent);
     }
     if(needsZeroing) {

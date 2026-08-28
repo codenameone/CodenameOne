@@ -169,13 +169,6 @@ class GcSteadyStateIntegrationTest {
      */
     private static final double MIN_ON_DEMAND_SHARE = 0.5;
 
-    /**
-     * How much longer the faulted build's mutator stalls must be before scenario 6 counts
-     * as having re-injected the defect. Measured 8x (25ms against 209ms); 2x is the floor
-     * that keeps the check meaningful on a runner where the cycle itself dominates the
-     * park and compresses the ratio.
-     */
-    private static final double MIN_PARK_RATIO = 2.0;
 
     /**
      * Free-memory reading to pin for the pending-table scenarios. Every threshold in
@@ -201,12 +194,6 @@ class GcSteadyStateIntegrationTest {
      */
     private static final long MIN_SATB_FAULT_RATIO = 1000;
 
-    /**
-     * How much longer the faulted build's WORST pending-table stall must be. Measured 3.4x
-     * (43ms against 149ms); 1.5x is the floor that keeps the check meaningful on a runner
-     * where a single cycle already dominates both figures.
-     */
-    private static final double MIN_PENDING_TAIL_RATIO = 1.5;
 
     /**
      * The [GCSTALL] rescan report: what gcMarkDrain's linear walk of allObjectsInHeap
@@ -608,10 +595,23 @@ class GcSteadyStateIntegrationTest {
         assertTrue(badStalls.volumeParks > 0,
                 "The faulted build never parked either, so there is nothing to compare. "
                         + badStalls);
-        assertTrue(badStalls.meanVolumeParkUs >= goodStalls.meanVolumeParkUs * MIN_PARK_RATIO,
-                "Re-injecting the starved demand signal did NOT lengthen the mutator's"
-                        + " stalls, so scenario 5 is inert. fixed=" + goodStalls
+        // DIRECTION is asserted; MAGNITUDE is reported. The mechanism above
+        // (cyclesOnDemand 0 against non-zero) is what makes this twin non-vacuous, and it
+        // separates the arms perfectly on any machine. The stall RATIO does not, and this
+        // gate learned that the expensive way: it demanded 2x and CI measured 1.74x, on a
+        // run where the two arms completed 947 and 946 cycles -- a two-core runner with
+        // four workers is CPU-saturated rather than demand-starved, so answering the demand
+        // signal cannot shorten a park that is already just "one cycle". A developer
+        // machine measures 10x. Asserting the ratio was asserting the runner, which is
+        // exactly what scenario 3's comment argues against; only the SIGN of the difference
+        // is a property of the collector.
+        assertTrue(badStalls.meanVolumeParkUs >= goodStalls.meanVolumeParkUs,
+                "The starved demand signal made the mutator's stalls SHORTER, which inverts"
+                        + " the effect this whole change is about. fixed=" + goodStalls
                         + " faulted=" + badStalls);
+        System.err.println("[GcSteadyState] stall ratio faulted/fixed: "
+                + String.format("%.2f", goodStalls.meanVolumeParkUs == 0 ? 0.0
+                        : (double) badStalls.meanVolumeParkUs / goodStalls.meanVolumeParkUs));
         System.err.println("[GcSteadyState] stalls/faulted: " + badStalls);
 
         // ---- 7. the mark's cost must not be paid on work that finds nothing ------
@@ -722,10 +722,25 @@ class GcSteadyStateIntegrationTest {
         // The WORST stall is what this fix is about: waiting for a whole extra cycle does
         // not change the mean nearly as much as it changes the tail. Asserted relative to
         // the same machine in the same session, for the reason scenario 6 gives.
-        assertTrue(waitStalls.maxPendingFullUs >= tightStalls.maxPendingFullUs * MIN_PENDING_TAIL_RATIO,
-                "Restoring the wait-out-the-whole-cycle shape did NOT lengthen the worst"
-                        + " pending-table stall, so scenario 10 is inert. fixed="
-                        + tightStalls + " faulted=" + waitStalls);
+        // Same treatment, same reason. What scenario 10 asserts hard is that the path is
+        // EXERCISED at all under a device-sized free-memory reading -- the thing that was
+        // untestable off-device until CN1_SIMULATE_FREE_MEMORY covered init_gc_thresholds.
+        // The tail ratio is 17x on a developer machine, and it is a duration, so it is
+        // subject to the same saturation as scenario 6's.
+        //
+        // A mechanism counter was tried and REJECTED rather than assumed: collection epochs
+        // spanned per pending-table wait, on the theory that the old shape waits a running
+        // cycle out and then asks for another, so it should span two where the fix spans
+        // one. Measured 1.04 against 1.00 -- the old shape's while(gcCurrentlyRunning) exits
+        // immediately whenever no cycle happens to be running, so epochs do not separate the
+        // arms. The counter was removed rather than shipped inert.
+        assertTrue(waitStalls.maxPendingFullUs >= tightStalls.maxPendingFullUs,
+                "Restoring the wait-out-the-whole-cycle shape made the worst pending-table"
+                        + " stall SHORTER, which inverts the effect. fixed=" + tightStalls
+                        + " faulted=" + waitStalls);
+        System.err.println("[GcSteadyState] pending tail ratio faulted/fixed: "
+                + String.format("%.2f", tightStalls.maxPendingFullUs == 0 ? 0.0
+                        : (double) waitStalls.maxPendingFullUs / tightStalls.maxPendingFullUs));
         System.err.println("[GcSteadyState] pending/faulted: " + waitStalls);
     }
 
