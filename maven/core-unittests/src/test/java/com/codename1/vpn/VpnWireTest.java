@@ -22,11 +22,13 @@
  */
 package com.codename1.vpn;
 
+import com.codename1.impl.vpn.TunnelWire;
 import com.codename1.impl.vpn.VpnWire;
 import com.codename1.vpn.profile.VpnProfile;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -155,5 +157,49 @@ public class VpnWireTest {
     public void aRecordWithNoServerIsNotAProfile() {
         assertNull(VpnWire.decodeProfile(""));
         assertNull(VpnWire.decodeProfile(null));
+    }
+
+    @Test
+    public void anAbsentPrefixIsFilledByFamily() {
+        // A bare address is the ordinary way to write a host block, and
+        // Builder.addAddress demands a number, so absence is filled rather
+        // than refused.
+        assertEquals(32, TunnelWire.prefix("10.0.0.2", "address"));
+        assertEquals(128, TunnelWire.prefix("fd00::2", "address"));
+        assertEquals("10.0.0.2", TunnelWire.host("10.0.0.2/32"));
+        assertEquals("fd00::", TunnelWire.host("fd00::/8"));
+    }
+
+    @Test
+    public void zeroIsTheDefaultRouteAndNotAnError() {
+        // /0 is what a full-tunnel VPN asks for and what the documentation
+        // shows. Reading it as unparseable handed back a host route.
+        assertEquals(0, TunnelWire.prefix("0.0.0.0/0", "route"));
+        assertEquals(0, TunnelWire.prefix("::/0", "route"));
+        assertEquals(24, TunnelWire.prefix("10.0.0.0/24", "route"));
+        assertEquals(64, TunnelWire.prefix("fd00::/64", "route"));
+    }
+
+    @Test
+    public void anUnreadablePrefixIsRefusedRatherThanShrunk() {
+        // The most dangerous answer available was the one this used to give.
+        // "0.0.0.0/o" is a typo for the default route, and falling back to
+        // the family width turned it into a HOST route -- so the tunnel came
+        // up acknowledged and carried one address, and every packet the app
+        // believed it was protecting went out in the clear. A misread
+        // full-tunnel route has to fail, not shrink.
+        String[] bad = {"0.0.0.0/o", "0.0.0.0/", "10.0.0.0/33",
+                "fd00::/129", "10.0.0.0/1234", "10.0.0.0/-1",
+                "10.0.0.0/ 24 x"};
+        for (String block : bad) {
+            IllegalArgumentException e = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> TunnelWire.prefix(block, "route"),
+                    block + " is not a prefix and must be refused");
+            assertTrue(e.getMessage().contains(block),
+                    "the message names the block: " + e.getMessage());
+            assertTrue(e.getMessage().contains("route"),
+                    "and the field it came from: " + e.getMessage());
+        }
     }
 }

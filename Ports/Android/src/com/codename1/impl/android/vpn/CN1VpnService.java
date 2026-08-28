@@ -333,16 +333,12 @@ public class CN1VpnService extends VpnService {
         Builder b = new Builder();
         String address = TunnelWire.address(fields);
         if (address.length() > 0) {
-            int slash = address.indexOf('/');
-            // The PREFIX is required by Builder.addAddress and a plain
-            // address is the ordinary way to write one, so a missing prefix
-            // is filled rather than refused: /32 for IPv4, /128 for IPv6.
-            String host = slash < 0 ? address : address.substring(0, slash);
-            int prefix = slash < 0
-                    ? (host.indexOf(':') >= 0 ? 128 : 32)
-                    : parsePrefix(address.substring(slash + 1),
-                            host.indexOf(':') >= 0 ? 128 : 32);
-            b.addAddress(host, prefix);
+            // Parsed in TunnelWire so the simulation reads a block exactly
+            // as this does -- including refusing one it cannot read. A
+            // missing prefix is filled, a present unreadable one throws, and
+            // open() turns that into INVALID_CONFIGURATION with the message.
+            b.addAddress(TunnelWire.host(address),
+                    TunnelWire.prefix(address, "address"));
         }
         // The SERVER stays outside the tunnel. TunnelSetup.server()
         // promises exactly that, and without it a default route captures the
@@ -369,12 +365,8 @@ public class CN1VpnService extends VpnService {
             excluded = false;
         }
         for (int i = 0; i < routes.length; i++) {
-            int slash = routes[i].indexOf('/');
-            String net = slash < 0 ? routes[i] : routes[i].substring(0, slash);
-            int prefix = slash < 0
-                    ? (net.indexOf(':') >= 0 ? 128 : 32)
-                    : parsePrefix(routes[i].substring(slash + 1),
-                            net.indexOf(':') >= 0 ? 128 : 32);
+            String net = TunnelWire.host(routes[i]);
+            int prefix = TunnelWire.prefix(routes[i], "route");
             if (!excluded && servers.length > 0) {
                 // No excludeRoute on this platform, so the route is SPLIT
                 // around the servers instead: the complement of a handful of
@@ -662,34 +654,6 @@ public class CN1VpnService extends VpnService {
     }
 
 
-
-    /// A CIDR prefix, or `fallback` when the text is not one.
-    ///
-    /// Tested rather than caught: this runs in the port, where a
-    /// NumberFormatException would take the tunnel down over a typo in a
-    /// route, and a route this cannot read is better refused by Builder --
-    /// which names it -- than turned into a silent exception here.
-    private static int parsePrefix(String text, int fallback) {
-        String t = text.trim();
-        if (t.length() == 0 || t.length() > 3) {
-            return fallback;
-        }
-        int value = 0;
-        for (int i = 0; i < t.length(); i++) {
-            char c = t.charAt(i);
-            if (c < '0' || c > '9') {
-                return fallback;
-            }
-            value = value * 10 + (c - '0');
-        }
-        // ZERO IS VALID, and it is the important one: /0 is the default
-        // route, which is what a full-tunnel VPN asks for and what the
-        // documentation shows. Treating it as unparseable handed the
-        // fallback back instead -- a /32 host route -- so the tunnel came up
-        // acknowledged and carried nothing, and the split around the server
-        // could not fire either because a /32 contains no other address.
-        return value >= 0 && value <= fallback ? value : fallback;
-    }
 
     private void start(VpnTunnel tunnel, ParcelFileDescriptor fd,
             String[] fields, int requestId, int generation, int startId) {

@@ -124,6 +124,65 @@ public final class TunnelWire {
     }
 
     /// Splits a record into its fields.
+    /// The address half of a `host/prefix` block.
+    ///
+    /// @param cidr the block, with or without a prefix
+    /// @return the address, never null
+    public static String host(String cidr) {
+        int slash = cidr.indexOf('/');
+        return slash < 0 ? cidr : cidr.substring(0, slash);
+    }
+
+    /// The prefix half of a `host/prefix` block, REFUSING text that is not
+    /// one.
+    ///
+    /// An absent prefix is filled -- `/32` for IPv4, `/128` for IPv6 --
+    /// because a bare address is the ordinary way to write a host block and
+    /// `Builder.addAddress` demands a number. A prefix that is PRESENT and
+    /// unreadable is refused, because the alternative was the most dangerous
+    /// answer available: a port that fell back to the family width turned
+    /// `route("0.0.0.0/o")` -- a typo for the default route -- into a host
+    /// route, and the tunnel came up acknowledged while every packet the app
+    /// believed it was protecting went out in the clear. A misread
+    /// full-tunnel route has to fail, not shrink.
+    ///
+    /// Here rather than in a port so the SIMULATION refuses it too. A trap
+    /// that only springs on a device is one an app meets after it ships.
+    ///
+    /// ZERO IS VALID and is the important one: `/0` is the default route,
+    /// which is what a full-tunnel VPN asks for.
+    ///
+    /// @param cidr the block, with or without a prefix
+    /// @param what the setup field it came from, so the message names the
+    /// line to look at
+    /// @return the prefix width
+    /// @throws IllegalArgumentException when a present prefix is not a
+    /// number the family allows
+    public static int prefix(String cidr, String what) {
+        String host = host(cidr);
+        int width = host.indexOf(':') >= 0 ? 128 : 32;
+        int slash = cidr.indexOf('/');
+        if (slash < 0) {
+            return width;
+        }
+        String text = cidr.substring(slash + 1).trim();
+        boolean digits = text.length() > 0 && text.length() <= 3;
+        int value = 0;
+        for (int i = 0; digits && i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < '0' || c > '9') {
+                digits = false;
+            } else {
+                value = value * 10 + (c - '0');
+            }
+        }
+        if (!digits || value > width) {
+            throw new IllegalArgumentException("The " + what + " prefix in '"
+                    + cidr + "' is not a number from 0 to " + width);
+        }
+        return value;
+    }
+
     public static String[] split(String record) {
         return CallWire.split(record);
     }

@@ -50,6 +50,10 @@ public final class TunnelSetup {
     private String sessionName = "";
 
     /// The address this device takes on the tunnel, in CIDR form.
+    ///
+    /// The prefix may be left off -- `/32` for IPv4, `/128` for IPv6 -- but
+    /// one that is written and unreadable FAILS the start with
+    /// `INVALID_CONFIGURATION`; see [#route].
     public TunnelSetup address(String cidr) {
         this.address = cidr == null ? "" : cidr;
         return this;
@@ -63,6 +67,14 @@ public final class TunnelSetup {
     }
 
     /// A route directed into the tunnel, in CIDR form. Repeatable.
+    ///
+    /// `0.0.0.0/0` and `::/0` are the full tunnel. An unreadable prefix
+    /// fails the start with `INVALID_CONFIGURATION` rather than being
+    /// narrowed to a host route: `"0.0.0.0/o"` is a typo for the default
+    /// route, and a tunnel that started and carried one address would let
+    /// every packet the app believed it was protecting out in the clear.
+    /// Checked in the simulation as well, so the refusal is not something
+    /// found first on a device.
     public TunnelSetup route(String cidr) {
         routes = append(routes, cidr);
         return this;

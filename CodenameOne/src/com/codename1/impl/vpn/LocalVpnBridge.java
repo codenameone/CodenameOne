@@ -117,6 +117,25 @@ public class LocalVpnBridge implements VpnBridge {
             return;
         }
         String[] fields = TunnelWire.split(setupWire);
+        // The BLOCKS, read exactly as a port reads them. Without this the
+        // simulation accepted a setup the device refuses -- route("0/o") ran
+        // here and failed there -- which is the one divergence a simulation
+        // must not have, because the app meets it after it ships.
+        try {
+            String address = TunnelWire.address(fields);
+            if (address.length() > 0) {
+                TunnelWire.prefix(address, "address");
+            }
+            String[] blocks = TunnelWire.routes(fields);
+            for (int i = 0; i < blocks.length; i++) {
+                TunnelWire.prefix(blocks[i], "route");
+            }
+        } catch (IllegalArgumentException malformed) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.INVALID_CONFIGURATION.ordinal(),
+                    malformed.getMessage());
+            return;
+        }
         // NON-BLOCKING: this bridge delivers packets by pumping, which is
         // the iOS shape. Asking for the blocking one ran the host's loop to
         // its end inside start().

@@ -79,6 +79,18 @@ public final class Tunnels {
     /// The tunnel the platform is currently running, once it claimed one.
     private static VpnTunnel current;
 
+    /// The request that claimed [#current], or -1.
+    ///
+    /// A claim is not a start. A port claims the tunnel when it takes the
+    /// request and can still fail afterwards -- Android's service claims in
+    /// onStartCommand and refuses in establish(), the simulation refuses a
+    /// block it cannot read -- and a refusal left `current` naming a tunnel
+    /// nothing was running, holding the application's object and everything
+    /// it closed over until the next start or stop. Recording which request
+    /// owns the registration is what lets deliverAck undo the claim it is
+    /// answering, rather than every port remembering to.
+    private static int currentRequest = -1;
+
     private Tunnels() {
     }
 
@@ -152,6 +164,7 @@ public final class Tunnels {
             VpnTunnel t = PENDING.remove(Integer.valueOf(requestId));
             if (t != null) {
                 current = t;
+                currentRequest = requestId;
             }
             return t;
         }
@@ -172,6 +185,7 @@ public final class Tunnels {
     public static void clearRegistered() {
         synchronized (Tunnels.class) {
             current = null;
+            currentRequest = -1;
         }
     }
 
@@ -186,6 +200,7 @@ public final class Tunnels {
         synchronized (Tunnels.class) {
             PENDING.clear();
             current = null;
+            currentRequest = -1;
         }
     }
 
@@ -213,6 +228,15 @@ public final class Tunnels {
         // keeps that from being the next port's bug to find.
         synchronized (Tunnels.class) {
             PENDING.remove(Integer.valueOf(requestId));
+            if (!ok && currentRequest == requestId) {
+                // A FAILED start unregisters what it claimed. See
+                // currentRequest: the claim happens when the port takes the
+                // request and the refusal can come later, so without this
+                // the tunnel the platform is "running" is one that never
+                // ran.
+                current = null;
+                currentRequest = -1;
+            }
         }
         EdtResult<Boolean> r = VpnRequests.takeAck(requestId);
         if (r == null) {

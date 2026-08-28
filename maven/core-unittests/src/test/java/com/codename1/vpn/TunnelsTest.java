@@ -229,4 +229,32 @@ public class TunnelsTest {
         VpnAwait.assertFailedWith(VpnError.NOT_SUPPORTED,
                 Tunnels.start(new Echo(), new TunnelSetup()));
     }
+
+    @Test
+    public void theSimulationRefusesABlockADeviceWouldRefuse() {
+        // The simulation used to accept any route text, so "0.0.0.0/o" -- a
+        // typo for the default route -- ran here and failed on a device.
+        // That is the one divergence a simulation must not have: the app
+        // meets it after it ships. Refused with the same error and the same
+        // message the port answers with, because both read the block through
+        // TunnelWire.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .address("10.0.0.2/32")
+                        .route("0.0.0.0/o")));
+        assertNull(Tunnels.getRegistered(),
+                "and a refused start leaves nothing registered");
+        // The ADDRESS too, which is read by the same call.
+        VpnAwait.assertFailedWith(VpnError.INVALID_CONFIGURATION,
+                Tunnels.start(new Echo(), new TunnelSetup()
+                        .address("10.0.0.2/nope")
+                        .route("0.0.0.0/0")));
+        // And a setup that is fine still starts, so the guard is not simply
+        // refusing everything.
+        Echo good = new Echo();
+        VpnAwait.value(Tunnels.start(good, new TunnelSetup()
+                .address("10.0.0.2/32").route("0.0.0.0/0")));
+        assertEquals("start", good.events.get(0));
+        VpnAwait.value(Tunnels.stop());
+    }
 }

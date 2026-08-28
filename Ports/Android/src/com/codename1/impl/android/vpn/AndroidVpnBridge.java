@@ -1111,6 +1111,31 @@ public class AndroidVpnBridge implements VpnBridge {
         Tunnels.deliverAck(requestId, false, e.ordinal(), message);
     }
 
+    /// Which tunnel start the bridge is on, bumped by every start and every
+    /// stop.
+    ///
+    /// CN1VpnService has a generation of its own, and it cannot see this
+    /// window: the consent prompt is open, no service exists yet, and
+    /// Tunnels.stop() in the meantime starts the service with ACTION_STOP,
+    /// acknowledges the stop and lets it go. An approval arriving after that
+    /// launched the original tunnel anyway -- a VPN coming up seconds after
+    /// the app had been told it was down, with the user having answered a
+    /// prompt for a tunnel that no longer existed.
+    ///
+    /// Sampled by TunnelConsent when the prompt opens and compared when it
+    /// answers. Guarded by this instance's monitor.
+    private int tunnelGeneration;
+
+    /// A new tunnel generation, invalidating any consent still on screen.
+    private synchronized int nextTunnelGeneration() {
+        return ++tunnelGeneration;
+    }
+
+    /// Whether this consent still speaks for the current start.
+    private synchronized boolean currentTunnel(int generation) {
+        return generation == tunnelGeneration;
+    }
+
     @Override
     public void startCustomTunnel(final int requestId, final String setupWire) {
         if (!isCustomTunnelSupported()) {
@@ -1137,6 +1162,10 @@ public class AndroidVpnBridge implements VpnBridge {
             }
             operationOwner = mine;
         }
+        // This start's generation, taken before anything can be shown. A
+        // stop -- or another start -- moves it on, and the consent below
+        // finds out when it answers.
+        final int generation = nextTunnelGeneration();
         // CONSENT first, and it is a prompt rather than a permission: an app
         // cannot hold BIND_VPN_SERVICE, it asks the user each time the grant
         // is not already in force. prepare() answers null when it is.
@@ -1176,7 +1205,7 @@ public class AndroidVpnBridge implements VpnBridge {
             com.codename1.impl.android.AndroidNativeUtil
                     .startActivityForResult(consent,
                             new TunnelConsent(this, requestId, setupWire,
-                                    mine));
+                                    mine, generation));
             // From here the reservation belongs to TunnelConsent, exactly as
             // the install hands its own to Consent.
             return;
@@ -1214,6 +1243,10 @@ public class AndroidVpnBridge implements VpnBridge {
                     VpnError.NOT_SUPPORTED.ordinal(), null);
             return;
         }
+        // BEFORE the service is told, so a consent answering while this is
+        // in flight already sees a generation it does not own. See
+        // tunnelGeneration.
+        nextTunnelGeneration();
         try {
             Intent i = new Intent(context, CN1VpnService.class);
             i.setAction(CN1VpnService.ACTION_STOP);
@@ -1238,13 +1271,15 @@ public class AndroidVpnBridge implements VpnBridge {
         private final int requestId;
         private final String setupWire;
         private final Object token;
+        private final int generation;
 
         TunnelConsent(AndroidVpnBridge bridge, int requestId,
-                String setupWire, Object token) {
+                String setupWire, Object token, int generation) {
             this.bridge = bridge;
             this.requestId = requestId;
             this.setupWire = setupWire;
             this.token = token;
+            this.generation = generation;
         }
 
         @Override
@@ -1255,6 +1290,18 @@ public class AndroidVpnBridge implements VpnBridge {
             // reservation this one was still holding.
             bridge.endOperation(token);
             if (resultCode == Activity.RESULT_OK) {
+                if (!bridge.currentTunnel(generation)) {
+                    // A stop won while this prompt was on screen, and it has
+                    // already been acknowledged. Launching now would bring a
+                    // VPN up seconds after the app was told it was down --
+                    // and the service's own generation cannot refuse it,
+                    // because this start would be the newest thing it had
+                    // ever seen.
+                    failStart(requestId, VpnError.UNKNOWN,
+                            "The tunnel start was superseded while the"
+                            + " consent prompt was open");
+                    return;
+                }
                 bridge.launchTunnel(requestId, setupWire);
                 return;
             }
