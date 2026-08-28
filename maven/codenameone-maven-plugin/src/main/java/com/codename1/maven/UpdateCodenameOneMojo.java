@@ -110,15 +110,18 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
                         + "-DnewVersion=<version> to set one explicitly.");
                 return;
             }
-            // Belt and braces over the removed Central fallback: an automatic update is
-            // this goal guessing, so it must never move the project backwards whatever
-            // the metadata says -- a stale or misconfigured -Dcn1.metadataUrl mirror
-            // could otherwise downgrade it. Only the automatic path is guarded; an
-            // explicit -DnewVersion is the user asking for that version, downgrade
-            // included, and the automatic path never runs against a -SNAPSHOT project.
-            if (isAutoVersion
-                    && (isOlderThan(resolved, existingCn1Version)
-                        || isOlderThan(resolved, existingCn1PluginVersion))) {
+            // Belt and braces over the removed Central fallback: a stale or
+            // misconfigured -Dcn1.metadataUrl mirror could still answer with an older
+            // release, and nothing downstream compares versions for order.
+            //
+            // This guards every path that reaches here, not just the automatic one.
+            // "LATEST" is a symbolic request in both cases -- it means "whatever is
+            // newest", so resolving it to something older is self-contradictory no
+            // matter who asked. A concrete -DnewVersion=7.0.x never reaches this block
+            // and is left alone, because naming a version IS a request for it,
+            // downgrade included.
+            if (wouldDowngrade(resolved, existingCn1Version)
+                    || wouldDowngrade(resolved, existingCn1PluginVersion)) {
                 getLog().warn("The newest version offered (" + resolved + ") is older than "
                         + "this project's (cn1.version=" + existingCn1Version
                         + ", cn1.plugin.version=" + existingCn1PluginVersion
@@ -271,9 +274,18 @@ public class UpdateCodenameOneMojo extends AbstractCN1Mojo {
         return readLatestVersion(metadataUrl);
     }
 
-    /** @return true if {@code candidate} is an earlier version than {@code current}. */
-    private static boolean isOlderThan(String candidate, String current) {
-        if (current == null || current.trim().isEmpty()) {
+    /**
+     * @return true if moving to {@code candidate} would take a project currently on
+     * {@code current} backwards.
+     *
+     * A -SNAPSHOT current version is never treated as downgraded by a release. Moving
+     * off a development build onto a published one is an ordinary thing to ask for, and
+     * ComparableVersion ranks 8.0-SNAPSHOT above 7.0.267 purely on the numbering -- so
+     * without this a contributor running -DnewVersion=LATEST on a snapshot project
+     * would be refused the very thing the command means.
+     */
+    private static boolean wouldDowngrade(String candidate, String current) {
+        if (current == null || current.trim().isEmpty() || current.endsWith("-SNAPSHOT")) {
             return false;
         }
         return new ComparableVersion(candidate).compareTo(new ComparableVersion(current)) < 0;
