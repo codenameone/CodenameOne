@@ -54,10 +54,16 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Three things about that code are worth spelling out.
 
-*The user is asked, every time.* Both platforms show a system prompt when a
-configuration is installed and neither lets an app avoid it. A declined prompt
-fails with `VpnError.USER_DECLINED`, which is an ordinary outcome and not
-something to report as an error -- the snippet treats it as a normal return.
+*The user may be asked, and you can't skip the asking.* The platform shows a
+system prompt when it wants consent, and neither lets an app avoid it. A
+declined prompt fails with `VpnError.USER_DECLINED`, which is an ordinary
+outcome and not something to report as an error -- the snippet treats it as a
+normal return.
+
+It isn't a prompt on every install, though. Android asks once and remembers,
+so replacing a profile in an app the user has already approved goes through
+with nothing shown. Be ready for the prompt; don't build a flow that depends
+on it appearing, and don't tell the user a dialog is coming.
 
 *One configuration per app.* Both platforms give an app a single managed
 configuration, so `install` replaces whatever was there rather than adding to

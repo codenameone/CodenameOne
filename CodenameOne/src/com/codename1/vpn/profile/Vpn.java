@@ -56,11 +56,21 @@ import java.util.List;
 /// documentation -- and this API stays useful around it either way, for the
 /// install, the status and the control.
 ///
-/// #### The user is asked, every time a configuration is installed
+/// #### The user may be asked, and the app cannot skip the asking
 ///
-/// [#install] shows a system prompt on both platforms and there is no way
-/// around it. A declined prompt fails with [VpnError#USER_DECLINED], which is
-/// an ordinary outcome and not an error to report to the user again.
+/// [#install] shows a system prompt when the platform wants consent, and
+/// there is no way around it: a declined prompt fails with
+/// [VpnError#USER_DECLINED], which is an ordinary outcome and not an error to
+/// report to the user again.
+///
+/// It is NOT a prompt on every install. Android asks once and remembers, so
+/// replacing a profile in an app the user has already approved provisions
+/// and answers with nothing shown -- the port takes that path whenever
+/// `provisionVpnProfile` returns no consent intent. An app that treated each
+/// install as a fresh checkpoint, or that told the user a dialog was coming,
+/// was wrong in that case.
+///
+/// So: be ready for the prompt, and do not depend on it appearing.
 ///
 /// #### One configuration per app
 ///
