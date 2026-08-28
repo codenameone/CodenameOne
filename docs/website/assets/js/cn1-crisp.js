@@ -12,7 +12,7 @@
   const EXP004_COUNTER_ACK_PREFIX = "cn1-exp-004-counter-ack-v1-";
   const EXP004_COUNTER_SESSION_ENDPOINT = "/api/exp004/session";
   const EXP004_COUNTER_ENDPOINT = "/api/exp004/collect";
-  const EXP004_COUNTER_RETRY_DELAYS = [1000, 5000, 15000];
+  const EXP004_COUNTER_RETRY_DELAYS = [1000, 5000, 15000, 45000];
   const EXP004_ID = "EXP-004";
   const EXP004_HOSTNAME = (window.location && window.location.hostname) || "";
   const EXP004_PREVIEW_HOST = EXP004_HOSTNAME === "localhost" ||

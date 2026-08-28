@@ -42,6 +42,7 @@ function load(
   fetchHandler = null
 ) {
   const timers = [];
+  const timerDelays = [];
   const fetches = [];
   let uuid = 0;
   const documentListeners = {};
@@ -116,8 +117,9 @@ function load(
       pathname,
       search,
     },
-    setTimeout(callback) {
+    setTimeout(callback, delay = 0) {
       timers.push(callback);
+      timerDelays.push(delay);
       return timers.length;
     },
   };
@@ -148,6 +150,7 @@ function load(
     decline,
     documentListeners,
     fetches,
+    timerDelays,
     timers,
     window,
     sessionStorage: context.sessionStorage,
@@ -411,6 +414,21 @@ function events(state) {
   await settle(state);
   assert.equal(state.fetches.filter(({ url }) => url === "/api/exp004/collect").length, 1,
     "storage-disabled visitors must still get best-effort in-memory telemetry");
+}
+
+{
+  const state = load(
+    "accepted", "", "/", "ownership", true, "www.codenameone.com", null,
+    storage(),
+    (url) => url === "/api/exp004/session"
+      ? { ok: false, status: 429, json: async () => ({}) }
+      : { ok: true, status: 202 }
+  );
+  await settle(state, true);
+  assert.ok(
+    state.timerDelays.reduce((total, delay) => total + delay, 0) > 60000,
+    "session enrollment retries must continue beyond the 60-second rate-limit window"
+  );
 }
 
 {
