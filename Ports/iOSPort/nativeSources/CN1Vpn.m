@@ -1013,8 +1013,14 @@ static CN1VpnTunnelWatcher *cn1vpTunnelWatcher = nil;
 /// loading the manager, saving it, reloading it -- is asynchronous too, and a
 /// stop arriving in that window found no watcher and no manager, answered
 /// successfully, and then the continuation went on to start the session. The
-/// tunnel came up after the caller was told it was down. Bumped by every
-/// start and every stop, and checked before the session is started.
+/// tunnel came up after the caller was told it was down.
+///
+/// MAIN QUEUE ONLY, and that is what makes the check mean anything. A
+/// generation compared on one thread and acted on while another may change
+/// it is a narrower window, not a closed one -- and vpnStopTunnel is called
+/// from a Java thread. Every read and every write of this, of
+/// cn1vpTunnelWatcher and of cn1vpTunnelManager happens on the main queue,
+/// so a check and the act that follows it cannot be interleaved with a stop.
 static int cn1vpTunnelGeneration = 0;
 
 /// Stops watching and releases the watcher, ANSWERING it if it never was.
@@ -1118,6 +1124,9 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
                     stringToUTF8(threadStateData, setupWire)];
     [wire retain];
     int rid = (int)requestId;
+    // ONTO the main queue before anything is read or written; see
+    // cn1vpTunnelGeneration. This native is called from a Java thread.
+    dispatch_async(dispatch_get_main_queue(), ^{
     int generation = ++cn1vpTunnelGeneration;
     cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *loadError) {
         if (generation != cn1vpTunnelGeneration) {
@@ -1217,15 +1226,20 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
             }];
         }];
     });
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
         JAVA_INT requestId) {
     int rid = (int)requestId;
-    // Invalidates any start in flight, armed or not; see
-    // cn1vpTunnelGeneration. The watcher covers the armed ones and this
-    // covers the window before that, where there is nothing to disarm.
+    // ONTO the main queue, like the start: this runs on a Java thread, and
+    // the generation it is about to bump is read there. See
+    // cn1vpTunnelGeneration.
+    dispatch_async(dispatch_get_main_queue(), ^{
+    // Invalidates any start in flight, armed or not. The watcher covers the
+    // armed ones and this covers the window before that, where there is
+    // nothing to disarm.
     cn1vpTunnelGeneration++;
     cn1vpStopWatchingTunnel();
     if (cn1vpTunnelManager != nil) {
@@ -1244,6 +1258,7 @@ void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
         // got the caller what they asked for, and reporting a failure would
         // have an app treat its own idle state as an error.
         cn1vpTunnelAck(rid, YES, 0, nil);
+    });
     });
 }
 

@@ -127,6 +127,24 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void aFilteredIpv6ListDoesNotBecomeTheDefaultRoute() {
+        // A setup listing only v4 routes on a v6 interface asked for no v6
+        // traffic. Falling back to the default route after filtering them
+        // all out captured every v6 packet instead -- the opposite of the
+        // request. The default belongs to an EMPTY input, where the app
+        // named no routes at all.
+        String src = provider();
+        int helper = src.indexOf("cn1tnRoutes6");
+        assertTrue(helper >= 0);
+        String body = src.substring(helper);
+        int guard = body.indexOf("if ([list length] == 0)");
+        int tail = body.indexOf("return out;");
+        assertTrue(guard >= 0 && tail > guard,
+                "the empty-input default stays, and the filtered list is"
+                + " returned as it stands");
+    }
+
+    @Test
     void searchDomainsReachTheLink() {
         // TunnelSetup documents iOS applying these, and field 4 was carried
         // across the wire and then never read -- so a short hostname that

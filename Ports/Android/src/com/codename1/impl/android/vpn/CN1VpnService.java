@@ -208,29 +208,11 @@ public class CN1VpnService extends VpnService {
             stopSelf();
             return;
         }
-        // RE-CHECKED with the descriptor in hand. Establishing can take a
-        // while -- a DNS lookup and a platform call -- and a stop that
-        // arrived meanwhile has already told the caller the tunnel is down.
-        // Publishing now would bring one up behind that answer.
-        if (!current(generation)) {
-            try {
-                fd.close();
-            } catch (java.io.IOException alreadyGone) {
-                // Nothing useful to do; the link is going either way.
-            }
-            fail(requestId, VpnError.UNKNOWN,
-                    "The tunnel start was superseded while it was opening");
-            stopSelf();
-            return;
-        }
-        // FOREGROUND before the loop starts. Android 8 shuts down an
-        // ordinary started service that keeps running, so a tunnel brought
-        // up this way was acknowledged, established, and then killed a
-        // little later with nothing in the app to say why. A VPN is exactly
-        // the kind of service that has to stay up, and the persistent
-        // notification is the price the platform charges for that.
-        promote(TunnelWire.sessionName(fields));
-        start(tunnel, fd, fields, requestId);
+        // The generation is re-checked INSIDE the publication, not before
+        // it; see start(). A check here and an install a few statements
+        // later is a window, and it is the same window this whole mechanism
+        // exists to close.
+        start(tunnel, fd, fields, requestId, generation);
     }
 
     /// The notification channel the ongoing-tunnel notification lives in.
@@ -561,7 +543,7 @@ public class CN1VpnService extends VpnService {
     }
 
     private void start(VpnTunnel tunnel, ParcelFileDescriptor fd,
-            String[] fields, int requestId) {
+            String[] fields, int requestId, int generation) {
         DescriptorTunnelTransport t =
                 new DescriptorTunnelTransport(fd, TunnelWire.mtu(fields));
         TunnelHost h = new TunnelHost(tunnel, t);
@@ -573,15 +555,38 @@ public class CN1VpnService extends VpnService {
         // non-daemon thread doing that keeps the process alive after
         // everything else has finished with it.
         runner.setDaemon(true);
+        boolean published;
         synchronized (CN1VpnService.class) {
-            // A start arriving while one is already up replaces it, so the
-            // previous link is torn down first rather than left with a
-            // thread still reading it.
-            stopLocked(TunnelStopReason.REQUESTED);
-            host = h;
-            transport = t;
-            loop = runner;
+            // The CHECK and the install in ONE critical section. Separated,
+            // a stop landing between them bumped the generation, found no
+            // published host, answered successfully -- and then this
+            // installed the tunnel and acknowledged the start anyway. The
+            // check has to be part of the publication, not a prelude to it.
+            published = generation == startGeneration;
+            if (published) {
+                // A start arriving while one is already up replaces it, so
+                // the previous link is torn down first rather than left with
+                // a thread still reading it.
+                stopLocked(TunnelStopReason.REQUESTED);
+                host = h;
+                transport = t;
+                loop = runner;
+            }
         }
+        if (!published) {
+            t.close();
+            fail(requestId, VpnError.UNKNOWN,
+                    "The tunnel start was superseded while it was opening");
+            stopSelf();
+            return;
+        }
+        // FOREGROUND once the tunnel is really this service's. Android 8
+        // shuts down an ordinary started service that keeps running, so a
+        // tunnel brought up without this was acknowledged, established, and
+        // then killed a little later with nothing in the app to say why.
+        // After the publication rather than before it, so a superseded start
+        // does not leave a notification for a tunnel it never installed.
+        promote(TunnelWire.sessionName(fields));
         // ANSWERED before the loop is started, and deliberately: the link is
         // established by now -- establish() returned a descriptor -- so the
         // app's start() has succeeded, and making it wait for the first
