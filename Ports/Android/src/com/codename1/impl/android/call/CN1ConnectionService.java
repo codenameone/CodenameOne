@@ -238,9 +238,27 @@ public class CN1ConnectionService extends ConnectionService {
             return null;
         }
         CN1Connection c = new CN1Connection(this, id);
-        c.setRingingName(request == null || request.getExtras() == null ? null
+        android.net.Uri address = request == null ? null : request.getAddress();
+        if (address != null) {
+            // The address Telecom was given, put on the connection HERE.
+            // Nothing else did until updateCall, which is optional and often
+            // never called, so the system's own record of the call -- its
+            // entry in Recents, what a car head unit or watch shows --
+            // carried no number for a call the app had supplied one for.
+            c.setAddress(address,
+                    android.telecom.TelecomManager.PRESENTATION_ALLOWED);
+        }
+        String subject = request == null || request.getExtras() == null ? null
                 : request.getExtras().getString(
-                        android.telecom.TelecomManager.EXTRA_CALL_SUBJECT));
+                        android.telecom.TelecomManager.EXTRA_CALL_SUBJECT);
+        // The ADDRESS when there is no name. reportIncoming's displayName is
+        // optional and the bridge omits the subject extra when it is null, so
+        // a call reported with a handle and no name rang with a lock-screen
+        // notification that said only "Incoming call" -- the user could not
+        // see who was calling, on the one screen where that is the whole
+        // point.
+        c.setRingingName(subject != null && subject.length() > 0
+                ? subject : addressText(address));
         c.setVideo(request != null && request.getExtras() != null
                 && request.getExtras().getBoolean(EXTRA_VIDEO, false));
         c.setInitializing();
@@ -274,6 +292,23 @@ public class CN1ConnectionService extends ConnectionService {
     /// Telecom hands it over as a `tel:` or `sip:` URI; anything else is
     /// carried through as a generic handle rather than dropped, because the
     /// app can still recognise an address this bridge does not.
+    /// The readable form of a Telecom address, or null when there is none.
+    ///
+    /// The scheme-specific part for tel: and sip:, which is the number or the
+    /// user, rather than the whole URI -- "tel:+15551234" is not what anyone
+    /// wants to read on a lock screen.
+    private static String addressText(android.net.Uri address) {
+        if (address == null) {
+            return null;
+        }
+        String part = address.getSchemeSpecificPart();
+        if (part != null && part.length() > 0) {
+            return part;
+        }
+        String whole = address.toString();
+        return whole.length() > 0 ? whole : null;
+    }
+
     /// Android's own CSPRNG, for ids minted where the framework is absent.
     private static final java.security.SecureRandom COLD_RANDOM =
             new java.security.SecureRandom();

@@ -285,8 +285,59 @@ public class IPhoneBuilder extends Executor {
     }
 
     /// @return the fragment, with the entry appended when it was wanted
+    /// Keys the generated Call Directory extension resolves as well, so an
+    /// injected value of the wrong TYPE is a build error rather than the
+    /// project's own choice. See appendCallPlist.
+    private static final String[] CALL_PLIST_COORDINATED = {
+        "CN1CallAppGroup",
+        "CN1CallDirectoryExtensionIdentifier",
+    };
+
+    private static boolean isCoordinatedCallKey(String key) {
+        for (int i = 0; i < CALL_PLIST_COORDINATED.length; i++) {
+            if (CALL_PLIST_COORDINATED[i].equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The tag name of the value element a key is given in an
+    /// `ios.plistInject` fragment, or null when the fragment does not give
+    /// that key a value at all.
+    ///
+    /// A plist key is followed by exactly one value element, so this reads
+    /// the FIRST element after the key rather than searching for a type it
+    /// hoped to find. A key given `<false/>` has a value; it is simply not a
+    /// string, and reading "no string here" as "no value here" is what let a
+    /// wrong-typed value through unexamined.
+    static String injectedPlistValueTag(String inject, String key) {
+        String live = plistWithoutComments(inject);
+        int at = live.indexOf("<key>" + key + "</key>");
+        if (at < 0) {
+            return null;
+        }
+        int i = at + ("<key>" + key + "</key>").length();
+        while (i < live.length() && Character.isWhitespace(live.charAt(i))) {
+            i++;
+        }
+        if (i >= live.length() || live.charAt(i) != '<') {
+            return null;
+        }
+        int start = i + 1;
+        int end = start;
+        while (end < live.length()) {
+            char c = live.charAt(end);
+            if (c == '>' || c == '/' || Character.isWhitespace(c)) {
+                break;
+            }
+            end++;
+        }
+        return end > start ? live.substring(start, end) : null;
+    }
+
     private static String appendCallPlist(String inject, String key,
-            String value) {
+            String value) throws BuildException {
         // The EXACT key, not a substring of the fragment: a project with an
         // unrelated MyCN1CallAppGroupSetting suppressed generation entirely,
         // and the host plist then carried neither the group nor the extension
@@ -295,9 +346,29 @@ public class IPhoneBuilder extends Executor {
         // project that commented an old CN1CallAppGroup out was treated as
         // supplying it, so neither the comment nor a generated key reached
         // the host plist.
-        if (value == null || value.trim().length() == 0
-                || plistWithoutComments(inject)
-                        .contains("<key>" + key + "</key>")) {
+        if (value == null || value.trim().length() == 0) {
+            return inject;
+        }
+        if (plistWithoutComments(inject).contains("<key>" + key + "</key>")) {
+            String tag = injectedPlistValueTag(inject, key);
+            if (isCoordinatedCallKey(key) && tag != null
+                    && !"string".equals(tag)) {
+                // A VALID plist value of the wrong type -- <false/>, an
+                // <array>, a <dict>. The key check has already suppressed
+                // generation, so the host plist carries a CN1CallAppGroup
+                // that is a boolean: the app cannot address the container the
+                // generated extension reads, and every directory write fails
+                // on a device with nothing in the build to see. The other
+                // call keys are left alone, because the injected value IS
+                // what the native code reads and nothing else resolves it.
+                throw new BuildException("ios.plistInject sets " + key
+                        + " to a <" + tag + "> value, but this key has to be"
+                        + " a <string> -- the generated Call Directory"
+                        + " extension resolves the same value and the two"
+                        + " have to agree. Remove the key from"
+                        + " ios.plistInject, or give it the string '"
+                        + value.trim() + "'.");
+            }
             return inject;
         }
         return inject + "\n<key>" + key + "</key><string>"
@@ -5230,6 +5301,32 @@ public class IPhoneBuilder extends Executor {
                         || vpnEntitlement.trim().length() == 0) {
                     request.putArgument("ios.entitlements.com.apple.developer"
                             + ".networking.vpn.api", "allow-vpn");
+                } else if (!"allow-vpn".equals(vpnEntitlement.trim())) {
+                    // A NON-BLANK override is the same hole one step over.
+                    // Blank was handled above because it silently suppressed
+                    // the entitlement; a value like "false" survives instead,
+                    // and the array renderer emits <string>false</string> --
+                    // an entitlement no profile grants, so the archive fails
+                    // at codesign in a message about the app rather than
+                    // about the value that caused it.
+                    //
+                    // Refused rather than replaced: the hint is the project
+                    // saying something deliberate, and overwriting it
+                    // silently would ship a build that disagrees with its own
+                    // configuration. allow-vpn is the only value Apple
+                    // defines for this key, so there is nothing else to
+                    // honour.
+                    throw new BuildException("This app uses"
+                            + " com.codename1.vpn.profile, so its"
+                            + " com.apple.developer.networking.vpn.api"
+                            + " entitlement has to be 'allow-vpn' -- the only"
+                            + " value Apple defines for it. The build hint"
+                            + " ios.entitlements.com.apple.developer"
+                            + ".networking.vpn.api sets it to '"
+                            + vpnEntitlement.trim() + "', which no"
+                            + " provisioning profile grants, so the archive"
+                            + " would fail at codesign. Remove the hint and"
+                            + " let the build supply the value.");
                 }
             }
 
