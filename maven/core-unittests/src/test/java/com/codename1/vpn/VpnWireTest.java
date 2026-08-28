@@ -181,6 +181,34 @@ public class VpnWireTest {
     }
 
     @Test
+    public void anAddressThatIsNotOneIsRefused() {
+        // The simulation used to check the prefix and accept any host, so
+        // route("not-an-ip/32") started here and failed on Android, where
+        // VpnService.Builder.addRoute throws on a literal it cannot parse.
+        // A setup approved in the simulator that cannot come up on a phone
+        // is the divergence this arrangement exists to remove.
+        String[] bad = {"not-an-ip/32", "10.0.0/24", "10.0.0.256/24",
+                "10.0.0.1.2/24", "vpn.example.com/32", "/24", "10.0.0.-1/24",
+                "10.0..1/24"};
+        for (String block : bad) {
+            IllegalArgumentException e = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> TunnelWire.validate(block, "route"),
+                    block + " does not start with an address");
+            assertTrue(e.getMessage().contains(block),
+                    "the message names the block: " + e.getMessage());
+        }
+        // And every ordinary literal is still accepted, in both families and
+        // with the prefix left off.
+        String[] good = {"0.0.0.0/0", "10.0.0.2/32", "255.255.255.255",
+                "::/0", "fd00::2/128", "fd00::", "::ffff:10.0.0.2/128",
+                "2001:db8:0:0:0:0:0:1/64"};
+        for (String block : good) {
+            TunnelWire.validate(block, "route");
+        }
+    }
+
+    @Test
     public void anUnreadablePrefixIsRefusedRatherThanShrunk() {
         // The most dangerous answer available was the one this used to give.
         // "0.0.0.0/o" is a typo for the default route, and falling back to

@@ -124,10 +124,10 @@ public class LocalVpnBridge implements VpnBridge {
         try {
             String address = TunnelWire.address(fields);
             if (address.length() > 0) {
-                TunnelWire.prefix(address, "address");
+                TunnelWire.validate(address, "address");
             }
             for (String block : TunnelWire.routes(fields)) {
-                TunnelWire.prefix(block, "route");
+                TunnelWire.validate(block, "route");
             }
         } catch (IllegalArgumentException malformed) {
             Tunnels.deliverAck(requestId, false,

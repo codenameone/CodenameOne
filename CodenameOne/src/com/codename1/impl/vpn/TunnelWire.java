@@ -133,6 +133,86 @@ public final class TunnelWire {
         return slash < 0 ? cidr : cidr.substring(0, slash);
     }
 
+    /// Refuses a `host/prefix` block that is not one, in EITHER half.
+    ///
+    /// Here rather than in a port so the simulation refuses what a device
+    /// refuses. Android hands the address to `VpnService.Builder.addRoute`,
+    /// which throws on a literal it cannot parse, so `route("not-an-ip/32")`
+    /// failed there and started here -- and a setup approved in the
+    /// simulator that cannot come up on a phone is the divergence this whole
+    /// arrangement exists to remove.
+    ///
+    /// @param cidr the block, with or without a prefix
+    /// @param what the setup field it came from
+    /// @throws IllegalArgumentException when either half is unreadable
+    public static void validate(String cidr, String what) {
+        String host = host(cidr);
+        if (!isAddressLiteral(host)) {
+            throw new IllegalArgumentException("The " + what + " '" + cidr
+                    + "' does not start with an IP address");
+        }
+        prefix(cidr, what);
+    }
+
+    /// Whether this is an IP address literal.
+    ///
+    /// IPv4 is checked exactly: four dot-separated decimal octets in range.
+    /// IPv6 is checked by SHAPE -- hex digits, colons, and the dots of a
+    /// v4-mapped tail -- rather than parsed, because the address has eight
+    /// notations and a hand-written parser here would get one of them wrong
+    /// and refuse a setup that works. Core cannot borrow the platform's
+    /// parser: java.net.InetAddress is not part of the API a Codename One
+    /// application compiles against.
+    ///
+    /// So a malformed v6 literal can still reach the platform, which refuses
+    /// it. What this removes is the case that actually happens -- a
+    /// hostname, or a typo, written where an address belongs.
+    private static boolean isAddressLiteral(String host) {
+        if (host.length() == 0) {
+            return false;
+        }
+        if (host.indexOf(':') >= 0) {
+            int colons = 0;
+            for (int i = 0; i < host.length(); i++) {
+                char c = host.charAt(i);
+                if (c == ':') {
+                    colons++;
+                } else if (c != '.' && (c < '0' || c > '9')
+                        && (c < 'a' || c > 'f') && (c < 'A' || c > 'F')) {
+                    return false;
+                }
+            }
+            return colons >= 2;
+        }
+        int octets = 0;
+        int at = 0;
+        while (at <= host.length()) {
+            int dot = host.indexOf('.', at);
+            String part = dot < 0 ? host.substring(at)
+                    : host.substring(at, dot);
+            if (part.length() == 0 || part.length() > 3) {
+                return false;
+            }
+            int value = 0;
+            for (int i = 0; i < part.length(); i++) {
+                char c = part.charAt(i);
+                if (c < '0' || c > '9') {
+                    return false;
+                }
+                value = value * 10 + (c - '0');
+            }
+            if (value > 255) {
+                return false;
+            }
+            octets++;
+            if (dot < 0) {
+                break;
+            }
+            at = dot + 1;
+        }
+        return octets == 4;
+    }
+
     /// The prefix half of a `host/prefix` block, REFUSING text that is not
     /// one.
     ///

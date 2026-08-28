@@ -343,6 +343,7 @@ public class CN1VpnService extends VpnService {
             // as this does -- including refusing one it cannot read. A
             // missing prefix is filled, a present unreadable one throws, and
             // open() turns that into INVALID_CONFIGURATION with the message.
+            TunnelWire.validate(address, "address");
             b.addAddress(TunnelWire.host(address),
                     TunnelWire.prefix(address, "address"));
         }
@@ -395,6 +396,9 @@ public class CN1VpnService extends VpnService {
             excluded = false;
         }
         for (int i = 0; i < routes.length; i++) {
+            // Validated rather than left to Builder, so the message names
+            // the field and matches the one the simulation gives.
+            TunnelWire.validate(routes[i], "route");
             String net = TunnelWire.host(routes[i]);
             int prefix = TunnelWire.prefix(routes[i], "route");
             if (!excluded && servers.length > 0) {

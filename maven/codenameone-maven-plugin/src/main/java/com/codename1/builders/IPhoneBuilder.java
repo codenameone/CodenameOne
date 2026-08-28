@@ -751,7 +751,36 @@ public class IPhoneBuilder extends Executor {
                 "ios.call.directory.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
                 null);
         if (override != null && override.trim().length() > 0) {
-            return override.trim();
+            String value = override.trim();
+            // NO Xcode substitution. Xcode expands $(...) for the target it
+            // builds and nothing expands it here, so the same hint became
+            // one identifier in PRODUCT_BUNDLE_IDENTIFIER and a literal
+            // "$(APP_BUNDLE_IDENTIFIER).calldirectory" in the host plist and
+            // the profile check -- the app then asking the system to reload
+            // an extension identifier nothing installed, and the archive
+            // validated against an App ID that is not the one it ships.
+            //
+            // Refused rather than expanded: resolving these means
+            // reimplementing Xcode's setting evaluation, and getting it
+            // subtly wrong here would produce the same disagreement with no
+            // hint that a substitution was involved.
+            //
+            // Unchecked, as the manifest fragments' refusals are. This is a
+            // static helper two callers deep and the alternative is a
+            // throws clause threaded up through methods that have nothing to
+            // do with it.
+            if (value.indexOf("$(") >= 0 || value.indexOf("${") >= 0) {
+                throw new IllegalArgumentException("ios.call.directory"
+                        + ".buildSettings.PRODUCT_BUNDLE_IDENTIFIER is '"
+                        + value + "'. Xcode build-setting substitutions"
+                        + " cannot be used here: the same string is written"
+                        + " into the host Info.plist and checked against the"
+                        + " provisioning profile, and neither expands it, so"
+                        + " the extension the app asks the system to reload"
+                        + " would not be the one it built. Give the bundle"
+                        + " identifier itself.");
+            }
+            return value;
         }
         return IOSCallDirectoryExtensionBuilder.bundleId(
                 request.getPackageName());
