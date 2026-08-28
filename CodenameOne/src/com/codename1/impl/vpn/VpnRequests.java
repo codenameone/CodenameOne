@@ -95,6 +95,12 @@ public final class VpnRequests {
         ACKS.failAll(new IllegalStateException("reset"));
         STRINGS.failAll(new IllegalStateException("reset"));
         com.codename1.vpn.profile.Vpn.resetForTest();
+        // The TUNNEL registry too, which this did not reach. A tunnel
+        // registered by a finished test stayed the "running" one into the
+        // next, and the same gap outlives a real Display re-init: the
+        // application's tunnel object was held after the platform running it
+        // had gone.
+        com.codename1.vpn.tunnel.Tunnels.resetForTest();
     }
 
     /// The next request id, from one counter shared by the family.

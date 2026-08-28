@@ -104,11 +104,16 @@ public class CN1VpnService extends VpnService {
             stopSelf();
             return START_NOT_STICKY;
         }
-        VpnTunnel tunnel = Tunnels.getRegistered();
+        // Claimed by REQUEST, not read from a global. Two starts racing
+        // used to leave whichever registered last in the field, so this
+        // service command could run the second tunnel object under the first
+        // setup and acknowledge the first request.
+        VpnTunnel tunnel = Tunnels.claim(requestId);
         if (tunnel == null) {
             fail(requestId, VpnError.INVALID_CONFIGURATION,
-                    "No tunnel is registered; Tunnels.start() registers one"
-                    + " before the service is asked to run");
+                    "No tunnel is registered for this request; Tunnels"
+                    + ".start() registers one before the service is asked to"
+                    + " run, and a restart of this service does not carry it");
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -415,7 +420,13 @@ public class CN1VpnService extends VpnService {
             }
             value = value * 10 + (c - '0');
         }
-        return value > 0 && value <= fallback ? value : fallback;
+        // ZERO IS VALID, and it is the important one: /0 is the default
+        // route, which is what a full-tunnel VPN asks for and what the
+        // documentation shows. Treating it as unparseable handed the
+        // fallback back instead -- a /32 host route -- so the tunnel came up
+        // acknowledged and carried nothing, and the split around the server
+        // could not fire either because a /32 contains no other address.
+        return value >= 0 && value <= fallback ? value : fallback;
     }
 
     private void start(VpnTunnel tunnel, ParcelFileDescriptor fd,

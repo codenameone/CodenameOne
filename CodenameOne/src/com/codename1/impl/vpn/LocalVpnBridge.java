@@ -109,7 +109,7 @@ public class LocalVpnBridge implements VpnBridge {
 
     @Override
     public void startCustomTunnel(int requestId, String setupWire) {
-        VpnTunnel tunnel = Tunnels.getRegistered();
+        VpnTunnel tunnel = Tunnels.claim(requestId);
         if (tunnel == null) {
             Tunnels.deliverAck(requestId, false,
                     VpnError.INVALID_CONFIGURATION.ordinal(),

@@ -41,6 +41,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -173,6 +174,37 @@ public class TunnelsTest {
         String[] f = TunnelWire.split(TunnelWire.encodeSetup(
                 new TunnelSetup().address("10.0.0.2/32")));
         assertEquals(TunnelSetup.DEFAULT_MTU, TunnelWire.mtu(f));
+    }
+
+    @Test
+    public void twoStartsDoNotSwapEachOthersTunnels() {
+        // The registration used to be one field. On Android the service reads
+        // it back after startService returns, so a second start landing in
+        // that window ran the WRONG tunnel object under the first setup and
+        // acknowledged the first request. Each start carries its own now.
+        Echo first = new Echo();
+        Echo second = new Echo();
+        VpnAwait.value(Tunnels.start(first, new TunnelSetup()
+                .address("10.0.0.2/32").data("first")));
+        VpnAwait.value(Tunnels.start(second, new TunnelSetup()
+                .address("10.0.0.3/32").data("second")));
+        assertEquals("first", first.configuration.getData(),
+                "the first tunnel got the first setup");
+        assertEquals("second", second.configuration.getData(),
+                "and the second got its own");
+    }
+
+    @Test
+    public void aRefusedStartDoesNotStrandItsTunnel() {
+        // A start that never reaches the platform has to release what it
+        // registered, or the application's tunnel is held for the life of
+        // the process.
+        VpnRequests.resetForTest(null);
+        VpnAwait.assertFailedWith(VpnError.NOT_SUPPORTED,
+                Tunnels.start(new Echo(), new TunnelSetup()));
+        VpnRequests.resetForTest(bridge);
+        assertNull(Tunnels.getRegistered(),
+                "nothing is running, so nothing is registered");
     }
 
     @Test

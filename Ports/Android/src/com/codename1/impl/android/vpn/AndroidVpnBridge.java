@@ -1004,11 +1004,21 @@ public class AndroidVpnBridge implements VpnBridge {
         }
     }
 
+    /// Refuses a tunnel start, dropping the tunnel it registered.
+    ///
+    /// Every refusal goes through here rather than calling deliverAck
+    /// directly: a start that never reaches the service has to release its
+    /// entry, and a path that forgets leaks the application's tunnel object
+    /// until the process ends.
+    private static void failStart(int requestId, VpnError e, String message) {
+        Tunnels.abandon(requestId);
+        Tunnels.deliverAck(requestId, false, e.ordinal(), message);
+    }
+
     @Override
     public void startCustomTunnel(final int requestId, final String setupWire) {
         if (!isCustomTunnelSupported()) {
-            Tunnels.deliverAck(requestId, false,
-                    VpnError.NOT_SUPPORTED.ordinal(),
+            failStart(requestId, VpnError.NOT_SUPPORTED,
                     "This build does not declare a VPN tunnel service;"
                     + " reference com.codename1.vpn.tunnel so the builder"
                     + " adds it");
@@ -1024,7 +1034,7 @@ public class AndroidVpnBridge implements VpnBridge {
         Object mine = new Object();
         synchronized (this) {
             if (operationOwner != null) {
-                Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                failStart(requestId, VpnError.UNKNOWN,
                         "A VPN operation is in progress; wait for it to"
                         + " finish before starting a tunnel");
                 return;
@@ -1039,8 +1049,7 @@ public class AndroidVpnBridge implements VpnBridge {
             consent = asIntent(android.net.VpnService.prepare(context));
         } catch (Exception refused) {
             endOperation(mine);
-            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
-                    describe(refused));
+            failStart(requestId, VpnError.UNKNOWN, describe(refused));
             return;
         }
         if (consent == null) {
@@ -1051,8 +1060,7 @@ public class AndroidVpnBridge implements VpnBridge {
         Activity a = currentActivity();
         if (a == null) {
             endOperation(mine);
-            Tunnels.deliverAck(requestId, false,
-                    VpnError.UNAUTHORIZED.ordinal(),
+            failStart(requestId, VpnError.UNAUTHORIZED,
                     "Starting a VPN tunnel needs a foreground activity to"
                     + " show the consent prompt");
             return;
@@ -1070,8 +1078,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // The same case installProfile guards: a cached context that
             // still looks like an Activity after the app went to the
             // background. Answered rather than left pending.
-            Tunnels.deliverAck(requestId, false,
-                    VpnError.UNAUTHORIZED.ordinal(),
+            failStart(requestId, VpnError.UNAUTHORIZED,
                     "The VPN consent prompt could not be shown: "
                             + describe(launchFailed));
         }
@@ -1089,8 +1096,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // service would demand a notification the tunnel does not need.
             context.startService(i);
         } catch (RuntimeException refused) {
-            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
-                    describe(refused));
+            failStart(requestId, VpnError.UNKNOWN, describe(refused));
         }
     }
 
@@ -1148,8 +1154,7 @@ public class AndroidVpnBridge implements VpnBridge {
             // USER_DECLINED rather than an error: refusing a VPN prompt is
             // an ordinary answer, and an app that treats it as a failure
             // shows the user a problem where they made a choice.
-            Tunnels.deliverAck(requestId, false,
-                    VpnError.USER_DECLINED.ordinal(),
+            failStart(requestId, VpnError.USER_DECLINED,
                     "The user declined the VPN consent prompt");
         }
     }

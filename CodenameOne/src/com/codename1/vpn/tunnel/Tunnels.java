@@ -58,6 +58,19 @@ import com.codename1.vpn.spi.VpnBridge;
 /// happens to work on one platform.
 public final class Tunnels {
 
+    /// The tunnel each pending start belongs to, keyed by request.
+    ///
+    /// A map rather than one field, because a field is a race the port
+    /// cannot close: the already-authorized path releases its reservation
+    /// and calls startService, which returns before the service has read
+    /// anything -- so a second start overwrote the field in between and the
+    /// service ran the WRONG tunnel object under the first setup, then
+    /// acknowledged the wrong request. The intent already carries the
+    /// request id; claiming by that id is what makes the two agree.
+    private static final java.util.Map<Integer, VpnTunnel> PENDING =
+            new java.util.HashMap<Integer, VpnTunnel>();
+
+    /// The tunnel the platform is currently running, once it claimed one.
     private static VpnTunnel current;
 
     private Tunnels() {
@@ -91,14 +104,14 @@ public final class Tunnels {
         if (b == null || !b.isCustomTunnelSupported()) {
             return failed(VpnError.NOT_SUPPORTED, null);
         }
-        // Registered BEFORE the bridge is asked. On Android the service can
-        // be running and calling back into TunnelRunner before startTunnel
-        // returns, and a tunnel registered after that call had the platform
-        // holding a live link with nothing to hand its packets to.
-        synchronized (Tunnels.class) {
-            current = tunnel;
-        }
         int id = VpnRequests.nextId();
+        // Registered BEFORE the bridge is asked, and against THIS request.
+        // On Android the service can be running and reading it back before
+        // startCustomTunnel returns, so a tunnel registered afterwards left
+        // the platform holding a live link with nothing to hand packets to.
+        synchronized (Tunnels.class) {
+            PENDING.put(Integer.valueOf(id), tunnel);
+        }
         EdtResult<Boolean> r = VpnRequests.openAck(id);
         b.startCustomTunnel(id, TunnelWire.encodeSetup(setup));
         return r;
@@ -119,7 +132,26 @@ public final class Tunnels {
         return r;
     }
 
-    /// The tunnel this application registered, or null.
+    /// Takes the tunnel a particular start belongs to.
+    ///
+    /// Removes it, so two service commands carrying the same request cannot
+    /// both run it, and records it as the running one.
+    ///
+    /// @param requestId the id the start intent carried
+    /// @return the tunnel, or null when that start is not pending
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static VpnTunnel claim(int requestId) {
+        synchronized (Tunnels.class) {
+            VpnTunnel t = PENDING.remove(Integer.valueOf(requestId));
+            if (t != null) {
+                current = t;
+            }
+            return t;
+        }
+    }
+
+    /// The tunnel the platform is running, or null.
     ///
     /// @hidden not part of the public API; called by the ports.
     public static VpnTunnel getRegistered() {
@@ -134,6 +166,29 @@ public final class Tunnels {
     public static void clearRegistered() {
         synchronized (Tunnels.class) {
             current = null;
+        }
+    }
+
+    /// Forgets every tunnel, running or pending.
+    ///
+    /// Reached from VpnRequests.resetForTest, so a tunnel does not outlive
+    /// the bridge that was running it -- in a test, or across a Display
+    /// re-init where the platform holding it has gone.
+    ///
+    /// @hidden not part of the public API; test support.
+    public static void resetForTest() {
+        synchronized (Tunnels.class) {
+            PENDING.clear();
+            current = null;
+        }
+    }
+
+    /// Drops a start that never reached the platform.
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static void abandon(int requestId) {
+        synchronized (Tunnels.class) {
+            PENDING.remove(Integer.valueOf(requestId));
         }
     }
 

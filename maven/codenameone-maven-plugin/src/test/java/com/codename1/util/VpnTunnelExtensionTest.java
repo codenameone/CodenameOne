@@ -139,6 +139,32 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void theDefaultRouteSurvivesTheMaskHelper() {
+        // /0 is what a full-tunnel VPN asks for and what the documentation
+        // shows. Folding zero into 32 gave 255.255.255.255, so the extension
+        // installed a host route, started successfully, and carried almost
+        // nothing -- the same bug the Android parser had, in the other
+        // language.
+        String src = provider();
+        assertFalse(src.contains("if (bits <= 0 || bits > 32)"),
+                "zero is a valid prefix, and the important one");
+        assertTrue(src.contains("if (bits < 0 || bits > 32)"),
+                "only a negative or oversized prefix is unusable");
+    }
+
+    @Test
+    void theSuppliedIpv6PrefixIsUsed() {
+        // fd00::2/64 was parsed and then discarded for a hardcoded 128, so
+        // the interface did not match the requested subnet and what onStart
+        // reported was not what iOS installed.
+        String src = provider();
+        assertTrue(src.contains("v6bits"),
+                "the parsed prefix has to reach NEIPv6Settings");
+        assertFalse(src.contains("numberWithInt:128]]]"),
+                "128 is the default, not the answer");
+    }
+
+    @Test
     void theInfoPlistDeclaresAPacketTunnel() throws Exception {
         Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
                 "com.example.app", "My VPN", "1.0", "17",
