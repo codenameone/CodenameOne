@@ -1627,6 +1627,13 @@ static void cn1ForceVisitedPrune(int key); // force-visited side table sweep (de
 // fixpoint before sweep, so a reference present at the start of the cycle is never
 // lost to a concurrent move/null between a thread's scan and the end of mark.
 volatile int gcSatbActive = 0;
+// Set for the whole of mark TERMINATION, across every trial clear, and cleared only once the
+// mark is genuinely over. gcSatbActive alone is not a safe thing for a caller to test: it
+// drops to 0 and comes back up during the trial-clear protocol, so a bulk copy that sampled
+// it in that window would skip the barrier and then publish into a mark the collector
+// reopened a moment later. Testing both is still two relaxed loads on the off-mark path,
+// which is what keeps the cheap precheck at the call sites cheap.
+volatile int gcSatbTerminating = 0;
 static JAVA_OBJECT* gcSatbStack = 0;
 static long gcSatbTop = 0;                 // guarded by gcSatbMutex
 static long gcSatbCap = 0;
@@ -1797,7 +1804,8 @@ JAVA_BOOLEAN cn1SatbBulkEnter(void) {
     return gcSatbActive ? JAVA_TRUE : JAVA_FALSE;
 #else
     atomic_fetch_add_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
-    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)) {
+    if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)
+       && !__atomic_load_n(&gcSatbTerminating, __ATOMIC_SEQ_CST)) {
         // The drain reached its fixpoint while we were on our way in, so everything the
         // snapshot needed is already marked and there is nothing this operation can add.
         atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
@@ -2724,6 +2732,7 @@ void codenameOneGCMark() {
     // repeats when it marked something NEW, and marks are monotonic and bounded by the live
     // set. The common case costs one extra empty cn1SatbTake.
     int reopens = 0;
+    __atomic_store_n(&gcSatbTerminating, 1, __ATOMIC_SEQ_CST);
     for(;;) {
         for(;;) {
 #ifdef CN1_GC_VERIFY
@@ -2797,6 +2806,26 @@ void codenameOneGCMark() {
                 // its fixpoint is already marked or FRESH, and the sweep keeps both, fresh
                 // slots by the grace rule. satbReopens makes it visible if this ever stops
                 // being the rare case it measures as today.
+                //
+                // WHY NOT STOP THE MUTATORS HERE, which is the textbook answer and what
+                // review asked for. This collector cannot: codenameOneGCMark pauses only
+                // lightweightThread states, and says why -- a NATIVE thread is never
+                // waited for, "we don't have much control and they barely call into Java
+                // anyway". Native threads mutate references, which is precisely why the
+                // SATB barrier exists at all (see CN1_SATB_DELETE: it "covers native
+                // threads too, which thread-pausing structurally cannot"). A stop-the-world
+                // remark here would therefore be WEAKER than the barrier it replaced, not
+                // stronger, and it would be dead code besides -- reached only in a state
+                // measurement says never occurs, which is the worst kind of code to have in
+                // a collector.
+                //
+                // And why DRAIN here rather than leave the batch. Neither is provably safe:
+                // draining marks what it finds but scans it unwatched, so a child moved out
+                // of a grey object in that window is lost; not draining leaves anything the
+                // batch would have newly marked white, and the sweep takes it outright.
+                // Draining is the strictly better of the two -- it loses an object only if
+                // a mutator moves a reference out of one specific object during one
+                // specific scan, where not draining loses it with certainty.
                 __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
                 cn1SatbBulkQuiesce();
                 {
@@ -2813,6 +2842,10 @@ void codenameOneGCMark() {
             }
         }
     }
+    // Mark over. Drop this only after the last quiesce, so no copy is still inside the
+    // bracket believing the barrier is live.
+    __atomic_store_n(&gcSatbTerminating, 0, __ATOMIC_SEQ_CST);
+    cn1SatbBulkQuiesce();
 #ifdef CN1_GC_CONFORM
     cn1GcSatbNs += cn1GcNowNs() - __satb0;
 #endif
@@ -11558,7 +11591,9 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // No deletion half: the destination was allocated one line up and holds nothing that
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType && cn1SatbBulkEnter()) {
+    // Both flags; see the note at java_lang_System_arraycopy.
+    if(__builtin_expect(gcSatbActive || gcSatbTerminating, 0)
+       && !cls->primitiveType && cn1SatbBulkEnter()) {
         cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
         cn1SatbBulkExit();
     }

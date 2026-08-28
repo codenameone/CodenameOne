@@ -1030,6 +1030,7 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 // complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
+extern volatile int gcSatbTerminating;
 extern JAVA_BOOLEAN cn1SatbBulkEnter(void);
 extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
 extern void cn1SatbBulkExit(void);

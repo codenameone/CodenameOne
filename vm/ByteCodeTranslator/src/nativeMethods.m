@@ -991,7 +991,15 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // see zero and finish its final drain in that gap -- after which the insertion half
     // logs nothing while the memmove below publishes those references regardless. See
     // cn1SatbBulkEnter.
-    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType && cn1SatbBulkEnter()) {
+    // TEST BOTH FLAGS. gcSatbActive alone is unsafe to sample out here: mark termination
+    // clears and re-sets it during its trial-clear protocol, so a copy that read 0 in that
+    // window would skip the barrier and then publish its references into a mark the
+    // collector reopened a moment later. gcSatbTerminating stays up across every trial, so
+    // the pair is never both-zero while a mark can still reopen. cn1SatbBulkEnter re-reads
+    // them while REGISTERED, which is what makes the answer authoritative; this precheck is
+    // only the off-mark fast path, and stays two relaxed loads.
+    if(__builtin_expect(gcSatbActive || gcSatbTerminating, 0)
+       && !cls->primitiveType && cn1SatbBulkEnter()) {
         // One acquisition of the SATB mutex per 256 references rather than per reference;
         // this used to be two locked enqueues per element. See cn1SatbEnqueueRangeLocked.
         cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
