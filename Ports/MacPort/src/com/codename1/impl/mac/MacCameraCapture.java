@@ -86,12 +86,18 @@ final class MacCameraCapture {
 
     /// Opens the camera and shows the capture form.
     ///
-    /// Permission first, and asynchronously: on macOS the first use of a capture
-    /// device raises the system prompt, and opening a session before the answer
-    /// arrives gives a session with no device rather than an error worth
-    /// reporting.
+    /// Permission first, and asynchronously, through the system rather than
+    /// through Camera.requestPermissions().
+    ///
+    /// That method probes by opening a session with a sentinel id, and this
+    /// port's back end returns success for the sentinel without asking anyone --
+    /// so it answered "granted" while access was undetermined or refused, and
+    /// the capture went ahead to a preview that stayed black. Video also asks
+    /// for the microphone, because a recording made without it is a silent movie
+    /// reported as a success.
     private static void start(final ActionListener response, final boolean video) {
-        Camera.requestPermissions(video, new SuccessCallback<Boolean>() {
+        com.codename1.impl.ios.IOSImplementation.requestCameraAccess(video,
+                new SuccessCallback<Boolean>() {
             @Override
             public void onSucess(Boolean granted) {
                 if (granted == null || !granted.booleanValue()) {
@@ -321,8 +327,16 @@ final class MacCameraCapture {
         try {
             out = FileSystemStorage.getInstance().openOutputStream(path);
             out.write(jpeg);
+            // Closed HERE rather than only in the finally, and its failure is a
+            // failure of the write. A stream buffers, so the error that matters
+            // -- the disk filling as the last block is flushed -- surfaces from
+            // close() and nowhere else. Logging it and returning the path anyway
+            // handed the application a truncated JPEG reported as a success.
+            out.close();
+            out = null;
         } catch (Throwable t) {
             Log.e(t);
+            deleteQuietly(path);
             return null;
         } finally {
             if (out != null) {

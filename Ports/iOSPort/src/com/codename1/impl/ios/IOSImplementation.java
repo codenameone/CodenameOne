@@ -12268,6 +12268,46 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// The lifecycle notification still fires -- an application that wants to
     /// pause on losing focus is entitled to -- and isActive still goes false.
+    // Camera authorization answers, keyed by the id handed to cn1CameraRequestAccess.
+    private static final java.util.HashMap<Integer, com.codename1.util.SuccessCallback<Boolean>>
+            pendingCameraAccess = new java.util.HashMap<Integer, com.codename1.util.SuccessCallback<Boolean>>();
+    private static int nextCameraAccessId = 1;
+
+    /// Asks the system for camera access, and optionally microphone access, reporting the real
+    /// answer.
+    ///
+    /// Camera.requestPermissions() cannot answer this: it probes by opening a session with a
+    /// sentinel id, and this port's back end returns success for that without asking anyone. So a
+    /// capture went ahead while access was undetermined or refused, and the user got a preview that
+    /// stayed black or a recording with no sound.
+    public static void requestCameraAccess(boolean audio,
+            com.codename1.util.SuccessCallback<Boolean> callback) {
+        int id;
+        synchronized (pendingCameraAccess) {
+            id = nextCameraAccessId++;
+            pendingCameraAccess.put(Integer.valueOf(id), callback);
+        }
+        nativeInstance.cn1CameraRequestAccess(audio, id);
+    }
+
+    /// Invoked from native with the outcome. Public so the VM-emitted symbol stays stable.
+    public static void cn1CameraAccessResult(int callbackId, final boolean granted) {
+        final com.codename1.util.SuccessCallback<Boolean> callback;
+        synchronized (pendingCameraAccess) {
+            callback = pendingCameraAccess.remove(Integer.valueOf(callbackId));
+        }
+        if (callback == null) {
+            return;
+        }
+        // On the EDT: this arrives from an AVFoundation completion handler, and
+        // the caller opens a camera and shows a Form with the answer.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                callback.onSucess(Boolean.valueOf(granted));
+            }
+        });
+    }
+
     /// Runs the native side's next delivery step behind everything already queued on this
     /// thread.
     ///

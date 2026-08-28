@@ -437,6 +437,51 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 // still exist so ParparVM links cleanly -- they just return null/0 and
 // the Java side reports the platform as unsupported.
 
+/// Reports an authorization answer back to Java, on the main queue.
+///
+/// Declared here rather than by including the generated header: this file
+/// includes none of them, and one extern is a smaller dependency than the whole
+/// class header.
+extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_cn1CameraAccessResult___int_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT callbackId, JAVA_BOOLEAN granted);
+
+static void cn1CameraReportAccess(int callbackId, BOOL granted) {
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_cn1CameraAccessResult___int_boolean(
+            threadStateData, (JAVA_INT)callbackId, granted ? JAVA_TRUE : JAVA_FALSE);
+}
+
+void com_codename1_impl_ios_IOSNative_cn1CameraRequestAccess___boolean_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN audio, JAVA_INT callbackId) {
+#if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
+    int cb = (int)callbackId;
+    BOOL wantsAudio = audio != 0;
+    // Asked rather than inspected. The status can be undetermined, and there is
+    // no answer to report until the user has actually been shown the prompt --
+    // requestAccessForMediaType is what shows it, and calls back with the real
+    // result whether or not it had to.
+    [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
+                             completionHandler:^(BOOL videoGranted) {
+        if (!videoGranted || !wantsAudio) {
+            // Audio is not asked for when video was refused: the capture cannot
+            // happen either way, and a second prompt for a session that will not
+            // run is a prompt the user has to dismiss for nothing.
+            cn1CameraReportAccess(cb, videoGranted);
+            return;
+        }
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
+                                 completionHandler:^(BOOL audioGranted) {
+            // Both, for a video recording. A denied microphone produced a
+            // silent movie reported as a success, which is worse than declining:
+            // the file looks right until it is played.
+            cn1CameraReportAccess(cb, audioGranted);
+        }];
+    }];
+#else
+    cn1CameraReportAccess((int)callbackId, NO);
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_cn1CameraEnumerate___R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if defined(INCLUDE_CN1_CAMERA) && !TARGET_OS_TV
