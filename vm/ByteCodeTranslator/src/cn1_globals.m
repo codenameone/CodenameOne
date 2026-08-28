@@ -3093,6 +3093,47 @@ static _Atomic int cn1BibopGcScheduled = 0;
 // consumes it alongside forceGc.
 static _Atomic int cn1GcNativeGcRequest = 0;
 
+// Something that CHANGES when a collection starts, for callers that need to wait for the
+// one they just asked for rather than for a handshake that may never reach them.
+#ifdef CN1_GC_CONFORM
+// TEST HOOK. CN1_SIMULATE_ALLOC_FAILURES=<n> makes the next n legacy allocations return
+// NULL. The out-of-memory retry path is the one place in this allocator that cannot be
+// reached on a developer machine -- macOS ignores `ulimit -v`, so there is no way to make
+// calloc fail on demand -- and it has now been the subject of two review findings that
+// could only be reasoned about. Gated on CN1_GC_CONFORM, like the rest of the QA
+// instrumentation, so no shipping build can be told to fail an allocation.
+static _Atomic long cn1SimulatedAllocFailures = -1;
+_Atomic long cn1AllocRetries = 0;   // times the OOM path went round again
+
+static JAVA_BOOLEAN cn1ShouldFailAllocation(void) {
+    long v = atomic_load_explicit(&cn1SimulatedAllocFailures, memory_order_relaxed);
+    if(v < 0) {
+        const char* e = getenv("CN1_SIMULATE_ALLOC_FAILURES");
+        v = e ? atol(e) : 0;
+        if(v < 0) {
+            v = 0;
+        }
+        atomic_store_explicit(&cn1SimulatedAllocFailures, v, memory_order_relaxed);
+    }
+    if(v <= 0) {
+        return JAVA_FALSE;
+    }
+    return atomic_fetch_sub_explicit(&cn1SimulatedAllocFailures, 1, memory_order_relaxed) > 0
+            ? JAVA_TRUE : JAVA_FALSE;
+}
+#endif
+
+static int cn1GcCycleTick(void) {
+#ifndef CN1_DISABLE_BIBOP
+    // Published at cycle start by cn1BibopBeginGcCycle.
+    return atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+#else
+    // No epoch to observe with the page heap compiled out; entering a cycle at least
+    // flips this, which is enough for a bounded wait in an ablation-only build.
+    return gcCurrentlyRunning ? 1 : 0;
+#endif
+}
+
 static void cn1RequestGcFromParkedThread(void) {
     atomic_store_explicit(&cn1GcNativeGcRequest, 1, memory_order_release);
 }
@@ -3105,6 +3146,12 @@ static void cn1RequestGcFromParkedThread(void) {
 // collector cannot hang a mutator forever. On expiry the caller grows its table instead.
 #ifndef CN1_PENDING_WAIT_MAX_SPINS
 #define CN1_PENDING_WAIT_MAX_SPINS 10000
+#endif
+
+// Milliseconds of backoff between retries of a FAILED allocation. Not a wait for a whole
+// collection -- see the measurement at the use site.
+#ifndef CN1_ALLOC_RETRY_BACKOFF_SPINS
+#define CN1_ALLOC_RETRY_BACKOFF_SPINS 10
 #endif
 
 // NOT under CN1_GC_CONFORM: this one is policy, not diagnostics -- gcIdleWaitMillis reads
@@ -7983,6 +8030,14 @@ cn1GcMallocRetry:
     JAVA_OBJECT o = (JAVA_OBJECT)calloc(1, size);
     JAVA_BOOLEAN needsZeroing = JAVA_FALSE;
 #endif
+#ifdef CN1_GC_CONFORM
+    // Not before the VM is up: an injected failure during bootstrap tests the bootstrap,
+    // not the retry path, and the process cannot survive it either way.
+    if(o != NULL && constantPoolObjects != 0 && cn1ShouldFailAllocation()) {
+        free(o);
+        o = NULL;
+    }
+#endif
     if(o == NULL) {
         // malloc failed! We need to free up RAM FAST!
         //
@@ -7996,9 +8051,72 @@ cn1GcMallocRetry:
         // those, threadBlockedByGC is still false, the wait below falls straight through,
         // and this function recurses into another failing allocation -- burning stack
         // instead of giving the collection it just asked for a chance to happen.
+        // constantPoolObjects != 0 is the guard every other GC-trigger site in this file
+        // carries, and this one did not: java_lang_System_gc__ reaches startGCThread(),
+        // which touches System's statics, and calling it before the constant pool exists
+        // dereferences null. Injecting a single allocation failure early in startup
+        // reproduces that as an EXC_BAD_ACCESS inside startGCThread -- which is what a real
+        // out-of-memory during bootstrap would have done. There is nothing to collect that
+        // early anyway, so the answer is to sleep briefly and retry rather than to ask.
+        if(constantPoolObjects == 0) {
+            usleep((JAVA_INT)(1000));
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1AllocRetries, 1, memory_order_relaxed);
+#endif
+            goto cn1GcMallocRetry;
+        }
         invokedGC = YES;
         java_lang_System_gc__(getThreadLocalData());
+        CN1_GC_PARK_CAPTURE(threadStateData);   // this park can now last seconds; be scannable
         threadStateData->threadActive = JAVA_FALSE;
+        // WAIT FOR THE COLLECTION THIS JUST ASKED FOR. System.gc() is asynchronous, so
+        // threadBlockedByGC is still false whenever the collector has not begun -- and
+        // right after startGCThread() it cannot have, because that thread's first act is
+        // LOCK.wait(2000). Falling through on that flag alone and retrying immediately is
+        // a tight spin: calloc fails, System.gc() takes the monitor, the flag reads false,
+        // the retry fails again. It hammers the very monitor the collector needs in order
+        // to wake up and do the thing being waited for.
+        //
+        // This was survivable before only because the retry recursed and the process ran
+        // out of stack; turning that into a loop removed the accidental brake, so the wait
+        // has to be a real one. Bounded, so a collection that never comes cannot wedge the
+        // allocator, and it still ends the moment the collector takes this thread into its
+        // handshake.
+#ifndef CN1_GC_NO_ALLOC_WAIT
+        {
+            // A SHORT backoff, not a wait for the whole cycle. Both halves of that were
+            // measured with CN1_SIMULATE_ALLOC_FAILURES, 200 consecutive failures on one
+            // allocation:
+            //
+            //   no delay at all       0.37s wall, 0.17s CPU   -- and 0.85ms of CPU per
+            //                                                    iteration, because the
+            //                                                    monitor round-trip in
+            //                                                    System.gc() already
+            //                                                    throttles it. Not the CPU
+            //                                                    fire it looks like.
+            //   wait for the cycle   40.51s wall              -- 100x slower to recover,
+            //                                                    because each retry sits
+            //                                                    through the collector's
+            //                                                    200ms idle.
+            //
+            // So the thing worth preventing is an unbounded retry rate in the window where
+            // System.gc() returns instantly and nothing collects -- the two seconds after
+            // startGCThread(), whose first act is LOCK.wait(2000) -- and the thing worth
+            // NOT paying is a full cycle per failed allocation. Ten milliseconds caps the
+            // rate at a hundred retries a second and costs a hundredth of what waiting for
+            // the cycle did; the loop still exits the moment a collection actually starts.
+            int gcWaitSpins = 0;
+            int tickAtRequest = cn1GcCycleTick();
+            while(gcWaitSpins < CN1_ALLOC_RETRY_BACKOFF_SPINS
+                  && !threadStateData->threadBlockedByGC
+                  && cn1GcCycleTick() == tickAtRequest
+                  && get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
+                usleep((JAVA_INT)(1000));
+                gcWaitSpins++;
+            }
+        }
+#endif
+        // Then honour the handshake, unbounded, exactly like every other park here.
         while(threadStateData->threadBlockedByGC) {
             usleep((JAVA_INT)(1000));
         }
@@ -8016,6 +8134,9 @@ cn1GcMallocRetry:
         // re-execution of the counters and the class registration above -- without the
         // frame. The retry stays unbounded because this VM has no way to fail an
         // allocation; what changed is that failing repeatedly no longer costs stack.
+#ifdef CN1_GC_CONFORM
+        atomic_fetch_add_explicit(&cn1AllocRetries, 1, memory_order_relaxed);
+#endif
         goto cn1GcMallocRetry;
     }
     if(needsZeroing) {
@@ -10458,6 +10579,8 @@ static void cn1ReportStalls(void) {
                 ? (double)atomic_load_explicit(&cn1GcSnapSortNs, memory_order_relaxed)
                     / (double)atomic_load_explicit(&cn1ConsExtSorted, memory_order_relaxed)
                 : 0.0);
+    fprintf(stderr, "[GCSTALL] allocRetries=%ld\n",
+            atomic_load_explicit(&cn1AllocRetries, memory_order_relaxed));
     fprintf(stderr, "[GCSTALL] gracePagesWalked=%lld gracePagesSkipped=%lld"
                     " graceSlotsWalked=%lld graceSlotsFresh=%lld graceMarked=%lld\n",
             atomic_load_explicit(&cn1GracePagesWalked, memory_order_relaxed),
