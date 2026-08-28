@@ -258,6 +258,28 @@ public class CN1ConnectionService extends ConnectionService {
 
         @Override
         public void run() {
+            // READY STILL, re-read on this pass. setJavaReady(true) empties
+            // the queue and posts this, and the app can remove its last
+            // listener in between -- a form closing as a call arrives. The
+            // registry is then empty when this runs, so the START goes to
+            // nobody, fails unanswered, and Telecom destroys the connection:
+            // exactly the outcome parking exists to avoid, arrived at
+            // through the mechanism that avoids it.
+            //
+            // Put back rather than delivered. Each entry keeps its own
+            // watchdog, so a call that is never claimed still ends on the
+            // timeout instead of waiting for ever, and the next listener to
+            // arrive drains it.
+            synchronized (WAITING_STARTS) {
+                if (!javaReady) {
+                    for (PendingStart p : pending) {
+                        if (!p.sent && !WAITING_STARTS.contains(p)) {
+                            WAITING_STARTS.add(p);
+                        }
+                    }
+                    return;
+                }
+            }
             for (PendingStart p : pending) {
                 p.deliver();
             }

@@ -185,6 +185,51 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void theHelpersAreDeclaredBeforeTheyAreCalled() {
+        // The implementation calls cn1tnSettings and cn1tnReason and their
+        // definitions follow @end, which reads well and does not compile:
+        // C99 removed implicit declarations and current clang makes that an
+        // error, so the generated target failed on its own first build.
+        //
+        // Nothing in this repository compiles this file -- it is written
+        // here and built by Xcode on a machine none of our tests run on --
+        // which is exactly why a break like this sat here unseen. Checked
+        // by generating the provider and running clang against the real iOS
+        // SDK; that cannot run in a unit test, so this holds the property
+        // the fix established.
+        String src = provider();
+        int impl = src.indexOf("@implementation");
+        assertTrue(impl > 0, "the provider has an implementation");
+        String preamble = src.substring(0, impl);
+        for (String helper : new String[] {"cn1tnSettings", "cn1tnReason"}) {
+            assertTrue(preamble.contains(helper),
+                    helper + " is called from the implementation, so it has"
+                    + " to be declared above it: " + preamble);
+        }
+    }
+
+    @Test
+    void routesOfBothFamiliesReachTheLink() {
+        // The address decides which family carries the interface and the
+        // route helpers drop entries of the other, so
+        // address("10.0.0.2/32").route("0.0.0.0/0").route("::/0") built v4
+        // settings, discarded the v6 route, and reported the tunnel
+        // connected while v6 traffic went around it -- a full tunnel
+        // carrying half the traffic.
+        String src = provider();
+        int at = src.indexOf("The OTHER family");
+        assertTrue(at > 0, "the other family has to be considered at all");
+        String block = src.substring(at, src.indexOf("NSString *dns", at));
+        assertTrue(block.contains("cn1tnRoutes6(cn1tnField(f, 2))")
+                        && block.contains("cn1tnRoutes(cn1tnField(f, 2))"),
+                "both helpers are consulted, whichever family the address is");
+        assertTrue(block.contains("[cn1tnField(f, 2) length] > 0"),
+                "and only when routes were NAMED -- an empty list means the"
+                + " default route, which belongs to the family that has the"
+                + " address");
+    }
+
+    @Test
     void searchDomainsReachTheLink() {
         // TunnelSetup documents iOS applying these, and field 4 was carried
         // across the wire and then never read -- so a short hostname that

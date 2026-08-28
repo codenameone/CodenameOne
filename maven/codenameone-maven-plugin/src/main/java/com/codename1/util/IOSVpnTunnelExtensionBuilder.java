@@ -26,8 +26,31 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Generates the iOS packet-tunnel app extension behind
- * {@code com.codename1.vpn.tunnel}.
+ * NOTHING CALLS THIS, and that is the current state rather than an oversight.
+ *
+ * <p>IPhoneBuilder refuses {@code ios.vpn.tunnel=true} and never enables
+ * {@code CN1_VPN_TUNNEL}, so {@code vpnTunnelSupported()} compiles to false
+ * in every build and no target is generated. The class is kept, and kept
+ * under test, because the piece that is missing is a ByteCodeTranslator
+ * translation rooted at the tunnel -- not any of this -- and throwing the
+ * generator away would mean writing it again from nothing when that lands.
+ *
+ * <p>It has been read as evidence that the iOS tunnel works, twice. It is
+ * not: a generator with no caller and a {@code #if} whose macro nothing
+ * defines produce no code at all. The guide says the iOS half is unbuilt
+ * because the iOS half is unbuilt.
+ *
+ * <p>One consequence worth stating plainly: no build in this repository
+ * compiles what this writes. The output was checked by generating it and
+ * running clang against the real iOS SDK by hand, which is how a
+ * forward-declaration break that would have failed the target's first build
+ * was found sitting here. Treat a change to this file as unverified until
+ * that is done again.
+ *
+ * <hr>
+ *
+ * <p>What it WOULD generate, when there is something to call it: the iOS
+ * packet-tunnel app extension behind {@code com.codename1.vpn.tunnel}.</p>
  *
  * <p>This one differs from every other extension this builder generates:
  * <b>it hosts a virtual machine</b>. The others are small Objective-C
@@ -38,11 +61,14 @@ import java.util.Map;
  *
  * <p>An earlier version of this framework recorded that this could not be
  * done -- that a Network Extension is "a separate process with no ParparVM
- * in it". The premise was wrong: the extension is a target this build
- * produces, so what is in it is this build's decision. What IS true is that
- * it shares nothing with the app: no statics, no {@code Display}, no open
- * connections. Everything the tunnel needs travels in
- * {@code TunnelSetup.data} and arrives as the provider configuration.</p>
+ * in it". That premise is half right, and the half that matters is the
+ * reason nothing calls this yet: the extension WOULD be a target this build
+ * produces, so what is in it would be this build's decision -- but the
+ * translation that would put a VM in it without the application shell, whose
+ * natives call UIKit an extension may not touch, has not been written. What
+ * IS true either way is that it shares nothing with the app: no statics, no
+ * {@code Display}, no open connections. Everything the tunnel needs travels
+ * in {@code TunnelSetup.data} and arrives as the provider configuration.</p>
  *
  * <p><b>The entitlement is not injected.</b>
  * {@code com.apple.developer.networking.networkextension} is granted by Apple
@@ -186,6 +212,20 @@ public final class IOSVpnTunnelExtensionBuilder {
                 .append("_ctor__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);\n");
         sb.append("\n");
         sb.append("static CN1VpnTunnelProvider *cn1tnProvider = nil;\n");
+        sb.append("\n");
+        sb.append("// FORWARD DECLARATIONS for the helpers below.\n");
+        sb.append("//\n");
+        sb.append("// The implementation calls them and their definitions\n");
+        sb.append("// follow it, which reads well and does not compile: C99\n");
+        sb.append("// removed implicit declarations and current clang makes\n");
+        sb.append("// that an error, so the generated target failed on its\n");
+        sb.append("// own first build. Nothing in this repository compiles\n");
+        sb.append("// this file -- it is written here and built by Xcode on a\n");
+        sb.append("// machine none of our tests run on -- which is the whole\n");
+        sb.append("// reason a break like this could sit here unseen.\n");
+        sb.append("static NEPacketTunnelNetworkSettings *cn1tnSettings(\n");
+        sb.append("        NSString *wire);\n");
+        sb.append("static JAVA_INT cn1tnReason(NEProviderStopReason reason);\n");
         sb.append("\n");
         sb.append("@implementation CN1VpnTunnelProvider\n");
         sb.append("\n");
@@ -519,6 +559,49 @@ public final class IOSVpnTunnelExtensionBuilder {
                 + "            // interface and route nothing.\n"
                 + "            v4s.includedRoutes = cn1tnRoutes(cn1tnField(f, 2));\n"
                 + "            s.IPv4Settings = v4s;\n"
+                + "        }\n"
+                + "        // The OTHER family, when the routes ask for one.\n"
+                + "        // The address decides which family carries the\n"
+                + "        // interface, and the route helpers drop entries of\n"
+                + "        // the other -- so address(\"10.0.0.2/32\")\n"
+                + "        // .route(\"0.0.0.0/0\").route(\"::/0\") built v4\n"
+                + "        // settings, discarded the v6 route, and reported\n"
+                + "        // the tunnel connected while v6 traffic went\n"
+                + "        // around it. A full tunnel that carries half the\n"
+                + "        // traffic is the failure the exclusion work above\n"
+                + "        // is all about, arrived at from the other side.\n"
+                + "        //\n"
+                + "        // Only when routes were NAMED: an empty list means\n"
+                + "        // the default route, which belongs to the family\n"
+                + "        // that has the address and not to both.\n"
+                + "        //\n"
+                + "        // Whether iOS accepts a family carrying routes and\n"
+                + "        // no address is not something this can settle from\n"
+                + "        // here. If it refuses, setTunnelNetworkSettings\n"
+                + "        // fails and the error reaches the application --\n"
+                + "        // which is the outcome to prefer over a tunnel\n"
+                + "        // that says it carries everything and does not.\n"
+                + "        if ([cn1tnField(f, 2) length] > 0) {\n"
+                + "            NSArray *other = v6\n"
+                + "                    ? cn1tnRoutes(cn1tnField(f, 2))\n"
+                + "                    : cn1tnRoutes6(cn1tnField(f, 2));\n"
+                + "            if ([other count] > 0) {\n"
+                + "                if (v6) {\n"
+                + "                    NEIPv4Settings *o = [[[NEIPv4Settings alloc]\n"
+                + "                            initWithAddresses:[NSArray array]\n"
+                + "                            subnetMasks:[NSArray array]]\n"
+                + "                            autorelease];\n"
+                + "                    o.includedRoutes = other;\n"
+                + "                    s.IPv4Settings = o;\n"
+                + "                } else {\n"
+                + "                    NEIPv6Settings *o = [[[NEIPv6Settings alloc]\n"
+                + "                            initWithAddresses:[NSArray array]\n"
+                + "                            networkPrefixLengths:[NSArray array]]\n"
+                + "                            autorelease];\n"
+                + "                    o.includedRoutes = other;\n"
+                + "                    s.IPv6Settings = o;\n"
+                + "                }\n"
+                + "            }\n"
                 + "        }\n"
                 + "    }\n"
                 + "    NSString *dns = cn1tnField(f, 3);\n"
