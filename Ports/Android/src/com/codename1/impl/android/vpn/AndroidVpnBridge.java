@@ -39,6 +39,8 @@ import com.codename1.vpn.VpnStatus;
 import com.codename1.vpn.profile.Vpn;
 import com.codename1.vpn.profile.VpnProfile;
 import com.codename1.vpn.spi.VpnBridge;
+import com.codename1.vpn.tunnel.TunnelStopReason;
+import com.codename1.vpn.tunnel.Tunnels;
 
 import java.lang.reflect.Method;
 
@@ -177,8 +179,40 @@ public class AndroidVpnBridge implements VpnBridge {
 
     @Override
     public boolean isCustomTunnelSupported() {
-        // A VpnService the app implements is a separate, much larger
-        // commitment and is reported by the tunnel package's own bridge.
+        // The port ships CN1VpnService, so this is true wherever the
+        // manifest declares it -- which the builder does only for an app
+        // that referenced com.codename1.vpn.tunnel. Tested rather than
+        // assumed: an app carrying the class without the <service> cannot
+        // run a tunnel, and saying it can would send it down a path that
+        // fails at establish() with nothing to explain it.
+        return declaresTunnelService();
+    }
+
+    /// Whether the manifest declares the tunnel service.
+    ///
+    /// A VpnService that is not declared, or is declared without
+    /// BIND_VPN_SERVICE, is one Android silently refuses to bind.
+    private boolean declaresTunnelService() {
+        try {
+            android.content.pm.PackageManager pm = context.getPackageManager();
+            android.content.pm.ServiceInfo[] services = pm.getPackageInfo(
+                    context.getPackageName(),
+                    android.content.pm.PackageManager.GET_SERVICES).services;
+            if (services == null) {
+                return false;
+            }
+            String name = CN1VpnService.class.getName();
+            for (int i = 0; i < services.length; i++) {
+                if (name.equals(services[i].name)) {
+                    return true;
+                }
+            }
+        } catch (Exception missing) {
+            // A package manager that cannot answer says nothing about the
+            // manifest, and claiming the capability on a guess is the
+            // failure this method exists to avoid.
+            return false;
+        }
         return false;
     }
 
@@ -960,6 +994,125 @@ public class AndroidVpnBridge implements VpnBridge {
         } finally {
             // See startVpn: released on every path.
             endOperation(mine);
+        }
+    }
+
+    @Override
+    public void startCustomTunnel(final int requestId, final String setupWire) {
+        if (!isCustomTunnelSupported()) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.NOT_SUPPORTED.ordinal(),
+                    "This build does not declare a VPN tunnel service;"
+                    + " reference com.codename1.vpn.tunnel so the builder"
+                    + " adds it");
+            return;
+        }
+        // CONSENT first, and it is a prompt rather than a permission: an app
+        // cannot hold BIND_VPN_SERVICE, it asks the user each time the grant
+        // is not already in force. prepare() answers null when it is.
+        Intent consent;
+        try {
+            consent = asIntent(android.net.VpnService.prepare(context));
+        } catch (Exception refused) {
+            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                    describe(refused));
+            return;
+        }
+        if (consent == null) {
+            launchTunnel(requestId, setupWire);
+            return;
+        }
+        Activity a = currentActivity();
+        if (a == null) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.UNAUTHORIZED.ordinal(),
+                    "Starting a VPN tunnel needs a foreground activity to"
+                    + " show the consent prompt");
+            return;
+        }
+        try {
+            com.codename1.impl.android.AndroidNativeUtil
+                    .startActivityForResult(consent,
+                            new TunnelConsent(this, requestId, setupWire));
+        } catch (RuntimeException launchFailed) {
+            // The same case installProfile guards: a cached context that
+            // still looks like an Activity after the app went to the
+            // background. Answered rather than left pending.
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.UNAUTHORIZED.ordinal(),
+                    "The VPN consent prompt could not be shown: "
+                            + describe(launchFailed));
+        }
+    }
+
+    /// Starts the service now that consent is in force.
+    void launchTunnel(int requestId, String setupWire) {
+        try {
+            Intent i = new Intent(context, CN1VpnService.class);
+            i.putExtra(CN1VpnService.EXTRA_SETUP, setupWire);
+            i.putExtra(CN1VpnService.EXTRA_REQUEST, requestId);
+            // startService, not startForegroundService: a VpnService is
+            // exempt from the background start restriction precisely because
+            // the user has just consented to it, and asking for a foreground
+            // service would demand a notification the tunnel does not need.
+            context.startService(i);
+        } catch (RuntimeException refused) {
+            Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                    describe(refused));
+        }
+    }
+
+    @Override
+    public void stopCustomTunnel(int requestId) {
+        if (!isCustomTunnelSupported()) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.NOT_SUPPORTED.ordinal(), null);
+            return;
+        }
+        try {
+            Intent i = new Intent(context, CN1VpnService.class);
+            i.setAction(CN1VpnService.ACTION_STOP);
+            i.putExtra(CN1VpnService.EXTRA_REQUEST, requestId);
+            context.startService(i);
+        } catch (RuntimeException refused) {
+            // A service that is not running cannot be told to stop, and the
+            // app asking for a stopped tunnel to stop has got what it asked
+            // for -- so this is a success, not an error.
+            CN1VpnService.stopTunnel(TunnelStopReason.REQUESTED);
+            Tunnels.deliverAck(requestId, true, 0, null);
+        }
+    }
+
+    /// Answers the tunnel start once the user has decided.
+    ///
+    /// A named class rather than an anonymous one so it carries no synthetic
+    /// reference to the activity, which outlives the dialog.
+    private static final class TunnelConsent
+            implements com.codename1.impl.android.IntentResultListener {
+        private final AndroidVpnBridge bridge;
+        private final int requestId;
+        private final String setupWire;
+
+        TunnelConsent(AndroidVpnBridge bridge, int requestId,
+                String setupWire) {
+            this.bridge = bridge;
+            this.requestId = requestId;
+            this.setupWire = setupWire;
+        }
+
+        @Override
+        public void onActivityResult(int requestCode, int resultCode,
+                Intent data) {
+            if (resultCode == Activity.RESULT_OK) {
+                bridge.launchTunnel(requestId, setupWire);
+                return;
+            }
+            // USER_DECLINED rather than an error: refusing a VPN prompt is
+            // an ordinary answer, and an app that treats it as a failure
+            // shows the user a problem where they made a choice.
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.USER_DECLINED.ordinal(),
+                    "The user declined the VPN consent prompt");
         }
     }
 

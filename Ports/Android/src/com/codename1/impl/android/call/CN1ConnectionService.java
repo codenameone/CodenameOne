@@ -138,6 +138,116 @@ public class CN1ConnectionService extends ConnectionService {
     private static final Map<String, CN1Connection> SYSTEM_STARTED =
             new HashMap<String, CN1Connection>();
 
+    /// System-started calls waiting for the app's Java to be listening.
+    ///
+    /// Guarded by its own monitor, which also guards JAVA_READY, so a
+    /// listener registering cannot land between the check and the park.
+    private static final List<PendingStart> WAITING_STARTS =
+            new ArrayList<PendingStart>();
+
+    /// Whether any listener is installed to receive a start request.
+    private static boolean javaReady;
+
+    /// How long a system-started call may wait for the app to come up.
+    ///
+    /// Bounded because Telecom is holding a connection that says DIALING the
+    /// whole time. On expiry the request is delivered anyway, which fails the
+    /// action and destroys the connection -- the outcome this path had
+    /// IMMEDIATELY before, kept as the timeout rather than as the rule.
+    private static final long START_WAIT_MILLIS = 20000L;
+
+    /// A start request held until the app can receive it.
+    private static final class PendingStart implements Runnable {
+        private final String callId;
+        private final String handleWire;
+        private final boolean video;
+        private final long token;
+        private boolean sent;
+
+        PendingStart(String callId, String handleWire, boolean video,
+                long token) {
+            this.callId = callId;
+            this.handleWire = handleWire;
+            this.video = video;
+            this.token = token;
+        }
+
+        /// Exactly once, whether the drain or the watchdog gets here first.
+        private void deliver() {
+            synchronized (WAITING_STARTS) {
+                if (sent) {
+                    return;
+                }
+                sent = true;
+            }
+            Calls.deliverStartCallRequest(callId, handleWire, video, token);
+        }
+
+        @Override
+        public void run() {
+            // The watchdog. Removed from the queue first so a listener that
+            // registers a moment later does not deliver it a second time --
+            // deliver() would refuse, but leaving it queued would keep the
+            // list growing for the life of the process.
+            synchronized (WAITING_STARTS) {
+                WAITING_STARTS.remove(this);
+            }
+            deliver();
+        }
+    }
+
+    /// Told when the app's Java has a listener, so held calls can go out.
+    ///
+    /// This is the Android half of what setJavaReady plus drainPendingCalls
+    /// do on iOS, and the port used to say it needed neither -- true of an
+    /// INCOMING call, which arrives as an FCM message that Java sees first,
+    /// and false of a call the SYSTEM places. Telecom binds this service in a
+    /// process where Codename One has not initialised and the app's listener
+    /// registry is empty, so the request was dispatched to nobody, the START
+    /// action went unanswered, and the connection was destroyed before any
+    /// application code could run. A call from Recents or an assistant could
+    /// never be placed after the app had been killed.
+    static void setJavaReady(boolean ready) {
+        List<PendingStart> drain = null;
+        synchronized (WAITING_STARTS) {
+            javaReady = ready;
+            if (ready && !WAITING_STARTS.isEmpty()) {
+                drain = new ArrayList<PendingStart>(WAITING_STARTS);
+                WAITING_STARTS.clear();
+            }
+        }
+        if (drain != null) {
+            for (PendingStart p : drain) {
+                p.deliver();
+            }
+        }
+    }
+
+    /// Brings the app up so its Java can register a listener.
+    ///
+    /// Telecom starts this service without starting the app, and a
+    /// self-managed call is the app's own to present, so nothing else will.
+    /// The launcher intent is the same one the incoming-call notification
+    /// uses; an app with none simply waits out START_WAIT_MILLIS, which is
+    /// the behaviour it had for every such call before.
+    private void launchForStart() {
+        try {
+            android.content.Intent i = getPackageManager()
+                    .getLaunchIntentForPackage(getPackageName());
+            if (i == null) {
+                return;
+            }
+            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(i);
+        } catch (RuntimeException refused) {
+            // Android 10 and later refuse a background activity start in some
+            // states. The request stays parked and the watchdog resolves it,
+            // which is strictly better than the immediate destruction this
+            // replaced.
+        }
+    }
+
     /// One action the system asked for and the app has not answered.
     private static final class PendingAction {
         private final CN1Connection connection;
@@ -278,8 +388,27 @@ public class CN1ConnectionService extends ConnectionService {
             synchronized (SYSTEM_STARTED) {
                 SYSTEM_STARTED.put(id, c);
             }
-            Calls.deliverStartCallRequest(id, externalHandleWire(request),
-                    c.isVideo(), nextActionToken(c, CN1Connection.ACTION_START));
+            PendingStart start = new PendingStart(id,
+                    externalHandleWire(request), c.isVideo(),
+                    nextActionToken(c, CN1Connection.ACTION_START));
+            boolean park;
+            synchronized (WAITING_STARTS) {
+                // Checked and parked under ONE monitor with the readiness
+                // flag: split, a listener registering in between would drain
+                // an empty list and this would then park behind it for ever.
+                park = !javaReady;
+                if (park) {
+                    WAITING_STARTS.add(start);
+                }
+            }
+            if (!park) {
+                start.deliver();
+                return c;
+            }
+            // Nothing else will bring the app up for a call it did not start.
+            launchForStart();
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(start, START_WAIT_MILLIS);
             return c;
         }
         answerReport(id, true, 0, null);
@@ -559,6 +688,15 @@ public class CN1ConnectionService extends ConnectionService {
         // dialing session in Java for a Telecom call that no longer exists.
         synchronized (SYSTEM_STARTED) {
             SYSTEM_STARTED.clear();
+        }
+        // The held requests go with them: the provider they belong to is
+        // gone, so delivering one later would hand the app a call the system
+        // has already destroyed.
+        synchronized (WAITING_STARTS) {
+            for (PendingStart p : WAITING_STARTS) {
+                p.sent = true;
+            }
+            WAITING_STARTS.clear();
         }
         for (CN1Connection c : all) {
             c.setDisconnected(new DisconnectCause(DisconnectCause.CANCELED));

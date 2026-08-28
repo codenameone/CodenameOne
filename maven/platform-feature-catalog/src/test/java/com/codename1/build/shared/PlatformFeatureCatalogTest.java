@@ -143,6 +143,29 @@ class PlatformFeatureCatalogTest {
     }
 
     @Test
+    void aPacketTunnelIsNotASupersetOfTheManagedProfile() {
+        // An app that writes its own tunnel does not use the platform's
+        // IKEv2 client, so it must not acquire the Personal VPN entitlement
+        // for it -- and it must not carry the packet-tunnel entitlement from
+        // a class reference either, because Apple grants that one case by
+        // case and an App ID without it fails codesigning.
+        List<PlatformFeatureCatalog.Entry> hits =
+                PlatformFeatureCatalog.matchesFor(
+                        "com/codename1/vpn/tunnel/VpnTunnel");
+        assertEquals(1, hits.size());
+        assertTrue(hits.get(0).iosFrameworks().contains("NetworkExtension"));
+        assertEquals(0, hits.get(0).androidMinimumSdk(),
+                "VpnService is older than anything this framework targets,"
+                + " and consent is a runtime question");
+        for (String[] plist : hits.get(0).iosPlistEntries()) {
+            assertFalse(plist[0].startsWith("com.apple.developer"),
+                    "the packet-tunnel entitlement is granted case by case"
+                    + " and must never arrive from a class reference: "
+                    + plist[0]);
+        }
+    }
+
+    @Test
     void managedVpnNeedsNoAndroidFloor() {
         // VpnManager is API 30 but is reached reflectively, so the port
         // reports the capability absent below 30 rather than the whole app

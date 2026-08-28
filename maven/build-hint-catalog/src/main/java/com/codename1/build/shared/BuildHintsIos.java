@@ -118,6 +118,20 @@ final class BuildHintsIos {
                 .platform("ios")
                 .doc("Whether calls appear in the system call log."));
 
+        h.add(new Hint("ios.vpn.tunnel")
+                .group(HintGroup.IOS)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("ios")
+                .doc("Whether to generate the packet tunnel extension for `com.codename1.vpn.tunnel`. Two "
+                        + "things have to be true for a tunnel to be built: the app references the package, "
+                        + "and this hint says the App ID holds "
+                        + "`com.apple.developer.networking.networkextension`, which Apple grants case by case "
+                        + "rather than self-serve. Generating the target without the grant fails codesigning "
+                        + "with an error naming an entitlement nobody asked for, so referencing the package "
+                        + "alone is deliberately not enough. Left false, the build produces no extension and "
+                        + "`Tunnels.isSupported()` answers false."));
+
         h.add(new Hint("ios.call.appGroup")
                 .group(HintGroup.IOS)
                 .type(HintType.STRING)

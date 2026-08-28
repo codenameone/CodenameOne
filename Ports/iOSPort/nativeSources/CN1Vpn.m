@@ -185,6 +185,42 @@ static NSString *cn1vpField(NSArray *fields, NSUInteger index) {
     return cn1vpUnescape([fields objectAtIndex:index]);
 }
 
+/// Answers a tunnel start or stop.
+///
+/// A different channel from cn1vpAck because it settles a different request
+/// map: com.codename1.vpn.tunnel.Tunnels keeps its own, so an ack routed
+/// through the profile facade would find no waiter and drop.
+static void cn1vpTunnelAck(int requestId, BOOL ok, int error,
+        NSString *message) {
+    com_codename1_impl_ios_IOSCallCallbacks_vpnTunnelAck___int_boolean_int_java_lang_String(
+            getThreadLocalData(), requestId, ok ? JAVA_TRUE : JAVA_FALSE,
+            error, cn1vpJString(message));
+}
+
+/// Answers a tunnel request with the message an NSError carried.
+static void cn1vpFail(int requestId, int error, NSError *e) {
+    cn1vpTunnelAck(requestId, NO, error,
+            e == nil ? nil : [e localizedDescription]);
+}
+
+/// A string from the app's own Info.plist, or the empty string.
+static NSString *cn1vpPlistString(NSString *key) {
+    id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
+    return [value isKindOfClass:[NSString class]] ? (NSString *)value : @"";
+}
+
+/// One field of a tab-delimited setup record, unescaped.
+static NSString *cn1vpWireField(NSString *record, NSUInteger index) {
+    if (record == nil) {
+        return @"";
+    }
+    // componentsSeparatedByString keeps trailing empties, which is what the
+    // positional record needs -- a reader that drops them shifts every field
+    // after the first empty one.
+    return cn1vpField([record componentsSeparatedByString:@"\t"], index);
+}
+
+
 static NSString *cn1vpSanitize(NSString *s) {
     if (s == nil) {
         return @"";
@@ -394,10 +430,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_vpnSupported___R_boolean(
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_vpnTunnelSupported___R_boolean(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
-    // Always false. A packet tunnel runs in a Network Extension, which is a
-    // separate process with no ParparVM in it, so there is no way to carry a
-    // tunnel written in this framework into one.
+#if defined(CN1_VPN_TUNNEL) && defined(CN1_VPN_HAS_NE)
+    // The build generated the packet-tunnel target. Whether Apple GRANTED
+    // the entitlement is not knowable here -- an ungranted App ID fails at
+    // codesigning, long before this runs -- so a build that got this far has
+    // the extension.
+    return JAVA_TRUE;
+#else
+    // No tunnel target in this build, which is the ordinary case: the
+    // entitlement is granted case by case, so the builder generates the
+    // extension only for a project that asked for it and said it has the
+    // grant.
     return JAVA_FALSE;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_vpnCapabilities___R_int(
@@ -405,8 +450,13 @@ JAVA_INT com_codename1_impl_ios_IOSNative_vpnCapabilities___R_int(
 #ifdef CN1_VPN_HAS_NE
     // No CN1_VPN_CAP_ALWAYS_ON: always-on VPN on iOS needs a supervised
     // device and an MDM payload, not something an app may request.
-    // No CN1_VPN_CAP_CUSTOM_TUNNEL: see vpnTunnelSupported above.
+#ifdef CN1_VPN_TUNNEL
+    return CN1_VPN_CAP_IKEV2 | CN1_VPN_CAP_IPSEC | CN1_VPN_CAP_ON_DEMAND
+            | CN1_VPN_CAP_CUSTOM_TUNNEL;
+#else
+    // No CN1_VPN_CAP_CUSTOM_TUNNEL: this build generated no tunnel target.
     return CN1_VPN_CAP_IKEV2 | CN1_VPN_CAP_IPSEC | CN1_VPN_CAP_ON_DEMAND;
+#endif
 #else
     return 0;
 #endif
@@ -933,3 +983,150 @@ void com_codename1_impl_ios_IOSNative_vpnSetStatusListening___boolean(
     }
 #endif
 }
+
+#if defined(CN1_VPN_TUNNEL) && defined(CN1_VPN_HAS_NE)
+
+/// The saved provider manager, so a stop does not have to reload it.
+static NETunnelProviderManager *cn1vpTunnelManager = nil;
+
+/// Loads or creates the manager for this app's packet tunnel.
+///
+/// NETunnelProviderManager is per app, and loading is asynchronous, so this
+/// answers through the block rather than returning. A first run has no saved
+/// configuration and gets a fresh manager, which is the ordinary path -- an
+/// app installs its tunnel configuration the first time it starts one.
+static void cn1vpLoadTunnelManager(void (^done)(NETunnelProviderManager *m,
+        NSError *e)) {
+    [NETunnelProviderManager loadAllFromPreferencesWithCompletionHandler:
+            ^(NSArray<NETunnelProviderManager *> *managers, NSError *error) {
+        if (error != nil) {
+            done(nil, error);
+            return;
+        }
+        NETunnelProviderManager *m = [managers count] > 0
+                ? [managers objectAtIndex:0]
+                : [[[NETunnelProviderManager alloc] init] autorelease];
+        done(m, nil);
+    }];
+}
+
+void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT setupWire) {
+    // COPIED out of the Java string here, on the calling thread. The blocks
+    // below run later and on another queue, where the JAVA_OBJECT is no
+    // longer safe to touch.
+    NSString *wire = setupWire == JAVA_NULL ? @""
+            : [NSString stringWithUTF8String:
+                    stringToUTF8(threadStateData, setupWire)];
+    [wire retain];
+    int rid = (int)requestId;
+    cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *loadError) {
+        if (m == nil) {
+            cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, loadError);
+            [wire release];
+            return;
+        }
+        NETunnelProviderProtocol *proto =
+                [[[NETunnelProviderProtocol alloc] init] autorelease];
+        // The extension's bundle identifier, which is the app's plus the
+        // suffix the generated target signs under. Baked in by the builder
+        // through this plist key rather than guessed, because a project can
+        // override the extension's PRODUCT_BUNDLE_IDENTIFIER.
+        proto.providerBundleIdentifier =
+                cn1vpPlistString(@"CN1VpnTunnelExtensionIdentifier");
+        // serverAddress is what the system shows in Settings for this VPN.
+        // It is display text to iOS, not something it connects to -- the
+        // tunnel decides that -- so the session name goes here when the app
+        // gave one.
+        NSString *display = cn1vpWireField(wire, 6);
+        if ([display length] == 0) {
+            display = cn1vpWireField(wire, 1);
+        }
+        proto.serverAddress = [display length] > 0 ? display : @"VPN";
+        // The WHOLE setup, handed to the extension. This dictionary is the
+        // only channel between the two processes at start-up, and the
+        // extension reads the same record with the same field indices.
+        proto.providerConfiguration = [NSDictionary dictionaryWithObject:wire
+                forKey:@"cn1TunnelSetup"];
+        m.protocolConfiguration = proto;
+        m.localizedDescription = proto.serverAddress;
+        m.enabled = YES;
+        [m saveToPreferencesWithCompletionHandler:^(NSError *saveError) {
+            if (saveError != nil) {
+                cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, saveError);
+                [wire release];
+                return;
+            }
+            // RELOADED before starting. A manager that has just been saved
+            // is stale in this process until it is read back, and
+            // startVPNTunnel on a stale manager fails with a configuration
+            // error that names nothing the developer wrote.
+            [m loadFromPreferencesWithCompletionHandler:^(NSError *reloadError) {
+                if (reloadError != nil) {
+                    cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, reloadError);
+                    [wire release];
+                    return;
+                }
+                NSError *startError = nil;
+                NETunnelProviderSession *session =
+                        (NETunnelProviderSession *)m.connection;
+                BOOL ok = [session startVPNTunnelAndReturnError:&startError];
+                if (ok) {
+                    [cn1vpTunnelManager release];
+                    cn1vpTunnelManager = [m retain];
+                    cn1vpTunnelAck(rid, YES, 0, nil);
+                } else {
+                    cn1vpFail(rid, CN1_VPN_ERR_UNKNOWN, startError);
+                }
+                [wire release];
+            }];
+        }];
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    int rid = (int)requestId;
+    if (cn1vpTunnelManager != nil) {
+        [(NETunnelProviderSession *)cn1vpTunnelManager.connection stopVPNTunnel];
+        cn1vpTunnelAck(rid, YES, 0, nil);
+        return;
+    }
+    // No manager in this process. Loaded rather than refused: the app may
+    // have been restarted while its tunnel kept running, which is exactly
+    // when a stop matters most.
+    cn1vpLoadTunnelManager(^(NETunnelProviderManager *m, NSError *e) {
+        if (m != nil) {
+            [(NETunnelProviderSession *)m.connection stopVPNTunnel];
+        }
+        // TRUE either way. Asking a tunnel that is not running to stop has
+        // got the caller what they asked for, and reporting a failure would
+        // have an app treat its own idle state as an error.
+        cn1vpTunnelAck(rid, YES, 0, nil);
+    });
+}
+
+#elif defined(CN1_INCLUDE_VPN)
+
+void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId, JAVA_OBJECT setupWire) {
+    // The unsupported half, present so a build without the tunnel target
+    // links identically. Answered rather than ignored: the SPI calls an
+    // operation that never answers worse than one that fails.
+    com_codename1_impl_ios_IOSCallCallbacks_vpnTunnelAck___int_boolean_int_java_lang_String(
+            threadStateData, requestId, JAVA_FALSE, CN1_VPN_ERR_NOT_SUPPORTED,
+            cn1vpJString(@"This build has no packet tunnel extension"));
+}
+
+void com_codename1_impl_ios_IOSNative_vpnStopTunnel___int(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject,
+        JAVA_INT requestId) {
+    com_codename1_impl_ios_IOSCallCallbacks_vpnTunnelAck___int_boolean_int_java_lang_String(
+            threadStateData, requestId, JAVA_FALSE, CN1_VPN_ERR_NOT_SUPPORTED,
+            cn1vpJString(@"This build has no packet tunnel extension"));
+}
+
+#endif

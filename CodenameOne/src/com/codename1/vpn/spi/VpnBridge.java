@@ -45,12 +45,13 @@ public interface VpnBridge {
     /// [#getVpnCapabilities()] bit: an IPsec configuration can be installed.
     int CAPABILITY_IPSEC = 2;
 
-    /// Reserved. **No port sets this.** A packet tunnel the app implements
-    /// is not shipped: on iOS it runs in an app extension with no Java
-    /// virtual machine in it, so its body could not be written in this
-    /// framework, and on Android it needs a bound `VpnService` and a packet
-    /// API that does not exist here. The constant and
-    /// [#isCustomTunnelSupported()] are kept as the seam it would attach to.
+    /// [#getVpnCapabilities()] bit: `com.codename1.vpn.tunnel` runs here.
+    ///
+    /// The extension iOS runs a tunnel in is a target the BUILD generates,
+    /// so it carries a translated VM exactly as the app target does. What it
+    /// does not carry is anything else of the app's, which is why the setup
+    /// travels as data. Android runs the tunnel in a bound `VpnService` the
+    /// port ships.
     int CAPABILITY_CUSTOM_TUNNEL = 4;
 
     /// [#getVpnCapabilities()] bit: on-demand rules are honoured.
@@ -77,8 +78,6 @@ public interface VpnBridge {
     boolean isVpnSupported();
 
     /// Whether this port can run a packet tunnel this app implements.
-    ///
-    /// Every port answers false today; see [#CAPABILITY_CUSTOM_TUNNEL].
     boolean isCustomTunnelSupported();
 
     /// The `CAPABILITY_*` bit mask this port supports.
@@ -112,4 +111,19 @@ public interface VpnBridge {
     /// Starts or stops delivery of status changes to
     /// `com.codename1.vpn.profile.Vpn#deliverStatusChanged`.
     void setStatusListening(boolean listening);
+
+    /// Brings up a tunnel the application implements.
+    ///
+    /// `setupWire` is a `com.codename1.impl.vpn.TunnelWire` record. The
+    /// application's [com.codename1.vpn.tunnel.VpnTunnel] is reached through
+    /// [com.codename1.vpn.tunnel.Tunnels#getRegistered()] on a port that
+    /// runs it in this process, and constructed afresh on one that runs it
+    /// in another.
+    ///
+    /// Answers through `com.codename1.vpn.tunnel.Tunnels#deliverAck`, once,
+    /// including where the user declines the system's consent prompt.
+    void startCustomTunnel(int requestId, String setupWire);
+
+    /// Takes down a tunnel started by [#startCustomTunnel].
+    void stopCustomTunnel(int requestId);
 }

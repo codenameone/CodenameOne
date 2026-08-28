@@ -26,6 +26,7 @@ import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
 import com.codename1.util.IOSCallDirectoryExtensionBuilder;
 import com.codename1.util.IOSDocumentProviderExtensionBuilder;
+import com.codename1.util.IOSVpnTunnelExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -1121,6 +1122,7 @@ public class IPhoneBuilder extends Executor {
         "com/codename1/call/voip/",
         "com/codename1/call/directory/",
         "com/codename1/vpn/profile/",
+        "com/codename1/vpn/tunnel/",
     };
 
     /// Folds call and VPN usage found inside submitted libraries into the
@@ -1140,6 +1142,7 @@ public class IPhoneBuilder extends Executor {
         usesCallVoip |= found.contains("com/codename1/call/voip/");
         usesCallDirectory |= found.contains("com/codename1/call/directory/");
         usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+        usesCustomTunnel |= found.contains("com/codename1/vpn/tunnel/");
         return found;
     }
 
@@ -1147,6 +1150,16 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCallVoip;
     private boolean usesCallDirectory;
     private boolean usesManagedVpn;
+
+    /// Whether the app referenced com.codename1.vpn.tunnel.
+    ///
+    /// Referencing it is NOT enough to generate the extension: see
+    /// customTunnelEnabled, which also requires the project to say it holds
+    /// the Network Extension grant.
+    private boolean usesCustomTunnel;
+
+    /// Whether this build generates the packet-tunnel extension.
+    private boolean customTunnelEnabled;
 
     /// Whether the Info.plist needs the CN1Call* provider block.
     private boolean callPlistWanted;
@@ -2399,6 +2412,9 @@ public class IPhoneBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesCustomTunnel = true;
                     }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;
@@ -5292,13 +5308,53 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // A packet tunnel the app implements, which is a GENERATED
+            // extension target carrying its own translated VM.
+            //
+            // Two conditions, not one. Referencing the package is the app
+            // saying it wants a tunnel; ios.vpn.tunnel=true is the project
+            // saying it holds the Network Extension grant, which Apple gives
+            // case by case. Generating the target for a reference alone
+            // would fail codesigning on every App ID without the grant, with
+            // an error naming an entitlement the developer never asked for.
+            customTunnelEnabled = usesCustomTunnel
+                    && "true".equals(request.getArg("ios.vpn.tunnel", "false"));
+            if (usesCustomTunnel && !customTunnelEnabled) {
+                log("This app references com.codename1.vpn.tunnel, but"
+                        + " ios.vpn.tunnel is not true, so no packet-tunnel"
+                        + " extension is generated and Tunnels.isSupported()"
+                        + " will answer false. Apple grants"
+                        + " com.apple.developer.networking.networkextension"
+                        + " case by case; set the hint once the App ID has"
+                        + " it.");
+            }
+            if (customTunnelEnabled) {
+                enableFeatureDefine(buildinRes, "CN1_INCLUDE_VPN",
+                        "com.codename1.vpn");
+                enableFeatureDefine(buildinRes, "CN1_VPN_TUNNEL",
+                        "com.codename1.vpn.tunnel");
+                // The extension's bundle identifier, which the app reads
+                // back at run time to name the provider it starts. Written
+                // into the host's plist rather than derived in the native,
+                // because a project may override the target's
+                // PRODUCT_BUNDLE_IDENTIFIER and the app has no other way to
+                // learn what it became.
+                String tunnelId = request.getArg(
+                        "ios.vpn.tunnel.buildSettings.PRODUCT_BUNDLE_IDENTIFIER",
+                        IOSVpnTunnelExtensionBuilder.bundleId(
+                                request.getPackageName()));
+                request.putArgument("ios.plistInject",
+                        appendCallPlist(request.getArg("ios.plistInject", ""),
+                                "CN1VpnTunnelExtensionIdentifier", tunnelId));
+            }
+
             // VPN configuration management.
             //
             // Both entitlements here are single-element arrays, which the
             // generic ios.entitlements.<key> namespace cannot encode -- it
             // reads a value with no newline as a <string> -- so they are
             // written in the array form the namespace does understand.
-            if (usesManagedVpn) {
+            if (usesManagedVpn || customTunnelEnabled) {
                 enableFeatureDefine(buildinRes, "CN1_INCLUDE_VPN",
                         "com.codename1.vpn");
                 // Personal VPN. Self-serve: any paid account can enable the

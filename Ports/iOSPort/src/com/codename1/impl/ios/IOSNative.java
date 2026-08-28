@@ -2210,6 +2210,12 @@ public final class IOSNative {
     /** The VpnBridge.CAPABILITY_* mask this platform offers. */
     native int vpnCapabilities();
 
+    /// Asks the packet-tunnel extension to start, with the setup record.
+    native void vpnStartTunnel(int requestId, String setupWire);
+
+    /// Asks the packet-tunnel extension to stop.
+    native void vpnStopTunnel(int requestId);
+
     /** The VpnStatus ordinal of the managed connection. */
     native int vpnStatus();
 

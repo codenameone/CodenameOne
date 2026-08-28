@@ -26,6 +26,7 @@ import com.codename1.call.directory.CallDirectory;
 import com.codename1.call.session.Calls;
 import com.codename1.call.voip.VoipPush;
 import com.codename1.vpn.profile.Vpn;
+import com.codename1.vpn.tunnel.Tunnels;
 
 /// Static callback surface invoked from `CN1Call` and `CN1Vpn` when CallKit,
 /// PushKit or NEVPNManager answer.
@@ -71,6 +72,7 @@ final class IOSCallCallbacks {
         vpnProfile(0, null);
         vpnProfileFailed(0, 0, null);
         vpnStatusChanged(-1);
+        vpnTunnelAck(0, false, 0, null);
         dceGuard = false;
     }
 
@@ -248,6 +250,17 @@ final class IOSCallCallbacks {
             return;
         }
         Vpn.deliverProfileFailed(requestId, errorOrdinal, message);
+    }
+
+    /// Answers a `com.codename1.vpn.tunnel.Tunnels` start or stop.
+    ///
+    /// A separate entry point from vpnAck because the tunnel facade keeps
+    /// its own request map: an ack routed through the profile facade would
+    /// find no waiter there and drop, leaving the app's AsyncResource
+    /// unresolved.
+    static void vpnTunnelAck(int requestId, boolean ok, int errorOrdinal,
+            String message) {
+        Tunnels.deliverAck(requestId, ok, errorOrdinal, message);
     }
 
     static void vpnStatusChanged(int statusOrdinal) {

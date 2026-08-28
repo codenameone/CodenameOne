@@ -86,6 +86,13 @@ final class BuildHintsDynamic {
                         + "CN1CallDirectoryExtensionIdentifier the host plist carries -- so an override has to "
                         + "reach both or the app asks the system to reload an identifier nothing installed.");
 
+        family(h, "ios.vpn.tunnel.buildSettings.*", "ios",
+                "Xcode build settings for the generated packet tunnel extension target. "
+                        + "PRODUCT_BUNDLE_IDENTIFIER is read in two places -- the target's own settings and the "
+                        + "CN1VpnTunnelExtensionIdentifier the host plist carries, which is how the app names "
+                        + "the provider it starts -- so an override has to reach both or the app asks the "
+                        + "system to start an extension that is not installed under that name.");
+
         family(h, "ios.surfaces.buildSettings.*", "ios",
                 "Overrides an Xcode build setting for the external-surfaces extension.");
         family(h, "ios.documentProvider.buildSettings.*", "ios",

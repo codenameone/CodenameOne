@@ -1,0 +1,9 @@
+# IOSExtensionTunnel.writeNative is implemented by the GENERATED packet-tunnel
+# extension (IOSVpnTunnelExtensionBuilder.writerSource), not by this port's
+# native sources. The app target has no NEPacketTunnelFlow to write to, so the
+# symbol exists only inside that extension -- which is a target the build
+# produces, and which the translation-time verifier checks there.
+# The C SYMBOL, not the Java name: isIgnored compares against the mangled
+# form, so a dotted entry here matches nothing and reads as an ignore that
+# is in place when it is not.
+com_codename1_impl_ios_IOSExtensionTunnel_writeNative___byte_1ARRAY_int_int

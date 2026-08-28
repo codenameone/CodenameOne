@@ -88,4 +88,21 @@ class IOSVpnBridge implements VpnBridge {
     public void setStatusListening(boolean listening) {
         nativeInstance.vpnSetStatusListening(listening);
     }
+
+    @Override
+    public void startCustomTunnel(int requestId, String setupWire) {
+        // The app process does NOT run the packet loop. It asks
+        // NETunnelProviderManager to start the extension, and the extension
+        // -- a separate process with its own copy of the VM -- constructs
+        // the tunnel and runs it there. The setup travels in the provider
+        // configuration, which is the only channel between the two: a static
+        // this process set is not visible over there, which is why
+        // TunnelSetup.data exists.
+        nativeInstance.vpnStartTunnel(requestId, setupWire);
+    }
+
+    @Override
+    public void stopCustomTunnel(int requestId) {
+        nativeInstance.vpnStopTunnel(requestId);
+    }
 }

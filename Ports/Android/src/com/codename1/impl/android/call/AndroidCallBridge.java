@@ -861,9 +861,16 @@ public class AndroidCallBridge implements CallBridge {
 
     @Override
     public void setJavaReady(boolean ready) {
-        // Nothing to hold. Unlike iOS, Android never reports a call to the
-        // system before this app's code has run -- the FCM message arrives in
-        // Java first -- so there is no queue to drain.
+        // There IS a queue, and the comment that used to sit here said there
+        // was not. It was right about incoming calls -- an FCM message
+        // arrives in Java first, so nothing is reported to the system ahead
+        // of the app's code -- and wrong about a call the SYSTEM places. From
+        // Recents, Contacts or an assistant, Telecom binds
+        // CN1ConnectionService in a process where Codename One has not
+        // initialised and no listener is registered, so the start request was
+        // delivered to nobody and the connection destroyed before the app
+        // could see it.
+        CN1ConnectionService.setJavaReady(ready);
     }
 
     @Override

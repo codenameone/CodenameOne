@@ -374,13 +374,31 @@ BOOL cn1_watch_apply_mirrored_surface(NSString *kind, NSData *json,
 // this device's traffic.
 //#define CN1_INCLUDE_VPN
 
-// There is deliberately no CN1_VPN_TUNNEL. A packet tunnel runs in a Network
-// Extension: a separate process with no ParparVM in it, so the tunnel body
-// could not be written in this framework even if the target were generated.
+// CN1_VPN_TUNNEL gates com.codename1.vpn.tunnel: a packet tunnel the app
+// writes, which runs in a generated Network Extension target.
+//
+// This comment used to say the capability could not exist, because the
+// extension is a separate process "with no ParparVM in it". That was wrong
+// about the only part that mattered: the extension is a target THIS BUILD
+// generates, so it carries a translated VM exactly as the app target does,
+// and the app's VpnTunnel subclass is translated into it. What is true is
+// that it shares nothing else with the app -- no statics, no Display, no
+// open connections -- which is why the setup travels as data.
+//
+// Its entitlement, com.apple.developer.networking.networkextension, is one
+// Apple grants case by case rather than one a paid account switches on, so
+// the builder never injects it automatically.
+//#define CN1_VPN_TUNNEL
 
 // NetworkExtension's VPN manager is unavailable on tvOS and watchOS.
 #if TARGET_OS_TV || TARGET_OS_WATCH
 #undef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
+#endif
+
+// A packet tunnel needs the VPN bridge that starts it.
+#ifndef CN1_INCLUDE_VPN
+#undef CN1_VPN_TUNNEL
 #endif
 
 // CN1_INCLUDE_MATTER_SETUP gates the MatterSupport add-device flow, which is

@@ -767,6 +767,7 @@ public class AndroidGradleBuilder extends Executor {
         "com/codename1/call/voip/",
         "com/codename1/call/directory/",
         "com/codename1/vpn/profile/",
+        "com/codename1/vpn/tunnel/",
     };
 
     /// Folds call and VPN usage found inside submitted libraries into the
@@ -786,6 +787,7 @@ public class AndroidGradleBuilder extends Executor {
         usesCallVoip |= found.contains("com/codename1/call/voip/");
         usesCallDirectory |= found.contains("com/codename1/call/directory/");
         usesManagedVpn |= found.contains("com/codename1/vpn/profile/");
+        usesCustomTunnel |= found.contains("com/codename1/vpn/tunnel/");
         return found;
     }
 
@@ -793,6 +795,9 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesCallVoip;
     private boolean usesCallDirectory;
     private boolean usesManagedVpn;
+
+    /// Whether the app referenced com.codename1.vpn.tunnel.
+    private boolean usesCustomTunnel;
 
     private boolean integrateMoPub = false;
 
@@ -2171,7 +2176,24 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
-                    // Smart home (com.codename1.home.*). Gated on actual
+                    // A packet tunnel the app implements (com.codename1.vpn.tunnel).
+        // Separate from the managed-profile flag beside it: a profile asks
+        // the OS to run its own IKEv2 client and needs no component of ours,
+        // while a tunnel is a VpnService the system binds.
+        if (usesCustomTunnel) {
+            log("VPN tunnel fragments version "
+                    + VpnManifestFragments.FRAGMENT_VERSION);
+            String existingApplication =
+                    request.getArg("android.xapplication", "");
+            String tunnelService = VpnManifestFragments.services(true,
+                    existingApplication);
+            if (tunnelService.length() > 0) {
+                request.putArgument("android.xapplication",
+                        existingApplication + tunnelService);
+            }
+        }
+
+        // Smart home (com.codename1.home.*). Gated on actual
                     // usage so the Play services home dependency and the
                     // injected bridge are only added for apps that reference
                     // the API.
@@ -2246,6 +2268,9 @@ public class AndroidGradleBuilder extends Executor {
                     // cannot tunnel anything.
                     if (cls.indexOf("com/codename1/vpn/profile/") == 0) {
                         usesManagedVpn = true;
+                    }
+                    if (cls.indexOf("com/codename1/vpn/tunnel/") == 0) {
+                        usesCustomTunnel = true;
                     }
                     if (cls.indexOf("com/codename1/nearby/ranging/") == 0) {
                         usesNearbyRanging = true;

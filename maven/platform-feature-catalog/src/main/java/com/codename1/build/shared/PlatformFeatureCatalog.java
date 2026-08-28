@@ -793,6 +793,25 @@ public final class PlatformFeatureCatalog {
                 // feature is worth.
                 .description("Managed VPN configurations (IKEv2, IPsec)"));
 
+        // A packet tunnel the app implements. NOT a superset of the profile
+        // entry: an app that writes its own tunnel does not need the managed
+        // IKEv2 client, and dragging in the Personal VPN entitlement for it
+        // would ask the App ID for a capability the feature never uses.
+        //
+        // No entitlement here either, and for a stronger reason than the
+        // profile package has: com.apple.developer.networking.networkextension
+        // is granted case by case, so injecting it from a class reference
+        // would fail codesigning for every project that has not been granted
+        // it. IPhoneBuilder generates the extension only when
+        // ios.vpn.tunnel says the grant is held.
+        //
+        // No androidMinimumSdk: VpnService is API 14, older than anything
+        // this framework targets, and the consent prompt is a runtime
+        // question rather than an install-time one.
+        e.add(new Entry("com/codename1/vpn/tunnel/")
+                .iosFrameworks("NetworkExtension")
+                .description("A packet tunnel the application implements"));
+
         e.add(new Entry("com/codename1/ar/")
                 .iosFrameworks("ARKit", "SceneKit")
                 .iosPlist("NSCameraUsageDescription",

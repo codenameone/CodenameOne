@@ -100,34 +100,47 @@ request was accepted, not that the tunnel is up. Watch the status.
 === A Tunnel Your App Implements
 
 If your VPN speaks a protocol the platforms don't implement -- anything that
-isn't IKEv2 or IPsec -- you need a packet tunnel, and Codename One doesn't
-provide one.
+isn't IKEv2 or IPsec -- you write the packet loop yourself, in Java, once.
+Extend `VpnTunnel` and hand it to `Tunnels.start`.
 
-The reason is structural rather than a gap in the roadmap. On iOS a packet
-tunnel is a *Network Extension*: a separate process, with its own bundle
-identifier, its own provisioning profile, a hard memory limit, and **no
-Codename One inside it**. There's no Java virtual machine in that process, so
-the tunnel body can't be written in this framework however the target is
-generated. It also needs the
+The loop is the same on both platforms. Where it *runs* is not, and that
+difference is the one thing to design around.
+
+On Android the tunnel runs inside a `VpnService` in your app's own process.
+The instance you passed to `Tunnels.start` is the instance that runs, and
+everything it closed over is still there.
+
+On iOS it runs inside a *Network Extension*: a separate process with its own
+bundle identifier, its own provisioning profile and a hard memory limit. The
+build generates that target and translates your tunnel into it, so the packet
+loop is your Java either way -- but the extension shares nothing else with
+the app. No statics you set, no `Display`, no open connections. Your tunnel is
+constructed fresh over there.
+
+That is why `TunnelSetup.data` exists, and it is the rule worth taking away:
+
+* Everything the tunnel needs arrives through `VpnTunnel.onStart`.
+* Anything it reaches for outside that is a static which works on Android and
+  is absent on iOS.
+
+The iOS half also needs the
 `com.apple.developer.networking.networkextension` entitlement, which Apple
-grants case by case rather than self-serve.
-
-Your options, in the order worth trying them:
-
-* *Express the requirement as IKEv2.* If the far end can speak it, everything
-  above applies and nothing else is needed.
-* *Write the extension natively and ship it alongside.* An iOS app extension
-  can be dropped into `ios/app_extensions/<Name>/` and is built and signed
-  with the app; see the app-extension build hints in
-  <<Advanced-Topics-Under-The-Hood.asciidoc#,Advanced Topics>>. The Android
-  half is an ordinary `VpnService` in a native Android module. This is real
-  work in two native languages, and it's the honest cost of a custom tunnel.
+grants case by case rather than self-serve. The build never injects it on its
+own: `ios.vpn.tunnel=true` is how a project says it holds the grant, and a
+build without it generates no extension and reports
+`Tunnels.isSupported()` false.
 
 === Developing Without Hardware
 
 The simulator and the desktop builds run a simulated configuration store that
 tunnels nothing, so an install flow, a status screen and a reconnect button can
 all be built without a device or a server.
+
+A packet tunnel runs there too, over a loopback: `Tunnels.start` calls your
+`onStart`, packets you feed in reach `onPacket`, and what you `forward` comes
+back out where a test can read it. The transport is fake and the packet loop
+is the real one, which is what makes a tunnel testable at all -- neither
+platform lets you run one on a desktop.
 
 Like the call simulation it keeps the awkward orderings: connecting passes
 through `CONNECTING`, and a profile read back has no password, because a

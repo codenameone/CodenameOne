@@ -27,6 +27,10 @@ import com.codename1.vpn.VpnError;
 import com.codename1.vpn.VpnStatus;
 import com.codename1.vpn.profile.Vpn;
 import com.codename1.vpn.spi.VpnBridge;
+import com.codename1.vpn.tunnel.TunnelHost;
+import com.codename1.vpn.tunnel.TunnelStopReason;
+import com.codename1.vpn.tunnel.Tunnels;
+import com.codename1.vpn.tunnel.VpnTunnel;
 
 import java.util.List;
 
@@ -95,11 +99,91 @@ public class LocalVpnBridge implements VpnBridge {
 
     @Override
     public boolean isCustomTunnelSupported() {
-        // False here as on every port: a packet tunnel the app implements is
-        // not shipped, and a simulation that offered one would be the only
-        // place an app's tunnel code appeared to work.
-        return false;
+        // TRUE now that the ports host one. The simulation runs the app's
+        // tunnel over a loopback transport, which is what makes a packet
+        // loop testable and rehearsable off-device -- and it was written
+        // before anything could host it, which is exactly the gap this
+        // closes.
+        return true;
     }
+
+    @Override
+    public void startCustomTunnel(int requestId, String setupWire) {
+        VpnTunnel tunnel = Tunnels.getRegistered();
+        if (tunnel == null) {
+            Tunnels.deliverAck(requestId, false,
+                    VpnError.INVALID_CONFIGURATION.ordinal(),
+                    "No tunnel is registered");
+            return;
+        }
+        String[] fields = TunnelWire.split(setupWire);
+        LoopbackTunnelTransport t =
+                new LoopbackTunnelTransport(4, TunnelWire.mtu(fields));
+        TunnelHost h = new TunnelHost(tunnel, t);
+        synchronized (this) {
+            stopTunnelLocked(TunnelStopReason.REQUESTED);
+            tunnelHost = h;
+            tunnelTransport = t;
+        }
+        // On the CALLER's thread, unlike Android where a descriptor read
+        // needs one of its own: the loopback transport is not blocking, so
+        // start() arms the tunnel and returns.
+        h.start(TunnelWire.server(fields), TunnelWire.routes(fields),
+                TunnelWire.dnsServers(fields), TunnelWire.mtu(fields),
+                TunnelWire.data(fields));
+        Tunnels.deliverAck(requestId, true, 0, null);
+    }
+
+    @Override
+    public void stopCustomTunnel(int requestId) {
+        synchronized (this) {
+            stopTunnelLocked(TunnelStopReason.REQUESTED);
+        }
+        Tunnels.clearRegistered();
+        Tunnels.deliverAck(requestId, true, 0, null);
+    }
+
+    /// Feeds a packet in from the simulated device side.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public void simulateInboundPacket(byte[] packet) {
+        LoopbackTunnelTransport t;
+        TunnelHost h;
+        synchronized (this) {
+            t = tunnelTransport;
+            h = tunnelHost;
+        }
+        if (t == null || h == null) {
+            return;
+        }
+        t.inject(packet);
+        h.pump();
+    }
+
+    /// What the tunnel forwarded back out.
+    ///
+    /// @hidden not part of the public API; test and simulator only.
+    public byte[][] forwardedPackets() {
+        LoopbackTunnelTransport t;
+        synchronized (this) {
+            t = tunnelTransport;
+        }
+        return t == null ? new byte[0][] : t.forwarded();
+    }
+
+    private void stopTunnelLocked(TunnelStopReason reason) {
+        if (tunnelHost == null) {
+            return;
+        }
+        TunnelHost h = tunnelHost;
+        tunnelHost = null;
+        tunnelTransport = null;
+        h.stop(reason.ordinal());
+    }
+
+    private TunnelHost tunnelHost;
+
+    private LoopbackTunnelTransport tunnelTransport;
 
     @Override
     public int getVpnCapabilities() {

@@ -59,7 +59,7 @@ public final class VpnWire {
     ///
     /// @param value the field, or null
     /// @return the escaped field, never null
-    static String escape(String value) {
+    public static String escape(String value) {
         if (value == null) {
             return "";
         }
@@ -96,7 +96,7 @@ public final class VpnWire {
     ///
     /// @param value the escaped field, or null
     /// @return the original field, never null
-    static String unescape(String value) {
+    public static String unescape(String value) {
         if (value == null) {
             return "";
         }
