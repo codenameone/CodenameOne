@@ -98,7 +98,6 @@ rather than being one you can't take.
 
 .Build hints
 include::_generated-build-hints.adoc[]
-
 === Versioned builds
 
 By default a cloud build always uses the current Codename One release. With a _versioned build_ you can instead pin the build to a specific previously released framework version, so you get reproducible output over time. This helps when stabilizing a release, supporting an older app, or isolating a regression: if an app that built correctly in the past starts failing, rebuilding against the last known good version tells you whether the change came from your code or from the framework and build server.

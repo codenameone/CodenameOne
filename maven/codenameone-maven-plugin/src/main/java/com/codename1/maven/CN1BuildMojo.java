@@ -402,6 +402,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // profile is reported as itself rather than as an extension problem.
         report(IOSProvisioningPreflight.checkAppExtensions(mergedSettings, release,
                 project.getBasedir()));
+        report(IOSProvisioningPreflight.checkGeneratedExtensions(mergedSettings, release));
     }
 
     private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {

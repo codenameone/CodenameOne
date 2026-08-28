@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSAppIntentsBuilder;
+import com.codename1.util.IOSDocumentProviderExtensionBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
@@ -842,6 +843,22 @@ public class IPhoneBuilder extends Executor {
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
     private boolean surfacesExtensionEnabled;
+
+    // Set when the app references com.codename1.documents. Gates the CN1_USE_DOCUMENTS native
+    // define, the CN1Documents file provider extension and the app group that lets the two
+    // processes meet.
+    private boolean usesDocuments;
+
+    // usesDocuments && ios.documentProvider.extension != false. When the developer opts out the
+    // whole iOS lowering is skipped and the API stays an inert no-op.
+    private boolean documentProviderEnabled;
+
+    private String documentsAppGroup;
+    private String documentsDisplayName;
+
+    // Whether the generated extension is the replicated (iOS 16 / macOS 13) provider.
+    // Read by injectToPlist so the app-side natives know which one they are talking to.
+    private boolean documentsUsesReplicatedApi = true;
     /// True when a watch target exists and at least one kind declares a complication family, so
     /// the watch app gets a CN1WatchWidgets extension of its own.
     ///
@@ -1017,8 +1034,64 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * <p>An App Group identifier: {@code group.} followed by dot-separated segments of letters,
+     * digits and hyphens.</p>
+     *
+     * <p>A positive pattern rather than a list of characters to reject, for the reason the Ruby
+     * escaping beside it gives: the failure being prevented is "someone thought of a character I
+     * did not". This value reaches an Info.plist, an entitlements file and the generated Ruby, so
+     * the cost of a character nobody anticipated is a malformed file rather than a clear error.</p>
+     */
+    private static boolean isAppGroupIdentifier(String value) {
+        if (value == null || !value.startsWith("group.") || value.length() <= "group.".length()) {
+            return false;
+        }
+        boolean segmentHasContent = false;
+        for (int i = "group.".length(); i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '.') {
+                if (!segmentHasContent) {
+                    return false;
+                }
+                segmentHasContent = false;
+            } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '-') {
+                segmentHasContent = true;
+            } else {
+                return false;
+            }
+        }
+        return segmentHasContent;
+    }
+
+    /** Escapes the five characters that cannot appear literally in plist text. */
+    private static String xmlEscape(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
     private static String escapeRuby(String input) {
         return input.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    /**
+     * <p>Escapes a value for a DOUBLE-quoted Ruby literal, which is what the generated
+     * xcodeproj script writes build settings into.</p>
+     *
+     * <p>Build-setting values are developer input -- they arrive from
+     * {@code <target>.buildSettings.*} hints and from a buildSettings.properties inside a
+     * submitted app_extensions archive -- and a perfectly ordinary one carries a quote:
+     * {@code OTHER_SWIFT_FLAGS=$(inherited) -DNAME="foo"}. Emitted verbatim it closes the
+     * literal, and the script then fails to parse before it has configured anything, with a
+     * Ruby error naming a line nobody wrote.</p>
+     *
+     * <p>Backslash first, or escaping the quote would be undone by escaping what precedes
+     * it. {@code #} is escaped too: Ruby interpolates {@code #{...}} inside double quotes,
+     * so a value containing one would otherwise be evaluated rather than written.</p>
+     */
+    private static String escapeRubyDoubleQuoted(String input) {
+        return input.replace("\\", "\\\\").replace("\"", "\\\"").replace("#", "\\#");
     }
 
     /** Package-private accessor so {@link MacNativeBuilder} (separate file in
@@ -2047,6 +2120,13 @@ public class IPhoneBuilder extends Executor {
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
                     }
+                    // Document provider (com.codename1.documents.*): the app's content shown in
+                    // the system file browser. Gated on actual usage so the CN1Documents
+                    // extension / app group / CN1_USE_DOCUMENTS natives are only added for apps
+                    // that publish documents.
+                    if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
+                        usesDocuments = true;
+                    }
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
                     // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
                     // natives are only added for apps that talk to their watch app.
@@ -2393,6 +2473,7 @@ public class IPhoneBuilder extends Executor {
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
         // group. Widget kinds must be known at build time -- the Swift WidgetBundle is static.
         parseSurfacesManifest(resDir, request);
+        parseDocumentProviderHints(request);
 
         // App intents: read the build-time manifest the annotation processor emitted into the
         // project jar. Deliberately softer than surfaces, where a missing manifest fails the
@@ -3617,6 +3698,14 @@ public class IPhoneBuilder extends Executor {
             // compiled out, so the watch slice fails to link rather than merely doing nothing.
             if (surfacesExtensionEnabled || surfacesWatchEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
+            }
+
+            // com.codename1.documents usage compiles the FileProvider glue (gated by
+            // CN1_USE_DOCUMENTS so other builds carry no such symbols). The define lives in the
+            // shared CodenameOne_GLViewController.h so it reaches every document translation
+            // unit, mirroring CN1_USE_WIDGETS.
+            if (documentProviderEnabled) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_DOCUMENTS", "#define CN1_USE_DOCUMENTS");
             }
 
             // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
@@ -4968,6 +5057,18 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // The document provider's whole transport is the shared container. Without the
+            // entitlement the group does not resolve, documentProviderSupported() answers false
+            // and DocumentProvider.publish() returns before the bridge is reached -- a feature
+            // that builds, signs and ships doing nothing.
+            if (documentProviderEnabled) {
+                String appGroups = request.getArg("ios.app_groups", "");
+                if (!declaresAppGroup(appGroups, documentsAppGroup)) {
+                    request.putArgument("ios.app_groups", appGroups.length() == 0
+                            ? documentsAppGroup : appGroups + "," + documentsAppGroup);
+                }
+            }
+
             // Sign in with Apple requires the
             // com.apple.developer.applesignin entitlement; Apple rejects
             // builds whose binary references ASAuthorizationAppleIDProvider
@@ -5539,6 +5640,7 @@ public class IPhoneBuilder extends Executor {
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
                     || surfacesExtensionEnabled || matterExtensionEnabled
+                    || documentProviderEnabled
                     || hasAppExtensionArchives(appExtensionArchiveDir);
             if (needsXcodeProjectMutation) {
                 try {
@@ -5943,7 +6045,8 @@ public class IPhoneBuilder extends Executor {
                                     + "embed_phase.add_file_reference(fileref)\n"
                                     + "service_target.build_configurations.each{|e| \n");
                             for (String buildSettingKey : buildSettingsMap.keySet()) {
-                                sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+                                sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
                             }
                             sb.append("}\n");
                             sb.append("end\n");
@@ -5974,6 +6077,14 @@ public class IPhoneBuilder extends Executor {
                         // extension's IPHONEOS_DEPLOYMENT_TARGET=16.1 survives it -- see the
                         // ordering note in appendWidgetExtensionRuby.
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
+                    if (documentProviderEnabled) {
+                        // Same ordering note: appended after the global deployment-target pass,
+                        // so the extension keeps its own floor while the app keeps whatever it
+                        // targets.
+                        appendDocumentProviderExtensionTargets(appExtensionsBuilder, request,
+                                new File(tmpFile, "dist"));
                     }
 
                     // App Intents needs no Xcode target of its own: the declarations compile
@@ -6090,7 +6201,8 @@ public class IPhoneBuilder extends Executor {
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
                             + SURFACES_EXTENSION_NAME + "/') && !file_name.start_with?('"
                             + SURFACES_WATCH_EXTENSION_NAME + "/') && !file_name.start_with?('"
-                            + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.include?('/"
+                            + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.start_with?('"
+                            + DOCUMENTS_EXTENSION_NAME + "/') && !file_name.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
@@ -6429,6 +6541,11 @@ public class IPhoneBuilder extends Executor {
 
                 if (macNativeBuilder.isEnabled()) {
                     File appSrcDir = new File(tmpFile, "dist/" + request.getMainClass() + "-src");
+                    // Deliberately no App Group in the Mac entitlements for the document
+                    // provider: FileProvider is unavailable on Mac Catalyst, so that slice hosts
+                    // no extension and nothing there would use the group. An entitlement the Mac
+                    // provisioning profile does not carry fails signing, so an unused capability
+                    // is not free.
                     macNativeBuilder.writeEntitlements(request, appSrcDir);
                     macNativeBuilder.writeStubHeaders(appSrcDir);
                     macNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
@@ -10518,8 +10635,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
-                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -10589,7 +10706,8 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.add_file_reference(fileref)\n"
                 + "service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -10600,6 +10718,9 @@ public class IPhoneBuilder extends Executor {
 
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
+
+    /** The generated file provider extension target, and so the last component of its bundle id. */
+    static final String DOCUMENTS_EXTENSION_NAME = "CN1Documents";
 
     /// The iOS release App Intents first shipped in.
     ///
@@ -11175,6 +11296,175 @@ public class IPhoneBuilder extends Executor {
     }
 
     /**
+     * Resolves the document provider hints. Unlike surfaces this needs no build-time manifest:
+     * the tree is published at runtime and nothing about it is compiled into the native app, so
+     * the only build-time decisions are the App Group, the name the location carries in the file
+     * browser and the extension's deployment target.
+     */
+    private void parseDocumentProviderHints(BuildRequest request) throws BuildException {
+        // Two ways in, because two things need to agree. The classpath scan is the automatic
+        // one and matches how surfaces decides. The explicit hint exists because the tools that
+        // cannot read bytecode -- the Certificate Wizard, which creates the extension's App ID
+        // and profile, and the signing preflight, which refuses a build that lacks them -- have
+        // no other way to know this project wants the extension. Honouring it here is what keeps
+        // those two from acting on an extension this builder would never have generated.
+        documentProviderEnabled = (usesDocuments
+                        || "true".equals(request.getArg("ios.documentProvider.enabled", "false")))
+                && !"false".equals(request.getArg("ios.documentProvider.extension", "true"));
+        if (!documentProviderEnabled) {
+            // Either the app never touches com.codename1.documents and never asked for the
+            // extension, or the developer opted out with ios.documentProvider.extension=false.
+            // In both cases the iOS lowering is skipped entirely and the API stays an inert
+            // no-op at runtime.
+            return;
+        }
+        String hintAppGroup = request.getArg("ios.documentProvider.appGroup", null);
+        documentsAppGroup = hintAppGroup != null && hintAppGroup.length() > 0
+                ? hintAppGroup : "group." + request.getPackageName();
+        if (!isAppGroupIdentifier(documentsAppGroup)) {
+            // Apple rejects the entitlement rather than the build, so this would otherwise
+            // surface as a signing failure naming neither the hint nor the value. The whole
+            // syntax is checked, not just the prefix: this value is written into the app plist,
+            // the extension's plist and its entitlements, so a character that is significant in
+            // XML produces a malformed file long before anything gets as far as signing.
+            throw new BuildException("ios.documentProvider.appGroup must be an App Group "
+                    + "identifier -- 'group.' followed by dot-separated alphanumeric segments, "
+                    + "hyphens allowed (an Apple requirement); found '" + documentsAppGroup + "'");
+        }
+        // Decided here rather than when the target is generated, so the plist key below cannot
+        // depend on which of the two runs first. It is the same comparison
+        // IOSDocumentProviderExtensionBuilder makes when it picks which provider to emit.
+        documentsUsesReplicatedApi = IOSDocumentProviderExtensionBuilder.compareVersions(
+                request.getArg("ios.documentProvider.deploymentTarget",
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS),
+                IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS) >= 0;
+        documentsDisplayName = request.getArg("ios.documentProvider.displayName",
+                request.getDisplayName());
+        if (documentsDisplayName == null || documentsDisplayName.length() == 0) {
+            documentsDisplayName = request.getMainClass();
+        }
+    }
+
+    /**
+     * Generates the CN1Documents file provider extension folder under dist/ and appends the ruby
+     * that wires the extension target into the generated Xcode project. Modeled on
+     * {@link #appendWidgetExtensionTargets}.
+     *
+     * <p>Unlike surfaces this writes no app-target glue. FileProvider is an Objective-C framework,
+     * so the natives in IOSNative.m call it directly rather than trampolining through Swift.</p>
+     */
+    private void appendDocumentProviderExtensionTargets(StringBuilder sb, BuildRequest request,
+            File distDir) throws IOException {
+        IOSDocumentProviderExtensionBuilder docBuilder = new IOSDocumentProviderExtensionBuilder()
+                .setVersions(embeddedExtensionShortVersion(request),
+                        embeddedExtensionBundleVersion(request))
+                .setExtensionName(DOCUMENTS_EXTENSION_NAME)
+                .setHostBundleId(request.getPackageName())
+                .setAppGroupId(documentsAppGroup)
+                .setDisplayName(documentsDisplayName)
+                .setDeploymentTarget(request.getArg("ios.documentProvider.deploymentTarget",
+                        IOSDocumentProviderExtensionBuilder.MIN_REPLICATED_IOS));
+        String extensionName = docBuilder.getExtensionName();
+        File extensionDir = new File(distDir, extensionName);
+        IOSWalletExtensionBuilder.writeFileMap(docBuilder.buildFileMap(), extensionDir);
+        appendDocumentProviderExtensionRuby(sb, request, docBuilder, extensionDir, distDir);
+        log("Adding file provider extension target " + extensionName + " (app group "
+                + documentsAppGroup + ", "
+                + (docBuilder.usesReplicatedApi()
+                        ? "NSFileProviderReplicatedExtension"
+                        : "NSFileProviderExtension (pre-iOS-16)")
+                + ")");
+        sb.append("xcproj.save(project_file)\n");
+    }
+
+    private void appendDocumentProviderExtensionRuby(StringBuilder sb, BuildRequest request,
+            IOSDocumentProviderExtensionBuilder docBuilder, File extensionDir, File distDir)
+            throws IOException {
+        String extensionName = docBuilder.getExtensionName();
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY",
+                embeddedExtensionDeviceFamily(request.getArg("ios.project_type", "ios")));
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        // The builder's buildSettings.properties supplies the deployment target, Swift version,
+        // bundle id, entitlements and Info.plist paths; deleted after loading so it is not added
+        // to the Xcode group as a resource.
+        File buildSettingsProps = new File(extensionDir, "buildSettings.properties");
+        if (buildSettingsProps.exists()) {
+            Properties props = new Properties();
+            // Deliberately not caught: falling back on the defaults above would silently
+            // produce a target with the wrong bundle id, which then signs against the wrong
+            // profile and fails much later with a message naming neither.
+            try (FileInputStream fis = new FileInputStream(buildSettingsProps)) {
+                props.load(fis);
+            }
+            for (Object key : props.keySet()) {
+                if (key instanceof String) {
+                    buildSettingsMap.put((String) key, props.getProperty((String) key));
+                }
+            }
+            buildSettingsProps.delete();
+        }
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.documentProvider.buildSettings.")) {
+                buildSettingsMap.put(
+                        key.substring("ios.documentProvider.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // No export-options bookkeeping here, unlike the daemon's copy of this method: this
+        // builder produces the Xcode project for a local build and the developer archives it in
+        // Xcode, so there is no generated exportOptions.plist to name each embedded bundle by
+        // identifier. An overridden PRODUCT_BUNDLE_IDENTIFIER therefore needs nothing recorded --
+        // it is already in the build settings the target is generated with.
+        // CRITICAL ordering note: this fragment rides in appExtensionsBuilder, which the schemes
+        // script appends AFTER the global deployment-target pass (deploymentTargetStr stomps
+        // IPHONEOS_DEPLOYMENT_TARGET on every existing target). Because this target is created
+        // after that pass ran, its own deployment target below survives. Do not move this
+        // fragment before deploymentTargetStr.
+        // The whole fragment is guarded so re-running the script (the build re-executes
+        // fix_xcode_schemes.rb after dependency integration) doesn't duplicate the target.
+        // No explicit framework linkage: Swift autolinks FileProvider.
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '"
+                + docBuilder.getDeploymentTarget() + "')\n"
+                + "service_group = xcproj.new_group('" + extensionName + "')\n");
+        appendFilesToXcodeProjGroup(sb, extensionDir, "service_group", "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| p.name=='Embed App Extensions'} || main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Kept off the Catalyst slice, exactly as the widget extension is, and for a harder
+            // reason than the widget one: FileProvider is API_UNAVAILABLE(macCatalyst), so the
+            // generated Swift does not compile under macabi at all -- "'NSFileProviderDomain' is
+            // unavailable in Mac Catalyst", and the same for every other type it names. A
+            // Catalyst app cannot host this extension however it is entitled.
+            //
+            // The iOS app keeps its provider; the Catalyst slice ships without one, and the
+            // app-side natives take their stub branch there so the API is an honest no-op.
+            // macOS support belongs to the AppKit port, which builds against the macOS SDK where
+            // FileProvider exists.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+    }
+
+    /**
      * Generates the CN1Widgets WidgetKit extension folder under dist/, drops the app-side
      * Swift glue into &lt;MainClass&gt;-src (the schemes ruby sweeps *.swift there into the
      * APP target) and appends the ruby that wires the extension target into the generated
@@ -11311,7 +11601,8 @@ public class IPhoneBuilder extends Executor {
         }
         sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
-            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+            sb.append("  e.build_settings['" + escapeRuby(buildSettingKey) + "'] = \""
+                    + escapeRubyDoubleQuoted(buildSettingsMap.get(buildSettingKey)) + "\"\n");
         }
         sb.append("}\n");
         sb.append("end\n");
@@ -11421,6 +11712,41 @@ public class IPhoneBuilder extends Executor {
         // device, which is the whole failure this validation exists to catch.
         int[] range = plistMemberRange(plist, 0, plist.length(), "UIApplicationSceneManifest");
         return range == null ? "" : plist.substring(range[0], range[1]);
+    }
+
+    /// The text of a top-level string or boolean member, or null when the fragment has none.
+    ///
+    /// Enough for the two internal keys that are compared against what the build resolved: both
+    /// are a plain value, and a fragment that put something else there -- a dict, an array -- is
+    /// not a value this can disagree with, so it answers null and the caller leaves it alone.
+    static String topLevelPlistString(String plist, String key) {
+        if (plist == null) {
+            return null;
+        }
+        int[] range = plistMemberRange(plist, 0, plist.length(), key);
+        if (range == null) {
+            return null;
+        }
+        String value = plist.substring(range[0], range[1]).trim();
+        if (value.startsWith("<true")) {
+            return "true";
+        }
+        if (value.startsWith("<false")) {
+            return "false";
+        }
+        if (!value.startsWith("<string>") || !value.endsWith("</string>")) {
+            return null;
+        }
+        return value.substring("<string>".length(), value.length() - "</string>".length()).trim();
+    }
+
+    /// Whether the fragment declares the key as a member of ITS OWN level.
+    ///
+    /// plistDeclaresKey answers for a key anywhere in the fragment, nested dictionaries included.
+    /// A key the app-side code reads off the main bundle has to be a top-level member to be read
+    /// at all, so a nested namesake is not the same declaration and must not stand in for one.
+    static boolean declaresTopLevelPlistKey(String plist, String key) {
+        return plist != null && plistMemberRange(plist, 0, plist.length(), key) != null;
     }
 
     /// Whether the fragment actually declares the given key.
@@ -12985,6 +13311,70 @@ public class IPhoneBuilder extends Executor {
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
+        // Document provider: the Java bridge (IOSDocumentProviderBridge via IOSNative.m) resolves
+        // the shared App Group container through this key, and names the location in the file
+        // browser through the next one; the CN1Documents extension carries its own copy of the
+        // group in its generated Info.plist. See the ios.documentProvider.* build hints.
+        if (documentProviderEnabled) {
+            // Structurally, not by substring. Everywhere else in this method a loose match only
+            // decides whether to add a key of our own, and matching too eagerly just skips an
+            // injection the developer clearly made themselves. Here it is not benign: the name
+            // appearing in a comment, inside a string value, in a nested dictionary or as part
+            // of a longer key would suppress the top-level entry, and the app-side native reads
+            // ONLY the main bundle's top-level key -- so it finds nothing, isSupported() answers
+            // false, and publishing becomes a silent no-op in a build that generated the
+            // extension and signed it.
+            // A value that disagrees is refused rather than left alone. This key is not a hint
+            // -- ios.documentProvider.appGroup is -- and the entitlements on both targets carry
+            // the group the hint resolved to, so an injected key naming a different one has the
+            // app publishing into a container the extension is not entitled to read: nothing
+            // appears, and nothing says why. A stale manual injection is exactly how a project
+            // gets there.
+            String injectedGroup = topLevelPlistString(inject, "CN1DocumentsAppGroup");
+            if (injectedGroup != null && !injectedGroup.equals(documentsAppGroup)) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsAppGroup to '"
+                        + injectedGroup + "' while this build shares '" + documentsAppGroup
+                        + "' with the generated extension. The app would publish into a container "
+                        + "the extension cannot read. Remove the injected key and set "
+                        + "ios.documentProvider.appGroup instead, which entitles both sides.");
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsAppGroup")) {
+                inject += "\n<key>CN1DocumentsAppGroup</key><string>"
+                        + xmlEscape(documentsAppGroup) + "</string>";
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsDisplayName")) {
+                inject += "\n<key>CN1DocumentsDisplayName</key><string>"
+                        + plistEscape(documentsDisplayName) + "</string>";
+            }
+            // Which provider was generated, which the app-side natives cannot infer. Below the
+            // replicated API's floor the extension is the classic NSFileProviderExtension, which
+            // registers no domain and is signalled through the default manager instead. Deciding
+            // that from @available at runtime would strand a classic build on the very systems it
+            // was generated for.
+            // Structurally, for the reason the two keys above give -- and this one decides
+            // MORE than whether a key is written: a missing top-level value reads as YES, so a
+            // classic build whose fragment merely mentions the name anywhere would register a
+            // domain and signal through a manager that the generated NSFileProviderExtension
+            // never registers with, leaving the location inert on exactly the systems the
+            // classic provider exists for.
+            // Same reasoning, and the same cost: this says which of the two FileProvider APIs
+            // was generated, so a value that disagrees has the app registering a domain the
+            // extension never serves, or signalling through a manager it never registers with.
+            String injectedReplicated = topLevelPlistString(inject, "CN1DocumentsReplicated");
+            if (injectedReplicated != null
+                    && !injectedReplicated.equals(String.valueOf(documentsUsesReplicatedApi))) {
+                throw new BuildException("ios.plistInject sets CN1DocumentsReplicated to '"
+                        + injectedReplicated + "' while this build generated the "
+                        + (documentsUsesReplicatedApi ? "replicated" : "classic")
+                        + " provider. Remove the injected key; ios.documentProvider."
+                        + "deploymentTarget is what chooses between them.");
+            }
+            if (!declaresTopLevelPlistKey(inject, "CN1DocumentsReplicated")) {
+                inject += "\n<key>CN1DocumentsReplicated</key><string>"
+                        + (documentsUsesReplicatedApi ? "true" : "false") + "</string>";
+            }
+        }
+
         if (surfacesExtensionEnabled || surfacesWatchEnabled) {
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";

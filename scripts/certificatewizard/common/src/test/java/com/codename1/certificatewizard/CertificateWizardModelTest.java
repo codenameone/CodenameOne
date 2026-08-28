@@ -158,6 +158,38 @@ class CertificateWizardModelTest {
     }
 
     @Test
+    void declaredAppGroupsSplitOnWhitespaceAsWellAsCommas() {
+        // The documented format is space delimited, and IPhoneBuilder reads the hint that way.
+        // Splitting on commas alone made "group.a group.b" ONE identifier: automatic setup then
+        // tried to create a group by that impossible name instead of preserving the two the
+        // project already had, and the App ID's association lost both.
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups("group.example.share group.example.other"));
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups("group.example.share,group.example.other"));
+        assertEquals(java.util.Arrays.asList("group.example.share", "group.example.other"),
+                WizardDecisions.declaredAppGroups(" group.example.share , group.example.other "));
+        assertEquals(java.util.Arrays.asList("group.example.share"),
+                WizardDecisions.declaredAppGroups("group.example.share group.example.share"));
+        assertTrue(WizardDecisions.declaredAppGroups(null).isEmpty());
+        assertTrue(WizardDecisions.declaredAppGroups("   ").isEmpty());
+    }
+
+    @Test
+    void documentProviderBundleIdFollowsTheOverriddenTargetName() {
+        // The project can rename the generated target through its build settings and the builder
+        // applies that; provisioning the default name would create an App ID and profiles for a
+        // target nobody is building, so setup would report success and the build fail in signing.
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app", null));
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app", "  "));
+        assertEquals("com.example.app.files",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app",
+                        " com.example.app.files "));
+    }
+
+    @Test
     void createAppGroupFindsOrCreatesAndAppearsInRefreshedState() {
         MockSigningService service = new MockSigningService();
         final SigningState.AppGroup[] first = new SigningState.AppGroup[1];
@@ -289,6 +321,54 @@ class CertificateWizardModelTest {
                 "codename1.ios.release.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
         assertFalse(written.contains("stale-dev.mobileprovision"));
         assertTrue(written.contains("codename1.ios.debug.appext.CN1Widgets.provision=\n"));
+    }
+
+    @Test
+    void documentProviderExtensionDecisionsAreDeterministic() {
+        // The suffix has to match the target name IPhoneBuilder generates and stamps as
+        // PRODUCT_BUNDLE_IDENTIFIER. Apple signs an extension against its own App ID, so a
+        // mismatch here is an archive-time signing failure naming neither side.
+        assertEquals("com.example.app.CN1Documents",
+                WizardDecisions.documentProviderExtensionBundleId("com.example.app"));
+        assertNull(WizardDecisions.documentProviderExtensionBundleId(null));
+        assertNull(WizardDecisions.documentProviderExtensionBundleId("  "));
+    }
+
+    @Test
+    void documentProviderSigningWritesTheHintsAndBothProfiles() throws Exception {
+        Path settings = Files.createTempFile("cn1-settings", ".properties");
+        Files.writeString(settings, "codename1.packageName=com.example.app\n",
+                StandardCharsets.UTF_8);
+        SigningAssetInstaller.applyDocumentProviderSigning(settings.toString(),
+                "group.com.example.app", "/tmp/CN1Documents.mobileprovision",
+                "/tmp/CN1Documents_Development.mobileprovision");
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        // Enabling the feature is part of installing its signing: an App ID, an App Group and two
+        // profiles with no hint is a project that builds without the extension and leaves the
+        // developer with signing assets nothing consumes.
+        assertTrue(written.contains("codename1.arg.ios.documentProvider.enabled=true"));
+        assertTrue(written.contains(
+                "codename1.arg.ios.documentProvider.appGroup=group.com.example.app"));
+        assertTrue(written.contains(
+                "codename1.ios.appext.CN1Documents.provision=/tmp/CN1Documents.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.release.appext.CN1Documents.provision=/tmp/CN1Documents.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.debug.appext.CN1Documents.provision=/tmp/CN1Documents_Development.mobileprovision"));
+        assertTrue(written.contains("codename1.packageName=com.example.app"));
+    }
+
+    @Test
+    void documentProviderSigningWithoutDevelopmentProfileClearsStaleDebugKey() throws Exception {
+        Path settings = Files.createTempFile("cn1-settings", ".properties");
+        Files.writeString(settings, "codename1.packageName=com.example.app\n"
+                + "codename1.ios.debug.appext.CN1Documents.provision=/tmp/stale-dev.mobileprovision\n",
+                StandardCharsets.UTF_8);
+        SigningAssetInstaller.applyDocumentProviderSigning(settings.toString(),
+                "group.com.example.app", "/tmp/CN1Documents.mobileprovision", null);
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        assertFalse(written.contains("stale-dev.mobileprovision"));
+        assertTrue(written.contains("codename1.ios.debug.appext.CN1Documents.provision=\n"));
     }
 
     @Test

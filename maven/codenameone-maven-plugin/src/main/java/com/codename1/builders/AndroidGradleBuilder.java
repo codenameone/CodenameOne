@@ -313,6 +313,11 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+
+    // Set when the app references com.codename1.documents. Gates the DocumentsProvider
+    // manifest entry, which is the whole of the Android lowering -- unlike Apple there is no
+    // extension and no app group, the provider runs in this app's own process.
+    private boolean usesDocuments;
     /// The kinds declaring a watch complication family, as {id, label, comma-joined families}.
     ///
     /// Collected while the surfaces manifest is parsed and consumed after the module layout is
@@ -2028,6 +2033,27 @@ public class AndroidGradleBuilder extends Executor {
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
                     }
+                    // Document provider: the app's content shown as a source in the storage
+                    // picker. Gated on actual usage so the provider is only declared for apps
+                    // that publish documents -- a declared provider that answers nothing is a
+                    // source the user can open and find empty.
+                    // Scoped to the APPLICATION's classes, not the framework's. The scanner
+                    // walks the tree unzipped from the submitted project (later zipped back as
+                    // userClasses.jar); the Codename One jar is never unpacked into it, so the
+                    // framework's own references between DocumentProvider, DocumentNode and the
+                    // bridge are not visible here and cannot switch this on by themselves. The
+                    // hit that does switch it on is an application class referencing the API,
+                    // which is the intended signal -- and the same reasoning every other feature
+                    // gate in this scan relies on.
+                    // Library-encapsulated usage is deliberately out of scope here. This reads
+                    // the application's own classes; a cn1lib that publishes on the app's behalf
+                    // is packaged separately and is not walked, which is true of every feature
+                    // gate in this scan rather than of this one. Rescanning library bytecode is a
+                    // change to that shared machinery, not to this line -- the documented route
+                    // for a library is android.documentProvider.enabled.
+                    if (!usesDocuments && cls.indexOf("com/codename1/documents/") == 0) {
+                        usesDocuments = true;
+                    }
                     if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
                         usesIntents = true;
                     }
@@ -3695,6 +3721,39 @@ public class AndroidGradleBuilder extends Executor {
         watchIntentsActivityMetaData = intentsActivityMetaData;
         watchIntentsManifestEntries = intentsManifestEntries;
 
+        // Document provider (com.codename1.documents): one ContentProvider, declared only when
+        // the app actually publishes documents. android:permission gates the CALLER, not this
+        // app -- MANAGE_DOCUMENTS is a system-signature permission that only the platform
+        // document UI holds, which is what keeps every other app from binding this.
+        String documentsProviderEntry = "";
+        // The explicit hint counts here too, so a project configured by the Certificate Wizard
+        // declares the same thing to both builders rather than only to the iOS one.
+        if (usesDocuments || "true".equals(request.getArg("android.documentProvider.enabled",
+                request.getArg("ios.documentProvider.enabled", "false")))) {
+            documentsProviderEntry =
+                    "        <provider\n"
+                    + "            android:name=\"" + xclass("com.codename1.impl.android.documents.CN1DocumentsProvider") + "\"\n"
+                    // ${applicationId}, not the request's package, and for the same reason the
+                    // FileProvider declaration above uses it: a build that changes the
+                    // application id -- an applicationIdSuffix for a variant, or an
+                    // xgradle_default_config that replaces it outright -- would otherwise
+                    // declare an authority belonging to the other variant. A provider authority
+                    // is globally unique on the device, so installing both variants side by side
+                    // fails on the second. It also keeps the manifest in step with the runtime,
+                    // which builds the authority from getPackageName().
+                    + "            android:authorities=\"${applicationId}.documents\"\n"
+                    + "            android:exported=\"true\"\n"
+                    + "            android:grantUriPermissions=\"true\"\n"
+                    + "            android:permission=\"android.permission.MANAGE_DOCUMENTS\">\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"android.content.action.DOCUMENTS_PROVIDER\" />\n"
+                    + "            </intent-filter>\n"
+                    + "        </provider>\n";
+            debug("Declaring the CN1Documents provider with authority "
+                    + "${applicationId}.documents (resolved by manifest merging; "
+                    + request.getPackageName() + ".documents unless a variant changes it)");
+        }
+
         String surfacesManifestEntries = "";
         String watchSurfacesManifestEntries = "";
         if (usesSurfaces) {
@@ -5304,6 +5363,7 @@ public class AndroidGradleBuilder extends Executor {
                 + carAppService
                 + wearableListenerService
                 + surfacesManifestEntries
+                + documentsProviderEntry
                 // Only in a STANDALONE build does this manifest belong to the watch. A companion
                 // build's watch services go in the wear module's own manifest, which
                 // generateWearModule writes; putting them here too would declare a complication

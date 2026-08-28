@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.javase;
 
@@ -96,10 +113,24 @@ public class ComponentTreeInspector extends JPanel {
     
     public JFrame showInFrame() {
         if (frame == null) {
+            // Whatever held this panel loses it: adding a component to a container removes it
+            // from its previous one, and in single-window mode that previous one is the app
+            // frame's docked "Component Details" panel. Swing does not repaint the container a
+            // component left -- removal marks no damage on it -- so the vacated strip kept
+            // showing this panel's last pixels until something else happened to repaint it.
+            // On a headless CI display nothing else does, and the simulator screenshot test
+            // read those stale labels as an inspector that had never settled.
+            //
+            // Read BEFORE the add, which is what performs the removal.
+            java.awt.Container previous = getParent();
             frame = new JFrame("Component Inspector");
             frame.getContentPane().setLayout(new BorderLayout());
             
             frame.getContentPane().add(this, BorderLayout.CENTER);
+            if (previous != null) {
+                previous.revalidate();
+                previous.repaint();
+            }
             frame.pack();
             frame.setLocationByPlatform(true);
             

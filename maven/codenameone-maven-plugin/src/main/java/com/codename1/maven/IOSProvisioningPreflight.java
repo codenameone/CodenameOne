@@ -90,6 +90,17 @@ final class IOSProvisioningPreflight {
          * wildcard). Null when the profile does not carry one.
          */
         String applicationIdentifier;
+        /**
+         * The {@code com.apple.security.application-groups} entitlement -- EMPTY when the
+         * profile grants none, never null once the profile has been parsed.
+         *
+         * <p>The difference matters: a generated document provider always declares an App Group,
+         * so a profile that grants none cannot sign it, and that is precisely what a profile
+         * issued before the capability was enabled looks like. Reading the absence as "cannot
+         * tell" would have accepted exactly the profiles this exists to catch. A file that could
+         * not be parsed at all produces no Profile, which is where "cannot tell" still lives.</p>
+         */
+        List<String> appGroups = new ArrayList<String>();
     }
 
     /** A problem found before the build was sent: {@code message} is written for the user. */
@@ -260,7 +271,7 @@ final class IOSProvisioningPreflight {
             if (name == null) {
                 continue;
             }
-            if (hasOwnProfile(settings, extension, name)) {
+            if (hasOwnProfile(settings, extension, name, release)) {
                 continue;
             }
             String bundleId = extensionBundleId(extension, packageName + "." + name);
@@ -272,6 +283,234 @@ final class IOSProvisioningPreflight {
                     release), true));
         }
         return problems;
+    }
+
+    /**
+     * Whether the app extensions this build GENERATES can be signed.
+     *
+     * <p>Same failure as {@link #checkAppExtensions} and the same fix, but these targets never
+     * appear under {@code ios/app_extensions/}: the builder synthesizes them from build hints, so
+     * nothing on disk announces them and the folder-driven check above cannot see them. Without
+     * this, enabling the document provider and never creating its App ID produces a green local
+     * build and an Xcode failure minutes into a cloud one, naming a bundle id the developer never
+     * typed.</p>
+     *
+     * <p>Only the document provider is checked here. The other generated extensions (the Wallet
+     * pair, CN1Widgets, CN1MatterSetup) have exactly this shape and could join the table below,
+     * but each one turns a late cloud failure into an early local one for projects that build
+     * today, so they are left for a change that can be verified against real projects rather than
+     * folded in as a side effect.</p>
+     *
+     * @return one problem per generated extension that cannot be signed as configured
+     */
+    static List<Problem> checkGeneratedExtensions(Properties settings, boolean release) {
+        List<Problem> problems = new ArrayList<Problem>();
+        if (settings == null) {
+            return problems;
+        }
+        if (!"true".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.enabled")))) {
+            return problems;
+        }
+        if ("false".equals(trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.extension")))) {
+            // Explicitly opted out: the build generates no target, so there is nothing to sign.
+            return problems;
+        }
+        String packageName = trimmed(settings.getProperty("codename1.packageName"));
+        if (packageName == null || packageName.isEmpty()) {
+            return problems;
+        }
+        String name = "CN1Documents";
+        if (hasOwnProfileSetting(settings, name, release)) {
+            // A profile of its own, but the right one? The generated target always declares the
+            // App Group it resolves its container from, so a profile issued before that group
+            // was enabled on the App ID matches the bundle id and still cannot sign it -- and
+            // the failure lands in Xcode, talking about an entitlement. Only a profile supplied
+            // as a local PATH can be read; a hosted URL or base64 blob is checked by the server.
+            Problem groupProblem = appGroupProblem(settings, name, release);
+            if (groupProblem != null) {
+                problems.add(groupProblem);
+            }
+            // And the app's own profile, which carries the same group: the builder puts the App
+            // Group into the host's entitlements too, so a main profile issued before the group
+            // was enabled fails signing even when the extension's profile is perfect. Checking
+            // only the extension would have moved the failure rather than prevented it.
+            Problem hostProblem = hostAppGroupProblem(settings, release);
+            if (hostProblem != null) {
+                problems.add(hostProblem);
+            }
+            return problems;
+        }
+        Profile appProfile = appProfile(settings, release);
+        if (appProfile == null || appProfile.applicationIdentifier == null) {
+            // No readable profile, or one that names no App ID: check() reports the former and
+            // neither is something to refuse a build over here.
+            return problems;
+        }
+        String bundleId = generatedExtensionBundleId(settings, packageName, name);
+        if (profileCoversBundleId(appProfile.applicationIdentifier, bundleId)) {
+            // No wildcard exemption here, unlike the folder-driven check above. A wildcard App ID
+            // does cover the bundle id, but this extension always declares
+            // com.apple.security.application-groups -- it resolves the container it reads from
+            // that group -- and Apple does not offer App Groups on a wildcard App ID at all. The
+            // profile therefore matches the name and still authorizes none of the entitlement, so
+            // the build would go on to fail in signing rather than here. A hand-written extension
+            // is left alone because nothing tells this check what it declares.
+            problems.add(new Problem(wildcardAppGroupMessage(name, bundleId, appProfile, release),
+                    true));
+            return problems;
+        }
+        problems.add(new Problem(appExtensionProfileMessage(name, bundleId, appProfile, release),
+                true));
+        return problems;
+    }
+
+    /// Says why a wildcard profile cannot stand in for the generated extension's own.
+    private static String wildcardAppGroupMessage(String name, String bundleId, Profile appProfile,
+            boolean release) {
+        String buildType = release ? "release" : "debug";
+        return "The " + name + " app extension has no provisioning profile of its own, and the "
+                + "wildcard profile this build signs with (\"" + appProfile.name + "\", App ID "
+                + appIdPattern(appProfile.applicationIdentifier) + ") cannot sign it. The bundle "
+                + "ID matches, but the extension declares the App Group it shares with the app "
+                + "and Apple does not offer the App Groups capability on a wildcard App ID, so "
+                + "signing fails on the entitlement rather than on the name.\n"
+                + "Create an explicit App ID for " + bundleId + " in the Apple Developer portal, "
+                + "enable App Groups on it and on the app's own App ID, generate a provisioning "
+                + "profile for it against the same certificate as the app, and supply it in one "
+                + "of these ways:\n"
+                + "  1. Set codename1.ios." + buildType + ".appext." + name + ".provision="
+                + "{path to the .mobileprovision} in codenameone_settings.properties.\n"
+                + "  2. Host the profile and name its URL in codename1.arg.ios." + buildType
+                + ".appext." + name + ".provisioningURL.\n"
+                + "The Certificate Wizard does all of this for you.\n"
+                + "The app's own profile has to change too: it carries the same App Group, which "
+                + "a wildcard App ID cannot authorize either.";
+    }
+
+    /// Whether the extension profile supplied as a local path grants the App Group the
+    /// generated target declares, or null when there is nothing to say.
+    ///
+    /// Silent when the profile cannot be READ -- an unreadable file is reported by check()
+    /// itself, and a file this cannot parse is not one to judge. A profile that parses and grants
+    /// no App Groups is a different thing entirely: that is what a profile issued before the
+    /// capability was enabled looks like, and it is the case this exists to catch.
+    private static Problem appGroupProblem(Properties settings, String name, boolean release) {
+        String configured = configuredAppGroup(settings);
+        if (configured == null) {
+            return null;
+        }
+        String qualifier = release ? "release" : "debug";
+        String[] paths = {
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.ios.appext." + name + ".provision"
+        };
+        for (String key : paths) {
+            String value = settings.getProperty(key);
+            if (value == null || value.trim().isEmpty()) {
+                continue;
+            }
+            String resolved = resolvePlaceholders(value.trim(), settings);
+            if (resolved.indexOf("${") >= 0 || !new File(resolved).isFile()) {
+                continue;
+            }
+            Profile profile;
+            try {
+                profile = parse(readFile(new File(resolved)));
+            } catch (Exception ex) {
+                return null;
+            }
+            if (profile == null) {
+                // Not a provisioning profile at all -- parse answers null for a plist that is
+                // some other kind of file, an Info.plist being the easy mistake. Reading its
+                // fields from here would have thrown out of the Maven build instead of producing
+                // the problem this method exists to report; an unreadable file is check()'s to
+                // report, not this one's.
+                return null;
+            }
+            String bundleId = generatedExtensionBundleId(settings,
+                    trimmed(settings.getProperty("codename1.packageName")), name);
+            if (!profileCoversBundleId(profile.applicationIdentifier, bundleId)) {
+                // A profile for a DIFFERENT App ID that happens to grant the same group. It is
+                // supplied as this extension's, so the check that an extension has a profile of
+                // its own is satisfied and nothing else looks at it -- and Xcode then refuses it
+                // for the name, after the archive.
+                return new Problem("The " + name + " provisioning profile named by " + key + " ("
+                        + profile.name + ") is for App ID "
+                        + appIdPattern(profile.applicationIdentifier) + ", which cannot sign \""
+                        + bundleId + "\". Supply the profile issued for the extension's own App "
+                        + "ID; the Certificate Wizard creates and installs it for you.", true);
+            }
+            if (profile.appGroups.contains(configured)) {
+                return null;
+            }
+            return new Problem("The " + name + " provisioning profile named by " + key + " ("
+                    + profile.name + ") does not grant the App Group \"" + configured + "\". The "
+                    + "generated extension declares that group -- it is how it reads the tree the "
+                    + "app publishes -- so signing fails on the entitlement rather than on the "
+                    + "profile's name. Enable App Groups on the " + name + " App ID, add \""
+                    + configured + "\" to it, and regenerate the profile: a profile is a snapshot "
+                    + "of the capabilities its App ID had when it was issued, so one made before "
+                    + "the change never gains them. The Certificate Wizard does this for you.",
+                    true);
+        }
+        return null;
+    }
+
+    /// The bundle id the generated extension is actually built with.
+    ///
+    /// "<package>.CN1Documents" unless the project overrides PRODUCT_BUNDLE_IDENTIFIER through
+    /// the extension's build settings, which the builder applies to the generated target. Judging
+    /// the profile against the default would reject the profile issued for the real identifier
+    /// and accept one issued for a target that is not being built -- the failure moving to Xcode,
+    /// after the archive, which is what this whole class exists to prevent.
+    private static String generatedExtensionBundleId(Properties settings, String packageName,
+                                                     String name) {
+        String override = settings.getProperty("codename1.arg.ios.documentProvider.buildSettings."
+                + "PRODUCT_BUNDLE_IDENTIFIER");
+        if (override != null) {
+            String resolved = resolvePlaceholders(override.trim(), settings);
+            // A value that still names an unresolved property is not an identifier; the default
+            // is the better guess and check() reports the unresolved reference itself.
+            if (!resolved.isEmpty() && resolved.indexOf("${") < 0) {
+                return resolved;
+            }
+        }
+        return packageName + "." + name;
+    }
+
+    /// The same check against the app's own profile.
+    private static Problem hostAppGroupProblem(Properties settings, boolean release) {
+        String configured = configuredAppGroup(settings);
+        Profile profile = appProfile(settings, release);
+        if (configured == null || profile == null || profile.appGroups.contains(configured)) {
+            return null;
+        }
+        return new Problem("The app's own provisioning profile (" + profile.name + ") does not "
+                + "grant the App Group \"" + configured + "\". Publishing documents puts that "
+                + "group in the app's entitlements as well as the extension's -- they meet in the "
+                + "container it names -- so the app itself fails to sign. Enable App Groups on "
+                + "the app's App ID, add \"" + configured + "\" to it, and regenerate the "
+                + "profile. The Certificate Wizard does this for you.", true);
+    }
+
+    /// The App Group this build will ask for, or null when it cannot be worked out.
+    private static String configuredAppGroup(Properties settings) {
+        String configured = trimmed(settings.getProperty(
+                "codename1.arg.ios.documentProvider.appGroup"));
+        if (configured != null && !configured.isEmpty()) {
+            return configured;
+        }
+        String packageName = trimmed(settings.getProperty("codename1.packageName"));
+        if (packageName == null || packageName.isEmpty()) {
+            return null;
+        }
+        return "group." + packageName;
+    }
+
+    private static String trimmed(String value) {
+        return value == null ? null : value.trim();
     }
 
     /** The app's own profile for this build type, or null when it cannot be read. */
@@ -316,21 +555,79 @@ final class IOSProvisioningPreflight {
      * build server accepts: a {@code .mobileprovision} travelling inside the extension, the
      * {@code codename1.ios.appext.<Name>.provision} project setting (which the build
      * base64-encodes into {@code provisioningData}), or the hosted-URL build hint. The
-     * build-type qualified forms count too -- the mojo collapses those into the plain ones
-     * before submitting.
+     * build-type qualified form counts too, but only the one matching THIS build: the mojo
+     * collapses that one into the plain key and deletes the other without promoting it, so a
+     * release build holding only the debug-qualified setting reaches the server with no profile
+     * at all -- which is the failure this check exists to catch, not to wave through.
      */
-    private static boolean hasOwnProfile(Properties settings, File extension, String name) {
+    private static boolean hasOwnProfile(Properties settings, File extension, String name,
+            boolean release) {
         if (containsProfileFile(extension)) {
             return true;
         }
-        String[] keys = {
+        return hasOwnProfileSetting(settings, name, release);
+    }
+
+    /**
+     * The settings-only half of {@link #hasOwnProfile}, for an extension the builder GENERATES.
+     * There is no folder on disk to carry a {@code .mobileprovision}, so the project settings and
+     * the build hints are the only carriers.
+     */
+    private static boolean hasOwnProfileSetting(Properties settings, String name,
+            boolean release) {
+        // Only this build's qualifier, never both. CN1BuildMojo's
+        // resolveAppExtensionBuildTypeQualifiers promotes the matching qualifier to the plain key
+        // and REMOVES the other one, so counting the opposite build type's setting would pass a
+        // release build that has only a debug profile configured -- and it would then fail
+        // signing on the server, with a message about the extension's bundle ID rather than about
+        // the profile nobody supplied.
+        String qualifier = release ? "release" : "debug";
+        // An explicitly BLANK key for this build type means "no profile for this build", and it
+        // has to beat the unqualified fallback rather than be ignored. The wizard writes one when
+        // automatic setup could not produce a development profile, while leaving the unqualified
+        // key holding the DISTRIBUTION profile for older tooling; the build then sends that
+        // profile for the extension and signing fails on the server, naming the extension's
+        // bundle ID rather than the missing development profile.
+        //
+        // Caught here rather than in CN1BuildMojo.resolveAppExtensionBuildTypeQualifiers, which
+        // deliberately keeps the unqualified fallback when a qualified value is blank -- shipped
+        // widget-extension projects rely on that, and a signing preflight is the right place to
+        // refuse a build the resolution cannot fix. A blank value is written by the wizard and by
+        // nothing else: it is not something a developer types by hand, so reading it as "this
+        // build type has no profile" cannot misfire on a hand-configured project.
+        String[] blanking = {
+            "codename1.ios." + qualifier + ".appext." + name + ".provision",
+            "codename1.arg.ios." + qualifier + ".appext." + name + ".provisioningURL"
+        };
+        for (String key : blanking) {
+            String value = settings.getProperty(key);
+            if (value != null && value.trim().isEmpty()) {
+                return false;
+            }
+        }
+        // The two path-valued keys are checked as PATHS, the rest only for a value. A path is
+        // the one carrier this can verify, and a stale or mistyped one is the likely mistake:
+        // CN1BuildMojo warns that the file is missing, skips encoding it, and submits the build
+        // anyway, so the extension reaches the server with no profile and fails signing -- the
+        // late failure this check exists to prevent, waved through by the setting that was
+        // supposed to prevent it.
+        String[] paths = {
             "codename1.ios.appext." + name + ".provision",
-            "codename1.ios.debug.appext." + name + ".provision",
-            "codename1.ios.release.appext." + name + ".provision",
+            "codename1.ios." + qualifier + ".appext." + name + ".provision"
+        };
+        for (String key : paths) {
+            String value = settings.getProperty(key);
+            if (value != null && !value.trim().isEmpty()) {
+                String resolved = resolvePlaceholders(value.trim(), settings);
+                if (resolved.indexOf("${") < 0 && new File(resolved).isFile()) {
+                    return true;
+                }
+            }
+        }
+        String[] keys = {
             "codename1.arg.ios.appext." + name + ".provisioningData",
             "codename1.arg.ios.appext." + name + ".provisioningURL",
-            "codename1.arg.ios.debug.appext." + name + ".provisioningURL",
-            "codename1.arg.ios.release.appext." + name + ".provisioningURL"
+            "codename1.arg.ios." + qualifier + ".appext." + name + ".provisioningURL"
         };
         for (String key : keys) {
             String value = settings.getProperty(key);
@@ -695,6 +992,18 @@ final class IOSProvisioningPreflight {
         Element applicationIdentifier = valueForKey(doc, "application-identifier");
         if (applicationIdentifier != null && "string".equals(applicationIdentifier.getTagName())) {
             profile.applicationIdentifier = applicationIdentifier.getTextContent().trim();
+        }
+        // Same nesting, same reason: this is what says whether the profile can sign a target
+        // that declares an App Group, which every generated document provider does.
+        Element groups = valueForKey(doc, "com.apple.security.application-groups");
+        if (groups != null && "array".equals(groups.getTagName())) {
+            NodeList values = groups.getElementsByTagName("string");
+            for (int i = 0; i < values.getLength(); i++) {
+                String value = values.item(i).getTextContent().trim();
+                if (!value.isEmpty()) {
+                    profile.appGroups.add(value);
+                }
+            }
         }
         profile.type = deriveType(doc);
         return profile;

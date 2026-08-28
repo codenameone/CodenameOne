@@ -335,6 +335,19 @@ final class BuildHintsAndroid {
                 .def("false")
                 .platform("android"));
 
+        h.add(new Hint("android.documentProvider.enabled")
+                .group(HintGroup.ANDROID)
+                .type(HintType.BOOLEAN)
+                .def("false")
+                .platform("android")
+                .doc("The Android counterpart of ios.documentProvider.enabled, and the supported "
+                        + "way to declare the feature when the code that publishes lives in a "
+                        + "cn1lib rather than in the app: the build's usage scan reads the "
+                        + "application's own classes, so an app that only calls a library which "
+                        + "publishes documents goes undetected. Falls back to "
+                        + "ios.documentProvider.enabled when unset, so a project that sets one "
+                        + "gets both."));
+
         h.add(new Hint("android.disableR8FullMode")
                 .group(HintGroup.ANDROID)
                 .type(HintType.BOOLEAN)
