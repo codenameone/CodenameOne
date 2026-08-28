@@ -1,0 +1,383 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.ios;
+
+import com.codename1.documents.spi.DocumentProviderBridge;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// Apple `DocumentProviderBridge` backing the `com.codename1.documents` API with FileProvider.
+///
+/// Everything published is persisted into the shared App Group container (the group id comes from
+/// the `CN1DocumentsAppGroup` Info.plist key injected by the build) where the generated
+/// CN1Documents extension reads it while the app process is dead:
+///
+/// - the tree: `<container>/cn1documents/index.json`
+/// - the endpoint and token: `<container>/cn1documents/endpoint.json`
+/// - the bytes of any node carrying a path: `<container>/cn1documents/files/<path>`
+///
+/// Both JSON files are written write-then-rename so the extension never observes a partial file.
+/// That is not a nicety here: the extension is a separate process the system may start at any
+/// instant, including midway through a publish, and a half-written index is a file browser showing
+/// half a tree.
+///
+/// All file IO goes through `FileSystemStorage` (which tolerates the container's plain absolute
+/// paths): `java.io.File`'s mutating methods are unimplemented natives on the ParparVM runtime --
+/// referencing them fails the native link.
+///
+/// Shared unchanged with the AppKit macOS port, which reaches the same natives: they compile
+/// against the macOS SDK, where FileProvider exists. They answer unsupported on Mac Catalyst,
+/// where it does not -- FileProvider is API_UNAVAILABLE(macCatalyst), so that slice hosts no
+/// extension and the public API is an honest no-op there.
+///
+/// This whole class is dead code unless the build linked the document provider natives (the
+/// `CN1_USE_DOCUMENTS` define the builder flips when the app references `com.codename1.documents`);
+/// without it every native answers unsupported and the public API no-ops.
+final class IOSDocumentProviderBridge implements DocumentProviderBridge {
+    /// The directory, relative to the container, that everything published lives under. Namespaced
+    /// so the container stays shareable with the other features that use the same App Group.
+    private static final String ROOT = "cn1documents";
+
+    private final IOSNative nativeInstance;
+    private final FileSystemStorage fs = FileSystemStorage.getInstance();
+    private boolean warnedNoContainer;
+
+    IOSDocumentProviderBridge(IOSNative nativeInstance) {
+        this.nativeInstance = nativeInstance;
+    }
+
+    public boolean isDocumentProviderSupported() {
+        return nativeInstance.documentProviderSupported();
+    }
+
+    public String getSharedDirectory() {
+        String container = containerPath();
+        if (container == null) {
+            return null;
+        }
+        String files = container + "/" + ROOT + "/files";
+        mkdirs(container, ROOT + "/files");
+        return files;
+    }
+
+    public void publishIndex(String indexJson) {
+        String container = containerPath();
+        if (container == null || indexJson == null) {
+            return;
+        }
+        // The whole operation holds the lock, not just the write. publish() and clear() are
+        // called from application code on whatever thread it likes -- a logout clear() racing a
+        // background publish() could otherwise delete the tree between this write's temporary
+        // file and its rename, and the rename would then put the departing user's index back
+        // after the clear had returned.
+        synchronized (WRITE_LOCK) {
+            try {
+                mkdirs(container, ROOT);
+                writeAtomically(container + "/" + ROOT, "index.json",
+                        indexJson.getBytes("UTF-8"));
+                // Registering on every publish rather than once at startup: the domain is what
+                // makes the location exist at all, and an app that publishes before the first
+                // registration completed would otherwise have written a tree nothing listens for.
+                nativeInstance.documentsRegisterDomain();
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
+    }
+
+    public void setRemoteEndpoint(String endpoint, String authToken) {
+        String container = containerPath();
+        if (container == null) {
+            return;
+        }
+        // Under the same lock as publish and clear: this file holds the bearer token, so a clear()
+        // that interleaved with it would leave the token on disk after logout.
+        synchronized (WRITE_LOCK) {
+            try {
+                mkdirs(container, ROOT);
+                writeAtomically(container + "/" + ROOT, "endpoint.json",
+                        endpointJson(endpoint, authToken).getBytes("UTF-8"));
+                // Told, not left to be noticed. A credential change moves the content version of
+                // every remote item, but the browser only learns that when it asks for the item
+                // again -- so without this a signed-in-again user kept seeing the bytes
+                // materialized under the old token until something unrelated published.
+                nativeInstance.documentsSignalChange();
+            } catch (IOException err) {
+                Log.e(err);
+            }
+        }
+    }
+
+    public void signalChange() {
+        if (containerPath() == null) {
+            return;
+        }
+        nativeInstance.documentsSignalChange();
+    }
+
+    public void clear() {
+        String container = containerPath();
+        if (container == null) {
+            return;
+        }
+        // Order matters. The tree goes first so anything that re-enumerates from here on finds
+        // nothing; then the browser is told to re-enumerate, which is the only thing that
+        // reaches a pre-iOS-16 provider at all (it registers no domain, so removing one is a
+        // no-op there); then the domain goes, which is what removes the location itself.
+        //
+        // The whole sequence holds the mutation lock, deletions and domain calls alike. Leaving
+        // the domain calls outside it let a publish slip between them: that publish wrote its
+        // index and registered the domain, and this thread then removed the domain it had just
+        // registered, leaving a published tree that no longer appears in Files until something
+        // publishes again.
+        //
+        // The last call WAITS for the system to take the domain away, which is why this can hold
+        // the lock for as long as a logout takes rather than as long as a few deletions take.
+        // That is the point: clear() returning has to mean the location is gone, or an app can
+        // finish logging a user out while their documents are still browsable.
+        synchronized (WRITE_LOCK) {
+            deleteTree(container + "/" + ROOT);
+            // The pre-iOS-16 provider materializes copies into "File Provider Storage" inside
+            // the same group container. Deleting the published tree does not remove those, so
+            // without this a logged-out user's documents stay readable through an open browser.
+            deleteTree(container + "/File Provider Storage");
+            nativeInstance.documentsSignalChange();
+            nativeInstance.documentsRemoveDomain();
+        }
+    }
+
+    /// Hand-built rather than routed through a serializer: two optional strings do not justify
+    /// pulling the JSON writer into the port, and the extension's decoder expects exactly these
+    /// two keys.
+    private static String endpointJson(String endpoint, String authToken) {
+        StringBuilder sb = new StringBuilder("{");
+        if (endpoint != null && endpoint.length() > 0) {
+            sb.append("\"endpoint\":\"").append(escapeJson(endpoint)).append("\"");
+        }
+        if (authToken != null && authToken.length() > 0) {
+            if (sb.length() > 1) {
+                sb.append(',');
+            }
+            sb.append("\"authToken\":\"").append(escapeJson(authToken)).append("\"");
+        }
+        return sb.append('}').toString();
+    }
+
+    private static String escapeJson(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        String hex = Integer.toHexString(c);
+                        sb.append("\\u");
+                        for (int pad = hex.length(); pad < 4; pad++) {
+                            sb.append('0');
+                        }
+                        sb.append(hex);
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+            }
+        }
+        return sb.toString();
+    }
+
+    private String containerPath() {
+        String container = nativeInstance.getDocumentsContainerPath();
+        if (container == null || container.length() == 0) {
+            if (!warnedNoContainer) {
+                warnedNoContainer = true;
+                Log.p("DocumentProvider: no App Group container is available; check that the "
+                        + "build set ios.documentProvider.appGroup and that the app group in "
+                        + "the CN1DocumentsAppGroup Info.plist key exists on the App ID");
+            }
+            return null;
+        }
+        if (container.endsWith("/")) {
+            container = container.substring(0, container.length() - 1);
+        }
+        return container;
+    }
+
+    /// Serializes replacements within this process. Two background flows calling publish() at
+    /// once previously shared one fixed ".tmp" path: whichever renamed first had its file pulled
+    /// out from under the other, which then deleted the freshly published target and failed to
+    /// find its own temporary -- leaving nothing published at all.
+    /// Serializes every mutation of the published state -- the index write, the endpoint write
+    /// and clear() -- against each other, not merely one write against another. Held across whole
+    /// operations, so a clear() cannot land in the middle of a publish and be undone by its
+    /// rename. `synchronized` is reentrant, so the writers below can take it again.
+    private static final Object WRITE_LOCK = new Object();
+
+    /// Counter for temporary names, so even a relaxed lock cannot put two writers on one path.
+    private static int tempCounter;
+
+    private void writeAtomically(String dir, String name, byte[] data) throws IOException {
+        synchronized (WRITE_LOCK) {
+            String target = dir + "/" + name;
+            String tmpName = name + "." + (tempCounter++) + ".tmp";
+            String tmp = dir + "/" + tmpName;
+            // Removed if anything about writing it fails -- opening the stream, the write, or
+            // the close. The cleanup further down only runs for a replace that failed, so a full
+            // container or a transient error left one of these in the shared directory per
+            // attempt, under a name that changes every time, and nothing ever reads or removes
+            // them. They also carry what was being published: an index, or the endpoint file
+            // with its bearer token.
+            try {
+                write(tmp, data);
+            } catch (IOException err) {
+                fs.delete(tmp);
+                throw err;
+            }
+            // One step, because the reader is a different process. The lock above orders writers
+            // inside this app and can do nothing about the extension, which may enumerate at any
+            // instant: deleting the target first would leave a window with no index in it, and an
+            // enumeration landing there reports an empty tree. A failed replace also has to leave
+            // the previous publication intact rather than destroyed.
+            if (nativeInstance.documentsReplaceFile(tmp, target)) {
+                return;
+            }
+            // A false answer is not proof that the natives are absent. It is also what a real
+            // rename(2) failure looks like -- a full volume, a read-only mount -- so the fallback
+            // has to be one that cannot destroy the publication that is already there. Deleting
+            // the target first and then failing the second rename for the same reason left the
+            // app with no index at all, which is worse than a publish that did not happen.
+            //
+            // A plain rename first: on every filesystem this runs on it replaces, and then there
+            // is nothing to clean up.
+            fs.rename(tmp, name);
+            if (!fs.exists(tmp)) {
+                return;
+            }
+            // Refused, most likely because the name is taken. The old file is moved aside rather
+            // than deleted, so it can be put back.
+            String asideName = name + ".previous";
+            String aside = dir + "/" + asideName;
+            boolean hadTarget = fs.exists(target);
+            if (hadTarget) {
+                fs.delete(aside);
+                fs.rename(target, asideName);
+            }
+            fs.rename(tmp, name);
+            if (!fs.exists(tmp)) {
+                fs.delete(aside);
+                return;
+            }
+            if (hadTarget && fs.exists(aside)) {
+                fs.rename(aside, name);
+            }
+            fs.delete(tmp);
+            throw new IOException("Failed to rename " + tmp + " to " + target
+                    + "; the previous publication was left in place");
+        }
+    }
+
+    private void write(String path, byte[] data) throws IOException {
+        OutputStream os = fs.openOutputStream(path);
+        try {
+            os.write(data);
+        } finally {
+            os.close();
+        }
+    }
+
+    private void mkdirs(String base, String relative) {
+        StringBuilder current = new StringBuilder(base);
+        int start = 0;
+        while (start < relative.length()) {
+            int slash = relative.indexOf('/', start);
+            String segment = slash < 0 ? relative.substring(start)
+                    : relative.substring(start, slash);
+            if (segment.length() > 0) {
+                current.append('/').append(segment);
+                String path = current.toString();
+                if (!fs.exists(path)) {
+                    fs.mkdir(path);
+                }
+            }
+            if (slash < 0) {
+                break;
+            }
+            start = slash + 1;
+        }
+    }
+
+    /// Depth-first delete. `FileSystemStorage.delete` refuses a non-empty directory, so a plain
+    /// delete of the root would silently leave every published document in the container -- which
+    /// is exactly what `clear()` exists to prevent on logout.
+    private void deleteTree(String path) {
+        if (!fs.exists(path)) {
+            return;
+        }
+        // Handed to the platform rather than walked here. A walk asks isDirectory of each entry,
+        // which follows symbolic links, so a link inside the published tree pointing at the app's
+        // own storage would have this delete that storage's contents on logout. The native uses
+        // -[NSFileManager removeItemAtPath:], which removes a link instead of following it, so
+        // the deletion cannot leave the tree it was given.
+        if (nativeInstance.documentsRemoveTree(path)) {
+            return;
+        }
+        // The native is compiled out when the app does not reference com.codename1.documents, in
+        // which case nothing was ever published here -- but the simulator-shaped fallback below
+        // costs nothing and keeps the method honest if a removal fails for another reason. It
+        // never descends: only the entries it can see directly are removed, so a link is deleted
+        // rather than traversed.
+        String[] children = null;
+        try {
+            children = fs.listFiles(path);
+        } catch (IOException err) {
+            Log.e(err);
+        }
+        if (children != null) {
+            for (int i = 0; i < children.length; i++) {
+                String child = children[i];
+                if (child.endsWith("/")) {
+                    child = child.substring(0, child.length() - 1);
+                }
+                fs.delete(path + "/" + child);
+            }
+        }
+        fs.delete(path);
+    }
+}

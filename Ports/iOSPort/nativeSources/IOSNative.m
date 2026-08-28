@@ -16379,6 +16379,392 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- Document provider (FileProvider) ----------------------------------------
+// Gated by CN1_USE_DOCUMENTS, which the builder defines when the app references
+// com.codename1.documents. It also generates the CN1Documents extension target and injects
+// the CN1DocumentsAppGroup Info.plist key. Builds without the define compile the stub branch
+// and link no framework.
+//
+// Nothing here hands the extension any data. The extension is a separate process that runs
+// while this one is dead, so the Java side writes the index and the endpoint settings into the
+// App Group container and these natives only tell the system that the provider exists and that
+// what it published has changed.
+//
+// TARGET_OS_* rather than a restructure: this file is shared verbatim with the AppKit macOS
+// port, and the iOS slice has to stay byte-for-byte what it was.
+//
+// Mac Catalyst is excluded, and not as a policy choice: FileProvider is marked
+// API_UNAVAILABLE(macCatalyst), so importing it under macabi does not compile. Catalyst reports
+// TARGET_OS_IOS, which is why the test is not simply for iOS. A Catalyst build therefore takes
+// the stub branch below, documentProviderSupported() answers false, and the API is an honest
+// no-op there. The AppKit macOS port is unaffected -- it builds against the macOS SDK, where
+// FileProvider is available.
+#if defined(CN1_USE_DOCUMENTS) && (TARGET_OS_OSX || (TARGET_OS_IOS && !TARGET_OS_MACCATALYST))
+#import <FileProvider/FileProvider.h>
+
+// The domain identifier is fixed rather than derived from the bundle id: it is scoped to this
+// app already, and the extension resolves its container from the app group, not from this.
+#define CN1_DOCUMENTS_DOMAIN_ID @"CN1Documents"
+
+static NSString *cn1DocumentsGroupId(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSString *cn1DocumentsContainerPath(void) {
+    NSString *group = cn1DocumentsGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    return container == nil ? nil : container.path;
+}
+
+// The display name shown for this location in the file browser. The builder writes it next to
+// the group id; falling back to the app's own name keeps an unnamed location from appearing as
+// a bare identifier.
+static NSString *cn1DocumentsDisplayName(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsDisplayName"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        return (NSString *)v;
+    }
+    id name = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+    if ([name isKindOfClass:[NSString class]] && [(NSString *)name length] > 0) {
+        return (NSString *)name;
+    }
+    return @"Documents";
+}
+
+// ARC is off in this port, so the domain is autoreleased at the point of creation rather than
+// left to leak on every publish.
+API_AVAILABLE(ios(16.0), macos(13.0))
+static NSFileProviderDomain *cn1DocumentsDomain(void) {
+    return [[[NSFileProviderDomain alloc] initWithIdentifier:CN1_DOCUMENTS_DOMAIN_ID
+                                                displayName:cn1DocumentsDisplayName()] autorelease];
+}
+
+// Which provider the BUILD generated, not what this OS could run. Below the replicated API's
+// floor the builder emits the classic NSFileProviderExtension instead, and that one is not
+// domain-based: it is reached through the default manager and registers no domain at all.
+// Deciding this from @available alone would strand the classic extension -- every publish would
+// register nothing and signal nothing, so the browser would keep serving the tree it first read.
+static BOOL cn1DocumentsReplicated(void) {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1DocumentsReplicated"];
+    if ([v isKindOfClass:[NSString class]]) {
+        return [(NSString *)v boolValue];
+    }
+    if ([v isKindOfClass:[NSNumber class]]) {
+        return [(NSNumber *)v boolValue];
+    }
+    // Absent means a build that predates the key, which only ever generated the replicated
+    // provider.
+    return YES;
+}
+
+/// The queue every domain operation runs on, one at a time.
+///
+/// +addDomain: and +removeDomain: return as soon as the operation has STARTED, so ordering the
+/// calls -- which is all a lock on the Java side can do -- orders nothing at all. An account
+/// switch is clear() followed by publish(): the removal and the registration then run
+/// concurrently, and a removal that completes last takes away the location the publish had just
+/// registered. The tree is on disk, the app believes it published, and nothing appears in Files
+/// until something publishes again.
+static dispatch_queue_t cn1DocumentsDomainQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        queue = dispatch_queue_create("com.codename1.documents.domain", DISPATCH_QUEUE_SERIAL);
+    });
+    return queue;
+}
+
+/// Runs one domain operation, holding the queue until its completion handler has fired.
+///
+/// Suspending from inside a block running on the queue takes effect once that block returns, so
+/// the operation is started and nothing else begins until the completion resumes the queue. That
+/// is what turns "the calls were ordered" into "the operations were ordered". No semaphore, so no
+/// thread is blocked and nothing has to outlive the callback.
+///
+/// The resume is guarded because resuming a queue that is not suspended traps. `op` is expected
+/// to call `done` exactly once, which is what NSFileProviderManager does whether or not it
+/// errors; the guard means a framework that called back twice would cost an ordering rather than
+/// crash the app.
+/// How long clear() waits for the system to take the domain away before giving up on it.
+///
+/// Long enough that a removal queued behind a registration still lands inside it, short enough
+/// that a provider daemon in trouble cannot hold up a logout.
+#define CN1_DOCUMENTS_DOMAIN_TIMEOUT 5.0
+
+static void cn1DocumentsQueueDomainOp(void (^op)(void (^done)(void))) {
+    dispatch_queue_t queue = cn1DocumentsDomainQueue();
+    dispatch_async(queue, ^{
+        dispatch_suspend(queue);
+        __block BOOL resumed = NO;
+        op(^{
+            @synchronized (queue) {
+                if (resumed) {
+                    return;
+                }
+                resumed = YES;
+            }
+            dispatch_resume(queue);
+        });
+    });
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *path = cn1DocumentsContainerPath();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (path == nil ? @"" : path));
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    // The classic provider has no domain to register: the system finds it through the extension
+    // point alone, so this is correctly a no-op there rather than a missing step.
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        if (cn1DocumentsGroupId() != nil) {
+            // Adding a domain that already exists succeeds, which is what lets this be called on
+            // every publish instead of tracked. The error is logged rather than propagated: a
+            // failure here means the location does not appear, and taking down the publish that
+            // already wrote the index would help nobody.
+            NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+            cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+                [NSFileProviderManager addDomain:domain completionHandler:^(NSError *error) {
+                    if (error != nil) {
+                        NSLog(@"Codename One: could not register the document provider domain: %@",
+                              error);
+                    }
+                    [domain release];
+                    done();
+                }];
+            });
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        // Queued behind any registration still running, and holding the queue until this one
+        // finishes, so a publish that follows a clear cannot have its domain removed by this.
+        NSFileProviderDomain *domain = [cn1DocumentsDomain() retain];
+        // And WAITED for, unlike every other domain call here. This one is the last step of
+        // clear(), which an app calls to log a user out: queueing it and returning would let the
+        // app finish logging out while the domain -- and the copies the system materialized
+        // under it, which live in its own store rather than in the container the tree was just
+        // deleted from -- are still there to be browsed. The wait can also be a real one, since
+        // the operation may be sitting behind a registration that has not finished.
+        //
+        // Bounded, and deliberately so, rather than waiting until the system says it is done.
+        // This runs on whatever thread the app calls clear() from, in the middle of a logout: an
+        // open-ended wait hands a provider daemon in trouble the power to hang the app there,
+        // which is a worse failure than a system cache that outlives the call. Past the deadline
+        // nothing is abandoned -- the removal is still queued and the system still performs it --
+        // and there is no API that makes it happen sooner.
+        //
+        // What can be seen in that window is narrower than it looks. The published tree and the
+        // copies in the group container are already gone, synchronously, above; an enumeration
+        // therefore answers empty. What the system may still show is its OWN store of items it
+        // had materialized, which only removeDomain clears.
+        NSCondition *finished = [[NSCondition alloc] init];
+        __block BOOL removed = NO;
+        cn1DocumentsQueueDomainOp(^(void (^done)(void)) {
+            [NSFileProviderManager removeDomain:domain completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not remove the document provider domain: %@",
+                          error);
+                }
+                [domain release];
+                [finished lock];
+                removed = YES;
+                [finished signal];
+                [finished unlock];
+                done();
+            }];
+        });
+        // The block owns its own reference to the condition -- dispatch_async copies it to the
+        // heap, which retains what it captured -- so releasing this one after the wait is safe
+        // whether the completion has run or not.
+        NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:CN1_DOCUMENTS_DOMAIN_TIMEOUT];
+        [finished lock];
+        while (!removed && [finished waitUntilDate:deadline]) {
+            // waitUntilDate returns on a signal OR a spurious wake; the flag is the condition.
+        }
+        BOOL timedOut = !removed;
+        [finished unlock];
+        [finished release];
+        if (timedOut) {
+            NSLog(@"Codename One: removing the document provider domain did not finish within "
+                  @"%g seconds; the published location may remain visible until it does",
+                  (double) CN1_DOCUMENTS_DOMAIN_TIMEOUT);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (!cn1DocumentsReplicated()) {
+        // The classic provider is reached through the default manager rather than a domain.
+        // Without this a pre-iOS-16 build would publish a new tree and never tell the browser,
+        // leaving an open or cached folder showing the previous publish indefinitely.
+        //
+        // TARGET_OS_OSX rather than @available: +defaultManager is API_UNAVAILABLE(macos), so on
+        // the AppKit slice this does not compile at all rather than merely failing at runtime.
+        // Nothing is lost there -- the generator refuses to emit the classic provider for macOS,
+        // whose floor is already past the replicated API, so this branch is unreachable on it.
+#if !TARGET_OS_OSX
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager defaultManager];
+        // The root AND the working set. This provider hands out a separate enumerator per folder
+        // identifier, so signalling the root alone leaves a nested folder the user already has
+        // open showing the previous publication until something makes Files re-enumerate it. The
+        // working set is the container that stands for the whole published tree -- CN1's
+        // enumerator answers it by walking every node -- so the pair covers what the root cannot.
+        NSString *containers[] = {
+            NSFileProviderRootContainerItemIdentifier,
+            NSFileProviderWorkingSetContainerItemIdentifier
+        };
+        for (int i = 0; i < 2; i++) {
+            [mgr signalEnumeratorForContainerItemIdentifier:containers[i]
+                                          completionHandler:^(NSError *error) {
+                if (error != nil) {
+                    NSLog(@"Codename One: could not signal the document provider: %@", error);
+                }
+            }];
+        }
+        POOL_END();
+#endif
+        return;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        POOL_BEGIN();
+        NSFileProviderManager *mgr = [NSFileProviderManager managerForDomain:cn1DocumentsDomain()];
+        // The working set is signalled rather than the root: it is the container the browser
+        // watches while the location is not open, so signalling only the root would leave a
+        // closed-and-reopened browser showing the previous publish.
+        [mgr signalEnumeratorForContainerItemIdentifier:NSFileProviderWorkingSetContainerItemIdentifier
+                                      completionHandler:^(NSError *error) {
+            if (error != nil) {
+                NSLog(@"Codename One: could not signal the document provider: %@", error);
+            }
+        }];
+        POOL_END();
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    // The container is load-bearing either way: without the group there is nowhere for the two
+    // processes to meet and the extension would enumerate an empty tree forever.
+    BOOL ok = cn1DocumentsContainerPath() != nil;
+    POOL_END();
+    if (!ok) {
+        return JAVA_FALSE;
+    }
+    if (!cn1DocumentsReplicated()) {
+        // A classic build is supported on exactly the systems it was generated for. Gating this
+        // on the replicated API would answer false on every device below iOS 16 -- which is the
+        // whole population ios.documentProvider.deploymentTarget < 16 exists to serve -- and an
+        // app following the documented isSupported() guard would hide the feature there.
+        return JAVA_TRUE;
+    }
+    if (@available(iOS 16.0, macOS 13.0, *)) {
+        return JAVA_TRUE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    if (source == JAVA_NULL || target == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *from = toNSString(CN1_THREAD_STATE_PASS_ARG source);
+    NSString *to = toNSString(CN1_THREAD_STATE_PASS_ARG target);
+    // rename(2) rather than NSFileManager: -moveItemAtPath: refuses an existing destination, and
+    // removing it first is exactly the window this exists to close. rename replaces atomically
+    // within a filesystem, which the two paths always share -- both are inside the App Group
+    // container.
+    BOOL ok = rename([from fileSystemRepresentation], [to fileSystemRepresentation]) == 0;
+    if (!ok) {
+        NSLog(@"Codename One: could not replace %@ with %@ (errno %d)", to, from, errno);
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    if (path == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    POOL_BEGIN();
+    NSString *target = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *err = nil;
+    // -removeItemAtPath: rather than a walk in Java. It removes a symbolic link itself instead of
+    // what the link names, so clear() cannot be steered out of the published tree and into the
+    // app's own storage. It also removes a whole directory in one call, which a Java walk cannot:
+    // FileSystemStorage.delete refuses a non-empty directory.
+    BOOL ok = [fm removeItemAtPath:target error:&err];
+    if (!ok && [fm fileExistsAtPath:target]) {
+        NSLog(@"Codename One: could not remove %@ (%@)", target, err);
+    } else {
+        // "Nothing is left there" is the contract, and a path that was never there satisfies it.
+        ok = ![fm fileExistsAtPath:target];
+    }
+    POOL_END();
+    return ok ? JAVA_TRUE : JAVA_FALSE;
+}
+
+#else
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_documentsRegisterDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsRemoveDomain__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_documentsSignalChange__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+
+#endif // CN1_USE_DOCUMENTS
+
+// New-VM (return-type-encoded) manglings for the value-returning document provider natives.
+// Defined after the implementations/stubs above so each call is to an already-declared
+// function. The void documents* methods need no _R_ wrapper.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDocumentsContainerPath___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getDocumentsContainerPath__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentProviderSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_documentProviderSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT source, JAVA_OBJECT target) {
+    return com_codename1_impl_ios_IOSNative_documentsReplaceFile___java_lang_String_java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, source, target);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    return com_codename1_impl_ios_IOSNative_documentsRemoveTree___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, path);
+}
+
 // --- App intents (Core Spotlight + App Intents) ------------------------------
 // Gated by CN1_USE_INTENTS, which the builder defines when the app references
 // com.codename1.intents. Two frameworks with very different availability sit behind this:

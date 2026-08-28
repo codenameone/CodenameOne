@@ -471,6 +471,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    private IOSDocumentProviderBridge documentProviderBridge;
+
+    @Override
+    public com.codename1.documents.spi.DocumentProviderBridge getDocumentProviderBridge() {
+        // Only meaningful in builds that linked the document provider natives (CN1_USE_DOCUMENTS,
+        // flipped by the builder when the app references com.codename1.documents). Always
+        // returned: the bridge's own isDocumentProviderSupported answers honestly through the
+        // native, which stubs to unsupported when the define is off.
+        if (documentProviderBridge == null) {
+            documentProviderBridge = new IOSDocumentProviderBridge(nativeInstance);
+        }
+        return documentProviderBridge;
+    }
+
     private IOSIntentBridge intentBridge;
 
     @Override

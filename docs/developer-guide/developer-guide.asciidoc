@@ -126,6 +126,8 @@ include::App-Review.asciidoc[]
 
 include::Apple-Wallet-Extension.asciidoc[]
 
+include::Document-Provider.asciidoc[]
+
 include::Advanced-Topics-Under-The-Hood.asciidoc[]
 
 

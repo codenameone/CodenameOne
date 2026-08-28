@@ -449,6 +449,15 @@
       ]
     },
     {
+      "id": "document-provider",
+      "category": "System surfaces",
+      "name": "Document provider",
+      "description": "Publishes a document tree to the system file browser and checks the on-disk index the native readers parse: the serializer round trip, the shared directory, and that publishing, signalling and clearing are safe on every port.",
+      "tests": [
+        "DocumentProviderPublishTest"
+      ]
+    },
+    {
       "id": "vector-maps",
       "category": "Maps",
       "name": "Vector maps",

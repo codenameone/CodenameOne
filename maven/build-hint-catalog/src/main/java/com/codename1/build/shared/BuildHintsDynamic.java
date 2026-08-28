@@ -88,6 +88,9 @@ final class BuildHintsDynamic {
 
         family(h, "ios.surfaces.buildSettings.*", "ios",
                 "Overrides an Xcode build setting for the external-surfaces extension.");
+        family(h, "ios.documentProvider.buildSettings.*", "ios",
+                "Overrides an Xcode build setting for the generated document provider "
+                        + "extension. Applied last, so it wins over the generated defaults.");
         family(h, "ios.*.appext.*", "ios",
                 "Per-app-extension signing. ios.debug.appext.<Name>.* and "
                         + "ios.release.appext.<Name>.* are collapsed to unqualified keys before "

@@ -105,6 +105,34 @@ public final class SigningAssetInstaller {
         update(settingsPath, updates);
     }
 
+    public static void applyDocumentProviderSigning(String settingsPath, String appGroupIdentifier,
+                                                    String releaseProfilePath, String debugProfilePath)
+            throws IOException {
+        Map<String, String> updates = new HashMap<String, String>();
+        // Turning the feature on is part of installing its signing: a project whose extension has
+        // an App ID, an App Group and two profiles but no hint would build without the extension
+        // and leave the developer with signing assets nothing consumes.
+        updates.put("codename1.arg.ios.documentProvider.enabled", "true");
+        if (appGroupIdentifier != null) {
+            updates.put("codename1.arg.ios.documentProvider.appGroup", appGroupIdentifier);
+        }
+        if (releaseProfilePath != null) {
+            // The unqualified key stays populated with the distribution profile so builds
+            // through tooling that predates the debug/release split keep working.
+            updates.put("codename1.ios.appext.CN1Documents.provision", releaseProfilePath);
+            updates.put("codename1.ios.release.appext.CN1Documents.provision", releaseProfilePath);
+            // Blank rather than skip the debug key when no development profile was produced: a
+            // stale path left by an earlier wizard run would otherwise keep overriding the
+            // unqualified fallback for debug device builds. A blank qualified key is dropped
+            // during build-type resolution.
+            updates.put("codename1.ios.debug.appext.CN1Documents.provision",
+                    debugProfilePath == null ? "" : debugProfilePath);
+        } else if (debugProfilePath != null) {
+            updates.put("codename1.ios.debug.appext.CN1Documents.provision", debugProfilePath);
+        }
+        update(settingsPath, updates);
+    }
+
     static void update(String settingsPath, Map<String, String> updates) throws IOException {
         String text = read(settingsPath);
         String[] lines = text.replace("\r\n", "\n").split("\n");

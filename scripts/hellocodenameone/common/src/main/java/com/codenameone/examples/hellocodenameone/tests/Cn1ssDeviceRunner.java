@@ -450,6 +450,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new SurfacesTimelineLogicTest(),
             new SurfacesActionDispatchTest(),
             new SurfacesPublishTest(),
+            // Document provider on the device VM: the serializer that is the on-disk contract
+            // with the native readers, and the publish path. Referencing com.codename1.documents
+            // at all is also what makes the iOS extension target and the Android <provider> get
+            // generated and compiled in the first place.
+            new DocumentProviderPublishTest(),
             // App intents on the device VM: the generated registry, the coercion it wraps
             // every parameter in, and entity resolution behind an id. The declarations it
             // exercises are also what make the iOS Swift and the Android shortcut resources
