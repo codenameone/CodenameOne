@@ -45,12 +45,16 @@ jobs:
         uses: actions/github-script@v8
         env:
           HEALTH_REPORT: ${{ runner.temp }}/syndication-health.json
+          BLOG_SCHEDULE_HOUR_UTC: '13'
+          BLOG_SCHEDULE_MINUTE_UTC: '17'
+          BLOG_SCHEDULE_GRACE_HOURS: '2'
           # Assign Shai directly so this is harder to miss than an Actions-only
           # failure. A repository variable can override the recipient later.
           ALERT_ASSIGNEE: ${{ vars.SYNDICATION_ALERT_ASSIGNEE || 'shai-almog' }}
         with:
           script: |
             const fs = require('fs');
+            const { expectedRunWindow } = require('./scripts/website/syndication_schedule_sla.js');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const title = 'Syndication pipeline needs attention';
@@ -106,16 +110,32 @@ jobs:
             if (!latest) {
               addProblem('missing-blog-run', 'No completed blog syndication workflow run was found.');
             } else {
-              const ageHours = (Date.now() - Date.parse(latest.updated_at)) / 3600000;
+              const now = new Date();
+              const scheduleHour = Number(process.env.BLOG_SCHEDULE_HOUR_UTC);
+              const scheduleMinute = Number(process.env.BLOG_SCHEDULE_MINUTE_UTC);
+              const graceHours = Number(process.env.BLOG_SCHEDULE_GRACE_HOURS);
+              const { expectedStart, deadline } = expectedRunWindow(
+                now,
+                scheduleHour,
+                scheduleMinute,
+                graceHours
+              );
+
+              const latestStartedAt = Date.parse(latest.run_started_at || latest.created_at);
               if (latest.conclusion !== 'success') {
                 addProblem(
                   'blog-run',
                   `The latest blog syndication workflow concluded with **${latest.conclusion || 'unknown'}**: ${latest.html_url}`
                 );
-              } else if (ageHours > 30) {
+              } else if (!Number.isFinite(latestStartedAt)) {
                 addProblem(
-                  'stale-blog-run',
-                  `The last successful blog syndication workflow is ${ageHours.toFixed(1)} hours old: ${latest.html_url}`
+                  'invalid-blog-run-time',
+                  `The latest successful blog syndication workflow has no valid start time: ${latest.html_url}`
+                );
+              } else if (latestStartedAt < expectedStart.getTime()) {
+                addProblem(
+                  'missing-daily-blog-run',
+                  `No successful blog syndication workflow has started since the ${expectedStart.toISOString()} daily slot (deadline ${deadline.toISOString()}): ${latest.html_url}`
                 );
               }
             }
