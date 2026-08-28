@@ -448,7 +448,23 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // local-build/on-device-debug refusal while the engine goes on to harden the shared jar locally
         // and orphan its mapping. A non-Apple target has a single slice, so its own opt-out still applies.
         boolean platformOptedOut;
-        if (isAppleHardenPlatform(hardenPlatform)) {
+        if (isNativeMacOsTarget(buildTarget)) {
+            // A native macOS target is not a slice of an iOS build. It runs its
+            // own builder against the macosx SDK, and that builder's hardening
+            // platform list is "mac" alone -- there is no shared jar and no iOS
+            // app. The all-slice rule below starts by reading harden.ios.enabled,
+            // which defaults to true and is answering about a slice this build
+            // does not ship, so harden.mac.enabled=false was overruled by it and
+            // the build was refused as a hardened local/source one that the
+            // builder would in fact have hardened nothing for.
+            //
+            // Mac Catalyst is deliberately NOT here: it really is an iOS build
+            // with a hint set, it does ship the shared jar, and the all-slice
+            // rule is right for it. hardenPlatformForBuildTarget draws the same
+            // line for the same reason.
+            platformOptedOut = isHardenFalse(
+                    settings.getProperty("codename1.arg.harden.mac.enabled", "true"));
+        } else if (isAppleHardenPlatform(hardenPlatform)) {
             platformOptedOut = allAppleHardeningSlicesOptedOut(settings);
         } else {
             platformOptedOut = hardenPlatform != null && isHardenFalse(
@@ -517,6 +533,22 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     }
 
     /**
+     * True for the targets that run the standalone macOS builder rather than a
+     * slice of an iOS build.
+     *
+     * <p>The same three {@link #hardenPlatformForBuildTarget(String)} maps to
+     * "mac", kept beside it so the two cannot come to disagree about which
+     * targets are natively macOS.</p>
+     */
+    // Package-visible so a test can pin which targets are natively macOS; the
+    // hardening preflight's answer turns on it.
+    static boolean isNativeMacOsTarget(String buildTarget) {
+        return BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget);
+    }
+
+    /**
      * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
      * whose {@code codename1.platform} does not name their real hardening platform. The macOS
      * targets run with {@code platform=ios} but harden as "mac", so their opt-out is
@@ -525,7 +557,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * Returns {@code null} when the target carries no such override and the platform value
      * should be used.
      */
-    private static String hardenPlatformForBuildTarget(String buildTarget) {
+    static String hardenPlatformForBuildTarget(String buildTarget) {
         if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)
                 || BUILD_TARGET_MAC_NATIVE_LOCAL.equals(buildTarget)) {

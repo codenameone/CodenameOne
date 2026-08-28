@@ -2146,9 +2146,28 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macSetCursor___int(CODENAME_ONE_THREA
         // AppKit resets the cursor itself whenever the pointer crosses a
         // boundary, so a cursor set directly is overwritten moments later; the
         // rect is the thing it consults, and this asks it to consult it again.
-        NSView *view = [CN1MacHost sharedHost].renderingView;
-        if (view != nil && view.window != nil) {
-            [view.window invalidateCursorRectsForView:view];
+        //
+        // EVERY rendering view, not just the shared host's. A secondary Window
+        // has its own METALView, and each installs a single rect over its whole
+        // bounds -- so moving between two controls inside one crosses no
+        // boundary AppKit would notice, and invalidating only the main host left
+        // that window's cursor stale for as long as the pointer stayed in it.
+        //
+        // By enumeration rather than by remembering which view asked. The answer
+        // arrives from the dispatch thread some time after the question, and a
+        // pointer to a view held across that gap is a pointer to a view that may
+        // have been closed. There are a handful of windows; this is cheap.
+        for (NSWindow *window in [NSApp windows]) {
+            NSView *view = window.contentView;
+            if ([view isKindOfClass:[METALView class]]) {
+                [window invalidateCursorRectsForView:view];
+                continue;
+            }
+            for (NSView *child in view.subviews) {
+                if ([child isKindOfClass:[METALView class]]) {
+                    [window invalidateCursorRectsForView:child];
+                }
+            }
         }
     });
 }
