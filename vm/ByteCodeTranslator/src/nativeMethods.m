@@ -990,7 +990,7 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // in-flight count fall to zero between them, and the collector can clear gcSatbActive,
     // see zero and finish its final drain in that gap -- after which the insertion half
     // logs nothing while the memmove below publishes those references regardless. See
-    // cn1SatbBulkEnter.
+    // cn1SatbBulkBegin.
     // NO FLAG PRECHECK. Sampling gcSatbActive out here is unsafe at BOTH ends of a mark:
     // termination clears and re-raises it during the trial-clear protocol, and startup arms
     // it without waiting for a copy that already looked. Either way the copy skips the
@@ -1001,14 +1001,21 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     // The cost lands only on OBJECT arrays: cls->primitiveType is a load and a branch, and
     // it rejects the byte[]/char[] copies that dominate arraycopy traffic before any atomic
     // is executed.
-    if(!cls->primitiveType && cn1SatbBulkEnter()) {
-        // One acquisition of the SATB mutex per 256 references rather than per reference;
-        // this used to be two locked enqueues per element. See cn1SatbEnqueueRangeLocked.
-        cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
+    // The bracket spans the memmove below, not just the logging: the registration is what
+    // mark startup and mark termination wait on, so releasing it before the copy would let
+    // a scan interleave with the publication. See cn1SatbBulkBegin.
+    JAVA_BOOLEAN cn1__satbReg = JAVA_FALSE;
+    if(!cls->primitiveType) {
+        cn1__satbReg = JAVA_TRUE;
+        if(cn1SatbBulkBegin()) {
+            // One acquisition of the SATB mutex per 256 references rather than per
+            // reference; this used to be two locked enqueues per element. See
+            // cn1SatbEnqueueRangeLocked.
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*dstArr).data) + dstOffset, length);
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-        cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*srcArr).data) + srcOffset, length);
+            cn1SatbEnqueueRangeLocked(((JAVA_ARRAY_OBJECT*)(*srcArr).data) + srcOffset, length);
 #endif
-        cn1SatbBulkExit();
+        }
     }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
      * it as if copying via a temporary), and callers such as ArrayList.remove
@@ -1018,6 +1025,9 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
      * heap corruption on the arm64 clean target). memmove is the correct,
      * overlap-safe primitive. */
     memmove( (*dstArr).data + (dstOffset * byteSize), (*srcArr).data  + (srcOffset * byteSize), length * byteSize);
+    if(cn1__satbReg) {
+        cn1SatbBulkEnd();
+    }
 }
 
 JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {

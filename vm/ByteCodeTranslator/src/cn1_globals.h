@@ -1031,9 +1031,9 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 extern volatile int gcSatbActive;
 extern void cn1SatbEnqueue(JAVA_OBJECT old);
 extern volatile int gcSatbTerminating;
-extern JAVA_BOOLEAN cn1SatbBulkEnter(void);
+extern JAVA_BOOLEAN cn1SatbBulkBegin(void);
 extern void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count);
-extern void cn1SatbBulkExit(void);
+extern void cn1SatbBulkEnd(void);
 extern void cn1SatbBulkQuiesce(void);
 #if defined(CN1_DISABLE_SATB)
 #define CN1_WRITE_BARRIER(target, value) do { } while(0)

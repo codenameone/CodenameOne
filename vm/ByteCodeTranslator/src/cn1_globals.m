@@ -1799,23 +1799,37 @@ static _Atomic int cn1SatbBulkInFlight = 0;
 // halves, and registering them independently lets the count fall to zero between them --
 // the collector then clears the flag, sees zero, finishes its final drain, and the second
 // range logs nothing while the memmove goes on to publish those references anyway.
-JAVA_BOOLEAN cn1SatbBulkEnter(void) {
+// Registers for the whole operation and reports whether the caller must LOG. The caller
+// must pair every call with cn1SatbBulkEnd(), whatever the answer.
+//
+// THE REGISTRATION HAS TO SPAN THE PUBLICATION, not just the logging. An earlier shape
+// deregistered on the "no logging needed" path and the successful path released before the
+// memmove, which left the copy itself uncovered: a mutator could observe both flags clear,
+// deregister, and then publish while the collector armed the mark, saw zero in
+// cn1SatbBulkQuiesce, and began scanning the destination. References written after that
+// scan were logged by nobody. Native threads make it reachable -- nothing else in the mark
+// waits for them.
+//
+// Holding the registration across the copy is what gives the quiesce something to wait on:
+// mark startup and mark termination both block until every in-flight copy has finished
+// publishing, so no scan can interleave with one. Nothing inside the bracket can block or
+// reach a safepoint -- the allocation in cloneArray happens before it -- so a registered
+// thread cannot be paused while the collector waits for it.
+JAVA_BOOLEAN cn1SatbBulkBegin(void) {
 #ifdef CN1_SATB_NO_BULK_HANDSHAKE
     return gcSatbActive ? JAVA_TRUE : JAVA_FALSE;
 #else
     atomic_fetch_add_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
+    // Registered either way; the answer only decides whether anything needs logging.
     if(!__atomic_load_n(&gcSatbActive, __ATOMIC_SEQ_CST)
        && !__atomic_load_n(&gcSatbTerminating, __ATOMIC_SEQ_CST)) {
-        // The drain reached its fixpoint while we were on our way in, so everything the
-        // snapshot needed is already marked and there is nothing this operation can add.
-        atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
         return JAVA_FALSE;
     }
     return JAVA_TRUE;
 #endif
 }
 
-void cn1SatbBulkExit(void) {
+void cn1SatbBulkEnd(void) {
 #ifndef CN1_SATB_NO_BULK_HANDSHAKE
     atomic_fetch_sub_explicit(&cn1SatbBulkInFlight, 1, memory_order_seq_cst);
 #endif
@@ -1856,7 +1870,7 @@ static void cn1SatbFlushChunk(JAVA_OBJECT* buf, int n) {
     pthread_mutex_unlock(&gcSatbMutex);
 }
 
-// Log one range. The caller MUST be inside a cn1SatbBulkEnter()/cn1SatbBulkExit() bracket
+// Log one range. The caller MUST be inside a cn1SatbBulkBegin()/cn1SatbBulkEnd() bracket
 // -- that is what keeps the collector's final drain from running underneath it.
 void cn1SatbEnqueueRangeLocked(JAVA_ARRAY_OBJECT* refs, int count) {
 #ifdef CN1_SATB_NO_BULK
@@ -2149,7 +2163,7 @@ void codenameOneGCMark() {
     // have walked past, with nothing logged for them. Native threads make that reachable
     // rather than theoretical -- they are never cooperatively paused, so nothing else in
     // this mark waits for them. Waiting here is bounded by one copy, and it is the reason
-    // cn1SatbBulkEnter registers BEFORE it reads the flags: seq_cst on both sides makes the
+    // cn1SatbBulkBegin registers BEFORE it reads the flags: seq_cst on both sides makes the
     // store-then-load pair non-reorderable, so either the copy sees the armed flag and
     // logs, or this sees its registration and waits for it.
     cn1SatbBulkQuiesce();
@@ -11642,13 +11656,22 @@ JAVA_OBJECT cloneArray(JAVA_OBJECT array) {
     // No deletion half: the destination was allocated one line up and holds nothing that
     // could be in the snapshot. Off-mark this is one predicted-not-taken flag load.
 #ifndef CN1_NO_BULK_INSERTION_BARRIER
-    // No flag precheck; see the note at java_lang_System_arraycopy.
-    if(!cls->primitiveType && cn1SatbBulkEnter()) {
-        cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
-        cn1SatbBulkExit();
+    // The bracket spans the memcpy, not just the logging; see cn1SatbBulkBegin. A primitive
+    // array publishes no references, so it needs neither.
+    JAVA_BOOLEAN cn1__satbReg = JAVA_FALSE;
+    if(!cls->primitiveType) {
+        cn1__satbReg = JAVA_TRUE;
+        if(cn1SatbBulkBegin()) {
+            cn1SatbEnqueueRangeLocked((JAVA_ARRAY_OBJECT*)(*src).data, src->length);
+        }
     }
 #endif
     memcpy( (*arr).data, (*src).data, arr->length * byteSize);
+#ifndef CN1_NO_BULK_INSERTION_BARRIER
+    if(cn1__satbReg) {
+        cn1SatbBulkEnd();
+    }
+#endif
     return (JAVA_OBJECT)arr;
 }
 
