@@ -22,7 +22,7 @@ one difference between the platforms that you have to design around.
 | IPsec with a pre-shared key | yes | -- | simulated | --
 | Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
 | Always-on / on-demand | yes | yes | simulated | --
-| A tunnel your app implements | yes (needs an Apple grant) | yes | simulated | --
+| A tunnel your app implements | not yet | yes | simulated | --
 | Detect that some VPN is active | yes | yes | yes | --
 |===
 
@@ -112,12 +112,19 @@ On Android the tunnel runs inside a `VpnService` in your app's own process.
 The instance you passed to `Tunnels.start` is the instance that runs, and
 everything it closed over is still there.
 
-On iOS it runs inside a *Network Extension*: a separate process with its own
-bundle identifier, its own provisioning profile and a hard memory limit. The
-build generates that target and translates your tunnel into it, so the packet
-loop is your Java either way -- but the extension shares nothing else with
-the app. No statics you set, no `Display`, no open connections. Your tunnel is
-constructed fresh over there.
+On iOS it would run inside a *Network Extension*: a separate process with its
+own bundle identifier, its own provisioning profile and a hard memory limit.
+**That half remains unbuilt.** The extension has to carry a virtual machine to
+run your Java, and the translation that would give it one without the
+application shell -- which uses UIKit APIs an extension may not call -- has
+not been written. `ios.vpn.tunnel` fails the build rather than producing an
+extension too broken to compile, and `Tunnels.isSupported()` answers false on
+iOS.
+
+Design for it anyway, because the constraint it will impose is the one worth
+designing around: the extension shares nothing else with the app. No statics
+you set, no `Display`, no open connections, and your tunnel constructed fresh
+over there.
 
 `TunnelSetup.data` exists for that reason, and the rule worth taking away
 follows from it:

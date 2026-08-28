@@ -429,6 +429,20 @@ public class AndroidVpnBridge implements VpnBridge {
                     + " the other");
             return;
         }
+        // On-demand is the same shape as the local identifier below: a
+        // setting this platform cannot express, which the install would
+        // otherwise acknowledge and then store as though it had taken.
+        // load() reads the stored record back, so the app was told its
+        // profile connects on demand while Android had installed a manually
+        // started tunnel -- and getCapabilities has never claimed
+        // CAPABILITY_ON_DEMAND, so the two disagreed about the same profile.
+        if (p.isOnDemand()) {
+            fail(requestId, VpnError.NOT_SUPPORTED,
+                    "Android's managed VPN has no on-demand rules; install"
+                    + " the profile without onDemand and start it when the"
+                    + " app decides, or branch on Vpn.getCapabilities().");
+            return;
+        }
         // Ikev2VpnProfile.Builder cannot express a client IKE identity. Its
         // two-argument constructor takes the server address and the SERVER's
         // identity, and no setter carries the local one -- so a profile that
@@ -1561,7 +1575,9 @@ public class AndroidVpnBridge implements VpnBridge {
             }
             // Nothing here reads VpnProfile.onDemand: Ikev2VpnProfile has no
             // on-demand rules, which is why getVpnCapabilities does not claim
-            // CAPABILITY_ON_DEMAND.
+            // CAPABILITY_ON_DEMAND -- and why installProfile refuses a
+            // profile that asks for it rather than dropping the setting and
+            // storing a record that says otherwise.
             return BUILDER.getMethod("build").invoke(b);
         }
 
