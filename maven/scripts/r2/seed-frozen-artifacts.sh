@@ -5,18 +5,19 @@
 # Some artifacts stopped being published because their content does not change per
 # release (see <excludeArtifacts> in maven/pom.xml). Consumers are pinned to the last
 # version that *was* published, and that version lives only on Maven Central -- so
-# after the cutover an R2 consumer could not resolve it. That matters most in exactly
-# the situation this migration exists to survive: Central throttled or unavailable.
+# an R2 consumer cannot resolve it. That matters most in exactly the situation this
+# migration exists to survive: Central throttled or unavailable.
 #
-# codenameone-javase declares com.codenameone:sqlite-jdbc:${cn1.sqlite.jdbc.version},
-# and codenameone-javase is itself a runtime dependency of codenameone-maven-plugin,
-# so ordinary plugin resolution reaches it. It is not history that can be left behind;
-# it is a live dependency of every future release.
+# codenameone-maven-plugin resolves codenameone-designer at cn1.designer.version for
+# the Resource Editor goals, so ordinary plugin resolution reaches it. It is not
+# history that can be left behind; it is a live dependency of every future release.
 #
-# Run this once before flipping CN1_DUAL_PUBLISH to false. It is idempotent.
+# Now that releases no longer go to Central, this is a prerequisite rather than a
+# nice-to-have: check-frozen-artifacts.sh fails the release while any of it is absent.
+# It is idempotent, so re-running after a pin bump seeds only what is new.
 #
 # Usage: seed-frozen-artifacts.sh [<artifactId>:<version> ...]
-#        defaults to the set pinned in maven/pom.xml and AbstractCN1Mojo
+#        defaults to the coordinates in frozen-coordinates.sh
 #
 set -euo pipefail
 
@@ -25,43 +26,27 @@ set -euo pipefail
 : "${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is required}"
 : "${R2_BUCKET:?R2_BUCKET is required}"
 
-# Versions are read from where they are actually declared rather than repeated here.
-# Duplicating them would mean a bump could seed the wrong artifact -- the pin would move
-# and the seeding would not, silently, with no build failure to catch it.
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-
-read_pinned() {
-    local description="$1" file="$2" pattern="$3"
-    local value
-    # `|` as the delimiter, not `/`: the XML pattern contains a closing tag.
-    value=$(sed -nE "s|.*${pattern}.*|\1|p" "$file" | head -n1)
-    if [ -z "$value" ]; then
-        echo "ERROR: could not read the ${description} from ${file}." >&2
-        echo "It has moved or been renamed; update this script rather than hardcoding it." >&2
-        exit 1
-    fi
-    printf '%s' "$value"
-}
-
-SQLITE_VERSION=$(read_pinned "pinned sqlite-jdbc version" \
-    "${REPO_ROOT}/maven/pom.xml" \
-    "<cn1\\.sqlite\\.jdbc\\.version>([^<]+)</cn1\\.sqlite\\.jdbc\\.version>")
-
-# The designer pin lives only on the mojo parameter, deliberately: see the comment in
-# maven/pom.xml explaining why it is not also a Maven property.
-DESIGNER_VERSION=$(read_pinned "pinned designer version" \
-    "${REPO_ROOT}/maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/AbstractCN1Mojo.java" \
-    "cn1\\.designer\\.version\", defaultValue = \"([^\"]+)\"")
-
-DEFAULT_COORDINATES=(
-    "sqlite-jdbc:${SQLITE_VERSION}"
-    "codenameone-designer:${DESIGNER_VERSION}"
-    "codenameone-javase-svg:${DESIGNER_VERSION}"
-)
+# Coordinates come from frozen-coordinates.sh so that this script and the release-time
+# check cannot disagree about which version is pinned.
+# shellcheck source=maven/scripts/r2/frozen-coordinates.sh
+source "$(dirname "${BASH_SOURCE[0]}")/frozen-coordinates.sh"
 
 coordinates=("$@")
 if [ "${#coordinates[@]}" -eq 0 ]; then
-    coordinates=("${DEFAULT_COORDINATES[@]}")
+    # Captured before the split, deliberately. `mapfile < <(...)` would report the
+    # exit status of mapfile rather than of the generator, so an unreadable pin would
+    # seed nothing and still exit 0 -- and seeding the wrong set is worse than not
+    # seeding at all, because the immutability guard then refuses to repair it.
+    if ! frozen_list=$(cn1_frozen_coordinates); then
+        exit 1
+    fi
+    while IFS= read -r line; do
+        [ -n "$line" ] && coordinates+=("$line")
+    done <<< "$frozen_list"
+    if [ "${#coordinates[@]}" -eq 0 ]; then
+        echo "ERROR: no frozen coordinates resolved." >&2
+        exit 1
+    fi
 fi
 
 export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"

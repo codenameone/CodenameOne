@@ -23,11 +23,16 @@ The `cn1app-archetype` and `cn1lib-archetype` Maven archetypes are part of this
 reactor (under `maven/cn1app-archetype/` and `maven/cn1lib-archetype/`). They
 build alongside the rest of the project — no separate checkout is needed.
 
-=== Deploying to Maven Central
+=== Cutting a Release
 
-NOTE: SNAPSHOT versions will not trigger a deploy to Maven central.
+Releases are published to the Codename One Maven repository at
+https://repo.codenameone.com/maven2, hosted on Cloudflare R2. They are no longer
+published to Maven Central; see `scripts/r2/README.md` for why, and for the rules the
+publishing scripts enforce.
 
-==== Step 1:  Update Version to New Release Version
+NOTE: SNAPSHOT versions do not trigger a release.
+
+==== Step 1: Update Version to New Release Version
 
 [source,bash]
 ----
@@ -38,9 +43,19 @@ cd maven
 bash update-version.sh $NEWVERSION && git push && git push --tags
 ----
 
-Then check the build log on Github to make sure that the https://github.com/codenameone/CodenameOne/actions/workflows/sonatype.yml[Deploy to Maven Central] workflow completes succesfully.
+Push release tags *one at a time*. The release workflow serialises on a single
+`concurrency` group, and GitHub keeps only one pending member per group -- so a third tag
+pushed while a release is running silently replaces the second, which is then never
+published. See the "tag bursts" limitation in `scripts/r2/README.md`.
 
-If it completes successfully, then update to the next snapshot version:
+Then check that the
+https://github.com/codenameone/CodenameOne/actions/workflows/release.yml[Release] workflow
+completes successfully.
+
+The workflow decides its verdict in a single final step, so a red job lists every
+component that failed rather than the first one. A release is discoverable only once it
+has been marked complete, so a failed run leaves its artifacts orphaned and invisible
+rather than half-published; re-running the tag uploads what is missing and marks it.
 
 ==== Step 2: Update Version to New Snapshot Version
 
@@ -50,21 +65,23 @@ NEXTVERSION=7.0.16-SNAPSHOT
 bash update-version.sh $NEXTVERSION && git push
 ----
 
+==== Verifying a Release
 
-==== Step 3: Close and Release Staging Repository
+There is no staging repository to close and no propagation delay to wait out -- an
+artifact is either in the bucket or it is not. Confirm the tag is discoverable:
 
-If these steps complete succesfully, then a staging repository has been created on Sonatype.  Log into the https://oss.sonatype.org/#stagingRepositories[Nexus Repository Manager] and click on "Staging Repositories".
+[source,bash]
+----
+curl -s "https://repo.codenameone.com/maven2/com/codenameone/codenameone-core/maven-metadata.xml?cb=$RANDOM"
+----
 
-It will look something like:
+The cache-busting parameter is not superstition: Cloudflare caches 404s, so a check run
+moments too early can otherwise keep serving the negative.
 
-image::images/nexus-repository-manager.png[]
+==== Bumping a Frozen Artifact
 
-Select the "codenameone-xxx" repository in the main frame in the "Staging Repositories" tab.  Inspect the content of the repository in the "Content" tab of the south frame.  It it all looks good, then press the "Close" button on the toolbar.
-
-This will intiate a process that will take a minute or two.  Press "refresh" in a couple of minutes to see if it succeeded.  If successful, then press the "Release" button on the toolbar.
-
-It usually takes between 1 and 8 hours before the new release is available on Maven central.
-
-
-
-
+`codenameone-designer` and `codenameone-javase-svg` are built but not published --
+they are frozen at `cn1.designer.version` in `AbstractCN1Mojo`. After bumping that pin,
+run the *Seed frozen artifacts to R2* workflow before pushing the next release tag. The
+release refuses to build while the pinned version is absent from the repository, so the
+ordering is enforced rather than remembered.

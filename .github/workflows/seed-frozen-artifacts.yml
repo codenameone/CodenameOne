@@ -1,0 +1,56 @@
+# Copies the artifacts a release resolves but no longer publishes from Maven Central
+# into the Codename One R2 repository.
+#
+# Manual by design. It is a one-off per pinned version rather than something a release
+# should do on every tag: it reads from Central, and the whole point of the migration
+# is that a release must not depend on Central being reachable at that moment.
+#
+# Run it after bumping cn1.designer.version, before pushing the next release tag. The
+# release itself refuses to build while any of it is absent (check-frozen-artifacts.sh),
+# so the ordering is enforced rather than remembered.
+name: Seed frozen artifacts to R2
+
+on:
+  workflow_dispatch:
+    inputs:
+      coordinates:
+        description: 'Optional "<artifactId>:<version> ..." override; blank uses the pinned set'
+        required: false
+        default: ''
+
+# Shares the release group: seeding writes into the same bucket that a release's
+# metadata regeneration reads, and that regeneration is a read-modify-write.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      R2_BASE_URL: https://repo.codenameone.com/maven2
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Seed
+        # Unquoted expansion is deliberate: the input is a space-separated coordinate
+        # list, and blank must expand to no arguments so the script uses its own set.
+        run: bash maven/scripts/r2/seed-frozen-artifacts.sh ${{ inputs.coordinates }}
+
+      - name: Regenerate R2 metadata
+        # Seeded artifacts are resolved by exact pinned version rather than discovered,
+        # so they carry no release marker -- but their own maven-metadata.xml still has
+        # to list them, or a version range or LATEST resolution reads the artifact as
+        # absent. regen knows them as frozen and generates from what is present.
+        run: python3 maven/scripts/r2/regen-maven-metadata.py
+
+      - name: Verify
+        # The same gate the release runs, so a green seed here means the next tag
+        # cannot fail on this. Reads the public URL, not the bucket, so it also proves
+        # the custom domain is serving what was uploaded.
+        run: bash maven/scripts/r2/check-frozen-artifacts.sh ${{ inputs.coordinates }}

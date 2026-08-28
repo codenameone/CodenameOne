@@ -1,0 +1,464 @@
+# Publishes a Codename One release to the Cloudflare R2 Maven repository served at
+# https://repo.codenameone.com/maven2.
+#
+# Releases no longer go to Maven Central. Central still holds every version published
+# up to the cutover and nothing is removed from it, but new tags are published here
+# only -- see maven/scripts/r2/README.md for the why and the rules.
+#
+# central-publishing-maven-plugin is still what builds the artifacts, and that is not
+# a leftover: it is what stages a complete Maven layout with all four checksums and
+# .asc signatures before any upload, which is exactly the tree R2 needs. It runs with
+# -DskipPublishing=true throughout, so it stages and never uploads to Central.
+
+name: Release
+on:
+  push:
+    tags: '*'
+
+# The R2 metadata regeneration is a read-modify-write over the bucket listing, so two
+# releases must never overlap.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Was 240 to cover five 30-minute Maven Central propagation polls. Those are gone
+    # with Central, and what remains is the core reactor plus four editors against a
+    # repository that either accepts an upload or does not. Still bounded explicitly
+    # rather than inheriting the 6h default, so a wedged release fails in a shift
+    # rather than overnight.
+    timeout-minutes: 120
+
+    env:
+      # Cloudflare R2, the repository Codename One releases to. These are deliberately
+      # not the CLOUDFLARE_* secrets -- those belong to the Pages website deploy.
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      R2_BASE_URL: https://repo.codenameone.com/maven2
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK 8 and the signing key
+        uses: actions/setup-java@v5
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+          # `server-id: central` stays even though nothing is published to Central:
+          # central-publishing-maven-plugin looks its server up in settings.xml and
+          # NPEs before it stages anything if the entry is absent, and staging is
+          # what produces the tree R2 publishes. No credentials are wired to it --
+          # with skipPublishing there is no request to authenticate.
+          server-id: central
+          # GPG is not about Central either. Consumers verify .asc signatures against
+          # the artifacts wherever they are served from, so a release still signs.
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Set up Git Config
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "github-actions@codenameone.com"
+
+      - name: Check Maven Version
+        run: mvn -v
+
+      - name: Verify frozen artifacts are on R2
+        # A release resolves codenameone-designer at its pinned version but does not
+        # publish it (<excludeArtifacts> in maven/pom.xml). While Central was in every
+        # consumer's resolution path that absence was invisible; now that a generated
+        # project declares R2 and nothing else, it means `cn1:design` cannot resolve.
+        #
+        # Checked first, before a single artifact is built: a release is immutable once
+        # published, so the only cheap moment to discover this is before there is one.
+        # Not continue-on-error -- unlike the publication steps below, there is nothing
+        # for a later step to salvage.
+        run: bash maven/scripts/r2/check-frozen-artifacts.sh
+
+      - name: Build and stage the core reactor (core + archetypes)
+        id: deploy
+        continue-on-error: true
+        run: |
+          cat $HOME/.m2/settings.xml
+          cd maven
+          bash update-version.sh "$GITHUB_REF_NAME"
+          export GPG_TTY=$(tty)
+          # R2 is the repository. `deploy` is still the phase to run because
+          # skipPublishing stages the signed, checksummed tree that the R2 upload
+          # below consumes; it just never uploads to Central. Same for the four
+          # editor builds.
+          # The cn1{app,lib}-archetype modules are part of the main reactor
+          # since the in-tree migration, so a single mvn deploy publishes
+          # everything (core + maven plugin + both archetypes).
+          # -Darchetype.test.skip=true: the archetypes' ITs generate a
+          # project pinned to the current cn1Version and invoke the
+          # codenameone-maven-plugin against it; that plugin is being built in
+          # this same reactor, so at that moment it exists only in the local
+          # repo and no remote can serve it. -DskipTests covers the matching
+          # surefire pass.
+          xvfb-run -a mvn deploy -Psign-artifacts -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Plocal-dev-javase -Darchetype.test.skip=true -DskipTests \
+            -DskipPublishing=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      # --- Cloudflare R2 -------------------------------------------------------
+      # central-publishing-maven-plugin stages every module into
+      # maven/target/central-staging: standard Maven layout, all four checksums,
+      # .asc signatures. The directory name is the plugin's, not a statement about
+      # where this goes -- with skipPublishing it is only ever a staging tree.
+      - name: Publish core reactor to R2
+        id: r2_core
+        # Non-fatal so that one component's upload failure does not skip the others.
+        # A release is only discoverable once it is marked complete, so a partial run
+        # leaves invisible artifacts rather than a broken version, and the final gate
+        # below turns any failure here into a red job.
+        continue-on-error: true
+        if: always()
+        run: |
+          staging=maven/target/central-staging
+          if [ ! -d "$staging" ]; then
+            echo "No staging tree at $staging -- the build failed before packaging." >&2
+            exit 1
+          fi
+          bash maven/scripts/r2/publish-staging-to-r2.sh "$staging"
+
+      - name: Confirm artifacts on R2
+        id: r2_core_confirm
+        continue-on-error: true
+        if: always() && steps.r2_core.outcome == 'success'
+        run: |
+          # Cache-busting query parameter is deliberate: Cloudflare caches 404s on the R2
+          # custom domain, so a poll that runs a moment too early would cache the negative
+          # and keep seeing it. A Cache Rule sets Status Code TTL 400-599 to no-store, but
+          # this keeps the release green even if that rule is ever removed.
+          set -e
+          for artifact in codenameone-core codenameone-maven-plugin codenameone-platform-feature-catalog \
+                          codenameone-build-hint-catalog codenameone-build-hint-tools \
+                          cn1app-archetype cn1lib-archetype; do
+            url="${R2_BASE_URL}/com/codenameone/${artifact}/${GITHUB_REF_NAME}/${artifact}-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" != "200" ]; then
+              echo "MISSING on R2: $artifact ${GITHUB_REF_NAME} (HTTP $code)" >&2
+              exit 1
+            fi
+            echo "ok: $artifact ${GITHUB_REF_NAME}"
+          done
+
+      # --- Game Builder editor -------------------------------------------------
+      # The cn1:gamebuilder goal resolves
+      # com.codenameone:codenameone-gamebuilder:<version> and its runtime
+      # dependencies from the Codename One repository. That editor lives outside
+      # the maven/ reactor (scripts/gamebuilder), compiles at Java 17, and depends
+      # on the core/javase/plugin published above, so it is built and staged in a
+      # second pass here. These steps run only when the core release succeeded;
+      # update-version.sh already synced the gamebuilder poms to GITHUB_REF_NAME.
+      # Deliberately does NOT import the GPG key: it was already imported by the
+      # Java 8 "Set up JDK 8 and the signing key" step above and persists in the
+      # runner keyring (gpg signing in the editor build below uses it fine). If
+      # both setup-java steps import the key, both of their cleanup post-steps
+      # try to delete it; the second deletion fails ("gpg ... exit code 2") and
+      # marks the whole release red even though every artifact published.
+      - name: Set up JDK 17 for the editors
+        # The editors are resolved at the core release's own version, so a core that
+        # reached R2 needs its editors there too -- staged even if the core build
+        # itself reported failure after packaging.
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          # Same reason as the JDK 8 step: central-publishing needs the settings.xml
+          # entry to exist before it will stage, and nothing authenticates to it.
+          server-id: central
+
+      - name: Build and stage the Game Builder editor
+        id: deploy_gamebuilder
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          # skipPublishing stages the signed artifacts without uploading them to
+          # Central; the R2 step below publishes that tree.
+          cd scripts/gamebuilder
+          # The core/javase/plugin just released are already in the local repo
+          # from the build above (install runs before the staging step).
+          # -Dcn1.version/-Dcn1.plugin.version pin the build to that version.
+          # -Dmaven.test.skip=true also skips test *compilation* (the editor's
+          # JUnit test deps are irrelevant to the published jar). -Pgamebuilder-
+          # central adds the sources/javadoc jars, GPG signatures and the
+          # central-publishing bundle; -Pexecutable-jar builds the desktop
+          # launcher jar and copies runtime dependencies for local runs.
+          # -Dcodename1.platform=javase is REQUIRED: it activates the parent's
+          # `javase` profile (which contributes the editor module) by property.
+          # That profile is activeByDefault, but any explicit -P activation
+          # suppresses activeByDefault, so without this property the editor
+          # (codenameone-gamebuilder) silently drops out of the reactor and only
+          # the parent + common modules would be published.
+          xvfb-run -a mvn -Pexecutable-jar -Pgamebuilder-central deploy \
+            -DskipPublishing=true \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish Game Builder editor to R2
+        id: r2_gamebuilder
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' builds.
+        continue-on-error: true
+        # always(): central-publishing writes the staging tree during the build, so
+        # it exists even when the build above failed late -- uploading what is there
+        # keeps the diagnosis in one run. The marker step, not this one, decides
+        # whether any of it becomes discoverable. Metadata is regenerated once,
+        # after all four.
+        if: always() && steps.deploy_gamebuilder.conclusion != 'skipped'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/gamebuilder/target/central-staging
+          url="${R2_BASE_URL}/com/codenameone/codenameone-gamebuilder/${GITHUB_REF_NAME}/codenameone-gamebuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-gamebuilder (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-gamebuilder ${GITHUB_REF_NAME} on R2"
+
+      # --- Signing Wizard editor ---------------------------------------------
+      # The cn1:certificatewizard goal resolves
+      # com.codenameone:codenameone-certificatewizard:<version> and its runtime
+      # dependencies from the Codename One repository. The editor is a Java-17
+      # desktop app in scripts/certificatewizard, using the generated OpenAPI client for the
+      # Apple signing service.
+      - name: Build and stage the Signing Wizard editor
+        id: deploy_certificatewizard
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          # skipPublishing stages the signed artifacts without uploading them to
+          # Central; the R2 step below publishes that tree.
+          cd scripts/certificatewizard
+          xvfb-run -a mvn -Pexecutable-jar -Pcertificatewizard-central deploy \
+            -DskipPublishing=true \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish Signing Wizard editor to R2
+        id: r2_certificatewizard
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' builds.
+        continue-on-error: true
+        # always(): central-publishing writes the staging tree during the build, so
+        # it exists even when the build above failed late -- uploading what is there
+        # keeps the diagnosis in one run. The marker step, not this one, decides
+        # whether any of it becomes discoverable. Metadata is regenerated once,
+        # after all four.
+        if: always() && steps.deploy_certificatewizard.conclusion != 'skipped'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/certificatewizard/target/central-staging
+          url="${R2_BASE_URL}/com/codenameone/codenameone-certificatewizard/${GITHUB_REF_NAME}/codenameone-certificatewizard-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-certificatewizard (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-certificatewizard ${GITHUB_REF_NAME} on R2"
+
+      # --- Settings editor ----------------------------------------------------
+      # The cn1:settings goal resolves the standalone Java-17 Settings editor
+      # and its runtime dependencies from the Codename One repository.
+      - name: Build and stage the Settings editor
+        id: deploy_settings
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          # skipPublishing stages the signed artifacts without uploading them to
+          # Central; the R2 step below publishes that tree.
+          cd scripts/settings
+          xvfb-run -a mvn -Pexecutable-jar -Psettings-central deploy \
+            -DskipPublishing=true \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish Settings editor to R2
+        id: r2_settings
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' builds.
+        continue-on-error: true
+        # always(): central-publishing writes the staging tree during the build, so
+        # it exists even when the build above failed late -- uploading what is there
+        # keeps the diagnosis in one run. The marker step, not this one, decides
+        # whether any of it becomes discoverable. Metadata is regenerated once,
+        # after all four.
+        if: always() && steps.deploy_settings.conclusion != 'skipped'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/settings/target/central-staging
+          url="${R2_BASE_URL}/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-settings (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-settings ${GITHUB_REF_NAME} on R2"
+
+      # --- GUI Builder editor -------------------------------------------------
+      # The cn1:guibuilder goal resolves the standalone Java-17 GUI Builder and
+      # its runtime dependencies from the Codename One repository, exactly like cn1:settings.
+      - name: Build and stage the GUI Builder editor
+        id: deploy_guibuilder
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          # skipPublishing stages the signed artifacts without uploading them to
+          # Central; the R2 step below publishes that tree.
+          cd scripts/guibuilder
+          xvfb-run -a mvn -Pexecutable-jar -Pguibuilder-central deploy \
+            -DskipPublishing=true \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish GUI Builder editor to R2
+        id: r2_guibuilder
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' builds.
+        continue-on-error: true
+        # always(): central-publishing writes the staging tree during the build, so
+        # it exists even when the build above failed late -- uploading what is there
+        # keeps the diagnosis in one run. The marker step, not this one, decides
+        # whether any of it becomes discoverable. Metadata is regenerated once,
+        # after all four.
+        if: always() && steps.deploy_guibuilder.conclusion != 'skipped'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/guibuilder/target/central-staging
+          url="${R2_BASE_URL}/com/codenameone/codenameone-guibuilder/${GITHUB_REF_NAME}/codenameone-guibuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-guibuilder (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-guibuilder ${GITHUB_REF_NAME} on R2"
+
+      - name: Mark the R2 release complete
+        id: r2_mark_complete
+        continue-on-error: true
+        # Only now, once the core reactor and all four editors are up AND the core
+        # artifacts have been observed on R2. This is what makes the tag discoverable:
+        # regen refuses to advertise a version without it, on this run and every future
+        # one. r2_core_confirm is what verifies the expected artifacts are actually
+        # present rather than merely that an upload command exited 0, so marking without
+        # it would let a truncated publish become discoverable.
+        #
+        # Every check is == 'success', never != 'failure': a cancelled or timed-out job
+        # leaves outcome 'cancelled', which satisfies != 'failure' and would have marked
+        # a release whose upload was interrupted mid-flight.
+        #
+        # The build outcomes are checked here too, which they were not while Central was
+        # the authority. Then, a failed deploy was ambiguous -- central-publishing
+        # reported failure for bundles it had accepted -- so the Central confirmation
+        # poll, not the deploy, was the verdict, and the marker could not trust it. With
+        # skipPublishing there is no upload to misreport: a build that fails, fails, and
+        # the tree it staged may be missing whichever modules came after the failure.
+        # r2_core_confirm only covers seven key artifacts, so without this a build that
+        # died late could publish and advertise a version that is quietly incomplete.
+        if: >-
+          always() && steps.deploy.outcome == 'success' &&
+          steps.deploy_gamebuilder.outcome == 'success' &&
+          steps.deploy_certificatewizard.outcome == 'success' &&
+          steps.deploy_settings.outcome == 'success' &&
+          steps.deploy_guibuilder.outcome == 'success' &&
+          steps.r2_core.outcome == 'success' &&
+          steps.r2_core_confirm.outcome == 'success' &&
+          steps.r2_gamebuilder.outcome == 'success' &&
+          steps.r2_certificatewizard.outcome == 'success' &&
+          steps.r2_settings.outcome == 'success' &&
+          steps.r2_guibuilder.outcome == 'success'
+        run: bash maven/scripts/r2/mark-release-complete.sh "${GITHUB_REF_NAME}"
+
+      - name: Regenerate R2 metadata and archetype catalog
+        id: r2_metadata
+        continue-on-error: true
+        # Skipped when any editor upload failed: regen discovers a version from any key
+        # under <artifact>/<version>/, so running it after a partial copy would publish an
+        # incomplete editor as <latest>/<release>. The gate below still fails the job.
+        if: >-
+          always() && steps.r2_mark_complete.outcome == 'success'
+        run: |
+          python3 maven/scripts/r2/regen-maven-metadata.py
+          # Assert here rather than earlier: metadata is what makes a version discoverable,
+          # so it is published only once every artifact for it is in place.
+          meta="${R2_BASE_URL}/com/codenameone/codenameone-core/maven-metadata.xml?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          body=$(curl -s "$meta")
+          # Assert discoverability, not primacy. Re-running an older tag to repair it is
+          # legitimate, and metadata correctly keeps the newer version as <release>; that
+          # is a successful repair, not a failure. <release> is only checked when this tag
+          # really is the newest.
+          if ! echo "$body" | grep -q "<version>${GITHUB_REF_NAME}</version>"; then
+            echo "maven-metadata.xml does not list ${GITHUB_REF_NAME} in <versions>" >&2
+            echo "$body" >&2
+            exit 1
+          fi
+          newest=$(echo "$body" | sed -n 's:.*<release>\(.*\)</release>.*:\1:p')
+          if [ "$newest" = "${GITHUB_REF_NAME}" ]; then
+            echo "ok: maven-metadata.xml <release> is ${GITHUB_REF_NAME}"
+          else
+            echo "ok: ${GITHUB_REF_NAME} is listed; <release> remains $newest (newer tag already published)"
+          fi
+
+      - name: Fail when any publication did not complete
+        # Every build and publish step runs with continue-on-error so that one
+        # component failing cannot skip the others -- the release is only discoverable
+        # once it is marked complete, so pushing on collects the rest of the diagnosis
+        # in a single run instead of one failure per re-run. That means the job's real
+        # verdict is decided here, once, at the end.
+        if: always()
+        run: |
+          status=0
+          fail() { echo "  FAILED: $1"; status=1; }
+          # Anything that is neither success nor a legitimate skip counts as failure.
+          # A cancelled or timed-out step reports 'cancelled', which an == "failure"
+          # test would wave through -- the same flaw the marker condition had.
+          bad() { [ "$1" != "success" ] && [ "$1" != "skipped" ]; }
+          echo "Publication outcomes:"
+          bad "${{ steps.deploy.outcome }}" && fail "core reactor build"
+          bad "${{ steps.deploy_gamebuilder.outcome }}" && fail "Game Builder build"
+          bad "${{ steps.deploy_certificatewizard.outcome }}" && fail "Signing Wizard build"
+          bad "${{ steps.deploy_settings.outcome }}" && fail "Settings build"
+          bad "${{ steps.deploy_guibuilder.outcome }}" && fail "GUI Builder build"
+          bad "${{ steps.r2_core.outcome }}" && fail "core reactor -> R2"
+          bad "${{ steps.r2_core_confirm.outcome }}" && fail "core artifacts missing on R2"
+          bad "${{ steps.r2_gamebuilder.outcome }}" && fail "Game Builder -> R2"
+          bad "${{ steps.r2_certificatewizard.outcome }}" && fail "Signing Wizard -> R2"
+          bad "${{ steps.r2_settings.outcome }}" && fail "Settings -> R2"
+          bad "${{ steps.r2_guibuilder.outcome }}" && fail "GUI Builder -> R2"
+          bad "${{ steps.r2_mark_complete.outcome }}" && fail "marking the R2 release complete"
+          bad "${{ steps.r2_metadata.outcome }}" && fail "R2 metadata regeneration"
+          # A skipped marker is not a legitimate skip: it is how a release ends up
+          # published-but-undiscoverable, which is the state that needs a human. `bad`
+          # cannot catch it, because that is the same 'skipped' a genuinely skipped
+          # step reports.
+          if [ "${{ steps.r2_mark_complete.outcome }}" = "skipped" ]; then
+            fail "the release was never marked complete, so it is not discoverable"
+          fi
+          [ "$status" = "0" ] && echo "  all publications succeeded"
+          exit $status

@@ -4,8 +4,14 @@ Scripts that publish Codename One releases to the Cloudflare R2 bucket served at
 <https://repo.codenameone.com/maven2>.
 
 Background: Sonatype rate-limits Maven Central consumption for commercial open-source
-projects, which makes Central a product availability risk rather than just a CI one. The
-migration dual-publishes to Central and R2 for three releases, then cuts over.
+projects, which makes Central a product availability risk rather than just a CI one.
+
+**The migration is complete.** Dual publication ran from 7.0.264 to 7.0.267 and this is
+now the only repository new releases go to. Central keeps every version published up to
+the cutover -- nothing is removed from it, and a project pinned to one of those versions
+resolves from Central exactly as before -- but it receives no new ones. Generated
+projects have declared this repository since the archetype and Initializr change, in
+both `<repositories>` and `<pluginRepositories>`.
 
 ## Layout
 
@@ -22,8 +28,10 @@ maven2/archetype-catalog.xml                        for archetype:generate
 
 Uploads a `central-staging` tree produced by `central-publishing-maven-plugin`. That plugin
 stages every module's artifacts in standard Maven layout, with MD5/SHA-1/SHA-256/SHA-512
-checksums and `.asc` signatures, *before* it uploads to Central — so the tree exists even
-when the Central upload fails, and needs no second Maven pass.
+checksums and `.asc` signatures, as a step before its upload — so running it with
+`-DskipPublishing=true` yields exactly the tree R2 needs, from the build that produced the
+artifacts, with no second Maven pass that could emit different bytes. The directory name
+is the plugin's; it is not a statement about where the tree goes.
 
 Where the tree lands:
 
@@ -36,20 +44,42 @@ Where the tree lands:
 ### `seed-frozen-artifacts.sh [<artifactId>:<version> ...]`
 
 Copies the frozen artifacts from Maven Central into R2, once. Some artifacts stopped
-being published because their content does not change per release, and consumers are
-pinned to the last version that *was* published — which lives only on Central. That is
-not history that can be left behind: `codenameone-javase` declares
-`com.codenameone:sqlite-jdbc:<pinned>`, and `codenameone-javase` is itself a runtime
-dependency of `codenameone-maven-plugin`, so ordinary plugin resolution reaches it. An
-R2 consumer could not resolve a release precisely when Central is throttled — the case
-this migration exists to survive.
+being published because their content does not change per release (`<excludeArtifacts>`
+in `maven/pom.xml`), and consumers are pinned to the last version that *was* published —
+which lives only on Central. That is not history that can be left behind:
+`codenameone-maven-plugin` resolves `codenameone-designer` at `cn1.designer.version` for
+the Resource Editor goals, so ordinary plugin resolution reaches it. It is a live
+dependency of every future release.
 
-**Run this before flipping `CN1_DUAL_PUBLISH` to false.** It verifies every file against
-its `.sha1` from Central before uploading, and is idempotent.
+Coordinates come from `frozen-coordinates.sh` rather than being repeated here, so the
+seeding and the release-time check cannot disagree about which version is pinned. It
+verifies every file against its `.sha1` from Central before uploading, and is idempotent.
+
+Run it through the **Seed frozen artifacts to R2** workflow (`workflow_dispatch`) after
+bumping `cn1.designer.version`, and before pushing the next release tag. It is manual on
+purpose: it reads from Central, and a release must not depend on Central being reachable
+at that moment.
+
+Note `sqlite-jdbc` is *not* frozen despite reading like a pin in `codenameone-javase`'s
+pom -- its version comes from the parent's `dependencyManagement`, which tracks
+`${project.version}`, so it is an ordinary reactor module the release itself publishes.
 
 Seeded artifacts deliberately carry no release marker: they are resolved by exact pinned
 version rather than discovered, so `regen-maven-metadata.py` knows them as frozen and
 generates their metadata from what is present.
+
+### `check-frozen-artifacts.sh [<artifactId>:<version> ...]`
+
+Fails while any frozen artifact is absent from R2. The release workflow runs it *before*
+it builds anything.
+
+Up to the cutover a missing frozen artifact was invisible: every consumer still had
+Central in its resolution path, so `codenameone-designer` resolved from there whatever R2
+held. With R2 as the only repository a generated project declares, the same absence means
+`cn1:design` cannot resolve -- and by the time anyone runs the goal, the release that
+shipped it is immutable. Hence a gate at the one moment nothing has been published yet.
+
+Reads the public URL, so it needs no credentials.
 
 ### `mark-release-complete.sh <version>`
 
@@ -89,7 +119,7 @@ resolves its editors at its own version — so advertising `codenameone-core:7.0
 core directory is complete in exactly the case that matters.
 
 `mark-release-complete.sh` writes `com/codenameone/_cn1-releases/<version>/complete` only
-once the core reactor *and* all three editors are up, and `regen-maven-metadata.py` will
+once the core reactor *and* all four editors are up, and `regen-maven-metadata.py` will
 not advertise any artifact at a version lacking it. That holds on every future run too,
 which matters because each run rebuilds metadata from the same bucket listing — gating
 only the run that failed would let the next tag advertise the abandoned one. Re-running
@@ -113,11 +143,14 @@ hitting the window is warned rather than broken.
 failed release leaves its artifacts orphaned but invisible — the recoverable direction.
 Advertised-but-incomplete cannot be undone.
 
-**Do not publish an editor to Central when the core release did not get there.** The
-editors declare core/plugin at their own version, and Central releases are immutable, so
-publishing one against a core that is absent leaves a permanently unresolvable artifact.
-The release workflow passes `-DskipPublishing` in that case; staging still happens, so the
-R2 upload is unaffected.
+**A build that failed does not get marked complete.** While Central was the authority a
+failed deploy was ambiguous -- `central-publishing-maven-plugin` reports failure for
+bundles it accepted -- so the Central confirmation poll, not the deploy, was the verdict.
+With `skipPublishing` there is no upload to misreport, so a failed build is simply a
+failed build, and its staging tree may be missing whichever modules came after the
+failure. The release marker therefore requires every build *and* every upload to have
+succeeded. The uploads still run after a failed build, deliberately: nothing is
+discoverable without the marker, so uploading collects the whole diagnosis in one run.
 
 **Known limitation: tag bursts can lose a release.** The workflow serialises on a single
 `concurrency` group so the metadata read-modify-write cannot interleave. GitHub allows one
@@ -148,7 +181,19 @@ Pages website deploy. Overwriting them breaks the site build.
 | Variable | Value |
 |---|---|
 | `R2_BUCKET` | `cn1-maven` |
-| `CN1_DUAL_PUBLISH` | `true` while still publishing to Central as well |
+
+The `MAVEN_CENTRAL_USERNAME` / `MAVEN_CENTRAL_PASSWORD` secrets and the
+`CN1_DUAL_PUBLISH` variable are no longer read by any workflow, and the variable can be
+deleted from the repository settings. `MAVEN_GPG_PRIVATE_KEY` and `MAVEN_GPG_PASSPHRASE` still are: signatures are
+verified against the artifact wherever it is served from, so releases are still signed.
+
+`central-publishing-maven-plugin` is still what builds a release, which is not a leftover
+-- it is what stages a complete Maven layout with all four checksums and `.asc`
+signatures, which is exactly the tree R2 needs, with no second Maven pass that could
+produce different bytes. Every build passes `-DskipPublishing=true`, so it stages and
+never uploads. It does still require a `central` server entry in `settings.xml` or it
+NPEs before staging, which is why the workflow's `setup-java` steps keep `server-id:
+central` with no credentials attached.
 
 The R2 token is scoped to Object Read & Write on `cn1-maven` only, so it deliberately cannot
 list buckets or read zones through the Cloudflare REST API. That is correct least privilege,
