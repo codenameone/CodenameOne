@@ -8,25 +8,106 @@ import { fileURLToPath } from "node:url";
 const workerDir = fileURLToPath(new URL("..", import.meta.url));
 const localUrl = "http://127.0.0.1:8797";
 
+async function snapshotIsLive(url) {
+  const response = await fetch(`${url}/api/exp004/snapshot`);
+  if (!response.ok || !(response.headers.get("content-type") || "")
+    .includes("application/json")) {
+    return false;
+  }
+  const payload = await response.json();
+  return payload.experiment_id === "EXP-004";
+}
+
+/*
+ * A cross-site Origin is refused by hasSameOriginBrowserContext before the
+ * worker reads the body or reaches the counter, so this probe costs one
+ * rejected request and records nothing however often the poll loop runs it.
+ *
+ * Readiness is that exact 403 and its body, not merely "not a 404". A Worker
+ * whose bindings are still initializing, or an edge that is having a bad
+ * minute, answers 5xx; treating anything non-404 as ready would let waitFor
+ * return on one of those and hand the transient error straight to the first
+ * assertion -- the failure this whole probe exists to stop. Only
+ * forbidden_browser_context proves the request reached our handler and ran it.
+ *
+ * Returns null once ready, otherwise a description of what answered instead.
+ */
+async function collectNotReady(url) {
+  const response = await post(url, {
+    event: "Exp004OwnershipExposure",
+    event_id: crypto.randomUUID(),
+    session_key: crypto.randomUUID(),
+  }, "https://example.com");
+  if (response.status !== 403) {
+    return `POST /api/exp004/collect answered ${response.status}, not the 403 the `
+      + "live handler returns for a cross-site Origin";
+  }
+  const payload = await response.json().catch(() => null);
+  if (!payload || payload.error !== "forbidden_browser_context") {
+    return "POST /api/exp004/collect answered 403 without the worker's "
+      + "forbidden_browser_context body, so something ahead of the worker refused it";
+  }
+  return null;
+}
+
+/*
+ * Cloudflare answers a request for a freshly deployed workers.dev route with
+ * its own 404 until that route has propagated, and the two verbs do not
+ * become live together: GET /api/exp004/snapshot can already be serving while
+ * the first POST is still 404. Waiting on the GET alone therefore returns
+ * about a second after `wrangler deploy` prints the URL and leaves the run's
+ * first POST to fail as a 404 where the worker itself would have answered 403
+ * or 400. Every assertion after the snapshot block is a POST, so whichever one
+ * happened to land first was the one that failed, which is why this looked
+ * random across branches rather than like one broken endpoint. Probe both
+ * verbs, and report which half was still not ready when the deadline passed.
+ */
 async function waitFor(url, process) {
   const deadline = Date.now() + 90_000;
+  let lastFailure = "no probe completed";
   while (Date.now() < deadline) {
     if (process && process.exitCode !== null) {
       throw new Error(`wrangler exited before becoming ready (${process.exitCode})`);
     }
     try {
-      const response = await fetch(`${url}/api/exp004/snapshot`);
-      if (response.ok && (response.headers.get("content-type") || "")
-        .includes("application/json")) {
-        const payload = await response.json();
-        if (payload.experiment_id === "EXP-004") return;
+      if (!await snapshotIsLive(url)) {
+        lastFailure = "GET /api/exp004/snapshot is not serving the EXP-004 snapshot yet";
+      } else {
+        const notReady = await collectNotReady(url);
+        if (notReady === null) {
+          return;
+        }
+        lastFailure = `GET /api/exp004/snapshot is live but ${notReady}`;
       }
     } catch (error) {
       // The local runtime or remote hostname is still becoming ready.
+      lastFailure = `probe failed: ${error.message}`;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("timed out waiting for the EXP-004 telemetry worker");
+  throw new Error(
+    `timed out waiting for the EXP-004 telemetry worker: ${lastFailure}`);
+}
+
+/*
+ * assert.equal on response.status alone reports "404 !== 403" and drops the
+ * body, which is the difference between "the edge has not routed us yet" and
+ * "the worker rejected the payload". Keep the body in the failure message; the
+ * response is left unread when the status matches so callers can still parse
+ * it.
+ */
+async function expectStatus(response, expected, what) {
+  if (response.status === expected) {
+    return response;
+  }
+  let body;
+  try {
+    body = (await response.text()).slice(0, 400);
+  } catch (error) {
+    body = `<body unreadable: ${error.message}>`;
+  }
+  assert.fail(
+    `${what}: expected ${expected}, got ${response.status} with body ${body}`);
 }
 
 async function post(baseUrl, body, origin = "https://www.codenameone.com") {
@@ -51,7 +132,7 @@ async function enroll(baseUrl, sessionKey, arm) {
     },
     body: JSON.stringify({ session_key: sessionKey, arm }),
   });
-  assert.equal(response.status, 201);
+  await expectStatus(response, 201, `enroll ${sessionKey} into ${arm}`);
   const payload = await response.json();
   assert.match(payload.submission_token, /^[0-9a-f-]{36}$/);
   return payload.submission_token;
@@ -116,14 +197,14 @@ async function verify(baseUrl) {
     event_id: crypto.randomUUID(),
     session_key: crypto.randomUUID(),
   }, "https://example.com");
-  assert.equal(forbidden.status, 403);
+  await expectStatus(forbidden, 403, "cross-site exposure POST");
 
   const invalid = await post(baseUrl, {
     event: "Exp004UnknownExposure",
     event_id: crypto.randomUUID(),
     session_key: crypto.randomUUID(),
   });
-  assert.equal(invalid.status, 400);
+  await expectStatus(invalid, 400, "unknown event name POST");
 
   const ownershipSession = crypto.randomUUID();
   const ownershipToken = await enroll(baseUrl, ownershipSession, "ownership");
@@ -139,10 +220,10 @@ async function verify(baseUrl) {
     submission_token: ownershipToken,
   };
   const firstExposure = await post(baseUrl, ownershipExposure);
-  assert.equal(firstExposure.status, 202);
+  await expectStatus(firstExposure, 202, "first ownership exposure");
   assert.equal((await firstExposure.json()).accepted, true);
   const duplicateExposure = await post(baseUrl, ownershipExposure);
-  assert.equal(duplicateExposure.status, 200);
+  await expectStatus(duplicateExposure, 200, "duplicate ownership exposure");
   assert.equal((await duplicateExposure.json()).accepted, false);
 
   const reachSession = crypto.randomUUID();
@@ -153,7 +234,7 @@ async function verify(baseUrl) {
     session_key: reachSession,
     submission_token: crypto.randomUUID(),
   });
-  assert.equal(unauthorized.status, 401);
+  await expectStatus(unauthorized, 401, "reach exposure with a foreign token");
 
   const futureDated = await post(baseUrl, {
     event: "Exp004ReachExposure",
@@ -162,7 +243,7 @@ async function verify(baseUrl) {
     session_key: reachSession,
     submission_token: reachToken,
   });
-  assert.equal(futureDated.status, 400);
+  await expectStatus(futureDated, 400, "future dated reach exposure");
 
   const reachDownload = await post(baseUrl, {
     event: "Exp004ReachDownload",
@@ -170,7 +251,7 @@ async function verify(baseUrl) {
     session_key: reachSession,
     submission_token: reachToken,
   });
-  assert.equal(reachDownload.status, 202);
+  await expectStatus(reachDownload, 202, "reach download");
   assert.deepEqual(await reachDownload.json(), {
     accepted: true,
     recovered_exposure: true,
@@ -187,7 +268,7 @@ async function verify(baseUrl) {
     session_key: reachSession,
     submission_token: reachToken,
   });
-  assert.equal(correctedReachExposure.status, 202);
+  await expectStatus(correctedReachExposure, 202, "corrected reach exposure");
   assert.equal((await correctedReachExposure.json()).accepted, true);
 
   const ownershipDownload = await post(baseUrl, {
@@ -196,7 +277,7 @@ async function verify(baseUrl) {
     session_key: ownershipSession,
     submission_token: ownershipToken,
   });
-  assert.equal(ownershipDownload.status, 202);
+  await expectStatus(ownershipDownload, 202, "ownership download");
 
   const snapshot = await fetch(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
   assert.deepEqual(snapshot.counts, {
