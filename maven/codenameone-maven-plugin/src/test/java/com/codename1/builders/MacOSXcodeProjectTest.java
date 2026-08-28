@@ -513,6 +513,29 @@ public class MacOSXcodeProjectTest {
                 ((Map<?, ?>) types.get(0)).get("CFBundleURLSchemes"));
     }
 
+    /**
+     * The comma separated form macos.urlSchemes documents. Written whole this was one
+     * scheme with a comma in its name, which macOS registers for neither of them.
+     */
+    @Test
+    public void commaSeparatedSchemesAreSplit() {
+        List<Object> types = MacOSXcodeProject.urlTypes("com.example.app",
+                "myapp,myapp-secure");
+        assertNotNull(types);
+        assertEquals(1, types.size());
+        assertEquals(Arrays.asList("myapp", "myapp-secure"),
+                ((Map<?, ?>) types.get(0)).get("CFBundleURLSchemes"));
+    }
+
+    /** Spacing around the commas is the writer's, not the scheme's. */
+    @Test
+    public void spacingAroundCommasIsTrimmed() {
+        List<Object> types = MacOSXcodeProject.urlTypes("com.example.app",
+                " myapp , myapp-secure ,, ");
+        assertEquals(Arrays.asList("myapp", "myapp-secure"),
+                ((Map<?, ?>) types.get(0)).get("CFBundleURLSchemes"));
+    }
+
     /** No hint means no key at all, rather than an empty array Xcode complains about. */
     @Test
     public void noSchemesMeansNoKey() {

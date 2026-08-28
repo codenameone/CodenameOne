@@ -160,8 +160,12 @@ public class MacOSXcodeProject {
      * <p>The hint carries raw plist markup on the iOS side --
      * {@code <string>a</string><string>b</string>} -- so the scheme names are
      * lifted out of it rather than pasted in, since this plist is built from a
-     * map. A value with no markup at all is taken as a single scheme, which is
-     * what someone writing the hint by hand tends to produce.</p>
+     * map. A value with no markup is the comma separated form
+     * {@code macos.urlSchemes} documents, and is split on the commas: written
+     * whole, {@code myapp,myapp-secure} became one scheme with a comma in its
+     * name, which macOS matches for neither of them, so a deep link built from
+     * either simply never arrived. A single name has no commas and comes through
+     * that split unchanged.</p>
      */
     public static List<Object> urlTypes(String bundleId, String schemesHint) {
         if (schemesHint == null || schemesHint.trim().length() == 0) {
@@ -171,7 +175,12 @@ public class MacOSXcodeProject {
         String hint = schemesHint.trim();
         int at = hint.indexOf("<string>");
         if (at < 0) {
-            schemes.add(hint);
+            for (String part : hint.split(",")) {
+                String scheme = part.trim();
+                if (scheme.length() > 0) {
+                    schemes.add(scheme);
+                }
+            }
         } else {
             while (at >= 0) {
                 int end = hint.indexOf("</string>", at);
