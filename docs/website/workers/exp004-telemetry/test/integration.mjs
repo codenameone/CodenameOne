@@ -176,6 +176,20 @@ async function verify(baseUrl) {
     recovered_exposure: true,
   });
 
+  const reachExposureOccurredAt = Math.max(
+    Date.parse(initial.original_experiment_start) + 2_000,
+    Date.now() - 24 * 60 * 60 * 1000,
+  );
+  const correctedReachExposure = await post(baseUrl, {
+    event: "Exp004ReachExposure",
+    event_id: crypto.randomUUID(),
+    occurred_at: reachExposureOccurredAt,
+    session_key: reachSession,
+    submission_token: reachToken,
+  });
+  assert.equal(correctedReachExposure.status, 202);
+  assert.equal((await correctedReachExposure.json()).accepted, true);
+
   const ownershipDownload = await post(baseUrl, {
     event: "Exp004OwnershipDownload",
     event_id: crypto.randomUUID(),
@@ -196,6 +210,13 @@ async function verify(baseUrl) {
   );
   assert.equal(ownershipOccurrenceBucket?.ownership_exposures, 1,
     "daily exposure counts must use the client occurrence date");
+  const reachOccurrenceDate = new Date(reachExposureOccurredAt)
+    .toISOString().slice(0, 10);
+  const reachOccurrenceBucket = snapshot.daily.find(
+    (row) => row.date === reachOccurrenceDate
+  );
+  assert.equal(reachOccurrenceBucket?.reach_exposures, 1,
+    "a real exposure must replace a download-first recovery timestamp");
 }
 
 const remoteUrl = process.argv[2];

@@ -211,13 +211,32 @@ export class Exp004Counter extends DurableObject {
       recoveredExposure = recovered.length === 1;
     }
 
-    const inserted = this.ctx.storage.sql.exec(`
-      INSERT OR IGNORE INTO events
-        (event_id, session_key, arm, kind, occurred_at, received_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      RETURNING event_id
-    `, input.eventId, input.sessionKey, input.arm, input.kind,
-    input.occurredAt, now).toArray();
+    let correctedRecoveredExposure = false;
+    if (input.kind === "exposure") {
+      const corrected = this.ctx.storage.sql.exec(`
+        UPDATE events
+        SET event_id = ?, occurred_at = ?, received_at = ?
+        WHERE session_key = ? AND kind = 'exposure'
+          AND event_id LIKE 'derived:%'
+        RETURNING event_id
+      `, input.eventId, input.occurredAt, now, input.sessionKey).toArray();
+      correctedRecoveredExposure = corrected.length === 1;
+      if (correctedRecoveredExposure) {
+        this.ctx.storage.sql.exec(
+          "UPDATE sessions SET exposed_at = ? WHERE session_key = ?",
+          input.occurredAt,
+          input.sessionKey,
+        );
+      }
+    }
+
+    const inserted = correctedRecoveredExposure ? [] : this.ctx.storage.sql.exec(`
+        INSERT OR IGNORE INTO events
+          (event_id, session_key, arm, kind, occurred_at, received_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        RETURNING event_id
+      `, input.eventId, input.sessionKey, input.arm, input.kind,
+      input.occurredAt, now).toArray();
 
     if (input.kind === "download" && inserted.length === 1) {
       this.ctx.storage.sql.exec(
@@ -227,7 +246,7 @@ export class Exp004Counter extends DurableObject {
       );
     }
     return {
-      accepted: inserted.length === 1,
+      accepted: correctedRecoveredExposure || inserted.length === 1,
       recovered_exposure: recoveredExposure,
     };
   }
