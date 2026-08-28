@@ -779,7 +779,7 @@
       "id": "multi-window",
       "category": "Desktop integration",
       "name": "Multiple native windows",
-      "description": "Opens additional native operating-system windows, each rendering its own component hierarchy, and checks layout, scrolling, graphics, layered overlays, native text editing and modality inside one.",
+      "description": "Opens additional native operating-system windows, each rendering its own component hierarchy, and checks layout, scrolling, graphics, layered overlays, native text editing, modality, and the dialogs and sheets shown inside one.",
       "tests": [
         "MultiWindowApiTest",
         "WindowLayoutTest",
@@ -787,7 +787,9 @@
         "WindowGraphicsTest",
         "WindowEditingTest",
         "WindowOverlayTest",
-        "WindowModalTest"
+        "WindowModalTest",
+        "WindowDialogTest",
+        "WindowSheetTest"
       ]
     }
   ],
@@ -823,6 +825,18 @@
       "windows-arm64"
     ],
     "WindowModalTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowDialogTest": [
+      "linux-x64",
+      "linux-arm64",
+      "windows-x64",
+      "windows-arm64"
+    ],
+    "WindowSheetTest": [
       "linux-x64",
       "linux-arm64",
       "windows-x64",
@@ -1397,6 +1411,14 @@
     {
       "pattern": "Window-Modal*",
       "test": "WindowModalTest"
+    },
+    {
+      "pattern": "Window-Dialog*",
+      "test": "WindowDialogTest"
+    },
+    {
+      "pattern": "Window-Sheet*",
+      "test": "WindowSheetTest"
     }
   ]
 }
