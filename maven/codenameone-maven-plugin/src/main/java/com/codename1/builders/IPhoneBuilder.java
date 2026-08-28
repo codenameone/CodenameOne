@@ -5278,29 +5278,109 @@ public class IPhoneBuilder extends Executor {
                 // had a chance to configure anything, so the name, icon and
                 // ringtone have to be baked into the bundle.
                 callPlistWanted = true;
-                // The MICROPHONE prompt is not optional the way the camera
-                // one is: a call carries voice, Calls.requestPermissions
-                // reaches AVAudioSession's record prompt, and iOS TERMINATES
-                // an app that asks for a protected resource with no purpose
-                // string in Info.plist. Injected for every calling app rather
-                // than behind a hint, because there is no calling app that
-                // does not need it.
-                if (request.getArg("ios.NSMicrophoneUsageDescription",
-                        null) == null) {
-                    request.putArgument("ios.NSMicrophoneUsageDescription",
-                            "Carries your voice during a call.");
+                // SESSION or VOIP only. A directory-only app owns no calls
+                // and never reaches AVAudioSession: it hands a list of
+                // numbers to an extension and stops there, and the catalog
+                // entry for com.codename1.call.directory says so by linking
+                // CallKit and declaring no microphone string. Injecting the
+                // disclosure for it shipped a voice-capture claim the app
+                // cannot act on, and would REFUSE a project that set the
+                // description to false -- rejecting it for declining a
+                // disclosure it genuinely does not need. The Android path
+                // already omits RECORD_AUDIO for directory-only usage.
+                //
+                // Straight into privacyUsageDescriptions rather than through
+                // putArgument: the sweep that turns ios.NS*UsageDescription
+                // args into that map runs EARLIER in this method, and the
+                // plist is rendered from the map alone -- so the argument
+                // this used to set was never read, and the safety net it was
+                // meant to be did nothing. Which mattered: an app that
+                // reaches the call API only from a cn1lib sets
+                // usesCallSession through foldInCallAndVpnLibraryUsage but
+                // produces no PlatformFeatureCatalog hit, so the catalog's
+                // own microphone entry never fired either and the build
+                // shipped with no purpose string at all. The calendar and
+                // reminders strings are placed the same way.
+                if (usesCallSession || usesCallVoip) {
+                    // A BLANK value is not a purpose string. The argument
+                    // sweep has already put the key in this map, so testing
+                    // containsKey alone kept an empty
+                    // ios.NSMicrophoneUsageDescription and the renderer
+                    // emitted an empty <string> -- which iOS treats exactly
+                    // as a missing one and terminates the app for. Blank
+                    // falls back to the default, as an absent hint does.
+                    String micPurpose = effectivePurposeString(request,
+                            "ios.NSMicrophoneUsageDescription");
+                    if (micPurpose != null
+                            && micPurpose.trim().length() == 0) {
+                        micPurpose = null;
+                    }
+                    if ("false".equalsIgnoreCase(micPurpose)) {
+                        // Suppressing it outright is a decision this build
+                        // cannot honour: a call app reaches AVAudioSession's
+                        // record prompt by definition, and iOS TERMINATES an
+                        // app that asks for a protected resource with no
+                        // purpose string. Failing says so where it can still
+                        // be acted on, as the commissioning path does.
+                        throw new BuildException(
+                                "This app uses com.codename1.call, which"
+                                + " reaches the microphone, but its"
+                                + " NSMicrophoneUsageDescription is false,"
+                                + " empty, or -- through ios.plistInject --"
+                                + " not a string at all. iOS terminates an"
+                                + " app that asks for the microphone with no"
+                                + " purpose string. Supply one through"
+                                + " ios.NSMicrophoneUsageDescription.");
+                    }
+                    String existingMic = privacyUsageDescriptions.get(
+                            "NSMicrophoneUsageDescription");
+                    if (existingMic == null
+                            || existingMic.trim().length() == 0) {
+                        privacyUsageDescriptions.put(
+                                "NSMicrophoneUsageDescription",
+                                micPurpose != null ? micPurpose
+                                        : "Carries your voice during a call.");
+                    }
                 }
-                // iOS refuses the camera prompt outright without a purpose
-                // string, so a video app that asked for CAMERA got a denial
-                // it could not clear. Behind the project's own statement that
-                // it does video, for the reason the Android CAMERA
-                // permission is.
-                if ("true".equals(request.getArg("ios.call.video",
-                        request.getArg("call.video", "false")))) {
-                    if (request.getArg("ios.NSCameraUsageDescription",
-                            null) == null) {
-                        request.putArgument("ios.NSCameraUsageDescription",
-                                "Carries the video of a call.");
+                if ((usesCallSession || usesCallVoip)
+                        && "true".equals(request.getArg("ios.call.video",
+                                request.getArg("call.video", "false")))) {
+                    // iOS refuses the camera prompt outright without a
+                    // purpose string, so a video app that asked for CAMERA
+                    // got a denial it could not clear. Behind the project's
+                    // own statement that it does video, unlike the
+                    // microphone -- and behind owning calls at all, because a
+                    // directory app has no media of any kind.
+                    //
+                    // Blank and false handled exactly as the microphone's
+                    // are, and placed in the map for the same reason. Here
+                    // the contradiction is sharper still: the project has
+                    // just said it does video.
+                    String cameraPurpose = effectivePurposeString(request,
+                            "ios.NSCameraUsageDescription");
+                    if (cameraPurpose != null
+                            && cameraPurpose.trim().length() == 0) {
+                        cameraPurpose = null;
+                    }
+                    if ("false".equalsIgnoreCase(cameraPurpose)) {
+                        throw new BuildException(
+                                "This app sets ios.call.video, so it asks for"
+                                + " the camera, but its"
+                                + " NSCameraUsageDescription is false, empty,"
+                                + " or -- through ios.plistInject -- not a"
+                                + " string at all. iOS refuses the camera"
+                                + " prompt with no purpose string and the"
+                                + " denial cannot be cleared. Supply one"
+                                + " through ios.NSCameraUsageDescription, or"
+                                + " turn ios.call.video off.");
+                    }
+                    String existingCamera = privacyUsageDescriptions.get(
+                            "NSCameraUsageDescription");
+                    if (existingCamera == null
+                            || existingCamera.trim().length() == 0) {
+                        privacyUsageDescriptions.put("NSCameraUsageDescription",
+                                cameraPurpose != null ? cameraPurpose
+                                        : "Carries the video of a call.");
                     }
                 }
             }
