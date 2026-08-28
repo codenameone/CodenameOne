@@ -122,6 +122,14 @@ iOS 18 uses AccessorySetupKit for association. It does not provide the same live
 
 `NearbyTransport` maps to Google Nearby Connections on Android and MultipeerConnectivity on Apple platforms:
 
+When the application uses a service id such as `chat`, declare it for the iOS build:
+
+```properties
+codename1.arg.ios.nearby.serviceType=chat
+```
+
+The hint accepts a comma-separated list when the application uses more than one service id. Without it, the iOS builder declares only the package-derived id, and the runtime rejects advertising or discovery for `chat` before starting the native service.
+
 ```java
 NearbyTransport.addTransportListener(new TransportAdapter() {
     public void endpointFound(Endpoint endpoint) {
