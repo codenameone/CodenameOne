@@ -30,6 +30,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -416,13 +417,11 @@ public class FloatingActionButton extends Button {
         }
         //if this fab has sub fab's display them
         if (subMenu != null) {
-            // The submenu is shown in a Dialog, which is not top-level-aware: inside a
-            // Window getComponentForm() is null by design, and the tint calls below
-            // dereferenced it without checking, so releasing a sub-menu FAB in a window
-            // threw out of the button press. There is nothing to show there until
-            // Dialog itself becomes window-aware, but a standard component must not
-            // throw to say so -- see the unsupported list in the desktop windows guide.
-            if (getComponentForm() == null) {
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, and the tint calls below dereference it. Dialog is window aware
+            // now, so the submenu opens on whatever surface the button is actually on.
+            TopLevelContainer f = getTopLevelContainer();
+            if (f == null) {
                 return;
             }
             final Container con = createPopupContent(subMenu);
@@ -439,7 +438,6 @@ public class FloatingActionButton extends Button {
             for (Component c : con) {
                 c.setVisible(false);
             }
-            Form f = getComponentForm();
             int oldTint = f.getTintColor();
             f.setTintColor(0);
             d.setBlurBackgroundRadius(-1);

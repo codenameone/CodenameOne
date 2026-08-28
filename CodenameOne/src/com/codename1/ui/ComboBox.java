@@ -341,6 +341,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
                 //if only height changed it's the virtual keyboard, no need to
                 //resize the popup just resize the parent form
                 if (getWidth() == w && getHeight() != h) {
+                    // Null inside a window, which has no previous form.
                     Form frm = getPreviousForm();
                     if (frm != null) {
                         frm.sizeChangedInternal(w, h);
@@ -420,7 +421,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             popupDialog.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));
             popupDialog.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 200));
             showingPopupDialog = true;
-            Command out = popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);
+            Command out = popupDialog.show(
+                    TopLevelSupport.hostHeight(getTopLevelContainer())
+                            - popupDialog.getDialogComponent().getPreferredH(),
+                    0, 0, 0, true, true);
             showingPopupDialog = false;
             return out;
         }
@@ -435,7 +439,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             int bottom;
             int left;
             int right;
-            Form parentForm = getComponentForm();
+            // The top level, not the form: getComponentForm() is null by design inside
+            // a Window, so the whole placement below dereferenced null and clicking a
+            // combo box in a window did nothing at all.
+            TopLevelContainer parentForm = getTopLevelContainer();
 
             int listW = Math.max(getWidth(), l.getPreferredW());
             listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());
@@ -453,13 +460,10 @@ public class ComboBox<T> extends List<T> implements ActionSource {
 
             bottom = 0;
             top = getAbsoluteY();
-            int formHeight = parentForm.getHeight();
-            if (parentForm.getSoftButtonCount() > 1) {
-                Component c = parentForm.getSoftButton(0).getParent();
-                formHeight -= c.getHeight();
-                Style s = c.getStyle();
-                formHeight -= (s.getVerticalMargins());
-            }
+            int formHeight = parentForm.asContainer().getHeight();
+            // A window has no soft button bar, and asking a Form for one it does not
+            // have is what this used to spell out inline.
+            formHeight -= TopLevelSupport.softButtonAreaHeight(parentForm);
 
             if (listH < formHeight) {
                 switch (popupPlacement) {
@@ -495,7 +499,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
             }
 
             left = getAbsoluteX();
-            right = parentForm.getWidth() - left - listW;
+            right = parentForm.asContainer().getWidth() - left - listW;
             if (right < 0) {
                 left += right;
                 right = 0;
@@ -518,9 +522,13 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         l.dispatcher = dispatcher;
         l.eventSource = this;
         l.disposeDialogOnSelection = true;
-        Form parentForm = getComponentForm();
+        // The top level, not the form: inside a Window getComponentForm() is null by
+        // design, which turned the EDT violation guard below into a permanent one and
+        // made a combo box in a window inert. It still guards the violation it was
+        // written for.
+        TopLevelContainer parentForm = getTopLevelContainer();
 
-        // unlikely to ever happen but occurs on EDT violations 
+        // unlikely to ever happen but occurs on EDT violations
         // github.com/codenameone/CodenameOne/issues/4726
         if (parentForm == null) {
             return;
@@ -529,6 +537,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
         int tint = parentForm.getTintColor();
         parentForm.setTintColor(0);
         Dialog popupDialog = createPopupDialog(l);
+        popupDialog.setTopLevelHost(parentForm);
         int originalSel = getSelectedIndex();
         Form.comboLock = includeSelectCancel;
         float rr = Dialog.getDefaultBlurBackgroundRadius();

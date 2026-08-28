@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -175,12 +176,16 @@ public class InfiniteProgress extends Component {
     ///
     /// the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
     public Dialog showInfiniteBlocking() {
-        Form f = Display.getInstance().getCurrent();
+        // The top level the user is in, not the current form: on the desktop those
+        // differ, and the spinner was dimming the main window while the user waited in
+        // another one.
+        TopLevelContainer f = CN.getCurrentTopLevel();
         if (f == null) {
-            f = new Form();
-            f.show();
+            Form nf = new Form();
+            nf.show();
+            f = nf;
         }
-        if (f.getClientProperty("isInfiniteProgress") == null) {
+        if (f.asContainer().getClientProperty("isInfiniteProgress") == null) {
             f.setTintColor(tintColor);
         }
         Dialog d = new Dialog();
@@ -191,6 +196,7 @@ public class InfiniteProgress extends Component {
         d.addComponent(BorderLayout.CENTER, this);
         d.setTransitionInAnimator(CommonTransitions.createEmpty());
         d.setTransitionOutAnimator(CommonTransitions.createEmpty());
+        d.setTopLevelHost(f);
         d.showPacked(BorderLayout.CENTER, false);
         return d;
     }
@@ -206,13 +212,7 @@ public class InfiniteProgress extends Component {
     /// true when the surface holding this component is displayed
     private boolean isOnDisplayedTopLevel() {
         TopLevelContainer top = getTopLevelContainer();
-        if (top == null) {
-            return false;
-        }
-        if (top instanceof com.codename1.ui.Window) {
-            return ((com.codename1.ui.Window) top).isWindowShowing();
-        }
-        return Display.getInstance().getCurrent() == top; //NOPMD CompareObjectsWithEquals
+        return top != null && top.isTopLevelShowing();
     }
 
     /// {@inheritDoc}
