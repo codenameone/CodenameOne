@@ -17129,15 +17129,18 @@ static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
 
 void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
-// Not implemented on the native macOS port: the body below is UIKit -- a
-// picker, an action sheet, a movie player, a pasteboard or a UIApplication
-// service -- and AppKit's equivalent is a different API rather than a
-// renamed one. The symbol still has to exist: ParparVM keeps a native method
-// alive BY its symbol appearing in the native sources, so removing it would
-// make the dead-code pass drop the Java side and ship green with the feature
-// silently gone. Returning an unsupported value instead lets the caller take
-// its unsupported path.
 #if TARGET_OS_OSX
+    // The tree is not a UIKit structure -- it arrives as JSON that the framework
+    // builds for every port -- so the macOS side projects the same list onto
+    // NSAccessibilityElement instead of UIAccessibilityElement. See
+    // CN1MacAccessibility.m.
+    if (json == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    extern void CN1MacAccessibilityUpdateTree(NSString *json, int changeType);
+    CN1MacAccessibilityUpdateTree(toNSString(CN1_THREAD_STATE_PASS_ARG json), (int)changeType);
+    POOL_END();
 #else
     if (json == JAVA_NULL) return;
     POOL_BEGIN();
