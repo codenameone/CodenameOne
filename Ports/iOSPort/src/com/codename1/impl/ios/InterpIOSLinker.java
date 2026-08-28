@@ -205,6 +205,13 @@ public class InterpIOSLinker implements InterpLinker {
             throw new NoSuchMethodError(owner + ".<init>" + descriptor
                     + " is not present in the installed app");
         }
+        // A host constructor the installed framework has since made private
+        // is only callable from inside the declaring class; pushed code is
+        // not that. JVM raises IllegalAccessError -- the sidecar records the
+        // private bit, so mirror it here.
+        if (symbols.isPrivateMethod(id)) {
+            throw new IllegalAccessError(owner + ".<init>" + descriptor + " is private");
+        }
         // A constructor thunk allocates its own receiver and returns it,
         // which is why this passes no target and expects an object back.
         return invokeWithId(id, descriptor, null, args, K_OBJECT);
@@ -253,6 +260,13 @@ public class InterpIOSLinker implements InterpLinker {
         }
         if (!symbols.isStaticMethod(id)) {
             throw new IncompatibleClassChangeError(owner + "." + name + " is not static");
+        }
+        // Same shape as invokeInstance: a host static the installed
+        // framework has since made private is only callable from inside
+        // the declaring class; pushed code is not that. JVM raises
+        // IllegalAccessError.
+        if (symbols.isPrivateMethod(id)) {
+            throw new IllegalAccessError(owner + "." + name + " is private");
         }
         return invokeWithId(id, descriptor, null, args,
                 kindOf(InterpValuesAccess.returnType(descriptor)));
@@ -326,6 +340,7 @@ public class InterpIOSLinker implements InterpLinker {
             throw new NoSuchFieldError(owner + "." + name
                     + " is not present in the installed app");
         }
+        requireAccessibleField(fieldId, owner, name);
         int kind = kindOf(descriptor);
         long[] out = new long[1];
         Object ref = InterpIOSNative.getStaticById(fieldId, kind, out);
@@ -339,6 +354,7 @@ public class InterpIOSLinker implements InterpLinker {
             throw new NoSuchFieldError(owner + "." + name
                     + " is not present in the installed app");
         }
+        requireAccessibleField(fieldId, owner, name);
         int kind = kindOf(descriptor);
         InterpIOSNative.setStaticById(fieldId, kind,
                 kind == K_OBJECT ? 0 : rawOf(kind, value),
@@ -354,6 +370,7 @@ public class InterpIOSLinker implements InterpLinker {
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name);
         }
+        requireAccessibleField(fieldId, owner, name);
         int kind = kindOf(descriptor);
         long[] out = new long[1];
         Object ref = InterpIOSNative.getFieldById(fieldId, target, kind, out);
@@ -369,6 +386,7 @@ public class InterpIOSLinker implements InterpLinker {
         if (fieldId < 0) {
             throw new NoSuchFieldError(owner + "." + name);
         }
+        requireAccessibleField(fieldId, owner, name);
         int kind = kindOf(descriptor);
         InterpIOSNative.setFieldById(fieldId, target, kind,
                 kind == K_OBJECT ? 0 : rawOf(kind, value),
@@ -377,6 +395,17 @@ public class InterpIOSLinker implements InterpLinker {
 
     public boolean hasMethod(String owner, String name, String descriptor) {
         return symbols.methodId(owner, name, descriptor) >= 0;
+    }
+
+    // A host field the installed framework has since narrowed to private
+    // is only readable/writable from inside the declaring class; pushed
+    // code is not that. Reaching through the native accessor here would
+    // otherwise let stale bytecode read or write past the JVM's access
+    // check. The sidecar's optional access-flags column tells us this.
+    private void requireAccessibleField(int fieldId, String owner, String name) {
+        if (symbols.isPrivateField(fieldId)) {
+            throw new IllegalAccessError(owner + "." + name + " is private");
+        }
     }
 
     public boolean isInstance(Object hostClass, Object value) {

@@ -467,6 +467,13 @@ public class ReflectionInterpLinker implements InterpLinker {
         if (!Modifier.isStatic(m.getModifiers())) {
             throw new IncompatibleClassChangeError(owner + "." + name + " is not static");
         }
+        // Same shape as invokeVirtual: a host static the installed framework
+        // has since made private is only callable from inside the declaring
+        // class; pushed code is not that. setAccessible(true) would otherwise
+        // silently execute the private declaration.
+        if (Modifier.isPrivate(m.getModifiers())) {
+            throw new IllegalAccessError(owner + "." + name + " is private");
+        }
         try {
             return m.invoke(null, args);
         } catch (InvocationTargetException e) {

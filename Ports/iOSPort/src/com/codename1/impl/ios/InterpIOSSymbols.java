@@ -81,6 +81,19 @@ class InterpIOSSymbols {
      */
     private final Hashtable privateMethods = new Hashtable();
 
+    /**
+     * Field ids the sidecar marked as private (JDWP flag 0x0002 in the
+     * optional 6th column of a field/sfield row).
+     *
+     * <p>A host field the installed framework has since narrowed to private
+     * is only readable/writable from inside the declaring class. Pushed code
+     * never is, so every GETFIELD/PUTFIELD/GETSTATIC/PUTSTATIC on a private
+     * host field is IllegalAccessError under the JVM. The linker consults
+     * this and rejects the access rather than reaching through the generated
+     * native accessor.</p>
+     */
+    private final Hashtable privateFields = new Hashtable();
+
     /** "owner#name" -> instance field id. */
     private final Hashtable fieldIds = new Hashtable();
 
@@ -230,7 +243,9 @@ class InterpIOSSymbols {
                     // field's type but kept the name would otherwise bind and
                     // the caller would read a primitive slot as an object
                     // reference (or the other way).
-                    fieldIds.put(ownerName + "#" + p[3] + "#" + p[4], Integer.valueOf(p[2]));
+                    Integer fieldId = Integer.valueOf(p[2]);
+                    fieldIds.put(ownerName + "#" + p[3] + "#" + p[4], fieldId);
+                    rememberFieldFlags(fieldId, p);
                 }
             }
         } else if (table.charAt(start) == 's' && table.startsWith("sfield\t", start)) {
@@ -238,12 +253,39 @@ class InterpIOSSymbols {
             if (p.length >= 5) {
                 String ownerName = (String)classNames.get(Integer.valueOf(p[1]));
                 if (ownerName != null) {
-                    staticFieldIds.put(ownerName + "#" + p[3] + "#" + p[4], Integer.valueOf(p[2]));
+                    Integer fieldId = Integer.valueOf(p[2]);
+                    staticFieldIds.put(ownerName + "#" + p[3] + "#" + p[4], fieldId);
+                    rememberFieldFlags(fieldId, p);
                     if (oneStaticField.get(ownerName) == null) {
                         oneStaticField.put(ownerName, p[2] + "|" + p[4]);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Records the private bit from the sidecar row's optional access-flags
+     * column (index 5, jdwpAccessFlagsOf format).
+     *
+     * <p>Older sidecars ended at column 4 -- absence of the column reads as
+     * "not private", which is what a non-private field's row would say and
+     * what the pre-flags behaviour amounted to; a stale field the installed
+     * framework has since narrowed to private wants the check regardless of
+     * sidecar age, but we cannot invent facts we do not have.</p>
+     */
+    private void rememberFieldFlags(Integer fieldId, String[] p) {
+        if (p.length < 6) {
+            return;
+        }
+        try {
+            int flags = Integer.parseInt(p[5]);
+            if ((flags & 0x0002) != 0) {
+                privateFields.put(fieldId, Boolean.TRUE);
+            }
+        } catch (NumberFormatException ignore) {
+            // A malformed flags column is not worth failing symbol load
+            // over; the field just gets no private-check enforcement.
         }
     }
 
@@ -532,6 +574,11 @@ class InterpIOSSymbols {
     /** True when the sidecar marked this id as a private method. */
     boolean isPrivateMethod(int id) {
         return privateMethods.get(Integer.valueOf(id)) != null;
+    }
+
+    /** True when the sidecar marked this field id as private. */
+    boolean isPrivateField(int id) {
+        return privateFields.get(Integer.valueOf(id)) != null;
     }
 
     /**

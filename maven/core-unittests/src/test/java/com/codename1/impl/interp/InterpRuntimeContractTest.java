@@ -473,6 +473,33 @@ class InterpRuntimeContractTest {
     }
 
     /**
+     * Same shape for statics: a host static method the installed framework
+     * has since narrowed to private is only callable from inside the
+     * declaring class; pushed code is not that, so
+     * <code>invokeStatic</code> raises <code>IllegalAccessError</code> too.
+     */
+    @Test
+    @DisplayName("static invocation refuses a static method that became private")
+    void staticInvocationRefusesAMethodThatBecamePrivate() throws Throwable {
+        ReflectionInterpLinker linker = new ReflectionInterpLinker();
+        try {
+            linker.invokeStatic(
+                    "com/codename1/impl/interp/InterpRuntimeContractTest$NowPrivateStatic",
+                    "run", "()V", new Object[0]);
+            throw new AssertionError("static bind to a private method should have been refused");
+        } catch (IllegalAccessError expected) {
+            // JVMS 5.4.4 -- invokestatic from outside the declaring class of
+            // a private method is IllegalAccessError.
+        }
+    }
+
+    static class NowPrivateStatic {
+        @SuppressWarnings("unused")
+        private static void run() {
+        }
+    }
+
+    /**
      * A field that changed instance/static between the bundle's compile and
      * the installed framework must not bind through the opposite access
      * opcode: <code>Field.get(target)</code> silently ignores the receiver
