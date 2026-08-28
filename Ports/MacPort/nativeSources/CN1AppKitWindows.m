@@ -1511,7 +1511,17 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macWindowWatchScreens__(CODENAME_ONE_
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macMonitorCount___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
-    return (int)[NSScreen screens].count;
+    // On the main thread, like every other AppKit call in this file -- see
+    // cn1OnMain. These monitor getters are reached from Desktop.getMonitors() on
+    // the event dispatch thread, which is not AppKit's main thread on this port,
+    // and NSScreen is no more thread safe than the window calls below it that
+    // have always marshalled. A display reconfiguration landing between the
+    // count and the queries that follow it is the race this closes.
+    __block int count = 0;
+    cn1OnMain(^{
+        count = (int)[NSScreen screens].count;
+    });
+    return count;
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macPrimaryMonitor___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
@@ -1528,42 +1538,75 @@ JAVA_VOID com_codename1_impl_mac_MacNative_macMonitorBounds___int_boolean_int_1A
     if (arr->length < 4) {
         return;
     }
-    NSScreen *screen = cn1ScreenAt(monitor);
-    if (screen == nil) {
+    // The whole lookup inside one hop, not four: the screen, its rectangle and
+    // the desktop scale have to describe the same moment, and a reconfiguration
+    // between them would place a window using one display's origin and another's
+    // scale. The Java array is filled afterwards -- writing to it needs no
+    // particular thread, and keeping it out of the block keeps the AppKit
+    // section to AppKit.
+    // Four scalars rather than an int[4]: a block cannot capture an array.
+    __block BOOL found = NO;
+    __block int x = 0;
+    __block int y = 0;
+    __block int w = 0;
+    __block int h = 0;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen == nil) {
+            return;
+        }
+        NSRect r = workArea != 0 ? screen.visibleFrame : screen.frame;
+        NSRect topLeft = cn1FromAppKitFrame(r);
+        // One scale for the whole desktop, not this screen's own -- see
+        // cn1DesktopScale. Per screen, the reported rectangles overlap on a
+        // mixed-DPI setup and a window placed at a monitor's origin lands on the
+        // wrong display.
+        CGFloat scale = cn1DesktopScale();
+        x = (int)(topLeft.origin.x * scale);
+        y = (int)(topLeft.origin.y * scale);
+        w = (int)(topLeft.size.width * scale);
+        h = (int)(topLeft.size.height * scale);
+        found = YES;
+    });
+    if (!found) {
         return;
     }
-    NSRect r = workArea != 0 ? screen.visibleFrame : screen.frame;
-    NSRect topLeft = cn1FromAppKitFrame(r);
-    // One scale for the whole desktop, not this screen's own -- see
-    // cn1DesktopScale. Per screen, the reported rectangles overlap on a
-    // mixed-DPI setup and a window placed at a monitor's origin lands on the
-    // wrong display.
-    CGFloat scale = cn1DesktopScale();
     JAVA_ARRAY_INT *data = (JAVA_ARRAY_INT *)arr->data;
-    data[0] = (int)(topLeft.origin.x * scale);
-    data[1] = (int)(topLeft.origin.y * scale);
-    data[2] = (int)(topLeft.size.width * scale);
-    data[3] = (int)(topLeft.size.height * scale);
+    data[0] = x;
+    data[1] = y;
+    data[2] = w;
+    data[3] = h;
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macMonitorDpi___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
-    NSScreen *screen = cn1ScreenAt(monitor);
-    if (screen == nil) {
-        return 96;
-    }
-    NSValue *res = [screen.deviceDescription objectForKey:NSDeviceResolution];
-    if (res == nil) {
-        return 96;
-    }
-    // NSDeviceResolution is in dots per inch of the backing store already, so it
-    // does not want the backing scale applied on top of it.
-    NSSize dpi = [res sizeValue];
-    return dpi.width > 0 ? (int)dpi.width : 96;
+    __block int dpiWidth = 96;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen == nil) {
+            return;
+        }
+        NSValue *res = [screen.deviceDescription objectForKey:NSDeviceResolution];
+        if (res == nil) {
+            return;
+        }
+        // NSDeviceResolution is in dots per inch of the backing store already, so
+        // it does not want the backing scale applied on top of it.
+        NSSize dpi = [res sizeValue];
+        if (dpi.width > 0) {
+            dpiWidth = (int)dpi.width;
+        }
+    });
+    return dpiWidth;
 }
 
 JAVA_INT com_codename1_impl_mac_MacNative_macMonitorScaleTimes100___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
-    NSScreen *screen = cn1ScreenAt(monitor);
-    CGFloat scale = screen != nil ? screen.backingScaleFactor : 1;
+    __block CGFloat scale = 1;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen != nil) {
+            scale = screen.backingScaleFactor;
+        }
+    });
     return (int)(scale * 100);
 }
 
@@ -1587,10 +1630,23 @@ JAVA_INT com_codename1_impl_mac_MacNative_macMonitorForMainWindow___R_int(CODENA
 }
 
 JAVA_OBJECT com_codename1_impl_mac_MacNative_macMonitorName___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT monitor) {
-    NSScreen *screen = cn1ScreenAt(monitor);
-    NSString *name = screen != nil ? screen.localizedName : nil;
+    // Copied out rather than read across the hop: the string AppKit hands back
+    // is autoreleased into the MAIN thread's pool, which is not this thread's,
+    // so holding the pointer past the block is holding something another thread
+    // may already have drained.
+    __block NSString *name = nil;
+    cn1OnMain(^{
+        NSScreen *screen = cn1ScreenAt(monitor);
+        if (screen != nil && screen.localizedName != nil) {
+            name = [screen.localizedName copy];
+        }
+    });
     if (name == nil) {
         return JAVA_NULL;
     }
-    return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG name);
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG name);
+#ifndef CN1_USE_ARC
+    [name release];
+#endif
+    return result;
 }

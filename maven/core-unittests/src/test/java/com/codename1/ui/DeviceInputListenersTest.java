@@ -223,4 +223,36 @@ class DeviceInputListenersTest extends UITestBase {
         assertNotNull(radiansGot.get(), "rotation gesture should reach the component rotation callback");
         assertEquals(0.25f, radiansGot.get(), 0.0001f);
     }
+
+    /// A producer with no gesture phases must leave nothing behind.
+    ///
+    /// Display is a singleton, and Windows, Linux and JavaSE report magnification
+    /// through Desktop.windowMagnifyGesture alone -- no begin, no release. A
+    /// claim recorded for them would never be read and never cleared, so the
+    /// component that consumed one pinch, and the whole form hierarchy behind
+    /// it, would stay reachable from the singleton for the life of the process,
+    /// surviving every navigation away from it.
+    @FormTest
+    void aPhaselessMagnifyGestureRetainsNothing() throws Exception {
+        Form form = Display.getInstance().getCurrent();
+        form.setLayout(new BorderLayout());
+        Container gestureCmp = new Container() {
+            @Override
+            protected boolean pinch(float scale) {
+                return true;
+            }
+        };
+        gestureCmp.setPreferredSize(new Dimension(200, 120));
+        form.add(BorderLayout.CENTER, gestureCmp);
+        form.revalidate();
+
+        Display.getInstance().fireMagnifyGesture(
+                gestureCmp.getAbsoluteX() + gestureCmp.getWidth() / 2,
+                gestureCmp.getAbsoluteY() + gestureCmp.getHeight() / 2, 1.5f);
+
+        java.lang.reflect.Field held = Display.class.getDeclaredField("pinchGestureTarget");
+        held.setAccessible(true);
+        assertNull(held.get(Display.getInstance()),
+                "a gesture with no reported begin must not leave a component held");
+    }
 }

@@ -8636,13 +8636,18 @@ public final class Display extends CN1Constants {
         }
         while (cmp != null) {
             if (cmp.pinch(scale)) {
+                // Recorded ONLY inside a reported gesture. A producer with no
+                // phases never calls firePinchReleaseGesture, so nothing would
+                // ever read this field or clear it -- and Display is a singleton,
+                // so the component and the form hierarchy behind it would be
+                // pinned for the life of the process, surviving every navigation
+                // away from it. Windows, Linux and JavaSE are exactly that kind
+                // of producer: they call Desktop.windowMagnifyGesture and
+                // nothing else.
+                //
+                // Recording it for them bought nothing even before the leak: the
+                // release it was meant to route never arrives.
                 if (pinchGestureActive) {
-                    pinchGestureTarget = cmp;
-                } else if (pinchGestureTarget == null) {
-                    // No begin was reported, so the claim cannot be scoped to a
-                    // gesture. Recording the first consumer still routes the
-                    // release to whoever started it, which is the half that needs
-                    // no scoping.
                     pinchGestureTarget = cmp;
                 }
                 return;
