@@ -155,8 +155,8 @@ final class MacCameraCapture {
         // Declared before Cancel so that cancelling mid-recording can reach it.
         // Closing the session stops the capture but does not finish the file the
         // recorder had already started writing, so a cancelled recording left a
-        // part-written mp4 in the application home for ever -- and the callback
-        // said "cancelled", so nothing downstream knew to clean it up.
+        // part-written recording in the application home for ever -- and the
+        // callback said "cancelled", so nothing downstream knew to clean it up.
         final VideoRecording[] recording = {null};
 
         cancel.addActionListener(new ActionListener() {
@@ -172,7 +172,16 @@ final class MacCameraCapture {
                 @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (recording[0] == null) {
-                        String path = tempFile("mp4");
+                        // mov, because that is what the bytes are. The backend
+                        // records through AVCaptureMovieFileOutput, which writes
+                        // a QuickTime container and honours whatever extension
+                        // it is handed -- its own comment says so. Asking for
+                        // mp4 therefore produced QuickTime bytes under a name
+                        // that misdescribed them, and anything deriving a MIME
+                        // type, a decoder or upload metadata from the extension
+                        // this API documents itself as returning got the wrong
+                        // answer.
+                        String path = tempFile("mov");
                         if (path == null) {
                             finish(finished, session, previous, response, null);
                             return;
@@ -188,6 +197,16 @@ final class MacCameraCapture {
                         capture.revalidate();
                         return;
                     }
+                    // Disabled the moment finalization starts, exactly as the
+                    // photo branch below does before its own await. A second
+                    // Stop click ran stopAndAwait() against a recording that had
+                    // already stopped; it resolved immediately with the same
+                    // path, finish() reported success and set finished[0], and
+                    // the FIRST stop's callback then took the finished[0] branch
+                    // and deleted the file it had just finalized. The
+                    // application was left holding a path to nothing, and the
+                    // capture had reported success.
+                    shutter.setEnabled(false);
                     recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
                         @Override
                         public void onSucess(String path) {
