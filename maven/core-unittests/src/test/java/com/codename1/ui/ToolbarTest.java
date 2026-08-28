@@ -593,6 +593,97 @@ class ToolbarTest extends UITestBase {
         flushSerialCalls();
     }
 
+    /// An app may call the public refreshTheme on the toolbar itself, with no
+    /// form traversal behind it. An open menu is attached to the form at that
+    /// moment, but nothing else is going to refresh it, so the toolbar has to.
+    @FormTest
+    void openOnTopSideMenuFollowsDirectToolbarRefresh() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        assertTrue(toolbar.isSideMenuShowing(), "The side menu should be open");
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+        assertEquals(LIGHT_COLOR, b.getUnselectedStyle().getFgColor(), "Light theme should apply");
+
+        Display.getInstance().setDarkMode(Boolean.TRUE);
+        UIManager.getInstance().refreshTheme();
+        toolbar.refreshTheme(true);
+        flushSerialCalls();
+
+        assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
+                "Refreshing the toolbar directly must reach the open side menu");
+
+        toolbar.closeSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+    }
+
+    /// The side menu is refreshed whether or not the form walk already covered
+    /// it, which only works because a merging refresh is idempotent: it keeps
+    /// the modified attributes an app set in code and re-resolves the rest.
+    /// If that ever stops holding, the fix above starts corrupting styles.
+    @FormTest
+    void repeatedMergingRefreshIsIdempotent() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+        int inCodePadding = 17;
+        b.getAllStyles().setPadding(inCodePadding, inCodePadding, inCodePadding, inCodePadding);
+
+        Display.getInstance().setDarkMode(Boolean.TRUE);
+        UIManager.getInstance().refreshTheme();
+        form.refreshTheme(true);
+        flushSerialCalls();
+
+        int afterFirst = b.getUnselectedStyle().getFgColor();
+        assertEquals(DARK_COLOR, afterFirst, "The first refresh should apply the dark theme");
+        assertEquals(inCodePadding, b.getUnselectedStyle().getPaddingTop(),
+                "A refresh must keep the padding the app set in code");
+
+        for (int iter = 0; iter < 3; iter++) {
+            form.refreshTheme(true);
+            flushSerialCalls();
+        }
+
+        assertEquals(afterFirst, b.getUnselectedStyle().getFgColor(),
+                "Repeating the refresh must not change the resolved theme value");
+        assertEquals(inCodePadding, b.getUnselectedStyle().getPaddingTop(),
+                "Repeating the refresh must not drop the padding the app set in code");
+    }
+
     /// The permanent side menu is part of the form, so it was never broken. The
     /// fix must not double refresh it.
     @FormTest

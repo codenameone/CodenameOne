@@ -3047,37 +3047,37 @@ public class Toolbar extends Container {
     /// the form, so while the menu is closed -- which is whenever the user is
     /// looking at the form and flipping the theme -- nothing re-resolves its
     /// styles and it re-opens painted in the previous theme until the app is
-    /// restarted (issue #5612). Refresh the detached menu explicitly. A menu
-    /// that happens to be open sits in the form's layered pane and is already
-    /// covered by the form's own traversal, so it is skipped here rather than
-    /// merged twice.
+    /// restarted (issue #5612).
+    ///
+    /// The menu is refreshed here whether or not it is currently attached.
+    /// Attachment would only prove that a form walk *could* reach it, not that
+    /// this call came from one: `refreshTheme` is public, and an app that calls
+    /// it on the toolbar while the menu is open gets no form traversal at all.
+    /// Refreshing an attached menu a second time costs nothing and changes
+    /// nothing -- a merge preserves the style's modified flags, so it resolves
+    /// to the same values -- and the toolbar's own subtree has always been
+    /// refreshed twice anyway, because `Form#refreshTheme(boolean)` calls this
+    /// method and then walks the form that the toolbar is a child of.
     @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if (sidemenuDialog != null) {
-            refreshDetachedSideMenu(sidemenuDialog, merge);
-        } else {
-            refreshDetachedSideMenu(permanentSideMenuContainer, merge);
-        }
-        if (rightSidemenuDialog != null) {
-            refreshDetachedSideMenu(rightSidemenuDialog, merge);
-        } else {
-            refreshDetachedSideMenu(permanentRightSideMenuContainer, merge);
-        }
+        refreshSideMenuTheme(sidemenuDialog != null
+                ? sidemenuDialog : permanentSideMenuContainer, merge);
+        refreshSideMenuTheme(rightSidemenuDialog != null
+                ? rightSidemenuDialog : permanentRightSideMenuContainer, merge);
     }
 
-    /// Re-resolves the styles of a side menu container that is currently outside
-    /// of any form. Attached containers are left alone: they are reached by the
-    /// form's own refresh pass and refreshing them again would merge the new
-    /// theme on top of itself.
+    /// Re-resolves the styles of one side menu container and lays it out again,
+    /// so that a font or padding change is applied the next time it is shown
+    /// rather than on the first interaction after that.
     ///
     /// #### Parameters
     ///
-    /// - `cnt`: the side menu container, may be null when the menu was never built
+    /// - `cnt`: the side menu container, null when that menu was never built
     ///
     /// - `merge`: passed through to `Component#refreshTheme(boolean)`
-    private void refreshDetachedSideMenu(Container cnt, boolean merge) {
-        if (cnt == null || cnt.getComponentForm() != null) {
+    private void refreshSideMenuTheme(Container cnt, boolean merge) {
+        if (cnt == null) {
             return;
         }
         cnt.refreshTheme(merge);
