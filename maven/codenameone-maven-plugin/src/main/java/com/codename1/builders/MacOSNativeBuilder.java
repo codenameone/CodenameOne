@@ -276,7 +276,6 @@ public class MacOSNativeBuilder extends Executor {
         final boolean[] usesLocalNotifications = {false};
         final boolean[] usesMicrophone = {false};
         final boolean[] usesBluetooth = {false};
-        final boolean[] usesVision = {false};
         final boolean[] usesCalendar = {false};
         final boolean[] usesPush = {false};
         final boolean[] usesLocation = {false};
@@ -284,7 +283,7 @@ public class MacOSNativeBuilder extends Executor {
         try {
             scanClassesForPermissions(classesDir, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation, usesAppReview, usesVision));
+                    usesLocation, usesAppReview));
             // btres too, for the reason the capability scan reads it: unzip routes a
             // submitted cn1lib's jar there rather than unpacking it beside the loose
             // classes. A library that is the only thing calling SecureRandom left
@@ -293,7 +292,7 @@ public class MacOSNativeBuilder extends Executor {
             // returns a constant is the worst failure in this file.
             scanClassesForPermissions(buildinRes, new NativeFeatureScanner(usesCrypto,
                     usesLocalNotifications, usesMicrophone, usesBluetooth, usesCalendar, usesPush,
-                    usesLocation, usesAppReview, usesVision));
+                    usesLocation, usesAppReview));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan the application for native feature usage", ex);
         }
@@ -381,7 +380,6 @@ public class MacOSNativeBuilder extends Executor {
         boolean pushEnabled = usesPush[0];
         boolean microphoneEnabled = usesMicrophone[0];
         boolean bluetoothEnabled = usesBluetooth[0];
-        boolean visionEnabled = usesVision[0];
         boolean calendarEnabled = usesCalendar[0];
         boolean locationEnabled = usesLocation[0];
         boolean appReviewEnabled = usesAppReview[0];
@@ -564,28 +562,6 @@ public class MacOSNativeBuilder extends Executor {
             extraFrameworks.add("CoreBluetooth.framework");
         }
         log("Bluetooth " + (bluetoothEnabled ? "enabled" : "disabled"));
-        if (visionEnabled) {
-            File controllerHeader = new File(nativeSources, "CodenameOne_GLViewController.h");
-            if (!controllerHeader.exists()) {
-                throw new BuildException("The application uses com.codename1.ai.vision but "
-                        + "CodenameOne_GLViewController.h is missing from the staged native "
-                        + "sources at " + controllerHeader.getAbsolutePath());
-            }
-            try {
-                replaceInFile(controllerHeader, "//#define INCLUDE_CN1_VISION",
-                        "#define INCLUDE_CN1_VISION");
-            } catch (Exception ex) {
-                throw new BuildException("Failed to enable the vision backend", ex);
-            }
-            // The same three the iOS builder links. Without them CN1Vision.m
-            // compiles its fallback branch and cn1VisionIsSupported() answers
-            // false, so OCR, barcode scanning and face detection all report
-            // unsupported on a build that carries the code for them.
-            extraFrameworks.add("Vision.framework");
-            extraFrameworks.add("CoreImage.framework");
-            extraFrameworks.add("CoreVideo.framework");
-        }
-        log("Vision " + (visionEnabled ? "enabled" : "disabled"));
         if (calendarEnabled) {
             File iosNative = new File(nativeSources, "IOSNative.m");
             if (!iosNative.exists()) {
@@ -1279,7 +1255,6 @@ public class MacOSNativeBuilder extends Executor {
 
         private final boolean[] usesMicrophone;
         private final boolean[] usesBluetooth;
-        private final boolean[] usesVision;
         private final boolean[] usesCalendar;
         private final boolean[] usesPush;
         private final boolean[] usesLocation;
@@ -1287,12 +1262,11 @@ public class MacOSNativeBuilder extends Executor {
 
         NativeFeatureScanner(boolean[] usesCrypto, boolean[] usesLocalNotifications,
                 boolean[] usesMicrophone, boolean[] usesBluetooth, boolean[] usesCalendar,
-                boolean[] usesPush, boolean[] usesLocation, boolean[] usesAppReview, boolean[] usesVision) {
+                boolean[] usesPush, boolean[] usesLocation, boolean[] usesAppReview) {
             this.usesCrypto = usesCrypto;
             this.usesLocalNotifications = usesLocalNotifications;
             this.usesMicrophone = usesMicrophone;
             this.usesBluetooth = usesBluetooth;
-            this.usesVision = usesVision;
             this.usesCalendar = usesCalendar;
             this.usesPush = usesPush;
             this.usesLocation = usesLocation;
@@ -1332,9 +1306,13 @@ public class MacOSNativeBuilder extends Executor {
             // the define is on -- so an application referencing any of them
             // reported "vision unsupported" at run time on a build that had
             // linked nothing to support it.
-            if (cls.startsWith("com/codename1/ai/vision/")) {
-                usesVision[0] = true;
-            }
+                // No vision detection here. INCLUDE_CN1_VISION cannot simply be
+                // flipped on this target: CN1Vision.m declares #error unless it
+                // is compiled with -fobjc-arc, and this port compiles without
+                // ARC, and it reads UIImage.CGImage, which NSImage does not
+                // have. Enabling it produced a project that does not build.
+                // Porting the file -- a per-file ARC flag and an NSImage to
+                // CGImage bridge -- is its own change.
 
             if (cls.startsWith("com/codename1/calendar/LocalCalendarSource")) {
                 usesCalendar[0] = true;
