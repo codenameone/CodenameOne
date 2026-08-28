@@ -131,8 +131,25 @@ public class InterpBundleWriter {
      * allowance for downloaded educational code is conditional on the user
      * being able to see and edit what runs, so this is enforced rather than
      * documented.
+     *
+     * <p>Two source roots may legally contain a same-key file whose contents
+     * differ -- javac lets two files named {@code Common.java} in package
+     * {@code p} each declare a different package-private class, so both
+     * produce a class whose {@code SourceFile} attribute names
+     * {@code Common.java} even though only one of the two files carries any
+     * given class's real source. Silently letting the last root win would
+     * make {@code requireSourcesFor} pass with the wrong text on screen,
+     * which is exactly the guarantee guideline 2.5.2 asks for. Fail loudly
+     * -- the loser's class has no correct source in the bundle, so the
+     * bundle cannot ship.</p>
      */
     public void addSource(String fileName, String text) {
+        String existing = sources.get(fileName);
+        if (existing != null && !existing.equals(text)) {
+            throw new IllegalStateException("two source roots supply a different "
+                    + fileName + "; the bundle cannot ship both -- one class's "
+                    + "declared SourceFile would name the other's contents");
+        }
         sources.put(fileName, text);
     }
 

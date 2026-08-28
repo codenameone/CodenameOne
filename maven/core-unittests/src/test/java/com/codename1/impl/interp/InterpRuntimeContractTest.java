@@ -1108,6 +1108,35 @@ class InterpRuntimeContractTest {
         assertTrue(bundle.getSource("b/Util.java").contains("package b;"));
     }
 
+    /// Two source roots may legally contain a same-key file whose contents
+    /// differ -- javac lets two `Common.java` in `p` each declare a different
+    /// package-private class, so both produce a class whose `SourceFile`
+    /// attribute names `Common.java` even though only one of the two files
+    /// carries any given class's real source. Silently letting the last root
+    /// win would make `requireSourcesFor` pass with the wrong text on screen,
+    /// exactly the guarantee guideline 2.5.2 asks for. The writer refuses
+    /// rather than shipping a bundle where one class's `SourceFile` names
+    /// the other's contents.
+    @Test
+    @DisplayName("colliding source keys across roots are refused")
+    void collidingSourceKeysAcrossRootsAreRefused() throws Exception {
+        Class<?> writerClass = Class.forName("com.codename1.tools.translator.InterpBundleWriter");
+        Object writer = writerClass.getDeclaredConstructor().newInstance();
+        java.lang.reflect.Method addSource =
+                writerClass.getMethod("addSource", String.class, String.class);
+        addSource.invoke(writer, "p/Common.java", "package p; class A {}");
+        try {
+            addSource.invoke(writer, "p/Common.java", "package p; class B {}");
+            throw new AssertionError("colliding source should have been refused");
+        } catch (java.lang.reflect.InvocationTargetException wrapped) {
+            Throwable cause = wrapped.getCause();
+            assertTrue(cause instanceof IllegalStateException,
+                    "expected IllegalStateException, got " + cause);
+            assertTrue(cause.getMessage().contains("p/Common.java"),
+                    "the message should name the file, was: " + cause.getMessage());
+        }
+    }
+
     /// A source file goes to the source section, not to both.
     ///
     /// `addResourceTree` used to reject only `.java`, so a Kotlin project's
