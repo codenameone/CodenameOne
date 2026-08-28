@@ -191,6 +191,17 @@ public @interface Mac {
     /// the bundle zipped with `ditto` rather than the raw `.app` directory.
     String packaging() default "";
 
+    /// macOS builds. Which native theme the application installs: `modern`
+    /// (equivalently `liquid` or `material`) or `ios7` (equivalently `flat`).
+    /// Defaults to `modern`, which is where this target parts company with iOS --
+    /// iOS keeps the legacy theme by default so that applications already
+    /// shipped, and their screenshot baselines, are not disturbed. There is no
+    /// such history here, and the legacy theme defines no dark styles at all, so
+    /// an application on it renders light however it asks for dark. The
+    /// cross-platform `nativeTheme` hint is honoured when this is unset, with
+    /// `legacy` mapping to `ios7`.
+    String themeMode() default "";
+
     /// macOS builds. Raw XML members added to the generated `Info.plist`, the
     /// same form `ios.plistInject` takes -- for example
     /// `<key>NSAppTransportSecurity</key><dict/>`. A key that the build also

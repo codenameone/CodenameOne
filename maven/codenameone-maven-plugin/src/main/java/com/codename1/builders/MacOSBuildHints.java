@@ -493,6 +493,47 @@ public class MacOSBuildHints {
                 source.get("ios.bundleVersion", applicationVersion));
     }
 
+    /**
+     * Which native theme the generated stub installs, as
+     * IOSImplementation.setIosMode() takes it.
+     *
+     * <p>{@code modern} by DEFAULT, which is where macOS parts company with iOS.
+     * iOS defaults to {@code auto} and therefore to the legacy iOS 7 theme
+     * deliberately, so that existing applications and their screenshot goldens
+     * are not disturbed. This port has neither: it has never shipped, so there
+     * is nothing to disturb, and defaulting it to a pre-flat iOS theme would
+     * give a brand new macOS port an iPhone 7 look and -- because iOS7Theme.res
+     * carries no $Dark styles at all -- no dark mode whatsoever, however
+     * carefully the application asks for one.</p>
+     *
+     * <p>{@code macos.themeMode} names it directly, the legacy macNative.
+     * spelling is accepted like every other setting here, and the cross platform
+     * {@code nativeTheme} meta hint is honoured with the same legacy/modern
+     * translation IPhoneBuilder applies.</p>
+     */
+    public String getThemeMode() {
+        String mode = hint(source, "themeMode", null);
+        if (mode == null) {
+            String shared = source.get("nativeTheme", source.get("cn1.nativeTheme", null));
+            mode = "legacy".equalsIgnoreCase(shared) ? "ios7" : "modern";
+        }
+        // Interpolated into generated Java source, so it is constrained to the
+        // vocabulary the runtime understands rather than passed through. A hint
+        // reaching a source file is an injection site, and this one comes
+        // straight from an uploaded settings file.
+        for (int iter = 0; iter < THEME_MODES.length; iter++) {
+            if (THEME_MODES[iter].equalsIgnoreCase(mode)) {
+                return THEME_MODES[iter];
+            }
+        }
+        return "modern";
+    }
+
+    /// Every value IOSImplementation.installNativeTheme() acts on.
+    private static final String[] THEME_MODES = {
+        "modern", "liquid", "material", "ios7", "flat", "auto",
+    };
+
     public String getFixedWindowSize() {
         return fixedWindowSize;
     }

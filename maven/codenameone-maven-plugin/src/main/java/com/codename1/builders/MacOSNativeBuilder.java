@@ -576,7 +576,7 @@ public class MacOSNativeBuilder extends Executor {
         deleteRecursive(stubSource);
         stubSource.mkdirs();
         try {
-            writeStub(request, stubSource, classesDir);
+            writeStub(request, stubSource, classesDir, hints);
         } catch (BuildException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -697,7 +697,9 @@ public class MacOSNativeBuilder extends Executor {
      * ships in both ports, and the transitions it declares are the ones
      * CN1MacAppDelegate reports.</p>
      */
-    private void writeStub(BuildRequest request, File stubSource, File classesDir) throws Exception {
+    private void writeStub(BuildRequest request, File stubSource, File classesDir,
+            MacOSBuildHints hints) throws Exception {
+        String themeMode = hints.getThemeMode();
         String svgRegistryInstall = new File(classesDir,
                 "com/codename1/generated/svg/SVGRegistry.class").isFile()
                 ? "            com.codename1.generated.svg.SVGRegistry.installGlobal();\n"
@@ -780,6 +782,16 @@ public class MacOSNativeBuilder extends Executor {
                 + "        }\n"
                 + "        " + stubName + " stub = new " + stubName + "();\n"
                 + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
+                // Before Display.init, which is what triggers
+                // installNativeTheme(). Without it the mode stays at the
+                // runtime default of "auto" and the port loads
+                // iOS7Theme.res -- which carries no $Dark styles at all, so
+                // UIManager.shouldUseDarkStyle() can never answer true and
+                // every dark-mode screen renders light no matter what the
+                // application asks for. IPhoneBuilder has always emitted
+                // this call; this builder was written without it.
+                + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\""
+                + themeMode + "\");\n"
                 + routeDispatcherInstallSource(null, "        ")
                 + "        Display.init(stub);\n"
                 + "    }\n"

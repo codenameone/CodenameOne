@@ -348,6 +348,35 @@ public class MacOSBuildHintsTest {
         assertEquals("1.0", parse(raw(), "p").getBundleVersion("1.0"));
     }
 
+    /// macOS defaults to the MODERN native theme, unlike iOS.
+    ///
+    /// iOS defaults to the legacy iOS 7 theme on purpose, so shipped apps and
+    /// their goldens are not disturbed. This port has never shipped, so there is
+    /// nothing to disturb -- and iOS7Theme.res carries no $Dark styles at all,
+    /// so defaulting to it gave a new macOS port an iPhone 7 look and no dark
+    /// mode whatsoever, however carefully the application asked for one. That is
+    /// what made every *_dark screenshot come out light.
+    @Test
+    public void theNativeThemeDefaultsToModernAndIsConstrainedToKnownModes() {
+        assertEquals("modern", parse(raw(), "p").getThemeMode());
+        assertEquals("ios7", parse(raw("macos.themeMode", "ios7"), "p").getThemeMode());
+        assertEquals("ios7", parse(raw("macNative.themeMode", "ios7"), "p").getThemeMode());
+
+        // The cross-platform meta hint, translated the way IPhoneBuilder
+        // translates it.
+        assertEquals("ios7", parse(raw("nativeTheme", "legacy"), "p").getThemeMode());
+        assertEquals("modern", parse(raw("nativeTheme", "modern"), "p").getThemeMode());
+        assertEquals("ios7", parse(raw("cn1.nativeTheme", "legacy"), "p").getThemeMode());
+
+        // The value is interpolated into generated Java source, so it is
+        // constrained to what the runtime understands rather than passed
+        // through. A settings file is an upload, and a source file is an
+        // injection site.
+        assertEquals("modern",
+                parse(raw("macos.themeMode", "\"); System.exit(1); //"), "p").getThemeMode());
+        assertEquals("modern", parse(raw("macos.themeMode", "nonsense"), "p").getThemeMode());
+    }
+
     @Test
     public void appStorePackagingIsAlwaysPkg() {
         MacOSBuildHints pinned = parse(raw("macos.distribution", "both",
