@@ -35,6 +35,39 @@ import static org.junit.Assert.assertTrue;
 public class MacOSNativeBuilderScanTest {
 
     /**
+     * Excluding the vision classes as CALLERS must not hide an application that
+     * USES them.
+     *
+     * <p>CodeScanner and VisionCameraView open an AVFoundation session through
+     * Camera.open() from inside the framework, so they are excluded as callers --
+     * otherwise their presence in every build grants every build the camera. The
+     * other half of that decision is recognising an application's own reference
+     * to them; without it, an application whose only camera use is a code
+     * scanner shipped with no NSCameraUsageDescription and was denied the
+     * instant the scanner started.</p>
+     */
+    @Test
+    public void anApplicationUsingACodeScannerGetsTheCamera() {
+        assertTrue("a code scanner is a camera user",
+                MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                        "com/example/MyForm", "com/codename1/ai/vision/CodeScanner"));
+        assertTrue("its nested types name it too",
+                MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                        "com/example/MyForm", "com/codename1/ai/vision/CodeScanner$Session"));
+        assertTrue(MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                "com/example/MyForm", "com/codename1/ai/vision/VisionCameraView"));
+
+        assertFalse("the framework talking to itself is in every build",
+                MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                        "com/codename1/ai/vision/VisionPipeline",
+                        "com/codename1/ai/vision/CodeScanner"));
+
+        assertFalse("an analyzer that opens no camera is not a camera user",
+                MacOSNativeBuilder.applicationUsesCameraBackedVision(
+                        "com/example/MyForm", "com/codename1/ai/vision/VisionImage"));
+    }
+
+    /**
      * The exclusion list has to match the framework it is excluding.
      *
      * <p>It is an exclusion of NAMES, so it decays silently in the worst
