@@ -112,7 +112,7 @@ public class CN1VpnService extends VpnService {
             // something this process kept. Refusing is honest: re-reading a
             // stale setup would bring a link up that the app has no tunnel
             // registered for.
-            stopSelf();
+            stopIfIdle();
             return START_NOT_STICKY;
         }
         // Claimed by REQUEST, not read from a global. Two starts racing
@@ -125,7 +125,7 @@ public class CN1VpnService extends VpnService {
                     "No tunnel is registered for this request; Tunnels"
                     + ".start() registers one before the service is asked to"
                     + " run, and a restart of this service does not carry it");
-            stopSelf();
+            stopIfIdle();
             return START_NOT_STICKY;
         }
         // OFF the main thread from here. establish() resolves the gateway
@@ -173,6 +173,26 @@ public class CN1VpnService extends VpnService {
         }
     }
 
+    /// Stops the service ONLY when no tunnel is published.
+    ///
+    /// stopSelf reaches onDestroy, which retires whatever is running -- so a
+    /// start that failed or was superseded, calling it unconditionally, tore
+    /// down the tunnel that had replaced it. The replacement's caller had
+    /// already been told it was up.
+    ///
+    /// The paths that DID stop something -- an explicit stop, a revoke -- do
+    /// not come through here: they have just cleared the field this reads,
+    /// and stopping is the point.
+    private void stopIfIdle() {
+        boolean idle;
+        synchronized (CN1VpnService.class) {
+            idle = host == null;
+        }
+        if (idle) {
+            stopSelf();
+        }
+    }
+
     /// Whether this opener is still the current start.
     private static boolean current(int generation) {
         synchronized (CN1VpnService.class) {
@@ -198,14 +218,14 @@ public class CN1VpnService extends VpnService {
             // something it cannot express -- a malformed CIDR, most often.
             fail(requestId, VpnError.INVALID_CONFIGURATION,
                     String.valueOf(refused.getMessage()));
-            stopSelf();
+            stopIfIdle();
             return;
         }
         if (fd == null) {
             fail(requestId, VpnError.UNAUTHORIZED,
                     "The VPN consent this app was granted is no longer in"
                     + " force; call Tunnels.start() again to ask for it");
-            stopSelf();
+            stopIfIdle();
             return;
         }
         // The generation is re-checked INSIDE the publication, not before
@@ -577,7 +597,7 @@ public class CN1VpnService extends VpnService {
             t.close();
             fail(requestId, VpnError.UNKNOWN,
                     "The tunnel start was superseded while it was opening");
-            stopSelf();
+            stopIfIdle();
             return;
         }
         // FOREGROUND once the tunnel is really this service's. Android 8
@@ -655,7 +675,10 @@ public class CN1VpnService extends VpnService {
                 // Outside the monitor: this reaches application code and
                 // the service, neither of which may run under it.
                 Tunnels.clearRegistered();
-                service.stopSelf();
+                // Through the same guard: stopLocked has cleared the field,
+                // so this stops -- unless a start published in the interval,
+                // and then it must not.
+                service.stopIfIdle();
             }
         }
     }
