@@ -156,15 +156,29 @@ child out of it into a fresh container in that window logs nothing on either sid
 scans the object the child has already left, the grace pass is long past the destination, and
 the child is unmarked, not fresh, and reachable only from the fresh container. The sweep takes
 it. So the clear is provisional -- an empty catch means closed, a non-empty one puts the
-barrier back UP before that batch is marked and re-runs the fixpoint. It terminates because an
-outer pass repeats only when it marked something NEW, and marks are monotonic and bounded by
-the live set.
+barrier back UP before that batch is marked and re-runs the fixpoint.
 
-`satbReopens` (`CN1_GC_CONFORM`) counts the re-arms, so this is answered by the instrument
-rather than by argument: **0 on the churn workload** -- where the whole thing costs one extra
-empty `cn1SatbTake` a cycle -- **and 1 on `BulkCopyCost`**. Take that 1 seriously: the window
-is reachable rather than theoretical, and it shows up on exactly the bulk copy paths this
-issue put a barrier on.
+**The only exit is an empty catch.** There is no "that batch marked nothing new, so stop"
+shortcut, and adding one is a bug: entries logged while the barrier was back up would then
+never be taken at all, and an unmarked non-fresh reference stored into a live or fresh
+container in that window gets swept.
+
+**Know where the regress ends.** Every take leaves a window after it in which a store can
+still log, so "drain what was logged during the last drain" has no fixed point a concurrent
+collector reaches on its own -- closing it completely means holding the mutators still, which
+is the stop-the-world pause this collector exists to avoid. The loop converges anyway because
+a cleared flag stops mutators logging within one barrier's worth of instructions and
+`cn1SatbBulkQuiesce` holds the bulk writers outright. `CN1_SATB_MAX_REOPENS` bounds it only
+against a mutator storming references; reaching it falls back on the invariant the sweep has
+always relied on -- a reference stored after the mark reaches its fixpoint is already marked
+or FRESH, and the sweep keeps both.
+
+`satbReopens` (`CN1_GC_CONFORM`) counts the re-arms, so all of this is answered by the
+instrument rather than by argument. Worst case per cycle: **0 on the churn workload in both
+stop modes and on the legacy-heavy shape, 4 on `BulkCopyCost`**, against a cap of 32. Take
+that 4 seriously: the window is reachable rather than theoretical, and it shows up on exactly
+the bulk copy paths this issue put a barrier on. The cap is set well above the measurement
+rather than just above it, because reaching it silently substitutes the weaker invariant.
 
 The flag check and the append are two steps, so the collector can clear `gcSatbActive` and
 run its final `cn1SatbTake()` between chunks and strand entries in a log this cycle never

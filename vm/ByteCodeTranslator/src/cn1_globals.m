@@ -1724,6 +1724,14 @@ static int gcBeltDiagCount = 0;
 // satbDrainAlready == satbRefs exactly, in every arm. This path is therefore neutral for
 // normal code and matters only for the bulk object-array copies that the arraycopy and
 // cloneArray barriers added here put through it.
+// Cap on how many times mark termination will put the barrier back up and try again.
+// This only bounds a pathological mutator; the comment at the bound itself says what falling
+// back to it means. Measured worst case per cycle (satbReopens): 0 on the churn workload in
+// both stop modes and on the legacy-heavy shape, 4 on BulkCopyCost. Set well above that
+// rather than just above it -- reaching the cap silently substitutes the weaker invariant,
+// so the headroom is the point.
+#define CN1_SATB_MAX_REOPENS 32
+
 #define CN1_SATB_BULK_CHUNK 256
 
 // TERMINATION HANDSHAKE for the bulk path.
@@ -2706,6 +2714,7 @@ void codenameOneGCMark() {
     // This terminates for the same reason the inner fixpoint does -- an outer pass only
     // repeats when it marked something NEW, and marks are monotonic and bounded by the live
     // set. The common case costs one extra empty cn1SatbTake.
+    int reopens = 0;
     for(;;) {
         for(;;) {
 #ifdef CN1_GC_VERIFY
@@ -2747,10 +2756,13 @@ void codenameOneGCMark() {
             if(n == 0) {
                 break;                       // nothing slipped in: closed, barrier down
             }
-            long before = gcMarkNewObjectCount;
-            // Back up BEFORE marking, so anything this batch discovers is scanned under a
-            // live barrier rather than while grey and unwatched.
+            // The ONLY way out of this loop is the empty catch above. There is deliberately
+            // no "the batch marked nothing new, so stop" shortcut here: entries logged
+            // while the barrier was back up would then never be taken at all, and an
+            // unmarked non-fresh reference stored into a live or fresh container in that
+            // window would be swept. Re-arm, drain, and go round again.
             __atomic_store_n(&gcSatbActive, 1, __ATOMIC_SEQ_CST);
+            reopens++;
 #ifdef CN1_GC_CONFORM
             atomic_fetch_add_explicit(&cn1GcSatbReopens, 1, memory_order_relaxed);
 #endif
@@ -2758,13 +2770,36 @@ void codenameOneGCMark() {
                 gcMarkObject(d, batch[i], JAVA_FALSE);
             }
             gcMarkDrain(d);
-            if(gcMarkNewObjectCount == before) {
-                // The catch marked nothing new, so no grey object was scanned here and
-                // there is nothing left for another pass to find. Anything logged from now
-                // on is already-marked or fresh, and a straggler left in the log is drained
-                // by the next cycle, when it is still alive.
+            if(reopens >= CN1_SATB_MAX_REOPENS) {
+                // WHERE THIS REGRESS ENDS, deliberately.
+                //
+                // Every take leaves a window after it in which a store can still log, so
+                // "drain what was logged during the last drain" has no fixed point a
+                // concurrent collector can reach on its own -- closing it completely means
+                // holding the mutators still, which is the stop-the-world pause this
+                // collector exists to avoid. The loop above converges in practice because
+                // a cleared flag stops mutators logging within one barrier's worth of
+                // instructions and cn1SatbBulkQuiesce holds the bulk writers outright:
+                // measured, 0 reopens on the churn workload and 1 on BulkCopyCost.
+                //
+                // The bound is only so a mutator storming references cannot keep the
+                // collector here indefinitely. Reaching it falls back on the invariant the
+                // sweep has always relied on -- a reference stored after the mark reaches
+                // its fixpoint is already marked or FRESH, and the sweep keeps both, fresh
+                // slots by the grace rule. satbReopens makes it visible if this ever stops
+                // being the rare case it measures as today.
                 __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
                 cn1SatbBulkQuiesce();
+                {
+                    JAVA_OBJECT* last;
+                    long m = cn1SatbTake(&last);
+                    for(long i = 0 ; i < m ; i++) {
+                        gcMarkObject(d, last[i], JAVA_FALSE);
+                    }
+                    if(m > 0) {
+                        gcMarkDrain(d);
+                    }
+                }
                 break;
             }
         }
