@@ -24,11 +24,12 @@
 
 """Guard that every project-scaffolding path declares the Codename One repository.
 
-Codename One releases are moving off Maven Central to the repository at
-https://repo.codenameone.com/maven2. A generated project that does not declare it
-resolves normally today -- Central still has every published version -- and then
-silently stops seeing new releases after the cutover. The failure is therefore
-invisible at generation time, which is exactly why it needs a build-time gate.
+Codename One releases are published to the repository at
+https://repo.codenameone.com/maven2, not to Maven Central. A generated project that
+does not declare it still resolves every version published before the cutover, because
+Central keeps those, and then silently stops seeing new releases. The failure is
+therefore invisible at generation time, which is exactly why it needs a build-time
+gate.
 
 Both lists are checked because Maven resolves ordinary dependencies through
 <repositories> and build plugins through <pluginRepositories>. A project holding only

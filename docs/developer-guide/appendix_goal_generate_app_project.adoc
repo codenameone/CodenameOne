@@ -14,7 +14,7 @@ Because there is no existing project, you will need to provide the full maven pa
 include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-app-project.sh[tag=appendix-goal-generate-app-project-bash-001,indent=0]
 ----
 
-NOTE: Substitute the https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[latest Codename One plugin version] for the `$CN1VERSION` in the above example.
+NOTE: Substitute the latest Codename One plugin version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-maven-plugin/maven-metadata.xml[repository metadata], for the `$CN1VERSION` in the above example.
 
 NOTE: This command is formatted for the bash prompt (for example, Linux or Mac). It will work on Windows also if you use bash. If you're on Windows and are using PowerShell or the regular command prompt, then you'll need to modify the command slightly. In particular, the entire command would need to be on a single line. (Remove the '\' at the end of each line, and merge lines together, with space between the command-line flags)
 
