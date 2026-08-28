@@ -247,22 +247,7 @@ final class CallManifestFragments {
      * @return true when a live declaration is already there
      */
     private static boolean declaresPermission(String existing, String name) {
-        String live = withoutComments(existing);
-        int at = live.indexOf("<uses-permission");
-        while (at >= 0) {
-            int close = live.indexOf('>', at);
-            if (close < 0) {
-                return false;
-            }
-            String tag = live.substring(at, close);
-            // Both quotings; see declares.
-            if (tag.contains("android:name=\"" + name + "\"")
-                    || tag.contains("android:name='" + name + "'")) {
-                return true;
-            }
-            at = live.indexOf("<uses-permission", close);
-        }
-        return false;
+        return ManifestServiceContract.declaresPermission(existing, name);
     }
 
     private static boolean declares(String existing, String name) {

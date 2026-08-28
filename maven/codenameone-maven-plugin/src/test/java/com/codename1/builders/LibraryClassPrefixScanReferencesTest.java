@@ -202,6 +202,43 @@ class LibraryClassPrefixScanReferencesTest {
     }
 
     @Test
+    void aClassLevelGenericSignatureCounts() throws Exception {
+        // "class Calls extends ArrayList<...Call>" puts ArrayList in
+        // super_class and the argument in the CLASS's Signature attribute,
+        // so a walk that stopped after the member tables never saw it.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(52);
+        d.writeShort(3);
+        d.writeByte(1);
+        d.writeUTF("Signature");
+        d.writeByte(1);
+        d.writeUTF("Ljava/util/ArrayList<L" + USED + ";>;");
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);          // interfaces
+        d.writeShort(0);          // fields
+        d.writeShort(0);          // methods
+        d.writeShort(1);          // one class attribute
+        d.writeShort(1);          // named by #1
+        d.writeInt(2);
+        d.writeShort(2);          // pointing at #2
+        d.flush();
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(out.toByteArray());
+        boolean sawIt = false;
+        for (String r : refs) {
+            if (r.indexOf(USED) >= 0) {
+                sawIt = true;
+            }
+        }
+        assertTrue(sawIt, "a generic supertype is a reference: " + refs);
+    }
+
+    @Test
     void somethingThatIsNotAClassFileIsNotParsed() {
         // Null, not empty: the caller falls back to the raw scan rather than
         // reading "no references" as "does not use anything", which would

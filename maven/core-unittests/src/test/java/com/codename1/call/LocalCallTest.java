@@ -22,6 +22,7 @@
  */
 package com.codename1.call;
 
+import com.codename1.call.CallHandleType;
 import com.codename1.call.directory.CallDirectory;
 import com.codename1.call.session.CallAction;
 import com.codename1.call.session.CallActionAdapter;
@@ -52,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The whole call stack, against the simulation. */
@@ -644,6 +646,36 @@ public class LocalCallTest {
         waitFor(got, 3);
         assertEquals(3, got.size(),
                 "every held call is replayed, whatever the first one did");
+    }
+
+    @Test
+    public void anEmptyHandleTypeSetIsRefusedRatherThanIgnored() {
+        // An empty replacement reads as "route nothing to me", which is not
+        // a configuration an account can hold: a PhoneAccount with no URI
+        // scheme and a provider with no handle type can never be given a
+        // call. The ports could not tell it from "not set" either -- both
+        // arrive as an empty wire field -- so they filled in the defaults
+        // and the app silently got the kinds it had just removed.
+        assertThrows(IllegalArgumentException.class, () ->
+                new CallConfiguration().handleTypes(new CallHandleType[0]),
+                "an empty set is not a set of none");
+        assertThrows(IllegalArgumentException.class, () ->
+                new CallConfiguration().handleTypes(
+                        new CallHandleType[]{null}),
+                "and neither is one that holds nothing usable");
+        // null RESTORES the defaults rather than clearing. Clearing left
+        // getHandleTypes() reporting no kinds while the ports, which read an
+        // empty wire field as "not set", went on registering both -- the
+        // getter and the behaviour disagreeing about the same object.
+        CallConfiguration defaults = new CallConfiguration()
+                .handleTypes(new CallHandleType[]{CallHandleType.GENERIC})
+                .handleTypes(null);
+        assertEquals(new CallConfiguration().getHandleTypes().length,
+                defaults.getHandleTypes().length,
+                "null restores what a fresh configuration holds");
+        assertEquals(1, new CallConfiguration().handleTypes(
+                new CallHandleType[]{CallHandleType.PHONE_NUMBER})
+                        .getHandleTypes().length);
     }
 
     @Test

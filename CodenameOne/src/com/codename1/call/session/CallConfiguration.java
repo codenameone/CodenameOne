@@ -59,6 +59,18 @@ public final class CallConfiguration {
     /// Creates a configuration with the defaults: audio only, calls in the
     /// system call log, no conferencing, phone-number and generic handles.
     public CallConfiguration() {
+        restoreDefaultHandleTypes();
+    }
+
+    /// The kinds a configuration holds until the app replaces them.
+    ///
+    /// In one place because two callers need the same answer: the
+    /// constructor and handleTypes(null). Written out at the second, they
+    /// disagreed -- null CLEARED the list, so getHandleTypes() reported no
+    /// kinds while the ports, which read an empty wire field as "not set",
+    /// went on registering both.
+    private void restoreDefaultHandleTypes() {
+        handleTypes.clear();
         handleTypes.add(CallHandleType.GENERIC);
         handleTypes.add(CallHandleType.PHONE_NUMBER);
     }
@@ -96,15 +108,42 @@ public final class CallConfiguration {
     }
 
     /// Replaces the set of address kinds the app understands.
+    ///
+    /// At least one, and `null` restores the defaults. An EMPTY array is
+    /// refused rather than obeyed or ignored: it reads as "route nothing to
+    /// me", which is not a configuration an account can hold -- a
+    /// PhoneAccount with no URI scheme and a provider with no handle type
+    /// can never be given a call -- and the ports had no way to tell it from
+    /// "not set", so they filled in the defaults and the app silently got
+    /// the types it had just removed. Refusing says so where the caller can
+    /// still act on it.
+    ///
+    /// @param types the kinds, or null for the defaults
+    /// @throws IllegalArgumentException when `types` is present and holds no
+    /// usable kind
     public CallConfiguration handleTypes(CallHandleType[] types) {
-        handleTypes.clear();
+        java.util.List<CallHandleType> replacement =
+                new java.util.ArrayList<CallHandleType>();
         if (types != null) {
             for (CallHandleType type : types) {
-                if (type != null && !handleTypes.contains(type)) {
-                    handleTypes.add(type);
+                if (type != null && !replacement.contains(type)) {
+                    replacement.add(type);
                 }
             }
+            if (replacement.isEmpty()) {
+                throw new IllegalArgumentException("handleTypes needs at"
+                        + " least one kind. Pass null to keep the defaults;"
+                        + " an empty set would leave the app registered for"
+                        + " no address kind at all, which no platform can"
+                        + " route a call to.");
+            }
         }
+        if (types == null) {
+            restoreDefaultHandleTypes();
+            return this;
+        }
+        handleTypes.clear();
+        handleTypes.addAll(replacement);
         return this;
     }
 

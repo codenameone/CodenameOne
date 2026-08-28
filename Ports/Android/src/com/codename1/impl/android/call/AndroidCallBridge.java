@@ -426,7 +426,16 @@ public class AndroidCallBridge implements CallBridge {
             handle = new PhoneAccountHandle(
                     new ComponentName(context, CN1ConnectionService.class), "cn1");
             int caps = PhoneAccount.CAPABILITY_SELF_MANAGED;
-            if (video) {
+            // CLAMPED to what the build can actually do, exactly as
+            // getCallCapabilities clamps CAPABILITY_VIDEO. The manifest
+            // permission comes from the call.video build hint at build time
+            // and videoSupported(true) is a runtime decision the scanner
+            // cannot see, so an audio-only build could advertise video
+            // calling to Telecom -- which would then route and present video
+            // calls the app can never capture for, while the capability
+            // query the app is told to branch on says video is unavailable.
+            // Two answers to one question is worse than the restrictive one.
+            if (video && declaresPermission(Manifest.permission.CAMERA)) {
                 caps |= PhoneAccount.CAPABILITY_SUPPORTS_VIDEO_CALLING
                         | PhoneAccount.CAPABILITY_VIDEO_CALLING;
             }
@@ -451,8 +460,13 @@ public class AndroidCallBridge implements CallBridge {
                 }
             }
             if (!tel && !sip) {
-                // A configuration that named none is not a configuration that
-                // wants none; the defaults are phone-number and generic.
+                // Nothing named means nothing was SET: CallConfiguration
+                // .handleTypes refuses an empty replacement, so an empty
+                // wire field is an app that never called it, and the
+                // defaults are phone-number and generic. Reading it as "the
+                // app wants none" would leave the account unreachable, which
+                // is why that refusal is at the setter rather than here --
+                // the ports cannot tell the two apart from the wire.
                 tel = true;
                 sip = true;
             }

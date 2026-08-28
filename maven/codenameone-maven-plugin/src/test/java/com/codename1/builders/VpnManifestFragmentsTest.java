@@ -238,6 +238,31 @@ class VpnManifestFragmentsTest {
     }
 
     @Test
+    public void aBoundedPermissionDoesNotSatisfyAnUnboundedOne() {
+        // A declaration capped with android:maxSdkVersion asks for the
+        // permission only up to that level, and the generated ones are
+        // unbounded because the platform needs them at the level the app
+        // actually runs. Suppressing on the NAME alone let a capped
+        // FOREGROUND_SERVICE stand in for one the service needs on 34, so
+        // the promotion failed with the manifest looking complete.
+        String capped = "    <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\""
+                + " android:maxSdkVersion=\"33\" />\n";
+        String out = VpnManifestFragments.injectPermissions(true, capped);
+        assertEquals(2, count(out,
+                "\"android.permission.FOREGROUND_SERVICE\""),
+                "the unbounded one goes in beside the capped one: " + out);
+        // An UNBOUNDED declaration still suppresses, so this is not simply
+        // refusing to see what the project wrote.
+        String plain = "    <uses-permission android:name="
+                + "\"android.permission.FOREGROUND_SERVICE\" />\n";
+        assertEquals(1, count(
+                VpnManifestFragments.injectPermissions(true, plain),
+                "\"android.permission.FOREGROUND_SERVICE\""),
+                "a permission the project already declares is not repeated");
+    }
+
+    @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
         // The lesson the call fragments learned twice: commenting a
         // declaration out is how a developer disables one, and treating it

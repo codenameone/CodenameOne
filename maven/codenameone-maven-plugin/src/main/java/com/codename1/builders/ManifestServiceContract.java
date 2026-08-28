@@ -146,6 +146,44 @@ final class ManifestServiceContract {
     }
 
     /**
+     * Returns whether a LIVE {@code <uses-permission>} declares {@code name}
+     * with no bound on it.
+     *
+     * <p>The name alone is not the question. A declaration carrying
+     * {@code android:maxSdkVersion} asks for the permission only up to that
+     * level, and the generated ones are unbounded because the platform needs
+     * them at the level the app actually runs -- so suppressing an
+     * unbounded FOREGROUND_SERVICE for a declaration capped at 33 left a
+     * VoIP call on Android 14 unable to promote its service, with call
+     * integration detected and the manifest looking complete.</p>
+     *
+     * <p>The name appearing as a VALUE is not a declaration either: an
+     * {@code android:permission} attribute names what a component REQUIRES
+     * of its binder, which says nothing about what this app holds.</p>
+     *
+     * @param existing the accumulated fragment
+     * @param name     the permission name
+     * @return true when an unbounded live declaration is already there
+     */
+    static boolean declaresPermission(String existing, String name) {
+        String live = withoutComments(existing);
+        int at = elementStart(live, "<uses-permission", 0);
+        while (at >= 0) {
+            int close = live.indexOf('>', at);
+            if (close < 0) {
+                return false;
+            }
+            String tag = live.substring(at, close);
+            if (name.equals(attributeValue(tag, "android:name"))
+                    && attributeValue(tag, "android:maxSdkVersion") == null) {
+                return true;
+            }
+            at = elementStart(live, "<uses-permission", close);
+        }
+        return false;
+    }
+
+    /**
      * Returns what a project-declared service is missing, or null when it
      * carries everything the generated one would have.
      *

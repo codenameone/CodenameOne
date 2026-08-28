@@ -858,12 +858,13 @@ public class IPhoneBuilder extends Executor {
                     && Character.isWhitespace(live.charAt(probe))) {
                 probe++;
             }
-            if (probe < live.length() && live.startsWith("<array>", probe)) {
-                int close = live.indexOf("</array>", probe);
+            int open = plistElementOpen(live, probe, "array");
+            if (open > 0) {
+                int close = live.indexOf("</array>", open);
                 if (close < 0) {
                     return false;
                 }
-                String body = live.substring(probe + "<array>".length(), close);
+                String body = live.substring(open, close);
                 if (arrayHasString(body, "voip")) {
                     return true;
                 }
@@ -875,19 +876,50 @@ public class IPhoneBuilder extends Executor {
         return false;
     }
 
+    /// The index just past a `<name ...>` start tag beginning at `from`, or
+    /// -1 when the text there is not that element.
+    ///
+    /// `<array >` is valid XML and `<array>` is what the serializer writes,
+    /// so a literal comparison rejected a fragment that already declared
+    /// what it was being asked for -- and the build then refused a
+    /// configuration that was correct, which is a worse answer than the one
+    /// the literal test was added to replace.
+    private static int plistElementOpen(String live, int from, String name) {
+        if (from < 0 || from >= live.length() || live.charAt(from) != '<') {
+            return -1;
+        }
+        int nameEnd = plistTagNameEnd(live, from);
+        if (nameEnd < 0 || !name.equals(live.substring(from + 1, nameEnd))) {
+            return -1;
+        }
+        int at = nameEnd;
+        while (at < live.length() && live.charAt(at) != '>') {
+            if (live.charAt(at) == '/') {
+                // Self-closing, so it has no body to look into.
+                return -1;
+            }
+            at++;
+        }
+        return at < live.length() ? at + 1 : -1;
+    }
+
     /// Whether a plist `<array>` body carries exactly this `<string>` value.
     private static boolean arrayHasString(String body, String value) {
-        int at = body.indexOf("<string>");
+        int at = body.indexOf('<');
         while (at >= 0) {
-            int end = body.indexOf("</string>", at);
-            if (end < 0) {
-                return false;
+            int open = plistElementOpen(body, at, "string");
+            if (open > 0) {
+                int end = body.indexOf("</string", open);
+                if (end < 0) {
+                    return false;
+                }
+                if (value.equals(body.substring(open, end).trim())) {
+                    return true;
+                }
+                at = body.indexOf('<', end + 1);
+                continue;
             }
-            String v = body.substring(at + "<string>".length(), end).trim();
-            if (value.equals(v)) {
-                return true;
-            }
-            at = body.indexOf("<string>", end);
+            at = body.indexOf('<', at + 1);
         }
         return false;
     }
@@ -4007,6 +4039,20 @@ public class IPhoneBuilder extends Executor {
         // project had set the hint itself -- which is the one case that
         // needed no inference. The class scan runs earlier in this method, so
         // usesCallVoip is already known here.
+        // ONE spelling of the hint from here down. The readers below
+        // disagree -- one uses equals("true") and the calculation uses
+        // equalsIgnoreCase -- so "TRUE" skipped the profile requirement
+        // and then resolved to false anyway, producing a build with
+        // PushKit, the voip background mode and no push entitlement.
+        // Normalised once rather than asking every reader to agree; a
+        // value that is not a case-insensitive true was already read as
+        // false by all of them.
+        String pushHint = request.getArg("ios.includePush", null);
+        if (pushHint != null) {
+            request.putArgument("ios.includePush",
+                    "true".equalsIgnoreCase(pushHint.trim())
+                            ? "true" : "false");
+        }
         // A VoIP app that turned push OFF is a contradiction the build
         // cannot resolve for it. Inferring the default is not enough: an
         // explicit ios.includePush=false still wins below, so the app got

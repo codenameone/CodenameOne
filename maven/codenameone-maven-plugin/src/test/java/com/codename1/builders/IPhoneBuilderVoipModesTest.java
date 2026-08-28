@@ -141,6 +141,34 @@ class IPhoneBuilderVoipModesTest {
         assertNull(IPhoneBuilder.plistWithoutComments(null));
     }
 
+    @Test
+    public void xmlSpacingInsideTheTagsIsStillXml() {
+        // "<array >" and "<string >voip</string >" are valid XML and only
+        // the SERIALIZER writes the compact spelling, so a literal
+        // comparison rejected a fragment that already declared the mode --
+        // and the build then refused a configuration that was correct,
+        // which is a worse answer than the one the literal test replaced.
+        assertTrue(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key>UIBackgroundModes</key><array ><string >voip</string >"
+                + "</array>"),
+                "spacing inside the tags does not change what they say");
+        assertTrue(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key>UIBackgroundModes</key>\n<array>\n"
+                + "  <string>remote-notification</string>\n"
+                + "  <string>voip</string>\n</array>"),
+                "and neither does formatting between them");
+        // Still NOT matched where it does not belong: the mode has to be in
+        // the array this key names.
+        assertFalse(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key>UIBackgroundModes</key><string >audio</string >"
+                + "<key>Other</key><array ><string >voip</string ></array>"),
+                "a later array is not this key's value");
+        assertFalse(IPhoneBuilder.injectedModesIncludeVoip(
+                "<key>UIBackgroundModes</key><array ><string >myvoipapp"
+                + "</string ></array>"),
+                "and a longer mode that contains it is not it");
+    }
+
     private static String builderSource() throws Exception {
         java.io.File f = new java.io.File(BUILDER_SOURCE);
         assertTrue(f.exists(), "builder source must be readable: "

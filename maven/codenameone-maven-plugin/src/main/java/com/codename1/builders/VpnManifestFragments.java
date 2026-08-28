@@ -113,21 +113,7 @@ final class VpnManifestFragments {
      * @return true when a live declaration is already there
      */
     static boolean declaresPermission(String existing, String name) {
-        String live = withoutComments(existing == null ? "" : existing);
-        int at = live.indexOf("<uses-permission");
-        while (at >= 0) {
-            int close = live.indexOf('>', at);
-            if (close < 0) {
-                return false;
-            }
-            String tag = live.substring(at, close);
-            if (tag.contains("android:name=\"" + name + "\"")
-                    || tag.contains("android:name='" + name + "'")) {
-                return true;
-            }
-            at = live.indexOf("<uses-permission", close);
-        }
-        return false;
+        return ManifestServiceContract.declaresPermission(existing, name);
     }
 
     static String services(boolean tunnel, String existing) {

@@ -378,6 +378,13 @@ final class LibraryClassPrefixScan {
                     readAttributes(in, utf8, count, out);
                 }
             }
+            // And the CLASS's own attributes. A generic supertype lives
+            // there and nowhere else: for
+            // "class Calls extends ArrayList<...Call>" the super_class entry
+            // names only ArrayList, and the argument is in the class-level
+            // Signature. Stopping after the members left that case exactly as
+            // invisible as the member-level one this walk was extended for.
+            readAttributes(in, utf8, count, out);
             return out;
         } catch (Throwable unreadable) {
             return null;
