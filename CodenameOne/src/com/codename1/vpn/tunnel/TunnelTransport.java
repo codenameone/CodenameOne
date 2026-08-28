@@ -30,9 +30,11 @@ package com.codename1.vpn.tunnel;
 ///
 /// - On Android a `VpnService` runs in the app's own process and hands over a
 ///   file descriptor. Reading it blocks, and the read loop owns a thread.
-/// - On iOS an `NEPacketTunnelProvider` runs in a separate extension process
-///   and delivers packets through a completion handler. There is nothing to
-///   block on, and a loop that tried to would deadlock the provider.
+/// - A host that delivers packets through a completion handler instead --
+///   an `NEPacketTunnelProvider` is the example, though iOS does not run
+///   these tunnels -- has nothing to block on, and a loop that tried to
+///   would deadlock it. The simulation takes this shape so the case is
+///   exercised.
 ///
 /// [#isBlocking] is the discriminator, and the host reads it rather than
 /// guessing from the platform. A tunnel written against [VpnTunnel] never
@@ -41,8 +43,8 @@ public interface TunnelTransport {
 
     /// Whether [#read] blocks until packets arrive.
     ///
-    /// True on Android, where the host gives the loop a thread. False on
-    /// iOS, where the host arms a callback and returns.
+    /// True on Android, where the host gives the loop a thread. False for a
+    /// host that arms a callback and returns, which is the simulation.
     boolean isBlocking();
 
     /// Takes the next packets, filling `into` and answering how many.

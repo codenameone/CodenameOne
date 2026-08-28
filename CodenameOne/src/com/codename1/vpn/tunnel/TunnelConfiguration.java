@@ -27,7 +27,7 @@ package com.codename1.vpn.tunnel;
 /// Handed to [VpnTunnel#onStart]. The addresses and routes are what the
 /// PLATFORM was told to set up before any packet arrives; a tunnel reads
 /// them to know what it is carrying, and does not set them here -- that is
-/// the profile's job, and on iOS it happens in a different process.
+/// the profile's job.
 public final class TunnelConfiguration {
     private final String server;
     private final String[] routes;
@@ -70,8 +70,8 @@ public final class TunnelConfiguration {
 
     /// Whatever the app attached when it started the tunnel, untouched.
     ///
-    /// On iOS the tunnel runs in another process, so this is how anything
-    /// the app knows reaches it -- there are no shared statics to read.
+    /// The way anything the app knows reaches a tunnel without the two
+    /// having to share a process. See [TunnelSetup#data].
     public String getData() {
         return data;
     }

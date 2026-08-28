@@ -34,19 +34,22 @@ package com.codename1.vpn.tunnel;
 ///
 /// #### Where this runs
 ///
-/// On Android, in the app's own process, inside the generated
-/// `VpnService`. On iOS, inside a Network Extension -- a SEPARATE process,
-/// with its own copy of the VM and none of the app's state. Anything the
-/// tunnel needs to know travels in [TunnelConfiguration#getData]; a static
-/// the app set is not there.
+/// On Android, in the app's own process, inside the port's `VpnService`.
+/// Nowhere else: [Tunnels#isSupported] is false on iOS, where a packet
+/// tunnel would have to run in a Network Extension and the translation that
+/// would give that process a virtual machine has not been written.
+///
+/// Write the tunnel as though it ran somewhere else anyway. Everything it
+/// needs travels in [TunnelConfiguration#getData]; a static the app set
+/// happens to be there on Android and is not a thing to rely on.
 ///
 /// #### What is expensive
 ///
-/// The extension runs under a memory budget far below an app's, and it is
-/// killed rather than warned when it exceeds it. The buffers handed to
-/// [#onPacket] are reused for exactly that reason, so copying every packet
-/// -- or holding one past the call -- gives back the headroom the pooling
-/// was for. See [PacketBuffer].
+/// A host process for a tunnel runs under a memory budget far below an
+/// app's, and is killed rather than warned when it exceeds it. The buffers
+/// handed to [#onPacket] are reused for exactly that reason, so copying
+/// every packet -- or holding one past the call -- gives back the headroom
+/// the pooling was for. See [PacketBuffer].
 public abstract class VpnTunnel {
 
     private TunnelTransport transport;

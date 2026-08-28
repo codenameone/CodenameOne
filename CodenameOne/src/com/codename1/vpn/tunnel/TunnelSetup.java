@@ -28,7 +28,7 @@ package com.codename1.vpn.tunnel;
 /// platform, that is what comes back up to [VpnTunnel#onStart]. They are
 /// separate types because they are not the same thing -- a setup is a
 /// request, a configuration is what the platform actually established, and
-/// on iOS the two are decided in different processes.
+/// a host that runs the tunnel in its own process decides the two apart.
 ///
 /// Every field has a usable default, so the smallest tunnel is
 /// `new TunnelSetup().address("10.0.0.2/32").route("0.0.0.0/0")`.
@@ -76,8 +76,8 @@ public final class TunnelSetup {
 
     /// A DNS search domain. Repeatable.
     ///
-    /// Android applies these; iOS applies them through the extension's own
-    /// settings. A platform that cannot express one ignores it rather than
+    /// Android applies these. A platform that cannot express one ignores it
+    /// rather than
     /// refusing the tunnel, because a search domain is a convenience and
     /// losing the tunnel over one is not a trade an app would choose.
     public TunnelSetup searchDomain(String domain) {
@@ -100,10 +100,12 @@ public final class TunnelSetup {
     /// Application data handed to [VpnTunnel#onStart] as
     /// [TunnelConfiguration#getData].
     ///
-    /// This is the ONLY thing that reaches the tunnel from the app on iOS,
-    /// where the tunnel runs in a separate process that shares no statics,
-    /// no singletons and no open connections with it. A tunnel that needs a
-    /// token, a server list or a key gets it from here or not at all.
+    /// The one thing that reaches the tunnel from the app WITHOUT relying
+    /// on the two sharing a process. Android's does, so a static works
+    /// there; a host that constructed the tunnel elsewhere shares no
+    /// statics, no singletons and no open connections with the app. A
+    /// tunnel that takes its token, server list or key from here is the one
+    /// that does not have to be rewritten.
     public TunnelSetup data(String value) {
         this.data = value == null ? "" : value;
         return this;

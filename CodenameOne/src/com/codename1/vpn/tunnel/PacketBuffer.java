@@ -28,7 +28,7 @@ package com.codename1.vpn.tunnel;
 ///
 /// The transport hands the same buffers back round rather than allocating
 /// per packet, because a packet loop allocating at line rate is the fastest
-/// way to exhaust the memory an iOS Network Extension is given. A packet you
+/// way to exhaust the memory a tunnel host is given. A packet you
 /// want after [VpnTunnel#onPacket] returns has to be copied, with
 /// [#toByteArray]; the buffer itself belongs to the transport again the
 /// moment that call ends.
@@ -68,10 +68,10 @@ public final class PacketBuffer {
 
     /// `FAMILY_IPV4` or `FAMILY_IPV6`.
     ///
-    /// iOS reports the family alongside the packet and Android does not, so
-    /// on Android it is read from the header's version nibble. Either way it
-    /// is the same answer, which is why it is a field here rather than
-    /// something each tunnel works out again.
+    /// Android does not report it alongside the packet, so there it is read
+    /// from the header's version nibble; a host that does report it says so
+    /// directly. Either way it is the same answer, which is why it is a
+    /// field here rather than something each tunnel works out again.
     public int getFamily() {
         return family;
     }

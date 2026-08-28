@@ -130,6 +130,31 @@ public class AndroidVpnBridge implements VpnBridge {
     /// status in DISCONNECTING.
     private volatile long stopRequestedAt;
 
+    /// Counts the times something else settled who owns the tunnel.
+    ///
+    /// stopVpn writes its bookkeeping AFTER the platform call, deliberately:
+    /// a refusal must not leave a teardown pending for a tunnel that is
+    /// still up. That leaves a window the flags alone cannot describe. The
+    /// transport loss can arrive while the thread is inside
+    /// stopProvisionedVpnProfile; onTunnelTransport then clears both flags
+    /// and publishes DISCONNECTED, and the returning thread writes
+    /// stopRequested = true for a teardown that is already over. Nothing
+    /// clears it afterwards -- reconciledStatus settles only from
+    /// DISCONNECTING -- so setStatusListening(false) never unregisters the
+    /// watcher, and the next VPN loss belonging to some other app is
+    /// published as this profile's.
+    ///
+    /// Read before the platform call and compared after, so both the commit
+    /// and the rollback apply only if nothing happened in between. That is
+    /// what "after the platform accepted" was always reaching for; the flag
+    /// it was written on cannot say it, because a stop is exactly the case
+    /// where startRequested is legitimately false (the restart case), so
+    /// "still ours" and "settled while we waited" look identical from there.
+    ///
+    /// Guarded by this instance's monitor, not volatile: it is read and
+    /// written together with the flags it is about.
+    private long ownershipEpoch;
+
     /// How long a pending teardown may go unconfirmed before it is taken as
     /// finished.
     ///
@@ -291,6 +316,7 @@ public class AndroidVpnBridge implements VpnBridge {
             stopRequested = false;
             startRequested = false;
             status = VpnStatus.DISCONNECTED;
+            ownershipEpoch++;
         }
         // Only the NOTIFICATION is outside, which is the rule setStatus
         // exists to state: application code never runs under this monitor.
@@ -966,6 +992,12 @@ public class AndroidVpnBridge implements VpnBridge {
         }
         VpnStatus before = reconciledStatus();
         boolean wasRequested = startRequested;
+        // Sampled before the platform is asked; every write below is
+        // conditional on it not having moved. See ownershipEpoch.
+        long epoch;
+        synchronized (this) {
+            epoch = ownershipEpoch;
+        }
         try {
             setStatus(VpnStatus.DISCONNECTING);
             Reflect.STOP.invoke(Reflect.manager(context));
@@ -986,8 +1018,24 @@ public class AndroidVpnBridge implements VpnBridge {
             // teardown pending for a tunnel that is still up.
             // Stamped before the flag, so a reader that sees the flag always
             // sees a time that is not left over from a previous stop.
-            stopRequestedAt = System.currentTimeMillis();
-            stopRequested = true;
+            boolean settledMeanwhile;
+            synchronized (this) {
+                settledMeanwhile = ownershipEpoch != epoch;
+                if (!settledMeanwhile) {
+                    stopRequestedAt = System.currentTimeMillis();
+                    stopRequested = true;
+                }
+            }
+            if (settledMeanwhile) {
+                // The loss arrived while the call was in flight, so the
+                // teardown this method asked for is already over and the
+                // flags belong to nobody. The DISCONNECTING written above
+                // has to give way to what the callback concluded -- left
+                // standing with stopRequested false, reconciledStatus can
+                // never settle it and getStatus() reports a tunnel going
+                // down for the life of the process.
+                setStatus(VpnStatus.DISCONNECTED);
+            }
             // And something has to be WATCHING. startVpn arms the watcher,
             // but a process that did not start this tunnel never ran it --
             // the restart case -- so a stop issued there had no callback
@@ -1014,11 +1062,24 @@ public class AndroidVpnBridge implements VpnBridge {
             // case the watcher exists for -- and a disconnect from Settings
             // would go unseen for ever. Only a platform saying there is no
             // profile at all justifies keeping it clear.
-            startRequested = wasRequested && !absent;
+            //
+            // Under the same epoch guard as the success path, and for a
+            // sharper reason: a refusal with a loss alongside it means the
+            // user took the tunnel down from Settings while this call was
+            // failing, so restoring startRequested would claim a tunnel that
+            // is provably gone.
+            boolean settledMeanwhile;
+            synchronized (this) {
+                settledMeanwhile = ownershipEpoch != epoch;
+                if (!settledMeanwhile) {
+                    startRequested = wasRequested && !absent;
+                }
+            }
             if (absent) {
                 forgetInstalledProfile();
             }
-            setStatus(absent ? VpnStatus.NOT_CONFIGURED : before);
+            setStatus(absent ? VpnStatus.NOT_CONFIGURED
+                    : settledMeanwhile ? VpnStatus.DISCONNECTED : before);
             endOperation(mine);
             fail(requestId, absent
                     ? VpnError.NOT_CONFIGURED : VpnError.UNKNOWN, describe(e));
@@ -1322,22 +1383,35 @@ public class AndroidVpnBridge implements VpnBridge {
     /// indistinguishable) but it removes the case that matters: an app that
     /// never started a tunnel never hears that one is up.
     void onTunnelTransport(boolean available) {
-        if (!startRequested && !stopRequested) {
-            return;
-        }
-        if (available && !startRequested) {
-            // A tunnel COMING UP while this app is tearing its own down is
-            // not this app's; reporting CONNECTED there would undo the stop
-            // the caller just asked for.
-            return;
-        }
-        if (!available) {
-            stopRequested = false;
-            // The tunnel is actually gone, which is the point at which this
-            // app stops owning one -- whether it asked to stop or the user
-            // did it from Settings. stopVpn used to clear this itself and
-            // publish DISCONNECTED before the teardown had happened.
-            startRequested = false;
+        // The tests and the writes in ONE critical section, which is the
+        // rule reconciledStatus states for the same three fields: split,
+        // a start arriving between them is read by the guard and then
+        // overwritten by the clear. Only setStatus is outside, because it
+        // reaches application code and this runs on a platform callback
+        // thread.
+        synchronized (this) {
+            if (!startRequested && !stopRequested) {
+                return;
+            }
+            if (available && !startRequested) {
+                // A tunnel COMING UP while this app is tearing its own down
+                // is not this app's; reporting CONNECTED there would undo
+                // the stop the caller just asked for.
+                return;
+            }
+            if (!available) {
+                // The tunnel is actually gone, which is the point at which
+                // this app stops owning one -- whether it asked to stop or
+                // the user did it from Settings. stopVpn used to clear these
+                // itself and publish DISCONNECTED before the teardown had
+                // happened.
+                //
+                // The epoch is what tells a stopVpn still inside the
+                // platform call that this happened; see its declaration.
+                stopRequested = false;
+                startRequested = false;
+                ownershipEpoch++;
+            }
         }
         setStatus(available ? VpnStatus.CONNECTED : VpnStatus.DISCONNECTED);
     }

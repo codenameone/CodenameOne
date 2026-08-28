@@ -36,7 +36,7 @@ public enum TunnelStopReason {
     /// The device lost the network the tunnel was running over.
     NETWORK_LOST,
 
-    /// The system is reclaiming the extension, on iOS usually for memory.
+    /// The system is reclaiming the tunnel's host, usually for memory.
     SYSTEM_RECLAIMED,
 
     /// Something else, or the platform did not say.

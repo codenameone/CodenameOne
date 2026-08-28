@@ -11,9 +11,9 @@ developer account can switch on, and is what almost every app that says
 what this chapter is mostly about.
 
 The second is *shipping a tunnel of your own* that receives raw IP packets and
-decides what to do with them. That's `com.codename1.vpn.tunnel`: you write the
-packet loop once, in Java, and the section below covers where it runs and the
-one difference between the platforms that you have to design around.
+decides what to do with them. That's `com.codename1.vpn.tunnel`, and it runs
+on Android only; the section below covers why, and what to write so the loop
+you wrote is still the loop that runs if that changes.
 
 [options="header"]
 |===
@@ -22,7 +22,7 @@ one difference between the platforms that you have to design around.
 | IPsec with a pre-shared key | yes | -- | simulated | --
 | Connect, disconnect, observe status | yes | yes (Android 11 and later) | simulated | --
 | Always-on / on-demand | yes | yes | simulated | --
-| A tunnel your app implements | not yet | yes | simulated | --
+| A tunnel your app implements | -- | yes | simulated | --
 | Detect that some VPN is active | yes | yes | yes | --
 |===
 
@@ -105,8 +105,9 @@ If your VPN speaks a protocol the platforms don't implement -- anything that
 isn't IKEv2 or IPsec -- you write the packet loop yourself, in Java, once.
 Extend `VpnTunnel` and hand it to `Tunnels.start`.
 
-The loop is the same on both platforms. Where it *runs* differs, and that
-difference is the one thing to design around.
+`Tunnels.isSupported()` answers true on Android and false everywhere else.
+Ask it, and keep a path for the answer being no -- `Tunnels.start` refuses
+with `NOT_SUPPORTED` rather than pretending.
 
 On Android the tunnel runs inside a `VpnService` in your app's own process.
 The instance you passed to `Tunnels.start` is the instance that runs, and
@@ -121,17 +122,17 @@ not been written. `ios.vpn.tunnel` fails the build rather than producing an
 extension too broken to compile, and `Tunnels.isSupported()` answers false on
 iOS.
 
-Design for it anyway, because the constraint it will impose is the one worth
-designing around: the extension shares nothing else with the app. No statics
-you set, no `Display`, no open connections, and your tunnel constructed fresh
-over there.
+Write the tunnel as though it ran over there anyway. It costs an Android
+tunnel nothing, and it's the difference between a packet loop and a packet
+loop wired to this process: no statics you set, no `Display`, no open
+connections, and the tunnel constructed fresh with none of them.
 
 `TunnelSetup.data` exists for that reason, and the rule worth taking away
 follows from it:
 
 * Everything the tunnel needs arrives through `VpnTunnel.onStart`.
-* Anything it reaches for outside that becomes a static which works on
-  Android and goes missing on iOS.
+* Anything it reaches for outside that becomes a static, which works while
+  the tunnel shares the app's process and goes missing the moment it doesn't.
 
 When the iOS half lands it will also need the
 `com.apple.developer.networking.networkextension` entitlement, which Apple

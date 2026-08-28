@@ -43,19 +43,25 @@ import com.codename1.vpn.spi.VpnBridge;
 /// }
 /// ```
 ///
-/// #### The instance you pass is not always the one that runs
+/// #### Android only
 ///
-/// On Android it is: the tunnel runs in this process, inside the generated
-/// `VpnService`. On iOS the tunnel runs in a Network Extension -- another
-/// process, with its own copy of the VM -- so the instance handed here is
-/// used to learn WHICH tunnel to construct, and a fresh one is built over
-/// there. That is why [TunnelSetup#data] exists and why a field the app set
-/// on its tunnel object before calling this is not there when `onStart`
-/// runs.
+/// [#isSupported] answers true on Android and false everywhere else,
+/// including iOS: a packet tunnel there runs in a Network Extension, and the
+/// translation that would give that process a virtual machine has not been
+/// written. Ask [#isSupported] and keep a path for the answer being no --
+/// [#start] refuses with `NOT_SUPPORTED` rather than pretending.
 ///
-/// The rule that follows: a tunnel takes everything it needs from
-/// [VpnTunnel#onStart]'s configuration. Anything else is a static that
-/// happens to work on one platform.
+/// #### Do not assume the instance you pass is the one that runs
+///
+/// On Android it is: the tunnel runs in this process, inside the port's
+/// `VpnService`, so everything it closed over is still there. That is a
+/// property of one platform rather than of this API -- a tunnel hosted in
+/// another process would be CONSTRUCTED there, with none of the app's
+/// statics, which is what [TunnelSetup#data] is for.
+///
+/// The rule that follows costs nothing on Android and is the only thing
+/// that stays portable: a tunnel takes everything it needs from
+/// [VpnTunnel#onStart]'s configuration.
 public final class Tunnels {
 
     /// The tunnel each pending start belongs to, keyed by request.
@@ -198,11 +204,13 @@ public final class Tunnels {
     public static void deliverAck(int requestId, boolean ok, int errorOrdinal,
             String message) {
         // The pending entry goes HERE, because this is the one point every
-        // platform passes through. claim() covers the ports that run the
-        // tunnel in this process; iOS runs it in another and never claims,
-        // so its starts accumulated a tunnel object -- and everything the
-        // application had closed over -- once per reconnect, for the life of
-        // the process. Removing here is a no-op where claim already did it.
+        // platform passes through. claim() covers a port that runs the
+        // tunnel in this process, which is the only kind there is today; a
+        // port that ran it elsewhere would never call claim, and its starts
+        // would accumulate a tunnel object -- and everything the application
+        // had closed over -- once per reconnect for the life of the process.
+        // Removing here is a no-op where claim already did it, and is what
+        // keeps that from being the next port's bug to find.
         synchronized (Tunnels.class) {
             PENDING.remove(Integer.valueOf(requestId));
         }

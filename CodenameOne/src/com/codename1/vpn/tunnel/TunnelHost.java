@@ -43,8 +43,8 @@ public final class TunnelHost {
 
     /// Starts the tunnel and, on a blocking transport, its read loop.
     ///
-    /// Returns once the loop ends on Android, and immediately on iOS, where
-    /// the provider is callback-driven and blocking would deadlock it --
+    /// Returns once the loop ends on a blocking transport, and immediately
+    /// on a callback-driven one, where blocking would deadlock the host --
     /// which is why [TunnelTransport#isBlocking] exists rather than the host
     /// testing the platform.
     ///
