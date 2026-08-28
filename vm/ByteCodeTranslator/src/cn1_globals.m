@@ -709,6 +709,7 @@ long long cn1GcPoolNs = 0;    // the constant-pool root scan
 _Atomic long cn1GcSatbAlready = 0;   // enqueued while ALREADY at the current epoch
 _Atomic long cn1GcSatbFresh = 0;     // enqueued while mark == -1 (fresh; grace covers it)
 _Atomic long cn1GcSatbLocks = 0;     // gcSatbMutex acquisitions taken by the ENQUEUE side
+_Atomic long cn1GcSatbReopens = 0;   // trial clears that had to re-arm and run the fixpoint again
 long cn1GcSatbDrainAlready = 0;      // already at the current epoch by the time it drained
 static long long cn1GcNowNs(void) {
     struct timespec t;
@@ -2667,44 +2668,83 @@ void codenameOneGCMark() {
 #ifdef CN1_GC_CONFORM
     long long __satb0 = cn1GcNowNs();
 #endif
+    //
+    // NEVER TRACE A NEW DISCOVERY WITH THE BARRIER DOWN. The closing catch below used to
+    // run after gcSatbActive was cleared, and gcMarkDrain traces what that catch marks --
+    // so an object the catch discovered was GREY (marked, not yet scanned) at a moment when
+    // no barrier was watching. A mutator moving an old child out of that grey object into a
+    // fresh container in that window logs nothing on either side, the drain then scans the
+    // object the child has already left, and the grace pass is long past the destination:
+    // the child is unmarked, not fresh, and reachable only from the fresh container, so the
+    // sweep takes it. The clear is therefore a TRIAL: if the catch turns out to mark
+    // anything new, the barrier goes back up before that batch is marked and the fixpoint
+    // runs again.
+    //
+    // This terminates for the same reason the inner fixpoint does -- an outer pass only
+    // repeats when it marked something NEW, and marks are monotonic and bounded by the live
+    // set. The common case costs one extra empty cn1SatbTake.
     for(;;) {
+        for(;;) {
 #ifdef CN1_GC_VERIFY
-    { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "satb-drain"; }
+        { extern const char* cn1GcMarkPhase; cn1GcMarkPhase = "satb-drain"; }
 #endif
-        JAVA_OBJECT* batch;
-        long n = cn1SatbTake(&batch);
+            JAVA_OBJECT* batch;
+            long n = cn1SatbTake(&batch);
 #ifdef CN1_GC_CONFORM
-        cn1GcSatbEntries += n;
+            cn1GcSatbEntries += n;
 #endif
-        if(n == 0) break;                    // log empty at this instant
-        long before = gcMarkNewObjectCount;
-        for(long i = 0 ; i < n ; i++) {
+            if(n == 0) break;                    // log empty at this instant
+            long before = gcMarkNewObjectCount;
+            for(long i = 0 ; i < n ; i++) {
 #ifdef CN1_GC_CONFORM
-            if(batch[i] != JAVA_NULL
-               && __atomic_load_n(&batch[i]->__codenameOneGcMark, __ATOMIC_RELAXED)
-                      == currentGcMarkValue) {
-                cn1GcSatbDrainAlready++;
+                if(batch[i] != JAVA_NULL
+                   && __atomic_load_n(&batch[i]->__codenameOneGcMark, __ATOMIC_RELAXED)
+                          == currentGcMarkValue) {
+                    cn1GcSatbDrainAlready++;
+                }
+#endif
+                gcMarkObject(d, batch[i], JAVA_FALSE);
             }
+            gcMarkDrain(d);
+            if(gcMarkNewObjectCount == before) break; // marked nothing new -> closed
+        }
+        // Trial clear. A store racing it either logged already (caught just below) or
+        // adds an already-marked or fresh reference, which the sweep keeps either way.
+        __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
+        // Let any bulk copy that already passed the flag check finish appending before the
+        // catch, so it cannot leave entries behind for a log this cycle never drains again.
+        // See cn1SatbBulkQuiesce.
+        cn1SatbBulkQuiesce();
+        {
+            JAVA_OBJECT* batch;
+            long n = cn1SatbTake(&batch);    // catch anything logged during the tail
+#ifdef CN1_GC_CONFORM
+            cn1GcSatbEntries += n;
 #endif
-            gcMarkObject(d, batch[i], JAVA_FALSE);
+            if(n == 0) {
+                break;                       // nothing slipped in: closed, barrier down
+            }
+            long before = gcMarkNewObjectCount;
+            // Back up BEFORE marking, so anything this batch discovers is scanned under a
+            // live barrier rather than while grey and unwatched.
+            __atomic_store_n(&gcSatbActive, 1, __ATOMIC_SEQ_CST);
+#ifdef CN1_GC_CONFORM
+            atomic_fetch_add_explicit(&cn1GcSatbReopens, 1, memory_order_relaxed);
+#endif
+            for(long i = 0 ; i < n ; i++) {
+                gcMarkObject(d, batch[i], JAVA_FALSE);
+            }
+            gcMarkDrain(d);
+            if(gcMarkNewObjectCount == before) {
+                // The catch marked nothing new, so no grey object was scanned here and
+                // there is nothing left for another pass to find. Anything logged from now
+                // on is already-marked or fresh, and a straggler left in the log is drained
+                // by the next cycle, when it is still alive.
+                __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
+                cn1SatbBulkQuiesce();
+                break;
+            }
         }
-        gcMarkDrain(d);
-        if(gcMarkNewObjectCount == before) break; // processed a batch, marked nothing new -> closed
-    }
-    // Snapshot closed; stop logging. A store racing this clear either logged already
-    // (drained just below) or overwrites/adds an already-marked reference (harmless).
-    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_SEQ_CST);
-    // Let any bulk copy that already passed the flag check finish appending before the
-    // final take, so it cannot leave entries behind for a log this cycle never drains
-    // again. See cn1SatbBulkQuiesce.
-    cn1SatbBulkQuiesce();
-    {
-        JAVA_OBJECT* batch;
-        long n = cn1SatbTake(&batch);        // final catch of anything logged during the tail
-        for(long i = 0 ; i < n ; i++) {
-            gcMarkObject(d, batch[i], JAVA_FALSE);
-        }
-        if(n > 0) gcMarkDrain(d);
     }
 #ifdef CN1_GC_CONFORM
     cn1GcSatbNs += cn1GcNowNs() - __satb0;
@@ -10561,6 +10601,7 @@ static void cn1GcProbeResetPhases(void) {
     atomic_store_explicit(&cn1GcSatbAlready, 0, memory_order_relaxed);
     atomic_store_explicit(&cn1GcSatbFresh, 0, memory_order_relaxed);
     atomic_store_explicit(&cn1GcSatbLocks, 0, memory_order_relaxed);
+    atomic_store_explicit(&cn1GcSatbReopens, 0, memory_order_relaxed);
     cn1GcPoolNs = 0;
 }
 
@@ -10670,7 +10711,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         " triggerKb=%ld bypassActs=%ld bypassAllocs=%ld occKb=%ld liveKb=%ld reclKb=%ld"
         " markMs=%.1f sweepMs=%.1f snapMs=%.1f graceMs=%.1f drainMs=%.1f"
         " waitMs=%.1f stackMs=%.1f tdrainMs=%.1f migrateMs=%.1f migrated=%ld"
-        " satbMs=%.1f satbRefs=%ld satbAlready=%ld satbFresh=%ld satbLocks=%ld satbDrainAlready=%ld poolMs=%.1f"
+        " satbMs=%.1f satbRefs=%ld satbAlready=%ld satbFresh=%ld satbLocks=%ld satbReopens=%ld satbDrainAlready=%ld poolMs=%.1f"
         " staleSkips=%ld ovfCycles=%ld graceDrains=%ld"
         " consWords=%lld consResolved=%lld consFirstMarks=%lld"
         " monitors=%ld immortal=%d fvLive=%ld sideKb=%lld residKb=%lld\n",
@@ -10698,6 +10739,7 @@ void cn1GcProbeCycle(double markMs, double sweepMs, int threw) {
         atomic_load_explicit(&cn1GcSatbAlready, memory_order_relaxed),
         atomic_load_explicit(&cn1GcSatbFresh, memory_order_relaxed),
         atomic_load_explicit(&cn1GcSatbLocks, memory_order_relaxed),
+        atomic_load_explicit(&cn1GcSatbReopens, memory_order_relaxed),
         cn1GcSatbDrainAlready, cn1GcPoolNs / 1e6,
         atomic_load_explicit(&cn1GcStaleSkips, memory_order_relaxed),
         atomic_load_explicit(&cn1GcOverflowCycles, memory_order_relaxed),
