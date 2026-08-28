@@ -88,6 +88,20 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void packetsGoIntoThePooledBuffer() {
+        // An allocation and a second copy per packet, at line rate, in a
+        // process with a hard memory cap -- in an API whose buffers are
+        // pooled to avoid precisely that.
+        String src = provider();
+        assertFalse(src.contains("__NEW_ARRAY_JAVA_BYTE"),
+                "no per-packet Java array");
+        assertTrue(src.contains("ExtensionTunnelHost_buffer___int"),
+                "the pooled buffer is asked for instead");
+        assertTrue(src.contains("ExtensionTunnelHost_received___int"),
+                "and told how much was written");
+    }
+
+    @Test
     void theTunnelClassIsNamedRatherThanLookedUp() {
         // Class.forName would not survive obfuscation, which is why the
         // framework bans it -- so the class is baked in as a symbol at

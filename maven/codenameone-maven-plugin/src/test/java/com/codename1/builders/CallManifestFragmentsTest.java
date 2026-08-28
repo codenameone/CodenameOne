@@ -206,15 +206,15 @@ public class CallManifestFragmentsTest {
         // Ranging alone reaches 36 even when the ladder and the target are
         // far below it.
         assertEquals(36, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                true, true, false));
+                true, true, false, false));
         // Transport or companion without ranging still reaches 33.
         assertEquals(33, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, true, false));
+                false, true, false, false));
         // No nearby at all: the ladder and the target decide.
         assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, false, false));
+                false, false, false, false));
         assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "34",
-                false, false, false),
+                false, false, false, false),
                 "the compile SDK is never below the target");
     }
 
@@ -231,13 +231,13 @@ public class CallManifestFragmentsTest {
         // daemon twin raises to the target only inside its container path,
         // which is why it states the rule on its own.
         assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "34",
-                false, false, true),
+                false, false, true, false),
                 "a target-34 VoIP build must be able to name phoneCall");
         assertTrue(AndroidGradleBuilder.compileSdkInt("28", "28", "34",
-                false, false, true)
+                false, false, true, false)
                 >= AndroidGradleBuilder.FOREGROUND_SERVICE_TYPE_COMPILE_SDK);
         assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
-                false, false, true),
+                false, false, true, false),
                 "a target-28 app neither needs the attribute nor a raise");
     }
 

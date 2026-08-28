@@ -86,20 +86,41 @@ public final class ExtensionTunnelHost {
                 TunnelWire.dnsServers(fields), mtu, TunnelWire.data(fields));
     }
 
-    /// Hands one packet the extension read to the tunnel.
+    /// The pooled array the extension writes the next packet into.
+    ///
+    /// The extension used to allocate a Java array per packet, copy the
+    /// NSData into it, and hand that over -- and the transport then copied
+    /// it AGAIN into the pooled buffer. Two copies and an allocation per
+    /// packet at line rate, inside a process with a hard memory cap, in an
+    /// API whose buffers are pooled precisely to avoid that. The extension
+    /// writes into this and calls [#received] instead.
+    ///
+    /// @param capacity the packet's length
+    /// @return the array to write into, or null when no tunnel is running
     ///
     /// @hidden not part of the public API.
-    public static void deliver(byte[] packet) {
+    public static byte[] buffer(int capacity) {
+        ExtensionTransport t;
+        synchronized (ExtensionTunnelHost.class) {
+            t = transport;
+        }
+        return t == null ? null : t.backing(capacity);
+    }
+
+    /// Delivers the packet just written into [#buffer].
+    ///
+    /// @hidden not part of the public API.
+    public static void received(int length) {
         TunnelHost h;
         ExtensionTransport t;
         synchronized (ExtensionTunnelHost.class) {
             h = host;
             t = transport;
         }
-        if (h == null || t == null || packet == null || packet.length == 0) {
+        if (h == null || t == null || length <= 0) {
             return;
         }
-        t.stage(packet);
+        t.received(length);
         h.pump();
     }
 
@@ -158,14 +179,23 @@ public final class ExtensionTunnelHost {
     /// the other side of the boundary, where the array already exists.
     private static final class ExtensionTransport implements TunnelTransport {
         private final PacketBuffer[] pool;
-        private byte[] staged;
+
+        /// Whether the pooled buffer holds a packet the host has not taken.
+        private boolean staged;
 
         ExtensionTransport(int mtu) {
             this.pool = new PacketBuffer[]{TunnelBuffers.allocate(mtu)};
         }
 
-        void stage(byte[] packet) {
-            this.staged = packet;
+        /// The pooled buffer's array, grown for this packet.
+        byte[] backing(int capacity) {
+            return TunnelBuffers.backing(pool[0], capacity);
+        }
+
+        /// Marks the pooled buffer as holding a packet of this length.
+        void received(int length) {
+            TunnelBuffers.received(pool[0], length);
+            this.staged = true;
         }
 
         @Override
@@ -178,13 +208,11 @@ public final class ExtensionTunnelHost {
 
         @Override
         public int read(PacketBuffer[] into) {
-            byte[] p = staged;
-            staged = null;
-            if (p == null || into == null || into.length == 0) {
-                return 0;
-            }
-            TunnelBuffers.fill(into[0], p, 0, p.length);
-            return 1;
+            boolean ready = staged;
+            staged = false;
+            // NOTHING is copied here: `into` IS this transport's pool, and
+            // the extension has already written into the buffer's own array.
+            return ready && into != null && into.length > 0 ? 1 : 0;
         }
 
         @Override
@@ -206,7 +234,7 @@ public final class ExtensionTunnelHost {
 
         @Override
         public void close() {
-            staged = null;
+            staged = false;
         }
     }
 }

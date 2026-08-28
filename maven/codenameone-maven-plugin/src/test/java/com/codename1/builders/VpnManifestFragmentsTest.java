@@ -60,6 +60,22 @@ class VpnManifestFragmentsTest {
     }
 
     @Test
+    public void aTunnelBuildCompilesAgainstAnSdkThatKnowsItsType() {
+        // systemExempted and the foregroundServiceType attribute arrive at
+        // 34 and 29, and AAPT rejects an enum value the compile SDK has
+        // never heard of -- so the legacy configuration, which is still
+        // supported and can sit at 28, failed on the generated manifest
+        // before anything was compiled.
+        assertEquals(34, AndroidGradleBuilder.TUNNEL_MIN_COMPILE_SDK);
+        assertEquals(34, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false, false, true),
+                "a tunnel build is raised to an SDK that knows its type");
+        assertEquals(28, AndroidGradleBuilder.compileSdkInt("28", "28", "28",
+                false, false, false, false),
+                "and an app without one keeps its legacy compile SDK");
+    }
+
+    @Test
     public void nothingIsEmittedWithoutTheTunnel() {
         assertEquals("", VpnManifestFragments.services(false, ""));
         assertEquals("x", VpnManifestFragments.injectPermissions(false, "x"));

@@ -2903,7 +2903,8 @@ public class AndroidGradleBuilder extends Executor {
                     compileSdkInt(maxPlatformVersion, buildToolsVersion,
                             targetNumber, usesNearbyRanging,
                             usesNearbyRanging || usesNearbyTransport
-                                    || usesNearbyCompanion, usesCallVoip));
+                                    || usesNearbyCompanion, usesCallVoip,
+                            usesCustomTunnel));
             if (callServices.length() > 0) {
                 request.putArgument("android.xapplication",
                         existingApplication + callServices);
@@ -7150,7 +7151,8 @@ public class AndroidGradleBuilder extends Executor {
         compileSdkVersion = String.valueOf(compileSdkInt(maxPlatformVersion,
                 buildToolsVersion, targetNumber, usesNearbyRanging,
                 usesNearbyRanging || usesNearbyTransport
-                        || usesNearbyCompanion, usesCallVoip));
+                        || usesNearbyCompanion, usesCallVoip,
+                usesCustomTunnel));
         String supportLibVersion = maxPlatformVersion;
         String[] supportLadder = {"28", "29", "30", "31", "32", "33", "34",
             "35", "36"};
@@ -10431,9 +10433,19 @@ public class AndroidGradleBuilder extends Executor {
      */
     static final int FOREGROUND_SERVICE_TYPE_COMPILE_SDK = 29;
 
+    /// The compile SDK a packet tunnel needs.
+    ///
+    /// 34, where FOREGROUND_SERVICE_TYPE_SYSTEM_EXEMPTED and the
+    /// systemExempted manifest enum arrive. AAPT rejects an enum value the
+    /// compile SDK has never heard of, so the legacy configuration -- which
+    /// is still supported and can sit at 28 -- failed on the generated
+    /// manifest before anything was compiled.
+    static final int TUNNEL_MIN_COMPILE_SDK = 34;
+
     static int compileSdkInt(String maxPlatformVersion, String buildToolsVersion,
             String targetNumber, boolean usesNearbyRanging,
-            boolean usesAnyNearby, boolean usesCallVoip) {
+            boolean usesAnyNearby, boolean usesCallVoip,
+            boolean usesCustomTunnel) {
         String compileSdkVersion = maxPlatformVersion;
         String[] ladder = {"28", "29", "30", "31", "32", "33", "34", "35", "36"};
         for (int i = 0; i < ladder.length; i++) {
@@ -10458,6 +10470,14 @@ public class AndroidGradleBuilder extends Executor {
         if (usesAnyNearby) {
             compileSdkVersion = ensureCompileSdkAtLeastTarget(
                     compileSdkVersion, String.valueOf(NEARBY_MIN_COMPILE_SDK));
+        }
+        if (usesCustomTunnel) {
+            // See TUNNEL_MIN_COMPILE_SDK. Unlike the VoIP attribute below,
+            // this one is not covered by the raise-to-target above: the
+            // VALUE is what needs the newer SDK, and a tunnel app may
+            // legitimately target something older than 34.
+            compileSdkVersion = ensureCompileSdkAtLeastTarget(
+                    compileSdkVersion, String.valueOf(TUNNEL_MIN_COMPILE_SDK));
         }
         // NO VoIP raise here, deliberately, and this is where the daemon
         // twin has one. A VoIP app targeting 29 or later must declare

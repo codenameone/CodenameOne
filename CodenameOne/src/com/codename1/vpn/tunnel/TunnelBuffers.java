@@ -49,4 +49,21 @@ public final class TunnelBuffers {
             int length) {
         buffer.fill(source, offset, length);
     }
+
+    /// The buffer's own array, grown to hold `capacity` bytes.
+    ///
+    /// For a platform that can write straight into it. Pair with
+    /// [#received]; see PacketBuffer for why the pair exists.
+    ///
+    /// @hidden not part of the public API.
+    public static byte[] backing(PacketBuffer buffer, int capacity) {
+        return buffer.backing(capacity);
+    }
+
+    /// Declares that `length` bytes were written into [#backing].
+    ///
+    /// @hidden not part of the public API.
+    public static void received(PacketBuffer buffer, int length) {
+        buffer.received(length);
+    }
 }

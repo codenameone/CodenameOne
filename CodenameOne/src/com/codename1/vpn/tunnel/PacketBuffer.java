@@ -83,6 +83,29 @@ public final class PacketBuffer {
         return out;
     }
 
+    /// Declares that the platform wrote `length` bytes into [#getData]
+    /// directly, so nothing needs copying.
+    ///
+    /// The zero-copy counterpart of [#fill]: a transport that can be handed
+    /// the backing array -- a Network Extension writing an NSData into it --
+    /// uses this instead, and the packet then crosses the boundary once
+    /// rather than twice.
+    void received(int length) {
+        this.offset = 0;
+        this.length = length;
+        this.family = length > 0 && ((data[0] & 0xf0) >> 4) == 6
+                ? FAMILY_IPV6 : FAMILY_IPV4;
+    }
+
+    /// Grows the backing array to at least `capacity`, discarding what it
+    /// held. Returns the array to write into.
+    byte[] backing(int capacity) {
+        if (data.length < capacity) {
+            data = new byte[capacity];
+        }
+        return data;
+    }
+
     /// Fills this buffer from an array the platform read into.
     ///
     /// Always a copy. A transport that reads STRAIGHT into this buffer's
