@@ -86,7 +86,16 @@ Every site where a mutator can be stopped is bracketed and charged to a cause --
 `pacingVolume`, `pacingBudget`, `lowMemory`, `handshake`, `pendingFull`, `nativeResume`,
 `signalStop` -- with a log2-microsecond histogram behind p50/p99/max. `[GCSTALL-T]` prints
 the same thing per second next to `[GCPROBE-T]`, including **dutyPct**: the share of wall
-time the mutator threads were RUNNING. That single number is what the whole issue was
+time the mutator threads were RUNNING.
+
+**The collector is not a mutator, and it is easy to leave it in the denominator.**
+`threadRunner` sets `lightweightThread = JAVA_TRUE` on every Java thread, the GC thread
+included, so summing all of them divided the aggregate stall by six thread-seconds instead
+of five on a four-worker run and OVERSTATED duty. `cn1StallSumThreads` excludes
+`System.gcThreadInstance` for that reason. Every duty figure quoted here was re-measured
+after that correction; earlier drafts of this file, the commit messages on the branch and
+the pull request description carry the pre-correction pair (51% -> 90%) and should not be
+copied forward. That single number is what the whole issue was
 about, and no earlier instrument could produce it.
 
 Read `cyclesOnDemand` / `cyclesAfterIdle` first. They say how the collector decided to
@@ -106,8 +115,8 @@ never got the same treatment.
 
 Fixing both halves (a latch instead of the suppression, and `gcIdleWaitMillis` answering a
 pending request instead of clearing it and sleeping) measured, interleaved in one session
-on the churn workload, median of three: **2.8x the search throughput, duty cycle 51% ->
-90%, mean mutator stall 213ms -> 15ms, and footprint DOWN 16%** -- a collector that runs
+on the churn workload, median of three: **2.8x the search throughput, duty cycle 38% ->
+86%, mean mutator stall 213ms -> 15ms, and footprint DOWN 16%** -- a collector that runs
 when asked keeps less garbage, so this does not trade memory for latency.
 `-DCN1_GC_NO_DEMAND_SIGNAL` restores both halves for A/B and is what scenario 6 of
 `GcSteadyStateIntegrationTest` re-injects.
@@ -129,7 +138,7 @@ Two things worth knowing before reading a number from this workload:
   crosses that line routinely, since a 15x15 board of ints is 900 bytes. `CN1_WL_BIGARRAY`
   (ints per throwaway array per node, default 0) is the knob that puts the workload on that
   path. It is a materially harder shape: at 256 the same fix is worth +78% throughput and
-  -38% footprint, but duty cycle only reaches ~55%, because the per-cycle legacy costs are
+  -38% footprint, but duty cycle only reaches ~53%, because the per-cycle legacy costs are
   large and are NOT what the demand-signal fix addresses.
 - **`RESULT=` is only a parity check in the fixed-round fixture.** The `vm/benchmarks`
   driver is time-bounded, so its `RESULT=` legitimately differs run to run and cannot be
