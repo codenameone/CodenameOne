@@ -148,6 +148,27 @@ public final class Pack {
             // Everything that is not source: theme.res, CSS, images. Keyed by
             // path relative to the tree, which is how an application loads them.
             w.addResourceTree(sourceRoot);
+            // Maven layout puts non-source assets under a sibling `resources/`
+            // directory and Kotlin sources under `kotlin/`. The documented
+            // invocation names the `java/` root, so both siblings would
+            // otherwise never enter the bundle -- theme.res and images would
+            // vanish and the runtime would refuse a mixed Java+Kotlin push
+            // as missing the Kotlin classes' source. Add whichever siblings
+            // exist alongside.
+            File parent = sourceRoot.getParentFile();
+            if (parent != null) {
+                File resources = new File(parent, "resources");
+                if (resources.isDirectory() && !resources.getCanonicalPath()
+                        .equals(sourceRoot.getCanonicalPath())) {
+                    w.addResourceTree(resources);
+                }
+                File kotlin = new File(parent, "kotlin");
+                if (kotlin.isDirectory() && !kotlin.getCanonicalPath()
+                        .equals(sourceRoot.getCanonicalPath())) {
+                    w.addSourceTree(kotlin);
+                    w.addResourceTree(kotlin);
+                }
+            }
         } else {
             // Keyed by the declared package, exactly as addSourceTree does:
             // the reader looks a class's source up as <package>/<SourceFile>,
