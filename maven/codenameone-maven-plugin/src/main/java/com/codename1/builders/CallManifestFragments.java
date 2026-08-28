@@ -273,23 +273,7 @@ final class CallManifestFragments {
         // and suppressed the real element for it. The manifest then has no
         // component handling android.telecom.ConnectionService, which is not
         // a build error: Telecom simply refuses every call on the device.
-        String live = withoutComments(existing);
-        int at = live.indexOf("<service");
-        while (at >= 0) {
-            int close = live.indexOf('>', at);
-            if (close < 0) {
-                return false;
-            }
-            String tag = live.substring(at, close);
-            // Both quotings, because an app hand-writing android.xapplication
-            // is writing XML by hand and either is valid there.
-            if (tag.contains("android:name=\"" + name + "\"")
-                    || tag.contains("android:name='" + name + "'")) {
-                return true;
-            }
-            at = live.indexOf("<service", close);
-        }
-        return false;
+        return ManifestServiceContract.declares(existing, name);
     }
 
     /**
@@ -302,29 +286,78 @@ final class CallManifestFragments {
      * @return the fragment with its comments removed
      */
     private static String withoutComments(String xml) {
-        int open = xml.indexOf("<!--");
-        if (open < 0) {
-            return xml;
-        }
-        StringBuilder sb = new StringBuilder();
-        int from = 0;
-        while (open >= 0) {
-            sb.append(xml, from, open);
-            int close = xml.indexOf("-->", open + 4);
-            if (close < 0) {
-                return sb.toString();
-            }
-            from = close + 3;
-            open = xml.indexOf("<!--", from);
-        }
-        sb.append(xml, from, xml.length());
-        return sb.toString();
+        return ManifestServiceContract.withoutComments(xml);
     }
+
+    /** What only Telecom holds, so only Telecom can bind the connection. */
+    static final String BIND_CONNECTION =
+            "android.permission.BIND_TELECOM_CONNECTION_SERVICE";
+
+    /** The action Telecom finds a self-managed ConnectionService by. */
+    static final String CONNECTION_ACTION =
+            "android.telecom.ConnectionService";
+
+    /** What only the system holds, so only it can bind the screener. */
+    static final String BIND_SCREENING =
+            "android.permission.BIND_SCREENING_SERVICE";
+
+    /** The action Telecom finds a CallScreeningService by. */
+    static final String SCREENING_ACTION =
+            "android.telecom.CallScreeningService";
 
     static String services(boolean session, boolean voip, boolean directory,
             String existing, int compileSdk) {
         String have = existing == null ? "" : existing;
         StringBuilder sb = new StringBuilder();
+        // A declaration the project wrote itself suppresses the generated
+        // one, and has to carry what the generated one would have. On the
+        // NAME alone an older or partial declaration replaced a working
+        // element -- Telecom refuses to bind a ConnectionService without
+        // BIND_TELECOM_CONNECTION_SERVICE or its action, a component with a
+        // filter and no android:exported fails the build from API 31, and
+        // from API 34 startForeground is refused for a type the manifest
+        // never declared. Calls.isSupported() went on answering true for all
+        // of it.
+        //
+        // Refused rather than merged, as the VPN fragments are: rewriting
+        // XML the project wrote is guesswork about intent, and two
+        // mechanisms cannot both own one element.
+        if (session || voip) {
+            // The VoIP type only when the generated element would have
+            // carried it -- it is emitted for a VoIP app compiling against
+            // 29 or later and nowhere else, so demanding it of a legacy
+            // build would refuse a declaration that is complete for the
+            // manifest this build can actually write.
+            String missing = ManifestServiceContract.whatIsMissing(have,
+                    CONNECTION_SERVICE, BIND_CONNECTION, CONNECTION_ACTION,
+                    voip && (compileSdk <= 0 || compileSdk >= 29)
+                            ? "phoneCall" : null);
+            if (missing != null) {
+                throw new IllegalArgumentException("The android.xapplication"
+                        + " build hint declares " + CONNECTION_SERVICE
+                        + " itself, so the build leaves it alone -- but that"
+                        + " declaration is missing " + missing + ". Telecom"
+                        + " would refuse to bind it and every call reported"
+                        + " through it would fail on the device. Remove the"
+                        + " declaration and let the build supply it, or add"
+                        + " what is listed.");
+            }
+        }
+        if (directory) {
+            String missing = ManifestServiceContract.whatIsMissing(have,
+                    SCREENING_SERVICE, BIND_SCREENING, SCREENING_ACTION,
+                    null);
+            if (missing != null) {
+                throw new IllegalArgumentException("The android.xapplication"
+                        + " build hint declares " + SCREENING_SERVICE
+                        + " itself, so the build leaves it alone -- but that"
+                        + " declaration is missing " + missing + ". The"
+                        + " system would never route a call to it and"
+                        + " screening would do nothing. Remove the"
+                        + " declaration and let the build supply it, or add"
+                        + " what is listed.");
+            }
+        }
         if ((session || voip) && !declares(have, CONNECTION_SERVICE)) {
             // exported=true is required rather than careless: Telecom is a
             // different process and cannot bind an unexported service. The
@@ -334,7 +367,7 @@ final class CallManifestFragments {
             sb.append("        <service android:name=\"")
                     .append(CONNECTION_SERVICE)
                     .append("\"\n                 android:permission=")
-                    .append("\"android.permission.BIND_TELECOM_CONNECTION_SERVICE\"");
+                    .append("\"").append(BIND_CONNECTION).append("\"");
             if (voip) {
                 // From API 34 startForeground is refused for a type the
                 // manifest never declared, so an app that grants itself
@@ -357,7 +390,7 @@ final class CallManifestFragments {
             sb.append("\n                 android:exported=\"true\">\n")
                     .append("            <intent-filter>\n")
                     .append("                <action android:name=")
-                    .append("\"android.telecom.ConnectionService\" />\n")
+                    .append("\"").append(CONNECTION_ACTION).append("\" />\n")
                     .append("            </intent-filter>\n")
                     .append("        </service>\n");
         }
@@ -365,11 +398,11 @@ final class CallManifestFragments {
             sb.append("        <service android:name=\"")
                     .append(SCREENING_SERVICE)
                     .append("\"\n                 android:permission=")
-                    .append("\"android.permission.BIND_SCREENING_SERVICE\"")
+                    .append("\"").append(BIND_SCREENING).append("\"")
                     .append("\n                 android:exported=\"true\">\n")
                     .append("            <intent-filter>\n")
                     .append("                <action android:name=")
-                    .append("\"android.telecom.CallScreeningService\" />\n")
+                    .append("\"").append(SCREENING_ACTION).append("\" />\n")
                     .append("            </intent-filter>\n")
                     .append("        </service>\n");
         }

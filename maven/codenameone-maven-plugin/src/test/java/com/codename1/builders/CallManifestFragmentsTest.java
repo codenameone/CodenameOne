@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The manifest a call-using app gets. */
@@ -151,22 +152,122 @@ public class CallManifestFragmentsTest {
         // android.xapplication used to suppress the whole generated block,
         // so the other went missing and either Telecom could not create the
         // app's calls or Android could not bind the screening service.
-        String mine = "        <service android:name=\""
-                + CallManifestFragments.CONNECTION_SERVICE + "\" />\n";
+        String mine = connection();
         String out = CallManifestFragments.services(true, false, true, mine);
-        assertFalse(out.contains(CallManifestFragments.CONNECTION_SERVICE),
+        assertFalse(out.contains("<service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\""),
                 "a service the project declared must not be generated again");
         assertTrue(out.contains(CallManifestFragments.SCREENING_SERVICE),
                 "the other service is still required");
     }
 
+    /**
+     * A hand-written declaration of {@code name} that Telecom will bind.
+     *
+     * <p>The tests used to pass a bare {@code <service android:name=".."/>},
+     * which is the declaration the build must NOT stand aside for -- the
+     * fixtures were encoding the defect. Suppression is still what each of
+     * them is about; the declaration just has to be a real one now.</p>
+     */
+    private static String complete(String name, String permission,
+            String action) {
+        return "        <service android:name=\"" + name + "\""
+                + " android:permission=\"" + permission + "\""
+                + " android:exported=\"true\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"" + action
+                + "\" />\n"
+                + "            </intent-filter>\n"
+                + "        </service>\n";
+    }
+
+    /** A bindable CN1ConnectionService. */
+    private static String connection() {
+        return complete(CallManifestFragments.CONNECTION_SERVICE,
+                CallManifestFragments.BIND_CONNECTION,
+                CallManifestFragments.CONNECTION_ACTION);
+    }
+
+    /** A bindable CN1CallScreeningService. */
+    private static String screening() {
+        return complete(CallManifestFragments.SCREENING_SERVICE,
+                CallManifestFragments.BIND_SCREENING,
+                CallManifestFragments.SCREENING_ACTION);
+    }
+
+    @Test
+    public void aDeclarationTelecomCannotBindIsRefused() {
+        // Suppressing the generated element on the class NAME alone let an
+        // older or partial declaration replace a working one: Telecom
+        // refuses to bind a ConnectionService without
+        // BIND_TELECOM_CONNECTION_SERVICE or its action, a component with a
+        // filter and no android:exported fails the build from API 31, and
+        // Calls.isSupported() went on answering true for all of it.
+        String bare = "        <service android:name=\""
+                + CallManifestFragments.CONNECTION_SERVICE + "\" />\n";
+        String message = assertThrows(IllegalArgumentException.class,
+                () -> CallManifestFragments.services(true, false, false, bare))
+                        .getMessage();
+        for (String needed : new String[] {"android:permission",
+                "android:exported", "intent-filter"}) {
+            assertTrue(message.contains(needed),
+                    "the message names every missing part; " + needed
+                    + " is absent from: " + message);
+        }
+        // The SCREENING service is judged by its own contract.
+        String bareScreening = "        <service android:name=\""
+                + CallManifestFragments.SCREENING_SERVICE + "\" />\n";
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> CallManifestFragments.services(false, false, true,
+                        bareScreening)).getMessage()
+                                .contains(CallManifestFragments.BIND_SCREENING),
+                "the screener names the permission the screener needs");
+    }
+
+    @Test
+    public void theVoipForegroundTypeIsDemandedOnlyWhereItIsGenerated() {
+        // The generated element carries android:foregroundServiceType
+        // ="phoneCall" for a VoIP app compiling against 29 or later and
+        // nowhere else, so that is exactly when a hand-written one has to
+        // carry it too. From API 34 startForeground is refused for a type
+        // the manifest never declared, and a call arriving in the background
+        // could not keep its service alive.
+        //
+        // Demanding it of a legacy build would refuse a declaration that is
+        // complete for the manifest this build can actually write: AAPT
+        // rejects an enum value the compile SDK does not know.
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> CallManifestFragments.services(false, true, false,
+                        connection(), 34)).getMessage()
+                                .contains("foregroundServiceType"),
+                "a VoIP service that cannot be promoted is not complete");
+        assertEquals("", CallManifestFragments.services(false, true, false,
+                connection(), 28),
+                "and a legacy build must not be asked for an enum AAPT would"
+                + " reject");
+        String withType = connection().replace(" android:exported=\"true\"",
+                " android:exported=\"true\""
+                + " android:foregroundServiceType=\"phoneCall\"");
+        assertEquals("", CallManifestFragments.services(false, true, false,
+                withType, 34),
+                "and one that carries it is accepted");
+        // A service that promotes for two reasons names both, separated by a
+        // pipe -- more complete than the generated element, not less.
+        String twoTypes = connection().replace(" android:exported=\"true\"",
+                " android:exported=\"true\" android:foregroundServiceType="
+                + "\"phoneCall|microphone\"");
+        assertEquals("", CallManifestFragments.services(false, true, false,
+                twoTypes, 34),
+                "a flag list containing the type is the type");
+    }
+
     @Test
     public void aHandDeclaredScreeningServiceLeavesTheConnectionService() {
-        String mine = "        <service android:name=\""
-                + CallManifestFragments.SCREENING_SERVICE + "\" />\n";
+        String mine = screening();
         String out = CallManifestFragments.services(true, false, true, mine);
         assertTrue(out.contains(CallManifestFragments.CONNECTION_SERVICE));
-        assertFalse(out.contains(CallManifestFragments.SCREENING_SERVICE));
+        assertFalse(out.contains("<service android:name=\""
+                + CallManifestFragments.SCREENING_SERVICE + "\""));
     }
 
     @Test
@@ -342,10 +443,10 @@ public class CallManifestFragmentsTest {
     @Test
     public void aLiveDeclarationAfterACommentStillSuppresses() {
         String mine = "        <!-- old: <service android:name=\"x\" /> -->\n"
-                + "        <service android:name=\""
-                + CallManifestFragments.CONNECTION_SERVICE + "\" />\n";
+                + connection();
         assertFalse(CallManifestFragments.services(true, false, false, mine)
-                .contains(CallManifestFragments.CONNECTION_SERVICE));
+                .contains("<service android:name=\""
+                        + CallManifestFragments.CONNECTION_SERVICE + "\""));
     }
 
     @Test
@@ -362,10 +463,14 @@ public class CallManifestFragmentsTest {
     public void singleQuotedDeclarationsSuppressToo() {
         // android.xapplication is hand-written XML, where either quoting is
         // valid.
-        String mine = "        <service android:name='"
-                + CallManifestFragments.CONNECTION_SERVICE + "' />\n";
+        String mine = connection()
+                .replace("android:name=\""
+                        + CallManifestFragments.CONNECTION_SERVICE + "\"",
+                        "android:name='"
+                        + CallManifestFragments.CONNECTION_SERVICE + "'");
         assertFalse(CallManifestFragments.services(true, false, false, mine)
-                .contains(CallManifestFragments.CONNECTION_SERVICE));
+                .contains("<service android:name=\""
+                        + CallManifestFragments.CONNECTION_SERVICE + "\""));
     }
 
     @Test

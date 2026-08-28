@@ -101,7 +101,9 @@ class VpnManifestFragmentsTest {
         return "        <service android:name=\""
                 + VpnManifestFragments.TUNNEL_SERVICE + "\""
                 + " android:permission=\""
-                + VpnManifestFragments.BIND_VPN_SERVICE + "\">\n"
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\""
                 + VpnManifestFragments.VPN_ACTION + "\" />\n"
@@ -139,19 +141,19 @@ class VpnManifestFragmentsTest {
         // does one builder over for the same reason.
         String bare = "        <service android:name=\""
                 + VpnManifestFragments.TUNNEL_SERVICE + "\" />\n";
-        IllegalArgumentException both = assertThrows(
-                IllegalArgumentException.class,
-                () -> VpnManifestFragments.services(true, bare));
-        assertTrue(both.getMessage().contains("neither"),
-                "the message names both: " + both.getMessage());
+        String both = assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, bare)).getMessage();
+        for (String needed : new String[] {"android:permission",
+                "android:exported", "android:foregroundServiceType",
+                "intent-filter"}) {
+            assertTrue(both.contains(needed),
+                    "the message names every missing part; " + needed
+                    + " is absent from: " + both);
+        }
 
-        String noPermission = "        <service android:name=\""
-                + VpnManifestFragments.TUNNEL_SERVICE + "\">\n"
-                + "            <intent-filter>\n"
-                + "                <action android:name=\""
-                + VpnManifestFragments.VPN_ACTION + "\" />\n"
-                + "            </intent-filter>\n"
-                + "        </service>\n";
+        String noPermission = bindable()
+                .replace(" android:permission=\""
+                        + VpnManifestFragments.BIND_VPN_SERVICE + "\"", "");
         assertTrue(assertThrows(IllegalArgumentException.class,
                 () -> VpnManifestFragments.services(true, noPermission))
                         .getMessage().contains("android:permission"),
@@ -160,11 +162,41 @@ class VpnManifestFragmentsTest {
         String noFilter = "        <service android:name=\""
                 + VpnManifestFragments.TUNNEL_SERVICE + "\""
                 + " android:permission=\""
-                + VpnManifestFragments.BIND_VPN_SERVICE + "\" />\n";
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\" />\n";
         assertTrue(assertThrows(IllegalArgumentException.class,
                 () -> VpnManifestFragments.services(true, noFilter))
                         .getMessage().contains("intent-filter"),
                 "and the permission alone leaves nothing to find it by");
+
+        // The ACTION has to be in a filter, not merely in the body. A
+        // meta-data that names it tells the system nothing, and the element
+        // it suppressed was the one that could be found.
+        String metaDataOnly = "        <service android:name=\""
+                + VpnManifestFragments.TUNNEL_SERVICE + "\""
+                + " android:permission=\""
+                + VpnManifestFragments.BIND_VPN_SERVICE + "\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
+                + "            <meta-data android:name=\""
+                + VpnManifestFragments.VPN_ACTION + "\""
+                + " android:value=\"x\" />\n"
+                + "        </service>\n";
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, metaDataOnly))
+                        .getMessage().contains("intent-filter"),
+                "the action outside a filter is not a filter");
+
+        // And the foreground TYPE, which Android 14 refuses a promotion
+        // without -- the service promotes itself with exactly this one.
+        String noType = bindable()
+                .replace(" android:foregroundServiceType=\"systemExempted\"",
+                        "");
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, noType))
+                        .getMessage().contains("foregroundServiceType"),
+                "a declaration that cannot be promoted is not complete");
 
         // A COMMENTED-OUT declaration is not one, so it is not judged
         // either: the build supplies its own and nothing is refused.
