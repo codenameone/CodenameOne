@@ -1468,11 +1468,20 @@ JAVA_INT com_codename1_impl_mac_MacNative_macCurrentModifiers___R_int(CODENAME_O
 JAVA_VOID com_codename1_impl_mac_MacNative_macTextInputSetOwnerWindow___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT windowId) {
     cn1OnMain(^{
         extern void CN1MacTextInputSetPendingOwner(NSView *view);
+        if (windowId == -1) {
+            // Nobody could say which surface this belongs to -- a TextInputClient
+            // that is not a Component, which the Java side passes as -1 on
+            // purpose. Cleared, so startWithText: falls back to the key window,
+            // which is where the user is typing. Sending it to the main view
+            // instead moved first responder out of a secondary window the user
+            // had just clicked into, and the client then received nothing: the
+            // Java side documents this exact fallback, and this was the half
+            // that did not honour it.
+            CN1MacTextInputSetPendingOwner(nil);
+            return;
+        }
         if (windowId < 0) {
-            // -2 is the main Form's surface and -1 is no source at all; both
-            // land on the main rendering view, because an editing session with
-            // nothing to bind it to belongs to the main surface rather than to
-            // whichever window happens to be key.
+            // -2: the main Form's surface, which has no Window and so no id.
             CN1MacTextInputSetPendingOwner([CN1MacHost sharedHost].renderingView);
             return;
         }
