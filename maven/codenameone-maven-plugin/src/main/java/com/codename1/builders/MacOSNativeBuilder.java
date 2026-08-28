@@ -1486,6 +1486,31 @@ public class MacOSNativeBuilder extends Executor {
         return false;
     }
 
+    /// Whether an APPLICATION opening a low level camera session also opens a
+    /// microphone.
+    ///
+    /// It does, by default: CameraSessionOptions.captureAudio is initialised to
+    /// true, and CN1Camera adds an AVMediaTypeAudio input whenever it is set. So
+    /// a plain Camera.open() takes the microphone, and without this the bundle
+    /// carried camera metadata and no NSMicrophoneUsageDescription -- macOS then
+    /// terminates the process the moment the session starts.
+    /// Camera.requestPermissions(audio, cb) is the same path: it opens a probe
+    /// session with exactly that option.
+    ///
+    /// The captureAudio(false) argument is deliberately NOT consulted, even
+    /// though the scanner could see it. An application that disables audio on
+    /// one session and leaves another on its default would then be reported as
+    /// using no microphone and be terminated on the second one. Over-reporting
+    /// is the recoverable direction and it has a documented way out --
+    /// macos.entitlements.device.microphone=false turns it off for an
+    /// application that knows every one of its sessions is silent.
+    static boolean applicationOpensCameraMicrophone(String caller, String cls, String method) {
+        return applicationOpensCameraSession(caller, cls, method)
+                || (!isFrameworkCameraCaller(caller)
+                    && "com/codename1/camera/Camera".equals(cls)
+                    && method.indexOf("requestPermissions") > -1);
+    }
+
     /// Whether an APPLICATION class opens a camera through the low level
     /// com.codename1.camera API.
     ///
@@ -1564,7 +1589,19 @@ public class MacOSNativeBuilder extends Executor {
             if (cls == null || method == null) {
                 return;
             }
-            if (opensMicrophone(cls, method)) {
+            // A low level camera session opens the microphone unless the
+            // application turns it off: CameraSessionOptions.captureAudio starts
+            // true and CN1Camera adds an audio input whenever it is set. This is
+            // deliberately NOT added to the native-define scanner, which shares
+            // opensMicrophone() for the recorder: the camera's audio input is
+            // compiled under the camera define, not under
+            // INCLUDE_MICROPHONE_USAGE, so switching the recorder on here would
+            // compile in a backend nothing calls. The two decisions were one
+            // rule and are now genuinely two -- an entitlement with no recorder
+            // behind it is exactly right when the microphone belongs to a camera
+            // session.
+            if (opensMicrophone(cls, method)
+                    || applicationOpensCameraMicrophone(scanning, cls, method)) {
                 caps.usesMicrophone = true;
             }
             // Matched by method one step finer than by package: the capture

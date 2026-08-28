@@ -108,6 +108,47 @@ public class MacOSNativeBuilderScanTest {
     }
 
     /**
+     * A camera session opens the microphone unless the application says not to.
+     *
+     * <p>CameraSessionOptions.captureAudio is initialised to true and CN1Camera
+     * adds an AVMediaTypeAudio input whenever it is set, so a plain
+     * Camera.open() takes the microphone. Without this the bundle carried camera
+     * metadata and no NSMicrophoneUsageDescription, and macOS terminates the
+     * process the moment the session starts.</p>
+     *
+     * <p>The captureAudio(false) argument is not consulted even though the
+     * scanner could see it: an application that disables audio on one session
+     * and leaves another on its default would then be reported as using no
+     * microphone and terminated on the second. Over-reporting is the recoverable
+     * direction and macos.entitlements.device.microphone=false is the documented
+     * way out of it.</p>
+     */
+    @Test
+    public void aLowLevelCameraSessionTakesTheMicrophoneWithIt() {
+        assertTrue("opening a session opens the default audio input",
+                MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                        "com/example/MyForm", "com/codename1/camera/Camera", "open"));
+        assertTrue("requestPermissions opens a probe session with the same options",
+                MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                        "com/example/MyForm",
+                        "com/codename1/camera/Camera", "requestPermissions"));
+
+        assertFalse("the framework's own callers are in every build",
+                MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                        "com/codename1/camera/Camera",
+                        "com/codename1/camera/Camera", "open"));
+        assertFalse(MacOSNativeBuilder.applicationOpensCameraMicrophone(
+                "com/codename1/ai/vision/CodeScanner",
+                "com/codename1/camera/Camera", "requestPermissions"));
+
+        // And the recorder rule is untouched by it, so the define keeps its own
+        // meaning: a camera session is not a reason to compile the recorder in.
+        assertFalse("a camera session is not a media recorder",
+                MacOSNativeBuilder.opensMicrophone(
+                        "com/codename1/camera/Camera", "open"));
+    }
+
+    /**
      * The low level camera API counts, but only when the APPLICATION reaches it.
      *
      * <p>The tree this scan reads is the application merged with the framework,
@@ -154,10 +195,16 @@ public class MacOSNativeBuilderScanTest {
     }
 
     /**
-     * One rule serves two decisions -- the microphone entitlement and whether
-     * the recorder is compiled at all -- so it is worth pinning on its own.
-     * Written twice they would drift, and the drift ships an application
-     * holding an entitlement with no recorder behind it.
+     * The recorder rule, which is also most of the microphone entitlement rule.
+     *
+     * <p>It used to be the whole of it. A low level camera session opens the
+     * microphone too, and that half is entitlement-only: the camera's audio
+     * input is compiled under the camera define rather than under
+     * INCLUDE_MICROPHONE_USAGE, so switching the recorder on for it would
+     * compile in a backend nothing calls. An entitlement with no recorder behind
+     * it is the correct outcome there, which is why the two decisions are no
+     * longer one rule. See
+     * {@link #aLowLevelCameraSessionTakesTheMicrophoneWithIt()}.</p>
      */
     @Test
     public void theMicrophoneRuleFollowsTheEntryPointThatOpensOne() {
