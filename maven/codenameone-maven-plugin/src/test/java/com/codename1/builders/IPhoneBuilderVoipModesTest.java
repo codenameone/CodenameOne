@@ -193,6 +193,25 @@ class IPhoneBuilderVoipModesTest {
                 "and a longer key that starts with ours is not ours");
     }
 
+    @Test
+    public void theAssemblyReadsTheKeyTheSameWayTheVoipBranchDoes()
+            throws Exception {
+        // Two readers of one fragment. The VoIP branch strips comments and
+        // finds the key structurally; the final assembly used a raw
+        // substring test -- so a project that had COMMENTED OUT an old
+        // UIBackgroundModes had ios.background_modes set for it by the first
+        // and was then refused by the second for using both mechanisms. The
+        // plist parser sees what the stripped read sees.
+        String src = builderSource();
+        int at = src.indexOf("if (backgroundModesStr != null) {");
+        assertTrue(at >= 0, "the assembly block has to be findable");
+        String block = src.substring(at, src.indexOf("</array>", at));
+        assertFalse(block.contains("inject.contains(\"UIBackgroundModes\")"),
+                "the assembly must not test the raw fragment: " + block);
+        assertTrue(block.contains("plistKeyNamed(plistWithoutComments(inject)"),
+                "it reads the live key, as the VoIP branch does");
+    }
+
     private static String builderSource() throws Exception {
         java.io.File f = new java.io.File(BUILDER_SOURCE);
         assertTrue(f.exists(), "builder source must be readable: "

@@ -14302,7 +14302,16 @@ public class IPhoneBuilder extends Executor {
 
         if (backgroundModesStr != null) {
             String[] backgroundModes = backgroundModesStr.split(",");
-            if (!inject.contains("UIBackgroundModes")) {
+            // The LIVE key, read the way the VoIP branch far above reads
+            // it. A raw substring test saw a declaration the project had
+            // COMMENTED OUT: that branch stripped comments, concluded the
+            // project supplies no modes and set ios.background_modes, and
+            // then this one found the commented text and refused the build
+            // for using both mechanisms. The plist parser sees what the
+            // stripped read sees, so this is the reading that matches what
+            // ships.
+            if (plistKeyNamed(plistWithoutComments(inject),
+                    "UIBackgroundModes", 0) < 0) {
                 inject += "\n<key>UIBackgroundModes</key><array>";
                 for (String mode : backgroundModes) {
                     if (mode.trim().isEmpty()) {
