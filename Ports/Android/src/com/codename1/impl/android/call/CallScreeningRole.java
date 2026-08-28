@@ -169,6 +169,34 @@ class CallScreeningRole {
                 finish(requestId, whenDone, false);
                 return;
             }
+            // The SHARED channel, not just this feature's own dialogs.
+            // rolePending below stops two ROLE prompts overlapping, and that
+            // is not the only way the channel is busy: any
+            // startActivityForResult in the app -- a file chooser, a share
+            // sheet, another feature's consent -- owns the single listener
+            // CodenameOneActivity keeps, and setIntentResultListener returns
+            // without installing while one is waiting. Launching anyway sent
+            // the role result to whoever was already listening and left this
+            // request in CallRequests for ever.
+            //
+            // BUSY rather than a refusal: the user has not declined
+            // anything, and an app that retries when its other dialog closes
+            // gets the prompt.
+            if (activity instanceof com.codename1.impl.android
+                    .CodenameOneActivity
+                    && ((com.codename1.impl.android.CodenameOneActivity)
+                            activity).isWaitingForResult()) {
+                if (requestId >= 0) {
+                    Calls.deliverAck(requestId, false,
+                            com.codename1.call.CallError.BUSY.ordinal(),
+                            "Another dialog is already waiting for a result;"
+                            + " ask for the screening role once it closes");
+                }
+                if (whenDone != null) {
+                    whenDone.run();
+                }
+                return;
+            }
             // One dialog at a time. CodenameOneActivity keeps a SINGLE
             // result listener and setIntentResultListener ignores a
             // replacement while it is waiting, so a second request started

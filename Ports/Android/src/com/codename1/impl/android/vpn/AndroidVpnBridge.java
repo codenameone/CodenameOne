@@ -535,6 +535,16 @@ public class AndroidVpnBridge implements VpnBridge {
             // not agreed to, and -- on a first install -- reconciledStatus()
             // read its mere presence as DISCONNECTED for a VPN that did not
             // exist. Consent carries the wire and publishes it on approval.
+            if (channelBusy(currentActivity())) {
+                // As the tunnel start does, and for the same reason: this
+                // reservation covers VPN operations, not the activity result
+                // channel every feature shares.
+                endOperation(mine);
+                fail(requestId, VpnError.UNKNOWN,
+                        "Another dialog is already waiting for a result;"
+                        + " install the profile once it closes");
+                return;
+            }
             try {
                 com.codename1.impl.android.AndroidNativeUtil
                         .startActivityForResult(consent,
@@ -1004,6 +1014,17 @@ public class AndroidVpnBridge implements VpnBridge {
         }
     }
 
+    /// Whether the one activity-result listener is already taken.
+    ///
+    /// setIntentResultListener returns WITHOUT installing while another flow
+    /// is waiting, so a prompt launched then has its result delivered to
+    /// that flow and its own request is never answered.
+    private static boolean channelBusy(Activity a) {
+        return a instanceof com.codename1.impl.android.CodenameOneActivity
+                && ((com.codename1.impl.android.CodenameOneActivity) a)
+                        .isWaitingForResult();
+    }
+
     /// Refuses a tunnel start, dropping the tunnel it registered.
     ///
     /// Every refusal goes through here rather than calling deliverAck
@@ -1063,6 +1084,17 @@ public class AndroidVpnBridge implements VpnBridge {
             failStart(requestId, VpnError.UNAUTHORIZED,
                     "Starting a VPN tunnel needs a foreground activity to"
                     + " show the consent prompt");
+            return;
+        }
+        if (channelBusy(a)) {
+            // The SHARED result channel; see CallScreeningRole for the same
+            // guard. The reservation above serializes VPN operations against
+            // each other and says nothing about a file chooser holding the
+            // one listener CodenameOneActivity keeps.
+            endOperation(mine);
+            failStart(requestId, VpnError.UNKNOWN,
+                    "Another dialog is already waiting for a result; start"
+                    + " the tunnel once it closes");
             return;
         }
         try {
