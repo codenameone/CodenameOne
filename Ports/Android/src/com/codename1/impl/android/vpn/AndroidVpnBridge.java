@@ -278,16 +278,23 @@ public class AndroidVpnBridge implements VpnBridge {
             }
         }
         synchronized (this) {
-            // Re-checked: a transport loss may have settled it already while
-            // the query above was in flight, and re-announcing an end that
-            // was announced is a status change the app never had.
+            // Re-checked AND committed in one critical section. Split, a
+            // start arriving between the check and the writes below took
+            // CONNECTING and startRequested=true, and then this stale
+            // settlement cleared the flag and overwrote the status with
+            // DISCONNECTED -- after which the new tunnel's transport
+            // callbacks were discarded as somebody else's. The three writes
+            // are what the check was about, so they belong with it.
             if (status != VpnStatus.DISCONNECTING || !stopRequested) {
                 return status;
             }
+            stopRequested = false;
+            startRequested = false;
+            status = VpnStatus.DISCONNECTED;
         }
-        stopRequested = false;
-        startRequested = false;
-        setStatus(VpnStatus.DISCONNECTED);
+        // Only the NOTIFICATION is outside, which is the rule setStatus
+        // exists to state: application code never runs under this monitor.
+        publishStatus(VpnStatus.DISCONNECTED);
         return VpnStatus.DISCONNECTED;
     }
 
@@ -1007,6 +1014,23 @@ public class AndroidVpnBridge implements VpnBridge {
                     + " adds it");
             return;
         }
+        // RESERVED, like every other path here that can open a prompt.
+        // CodenameOneActivity keeps ONE result listener and
+        // setIntentResultListener silently refuses to replace it while one
+        // is waiting -- so a second consent launched over the first had its
+        // result delivered to the first flow, left this request in
+        // VpnRequests for ever, and overwrote the registered tunnel while it
+        // was at it. The profile install guards this; the tunnel did not.
+        Object mine = new Object();
+        synchronized (this) {
+            if (operationOwner != null) {
+                Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
+                        "A VPN operation is in progress; wait for it to"
+                        + " finish before starting a tunnel");
+                return;
+            }
+            operationOwner = mine;
+        }
         // CONSENT first, and it is a prompt rather than a permission: an app
         // cannot hold BIND_VPN_SERVICE, it asks the user each time the grant
         // is not already in force. prepare() answers null when it is.
@@ -1014,16 +1038,19 @@ public class AndroidVpnBridge implements VpnBridge {
         try {
             consent = asIntent(android.net.VpnService.prepare(context));
         } catch (Exception refused) {
+            endOperation(mine);
             Tunnels.deliverAck(requestId, false, VpnError.UNKNOWN.ordinal(),
                     describe(refused));
             return;
         }
         if (consent == null) {
+            endOperation(mine);
             launchTunnel(requestId, setupWire);
             return;
         }
         Activity a = currentActivity();
         if (a == null) {
+            endOperation(mine);
             Tunnels.deliverAck(requestId, false,
                     VpnError.UNAUTHORIZED.ordinal(),
                     "Starting a VPN tunnel needs a foreground activity to"
@@ -1033,8 +1060,13 @@ public class AndroidVpnBridge implements VpnBridge {
         try {
             com.codename1.impl.android.AndroidNativeUtil
                     .startActivityForResult(consent,
-                            new TunnelConsent(this, requestId, setupWire));
+                            new TunnelConsent(this, requestId, setupWire,
+                                    mine));
+            // From here the reservation belongs to TunnelConsent, exactly as
+            // the install hands its own to Consent.
+            return;
         } catch (RuntimeException launchFailed) {
+            endOperation(mine);
             // The same case installProfile guards: a cached context that
             // still looks like an Activity after the app went to the
             // background. Answered rather than left pending.
@@ -1092,17 +1124,23 @@ public class AndroidVpnBridge implements VpnBridge {
         private final AndroidVpnBridge bridge;
         private final int requestId;
         private final String setupWire;
+        private final Object token;
 
         TunnelConsent(AndroidVpnBridge bridge, int requestId,
-                String setupWire) {
+                String setupWire, Object token) {
             this.bridge = bridge;
             this.requestId = requestId;
             this.setupWire = setupWire;
+            this.token = token;
         }
 
         @Override
         public void onActivityResult(int requestCode, int resultCode,
                 Intent data) {
+            // RELEASED before either answer, so a listener that starts
+            // another operation from the callback is not refused by the
+            // reservation this one was still holding.
+            bridge.endOperation(token);
             if (resultCode == Activity.RESULT_OK) {
                 bridge.launchTunnel(requestId, setupWire);
                 return;
@@ -1275,6 +1313,29 @@ public class AndroidVpnBridge implements VpnBridge {
     /// -- stopVpn setting DISCONNECTING and restoring it when the platform
     /// refuses -- publishes only where it ended up, rather than announcing a
     /// state that never existed and then taking it back.
+    /// Announces a status this class has already recorded.
+    ///
+    /// Split out so reconciledStatus can commit its transition under the
+    /// monitor and announce afterwards; see setStatus for why the two halves
+    /// are separated at all.
+    private void publishStatus(VpnStatus s) {
+        boolean publishNow;
+        synchronized (this) {
+            if (!listening) {
+                pendingPublication = null;
+                return;
+            }
+            if (operationOwner != null) {
+                pendingPublication = s;
+                return;
+            }
+            publishNow = true;
+        }
+        if (publishNow) {
+            Vpn.deliverStatusChanged(s.ordinal());
+        }
+    }
+
     void setStatus(VpnStatus s) {
         boolean publishNow;
         synchronized (this) {

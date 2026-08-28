@@ -2183,6 +2183,8 @@ public class AndroidGradleBuilder extends Executor {
         if (usesCustomTunnel) {
             log("VPN tunnel fragments version "
                     + VpnManifestFragments.FRAGMENT_VERSION);
+            xPermissions = VpnManifestFragments.injectPermissions(true,
+                    xPermissions);
             String existingApplication =
                     request.getArg("android.xapplication", "");
             String tunnelService = VpnManifestFragments.services(true,

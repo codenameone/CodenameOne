@@ -114,6 +114,31 @@ class VpnTunnelExtensionTest {
     }
 
     @Test
+    void anIpv6SetupRoutesTraffic() {
+        // Addresses establish the interface and route nothing, so a v6
+        // tunnel that assigned only addresses came up carrying nothing --
+        // including one that asked for the default route.
+        String src = provider();
+        assertTrue(src.contains("v6s.includedRoutes"),
+                "the v6 branch has to install routes, like the v4 one");
+        assertTrue(src.contains("NEIPv6Route"),
+                "v6 routes are their own class; the v4 helper cannot make"
+                + " them");
+    }
+
+    @Test
+    void searchDomainsReachTheLink() {
+        // TunnelSetup documents iOS applying these, and field 4 was carried
+        // across the wire and then never read -- so a short hostname that
+        // resolved on Android did not here.
+        String src = provider();
+        assertTrue(src.contains("searchDomains"),
+                "the documented behaviour has to be the implemented one");
+        assertTrue(src.contains("cn1tnField(f, 4)"),
+                "field 4 is where the wire puts them");
+    }
+
+    @Test
     void theInfoPlistDeclaresAPacketTunnel() throws Exception {
         Map<String, byte[]> files = IOSVpnTunnelExtensionBuilder.buildFileMap(
                 "com.example.app", "My VPN", "1.0", "17",

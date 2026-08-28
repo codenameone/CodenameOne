@@ -32,10 +32,12 @@ package com.codename1.builders;
  * attribute anywhere, because a name appearing as a value is not a
  * declaration.</p>
  *
- * <p>There is deliberately no permission to inject. An app does not hold
- * {@code BIND_VPN_SERVICE} -- the SERVICE declares that the system holds it,
- * which is what makes the binding trustworthy -- and the user's consent is a
- * runtime prompt rather than a permission.</p>
+ * <p>{@code BIND_VPN_SERVICE} is NOT among the permissions injected. An app
+ * does not hold it: the SERVICE declares that the system does, which is what
+ * makes the binding trustworthy, and the user's consent is a runtime prompt
+ * rather than a permission. The foreground-service permissions ARE injected,
+ * because a VPN has to keep running and Android 8 shuts down a plain started
+ * service that does.</p>
  */
 final class VpnManifestFragments {
 
@@ -57,6 +59,70 @@ final class VpnManifestFragments {
      * @param existing the current {@code android.xapplication} fragment
      * @return the element to append, possibly empty
      */
+    /**
+     * Returns the permissions a packet tunnel needs, prepended.
+     *
+     * @param tunnel         {@code com.codename1.vpn.tunnel} usage detected
+     * @param xPermissions   the current accumulated fragment
+     * @return the fragment with the permissions added
+     */
+    static String injectPermissions(boolean tunnel, String xPermissions) {
+        if (!tunnel) {
+            return xPermissions;
+        }
+        String out = xPermissions == null ? "" : xPermissions;
+        // The service promotes itself, and Android refuses the promotion
+        // without this. A tunnel that is not promoted is one Android shuts
+        // down shortly after it comes up.
+        out = addPermission(out, "android.permission.FOREGROUND_SERVICE");
+        // Android 14 wants the permission that matches the TYPE the service
+        // promotes with, and systemExempted is the type whose documented
+        // exemptions cover VPN apps. Declared whatever the app targets: a
+        // device that has never heard of it ignores it.
+        out = addPermission(out,
+                "android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED");
+        return out;
+    }
+
+    private static String addPermission(String xPermissions, String name) {
+        if (declaresPermission(xPermissions, name)) {
+            return xPermissions;
+        }
+        return "    <uses-permission android:name=\"" + name + "\" />\n"
+                + xPermissions;
+    }
+
+    /**
+     * Returns whether a LIVE {@code <uses-permission>} already declares
+     * {@code name}.
+     *
+     * <p>The same rigour {@link CallManifestFragments} arrived at: a
+     * commented-out declaration is not one, and the name appearing as a
+     * VALUE -- an {@code android:permission} attribute names a permission a
+     * component requires -- is not a declaration that this app holds it.</p>
+     *
+     * @param existing the accumulated fragment
+     * @param name     the permission name
+     * @return true when a live declaration is already there
+     */
+    static boolean declaresPermission(String existing, String name) {
+        String live = withoutComments(existing == null ? "" : existing);
+        int at = live.indexOf("<uses-permission");
+        while (at >= 0) {
+            int close = live.indexOf('>', at);
+            if (close < 0) {
+                return false;
+            }
+            String tag = live.substring(at, close);
+            if (tag.contains("android:name=\"" + name + "\"")
+                    || tag.contains("android:name='" + name + "'")) {
+                return true;
+            }
+            at = live.indexOf("<uses-permission", close);
+        }
+        return false;
+    }
+
     static String services(boolean tunnel, String existing) {
         if (!tunnel || declares(existing, TUNNEL_SERVICE)) {
             return "";
@@ -69,8 +135,12 @@ final class VpnManifestFragments {
         // android:exported is spelled out because it is MANDATORY from API
         // 31 for any component with an intent filter, and a manifest missing
         // it fails the build rather than defaulting.
+        // foregroundServiceType matches what the service promotes with, and
+        // Android 14 refuses a promotion whose type the manifest does not
+        // declare. An older platform ignores an attribute it does not know.
         return "\n        <service android:name=\"" + TUNNEL_SERVICE + "\""
                 + " android:permission=\"android.permission.BIND_VPN_SERVICE\""
+                + " android:foregroundServiceType=\"systemExempted\""
                 + " android:exported=\"true\">\n"
                 + "            <intent-filter>\n"
                 + "                <action android:name=\"android.net.VpnService\" />\n"
