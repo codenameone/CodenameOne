@@ -377,6 +377,46 @@ public class MacOSBuildHintsTest {
         assertEquals("modern", parse(raw("macos.themeMode", "nonsense"), "p").getThemeMode());
     }
 
+    /// Every remaining setting the builders used to read straight off the
+    /// request, swept in one pass rather than one report at a time.
+    ///
+    /// Each skipped the legacy macNative. spelling this class promises
+    /// everywhere else, so a project migrating off Catalyst on the documented
+    /// name silently got the default -- a Developer ID bundle without the
+    /// library-validation exception, an archive built Release when Debug was
+    /// asked for, an app with no URL schemes. Three were reported one by one
+    /// before it was worth reading the rest as one class of defect.
+    @Test
+    public void everySettingResolvesModernThenLegacyThenTheIosSpelling() {
+        assertEquals("true", parse(raw("macNative.crypto.gcm", "true"), "p").getCryptoGcm());
+        assertEquals("true", parse(raw("ios.crypto.gcm", "true"), "p").getCryptoGcm());
+        assertEquals("false", parse(raw(), "p").getCryptoGcm());
+
+        assertEquals("z.a", parse(raw("macNative.add_libs", "z.a"), "p").getAddLibs());
+        assertEquals("i.a", parse(raw("ios.add_libs", "i.a"), "p").getAddLibs());
+
+        assertTrue(parse(raw("macNative.sourceOnly", "true"), "p").isSourceOnly());
+        assertFalse(parse(raw(), "p").isSourceOnly());
+
+        assertTrue(parse(raw("macNative.loadsExternalCode", "true"), "p")
+                .isLoadsExternalCode());
+        assertFalse(parse(raw(), "p").isLoadsExternalCode());
+
+        assertEquals("myapp", parse(raw("macNative.urlSchemes", "myapp"), "p").getUrlSchemes());
+        assertEquals("iosapp", parse(raw("ios.urlSchemes", "iosapp"), "p").getUrlSchemes());
+        assertEquals("single", parse(raw("ios.urlScheme", "single"), "p").getUrlSchemes());
+
+        assertEquals("<key>A</key>",
+                parse(raw("macNative.plistInject", "<key>A</key>"), "p").getPlistInject());
+        assertEquals("<key>B</key>",
+                parse(raw("ios.plistInject", "<key>B</key>"), "p").getPlistInject());
+
+        // Precedence holds throughout: the modern spelling wins over both.
+        assertEquals("modern-wins", parse(raw("macos.urlSchemes", "modern-wins",
+                "macNative.urlSchemes", "legacy",
+                "ios.urlSchemes", "ios"), "p").getUrlSchemes());
+    }
+
     @Test
     public void appStorePackagingIsAlwaysPkg() {
         MacOSBuildHints pinned = parse(raw("macos.distribution", "both",

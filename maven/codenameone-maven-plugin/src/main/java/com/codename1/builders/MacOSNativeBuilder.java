@@ -302,8 +302,7 @@ public class MacOSNativeBuilder extends Executor {
                 // base replacement cannot see it, then restored to what the hint
                 // actually asked for. Parked rather than anchored to a newline
                 // because that anchor would quietly depend on the file staying LF.
-                boolean wantsGcm = "true".equalsIgnoreCase(request.getArg("macos.crypto.gcm",
-                        request.getArg("ios.crypto.gcm", "false")));
+                boolean wantsGcm = "true".equalsIgnoreCase(hints.getCryptoGcm());
                 replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO_GCM",
                         "//@CN1_CRYPTO_GCM_PLACEHOLDER@");
                 replaceInFile(cn1Crypto, "//#define CN1_INCLUDE_CRYPTO",
@@ -498,8 +497,7 @@ public class MacOSNativeBuilder extends Executor {
         // A migrated project carries the iOS spelling, because the target name
         // did not change under it, and a submitted .m that needs a framework
         // still compiles without one and then fails at the link.
-        String configuredLibs = request.getArg("macos.add_libs",
-                request.getArg("ios.add_libs", null));
+        String configuredLibs = hints.getAddLibs();
         if (configuredLibs != null) {
             // Semicolon, comma OR colon. IPhoneBuilder normalises all three
             // before it splits, so those are the separators a project has been
@@ -671,7 +669,7 @@ public class MacOSNativeBuilder extends Executor {
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
 
-        if (request.getArg("macos.sourceOnly", "false").equalsIgnoreCase("true")) {
+        if (hints.isSourceOnly()) {
             // mac-source: the deliverable is the project, so stop before
             // xcodebuild. Reported rather than silently skipped, because a build
             // that produces no .app and says nothing reads as a failure.
@@ -885,8 +883,7 @@ public class MacOSNativeBuilder extends Executor {
         // which a Codename One application does not, but a cn1lib shipping a
         // dylib might -- needs the library-validation exception or the load is
         // refused at runtime with nothing in the application's own logs.
-        loadsExternalCode = "true".equalsIgnoreCase(
-                request.getArg("macos.loadsExternalCode", "false"));
+        loadsExternalCode = hints.isLoadsExternalCode();
 
         Map<String, Object> plist = MacOSXcodeProject.infoPlist(request.getDisplayName(),
                 hints.getBundleId(), version, bundleVersion, hints);
@@ -924,28 +921,19 @@ public class MacOSNativeBuilder extends Executor {
                 }));
 
         List<Object> urlTypes = MacOSXcodeProject.urlTypes(hints.getBundleId(),
-                request.getArg("macos.urlSchemes",
-                        request.getArg("ios.urlSchemes",
-                                request.getArg("ios.urlScheme", null))));
+                hints.getUrlSchemes());
         if (urlTypes != null) {
             plist.put("CFBundleURLTypes", urlTypes);
         }
 
-        // ios.plistInject as well as macos.plistInject, like every other hint
-        // this builder reads. A project that was building mac-os-x-native
-        // before this port existed carries the iOS spelling, and the target name
-        // did not change under it -- so ignoring it means its document types,
-        // ATS exceptions and application services vanish from the bundle the
-        // first time it builds here, with nothing said.
-        String inject = request.getArg("macos.plistInject", null);
-        if (inject == null || inject.trim().length() == 0) {
-            inject = request.getArg("ios.plistInject", null);
-            if (inject != null && inject.trim().length() > 0) {
-                log("Using ios.plistInject for the macOS bundle. macos.plistInject is the "
-                        + "spelling for this target; the iOS one is read so a migrated project "
-                        + "keeps working.");
-            }
-        }
+        // macos.plistInject, then the legacy macNative. spelling, then
+        // ios.plistInject -- the resolver's order, like every other hint this
+        // builder reads. A project that was building mac-os-x-native before this
+        // port existed carries the iOS spelling, and the target name did not
+        // change under it, so ignoring it would make its document types, ATS
+        // exceptions and application services vanish from the bundle the first
+        // time it builds here, with nothing said.
+        String inject = hints.getPlistInject();
         String rawInject = null;
         if (inject != null && inject.trim().length() > 0) {
             if (MacOSXcodeProject.isRawPlistFragment(inject)) {

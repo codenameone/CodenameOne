@@ -534,6 +534,55 @@ public class MacOSBuildHints {
         "modern", "liquid", "material", "ios7", "flat", "auto",
     };
 
+    /**
+     * The remaining settings the builders used to read straight off the request.
+     *
+     * <p>Each one skipped the legacy {@code macNative.} spelling this class
+     * promises everywhere else, so a project migrating off Catalyst on the
+     * documented name silently got the default. Three of them were reported
+     * separately -- the archive configuration, the architectures and the bundle
+     * version -- before it was worth reading the rest as one class of defect
+     * rather than waiting for each to be found on its own.</p>
+     *
+     * <p>The {@code ios.} fallback each of them already had is preserved, as the
+     * resolver's default, so the order stays macos, then macNative, then the iOS
+     * spelling an existing settings file actually carries.</p>
+     */
+    public String getCryptoGcm() {
+        return hint(source, "crypto.gcm", source.get("ios.crypto.gcm", "false"));
+    }
+
+    /** @see #getCryptoGcm() */
+    public String getAddLibs() {
+        return hint(source, "add_libs", source.get("ios.add_libs", null));
+    }
+
+    /** @see #getCryptoGcm() */
+    public boolean isSourceOnly() {
+        return "true".equalsIgnoreCase(hint(source, "sourceOnly", "false"));
+    }
+
+    /**
+     * Whether the application loads code it did not ship, which a hardened
+     * bundle needs the library-validation exception for.
+     *
+     * @see #getCryptoGcm()
+     */
+    public boolean isLoadsExternalCode() {
+        return "true".equalsIgnoreCase(hint(source, "loadsExternalCode", "false"));
+    }
+
+    /** @see #getCryptoGcm() */
+    public String getUrlSchemes() {
+        return hint(source, "urlSchemes",
+                source.get("ios.urlSchemes", source.get("ios.urlScheme", null)));
+    }
+
+    /** @see #getCryptoGcm() */
+    public String getPlistInject() {
+        return hint(source, "plistInject", source.get("ios.plistInject", null));
+    }
+
     public String getFixedWindowSize() {
         return fixedWindowSize;
     }
