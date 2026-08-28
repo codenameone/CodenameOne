@@ -191,7 +191,14 @@ public final class VoipPush {
             HELD.clear();
         }
         for (Delivery d : held) {
-            post(d);
+            // ONE AT A TIME, and one that throws does not take the rest.
+            // HELD has already been emptied by the time this loop runs, so a
+            // delivery abandoned here is a pushed call lost for good: the
+            // native drain claimed it, its unanswered-call watchdog no
+            // longer owns it, and nothing consults HELD again until the next
+            // setListener. An application whose callReceived throws on the
+            // first of three calls used to lose the other two.
+            deliver(d);
         }
     }
 
@@ -368,6 +375,29 @@ public final class VoipPush {
         }
     }
 
+    /// Runs one delivery, containing whatever the application does with it.
+    ///
+    /// The same rule VpnTunnel.deliver states for its packet loop: a
+    /// callback that throws must not end the sequence it arrived in. Here
+    /// the sequence is a replay of calls the port has already handed over,
+    /// so ending it early loses them permanently.
+    private static void deliver(Delivery d) {
+        try {
+            post(d);
+        } catch (Throwable appFailure) {
+            report(appFailure);
+        }
+    }
+
+    /// Logs what the application threw, and never throws itself.
+    private static void report(Throwable appFailure) {
+        try {
+            com.codename1.io.Log.e(appFailure);
+        } catch (Throwable nowhereToLog) { //NOPMD EmptyCatchBlock
+            // Deliberately nothing.
+        }
+    }
+
     private static void post(Delivery d) {
         // A CALL with nobody to hand it to is held, not dropped; see HELD.
         // A token is not: it is re-read from getToken() by whoever asks, and
@@ -484,10 +514,17 @@ public final class VoipPush {
                     // told what it missed.
                     continue;
                 }
-                if (call != null) {
-                    l.callReceived(current());
-                } else {
-                    l.tokenChanged(newToken);
+                // PER LISTENER, so one that throws does not silence the
+                // others. Two registrations are two apps' worth of code as
+                // far as this class is concerned.
+                try {
+                    if (call != null) {
+                        l.callReceived(current());
+                    } else {
+                        l.tokenChanged(newToken);
+                    }
+                } catch (Throwable appFailure) {
+                    report(appFailure);
                 }
             }
         }

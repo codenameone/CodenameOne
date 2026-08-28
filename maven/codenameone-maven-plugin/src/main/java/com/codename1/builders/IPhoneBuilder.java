@@ -3957,6 +3957,27 @@ public class IPhoneBuilder extends Executor {
         // project had set the hint itself -- which is the one case that
         // needed no inference. The class scan runs earlier in this method, so
         // usesCallVoip is already known here.
+        // A VoIP app that turned push OFF is a contradiction the build
+        // cannot resolve for it. Inferring the default is not enough: an
+        // explicit ios.includePush=false still wins below, so the app got
+        // PushKit compiled in and the voip background mode declared while
+        // includePush stayed false -- signed, installable, and unable to
+        // receive the one kind of push the integration exists for.
+        //
+        // Refused rather than overridden: the hint is the project saying
+        // something deliberate, and quietly ignoring it would ship a build
+        // that disagrees with its own configuration. The way out is to
+        // remove the hint or to stop referencing the package.
+        if (usesCallVoip && "false".equalsIgnoreCase(
+                request.getArg("ios.includePush", null))) {
+            throw new BuildException("This app uses com.codename1.call.voip,"
+                    + " which rings through a VoIP push, but ios.includePush"
+                    + " is false. The build would carry PushKit and the voip"
+                    + " background mode with no push entitlement, so no"
+                    + " incoming call could ever arrive. Remove"
+                    + " ios.includePush=false, or stop referencing"
+                    + " com.codename1.call.voip.");
+        }
         if (usesCallVoip && request.getArg("ios.includePush", null) == null) {
             request.putArgument("ios.includePush", "true");
         }

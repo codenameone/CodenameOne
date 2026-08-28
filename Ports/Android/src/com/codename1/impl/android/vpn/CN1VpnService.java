@@ -246,6 +246,12 @@ public class CN1VpnService extends VpnService {
         ParcelFileDescriptor fd;
         try {
             fd = establish(fields);
+        } catch (UnresolvedGateway unresolved) {
+            // BEFORE the generic case, and with its own error: see the type.
+            fail(requestId, VpnError.CONNECTION_FAILED,
+                    unresolved.getMessage());
+            stopIfIdle(startId);
+            return;
         } catch (RuntimeException refused) {
             // establish() answers null when consent was revoked between the
             // prompt and here, and throws when the builder was given
@@ -350,6 +356,30 @@ public class CN1VpnService extends VpnService {
         // the routes, which is what the setup already describes.
         String[] servers = serverAddresses(TunnelWire.server(fields));
         String[] routes = TunnelWire.routes(fields);
+        if (servers.length == 0
+                && TunnelWire.server(fields).length() > 0
+                && carriesEverything(routes)) {
+            // A NAME that would not resolve, under a route that captures
+            // everything. TunnelSetup.server promises the gateway stays
+            // outside the tunnel, and the only way this service can keep
+            // that promise is to leave the address out of the routes -- it
+            // has no socket to protect, because the app owns the transport.
+            // So with 0.0.0.0/0 or ::/0 and no address to exclude, the
+            // tunnel's own connection to its gateway goes into the TUN it is
+            // trying to serve, and nothing moves. Coming up anyway reported
+            // success and blackholed the device.
+            //
+            // Only for a route that carries EVERYTHING. Under a narrower one
+            // the gateway may well sit outside it, and refusing there would
+            // turn a transient DNS failure into a refusal for a tunnel that
+            // would have worked.
+            throw new UnresolvedGateway("The VPN gateway '"
+                    + TunnelWire.server(fields) + "' could not be resolved,"
+                    + " and this setup routes all traffic into the tunnel --"
+                    + " so the tunnel's own connection to it would be"
+                    + " captured by the tunnel. Try again once the name"
+                    + " resolves, or give the address the transport dials.");
+        }
         boolean excluded = servers.length > 0;
         if (excluded && Build.VERSION.SDK_INT >= 33) {
             // The direct way, where the platform has it. EVERY address:
@@ -456,6 +486,41 @@ public class CN1VpnService extends VpnService {
             // up without the exclusion rather than not at all, which is what
             // it did before this existed.
             return new String[0];
+        }
+    }
+
+    /// Whether these routes carry every address of either family.
+    ///
+    /// A prefix of 0 is the default route, and it is what a full-tunnel VPN
+    /// asks for. Anything narrower may or may not contain a given gateway,
+    /// which is not something this can decide without the address it did not
+    /// get.
+    private static boolean carriesEverything(String[] routes) {
+        for (int i = 0; i < routes.length; i++) {
+            try {
+                if (TunnelWire.prefix(routes[i], "route") == 0) {
+                    return true;
+                }
+            } catch (IllegalArgumentException unreadable) {
+                // Not this method's to answer. The route loop below reads
+                // the same block through the same parser and refuses the
+                // whole setup, with a message about the block rather than
+                // about the gateway.
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// A configured gateway name that DNS could not answer.
+    ///
+    /// Its own type so open() can tell it from the malformed-setup case the
+    /// generic catch handles: a name that does not resolve right now is a
+    /// CONNECTION_FAILED, not an INVALID_CONFIGURATION, and an app that
+    /// retries on the one and gives up on the other needs the difference.
+    private static final class UnresolvedGateway extends RuntimeException {
+        UnresolvedGateway(String message) {
+            super(message);
         }
     }
 

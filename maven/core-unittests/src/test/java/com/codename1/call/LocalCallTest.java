@@ -610,6 +610,43 @@ public class LocalCallTest {
     }
 
     @Test
+    public void aListenerThatThrowsDoesNotLoseTheRestOfTheReplay() {
+        // Three calls arrive before any listener exists, so all three wait in
+        // HELD. setListener empties HELD and delivers them, and on this
+        // platform the deliveries run inline -- so a listener that threw on
+        // the first abandoned the loop, and the other two were already out of
+        // HELD and gone for good. Nothing consults HELD again until the next
+        // setListener, and the native drain had already claimed them, so
+        // their unanswered-call watchdog no longer owned them either: two
+        // calls the system was ringing and the app was never told about.
+        CallAwait.value(Calls.configure(
+                new CallConfiguration().displayName("Acme")));
+        for (int i = 0; i < 3; i++) {
+            VoipPush.deliverPushedCall(CallId.random(),
+                    CallWire.encodeHandle(CallHandle.phone("+1415555121"
+                            + i)),
+                    "Ada", false, false, false, "room-" + i,
+                    System.currentTimeMillis());
+        }
+        final List<PushedCall> got = new ArrayList<PushedCall>();
+        // ON THE EDT, and that is the whole point of the test rather than a
+        // detail of it. post() delivers INLINE when the caller is already on
+        // the EDT, so the three replays run inside setListener's own loop --
+        // which is the arrangement in which one that throws can take the
+        // others with it. Called from the test thread instead, each delivery
+        // is queued as its own EDT task and a throw in one could not reach
+        // the rest, so the assertion would hold whatever the code did.
+        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                VoipPush.setListener(new ThrowsOnce(got));
+            }
+        });
+        waitFor(got, 3);
+        assertEquals(3, got.size(),
+                "every held call is replayed, whatever the first one did");
+    }
+
+    @Test
     public void deferringTwiceLeavesNoTimerThreadBehind() {
         // Two listeners on one action both defer it -- or one defers twice --
         // and each call used to build a Timer and overwrite the field, so
@@ -1362,6 +1399,27 @@ public class LocalCallTest {
     }
 
     // ------------------------------------------------------------------
+
+    /** Collects pushed calls, throwing on the first. */
+    private static final class ThrowsOnce implements VoipPushListener {
+        private final List<PushedCall> sink;
+        private boolean thrown;
+
+        ThrowsOnce(List<PushedCall> sink) {
+            this.sink = sink;
+        }
+
+        public void callReceived(PushedCall call) {
+            sink.add(call);
+            if (!thrown) {
+                thrown = true;
+                throw new IllegalStateException("a badly behaved listener");
+            }
+        }
+
+        public void tokenChanged(String token) {
+        }
+    }
 
     /** Collects pushed calls. A named class so it holds no outer reference. */
     private static final class Collector implements VoipPushListener {
