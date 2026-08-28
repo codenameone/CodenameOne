@@ -204,17 +204,145 @@ final class LibraryClassPrefixScan {
         if (bytes == null || bytes.length == 0) {
             return;
         }
-        String text;
-        try {
-            // ISO-8859-1 so every byte maps to a char and nothing is lost;
-            // the prefixes are ASCII, so a match is a match.
-            text = new String(bytes, "ISO-8859-1");
-        } catch (java.io.UnsupportedEncodingException never) {
+        // The class's REFERENCES, not every byte in it. A raw text search
+        // matched a package name that merely appeared in a string constant --
+        // a feature registry listing package names, a log message, a piece of
+        // documentation -- and reported it as API usage. That is not a
+        // cosmetic over-report on iOS: com/codename1/call/directory/ turns on
+        // the Call Directory extension, and a signed build then aborts unless
+        // a separate extension provisioning profile is supplied. A library
+        // that only NAMES the package in a string broke the build of every
+        // app that included it.
+        //
+        // Class names and descriptors are the two places a real reference
+        // appears, and both are reachable from the constant pool without
+        // asking what bytecode version this is.
+        Set<String> references = classReferences(bytes);
+        if (references == null) {
+            // Unparseable. The raw scan is what this did before, and keeping
+            // it here means a class shape this parser does not understand
+            // still contributes rather than silently disabling a feature the
+            // app really uses.
+            String text;
+            try {
+                // ISO-8859-1 so every byte maps to a char and nothing is
+                // lost; the prefixes are ASCII, so a match is a match.
+                text = new String(bytes, "ISO-8859-1");
+            } catch (java.io.UnsupportedEncodingException never) {
+                return;
+            }
+            for (int i = 0; i < prefixes.length; i++) {
+                if (!found.contains(prefixes[i])
+                        && text.indexOf(prefixes[i]) >= 0) {
+                    found.add(prefixes[i]);
+                }
+            }
             return;
         }
         for (int i = 0; i < prefixes.length; i++) {
-            if (!found.contains(prefixes[i]) && text.indexOf(prefixes[i]) >= 0) {
-                found.add(prefixes[i]);
+            if (found.contains(prefixes[i])) {
+                continue;
+            }
+            for (String reference : references) {
+                if (reference.indexOf(prefixes[i]) >= 0) {
+                    found.add(prefixes[i]);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Every class name and type descriptor a class file refers to, or null
+    /// when the bytes are not a class file this can read.
+    ///
+    /// Deliberately NOT through a bytecode library. The daemon's ASM is
+    /// pinned to a version that refuses class files newer than it knows, and
+    /// refusing to read a modern library is the same failure as misreading an
+    /// old one. The constant pool's shape has not changed: only new TAGS have
+    /// been added, and those are skipped by size.
+    ///
+    /// Utf8 entries reached from a CONSTANT_Class, a CONSTANT_NameAndType
+    /// descriptor or a CONSTANT_MethodType are references. A Utf8 reached
+    /// from a CONSTANT_String is a literal the code happens to carry, and
+    /// that is exactly the difference this method exists to draw.
+    static Set<String> classReferences(byte[] bytes) {
+        java.io.DataInputStream in = new java.io.DataInputStream(
+                new java.io.ByteArrayInputStream(bytes));
+        try {
+            if (in.readInt() != 0xCAFEBABE) {
+                return null;
+            }
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            int count = in.readUnsignedShort();
+            String[] utf8 = new String[count];
+            int[] referenced = new int[count];
+            int referencedCount = 0;
+            for (int i = 1; i < count; i++) {
+                int tag = in.readUnsignedByte();
+                switch (tag) {
+                    case 1:
+                        utf8[i] = in.readUTF();
+                        break;
+                    case 7:
+                    case 16:
+                        referenced[referencedCount++] =
+                                in.readUnsignedShort();
+                        break;
+                    case 12:
+                        in.readUnsignedShort();
+                        referenced[referencedCount++] =
+                                in.readUnsignedShort();
+                        break;
+                    case 8:
+                    case 19:
+                    case 20:
+                        in.readUnsignedShort();
+                        break;
+                    case 3:
+                    case 4:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 17:
+                    case 18:
+                        in.readInt();
+                        break;
+                    case 5:
+                    case 6:
+                        in.readLong();
+                        // A long or double takes TWO pool slots, and the
+                        // second one is unusable. Miscounting here shifts
+                        // every later index and turns the rest of the pool
+                        // into noise.
+                        i++;
+                        break;
+                    case 15:
+                        in.readUnsignedByte();
+                        in.readUnsignedShort();
+                        break;
+                    default:
+                        // A tag this does not know means the rest cannot be
+                        // walked, so say so rather than returning a partial
+                        // answer that reads as "no references".
+                        return null;
+                }
+            }
+            Set<String> out = new HashSet<String>();
+            for (int i = 0; i < referencedCount; i++) {
+                int index = referenced[i];
+                if (index > 0 && index < count && utf8[index] != null) {
+                    out.add(utf8[index]);
+                }
+            }
+            return out;
+        } catch (Throwable unreadable) {
+            return null;
+        } finally {
+            try {
+                in.close();
+            } catch (java.io.IOException ignored) {
+                // Nothing useful to do about a failed close on a byte array.
             }
         }
     }

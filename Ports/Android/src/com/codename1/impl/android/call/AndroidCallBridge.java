@@ -455,7 +455,7 @@ public class AndroidCallBridge implements CallBridge {
     public void reportIncomingCall(int requestId, String callId,
             String handleWire, String displayName, int capabilityBits,
             boolean hasVideo) {
-        if (!ready(requestId)) {
+        if (!ready(requestId, true)) {
             return;
         }
         Bundle extras = extrasFor(callId, handleWire, displayName, hasVideo);
@@ -473,7 +473,7 @@ public class AndroidCallBridge implements CallBridge {
     public void reportOutgoingCall(int requestId, String callId,
             String handleWire, String displayName, int capabilityBits,
             boolean hasVideo) {
-        if (!ready(requestId)) {
+        if (!ready(requestId, false)) {
             return;
         }
         // A call the SYSTEM asked this app to place is already in Telecom.
@@ -550,7 +550,9 @@ public class AndroidCallBridge implements CallBridge {
         return false;
     }
 
-    private boolean ready(int requestId) {
+    /// @param incoming whether the call being reported will have to RING,
+    /// which is the only case that needs a notification to be showable
+    private boolean ready(int requestId, boolean incoming) {
         if (!isCallSupported()) {
             Calls.deliverAck(requestId, false, CallError.NOT_SUPPORTED.ordinal(),
                     "Self-managed calls need Android 8.0 or newer");
@@ -562,6 +564,31 @@ public class AndroidCallBridge implements CallBridge {
             Calls.deliverAck(requestId, false, CallError.CALL_REFUSED.ordinal(),
                     "Calls.configure() must run before a call is reported:"
                     + " Telecom ignores calls from an unregistered account");
+            return false;
+        }
+        // The last predicate getCallAvailability refuses on, and it was
+        // missing here. That method's own comment says why it matters -- a
+        // self-managed call has no system call UI on Android, this port rings
+        // with a full-screen notification, and without the permission the OS
+        // suppresses it -- and then says that Telecom would still accept the
+        // call, leaving the app believing it is ringing while nothing is.
+        // Which is precisely what this method did: the availability query
+        // answered NOT_PERMITTED and the report went through and was
+        // acknowledged as a success.
+        //
+        // Only for an INCOMING call. An outgoing one never rings, so it needs
+        // no notification and refusing it would take away a call the user
+        // themselves started.
+        if (incoming
+                && ((getGrantedPermissions() & PERMISSION_NOTIFICATIONS) == 0
+                        || !notificationsWillShow())) {
+            Calls.deliverAck(requestId, false,
+                    CallError.UNAUTHORIZED.ordinal(),
+                    "An incoming self-managed call rings through a"
+                    + " notification, and this app cannot show one: grant"
+                    + " POST_NOTIFICATIONS and enable the incoming call"
+                    + " channel. Calls.getAvailability() reports this as"
+                    + " NOT_PERMITTED before a call is reported.");
             return false;
         }
         return true;

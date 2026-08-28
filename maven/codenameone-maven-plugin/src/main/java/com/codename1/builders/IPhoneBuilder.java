@@ -769,21 +769,38 @@ public class IPhoneBuilder extends Executor {
         if (injected == null) {
             return false;
         }
-        int key = injected.indexOf("<key>UIBackgroundModes</key>");
+        // Live elements only. A modes array the project commented out is not
+        // one it supplies, and reading it as supplied skipped generating the
+        // real one -- so the app shipped with no voip mode at all.
+        String live = plistWithoutComments(injected);
+        int key = live.indexOf("<key>UIBackgroundModes</key>");
         while (key >= 0) {
-            int open = injected.indexOf("<array>", key);
-            if (open < 0) {
-                return false;
+            int after = key + "<key>UIBackgroundModes</key>".length();
+            // The key's IMMEDIATE value. Scanning forward for the next
+            // <array> anywhere meant a UIBackgroundModes given some other
+            // value -- a <string>, a <false/> -- was answered from an
+            // unrelated later array that happened to contain "voip", so the
+            // fragment was accepted as already declaring the mode and the
+            // real one was never generated. The app then could not be woken
+            // by a call, which is the whole point of the mode.
+            int probe = after;
+            while (probe < live.length()
+                    && Character.isWhitespace(live.charAt(probe))) {
+                probe++;
             }
-            int close = injected.indexOf("</array>", open);
-            if (close < 0) {
-                return false;
+            if (probe < live.length() && live.startsWith("<array>", probe)) {
+                int close = live.indexOf("</array>", probe);
+                if (close < 0) {
+                    return false;
+                }
+                String body = live.substring(probe + "<array>".length(), close);
+                if (arrayHasString(body, "voip")) {
+                    return true;
+                }
+                key = live.indexOf("<key>UIBackgroundModes</key>", close);
+                continue;
             }
-            String body = injected.substring(open + "<array>".length(), close);
-            if (arrayHasString(body, "voip")) {
-                return true;
-            }
-            key = injected.indexOf("<key>UIBackgroundModes</key>", close);
+            key = live.indexOf("<key>UIBackgroundModes</key>", after);
         }
         return false;
     }

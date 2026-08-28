@@ -1420,11 +1420,33 @@ static NSString *cn1clUuidFrom(NSDictionary *call, BOOL *synthesized) {
             // would leave the obligation exactly as unmet as skipping it.
             // Reported and ended inside one completion block, so it is an
             // acknowledgement to PushKit and never a call anyone sees.
+            //
+            // It does cost something, and the cost is known: a provider
+            // logs its calls to Recents at the end of each one
+            // (includesCallsInRecents, default YES), so a retraction leaves
+            // an entry for a call that was never separately placed. There is
+            // no per-call way to suppress that, and no way to avoid a second
+            // call at all -- PushKit wants a NEW incoming call per push, this
+            // push's call already exists, and re-reporting it fails. The
+            // trade is one Recents entry against process termination and,
+            // on repetition, losing VoIP push delivery altogether; an app
+            // that would rather have neither can turn the whole log off with
+            // the ios.call.recents build hint.
+            //
+            // So the entry is made TRUTHFUL instead: the retraction carries
+            // the caller's handle when the payload names one, which it does
+            // whenever the same server sent the call. What lands in Recents
+            // is then the caller who rang and hung up, not an unknown call.
             NSUUID *ack = [NSUUID UUID];
+            id cancelHandleValue = [call objectForKey:@"handle"];
+            NSString *cancelHandle =
+                    [cancelHandleValue isKindOfClass:[NSString class]]
+                            && [(NSString *)cancelHandleValue length] > 0
+                    ? (NSString *)cancelHandleValue : @" ";
             CXCallUpdate *retracted = [[[CXCallUpdate alloc] init] autorelease];
             retracted.remoteHandle =
                     [[[CXHandle alloc] initWithType:CXHandleTypeGeneric
-                                             value:@" "] autorelease];
+                                             value:cancelHandle] autorelease];
             [cn1clEnsureProvider() reportNewIncomingCallWithUUID:ack
                     update:retracted completion:^(NSError *error) {
                 [cn1clEnsureProvider() reportCallWithUUID:ack
