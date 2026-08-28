@@ -124,8 +124,16 @@ public final class VoipPush {
             // a Calls listener that is still installed.
             CallRequests.setPushesWanted(l != null);
             drainWanted = l != null;
-            b = CallRequests.bridge();
         }
+        // OUTSIDE the monitor. CallRequests.bridge() drains the port's held
+        // pushes as part of resolving it, and a drain reaches the
+        // application's callReceived -- so this ran app code while LISTENERS
+        // was held, and a callback that waited on any thread which itself
+        // calls setListener, including ordinary listener replacement or
+        // shutdown, deadlocked the EDT and the call UI with it. The flags
+        // above still move first, which is the ordering the comment there is
+        // about; only the lookup moved.
+        b = CallRequests.bridge();
         if (b != null) {
             drainIfWanted(b);
         }

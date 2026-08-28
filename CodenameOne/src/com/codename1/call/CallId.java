@@ -76,7 +76,13 @@ public final class CallId {
     /// wrong session an answer or an end.
     ///
     /// Every port that supports calling implements secureRandomBytes, so
-    /// this does not narrow where the API works.
+    /// this does not narrow which PLATFORMS the API works on -- but it does
+    /// require the runtime to be up, because the bytes come through the
+    /// implementation. That is true wherever application code runs and is
+    /// NOT true in a platform service the OS starts on its own: Android's
+    /// CN1ConnectionService can be created by Telecom in a process with no
+    /// Display, and it mints its own id there rather than calling this.
+    /// A port adding a similar entry point has to do the same.
     ///
     /// @return 36 uppercase characters with hyphens
     public static String random() {

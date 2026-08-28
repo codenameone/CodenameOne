@@ -216,7 +216,19 @@ public class CN1ConnectionService extends ConnectionService {
             }
         }
         if (external) {
-            id = CallId.random();
+            // NOT CallId.random(). Telecom starts this service in whatever
+            // process it finds, and a call placed from Recents, Contacts or
+            // an assistant after the app was killed reaches here with no
+            // Codename One runtime at all -- no Display, no implementation.
+            // CallId.random() goes through SecureRandom to that
+            // implementation and throws when there is none, so the service
+            // would die instead of delivering startCallRequested, which is
+            // the one path this whole branch exists to serve.
+            //
+            // The platform's own CSPRNG needs none of that and has the
+            // property CallId.random was moved onto: seeded by the platform
+            // rather than by the clock.
+            id = coldRandomCallId();
         }
         if (id == null) {
             // Nothing can be routed to a call with no identifier, so refusing
@@ -262,6 +274,27 @@ public class CN1ConnectionService extends ConnectionService {
     /// Telecom hands it over as a `tel:` or `sip:` URI; anything else is
     /// carried through as a generic handle rather than dropped, because the
     /// app can still recognise an address this bridge does not.
+    /// Android's own CSPRNG, for ids minted where the framework is absent.
+    private static final java.security.SecureRandom COLD_RANDOM =
+            new java.security.SecureRandom();
+
+    /// A version-4 call id generated without the Codename One runtime.
+    ///
+    /// The two RFC 4122 masks are repeated from
+    /// `com.codename1.call.CallId#random` rather than called, because that
+    /// method reaches the implementation and this runs in a cold service
+    /// process where there is none. `CallId#format` is pure and IS shared,
+    /// so the duplication is those two bytes and nothing else.
+    private static String coldRandomCallId() {
+        byte[] bytes = new byte[16];
+        COLD_RANDOM.nextBytes(bytes);
+        // Version 4, variant 1. Without these the value is unique but is not
+        // a valid UUID, which Telecom and CallKit both require.
+        bytes[6] = (byte) ((bytes[6] & 0x0f) | 0x40);
+        bytes[8] = (byte) ((bytes[8] & 0x3f) | 0x80);
+        return CallId.format(bytes);
+    }
+
     private static String externalHandleWire(ConnectionRequest request) {
         Uri address = request == null ? null : request.getAddress();
         if (address == null) {

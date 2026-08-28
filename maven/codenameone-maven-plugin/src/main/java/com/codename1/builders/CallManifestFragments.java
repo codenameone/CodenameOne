@@ -226,6 +226,45 @@ final class CallManifestFragments {
      * @param name     the fully qualified component name
      * @return true when the fragment already declares that exact component
      */
+    /**
+     * Returns whether {@code existing} already has a LIVE
+     * {@code <uses-permission>} for {@code name}.
+     *
+     * <p>The same rigour {@link #declares} applies to services, and for the
+     * same reason -- this one was a bare substring test for the quoted name
+     * anywhere in the fragment. A developer who comments a declaration out,
+     * which is the ordinary way to disable one, matched it: the generated
+     * live element was suppressed, the parser then discarded the comment, and
+     * the manifest shipped without the permission. That is not a build error.
+     * Without MANAGE_OWN_CALLS Telecom refuses every self-managed call on the
+     * device; without RECORD_AUDIO there is no call audio. The same test also
+     * matched the name used as a VALUE elsewhere -- an {@code android:permission}
+     * attribute on a component names a permission it requires, which is not a
+     * declaration that this app holds one.</p>
+     *
+     * @param existing the accumulated fragment
+     * @param name     the permission name
+     * @return true when a live declaration is already there
+     */
+    private static boolean declaresPermission(String existing, String name) {
+        String live = withoutComments(existing);
+        int at = live.indexOf("<uses-permission");
+        while (at >= 0) {
+            int close = live.indexOf('>', at);
+            if (close < 0) {
+                return false;
+            }
+            String tag = live.substring(at, close);
+            // Both quotings; see declares.
+            if (tag.contains("android:name=\"" + name + "\"")
+                    || tag.contains("android:name='" + name + "'")) {
+                return true;
+            }
+            at = live.indexOf("<uses-permission", close);
+        }
+        return false;
+    }
+
     private static boolean declares(String existing, String name) {
         // The attribute has to sit inside a LIVE <service> start tag. Testing
         // the whole fragment for the attribute matched it wherever it
@@ -362,7 +401,7 @@ final class CallManifestFragments {
 
     private static String addPermission(String xPermissions, String name,
             String extraAttributes) {
-        if (xPermissions.contains("\"" + name + "\"")) {
+        if (declaresPermission(xPermissions, name)) {
             return xPermissions;
         }
         return "    <uses-permission android:name=\"" + name + "\""

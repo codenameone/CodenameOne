@@ -265,6 +265,58 @@ public class CallManifestFragmentsTest {
     }
 
     @Test
+    public void aCommentedOutPermissionIsNotADeclaration() {
+        // The service dedup was hardened against this and the PERMISSION
+        // dedup was not: it tested for the quoted name anywhere in the
+        // fragment. Commenting a declaration out is the ordinary way to
+        // disable one, and it suppressed the generated live element -- after
+        // which the parser discards the comment and the manifest ships
+        // without the permission. Not a build error: Telecom simply refuses
+        // every self-managed call on the device.
+        String mine = "        <!-- <uses-permission android:name=\""
+                + "android.permission.MANAGE_OWN_CALLS\" /> -->\n";
+        String out = CallManifestFragments.injectPermissions(mine, true, false,
+                false, 34);
+        assertEquals(1, count(withoutComments(out),
+                "\"android.permission.MANAGE_OWN_CALLS\""),
+                "a commented-out declaration must not suppress the live one");
+    }
+
+    @Test
+    public void aPermissionNamedAsAValueIsNotADeclaration() {
+        // android:permission on a component names a permission the component
+        // REQUIRES. It is not this app declaring that it holds one, and the
+        // substring test read it as exactly that.
+        String mine = "        <service android:name=\"com.example.S\""
+                + " android:permission=\"android.permission.RECORD_AUDIO\" />\n";
+        String out = CallManifestFragments.injectPermissions(mine, true, false,
+                false, 34);
+        assertTrue(out.contains("<uses-permission android:name=\""
+                + "android.permission.RECORD_AUDIO\""),
+                "requiring a permission is not declaring it");
+    }
+
+    /// Strips comments the way the fragment builder does, so a count can ask
+    /// about live elements only.
+    private static String withoutComments(String xml) {
+        StringBuilder sb = new StringBuilder();
+        int at = 0;
+        while (true) {
+            int open = xml.indexOf("<!--", at);
+            if (open < 0) {
+                sb.append(xml.substring(at));
+                return sb.toString();
+            }
+            sb.append(xml, at, open);
+            int close = xml.indexOf("-->", open);
+            if (close < 0) {
+                return sb.toString();
+            }
+            at = close + 3;
+        }
+    }
+
+    @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
         // The exact-attribute matcher still matched inside a comment, so an
         // app that had commented its own <service> OUT lost the generated one

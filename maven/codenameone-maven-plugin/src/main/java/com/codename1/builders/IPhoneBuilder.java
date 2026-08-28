@@ -11024,6 +11024,34 @@ public class IPhoneBuilder extends Executor {
     /// Objective-C rather than Swift, so no SWIFT_VERSION and no embedded
     /// Swift runtime: an extension is memory-capped and CallKit has an
     /// Objective-C interface, unlike MatterSupport.
+    /// The file name Xcode will give a generated extension's product, or null
+    /// when only Xcode could work it out.
+    ///
+    /// PRODUCT_NAME defaults to `$(TARGET_NAME)`, and a target created with
+    /// the extension's name therefore builds `<extensionName>.appex`. A
+    /// literal override is honoured -- it is a name, and the embed phase can
+    /// use it. Anything else still holding a `$` is a setting whose value
+    /// depends on the configuration or the SDK, which this build has no way
+    /// to expand; the app-extension path treats the same shape as
+    /// unresolvable for the same reason.
+    ///
+    /// @param productName the PRODUCT_NAME the target will carry, or null
+    /// @param extensionName the target's name
+    /// @return the product's base name, or null when it cannot be known
+    static String effectiveExtensionProductName(String productName,
+            String extensionName) {
+        String value = productName == null ? "" : productName.trim();
+        if (value.length() == 0
+                || "$(TARGET_NAME)".equals(value)
+                || "${TARGET_NAME}".equals(value)) {
+            return extensionName;
+        }
+        if (value.indexOf('$') >= 0) {
+            return null;
+        }
+        return value;
+    }
+
     private void appendCallDirectoryExtensionTarget(StringBuilder sb,
             BuildRequest request, File distDir)
             throws IOException, BuildException {
@@ -11082,6 +11110,23 @@ public class IPhoneBuilder extends Executor {
                         request.getArg(key, ""));
             }
         }
+        // What Xcode will actually NAME the built product, which is not
+        // always the target. PRODUCT_NAME is set to $(TARGET_NAME) above and
+        // the ios.call.directory.buildSettings.* loop can replace it, so the
+        // embed phase below had the host copying CN1CallDirectory.appex while
+        // Xcode built <override>.appex -- a product that does not exist, and
+        // an archive that fails naming a file the developer never wrote.
+        String productName = effectiveExtensionProductName(
+                buildSettingsMap.get("PRODUCT_NAME"), name);
+        if (productName == null) {
+            // Refused rather than guessed; see effectiveExtensionProductName.
+            throw new RuntimeException(
+                    "ios.call.directory.buildSettings.PRODUCT_NAME is \""
+                    + buildSettingsMap.get("PRODUCT_NAME") + "\", which this"
+                    + " build cannot evaluate, so it cannot know what the"
+                    + " extension's product will be called or embed it in the"
+                    + " app. Use a literal name, or $(TARGET_NAME).");
+        }
         sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
                 + "service_target = xcproj.new_target(:app_extension, '" + name
                 + "', :ios, '"
@@ -11092,8 +11137,9 @@ public class IPhoneBuilder extends Executor {
                 "service_target", distDir);
         sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
                 + "main_app_target.add_dependency(service_target)\n"
+                // The PRODUCT name, not the target name; see above.
                 + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
-                + name + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + productName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
                 + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
                 + "p.name=='Embed App Extensions'} || "
                 + "main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
