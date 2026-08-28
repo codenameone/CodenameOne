@@ -3038,6 +3038,52 @@ public class Toolbar extends Container {
         return cmds;
     }
 
+    /// {@inheritDoc}
+    ///
+    /// A theme change (dark/light switch, a CSS live update) reaches the
+    /// component tree through `Form#refreshTheme(boolean)`, which walks the
+    /// form. The on-top side menu is not on that walk: it lives in an
+    /// `InteractionDialog` that `InteractionDialog#dispose()` detaches from
+    /// the form, so while the menu is closed -- which is whenever the user is
+    /// looking at the form and flipping the theme -- nothing re-resolves its
+    /// styles and it re-opens painted in the previous theme until the app is
+    /// restarted (issue #5612). Refresh the detached menu explicitly. A menu
+    /// that happens to be open sits in the form's layered pane and is already
+    /// covered by the form's own traversal, so it is skipped here rather than
+    /// merged twice.
+    @Override
+    public void refreshTheme(boolean merge) {
+        super.refreshTheme(merge);
+        if (sidemenuDialog != null) {
+            refreshDetachedSideMenu(sidemenuDialog, merge);
+        } else {
+            refreshDetachedSideMenu(permanentSideMenuContainer, merge);
+        }
+        if (rightSidemenuDialog != null) {
+            refreshDetachedSideMenu(rightSidemenuDialog, merge);
+        } else {
+            refreshDetachedSideMenu(permanentRightSideMenuContainer, merge);
+        }
+    }
+
+    /// Re-resolves the styles of a side menu container that is currently outside
+    /// of any form. Attached containers are left alone: they are reached by the
+    /// form's own refresh pass and refreshing them again would merge the new
+    /// theme on top of itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the side menu container, may be null when the menu was never built
+    ///
+    /// - `merge`: passed through to `Component#refreshTheme(boolean)`
+    private void refreshDetachedSideMenu(Container cnt, boolean merge) {
+        if (cnt == null || cnt.getComponentForm() != null) {
+            return;
+        }
+        cnt.refreshTheme(merge);
+        cnt.revalidate();
+    }
+
     /// Returns the commands within the right side menu which can be useful for
     /// things like unit testing. Notice that you should not mutate the commands
     /// or the iteratable set in any way!

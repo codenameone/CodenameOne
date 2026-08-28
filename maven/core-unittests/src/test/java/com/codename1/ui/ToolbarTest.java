@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -6,6 +29,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -15,19 +39,28 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ToolbarTest extends UITestBase {
+    private static final int LIGHT_COLOR = 0xff0000;
+    private static final int DARK_COLOR = 0x00ff00;
+
     private boolean originalOnTop;
+    private boolean originalPermanent;
+    private Boolean originalDarkMode;
     private boolean originalCentered;
     private int originalCommandBehavior;
 
     @BeforeEach
     void captureStatics() {
         originalOnTop = Toolbar.isOnTopSideMenu();
+        originalPermanent = Toolbar.isPermanentSideMenu();
+        originalDarkMode = Display.getInstance().isDarkMode();
         originalCentered = Toolbar.isCenteredDefault();
         originalCommandBehavior = Display.getInstance().getCommandBehavior();
     }
 
     @AfterEach
     void restoreStatics() {
+        Display.getInstance().setDarkMode(originalDarkMode);
+        Toolbar.setPermanentSideMenu(originalPermanent);
         Toolbar.setOnTopSideMenu(originalOnTop);
         Toolbar.setCenteredDefault(originalCentered);
         Display.getInstance().setCommandBehavior(originalCommandBehavior);
@@ -427,5 +460,166 @@ class ToolbarTest extends UITestBase {
         assertNotNull(pane.getParent(),
                 "Layered pane should stay attached while the dispose animation runs "
                         + "(deferred detach regression — see Toolbar.detachToolbarLayeredPane)");
+    }
+
+    private static String hex(int color) {
+        return Integer.toHexString(0x1000000 | color).substring(1);
+    }
+
+    /// Installs the light/dark pair the CSS compiler emits for a
+    /// `@media (prefers-color-scheme: dark)` block: the plain UIID plus a
+    /// `$Dark`-prefixed override that only resolves once dark mode is on.
+    private void installLightAndDarkSideMenuTheme() {
+        java.util.Hashtable props = new java.util.Hashtable();
+        for (String uiid : new String[]{"SideCommand", "RightSideCommand",
+                "SideNavigationPanel", "RightSideNavigationPanel"}) {
+            props.put(uiid + ".fgColor", hex(LIGHT_COLOR));
+            props.put(uiid + ".bgColor", hex(LIGHT_COLOR));
+            props.put("$Dark" + uiid + ".fgColor", hex(DARK_COLOR));
+            props.put("$Dark" + uiid + ".bgColor", hex(DARK_COLOR));
+        }
+        UIManager.getInstance().addThemeProps(props);
+    }
+
+    /// The exact sequence the simulator's Simulate -> Dark Mode item runs
+    /// (`JavaSEPort.applyThemeOnlyRefresh`) and the sequence a CSS live update
+    /// ends with.
+    private void switchToDarkMode(Form form) {
+        Display.getInstance().setDarkMode(Boolean.TRUE);
+        UIManager.getInstance().refreshTheme();
+        form.refreshTheme(true);
+        form.revalidate();
+        flushSerialCalls();
+    }
+
+    /// Issue #5612 - the on-top side menu lives in a detached InteractionDialog
+    /// while it is closed, so a theme switch performed from the form left it
+    /// painted in the old theme.
+    @FormTest
+    void closedOnTopSideMenuFollowsThemeChange() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+        assertEquals(LIGHT_COLOR, b.getUnselectedStyle().getFgColor(), "Light theme should apply");
+
+        switchToDarkMode(form);
+
+        assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
+                "A closed on-top side menu must pick up the new theme");
+        assertEquals(DARK_COLOR, b.getParent().getUnselectedStyle().getBgColor(),
+                "The side navigation panel must pick up the new theme");
+    }
+
+    /// The right side menu is a second detached dialog with the same problem.
+    @FormTest
+    void closedOnTopRightSideMenuFollowsThemeChange() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = new Command("Item");
+        toolbar.addCommandToRightSideMenu(cmd);
+        form.revalidate();
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The right side menu command should have a button");
+        assertEquals(LIGHT_COLOR, b.getUnselectedStyle().getFgColor(), "Light theme should apply");
+
+        switchToDarkMode(form);
+
+        assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
+                "A closed on-top right side menu must pick up the new theme");
+    }
+
+    /// An open side menu is inside the form's layered pane, so the form's own
+    /// refresh pass covers it. Guards against the fix refreshing it a second
+    /// time or skipping it entirely.
+    @FormTest
+    void openOnTopSideMenuFollowsThemeChange() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        assertTrue(toolbar.isSideMenuShowing(), "The side menu should be open");
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+
+        switchToDarkMode(form);
+
+        assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
+                "An open on-top side menu must pick up the new theme");
+
+        toolbar.closeSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+    }
+
+    /// The permanent side menu is part of the form, so it was never broken. The
+    /// fix must not double refresh it.
+    @FormTest
+    void permanentSideMenuFollowsThemeChange() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setPermanentSideMenu(true);
+        installLightAndDarkSideMenuTheme();
+
+        Form form = new Form("t", new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        Command cmd = toolbar.addCommandToSideMenu("Item", null, evt -> {
+        });
+        form.revalidate();
+        flushSerialCalls();
+
+        Button b = toolbar.findCommandComponent(cmd);
+        assertNotNull(b, "The side menu command should have a button");
+        assertEquals(LIGHT_COLOR, b.getUnselectedStyle().getFgColor(), "Light theme should apply");
+
+        switchToDarkMode(form);
+
+        assertEquals(DARK_COLOR, b.getUnselectedStyle().getFgColor(),
+                "A permanent side menu must pick up the new theme");
     }
 }
