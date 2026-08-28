@@ -185,6 +185,14 @@ final class MacCameraCapture {
                     recording[0].stopAndAwait().ready(new SuccessCallback<String>() {
                         @Override
                         public void onSucess(String path) {
+                            if (finished[0]) {
+                                // Cancelled while this stop was still pending.
+                                // finish() would ignore the result, and the file
+                                // it names has just been finalized, so it is the
+                                // one nothing will ever claim.
+                                deleteQuietly(path);
+                                return;
+                            }
                             finish(finished, session, previous, response, path);
                         }
                     }).except(new SuccessCallback<Throwable>() {
@@ -231,27 +239,45 @@ final class MacCameraCapture {
         capture.show();
     }
 
-    /// Stops a recording the user is abandoning and removes what it wrote.
+    /// Stops a recording the user is abandoning and removes what it wrote, once
+    /// there is something finished to remove.
     ///
-    /// Closing the session stops the capture, but the recorder has already been
-    /// writing to the destination and nothing else will ever finish or claim
-    /// that file: the callback reports a cancellation, so no application is told
-    /// a path to clean up. Stopped first so the file is closed before it is
-    /// deleted -- removing one still being written is how a half-flushed file
-    /// survives on some filesystems.
+    /// Deliberately asynchronous. stop() is documented as fire and forget and
+    /// AVFoundation finishes the file later, from
+    /// didFinishRecordingToOutputFileAtURL: -- so deleting straight after
+    /// stopping raced the writer, and the delegate could recreate or finish
+    /// writing the file that had just been removed. stopAndAwait resolves when
+    /// the file is closed, which is the first moment deleting it means anything.
+    ///
+    /// The cancellation itself is NOT made to wait for this: the user pressed
+    /// Cancel and the form closes now. Only the cleanup is deferred, which is
+    /// why it takes the path the recorder finally reports rather than the one it
+    /// was asked for -- they are usually the same file, and when they are not,
+    /// the reported one is the file that exists.
     private static void discard(VideoRecording recording) {
         if (recording == null) {
             return;
         }
-        String path = recording.getRequestedPath();
+        final String requested = recording.getRequestedPath();
         try {
-            if (recording.isRecording()) {
-                recording.stop();
-            }
+            recording.stopAndAwait().ready(new SuccessCallback<String>() {
+                @Override
+                public void onSucess(String path) {
+                    deleteQuietly(path != null && path.length() > 0 ? path : requested);
+                }
+            }).except(new SuccessCallback<Throwable>() {
+                @Override
+                public void onSucess(Throwable err) {
+                    // The stop failed, so nothing will report a final path. The
+                    // requested one is the best guess at what was left behind.
+                    Log.e(err);
+                    deleteQuietly(requested);
+                }
+            });
         } catch (Throwable t) {
             Log.e(t);
+            deleteQuietly(requested);
         }
-        deleteQuietly(path);
     }
 
     /// Removes a file nobody will ever be told about, ignoring the failure to.
