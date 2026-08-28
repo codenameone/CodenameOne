@@ -4904,15 +4904,6 @@ public final class Display extends CN1Constants {
         return impl.getProperty(key, defaultValue);
     }
 
-    /// Sets a local property to the application, this method has no effect on the
-    /// implementation code and only allows the user to override the logic of getProperty
-    /// for internal application purposes.
-    ///
-    /// #### Parameters
-    ///
-    /// - `key`: key the key of the property
-    ///
-    /// - `value`: the value of the property
     /// The PORT's answer for a property, ignoring anything the application set
     /// with `#setProperty(String, String)`.
     ///
@@ -4930,10 +4921,25 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// the implementation's value, or `defaultValue` when it has none
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the property
+    ///
+    /// - `defaultValue`: the value to answer when the implementation has none
     public String getImplementationProperty(String key, String defaultValue) {
         return impl.getProperty(key, defaultValue);
     }
 
+    /// Sets a local property to the application, this method has no effect on the
+    /// implementation code and only allows the user to override the logic of getProperty
+    /// for internal application purposes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: key the key of the property
+    ///
+    /// - `value`: the value of the property
     public void setProperty(String key, String value) {
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);

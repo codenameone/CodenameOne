@@ -8,6 +8,32 @@ import { fileURLToPath } from "node:url";
 const workerDir = fileURLToPath(new URL("..", import.meta.url));
 const localUrl = "http://127.0.0.1:8797";
 
+// A brand-new workers.dev hostname is not live in every Cloudflare colo the
+// instant `wrangler deploy` returns; the route reaches them independently. So a
+// run can get a correct answer from one request and a 404 from the very next --
+// Cloudflare's "no Worker on this hostname", not the Worker's own not_found
+// body. That is exactly how this test failed 0.6s after a preview deploy: the
+// same POST path answered 403 and then 404.
+//
+// Retrying absorbs it without hiding a routing bug, because the retry is
+// narrow in three ways. Only 404 is retried, and no assertion in this file
+// expects one. Only the remote run arms the window -- a local `wrangler dev`
+// has no colos and keeps zero tolerance. And the window is an absolute deadline
+// from the start of the run rather than a per-request budget, so a path the
+// Worker genuinely does not serve stays 404 until it expires and still fails.
+const COLD_ROUTE_TOLERANCE_MS = 60_000;
+let coldRouteDeadline = 0;
+
+async function request(url, init) {
+  for (;;) {
+    const response = await fetch(url, init);
+    if (response.status !== 404 || Date.now() >= coldRouteDeadline) {
+      return response;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
 async function waitFor(url, process) {
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -15,7 +41,7 @@ async function waitFor(url, process) {
       throw new Error(`wrangler exited before becoming ready (${process.exitCode})`);
     }
     try {
-      const response = await fetch(`${url}/api/exp004/snapshot`);
+      const response = await request(`${url}/api/exp004/snapshot`);
       if (response.ok && (response.headers.get("content-type") || "")
         .includes("application/json")) {
         const payload = await response.json();
@@ -30,7 +56,7 @@ async function waitFor(url, process) {
 }
 
 async function post(baseUrl, body, origin = "https://www.codenameone.com") {
-  return fetch(`${baseUrl}/api/exp004/collect`, {
+  return request(`${baseUrl}/api/exp004/collect`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -42,7 +68,7 @@ async function post(baseUrl, body, origin = "https://www.codenameone.com") {
 }
 
 async function enroll(baseUrl, sessionKey, arm) {
-  const response = await fetch(`${baseUrl}/api/exp004/session`, {
+  const response = await request(`${baseUrl}/api/exp004/session`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -98,7 +124,7 @@ async function stopProcess(child) {
 
 async function verify(baseUrl) {
   const testStartedAt = Date.now();
-  const initial = await fetch(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
+  const initial = await request(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
   assert.equal(initial.experiment_id, "EXP-004");
   assert.equal(initial.original_experiment_start, "2026-08-27T04:35:14.000Z");
   assert.equal(initial.coverage_complete_from_original_start, false);
@@ -198,7 +224,7 @@ async function verify(baseUrl) {
   });
   assert.equal(ownershipDownload.status, 202);
 
-  const snapshot = await fetch(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
+  const snapshot = await request(`${baseUrl}/api/exp004/snapshot`).then((r) => r.json());
   assert.deepEqual(snapshot.counts, {
     ownership: { exposures: 1, downloads: 1 },
     reach: { exposures: 1, downloads: 1 },
@@ -222,6 +248,7 @@ async function verify(baseUrl) {
 const remoteUrl = process.argv[2];
 if (remoteUrl) {
   const normalizedRemoteUrl = remoteUrl.replace(/\/$/, "");
+  coldRouteDeadline = Date.now() + COLD_ROUTE_TOLERANCE_MS;
   await waitFor(normalizedRemoteUrl);
   await verify(normalizedRemoteUrl);
   console.log("EXP-004 live telemetry integration passed");
