@@ -289,6 +289,61 @@ class LibraryClassPrefixScanReferencesTest {
     }
 
     @Test
+    void aTypeUseAnnotationClassLiteralCounts() throws Exception {
+        // A type-use annotation's class literal lives only in
+        // RuntimeVisibleTypeAnnotations, whose target_info varies by target
+        // kind -- which is why the parser skipped these at first, and why a
+        // library that put the reference there stayed invisible while the
+        // class parsed successfully, so the raw-text fallback never ran.
+        //
+        // This fixture targets a FIELD (target_type 0x13, empty_target),
+        // with an empty type_path.
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(0xCAFEBABE);
+        d.writeShort(0);
+        d.writeShort(52);
+        d.writeShort(5);
+        d.writeByte(1);
+        d.writeUTF("RuntimeVisibleTypeAnnotations");
+        d.writeByte(1);
+        d.writeUTF("Lcom/example/Handler;");
+        d.writeByte(1);
+        d.writeUTF("value");
+        d.writeByte(1);
+        d.writeUTF("L" + USED + ";");
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);
+        d.writeShort(0);          // interfaces
+        d.writeShort(0);          // fields
+        d.writeShort(0);          // methods
+        d.writeShort(1);          // one class attribute
+        d.writeShort(1);
+        d.writeInt(2 + 1 + 1 + 2 + 2 + 2 + 1 + 2);
+        d.writeShort(1);          // one type annotation
+        d.writeByte(0x13);        //   target_type: a field
+        d.writeByte(0);           //   type_path length
+        d.writeShort(2);          //   annotation type #2
+        d.writeShort(1);          //   one pair
+        d.writeShort(3);          //     name #3
+        d.writeByte('c');         //     a class literal
+        d.writeShort(4);          //     #4
+        d.writeShort(0);
+        d.flush();
+        Set<String> refs =
+                LibraryClassPrefixScan.classReferences(out.toByteArray());
+        boolean sawIt = false;
+        for (String r : refs) {
+            if (r.indexOf(USED) >= 0) {
+                sawIt = true;
+            }
+        }
+        assertTrue(sawIt, "a type-use annotation literal is a reference: "
+                + refs);
+    }
+
+    @Test
     void somethingThatIsNotAClassFileIsNotParsed() {
         // Null, not empty: the caller falls back to the raw scan rather than
         // reading "no references" as "does not use anything", which would

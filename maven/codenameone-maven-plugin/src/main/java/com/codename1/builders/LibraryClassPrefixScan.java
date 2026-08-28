@@ -439,7 +439,8 @@ final class LibraryClassPrefixScan {
                 in.readFully(body);
                 collectAnnotationTypes(body, utf8, count, out,
                         utf8[name].endsWith("ParameterAnnotations"),
-                        "AnnotationDefault".equals(utf8[name]));
+                        "AnnotationDefault".equals(utf8[name]),
+                        utf8[name].endsWith("TypeAnnotations"));
                 continue;
             }
             while (length > 0) {
@@ -459,14 +460,19 @@ final class LibraryClassPrefixScan {
     /// Whether an attribute name is one whose body is annotation data this
     /// can read.
     ///
-    /// Deliberately NOT the type-annotation attributes: their target_info
-    /// varies by target kind, and misreading it would desynchronise the
-    /// walk. They are skipped whole, as anything else unknown is.
+    /// The TYPE-annotation attributes are here too. Their target_info
+    /// varies by target kind, which is why they were skipped at first --
+    /// but the sizes are a fixed table, javac puts a type-use annotation's
+    /// class literal nowhere else, and the body is read into memory, so a
+    /// target kind this does not know costs that attribute and cannot
+    /// desynchronise the walk.
     private static boolean isAnnotationAttribute(String name) {
         return "RuntimeVisibleAnnotations".equals(name)
                 || "RuntimeInvisibleAnnotations".equals(name)
                 || "RuntimeVisibleParameterAnnotations".equals(name)
                 || "RuntimeInvisibleParameterAnnotations".equals(name)
+                || "RuntimeVisibleTypeAnnotations".equals(name)
+                || "RuntimeInvisibleTypeAnnotations".equals(name)
                 || "AnnotationDefault".equals(name);
     }
 
@@ -478,7 +484,7 @@ final class LibraryClassPrefixScan {
     /// rest of the class.
     private static void collectAnnotationTypes(byte[] body, String[] utf8,
             int count, Set<String> out, boolean parameters,
-            boolean defaultValue) {
+            boolean defaultValue, boolean typeUse) {
         try {
             int[] at = new int[]{0};
             if (defaultValue) {
@@ -492,6 +498,9 @@ final class LibraryClassPrefixScan {
             for (int g = 0; g < groups; g++) {
                 int annotations = u2(body, at);
                 for (int a = 0; a < annotations; a++) {
+                    if (typeUse) {
+                        skipTypeAnnotationTarget(body, at);
+                    }
                     readAnnotation(body, at, utf8, count, out);
                 }
             }
@@ -499,6 +508,37 @@ final class LibraryClassPrefixScan {
             // Not this class's problem to report; the rest of the walk is
             // unaffected because the body was consumed by length.
         }
+    }
+
+    /// Steps over a type_annotation's target_info and target_path, leaving
+    /// the cursor on the annotation that follows them.
+    ///
+    /// The sizes are a fixed table keyed by target_type, so this is a
+    /// lookup rather than an interpretation -- nothing here needs to know
+    /// what the target MEANS, only how wide it is. A kind this does not know
+    /// throws, which costs this attribute and nothing else.
+    private static void skipTypeAnnotationTarget(byte[] body, int[] at) {
+        int target = body[at[0]++] & 0xff;
+        if (target == 0x00 || target == 0x01 || target == 0x16) {
+            at[0] += 1;
+        } else if (target == 0x10 || target == 0x17 || target == 0x42
+                || (target >= 0x43 && target <= 0x46)) {
+            at[0] += 2;
+        } else if (target == 0x11 || target == 0x12) {
+            at[0] += 2;
+        } else if (target >= 0x13 && target <= 0x15) {
+            at[0] += 0;
+        } else if (target == 0x40 || target == 0x41) {
+            int entries = u2(body, at);
+            at[0] += entries * 6;
+        } else if (target >= 0x47 && target <= 0x4B) {
+            at[0] += 3;
+        } else {
+            throw new IllegalStateException("unknown target_type");
+        }
+        // type_path: one length byte, then two bytes per step.
+        int steps = body[at[0]++] & 0xff;
+        at[0] += steps * 2;
     }
 
     /// One `annotation` structure: its type, then its element pairs.

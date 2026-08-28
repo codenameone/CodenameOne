@@ -154,6 +154,24 @@ public final class TunnelWire {
         prefix(cidr, what);
     }
 
+    /// Refuses a bare address that is not one.
+    ///
+    /// A DNS server is an address with no prefix, so it cannot go through
+    /// validate(): "8.8.8.8/32" is not what the platform wants there. Same
+    /// reasoning otherwise -- Android hands the value to
+    /// VpnService.Builder.addDnsServer, which throws on a literal it cannot
+    /// parse, so a setup the simulator accepted failed on a device.
+    ///
+    /// @param address the literal
+    /// @param what    the setup field it came from
+    /// @throws IllegalArgumentException when it is not an address
+    public static void validateAddress(String address, String what) {
+        if (!isAddressLiteral(address)) {
+            throw new IllegalArgumentException("The " + what + " '" + address
+                    + "' is not an IP address");
+        }
+    }
+
     /// Whether this is an IP address literal.
     ///
     /// IPv4 is checked exactly: four dot-separated decimal octets in range.

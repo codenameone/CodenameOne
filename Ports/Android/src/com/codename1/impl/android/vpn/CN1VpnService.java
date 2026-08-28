@@ -431,6 +431,10 @@ public class CN1VpnService extends VpnService {
         }
         String[] dns = TunnelWire.dnsServers(fields);
         for (int i = 0; i < dns.length; i++) {
+            // Validated through the same call the simulation makes, so the
+            // message names the field rather than being whatever Builder
+            // threw.
+            TunnelWire.validateAddress(dns[i], "DNS server");
             b.addDnsServer(dns[i]);
         }
         String[] domains = TunnelWire.searchDomains(fields);

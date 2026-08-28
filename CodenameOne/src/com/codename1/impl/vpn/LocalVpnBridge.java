@@ -129,6 +129,16 @@ public class LocalVpnBridge implements VpnBridge {
             for (String block : TunnelWire.routes(fields)) {
                 TunnelWire.validate(block, "route");
             }
+            // EVERY field the platform is handed, not the two I happened to
+            // start with. Android passes each of these to
+            // VpnService.Builder.addDnsServer, which throws on a literal it
+            // cannot parse, so dnsServer("not-an-ip") started here and
+            // failed there. Search domains are names rather than addresses
+            // and the platform takes them as written, so there is nothing to
+            // check.
+            for (String dns : TunnelWire.dnsServers(fields)) {
+                TunnelWire.validateAddress(dns, "DNS server");
+            }
         } catch (IllegalArgumentException malformed) {
             Tunnels.deliverAck(requestId, false,
                     VpnError.INVALID_CONFIGURATION.ordinal(),

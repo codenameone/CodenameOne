@@ -209,6 +209,25 @@ public class VpnWireTest {
     }
 
     @Test
+    public void aDnsServerThatIsNotAnAddressIsRefused() {
+        // A DNS server is a BARE address, so it cannot go through
+        // validate() -- and validating the interface address and the routes
+        // and stopping there is how dnsServer("not-an-ip") started in the
+        // simulator and failed on a device, where Builder.addDnsServer
+        // throws on a literal it cannot parse.
+        for (String bad : new String[] {"not-an-ip", "10.0.0", "10.0.0.256",
+                "", "dns.example.com"}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> TunnelWire.validateAddress(bad, "DNS server"),
+                    bad + " is not an address");
+        }
+        for (String good : new String[] {"10.0.0.1", "8.8.8.8", "fd00::1",
+                "::1"}) {
+            TunnelWire.validateAddress(good, "DNS server");
+        }
+    }
+
+    @Test
     public void anUnreadablePrefixIsRefusedRatherThanShrunk() {
         // The most dangerous answer available was the one this used to give.
         // "0.0.0.0/o" is a typo for the default route, and falling back to

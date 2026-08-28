@@ -263,6 +263,31 @@ class VpnManifestFragmentsTest {
     }
 
     @Test
+    public void aSpacedClosingTagEndsTheElement() {
+        // "</service >" is valid XML, and an exact search for "</service>"
+        // ran past this element into a LATER <service> -- whose own action
+        // then satisfied the filter test, so the generated declaration was
+        // suppressed for a component that is still undiscoverable.
+        String spacedClose = ("        <service android:name=\"SVC\""
+                + " android:permission=\"PERM\""
+                + " android:exported=\"true\""
+                + " android:foregroundServiceType=\"systemExempted\">\n"
+                + "        </service >\n"
+                + "        <service android:name=\"other.Service\">\n"
+                + "            <intent-filter>\n"
+                + "                <action android:name=\"ACT\" />\n"
+                + "            </intent-filter>\n"
+                + "        </service>\n")
+                .replace("SVC", VpnManifestFragments.TUNNEL_SERVICE)
+                .replace("PERM", VpnManifestFragments.BIND_VPN_SERVICE)
+                .replace("ACT", VpnManifestFragments.VPN_ACTION);
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> VpnManifestFragments.services(true, spacedClose))
+                        .getMessage().contains("intent-filter"),
+                "another service's action does not belong to ours");
+    }
+
+    @Test
     public void aCommentedOutDeclarationIsNotADeclaration() {
         // The lesson the call fragments learned twice: commenting a
         // declaration out is how a developer disables one, and treating it

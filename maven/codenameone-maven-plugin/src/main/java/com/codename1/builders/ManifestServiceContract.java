@@ -226,7 +226,12 @@ final class ManifestServiceContract {
         // A self-closing element has no body, so it carries no filter.
         String body = "";
         if (live.charAt(close - 1) != '/') {
-            int end = live.indexOf("</service>", close);
+            // The closing tag by NAME. "</service >" is valid XML, and an
+            // exact search ran past this element into a LATER <service>
+            // whose own action then satisfied the filter test -- so the
+            // generated declaration was suppressed for a component that is
+            // still undiscoverable.
+            int end = live.indexOf("</service", close);
             body = end < 0 ? live.substring(close) : live.substring(close, end);
         }
         if (!filtersOn(body, action)) {
@@ -346,7 +351,7 @@ final class ManifestServiceContract {
     private static boolean filtersOn(String body, String action) {
         int at = elementStart(body, "<intent-filter", 0);
         while (at >= 0) {
-            int end = body.indexOf("</intent-filter>", at);
+            int end = body.indexOf("</intent-filter", at);
             String filter = end < 0 ? body.substring(at)
                     : body.substring(at, end);
             int actionAt = elementStart(filter, "<action", 0);
