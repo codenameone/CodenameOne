@@ -3166,59 +3166,71 @@ JAVA_INT java_lang_System_gcIdleWaitMillis___R_int(CODENAME_ONE_THREAD_STATE) {
     }
     if(forced) {
         set_static_java_lang_System_forceGc(JAVA_FALSE);
-        // Ablation arm: -DCN1_GC_NO_DEMAND_SIGNAL restores BOTH halves of the old
-        // behaviour -- the request discarded here and the request suppressed in
-        // cn1BibopMaybeGc -- so the pair can be A/B'd in one session. They are one defect:
-        // a demand signal that is never raised and, if raised, never answered.
+    }
+
+    // Ablation arm: -DCN1_GC_NO_DEMAND_SIGNAL restores BOTH halves of the old behaviour --
+    // the request discarded here and the request suppressed in cn1BibopMaybeGc -- so the
+    // pair can be A/B'd in one session. They are one defect: a demand signal that is never
+    // raised and, if raised, never answered.
 #if !defined(CN1_GC_NO_DEMAND_SIGNAL) && !defined(CN1_DISABLE_BIBOP)
-        // Answer the request only while it STILL STANDS. Both counters are zeroed at cycle
-        // start, so what they hold here is what the mutator produced DURING the cycle that
-        // just ended: at or above the trigger means it is outrunning the collector and the
-        // next cycle is already owed; below it means the collector is keeping up and the
-        // ordinary idle is the right answer. Answering every request the instant it can --
-        // including from an application that was never blocked -- measured 8-9% on the two
-        // allocation-heavy microbenchmarks, which is a real cost paid for nothing. In the
-        // case this whole change is about the test is never close: the mutator has run all
-        // the way to the run-ahead cap, which is a multiple of the trigger.
+    {
+        // A collection is owed when the BYTES say so, and that test does NOT depend on
+        // anyone having remembered to ask. Both counters are zeroed at cycle start, so what
+        // they hold here is what the mutator produced DURING the cycle that just ended: at
+        // or above the trigger means it is outrunning the collector and the next cycle is
+        // already owed.
+        //
+        // Gating this on `forced` as well was wrong, and review found the window: the
+        // request latch (cn1BibopGcScheduled) is cleared just AFTER bibopBytesSinceGc is
+        // zeroed in cn1BibopBeginGcCycle, so a collector descheduled between those two
+        // exchanges lets mutators cross the fresh trigger while the stale latch still
+        // suppresses every CAS. Level-triggering normally retries that on the next page
+        // acquire -- but if the mutators have by then parked on the run-ahead cap there is
+        // no next allocation to do the retrying, and the collector would idle with everyone
+        // blocked on it, which is the exact stall this whole change removes.
+        //
+        // A handshake between the counter and the latch would close that window. Not
+        // depending on the request at all closes it and every other lost-request window
+        // with it, for one comparison the collector was making anyway. The trigger test is
+        // also what keeps this cheap: answering every request the instant it can, without
+        // this gate, measured 8-9% on the two allocation-heavy microbenchmarks.
         //
         // Read the two atomics directly rather than through cn1PacingUncollectedBytes(),
         // which is compiled out under -DCN1_PACING_NO_RESERVE -- an arm this decision has
         // nothing to do with, and one the gate builds.
-        {
-            long long uncollected =
-                    (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed)
-                  + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
-            long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
-                                                                memory_order_relaxed);
-            // TRIED AND REJECTED: also returning 0 whenever any mutator was parked, on the
-            // theory that a parked mutator is demand the byte counters cannot express. It
-            // is, but it is not demand the COLLECTOR can always answer -- a thread parked
-            // because the process budget is exhausted is waiting for memory that collecting
-            // will not produce, and treating it as demand made the collector run cycles
-            // back to back at 100% instead of idling, starving the very threads it was
-            // trying to serve: the -DCN1_PACING_NO_RESERVE arm under a simulated ceiling
-            // stopped finishing its fixed round count at all. The counter that fed it is
-            // gone with it -- [GCSTALL]'s duty figure is built from the per-thread stall
-            // clocks, not from a parked-thread count.
-            if(uncollected >= trigger) {
+        //
+        // TRIED AND REJECTED: also returning 0 whenever any mutator was parked, on the
+        // theory that a parked mutator is demand the byte counters cannot express. It is,
+        // but it is not demand the COLLECTOR can always answer -- a thread parked because
+        // the process budget is exhausted is waiting for memory collecting will not
+        // produce, and treating it as demand ran the collector back to back at 100% and
+        // starved the threads it was serving: the -DCN1_PACING_NO_RESERVE arm under a
+        // simulated ceiling stopped finishing its fixed round count at all.
+        long long uncollected =
+                (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed)
+              + (long long)atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
+        long long trigger = (long long)atomic_load_explicit(&bibopGcTriggerBytes,
+                                                            memory_order_relaxed);
+        if(uncollected >= trigger) {
 #ifdef CN1_GC_CONFORM
-                atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&cn1GcCyclesOnDemand, 1, memory_order_relaxed);
 #endif
-                return 0;
-            }
+            return 0;
         }
+    }
 #endif
-        // A request was made, and consuming it must never drop this thread to the LONG
-        // idle. The code replaced here read
+
+    if(forced) {
+        // A request was made and consuming it must never drop this thread to the LONG idle.
+        // The code replaced here read
         //
         //     if(forceGc || isHighFrequencyGC()) { forceGc = false; LOCK.wait(200); }
         //
-        // so forceGc GUARANTEED a 200ms wait; returning 30000 for a consumed request loses
-        // that guarantee, and it loses it in the worst case: a mutator parked on the
-        // process budget allocates nothing, so isHighFrequencyGC() reads quiet at exactly
-        // the moment someone is waiting. It then set forceGc from inside its park -- a
-        // plain store with no notify, because a parked thread must not enter a Java monitor
-        // -- and the collector slept through it. ProcessBudgetPacingIntegrationTest under a
+        // so forceGc GUARANTEED a 200ms wait; returning 30000 for a request just consumed
+        // loses that guarantee in the one case that matters. A mutator parked on the process
+        // budget allocates nothing, so isHighFrequencyGC() reads quiet at exactly the moment
+        // someone is waiting on it, and its in-park re-request cannot notify -- a parked
+        // thread must not enter a Java monitor. ProcessBudgetPacingIntegrationTest under a
         // 120MB ceiling stalled out its whole 300s budget on this.
         return 200;
     }

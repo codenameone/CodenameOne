@@ -5381,6 +5381,12 @@ bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Objec
 bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });
 bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function() { return null; });
 bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function() { return 0; });
+// The GC thread's idle decision. gcMarkSweep above is a no-op here and isHighFrequencyGC
+// answers 0, so the collector loop has nothing to do; 30000 is the wait the Java code chose
+// for exactly that case before the decision moved into a native, which keeps this port's
+// GC thread as idle as it has always been rather than spinning it every 200ms over a
+// collector that does nothing.
+bindNative(["cn1_java_lang_System_gcIdleWaitMillis_R_int", "cn1_java_lang_System_gcIdleWaitMillis___R_int"], function() { return 30000; });
 // Tagged-immediate Integer natives (C-side poor-man's-Valhalla). The JS port
 // has no tagged pointers: cn1Value reads the heap field, valueOf delegates to
 // the pure-Java cache twin (valueOfHeap).
