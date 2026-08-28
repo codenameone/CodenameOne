@@ -999,22 +999,36 @@ static NETunnelProviderManager *cn1vpTunnelManager = nil;
 @interface CN1VpnTunnelWatcher : NSObject
 @property (nonatomic, assign) int requestId;
 @property (nonatomic, assign) BOOL answered;
+/// Whether the connection has left the state it was started in; see
+/// statusChanged.
+@property (nonatomic, assign) BOOL transitioned;
 - (void)statusChanged:(NSNotification *)note;
 @end
 
 static CN1VpnTunnelWatcher *cn1vpTunnelWatcher = nil;
 
-/// Stops watching and releases the watcher.
+/// Stops watching and releases the watcher, ANSWERING it if it never was.
 ///
-/// No lock: every path that touches it -- the start, the stop and the
+/// A watcher carries the only completion path its start has. Releasing one
+/// that has not answered -- because a stop arrived while it was connecting,
+/// or a second start replaced it -- left the application's AsyncResource
+/// unresolved for ever and its tunnel retained with it.
+///
+/// No lock: every path that touches this -- the start, the stop and the
 /// notification -- runs on the main queue.
 static void cn1vpStopWatchingTunnel(void) {
     if (cn1vpTunnelWatcher == nil) {
         return;
     }
-    [[NSNotificationCenter defaultCenter] removeObserver:cn1vpTunnelWatcher];
-    [cn1vpTunnelWatcher release];
+    CN1VpnTunnelWatcher *watcher = cn1vpTunnelWatcher;
     cn1vpTunnelWatcher = nil;
+    [[NSNotificationCenter defaultCenter] removeObserver:watcher];
+    if (!watcher.answered) {
+        watcher.answered = YES;
+        cn1vpTunnelAck(watcher.requestId, NO, CN1_VPN_ERR_UNKNOWN,
+                @"The tunnel start was superseded before it connected");
+    }
+    [watcher release];
 }
 
 @implementation CN1VpnTunnelWatcher
@@ -1030,16 +1044,31 @@ static void cn1vpStopWatchingTunnel(void) {
         cn1vpStopWatchingTunnel();
         return;
     }
-    if (status == NEVPNStatusDisconnected || status == NEVPNStatusInvalid) {
+    if (self.transitioned
+            && (status == NEVPNStatusDisconnected
+                    || status == NEVPNStatusInvalid)) {
         // The extension refused to come up, or came up and stopped before it
         // connected. Either way the app asked for a tunnel and has not got
         // one, and this SPI calls an operation that never answers worse than
         // one that fails.
+        //
+        // Only once the connection has MOVED, though. startVPNTunnel is
+        // asynchronous, so the status is still Disconnected for a moment
+        // after it is accepted -- and the immediate probe below reads it
+        // there. Failing on that reading reported a tunnel as failed while
+        // it was on its way up, and took the observer down with it so the
+        // Connected that followed had nobody to tell.
         self.answered = YES;
         cn1vpTunnelAck(self.requestId, NO, CN1_VPN_ERR_UNKNOWN,
                 @"The packet tunnel extension did not start; check its"
                 @" provisioning profile and entitlement");
         cn1vpStopWatchingTunnel();
+        return;
+    }
+    if (status != NEVPNStatusDisconnected) {
+        // Anything other than the state it started in counts as movement;
+        // from here a return to Disconnected is a real failure.
+        self.transitioned = YES;
     }
     // Connecting and Reasserting are passed over: they are the states this
     // is waiting through.
@@ -1148,10 +1177,11 @@ void com_codename1_impl_ios_IOSNative_vpnStartTunnel___int_java_lang_String(
                         selector:@selector(statusChanged:)
                         name:NEVPNStatusDidChangeNotification
                         object:session];
-                // Checked once immediately: a connection that is already up,
-                // or that connects between the start and this line, posts no
-                // further notification and would leave the request pending
-                // for ever.
+                // Checked once immediately for the CONNECTED case only: a
+                // connection already up posts no further notification and
+                // would leave the request pending for ever. A Disconnected
+                // reading here means "not started yet", not "failed", which
+                // is what the transitioned flag above is about.
                 [cn1vpTunnelWatcher statusChanged:
                         [NSNotification notificationWithName:
                                 NEVPNStatusDidChangeNotification

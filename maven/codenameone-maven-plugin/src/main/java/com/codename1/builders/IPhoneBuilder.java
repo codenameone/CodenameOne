@@ -5362,6 +5362,21 @@ public class IPhoneBuilder extends Executor {
                 request.putArgument("ios.plistInject",
                         appendCallPlist(request.getArg("ios.plistInject", ""),
                                 "CN1VpnTunnelExtensionIdentifier", tunnelId));
+                // The HOST needs the packet-tunnel entitlement too, not just
+                // the extension. The app process is what calls
+                // NETunnelProviderManager -- loading the configuration,
+                // saving it and starting the session -- and iOS refuses
+                // those to a process without it. A build that had the grant
+                // and generated the extension still could not manage its own
+                // provider.
+                //
+                // Written as an ARRAY, like the Personal VPN key beside it:
+                // this is another single-element array that the generic
+                // namespace would emit as a <string>, which either fails
+                // codesigning or is silently dropped.
+                request.putArgument("ios.entitlements.com.apple.developer"
+                        + ".networking.networkextension",
+                        "packet-tunnel-provider");
             }
 
             // VPN configuration management.
