@@ -126,10 +126,13 @@ emulated: motion sensors, orientation locking, SMS, and background task
 scheduling. `Display` reports each of them as unsupported, so an application
 that checks before using one behaves correctly without a Mac-specific branch.
 
-Accessibility is the one gap worth planning around. The port draws its own
-interface, and exposing a custom-drawn interface to VoiceOver means building an
-accessibility tree rather than setting a flag; that's not yet done, and the iOS
-port has the same gap.
+Accessibility is partly wired. Codename One builds a portable semantics tree for
+its lightweight components -- see <<_accessibility_semantics>> -- and this port
+maps `announceForAccessibility()` onto an AppKit announcement, so live messages
+reach VoiceOver. What it doesn't do yet is publish that tree through
+`NSAccessibility`, so VoiceOver can't navigate the interface element by element.
+The tree itself is shared and already consumed by the other ports, so what's
+missing here is this port's bridge to it rather than the semantics.
 ====
 
 Each additional window your application opens through the `Window` API is a real `NSWindow`, with its own GPU surface rather than a raster copied from somewhere else. See <<_desktop_windows>>.
