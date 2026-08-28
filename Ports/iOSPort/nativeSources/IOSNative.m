@@ -8350,6 +8350,22 @@ void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THR
         }
         NSInteger response = [panel runModal];
         NSURL *picked = response == NSModalResponseOK ? panel.URL : nil;
+        // Called from the AppKit main queue, not the EDT -- the same thread
+        // contract the UIKit twin of this callback has always had:
+        // -documentPicker:didPickDocumentsAtURLs: in
+        // CodenameOne_GLViewController.m calls this very method straight from a
+        // UIKit main thread delegate, and the EDT is a separate thread on both
+        // platforms. The share callback in CN1MacShare.m does the same.
+        //
+        // Worth knowing rather than assuming: an application listener that
+        // dispatch_syncs to the main queue from here deadlocks on itself. That
+        // is a real hazard and it is a FRAMEWORK-wide one -- the fix is inside
+        // IOSImplementation.fileChooserResult/capturePictureResult, which would
+        // have to marshal the listener while keeping the dropEvents flag
+        // immediate, and it changes iOS behaviour too. Marshalling only these
+        // two macOS call sites would leave the iOS twin and the mac share
+        // callback exactly as they are and put this port out of step with both,
+        // which is how most of the defects on this branch were made.
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(
             threadStateData,
@@ -8586,6 +8602,7 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
                 result = [paths componentsJoinedByString:@"\n"];
             }
         }
+        // Same thread contract as the file chooser above; see the note there.
         struct ThreadLocalData* threadStateData = getThreadLocalData();
         com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(
             threadStateData,
