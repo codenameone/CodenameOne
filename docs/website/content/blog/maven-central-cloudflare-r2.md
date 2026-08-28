@@ -11,6 +11,8 @@ series: ["release-2026-07-31"]
 
 ![Codename One Maven artifacts move through a staged Central and Cloudflare R2 migration](/blog/maven-central-cloudflare-r2.jpg)
 
+> **Editor's note, August 28, 2026.** The migration described below is complete. The dual-publish window ran as planned and new releases now go to the Codename One repository only. Maven Central keeps every version published before today and nothing has been removed from it, so existing projects pinned to one of those versions are unaffected. A project needs the repository block shown below to see releases published from today onward; generated projects have had it since the Initializr change. The rest of this post is left as written.
+
 Codename One is starting a staged move from Maven Central to a repository we operate on Cloudflare R2.
 
 This is not a story about Maven Central being bad. Sonatype runs expensive public infrastructure and has every right to define usage limits or sell a commercial service. Our release shape is simply a bad fit for those limits, and passing that infrastructure bill to Codename One users would make less sense than serving the same signed Maven layout ourselves.

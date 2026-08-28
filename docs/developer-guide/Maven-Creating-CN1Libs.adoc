@@ -283,7 +283,7 @@ Right-click on the "root" module in the project explorer and select _Run as_ > _
 
 image::img/eclipse-build-cn1lib.png[]
 
-TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin. You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version. Check for the latest version https://search.maven.org/artifact/com.codenameone/codenameone[here].
+TIP: If the build fails for any reason, check to make sure that your project is using the latest version of the Codename One plugin. You can do this by opening the _pom.xml_ file, and changing the `cn1.version` and `cn1.plugin.version` properties to reference the latest version. Check for the latest version, listed as `<release>` in the https://repo.codenameone.com/maven2/com/codenameone/codenameone-core/maven-metadata.xml[repository metadata].
 
 
 ===== Building the Legacy.cnlib file

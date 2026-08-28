@@ -21,3 +21,32 @@
 // tag::maven-getting-started-xml-003[]
 <!-- INJECT DEPENDENCIES -->
 // end::maven-getting-started-xml-003[]
+
+// tag::maven-getting-started-xml-004[]
+<settings>
+    <profiles>
+        <profile>
+            <id>codenameone</id>
+            <repositories>
+                <repository>
+                    <id>codenameone</id>
+                    <url>https://repo.codenameone.com/maven2</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>codenameone-plugins</id>
+                    <url>https://repo.codenameone.com/maven2</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>codenameone</activeProfile>
+    </activeProfiles>
+</settings>
+// end::maven-getting-started-xml-004[]

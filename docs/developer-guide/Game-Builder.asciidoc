@@ -83,7 +83,7 @@ include::../demos/common/src/main/snippets/developer-guide/game-builder.sh[tag=g
 ----
 
 The editor itself is delivered through Maven: the goal resolves the
-`com.codenameone:codenameone-gamebuilder` artifact from Maven Central (the same mechanism
+`com.codenameone:codenameone-gamebuilder` artifact from the Codename One Maven repository (the same mechanism
 that ships the Designer / CSS-compiler jar with the plugin), so there is no separate
 install step. The `cn1:gamebuilder` goal only applies to Java 17 Codename One projects.
 
