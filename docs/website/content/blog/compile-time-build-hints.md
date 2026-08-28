@@ -153,7 +153,7 @@ After updating the project POM and Codename One version, run:
 mvn cn1:migrate-build-hints
 ```
 
-The goal moves supported properties onto the main class and leaves unsupported or open-ended hints in `codenameone_settings.properties`. It then runs the annotation processing path and verifies that every moved setting reached the generated manifest. If verification fails, it restores both files.
+The goal moves every property backed by an annotation when it can reproduce the value faithfully. That includes open-ended strings such as `facebook.appId`, `gcm.sender_id`, and `ios.teamId`. Hints without annotations, including dynamic families, stay in `codenameone_settings.properties`; values that cannot be translated without changing their meaning stay there too. The goal then runs the annotation processing path and verifies that every moved setting reached the generated manifest. If verification fails, it restores both files.
 
 Older projects might not bind `process-annotations` to the module that compiles the main class. The build refuses to ignore the annotations and reports the missing execution. Add this to the Codename One Maven plugin configuration when needed:
 
