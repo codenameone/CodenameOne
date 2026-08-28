@@ -81,11 +81,20 @@ static void CN1MacPerformAction(long long nodeId, NSString *actionId) {
         return CN1MacActionId(self.cn1Actions, @"activate") != nil
                 || CN1MacActionId(self.cn1Actions, @"focus") != nil;
     }
+    // Increment and decrement also carry scrolling, which AccessibilityManager
+    // declares for a List as scrollForward and scrollBackward. NSAccessibility
+    // has no scroll action of its own -- the UIKit projection has
+    // accessibilityScroll: and AppKit's element protocol simply does not -- so a
+    // list that declared them offered VoiceOver nothing at all. Increment is the
+    // nearest action the platform does have, and it is what the rotor presents
+    // for stepping through a collection.
     if (selector == @selector(accessibilityPerformIncrement)) {
-        return CN1MacActionId(self.cn1Actions, @"increment") != nil;
+        return CN1MacActionId(self.cn1Actions, @"increment") != nil
+                || CN1MacActionId(self.cn1Actions, @"scrollForward") != nil;
     }
     if (selector == @selector(accessibilityPerformDecrement)) {
-        return CN1MacActionId(self.cn1Actions, @"decrement") != nil;
+        return CN1MacActionId(self.cn1Actions, @"decrement") != nil
+                || CN1MacActionId(self.cn1Actions, @"scrollBackward") != nil;
     }
     if (selector == @selector(accessibilityPerformCancel)) {
         return CN1MacActionId(self.cn1Actions, @"dismiss") != nil;
@@ -106,7 +115,12 @@ static void CN1MacPerformAction(long long nodeId, NSString *actionId) {
 }
 
 - (BOOL)accessibilityPerformIncrement {
+    // increment first: a node that declares both is a stepper inside a scroller,
+    // and the value is what the user reached for.
     NSString *action = CN1MacActionId(self.cn1Actions, @"increment");
+    if (action == nil) {
+        action = CN1MacActionId(self.cn1Actions, @"scrollForward");
+    }
     if (action == nil) {
         return NO;
     }
@@ -116,6 +130,9 @@ static void CN1MacPerformAction(long long nodeId, NSString *actionId) {
 
 - (BOOL)accessibilityPerformDecrement {
     NSString *action = CN1MacActionId(self.cn1Actions, @"decrement");
+    if (action == nil) {
+        action = CN1MacActionId(self.cn1Actions, @"scrollBackward");
+    }
     if (action == nil) {
         return NO;
     }

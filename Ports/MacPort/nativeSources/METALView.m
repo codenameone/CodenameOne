@@ -1896,10 +1896,16 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
         return NO;
     }
     if (action == @selector(undo:) || action == @selector(redo:)) {
-        // Disabled honestly rather than shown enabled and doing nothing: the
-        // input session keeps no undo stack, and the pure Codename One editor
-        // (EditField/CodeEditor) owns its own undo rather than routing it here.
-        return NO;
+        // Offered to the pure editor, which owns an undo stack and has always
+        // been able to use it: EditorView.onKeyCommand handles KEY_UNDO and
+        // KEY_REDO. This port simply never forwarded them, so Command-Z and the
+        // Edit menu were dead in an EditField or CodeEditor -- disabled with a
+        // comment saying the editor owns its own undo, which was the reason to
+        // FORWARD them rather than a reason to refuse.
+        //
+        // The legacy TextField path still refuses: that session really does keep
+        // no undo stack, and nothing behind it would answer.
+        return session.pureEditor && cn1OwnsSession(self, session);
     }
     if (action == @selector(paste:)) {
         return cn1OwnsSession(self, session)
@@ -1929,6 +1935,31 @@ static BOOL cn1PasteBlocked(NSView *view, CN1MacTextInputSession *session) {
         return YES;
     }
     return [super validateUserInterfaceItem:item];
+}
+
+/// TextInputClient.KEY_UNDO and KEY_REDO, which EditorView already implements.
+///
+/// Action methods rather than a doCommandBySelector: case, because that is how
+/// Command-Z and the Edit menu arrive: through the responder chain, to a first
+/// responder that implements them. The port never did, so both were dead in an
+/// EditField or CodeEditor even though the editor behind them has an undo stack.
+///
+/// Reported as a key COMMAND rather than an editor action: an action ends the
+/// session, and undo is something done inside one.
+- (void)cn1SendEditorKeyCommand:(int)command {
+    extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
+            CODENAME_ONE_THREAD_STATE, JAVA_INT cmd, JAVA_INT modifiers);
+    struct ThreadLocalData *threadStateData = getThreadLocalData();
+    com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(
+            threadStateData, (JAVA_INT)command, (JAVA_INT)0);
+}
+
+- (void)undo:(id)sender {
+    [self cn1SendEditorKeyCommand:16];
+}
+
+- (void)redo:(id)sender {
+    [self cn1SendEditorKeyCommand:17];
 }
 
 - (void)copy:(id)sender {
